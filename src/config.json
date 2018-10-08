@@ -1,0 +1,39 @@
+{
+    "CWE190": {
+        "symbols": ["xmalloc", "malloc", "realloc"]
+    },
+    "CWE243": {
+	    "chroot_pathes": [["chroot", "chdir"], ["chdir", "chroot", "setresuid"], ["chdir", "chroot", "seteuid"],
+			  ["chdir", "chroot", "setreuid"], ["chdir", "chroot", "setuid"]],
+	    "_comment": "valid chroot pathes according to http://www.unixwiz.net/techtips/chroot-practices.html"
+    },
+    "CWE332": {
+	    "init_rand_pairs": [["srand", "rand"]]
+    },
+    "CWE467": {
+	    "symbols": ["strncmp", "malloc",
+		    "alloca", "_alloca", "strncat", "wcsncat",
+		    "strncpy", "wcsncpy", "stpncpy", "wcpncpy",
+		    "memcpy", "wmemcpy", "memmove", "wmemmove", "memcmp", "wmemcmp"],
+	    "_comment": "any function that takes something of type size_t could be a possible candidate."
+    },
+    "CWE476": {
+	    "symbols": ["malloc", "calloc", "realloc", "getenv", "bsearch", "setlocale", "tmpfile", "tmpnam",
+		    "fopen", "freopen", "fgets", "memchr", "strchr", "strpbrk", "strrchr", "strstr", "strtok",
+		    "fgetws", "wcschr", "wcspbrk", "wcsrchr", "wcsstr", "wcstok", "wmemchr"],
+	    "_comment": "any function that possibly returns a NULL value.",
+	    "_comment1": "included functions of the following libs: stdlib.h, locale.h, stdio.h, cstring.h, wchar.h"
+    },
+    "CWE676": {
+	    "_comment": "https://github.com/01org/safestringlib/wiki/SDL-List-of-Banned-Functions",
+	    "symbols": ["alloca", "_alloca",
+                        "scanf", "wscanf", "sscanf", "swscanf", "vscanf", "vsscanf",                                        
+                        "strlen", "wcslen", "strtok", "strtok_r", "wcstok",
+                        "strcat", "strncat", "wcscat", "wcsncat",
+                        "strcpy", "strncpy", "wcscpy", "wcsncpy", "stpcpy", "stpncpy", "wcpcpy", "wcpncpy",
+                        "memcpy", "wmemcpy", "memmove", "wmemmove", "memcmp", "wmemcmp", "me​mset", "wmemset", 
+                        "gets", "sprintf​", "vsprintf", "swprintf", "vswprintf", "snprintf", "vsnprintf", 
+                        "realpath", "getwd", "wctomb", "wcrtomb", "wcstombs", "wcsrtombs", "wcsnrtombs"]
+    }
+    
+}
