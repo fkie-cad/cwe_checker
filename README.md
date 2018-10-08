@@ -71,6 +71,4 @@ A special thanks goes out to the BAP community (especially the official gitter) 
 
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
-    
-    Some plug-ins may have different licenses. If so, a license file is provided in the plug-in's folder.
 ```
