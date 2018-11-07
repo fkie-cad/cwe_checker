@@ -35,12 +35,12 @@ RUN opam repo add bap opam-repository
 RUN opam update
 RUN opam install depext --yes
 RUN OPAMJOBS=1 opam depext --install bap --yes
-RUN sudo pip install bap
+RUN sudo -EH pip install bap
 # install CWE_Checker and dependencies
-RUN OPAMJOBS=1 opam install yojson alcotest
+RUN OPAMJOBS=1 opam install yojson alcotest --yes
 COPY . /home/bap/cwe_checker/
 RUN sudo chown -R bap:bap /home/bap/cwe_checker
-ENV PATH="/home/bap/.opam/4.06.0/bin/:${PATH}"
+ENV PATH="/home/bap/.opam/4.05.0/bin/:${PATH}"
 RUN cd /home/bap/cwe_checker/src;\
     bapbuild -r -Is checkers,utils -pkgs yojson,unix cwe_checker.plugin; \
     bapbundle install cwe_checker.plugin; \
