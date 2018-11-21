@@ -85,42 +85,51 @@ class Parser(object):
             raise Exception()
         return lines
 
-    def _not_highlighted(self, warning):
+    @staticmethod
+    def _not_highlighted(warning):
         warning.highlight = False
         return warning
 
-    def _parse_at(self, warning):
+    @staticmethod
+    def _parse_at(warning):
         warning.address = warning.warning.split("at ")[-1].split()[0].strip()
         return warning
 
-    def _parse_cwe190(self, warning):
+    @staticmethod
+    def _parse_cwe190(warning):
         if "multiplication" in warning.warning:
             warning.address = warning.warning.split("multiplication ")[1].split()[0]
         else:
             warning.address = warning.warning.split("addition ")[1].split()[0]
         return warning
 
-    def _parse_cwe457(self, warning):
+    @staticmethod
+    def _parse_cwe457(warning):
         warning.address = warning.warning.split("at ")[-1].split(":")[0].strip()
         return warning
 
-    def _parse_cwe467(self, warning):
+    @staticmethod
+    def _parse_cwe467(warning):
         warning.address = warning.warning.split("at ")[1].split()[0]
         return warning
 
-    def _parse_cwe476(self, warning):
+    @staticmethod
+    def _parse_cwe476(warning):
         warning.address = warning.warning.split("at ")[1].split()[0]
         return warning
 
-    def _parse_cwe676(self, warning):
+    @staticmethod
+    def _parse_cwe676(warning):
         warning.address = warning.warning.split("(")[1].split(")")[0].split(":")[0]
         return warning
 
-    def _parse_cwe782(self, warning):
+    @staticmethod
+    def _parse_cwe782(warning):
         warning.address = warning.warning.spit("(")[1].split(")")[0].strip()
         return warning
 
-    def _extract_cwe_number(self, name):
+    @staticmethod
+    def _extract_cwe_number(name):
         tmp = name.split("]")[0]
         return tmp[1:]
 
