@@ -1,4 +1,7 @@
 # cwe_checker #
+
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/cca02727e4bc4520a87b311bf51a5cef)](https://app.codacy.com/app/weidenba/cwe_checker?utm_source=github.com&utm_medium=referral&utm_content=fkie-cad/cwe_checker&utm_campaign=Badge_Grade_Settings)
+
 ## What is cwe_checker? ## 
 *cwe_checker* detects common bug classes such as use of dangerous functions and simple integer overflows. These bug classes are formally known as [Common Weakness Enumerations](https://cwe.mitre.org/) (CWEs). Its main goal is to aid analysts to quickly find vulnerable code paths.
 
