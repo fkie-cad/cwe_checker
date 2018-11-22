@@ -1,6 +1,6 @@
 # based on https://github.com/BinaryAnalysisPlatform/bap/blob/master/docker/Dockerfile
 FROM phusion/baseimage:0.11
-RUN apt-get -y update && apt-get -y install \
+RUN apt-get -y update && install_clean \
     build-essential \
     curl \
     git \
@@ -8,6 +8,7 @@ RUN apt-get -y update && apt-get -y install \
     m4 \
     pkg-config \
     python-pip \
+    python-setuptools \
     software-properties-common \
     sudo \
     unzip \
@@ -17,11 +18,8 @@ RUN apt-get -y update && apt-get -y install \
 	libgmp-dev \
 	libzip-dev \
 	llvm-6.0-dev \
-	zlib1g-dev \
-	&& apt-get clean \
-	&& rm -rf /var/lib/apt/lists/*
-RUN wget https://raw.githubusercontent.com/ocaml/opam/master/shell/install.sh
-RUN yes /usr/local/bin | sh install.sh
+	zlib1g-dev
+RUN wget https://raw.githubusercontent.com/ocaml/opam/master/shell/install.sh && yes /usr/local/bin | sh install.sh
 RUN useradd -m bap && echo "bap:bap" | chpasswd && adduser bap sudo
 RUN sed -i.bkp -e \
       's/%sudo\s\+ALL=(ALL\(:ALL\)\?)\s\+ALL/%sudo ALL=NOPASSWD:ALL/g' \
@@ -31,8 +29,7 @@ WORKDIR /home/bap
 # install Bap
 RUN opam init --auto-setup --comp=4.05.0 --disable-sandboxing --yes
 RUN git clone -b testing --single-branch https://github.com/BinaryAnalysisPlatform/opam-repository.git
-RUN opam repo add bap opam-repository
-RUN opam update
+RUN opam repo add bap opam-repository && opam update
 RUN opam install depext --yes
 RUN OPAMJOBS=1 opam depext --install bap --yes
 RUN pip install bap
