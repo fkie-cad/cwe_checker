@@ -9,6 +9,7 @@ include Self()
 let known_modules = [(Cwe_190.name, Cwe_190.version);
                      (Cwe_215.name, Cwe_215.version);
                      (Cwe_243.name, Cwe_243.version);
+                     (Cwe_248.name, Cwe_248.version);
                      (Cwe_332.name, Cwe_332.version);
                      (Cwe_367.name, Cwe_367.version);
                      (Cwe_426.name, Cwe_426.version);
@@ -18,10 +19,10 @@ let known_modules = [(Cwe_190.name, Cwe_190.version);
                      (Cwe_676.name, Cwe_676.version);
                      (Cwe_782.name, Cwe_782.version)]
 
-let build_version_sexp () = 
+let build_version_sexp () =
   List.map known_modules ~f:(fun (name, version) -> Format.sprintf "(\"%s\" \"%s\")" name version)
   |> String.concat ~sep:" "
-  
+
 let print_module_versions () =
   Log_utils.info
     "[cwe_checker] module_versions: (%s)"
@@ -44,7 +45,7 @@ let get_symbols_from_json json cwe =
   |> List.map ~f:to_string
 
 let init_cwe_190 json project program tid_address_map =
-  let symbols = get_symbols_from_json json "CWE190" in 
+  let symbols = get_symbols_from_json json "CWE190" in
   Cwe_190.check_cwe program project tid_address_map symbols
 
 let init_cwe_215 json project program tid_address_map =
@@ -56,7 +57,10 @@ let init_cwe_243 json project program tid_address_map =
   |> filter_member "chroot_pathes"
   |> flatten
   |> List.map ~f:(fun l -> List.map (to_list l) ~f:to_string)
-  |> Cwe_243.check_cwe program project tid_address_map 
+  |> Cwe_243.check_cwe program project tid_address_map
+
+  let init_cwe_248 json project program tid_address_map =
+    Cwe_248.check_cwe program tid_address_map
 
 let init_cwe_332 json project program tid_address_map =
   (* TODO: read config. *)
@@ -68,44 +72,45 @@ let init_cwe_367 json project program tid_address_map =
 
 let init_cwe_426 json project program tid_address_map =
   (* TODO: read config. *)
-  let symbols = ["setresgid"; "setresuid"; "setuid"; "setgid"; "seteuid"; "setegid"] in 
+  let symbols = ["setresgid"; "setresuid"; "setuid"; "setgid"; "seteuid"; "setegid"] in
   Cwe_426.check_cwe program project tid_address_map symbols
 
 let init_cwe_457 json project program tid_address_map =
    Cwe_457.check_cwe program project tid_address_map
 
 let init_cwe_467 json project program tid_address_map =
-  let symbols = get_symbols_from_json json "CWE467" in 
+  let symbols = get_symbols_from_json json "CWE467" in
   Cwe_467.check_cwe program project tid_address_map symbols
 
 let init_cwe_476 json project program tid_address_map =
-   let symbols = get_symbols_from_json json "CWE476" in 
+   let symbols = get_symbols_from_json json "CWE476" in
    Cwe_476.check_cwe program project tid_address_map symbols
 
 let init_cwe_676 json project program tid_address_map =
-  let symbols = get_symbols_from_json json "CWE676" in 
+  let symbols = get_symbols_from_json json "CWE676" in
   Cwe_676.check_cwe program tid_address_map symbols
 
 let init_cwe_782 json project program tid_address_map =
   (* TODO: read config and hand over symbols from man ioctl *)
-  let symbols = [] in 
+  let symbols = [] in
   Cwe_782.check_cwe program project tid_address_map symbols
 
 let partial_run project config modules =
   (* IMPLEMENT ME: checkout how to dispatch ocaml modules dynamically *)
   let program = Project.program project in
   let tid_address_map = Address_translation.generate_tid_map program in
-  let json = Yojson.Basic.from_file config in 
+  let json = Yojson.Basic.from_file config in
   Log_utils.info "[cwe_checker] Just running a partial update of %s." modules
-  
-let full_run project config = 
+
+let full_run project config =
   let program = Project.program project in
   let tid_address_map = Address_translation.generate_tid_map program in
-  let json = Yojson.Basic.from_file config in 
+  let json = Yojson.Basic.from_file config in
   begin
     init_cwe_190 json project program tid_address_map;
     init_cwe_215 json project program tid_address_map;
     init_cwe_243 json project program tid_address_map;
+    init_cwe_248 json project program tid_address_map;
     init_cwe_332 json project program tid_address_map;
     init_cwe_367 json project program tid_address_map;
     init_cwe_426 json project program tid_address_map;
@@ -115,7 +120,7 @@ let full_run project config =
     init_cwe_676 json project program tid_address_map;
     init_cwe_782 json project program tid_address_map
   end
-  
+
 let main config module_versions partial_update project =
   Log_utils.set_log_level Log_utils.DEBUG;
   Log_utils.set_output stdout;
@@ -137,7 +142,7 @@ let main config module_versions partial_update project =
             partial_run project config partial_update
         end
     end
-  
+
 module Cmdline = struct
   open Config
   let config = param string "config" ~doc:"Path to configuration file."
