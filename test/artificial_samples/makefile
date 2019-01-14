@@ -88,6 +88,9 @@ endef
 define compile_all_cpp
 	$(shell mkdir -p "build")
 	$(call compile_x64_cpp,$(1))
+	$(call compile_arm_cpp,$(1))
+	$(call compile_mips_cpp,$(1))
+	$(call compile_ppc_cpp,$(1))
 endef
 
 all:
