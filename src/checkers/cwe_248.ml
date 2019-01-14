@@ -39,7 +39,3 @@ let check_cwe program tid_map =
   let exception_throws = Seq.concat_map blocks ~f:(fun block -> find_exceptions block) in
   (* print *)
   print_calls exception_throws ~tid_map:tid_map
-
-
-(* Der Segfault schaint das Ausführen von find_exception_throws zu sein. Er kommt nicht in die Funktion rein,
-  aber direkt davor ist das Programm noch am Leben *)
