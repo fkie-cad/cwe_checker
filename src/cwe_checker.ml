@@ -34,29 +34,6 @@ let print_module_versions () =
     "[cwe_checker] module_versions: (%s)"
     (build_version_sexp ())
 
-(** Extracts the symbols to check for from json document.
-An example looks like this:
-"CWE467": {
-	"symbols": ["strncmp", "malloc",
-		    "alloca", "_alloca", "strncat", "wcsncat",
-		    "strncpy", "wcsncpy", "stpncpy", "wcpncpy",
-		    "memcpy", "wmemcpy", "memmove", "wmemmove", "memcmp", "wmemcmp"],
-	"_comment": "any function that takes something of type size_t could be a possible candidate."
-    }, *)
-let get_symbols_from_json json cwe =
-  [json]
-  |> filter_member cwe
-  |> filter_member "symbols"
-  |> flatten
-  |> List.map ~f:to_string
-
-let get_symbol_lists_from_json json cwe =
-  [json]
-  |> filter_member cwe
-  |> filter_member "pairs"
-  |> flatten
-  |> List.map ~f:(fun l -> List.map (to_list l) ~f:to_string)
-
 let partial_run project config modules =
   let program = Project.program project in
   let tid_address_map = Address_translation.generate_tid_map program in
@@ -70,12 +47,12 @@ let full_run project config =
   begin
     List.iter known_modules ~f:(fun cwe -> if cwe.requires_pairs = true then
                                              begin
-                                               let symbol_pairs = get_symbol_lists_from_json json cwe.name in 
+                                               let symbol_pairs = Json_utils.get_symbol_lists_from_json json cwe.name in 
                                                 cwe.cwe_func program project tid_address_map symbol_pairs
                                              end
                                            else
                                              begin
-                                               let symbols = get_symbols_from_json json cwe.name in 
+                                               let symbols = Json_utils.get_symbols_from_json json cwe.name in 
                                                cwe.cwe_func program project tid_address_map [symbols]
                                              end)
   end
