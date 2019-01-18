@@ -3,7 +3,7 @@
 ## What is cwe_checker? ## 
 *cwe_checker* detects common bug classes such as use of dangerous functions and simple integer overflows. These bug classes are formally known as [Common Weakness Enumerations](https://cwe.mitre.org/) (CWEs). Its main goal is to aid analysts to quickly find vulnerable code paths.
 
-Its main focus are ELF binaries that are commonly found on Linux and Unix operating systems. *cwe_checker* is built on top of [BAP](https://github.com/BinaryAnalysisPlatform/bap)(Binary Analysis Platform). By using BAP, we are not restricted to one low level instruction set architectures like Intel x86. BAP lifts several of them to one common intermediate represenetation (IR). cwe_checker implements its analyses on this IR. At time of writing, BAP 1.5 supports Intel x86/x64, ARM, MIPS, and PPC amongst others. Hence, this makes *cwe_checker* a valuable tool in firmware analysis.
+Its main focus are ELF binaries that are commonly found on Linux and Unix operating systems. *cwe_checker* is built on top of [BAP](https://github.com/BinaryAnalysisPlatform/bap)(Binary Analysis Platform). By using BAP, we are not restricted to one low level instruction set architectures like Intel x86. BAP lifts several of them to one common intermediate represenetation (IR). cwe_checker implements its analyses on this IR. At time of writing, BAP 1.5 supports Intel x86/x64, ARM, MIPS, and PPC amongst others. Hence, this makes *cwe_checker* a valuable tool for firmware analysis.
 
 *cwe_checker* implements a modular architecture that allows to add new analyses with ease. So far the following analyses are implemented:
 -  [CWE-190](https://cwe.mitre.org/data/definitions/190.html): Integer Overflow or Wraparound
@@ -36,12 +36,12 @@ There are three ways to install cwe_checker. The recommended way is to get cwe_c
 
 The second way is to utilize the installation script `install.sh`, which is just a wrapper around Docker. Make sure to have the latest version of Docker. 
 
-The second way is to build it using the provided `Makefile`. In this case you must ensure that all dependencies are fulfilled:
+The three way is to build it using the provided `Makefile`. In this case you must ensure that all dependencies are fulfilled:
 -  Ocaml 4.05.0
--  Opam 1.2.2
+-  Opam <= 1.2.2
 -  BAP 1.5 (and its dependencies)
--  yojson 1.4.1
--  alcotest 0.8.3
+-  yojson <= 1.4.1
+-  alcotest <= 0.8.3
 -  Sark for IDA Pro annotations
 Just run `make all` to compile and register the plugin with BAP.
 ## How to use cwe_checker? ##
@@ -60,7 +60,7 @@ This project is partly financed by [German Federal Office for Information Securi
 A special thanks goes out to the BAP community (especially the official gitter) for answering questions and discussing solutions. 
 ## License
 ```
-    Copyright (C) 2018 -      Fraunhofer FKIE  (thomas.barabosch@fkie.fraunhofer.de)
+    Copyright (C) 2018 -       Fraunhofer FKIE  (thomas.barabosch@fkie.fraunhofer.de)
     
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Library General Public
