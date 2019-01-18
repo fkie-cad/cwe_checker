@@ -38,7 +38,10 @@ let check_null_pointer proj prog sub blk jmp tid_map symbols =
       | _ -> assert(false))
 
 let check_cwe prog proj tid_map symbol_names =
-  let symbols = Symbol_utils.build_symbols symbol_names prog in 
-  let calls = call_finder#run prog [] in
-  let relevant_calls = filter_calls_to_symbols calls symbols in
-  check_calls relevant_calls prog proj tid_map symbols check_null_pointer
+  match symbol_names with
+  | hd::[] ->
+     let symbols = Symbol_utils.build_symbols hd prog in 
+     let calls = call_finder#run prog [] in
+     let relevant_calls = filter_calls_to_symbols calls symbols in
+     check_calls relevant_calls prog proj tid_map symbols check_null_pointer
+  | _ -> failwith "[CWE476] symbol_names not as expected"

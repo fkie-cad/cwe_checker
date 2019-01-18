@@ -92,6 +92,5 @@ let check_subfunction prog proj tid_map sub =
             end
         end)
           
-
-let check_cwe prog proj tid_map =
+let check_cwe prog proj tid_map symbol_names =
   Seq.iter (Term.enum sub_t prog) ~f:(fun sub -> check_subfunction prog proj tid_map sub)

@@ -6,20 +6,27 @@ open Yojson.Basic.Util
 
 include Self()
 
-let known_modules = [(Cwe_190.name, Cwe_190.version);
-                     (Cwe_215.name, Cwe_215.version);
-                     (Cwe_243.name, Cwe_243.version);
-                     (Cwe_332.name, Cwe_332.version);
-                     (Cwe_367.name, Cwe_367.version);
-                     (Cwe_426.name, Cwe_426.version);
-                     (Cwe_467.name, Cwe_467.version);
-                     (Cwe_476.name, Cwe_476.version);
-                     (Cwe_457.name, Cwe_457.version);
-                     (Cwe_676.name, Cwe_676.version);
-                     (Cwe_782.name, Cwe_782.version)]
+type cwe_module = {
+    cwe_func :  Bap.Std.program Bap.Std.term -> Bap.Std.project -> Bap.Std.word Bap.Std.Tid.Map.t -> string list list ->  unit;
+    name : string;
+    version : string;
+    requires_pairs : bool;
+  }
+
+let known_modules = [{cwe_func = Cwe_190.check_cwe; name = Cwe_190.name; version = Cwe_190.version; requires_pairs = false};
+                     {cwe_func = Cwe_215.check_cwe; name = Cwe_215.name; version = Cwe_215.version; requires_pairs = false};
+                     {cwe_func = Cwe_243.check_cwe; name = Cwe_243.name; version = Cwe_243.version; requires_pairs = true};
+                     {cwe_func = Cwe_332.check_cwe; name = Cwe_332.name; version = Cwe_332.version; requires_pairs = true};
+                     {cwe_func = Cwe_367.check_cwe; name = Cwe_367.name; version = Cwe_367.version; requires_pairs = true};
+                     {cwe_func = Cwe_426.check_cwe; name = Cwe_426.name; version = Cwe_426.version; requires_pairs = false};
+                     {cwe_func = Cwe_457.check_cwe; name = Cwe_457.name; version = Cwe_457.version; requires_pairs = false};
+                     {cwe_func = Cwe_467.check_cwe; name = Cwe_467.name; version = Cwe_467.version; requires_pairs = false};
+                     {cwe_func = Cwe_476.check_cwe; name = Cwe_476.name; version = Cwe_476.version; requires_pairs = false};
+                     {cwe_func = Cwe_676.check_cwe; name = Cwe_676.name; version = Cwe_676.version; requires_pairs = false};
+                     {cwe_func = Cwe_782.check_cwe; name = Cwe_782.name; version = Cwe_782.version; requires_pairs = false}]
 
 let build_version_sexp () = 
-  List.map known_modules ~f:(fun (name, version) -> Format.sprintf "(\"%s\" \"%s\")" name version)
+  List.map known_modules ~f:(fun cwe -> Format.sprintf "(\"%s\" \"%s\")" cwe.name cwe.version)
   |> String.concat ~sep:" "
   
 let print_module_versions () =
@@ -43,56 +50,14 @@ let get_symbols_from_json json cwe =
   |> flatten
   |> List.map ~f:to_string
 
-let init_cwe_190 json project program tid_address_map =
-  let symbols = get_symbols_from_json json "CWE190" in 
-  Cwe_190.check_cwe program project tid_address_map symbols
-
-let init_cwe_215 json project program tid_address_map =
-  Cwe_215.check_cwe project
-
-let init_cwe_243 json project program tid_address_map =
+let get_symbol_lists_from_json json cwe =
   [json]
-  |> filter_member "CWE243"
-  |> filter_member "chroot_pathes"
+  |> filter_member cwe
+  |> filter_member "pairs"
   |> flatten
   |> List.map ~f:(fun l -> List.map (to_list l) ~f:to_string)
-  |> Cwe_243.check_cwe program project tid_address_map 
-
-let init_cwe_332 json project program tid_address_map =
-  (* TODO: read config. *)
-  Cwe_332.check_cwe program project tid_address_map
-
-let init_cwe_367 json project program tid_address_map =
-  (* TODO: read config. *)
-  Cwe_367.check_cwe program project tid_address_map
-
-let init_cwe_426 json project program tid_address_map =
-  (* TODO: read config. *)
-  let symbols = ["setresgid"; "setresuid"; "setuid"; "setgid"; "seteuid"; "setegid"] in 
-  Cwe_426.check_cwe program project tid_address_map symbols
-
-let init_cwe_457 json project program tid_address_map =
-   Cwe_457.check_cwe program project tid_address_map
-
-let init_cwe_467 json project program tid_address_map =
-  let symbols = get_symbols_from_json json "CWE467" in 
-  Cwe_467.check_cwe program project tid_address_map symbols
-
-let init_cwe_476 json project program tid_address_map =
-   let symbols = get_symbols_from_json json "CWE476" in 
-   Cwe_476.check_cwe program project tid_address_map symbols
-
-let init_cwe_676 json project program tid_address_map =
-  let symbols = get_symbols_from_json json "CWE676" in 
-  Cwe_676.check_cwe program tid_address_map symbols
-
-let init_cwe_782 json project program tid_address_map =
-  (* TODO: read config and hand over symbols from man ioctl *)
-  let symbols = [] in 
-  Cwe_782.check_cwe program project tid_address_map symbols
 
 let partial_run project config modules =
-  (* IMPLEMENT ME: checkout how to dispatch ocaml modules dynamically *)
   let program = Project.program project in
   let tid_address_map = Address_translation.generate_tid_map program in
   let json = Yojson.Basic.from_file config in 
@@ -103,17 +68,16 @@ let full_run project config =
   let tid_address_map = Address_translation.generate_tid_map program in
   let json = Yojson.Basic.from_file config in 
   begin
-    init_cwe_190 json project program tid_address_map;
-    init_cwe_215 json project program tid_address_map;
-    init_cwe_243 json project program tid_address_map;
-    init_cwe_332 json project program tid_address_map;
-    init_cwe_367 json project program tid_address_map;
-    init_cwe_426 json project program tid_address_map;
-    init_cwe_457 json project program tid_address_map;
-    init_cwe_467 json project program tid_address_map;
-    init_cwe_476 json project program tid_address_map;
-    init_cwe_676 json project program tid_address_map;
-    init_cwe_782 json project program tid_address_map
+    List.iter known_modules ~f:(fun cwe -> if cwe.requires_pairs = true then
+                                             begin
+                                               let symbol_pairs = get_symbol_lists_from_json json cwe.name in 
+                                                cwe.cwe_func program project tid_address_map symbol_pairs
+                                             end
+                                           else
+                                             begin
+                                               let symbols = get_symbols_from_json json cwe.name in 
+                                               cwe.cwe_func program project tid_address_map [symbols]
+                                             end)
   end
   
 let main config module_versions partial_update project =
