@@ -34,27 +34,37 @@ let print_module_versions () =
     "[cwe_checker] module_versions: (%s)"
     (build_version_sexp ())
 
+let execute_cwe_module cwe json program project tid_address_map =
+   if cwe.requires_pairs = true then
+     begin
+       let symbol_pairs = Json_utils.get_symbol_lists_from_json json cwe.name in 
+       cwe.cwe_func program project tid_address_map symbol_pairs
+     end
+   else
+     begin
+       let symbols = Json_utils.get_symbols_from_json json cwe.name in 
+       cwe.cwe_func program project tid_address_map [symbols]
+     end
+
 let partial_run project config modules =
-  let program = Project.program project in
+  let program = Project.program project in 
   let tid_address_map = Address_translation.generate_tid_map program in
   let json = Yojson.Basic.from_file config in 
-  Log_utils.info "[cwe_checker] Just running a partial update of %s." modules
+  Log_utils.info "[cwe_checker] Just running the following analyses: %s." modules;
+  List.iter (String.split modules ~on: ',') ~f:(fun cwe -> try
+        begin
+          let cwe_mod = List.find_exn known_modules ~f:(fun x -> x.name = cwe) in
+          let program = Project.program project in
+          execute_cwe_module cwe_mod json program project tid_address_map
+        end
+      with Not_found -> failwith "[CWE_CHECKER] Unknown CWE module")
   
 let full_run project config = 
   let program = Project.program project in
   let tid_address_map = Address_translation.generate_tid_map program in
   let json = Yojson.Basic.from_file config in 
   begin
-    List.iter known_modules ~f:(fun cwe -> if cwe.requires_pairs = true then
-                                             begin
-                                               let symbol_pairs = Json_utils.get_symbol_lists_from_json json cwe.name in 
-                                                cwe.cwe_func program project tid_address_map symbol_pairs
-                                             end
-                                           else
-                                             begin
-                                               let symbols = Json_utils.get_symbols_from_json json cwe.name in 
-                                               cwe.cwe_func program project tid_address_map [symbols]
-                                             end)
+    List.iter known_modules ~f:(fun cwe -> execute_cwe_module cwe json program project tid_address_map)
   end
   
 let main config module_versions partial_update project =
@@ -83,7 +93,7 @@ module Cmdline = struct
   open Config
   let config = param string "config" ~doc:"Path to configuration file."
   let module_versions = param bool "module_versions" ~doc:"Prints out the version numbers of all known modules."
-  let partial_update = param string "partial" ~doc:"Comma separated list of modules to apply on binary."
+  let partial_update = param string "partial" ~doc:"Comma separated list of modules to apply on binary, e.g. 'CWE332,CWE476,CWE782'"
   let () = when_ready (fun ({get=(!!)}) -> Project.register_pass' ~deps:["callsites"] (main !!config !!module_versions !!partial_update))
   let () = manpage [
                           `S "DESCRIPTION";
