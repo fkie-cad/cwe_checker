@@ -16,6 +16,7 @@ type cwe_module = {
 let known_modules = [{cwe_func = Cwe_190.check_cwe; name = Cwe_190.name; version = Cwe_190.version; requires_pairs = false};
                      {cwe_func = Cwe_215.check_cwe; name = Cwe_215.name; version = Cwe_215.version; requires_pairs = false};
                      {cwe_func = Cwe_243.check_cwe; name = Cwe_243.name; version = Cwe_243.version; requires_pairs = true};
+                     {cwe_func = Cwe_248.check_cwe; name = Cwe_248.name; version = Cwe_248.version; requires_pairs = false};
                      {cwe_func = Cwe_332.check_cwe; name = Cwe_332.name; version = Cwe_332.version; requires_pairs = true};
                      {cwe_func = Cwe_367.check_cwe; name = Cwe_367.name; version = Cwe_367.version; requires_pairs = true};
                      {cwe_func = Cwe_426.check_cwe; name = Cwe_426.name; version = Cwe_426.version; requires_pairs = false};
