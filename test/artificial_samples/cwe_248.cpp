@@ -6,23 +6,37 @@ void throw_exception(int i) {
   throw i;
 }
 
+void do_catch(int i) {
+  try {
+    throw i;
+  }
+  catch(int error) {
+    cout<<"Exception " << i << "successfully catched."<<endl;
+  }
+}
+
+void maybe_catch(int i) {
+  if(i<42) {
+    try {
+      throw_exception(i);
+    }
+    catch(int errror) {
+      // Yay, catched.
+      cout<<"Exception " << i << " successfully catched."<<endl;
+    }
+  }
+  else {
+    // We don't catch anything here.
+    throw_exception(i);
+  }
+}
+
 int main() {
-  // Throw and directly catch an exception
-  try {
-    throw 'e';
-  }
-  catch(char c)
-  {
-    cout<<"Exception "<< c <<" successfuly catched." << endl;
-  }
-  // Throw in a subfunction and catch it.
-  try {
-    throw_exception(20);
-  }
-  catch(int e)
-  {
-    cout<<"Exception "<< e <<" successfuly catched." << endl;
-  };
-  // Now throw without catching:
-  throw_exception(42);
+  cout<<"Enter a number." <<endl;
+  int i;
+  cin >> i;
+  maybe_catch(i);
+  do_catch(i);
+  // For good measure, just throw an exception here.
+  throw (i+20);
 }
