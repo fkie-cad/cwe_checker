@@ -22,6 +22,10 @@ function run_arch() {
     printf_new
     bap artificial_samples/build/cwe_243_clean_$1.out  --pass=callsites,cwe-checker --cwe-checker-config=../src/config.json
     printf_new
+    echo "cwe_248_$1"
+    printf_new
+    bap artificial_samples/build/cwe_248_$1.out  --pass=callsites,cwe-checker --cwe-checker-config=../src/config.json
+    printf_new
     echo "cwe_323_$1"
     printf_new
     bap artificial_samples/build/cwe_332_$1.out  --pass=callsites,cwe-checker --cwe-checker-config=../src/config.json 

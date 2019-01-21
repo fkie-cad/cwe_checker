@@ -10,6 +10,9 @@
 			  ["chdir", "chroot", "setreuid"], ["chdir", "chroot", "setuid"]],
 	    "_comment": "valid chroot pathes according to http://www.unixwiz.net/techtips/chroot-practices.html"
     },
+    "CWE248": {
+        "symbols": []
+    },
     "CWE332": {
 	    "pairs": [["srand", "rand"]]
     },
@@ -40,16 +43,16 @@
     "CWE676": {
 	    "_comment": "https://github.com/01org/safestringlib/wiki/SDL-List-of-Banned-Functions",
 	    "symbols": ["alloca", "_alloca",
-                        "scanf", "wscanf", "sscanf", "swscanf", "vscanf", "vsscanf",                                        
+                        "scanf", "wscanf", "sscanf", "swscanf", "vscanf", "vsscanf",
                         "strlen", "wcslen", "strtok", "strtok_r", "wcstok",
                         "strcat", "strncat", "wcscat", "wcsncat",
                         "strcpy", "strncpy", "wcscpy", "wcsncpy", "stpcpy", "stpncpy", "wcpcpy", "wcpncpy",
-                        "memcpy", "wmemcpy", "memmove", "wmemmove", "memcmp", "wmemcmp", "me​mset", "wmemset", 
-                        "gets", "sprintf​", "vsprintf", "swprintf", "vswprintf", "snprintf", "vsnprintf", 
+                        "memcpy", "wmemcpy", "memmove", "wmemmove", "memcmp", "wmemcmp", "me​mset", "wmemset",
+                        "gets", "sprintf​", "vsprintf", "swprintf", "vswprintf", "snprintf", "vsnprintf",
                         "realpath", "getwd", "wctomb", "wcrtomb", "wcstombs", "wcsrtombs", "wcsnrtombs"]
     },
     "CWE782": {
         "symbols": []
     }
-    
+
 }
