@@ -12,25 +12,9 @@ let print_uncatched_exception block_tid ~tid_map =
      version
      (Address_translation.translate_tid_to_assembler_address_string block_tid tid_map)
 
-
-(* Returns the symbol name if the block contains a direct jump to a symbol *)
-let extract_direct_call_tid block =
-  let jmp_instructions = Term.enum jmp_t block in
-  Seq.fold jmp_instructions ~init:None ~f:(fun already_found instr ->
-    match already_found with
-      | Some(symb) -> Some(symb)
-      | None ->
-        match Jmp.kind instr with
-          | Goto _ | Ret _ | Int (_,_) -> None
-          | Call dst -> match Call.target dst with
-            | Direct tid ->
-              (* Tid.name tid is the name of the symbol.*)
-              Some(tid)
-            | _ -> None)
-
-(* Extract the Tid of a direct call, if the block contains a direct call. *)
+(* Extract the name of a direct call, if the block contains a direct call. *)
 let extract_direct_call_symbol block =
-  match extract_direct_call_tid block with
+  match Symbol_utils.extract_direct_call_tid_from_block block with
     | Some(tid) -> Some(Tid.name tid)
     | None -> None
 
@@ -54,7 +38,7 @@ let find_calls_and_throws subfunction ~tid_map =
       let () = print_uncatched_exception  (Term.tid block) ~tid_map:tid_map in
       call_list
     else
-      match extract_direct_call_tid block with
+      match Symbol_utils.extract_direct_call_tid_from_block block with
         | Some(tid) -> tid :: call_list
         | None -> call_list
   )
@@ -72,18 +56,10 @@ let rec find_uncaught_exceptions subfunction already_checked_functions program ~
         | true -> already_checked
         | false ->  find_uncaught_exceptions ~tid_map:tid_map (Core_kernel.Option.value_exn (Term.find sub_t program subfunc)) (subfunc :: already_checked) program)
 
-
+(* Search for uncatched exceptions for each entry point into the binary.
+    TODO: Exceptions, that are catched when starting from one entry point, but not from another, are masked this
+    way. We should check whether this produces a lot of false negatives. *)
 let check_cwe program project tid_map symbol_pairs =
-  (* Get all subfunctions *)
-  let subfunctions = Term.enum sub_t program in
-  (* collect all entry points of the program *)
-  let entry_points = Seq.filter subfunctions ~f:(fun subfn -> Term.has_attr subfn Sub.entry_point) in
-  (* TODO: The _start entry point calls a libc-function which then calls the main function. Since right now only direct
-      calls are tracked, our graph traversal never finds the main function. For now, we add it by hand to the entry points.*)
-  let main_fn = Seq.filter subfunctions ~f:(fun subfn -> "@main" = Tid.name (Term.tid subfn)) in
-  let entry_points_with_main = Seq.append main_fn entry_points in
-  (* search for uncatched exceptions for each entry point, but accumulate the list of already checked functions. *)
-  (* TODO: Exceptions, that are catched when starting from one entry point, but not from another, are masked this
-      way. We should check whether this produces a lot of false negatives. *)
-  let _ = Seq.fold entry_points_with_main ~init:[] ~f:(fun already_checked_functions sub -> find_uncaught_exceptions ~tid_map:tid_map sub already_checked_functions program) in
+  let entry_points = Symbol_utils.get_program_entry_points program in
+  let _ = Seq.fold entry_points ~init:[] ~f:(fun already_checked_functions sub -> find_uncaught_exceptions ~tid_map:tid_map sub already_checked_functions program) in
   ()

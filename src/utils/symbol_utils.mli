@@ -12,7 +12,7 @@ type symbol = { address : Bap.Std.tid option; name : string; }
 (** Finds a symbol string in a program and returns its IR address (tid). *)
 val find_symbol : Bap.Std.program Bap.Std.term -> string -> Bap.Std.tid option
 
-(** builds a list of symbols from a list of strings for a given program 
+(** builds a list of symbols from a list of strings for a given program
    TODO: maybe another data structure like a hashmap would be better. *)
 val build_symbols : string list -> Bap.Std.program Bap.Std.term -> symbol list
 
@@ -60,3 +60,11 @@ val get_direct_callsites_of_sub :
 
 (** Returns call count of symbol in function *)
 val get_symbol_call_count_of_sub : string -> Bap.Std.Sub.t -> Bap.Std.Program.t -> int
+
+(** Returns Some(target tid) if the block contains a direct call or None if it does not. *)
+val extract_direct_call_tid_from_block : Bap.Std.blk Bap.Std.term -> Bap.Std.tid option
+
+(** Returns a sequence of all entry points of the program.
+    TODO: The _start entry point usually calls a libc-function which then calls the main function. Since right now only direct
+    calls are tracked, our graph traversal may never find the main function. For now, we add it by hand to the entry points. *)
+val get_program_entry_points : Bap.Std.program Bap.Std.term -> Bap.Std.sub Bap.Std.term Bap.Std.Seq.t
