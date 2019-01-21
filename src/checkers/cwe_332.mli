@@ -6,4 +6,4 @@ See https://cwe.mitre.org/data/definitions/332.html for detailed description. *)
 val name : string
 val version : string
 
-val check_cwe : Bap.Std.program Bap.Std.term -> 'a -> 'b -> unit
+val check_cwe : Bap.Std.program Bap.Std.term -> 'a -> 'b -> string list list -> unit

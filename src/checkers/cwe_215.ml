@@ -30,7 +30,7 @@ let read_lines in_chan =
     List.rev !lines
 
 (* TODO: check if program contains strings like "DEBUG"*) 
-let check_cwe project =
+let check_cwe _ project _ _ =
   match Project.get project filename with
   | Some fname -> begin
       let cmd = Format.sprintf "readelf --debug-dump=decodedline %s | grep CU" fname in
@@ -41,5 +41,5 @@ let check_cwe project =
         Unix.Unix_error (e,fm,argm) -> 
         Log_utils.error "[%s] {%s} %s %s %s" name version (Unix.error_message e) fm argm
     end
-  | _ -> ()
+  | _ -> failwith "[CWE215] symbol_names not as expected"
 

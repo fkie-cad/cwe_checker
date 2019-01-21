@@ -28,7 +28,10 @@ let check_multiplication_before_symbol proj prog sub blk jmp tid_map symbols =
                      (Symbol_utils.get_symbol_name_from_jmp jmp symbols))
 
 let check_cwe prog proj tid_map symbol_names =
-   let symbols = Symbol_utils.build_symbols symbol_names prog in 
+  match symbol_names with
+  | hd::[] ->
+   let symbols = Symbol_utils.build_symbols hd prog in 
    let calls = call_finder#run prog [] in
    let relevant_calls = filter_calls_to_symbols calls symbols in
    check_calls relevant_calls prog proj tid_map symbols check_multiplication_before_symbol
+  | _ -> failwith "[CWE190] symbol_names not as expected"

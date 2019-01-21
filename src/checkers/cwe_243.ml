@@ -87,3 +87,4 @@ let check_cwe prog proj tid_map pathes =
   | Some _ ->
     Seq.iter (Term.enum sub_t prog) ~f:(fun sub -> check_subfunction prog tid_map sub pathes)
   | _ -> ()
+

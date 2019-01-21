@@ -57,7 +57,6 @@ let handle_sub sub program tid_map symbols source sink =
   else
     ()
 
-(* TODO: access -> open is just one example of a TOCTOU *)
-let check_cwe program proj tid_map =
+let check_cwe program proj tid_map symbol_pairs =
   let symbols = Symbol_utils.build_symbols ["access"; "open";] in
   Seq.iter (Term.enum sub_t program) ~f:(fun s -> handle_sub s program tid_map symbols "access" "open")

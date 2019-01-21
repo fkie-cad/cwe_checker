@@ -73,7 +73,7 @@ let rec find_uncaught_exceptions subfunction already_checked_functions program ~
         | false ->  find_uncaught_exceptions ~tid_map:tid_map (Core_kernel.Option.value_exn (Term.find sub_t program subfunc)) (subfunc :: already_checked) program)
 
 
-let check_cwe program tid_map =
+let check_cwe program project tid_map symbol_pairs =
   (* Get all subfunctions *)
   let subfunctions = Term.enum sub_t program in
   (* collect all entry points of the program *)
