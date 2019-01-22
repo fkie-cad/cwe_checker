@@ -214,3 +214,5 @@ test/run_real_world_samples.sh
 .pydevproject
 
 src/cwe_checker.plugin
+
+.#*

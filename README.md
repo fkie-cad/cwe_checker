@@ -41,10 +41,12 @@ The three way is to build it using the provided `Makefile`. In this case you mus
 -  Ocaml 4.05.0
 -  Opam 2.0.2
 -  BAP 1.5 (and its dependencies)
--  yojson <= 1.4.1
--  alcotest <= 0.8.3
+-  yojson >= 1.4.1
+-  alcotest >= 0.8.3
 -  Sark for IDA Pro annotations
-Just run `make all` to compile and register the plugin with BAP.
+-  pytest >= 3.5.1
+
+Just run `make all` to compile and register the plugin with BAP. You can run the test suite via `make test`.
 ## How to use cwe_checker? ##
 The usage is straight forward: adjust the `config.json` (if needed) and call BAP with *cwe_checker* as a pass.
 ``` bash
