@@ -88,6 +88,8 @@ endef
 define compile_all_cpp
 	$(shell mkdir -p "build")
 	$(call compile_x64_cpp,$(1))
+# building fails
+# (call compile_x86_cpp,$(1))
 	$(call compile_arm_cpp,$(1))
 	$(call compile_mips_cpp,$(1))
 	$(call compile_ppc_cpp,$(1))
@@ -107,6 +109,7 @@ all:
 	$(call compile_all,cwe_467)
 	$(call compile_all,cwe_476)
 	$(call compile_all,cwe_478)
+	$(call compile_all,cwe_676)
 	$(call compile_x64,cwe_782)
 	$(call compile_all,arrays)
 	$(call compile_all,memory_access)
