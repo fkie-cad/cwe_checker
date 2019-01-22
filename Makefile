@@ -1,10 +1,9 @@
-.phony: all
+.PHONY: all clean test uninstall
 all:
 	cd src; bapbuild -r -Is checkers,utils -pkgs yojson,unix cwe_checker.plugin; bapbundle install cwe_checker.plugin; cd ..
 
 test:
-	bapbuild -r -Is src,src/checkers,src/utils,test -pkgs yojson,unix,alcotest test/test_cwe_checker.byte
-	./test/test_cwe_checker.byte
+	pytest -v
 
 clean:
 	bapbuild -clean
