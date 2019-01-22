@@ -5,6 +5,6 @@ rm -rf src/_build
 rm -f src/cwe_checker.plugin 
 
 echo "Building docker container"
-docker build --no-cache --build-arg http_proxy=$http_proxy --build-arg https_proxy=$https_proxy --build-arg HTTP_PROXY=$http_proxy --build-arg HTTPS_PROXY=$https_proxy -t cwe-checker .
+docker build --build-arg=http{,s}_proxy --build-arg=HTTP{,S}_PROXY -t cwe-checker .
 
 exit 0
