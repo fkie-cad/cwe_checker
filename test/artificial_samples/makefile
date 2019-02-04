@@ -36,7 +36,7 @@ endef
 
 define compile_x86_cpp
 	@echo "Compiling x86 target:" $(1)
-	$(CPP_X86) $(CFLAGS_X86) -o build/$(1)_x86.out $(1).cpp
+	./dockcross_x86 $(CPP_X86) $(CFLAGS_X86) -o build/$(1)_x86.out $(1).cpp
 	execstack -s build/$(1)_x86.out
 endef
 
@@ -88,8 +88,7 @@ endef
 define compile_all_cpp
 	$(shell mkdir -p "build")
 	$(call compile_x64_cpp,$(1))
-# building fails
-# (call compile_x86_cpp,$(1))
+	$(call compile_x86_cpp,$(1))
 	$(call compile_arm_cpp,$(1))
 	$(call compile_mips_cpp,$(1))
 	$(call compile_ppc_cpp,$(1))
