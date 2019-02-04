@@ -1,10 +1,18 @@
 #!/bin/bash
 echo "Installing cross compiler for ARM architecture."
-sudo apt install -y gcc-multilib-arm-linux-gnueabi g++-arm-linux-gnueabi
+sudo docker pull dockcross/linux-arm64
+sudo docker run -rm dockcross/linux-arm64 > ./dockcross-linux-arm64
+chmod +x ./dockcross-linux-arm64
 echo "Installing cross compiler for MIPS architecture."
-sudo apt install -y gcc-multilib-mips-linux-gnu g++-7-mips-linux-gnu
+sudo docker pull dockcross/linux-mips
+sudo docker run -rm dockcross/linux-mips > ./dockcross-linux-mips
+chmod +x ./dockcross-linux-mips
 echo "Installing cross compiler for PPC architecture."
-sudo apt install -y gcc-multilib-powerpc-linux-gnu g++-7-powerpc-linux-gnu
+sudo docker pull dockcross/linux-ppc64le
+sudo docker run -rm dockcross/linux-ppc64le > ./dockcross-linux-ppc64le
+chmod +x ./dockcross-linux-ppc64le
 echo "Installing dockcross image for x86 C++ cross-compiler"
 sudo docker pull dockcross/linux-x86
+sudo docker run -rm dockcross/linux-x86 > ./dockcross-linux-x86
+chmod +x ./dockcross-linux-x86
 echo "Done."

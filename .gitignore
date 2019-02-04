@@ -215,4 +215,6 @@ test/run_real_world_samples.sh
 
 src/cwe_checker.plugin
 
+test/artificial_samples/dockcross*
+
 .#*
