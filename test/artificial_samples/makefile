@@ -1,14 +1,14 @@
 CC_x64=gcc
-CC_X86=gcc
-CC_ARM=arm-linux-gnueabi-gcc-7
-CC_MIPS=mips-linux-gnu-gcc-7
-CC_PPC=powerpc-linux-gnu-gcc-7
+CC_X86=./dockcross-linux-x86 gcc
+CC_ARM=./dockcross-linux-arm64 arm-linux-gnueabi-gcc-7
+CC_MIPS=./dockcross-linux-mips mips-linux-gnu-gcc-7
+CC_PPC=./dockcross-linux-ppc64le powerpc-linux-gnu-gcc-7
 
 CPP_x64=g++
-CPP_X86=g++
-CPP_ARM=arm-linux-gnueabi-g++-7
-CPP_MIPS=mips-linux-gnu-g++-7
-CPP_PPC=powerpc-linux-gnu-g++-7
+CPP_X86=./dockcross-linux-x86 g++
+CPP_ARM=./dockcross-linux-arm64 arm-linux-gnueabi-g++-7
+CPP_MIPS=./dockcross-linux-mips mips-linux-gnu-g++-7
+CPP_PPC=./dockcross-linux-ppc64le powerpc-linux-gnu-g++-7
 
 CFLAGS_X64=-O0 -g -fno-stack-protector
 CFLAGS_X86=-O0 -g -m32 -fno-stack-protector
@@ -88,8 +88,7 @@ endef
 define compile_all_cpp
 	$(shell mkdir -p "build")
 	$(call compile_x64_cpp,$(1))
-# building fails
-# (call compile_x86_cpp,$(1))
+	$(call compile_x86_cpp,$(1))
 	$(call compile_arm_cpp,$(1))
 	$(call compile_mips_cpp,$(1))
 	$(call compile_ppc_cpp,$(1))
