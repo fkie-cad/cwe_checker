@@ -3,8 +3,10 @@
 
 - Refactoring: Unification of cwe_checker function interface
 - Refactoring: Created utils module for JSON functionality
-- Added check for CWE 248: Uncaught Exception
-- Added automated test suite (run with make test)
+- Added check for CWE 248: Uncaught Exception (PR #5)
+- Added automated test suite (run with make test) (PR #7)
+- Improved cross compiling for acceptance test cases by using dockcross (PR #8)
+- Added BAP recipe for standard cwe_checker run (PR #9)
 
 0.1 (2018-10-08)
 =====
