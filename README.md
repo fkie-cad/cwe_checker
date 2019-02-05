@@ -54,7 +54,11 @@ The usage is straight forward: adjust the `config.json` (if needed) and call BAP
 ``` bash
 bap PATH_TO_BINARY --pass=cwe-checker --cwe-checker-config=src/config.json
 ```
-*cwe_checker* outputs to stdin. This output is parsable (sexep). There is a script `cwe_checker_to_ida` to visualize the results in IDA Pro.
+For common use cases you can find some recipes in the recipes folder. These can be run with
+```
+bap PATH_TO_BINARY --recipe=recipes/RECIPE_FOLDER_NAME
+```
+*cwe_checker* outputs to stdout. This output is parsable (sexep). There is a script `cwe_checker_to_ida` to visualize the results in IDA Pro.
 ## How to extend cwe_checker? ##
 New plugins should be added to src/checkers. Implement a .ml and .mli file. See the existing modules for an interface description. If necessary add a section to `config.json` to allow users to configure your plugin. Finally, add your plugin to `cwe_checker.ml`.
 ### Contribute ###
