@@ -33,8 +33,6 @@ RUN sudo apt-get -y update \
     && yes /usr/local/bin | sudo sh install.sh \
 # install Bap
     && opam init --auto-setup --comp=4.05.0 --disable-sandboxing --yes \
-   # && git clone -b testing --depth 1 https://github.com/BinaryAnalysisPlatform/opam-repository.git \
-   # && opam repo add bap opam-repository \
     && opam update \
     && opam install depext --yes \
     && OPAMJOBS=1 opam depext --install bap --yes \
