@@ -11,12 +11,10 @@ install:
   - docker 
 
 before_script:
-  - ./.build_testcases_travis.sh
-  - ./.build_cwe_checker_travis.sh
+  - ./.travis_prepare.sh
 
 script:
-  - ./.run_unit_tests_travis.sh
-  - ./.run_acceptance_tests_travis.sh
+  - ./.travis_run_tests.sh
 
 notifications:
   email:
