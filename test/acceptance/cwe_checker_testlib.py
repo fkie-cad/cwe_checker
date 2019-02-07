@@ -1,7 +1,11 @@
+import os
 import subprocess
 
 def build_bap_cmd(filename, target, arch):
-        cmd = 'bap test/artificial_samples/build/cwe_%s_%s.out  --pass=callsites,cwe-checker --cwe-checker-partial=CWE%s --cwe-checker-config=src/config.json' % (filename, arch, target)
+        if 'TRAVIS' in os.environ:
+                cmd = 'bap test/artificial_samples/build/cwe_%s_%s.out  --pass=cwe-checker --cwe-checker-partial=CWE%s --cwe-checker-config=src/config.json' % (filename, arch, target)
+        else:
+                cmd = 'docker run --rm -v test/artificial_samples/build/cwe_%s_%s.out:/tmp/input cwe_checker bap /tmp/input --pass=cwe-checker --cwe-checker-partial=CWE%s --cwe-checker-config=/home/bap/cwe_checker/src/config.json' % (filename, arch, target)
         return cmd.split()
 
 def execute_and_check_occurence(filename, target, arch, string):
