@@ -1,8 +1,8 @@
 #!/bin/bash
 echo "Installing cross compiler for ARM architecture."
-docker pull dockcross/linux-arm64
-docker run --rm dockcross/linux-arm64 > ./dockcross-linux-arm64
-chmod +x ./dockcross-linux-arm64
+docker pull dockcross/linux-armv7
+docker run --rm dockcross/linux-armv7 > ./dockcross-linux-armv7
+chmod +x ./dockcross-linux-armv7
 echo "Installing cross compiler for MIPS architecture."
 docker pull dockcross/linux-mips
 docker run --rm dockcross/linux-mips > ./dockcross-linux-mips
