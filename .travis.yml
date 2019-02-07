@@ -7,6 +7,8 @@ services:
   - docker
 
 install:
+  - sudo apt-get update
+  - sudo apt-get install -y execstack
   - docker 
 
 before_script:
