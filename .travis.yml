@@ -5,6 +5,9 @@ dist: xenial
 services:
   - docker
 
+install:
+  - docker 
+
 script:
   - ./.prepare_travis.sh
 
