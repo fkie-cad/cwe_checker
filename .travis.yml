@@ -1,0 +1,13 @@
+language: minimal
+
+dist: xenial
+
+services:
+  - docker
+
+script:
+  - ./.prepare_travis.sh
+
+notifications:
+  email:
+    - firmware-security@fkie.fraunhofer.de
