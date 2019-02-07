@@ -1,6 +1,6 @@
 # cwe_checker #
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/9dbf158110de427d893b40ba397b94bc)](https://www.codacy.com/app/weidenba/cwe_checker?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=fkie-cad/cwe_checker&amp;utm_campaign=Badge_Grade)
-![Docker-Status](https://img.shields.io/docker/build/fkiecad/cwe_checker.svg)
+[![Build Status](https://travis-ci.com/fkie-cad/cwe_checker.svg?branch=master)](https://travis-ci.com/fkie-cad/cwe_checker)
 ![Docker-Pulls](https://img.shields.io/docker/pulls/fkiecad/cwe_checker.svg)
 ## What is cwe_checker? ##
 *cwe_checker* detects common bug classes such as use of dangerous functions and simple integer overflows. These bug classes are formally known as [Common Weakness Enumerations](https://cwe.mitre.org/) (CWEs). Its main goal is to aid analysts to quickly find vulnerable code paths.
@@ -35,11 +35,11 @@ The following arguments should convince you to give *cwe_checker* a try:
 -  view results annotated in IDA Pro
 -  *cwe_checker* can be integrated as a plugin into [FACT](https://github.com/fkie-cad/FACT_core)
 ## How to install cwe_checker? ##
-There are three ways to install cwe_checker. The recommended way is to get cwe_checker from the Ocaml package manager Opam. You can install cwe_checker via the package [fkie-cad-cwe-checker](https://opam.ocaml.org/packages/fkie-cad-cwe-checker/) (`opam install fkie-cad-cwe-checker`).
+There are several ways to install cwe_checker. The recommended way is to get cwe_checker from the Ocaml package manager Opam. You can install cwe_checker via the package [fkie-cad-cwe-checker](https://opam.ocaml.org/packages/fkie-cad-cwe-checker/) (`opam install fkie-cad-cwe-checker`). This gives you a stable version of cwe_checker. 
 
-The second way is to utilize the installation script `install.sh`, which is just a wrapper around Docker. Make sure to have the latest version of Docker.
+Another option is to pull the latest Docker container from [dockerhub](https://hub.docker.com/r/fkiecad/cwe_checker) (`docker pull fkiecad/cwe_checker`).
 
-The three way is to build it using the provided `Makefile`. In this case you must ensure that all dependencies are fulfilled:
+The last two ways are preferrable if you plan to develop cwe_checker. First, utilize the installation script `install.sh`, which is just a wrapper around Docker. Make sure to have the latest version of Docker. Second, build it using the provided `Makefile`. In this case you must ensure that all dependencies are fulfilled:
 -  Ocaml 4.05.0
 -  Opam 2.0.2
 -  BAP 1.5 (and its dependencies)
