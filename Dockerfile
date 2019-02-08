@@ -42,22 +42,22 @@ RUN sudo apt-get -y update \
     && cd /home/bap/cwe_checker/src \
     && bapbuild -r -Is checkers,utils -pkgs yojson,unix cwe_checker.plugin \
     && bapbundle install cwe_checker.plugin \
-    && sudo apt-get remove -y \
-        build-essential \
-        clang \
-        curl \
-        gcc \
-        g++ \
-        git \
-        libgmp-dev \
-        libx11-dev \
-        libzip-dev \
-        llvm-6.0-dev \
-        unzip \
-        wget \
-        zlib1g-dev \
-    && sudo apt-get -y autoremove \
-    && sudo apt-get -y clean \
+    # && sudo apt-get remove -y \
+    #     build-essential \
+    #     clang \
+    #     curl \
+    #     gcc \
+    #     g++ \
+    #     git \
+    #     libgmp-dev \
+    #     libx11-dev \
+    #     libzip-dev \
+    #     llvm-6.0-dev \
+    #     unzip \
+    #     wget \
+    #     zlib1g-dev \
+    # && sudo apt-get -y autoremove \
+    # && sudo apt-get -y clean \
     && rm -rf /home/bap/.opam/4.05.0/.opam-switch/sources
 
 WORKDIR /home/bap/cwe_checker/src
