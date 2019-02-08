@@ -1,14 +1,14 @@
 CC_x64=gcc
 CC_X86=./dockcross-linux-x86 gcc
-CC_ARM=./dockcross-linux-armv7 /usr/xcc/armv7-unknown-linux-gnueabi/bin/armv7-unknown-linux-gnueabi-gcc
-CC_MIPS=./dockcross-linux-mips /usr/xcc/mips-unknown-linux-gnu/bin/mips-unknown-linux-gnu-gcc
-CC_PPC=./dockcross-linux-ppc64le /usr/bin/powerpc64le-linux-gnu-gcc
+CC_ARM=arm-linux-gnueabi-gcc-7
+CC_MIPS=mips-linux-gnu-gcc-7
+CC_PPC=powerpc-linux-gnu-gcc-7
 
 CPP_x64=g++
 CPP_X86=./dockcross-linux-x86 g++
-CPP_ARM=./dockcross-linux-armv7 /usr/xcc/armv7-unknown-linux-gnueabi/bin/armv7-unknown-linux-gnueabi-g++
-CPP_MIPS=./dockcross-linux-mips /usr/xcc/mips-unknown-linux-gnu/bin/mips-unknown-linux-gnu-g++
-CPP_PPC=./dockcross-linux-ppc64le /usr/bin/powerpc64le-linux-gnu-g++
+CPP_ARM=arm-linux-gnueabi-g++-7
+CPP_MIPS=mips-linux-gnu-g++-7
+CPP_PPC=powerpc-linux-gnu-g++-7
 
 CFLAGS_X64=-O0 -g -fno-stack-protector -std=c11
 CFLAGS_X86=-O0 -g -m32 -fno-stack-protector -std=c11
