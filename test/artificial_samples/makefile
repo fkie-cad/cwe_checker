@@ -11,13 +11,13 @@ CPP_MIPS=mips-linux-gnu-g++-5
 CPP_PPC=powerpc-linux-gnu-g++-5
 
 CFLAGS_X64=-O0 -g -fno-stack-protector -std=c11
-CFLAGS_X86=-O0 -g -m32 -fno-stack-protector -std=c11
+CFLAGS_X86=-L/usr/lib32 -O0 -g -m32 -fno-stack-protector -std=c11
 CFLAGS_ARM=-O0 -g -fno-stack-protector -std=c11
 CFLAGS_MIPS=-O0 -g -fno-stack-protector -std=c11
 CFLAGS_PPC=-O0 -g -fno-stack-protector -std=c11
 
 CPPFLAGS_X64=-O0 -g -fno-stack-protector
-CPPFLAGS_X86=-O0 -g -m32 -fno-stack-protector
+CPPFLAGS_X86=-L/usr/lib32 -O0 -g -m32 -fno-stack-protector
 CPPFLAGS_ARM=-O0 -g -fno-stack-protector
 CPPFLAGS_MIPS=-O0 -g -fno-stack-protector
 CPPFLAGS_PPC=-O0 -g -fno-stack-protector
