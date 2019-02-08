@@ -1,23 +1,23 @@
 CC_x64=gcc
-CC_X86=gcc
+CC_X86=./dockcross-linux-x86 gcc
 CC_ARM=arm-linux-gnueabi-gcc
 CC_MIPS=mips-linux-gnu-gcc
 CC_PPC=powerpc-linux-gnu-gcc
 
 CPP_x64=g++
-CPP_X86=g++
+CPP_X86=./dockcross-linux-x86 g++
 CPP_ARM=arm-linux-gnueabi-g++-5
 CPP_MIPS=mips-linux-gnu-g++-5
 CPP_PPC=powerpc-linux-gnu-g++-5
 
 CFLAGS_X64=-O0 -g -fno-stack-protector -std=c11
-CFLAGS_X86=-L/usr/lib32 -O0 -g -m32 -fno-stack-protector -std=c11
+CFLAGS_X86=-O0 -g -m32 -fno-stack-protector -std=c11
 CFLAGS_ARM=-O0 -g -fno-stack-protector -std=c11
 CFLAGS_MIPS=-O0 -g -fno-stack-protector -std=c11
 CFLAGS_PPC=-O0 -g -fno-stack-protector -std=c11
 
 CPPFLAGS_X64=-O0 -g -fno-stack-protector
-CPPFLAGS_X86=-L/usr/lib32 -O0 -g -m32 -fno-stack-protector
+CPPFLAGS_X86=-O0 -g -m32 -fno-stack-protector
 CPPFLAGS_ARM=-O0 -g -fno-stack-protector
 CPPFLAGS_MIPS=-O0 -g -fno-stack-protector
 CPPFLAGS_PPC=-O0 -g -fno-stack-protector
