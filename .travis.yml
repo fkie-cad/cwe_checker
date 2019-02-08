@@ -1,0 +1,21 @@
+dist: xenial
+
+language: python
+python: 3.6
+services:
+  - docker
+
+install:
+  - sudo apt-get update
+  - sudo apt-get install -y execstack
+  - docker 
+
+before_script:
+  - ./.travis_prepare.sh
+
+script:
+  - ./.travis_run_tests.sh
+
+notifications:
+  email:
+    - firmware-security@fkie.fraunhofer.de
