@@ -61,6 +61,8 @@ bap PATH_TO_BINARY --recipe=recipes/RECIPE_FOLDER_NAME
 *cwe_checker* outputs to stdout. This output is parsable (sexep). There is a script `cwe_checker_to_ida` to visualize the results in IDA Pro.
 ## How to extend cwe_checker? ##
 New plugins should be added to src/checkers. Implement a .ml and .mli file. See the existing modules for an interface description. If necessary add a section to `config.json` to allow users to configure your plugin. Finally, add your plugin to `cwe_checker.ml`.
+
+If you planning to open a PR, please utilize [pre-commit](https://pre-commit.com) in your development environment to catch many issues before the code review.
 ### Contribute ###
 Contributions are always welcomed. Just fork it and open a pull request!
 ## Acknowledgements ##
