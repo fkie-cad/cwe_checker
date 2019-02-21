@@ -1,6 +1,7 @@
 import unittest
 import cwe_checker_testlib
 
+
 class TestCwe426(unittest.TestCase):
 
     def setUp(self):
@@ -33,4 +34,3 @@ class TestCwe426(unittest.TestCase):
         expect_res = 1
         res = cwe_checker_testlib.execute_and_check_occurence(self.target, self.target, 'ppc', self.string)
         assert res == expect_res
-    

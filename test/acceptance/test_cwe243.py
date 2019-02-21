@@ -1,6 +1,7 @@
 import unittest
 import cwe_checker_testlib
 
+
 class TestCwe243(unittest.TestCase):
 
     def setUp(self):
