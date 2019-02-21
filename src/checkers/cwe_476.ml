@@ -183,7 +183,10 @@ let update_state_jmp jmp state ~cwe_hits ~function_names ~program ~block ~strict
   match Jmp.kind jmp with
   | Goto(Indirect(exp)) -> flag_any_access exp state cwe_hits
   | Goto(Direct(_)) -> state
-  | Ret(_) -> flag_all_unchecked_registers state cwe_hits
+  | Ret(_) -> if strict_call_policy then
+      flag_all_unchecked_registers state cwe_hits
+    else
+      state
   | Int(_, _) -> flag_all_unchecked_registers state cwe_hits
   | Call(call) ->
     let state = match Call.return call with
@@ -216,7 +219,11 @@ let update_state_jmp jmp state ~cwe_hits ~function_names ~program ~block ~strict
       else
         state
 
-(** updates a block analysis. *)
+(** updates a block analysis.
+    The strict call policy decides the behaviour on call and return instructions:
+    strict: all unchecked values get flagged as cwe-hits
+    non-strict: the state gets cleared, it is assumed that the target of the call/return
+    instruction checks all remaining unchecked values. *)
 let update_block_analysis block register_state ~cwe_hits ~function_names ~program ~strict_call_policy =
   let elements = Blk.elts block in
   let register_state = Seq.fold elements ~init:register_state ~f:(fun state element ->
