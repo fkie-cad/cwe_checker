@@ -18,14 +18,14 @@ let get_calls_to_symbol symbol_name callsites program =
 
 let get_blk_tid_of_tid sub tid =
  let blk = Seq.find (Term.enum blk_t sub) ~f:(
-      fun b -> 
+      fun b ->
       match Term.last jmp_t b with
       | Some last_term -> tid = (Term.tid last_term)
       | None -> false) in
  match blk with
  | Some b -> Term.tid b
  | _ -> assert(false)
-    
+
 let is_reachable sub source sink =
   let cfg = Sub.to_graph sub in
   let source_tid = Term.tid source in
@@ -57,6 +57,6 @@ let handle_sub sub program tid_map symbols source sink =
   else
     ()
 
-let check_cwe program proj tid_map symbol_pairs =
+let check_cwe program proj tid_map symbol_pairs _ =
   let symbols = Symbol_utils.build_symbols ["access"; "open";] in
   Seq.iter (Term.enum sub_t program) ~f:(fun s -> handle_sub s program tid_map symbols "access" "open")

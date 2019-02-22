@@ -35,7 +35,7 @@ let resolve_symbols prog symbols =
     Seq.filter ~f:(fun s -> List.exists ~f:(fun x -> x = Sub.name s) symbols)
 
 
-let check_cwe prog proj tid_map symbol_names =
+let check_cwe prog proj tid_map symbol_names _ =
   match symbol_names with
   | hd::[] ->
      let subfunctions = Term.enum sub_t prog in
@@ -43,4 +43,3 @@ let check_cwe prog proj tid_map symbol_names =
      get_calls_to_symbols cg subfunctions (resolve_symbols prog hd)
      |> print_calls ~tid_map:tid_map
   | _ -> failwith "[CWE676] symbol_names not as expected"
-

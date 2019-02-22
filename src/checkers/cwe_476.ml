@@ -10,14 +10,11 @@ type access_type = | Access of Bil.var | MemAccess of Bil.var | NoAccess
 
 (* The union of two accesses is the higher access with MemAcces > Access > NoAccess *)
 let union_access access1 access2 : access_type =
-  match access1 with
-  | MemAccess(_) -> access1
-  | Access(_) -> begin
-      match access2 with
-      | MemAccess(_) -> access2
-      | Access(_) | NoAccess -> access1
-    end
-  | NoAccess -> access2
+  match (access1, access2) with
+  | (MemAccess(_), _) -> access1
+  | (_, MemAccess(_))
+  | (_, Access(_))    -> access2
+  | _                 -> access1
 
 
 (* union of three accesses for convenience *)
@@ -125,27 +122,24 @@ let checks_value exp state : State.t =
     end
   | _ -> state
 
-type cwe_hits_type = Tid.t list ref
-
-let add_to_hits (cwe_hits:cwe_hits_type) (tid:Tid.t) =
+let append_to_hits (cwe_hits:Tid.t list ref) (tid:Tid.t) =
   match List.find cwe_hits.contents ~f:(fun elem -> elem = tid) with
   | Some(_) -> ()
   | None -> (cwe_hits := (tid :: cwe_hits.contents))
 
 (** flags any access (not just memory access) from an unchecked source as a cwe_hit. *)
-
 let flag_any_access exp state ~cwe_hits =
   match contains_unchecked exp state with
   | MemAccess(var) | Access(var) ->
     let tid = State.find_exn state var in
-    add_to_hits cwe_hits tid;
+    append_to_hits cwe_hits tid;
     State.remove_tid state var
   | NoAccess -> state
 
 (** flag all unchecked registers as cwe_hits, return empty state *)
 let flag_all_unchecked_registers state ~cwe_hits =
   let () = List.iter state ~f:(fun (var, tid) ->
-      add_to_hits cwe_hits tid) in
+      append_to_hits cwe_hits tid) in
   []
 
 (** Updates the state depending on the def. If memory is accessed using an unchecked return value,
@@ -156,7 +150,7 @@ let update_state_def def state ~cwe_hits =
   match contains_unchecked rhs state with
   | MemAccess(var) -> begin (* we found a case of unchecked return value *)
       let tid = State.find_exn state var in
-      add_to_hits cwe_hits tid;
+      append_to_hits cwe_hits tid;
       State.remove_tid state var
     end
   | Access(var) -> (* taint the lhs as an unchecked return value *)
@@ -176,7 +170,7 @@ let update_state_jmp jmp state ~cwe_hits ~function_names ~program ~block ~strict
       State.remove_tid state var
     | MemAccess(var) -> (* a memory access using an unchecked value is still an error *)
       let tid = State.find_exn state var in
-      let () = add_to_hits cwe_hits tid in
+      let () = append_to_hits cwe_hits tid in
       State.remove_tid state var
     | NoAccess -> state
   end in
@@ -257,11 +251,19 @@ let print_hit tid ~sub ~function_names ~tid_map =
       | _ -> false
     ) in ()
 
-let check_cwe prog proj tid_map symbol_pairs =
-  let strict_call_policy = true in
-  let symbols = match symbol_pairs with
+let check_cwe prog proj tid_map symbol_names parameters =
+  let symbols = match symbol_names with
     | hd :: _ -> hd
     | _ -> failwith "[CWE476] symbol_names not as expected" in
+  let (strict_call_policy_string, max_steps_string) = match parameters with
+    | par1 :: par2 :: _ -> (par1, par2)
+    | _ -> failwith "[CWE476] parameters not as expected" in
+  let strict_call_policy = match String.split strict_call_policy_string ~on:'=' with
+    | "strict_call_policy" :: policy :: [] -> bool_of_string policy
+    | _ -> failwith "[CWE476] parameters not as expected" in
+  let max_steps = match String.split max_steps_string ~on:'=' with
+    | "max_steps" :: num :: [] -> int_of_string num
+    | _ -> failwith "[CWE476] parameters not as expected" in
   let function_names = List.map symbols ~f:(fun symb -> "@" ^ symb)  in
   let subfunctions = Term.enum sub_t prog in
   Seq.iter subfunctions ~f:(fun subfn ->
@@ -275,6 +277,6 @@ let check_cwe prog proj tid_map symbol_pairs =
           let block = Graphs.Ir.Node.label node in
           update_block_analysis block state ~cwe_hits ~function_names ~program:prog ~strict_call_policy
         ) in
-      let _ = Graphlib.Std.Graphlib.fixpoint (module Graphs.Ir) cfg ~steps:100 ~rev:false ~init:init ~equal:equal ~merge:merge ~f:f in
+      let _ = Graphlib.Std.Graphlib.fixpoint (module Graphs.Ir) cfg ~steps:max_steps ~rev:false ~init:init ~equal:equal ~merge:merge ~f:f in
       List.iter (!cwe_hits) ~f:(fun hit -> print_hit hit ~sub:subfn ~function_names ~tid_map)
     )

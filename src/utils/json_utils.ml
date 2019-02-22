@@ -23,3 +23,10 @@ let get_symbol_lists_from_json json cwe =
   |> filter_member "pairs"
   |> flatten
   |> List.map ~f:(fun l -> List.map (to_list l) ~f:to_string)
+
+let get_parameter_list_from_json json cwe =
+  [json]
+  |> filter_member cwe
+  |> filter_member "parameters"
+  |> flatten
+  |> List.map ~f:to_string

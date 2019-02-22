@@ -120,6 +120,10 @@
       "wcsstr",
       "wcstok",
       "wmemchr"
+    ],
+    "parameters": [
+      "strict_call_policy=true",
+      "max_steps=100"
     ]
   },
   "CWE676": {

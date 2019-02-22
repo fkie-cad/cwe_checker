@@ -1,6 +1,6 @@
 open Core_kernel.Std
 open Bap.Std
-open Symbol_utils    
+open Symbol_utils
 
 include Self()
 
@@ -30,10 +30,10 @@ let get_call_dests_of_sub sub =
     end
   | _ -> []
 
-let rec check dests symbols = 
+let rec check dests symbols =
   match dests with
   | [] -> (List.length symbols) = 0
-  | hd :: tl -> 
+  | hd :: tl ->
     begin
     match symbols with
       | [] -> true
@@ -45,7 +45,7 @@ let rec check dests symbols =
   end
 
 let check_route sub symbols =
-  let call_dests = get_call_dests_of_sub sub in 
+  let call_dests = get_call_dests_of_sub sub in
   let res = check call_dests symbols in
   if res then res else res
 
@@ -62,7 +62,7 @@ let check_path prog tid_map sub path =
   else
     false
 
-(** Checks a subfunction for CWE-243. Only functions that actually call "chroot" are considered. 
+(** Checks a subfunction for CWE-243. Only functions that actually call "chroot" are considered.
 It checks each of the configured VALID pathes found in config.json, e.g.
  "chroot_pathes": [["chroot", "chdir"], ["chdir", "chroot", "setresuid"], ["chdir", "chroot", "seteuid"],
  ["chdir", "chroot", "setreuid"], ["chdir", "chroot", "setuid"]].
@@ -81,10 +81,9 @@ let check_subfunction prog tid_map sub pathes =
          (Term.name sub)
     end
 
-let check_cwe prog proj tid_map pathes =
+let check_cwe prog proj tid_map pathes _ =
   let chroot_symbol = find_symbol prog "chroot" in
   match chroot_symbol with
   | Some _ ->
     Seq.iter (Term.enum sub_t prog) ~f:(fun sub -> check_subfunction prog tid_map sub pathes)
   | _ -> ()
-
