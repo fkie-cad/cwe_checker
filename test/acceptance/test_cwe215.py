@@ -1,6 +1,7 @@
 import unittest
 import cwe_checker_testlib
 
+
 class TestCwe215(unittest.TestCase):
 
     def setUp(self):
@@ -31,4 +32,4 @@ class TestCwe215(unittest.TestCase):
     def test_cwe215_01_mips(self):
         expect_res = 1
         res = cwe_checker_testlib.execute_and_check_occurence(self.filename, self.target, 'mips', self.string)
-        assert res == expect_res    
+        assert res == expect_res
