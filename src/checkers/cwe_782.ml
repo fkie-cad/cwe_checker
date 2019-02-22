@@ -14,6 +14,6 @@ let handle_sub sub program tid_map symbols =
           (Address_translation.translate_tid_to_assembler_address_string (Term.tid sub) tid_map)
       else
         ()
-    
-let check_cwe program proj tid_map symbols =
+
+let check_cwe program proj tid_map symbols _ =
   Seq.iter (Term.enum sub_t program) ~f:(fun s -> handle_sub s program tid_map symbols)

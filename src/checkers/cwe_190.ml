@@ -27,10 +27,10 @@ let check_multiplication_before_symbol proj prog sub blk jmp tid_map symbols =
                      (Address_translation.translate_tid_to_assembler_address_string (Term.tid blk) tid_map)
                      (Symbol_utils.get_symbol_name_from_jmp jmp symbols))
 
-let check_cwe prog proj tid_map symbol_names =
+let check_cwe prog proj tid_map symbol_names _ =
   match symbol_names with
   | hd::[] ->
-   let symbols = Symbol_utils.build_symbols hd prog in 
+   let symbols = Symbol_utils.build_symbols hd prog in
    let calls = call_finder#run prog [] in
    let relevant_calls = filter_calls_to_symbols calls symbols in
    check_calls relevant_calls prog proj tid_map symbols check_multiplication_before_symbol

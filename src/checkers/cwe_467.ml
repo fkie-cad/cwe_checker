@@ -1,12 +1,12 @@
 open Core_kernel.Std
 open Bap.Std
-open Symbol_utils       
+open Symbol_utils
 
 let name = "CWE467"
 let version = "0.1"
 
 let get_pointer_size arch =
-  Size.in_bytes @@ Arch.addr_size arch    
+  Size.in_bytes @@ Arch.addr_size arch
 
 let check_input_is_pointer_size proj prog sub blk jmp tid_map symbols =
   Seq.iter (Term.enum def_t blk) ~f:(fun d ->  match Exp.eval @@ Def.rhs d with
@@ -23,11 +23,11 @@ let check_input_is_pointer_size proj prog sub blk jmp tid_map symbols =
       end
       | _ -> ())
 
-                      
-let check_cwe prog proj tid_map symbol_names =
+
+let check_cwe prog proj tid_map symbol_names _ =
   match symbol_names with
   | hd::[] ->
-     let symbols = Symbol_utils.build_symbols hd prog in 
+     let symbols = Symbol_utils.build_symbols hd prog in
      let calls = call_finder#run prog [] in
      let relevant_calls = filter_calls_to_symbols calls symbols in
      check_calls relevant_calls prog proj tid_map symbols check_input_is_pointer_size

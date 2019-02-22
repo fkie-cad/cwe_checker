@@ -38,7 +38,7 @@ let get_min_fp_offset arch =
   match arch with
   | `x86 | `x86_64 -> 0x10000
   | _ -> 0x0
-  
+
 (*FIXME: this is architecture dependent and ugly*)
 let get_fp_of_arch arch =
   match arch with
@@ -91,6 +91,6 @@ let check_subfunction prog proj tid_map sub =
                                            end)
             end
         end)
-          
-let check_cwe prog proj tid_map symbol_names =
+
+let check_cwe prog proj tid_map symbol_names _ =
   Seq.iter (Term.enum sub_t prog) ~f:(fun sub -> check_subfunction prog proj tid_map sub)

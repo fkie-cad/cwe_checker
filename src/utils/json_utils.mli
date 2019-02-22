@@ -2,3 +2,4 @@
 
 val get_symbol_lists_from_json : Yojson.Basic.json -> string -> string list list
 val get_symbols_from_json : Yojson.Basic.json -> string -> string list
+val get_parameter_list_from_json : Yojson.Basic.json -> string -> string list
