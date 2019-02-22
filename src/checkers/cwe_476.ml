@@ -159,6 +159,21 @@ let update_state_def def state ~cwe_hits =
   | NoAccess -> (* no access to an unchecked return value in rhs. Since lhs is overwritten, it cannot be an unchecked return value anymore. *)
     State.remove_var state lhs
 
+(** Taint the return registers of a function as unchecked return values. *)
+let taint_return_registers func_tid state ~program ~block =
+  let func = Term.find_exn sub_t program func_tid in
+  let arguments = Term.enum arg_t func in
+  (* Every return register is tainted as unchecked return value. *)
+  Seq.fold arguments ~init:state ~f:(fun state arg ->
+      match Bap.Std.Arg.intent arg with
+      | None | Some(In) -> state
+      | Some(Out) | Some(Both) ->
+        let variable = match Bap.Std.Arg.rhs arg with
+          | Bil.Var(var) -> var
+          | _ -> failwith "[CWE476] Return register wasn't a register." in
+        State.add state variable (Term.tid block)
+    )
+
 (** Updates the state depending on the jump. On a jump to a function from the function list
     taint all return registers as unchecked return values. *)
 let update_state_jmp jmp state ~cwe_hits ~function_names ~program ~block ~strict_call_policy =
@@ -198,18 +213,7 @@ let update_state_jmp jmp state ~cwe_hits ~function_names ~program ~block ~strict
     | Indirect(_) -> state (* already handled above *)
     | Direct(tid) ->
       if List.exists function_names ~f:(fun elem -> String.(=) elem (Tid.name tid)) then
-        let func = Term.find_exn sub_t program tid in
-        let arguments = Term.enum arg_t func in
-        (* Every return register is tainted as unchecked return value. *)
-        Seq.fold arguments ~init:state ~f:(fun state arg ->
-            match Bap.Std.Arg.intent arg with
-            | None | Some(In) -> state
-            | Some(Out) | Some(Both) ->
-              let variable = match Bap.Std.Arg.rhs arg with
-                | Bil.Var(var) -> var
-                | _ -> failwith "[CWE476] Return register wasn't a register." in
-              State.add state variable (Term.tid block)
-          )
+        taint_return_registers tid state program block
       else
         state
 
