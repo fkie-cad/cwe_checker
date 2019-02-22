@@ -95,6 +95,10 @@
   "CWE476": {
     "_comment": "any function that possibly returns a NULL value.",
     "_comment1": "included functions of the following libs: stdlib.h, locale.h, stdio.h, cstring.h, wchar.h",
+    "parameters": [
+      "strict_call_policy=true",
+      "max_steps=100"
+    ],
     "symbols": [
       "malloc",
       "calloc",
@@ -120,10 +124,6 @@
       "wcsstr",
       "wcstok",
       "wmemchr"
-    ],
-    "parameters": [
-      "strict_call_policy=true",
-      "max_steps=100"
     ]
   },
   "CWE676": {
