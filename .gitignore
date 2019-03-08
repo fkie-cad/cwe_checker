@@ -213,7 +213,7 @@ test/run_real_world_samples.sh
 .project
 .pydevproject
 
-src/cwe_checker.plugin
+*.plugin
 
 test/artificial_samples/dockcross*
 
