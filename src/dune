@@ -1,0 +1,11 @@
+(library
+  (name cwe_checker)
+  (libraries
+  alcotest
+  yojson
+  bap
+  core_kernel)
+  (wrapped false) ; needed so that all submodules are accessible for library users
+)
+
+(include_subdirs unqualified) ; Include all subdirs when looking for source files

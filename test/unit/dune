@@ -1,0 +1,15 @@
+(executable
+  (name unit_tests)
+  (libraries
+  alcotest
+  yojson
+  bap
+  core_kernel
+  cwe_checker
+))
+
+(alias
+  (name runtest)
+  (deps unit_tests.exe)
+  (action (run %{deps} -q --color=always))
+)

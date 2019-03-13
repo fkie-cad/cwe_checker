@@ -77,6 +77,10 @@ let main config module_versions partial_update project =
   Log_utils.set_output stdout;
   Log_utils.color_on ();
 
+  (* TODO: for testing, remove later.*)
+  let state_map = Type_inference.compute_pointer_register project in
+  let () = Type_inference.print_blocks_with_error_register state_map project in
+
   if module_versions then
     begin
       print_module_versions ()
