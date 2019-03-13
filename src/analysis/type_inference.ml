@@ -56,16 +56,30 @@ module State = struct
     else
       false
 
-  (** create a new state with stack pointer as known pointer register and all flag
-      registers as known data registers. The stack itself is empty (TODO: Maybe add
-      return address to stack) and the offset is 0 (TODO: check correctness). *)
-  let stack_pointer_and_flags project =
+  (** Get an empty state. *)
+  let empty () =
+    let module VarMap = Map.Make(Var) in
+    { stack = Mem_region.empty ();
+      stack_offset = None;
+      reg = VarMap.empty;
+    }
+
+  (** Returns a register list with only the stack pointer as pointer register and
+      only the flag registers as data registers. *)
+  let get_stack_pointer_and_flags project =
     let module VarMap = Map.Make(Var) in
     let stack_pointer = Symbol_utils.stack_register project in
     let reg = Map.add VarMap.empty ~key:stack_pointer ~data:(Ok(Register.Pointer)) in
     let flags = Symbol_utils.flag_register_list project in
-    let reg = List.fold flags ~init:reg ~f:(fun state register ->
-        Map.add state register (Ok(Register.Data)) ) in
+    List.fold flags ~init:reg ~f:(fun state register ->
+        Map.add state register (Ok(Register.Data)) )
+
+  (** create a new state with stack pointer as known pointer register and all flag
+      registers as known data registers. The stack itself is empty (TODO: Maybe add
+      return address to stack) and the offset is 0 (TODO: check correctness). *)
+  let function_start_state project =
+    let module VarMap = Map.Make(Var) in
+    let reg = get_stack_pointer_and_flags project in
     { stack = Mem_region.empty ();
       stack_offset = Some(Ok(Bitvector.of_int 0 ~width:(Symbol_utils.arch_pointer_size_in_bytes project * 8))); (* TODO: Check whether this is correct. *)
       reg = reg;
@@ -266,7 +280,11 @@ let update_state_def state def ~project =
 let update_state_jmp state jmp ~project =
   match Jmp.kind jmp with
   | Call(_)
-  | Int(_, _) -> State.stack_pointer_and_flags project (* TODO: We need stubs and/or interprocedural analysis here *)
+  | Int(_, _) -> (* TODO: We need stubs and/or interprocedural analysis here *)
+    let empty_state = State.empty() in
+    { empty_state with
+      State.stack_offset = state.State.stack_offset;
+      State.reg = State.get_stack_pointer_and_flags project } (* Only the stack_offset is kept. *)
   | Goto(Indirect(Bil.Var(var))) (* TODO: warn when jumping to something that is marked as data. *)
   | Ret(Indirect(Bil.Var(var))) ->
     let reg = Map.add state.State.reg var (Ok(Register.Pointer)) in
@@ -289,9 +307,16 @@ let update_block_analysis block register_state ~project =
 
 let intraprocedural_fixpoint func ~project =
   let cfg = Sub.to_cfg func in
-  let only_sp = State.stack_pointer_and_flags project in
+  (* default state for nodes *)
+  let only_sp = { (State.empty ()) with State.reg = State.get_stack_pointer_and_flags project } in
+  (* Create a starting solution where only the first block of a function knows the stack_offset *)
+  let fn_start_state = State.function_start_state project in
+  let fn_start_block = Option.value_exn (Term.first blk_t func) in
+  let fn_start_state = update_block_analysis fn_start_block fn_start_state ~project in
+  let fn_start_node = Seq.find_exn (Graphs.Ir.nodes cfg) ~f:(fun node -> (Term.tid fn_start_block) = (Term.tid (Graphs.Ir.Node.label node))) in
   let empty = Map.empty Graphs.Ir.Node.comparator in
-  let init = Graphlib.Std.Solution.create empty only_sp in
+  let with_start_node = Map.add empty fn_start_node fn_start_state in
+  let init = Graphlib.Std.Solution.create with_start_node only_sp in
   let equal = State.equal in
   let merge = State.merge in
   let f = (fun node state ->
@@ -302,10 +327,14 @@ let intraprocedural_fixpoint func ~project =
 
 (** Extract the starting state of a node. *)
 let extract_start_state node ~cfg ~solution ~project =
-let predecessors = Graphs.Ir.Node.preds node cfg in
-Seq.fold predecessors ~init:(State.stack_pointer_and_flags project) ~f:(fun state node ->
-    State.merge state (Graphlib.Std.Solution.get solution node)
-  )
+  let predecessors = Graphs.Ir.Node.preds node cfg in
+  if Seq.is_empty predecessors then
+    State.function_start_state project (* This should be the first block of a function *)
+  else
+    let only_sp = { (State.empty ()) with State.reg = State.get_stack_pointer_and_flags project } in
+    Seq.fold predecessors ~init:only_sp ~f:(fun state node ->
+        State.merge state (Graphlib.Std.Solution.get solution node)
+      )
 
 (* TODO: remove or refactor to also print stack info. *)
 let print_state state =
