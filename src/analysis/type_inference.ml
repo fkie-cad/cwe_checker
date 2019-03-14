@@ -24,7 +24,7 @@ module Register = struct
 end
 
 
-module State = struct
+module TypeInfo = struct
   type reg_state = (Register.t, unit) Result.t Var.Map.t [@@deriving bin_io, compare, sexp]
   type t = {
     stack: Register.t Mem_region.t;
@@ -137,8 +137,8 @@ let rec nested_exp_list exp : Exp.t list =
 let get_stack_elem state exp ~project =
   match exp with
   | Bil.Load(_, addr, endian, size) when (Size.in_bytes size) = (Symbol_utils.arch_pointer_size_in_bytes project) -> begin (* TODO: add a test for correct endianess *)
-      match State.compute_stack_offset state addr project with
-      | Some(offset) -> Mem_region.get state.State.stack offset
+      match TypeInfo.compute_stack_offset state addr project with
+      | Some(offset) -> Mem_region.get state.TypeInfo.stack offset
       | None -> None
     end
   | _ -> None
@@ -146,7 +146,7 @@ let get_stack_elem state exp ~project =
 
 
 
-let rec type_of_exp exp (state: State.t) ~project =
+let rec type_of_exp exp (state: TypeInfo.t) ~project =
   let open Register in
   match exp with
   | Bil.Load(_) -> (* TODO: Right now only the stack is tracked for type infos. *)
@@ -178,7 +178,7 @@ let rec type_of_exp exp (state: State.t) ~project =
       | _ -> Some(Ok(Data)) (* every other operation should not yield valid pointers *)
     end
   | Bil.UnOp(_) -> Some(Ok(Data))
-  | Bil.Var(var) -> Map.find state.State.reg var
+  | Bil.Var(var) -> Map.find state.TypeInfo.reg var
   | Bil.Int(_) -> None (* TODO: For non-relocateable binaries this could be a pointer to a function/global variable *)
   | Bil.Cast(Bil.SIGNED, _, _) -> Some(Ok(Data))
   | Bil.Cast(_, size, exp) -> (* TODO: unit test, whether size here is really in bits??? *)
@@ -203,19 +203,19 @@ let set_stack_elem state exp ~project =
   match exp with
   | Bil.Store(_, addr_exp, value_exp, endian, size) ->
     begin
-      match (State.compute_stack_offset state addr_exp project, type_of_exp value_exp state ~project) with
+      match (TypeInfo.compute_stack_offset state addr_exp project, type_of_exp value_exp state ~project) with
       | (Some(offset), Some(Ok(value))) when Size.in_bytes size = (Symbol_utils.arch_pointer_size_in_bytes project) ->
-        let stack = Mem_region.add state.State.stack value ~pos:offset ~size:(pointer_size_as_bitvector project) in
-        { state with State.stack = stack}
+        let stack = Mem_region.add state.TypeInfo.stack value ~pos:offset ~size:(pointer_size_as_bitvector project) in
+        { state with TypeInfo.stack = stack}
       | (Some(offset), Some(Ok(value))) when Size.in_bytes size <> (Symbol_utils.arch_pointer_size_in_bytes project) ->
-        let stack = Mem_region.add state.State.stack Register.Data ~pos:offset ~size:(Bitvector.of_int (Size.in_bytes size) ~width:(Symbol_utils.arch_pointer_size_in_bytes project)) in
-        { state with State.stack = stack}
+        let stack = Mem_region.add state.TypeInfo.stack Register.Data ~pos:offset ~size:(Bitvector.of_int (Size.in_bytes size) ~width:(Symbol_utils.arch_pointer_size_in_bytes project)) in
+        { state with TypeInfo.stack = stack}
       | (Some(offset), Some(Error(_))) ->
-        let stack = Mem_region.mark_error state.State.stack ~pos:offset ~size:(Bitvector.of_int (Size.in_bytes size) ~width:(Symbol_utils.arch_pointer_size_in_bytes project)) in
-        { state with State.stack = stack}
+        let stack = Mem_region.mark_error state.TypeInfo.stack ~pos:offset ~size:(Bitvector.of_int (Size.in_bytes size) ~width:(Symbol_utils.arch_pointer_size_in_bytes project)) in
+        { state with TypeInfo.stack = stack}
       | (Some(offset), None) ->
-        let stack = Mem_region.remove state.State.stack ~pos:offset ~size:(Bitvector.of_int (Size.in_bytes size) ~width:(Symbol_utils.arch_pointer_size_in_bytes project)) in
-        { state with State.stack = stack}
+        let stack = Mem_region.remove state.TypeInfo.stack ~pos:offset ~size:(Bitvector.of_int (Size.in_bytes size) ~width:(Symbol_utils.arch_pointer_size_in_bytes project)) in
+        { state with TypeInfo.stack = stack}
       | _ -> state
     end
   | _ -> state
@@ -232,13 +232,13 @@ let add_mem_address_registers state exp ~project =
           | Bil.BinOp(Bil.MINUS, Bil.Var(addr), Bil.Int(_))
           | Bil.BinOp(Bil.AND, Bil.Var(addr), Bil.Int(_))
           | Bil.BinOp(Bil.OR, Bil.Var(addr), Bil.Int(_)) ->
-            { state with State.reg = Map.add state.State.reg addr (Ok(Register.Pointer)) } (* TODO: there are some false positives here for indices in global data array, where the immediate is the pointer. *)
+            { state with TypeInfo.reg = Map.add state.TypeInfo.reg addr (Ok(Register.Pointer)) } (* TODO: there are some false positives here for indices in global data array, where the immediate is the pointer. *)
           | Bil.BinOp(Bil.PLUS, Bil.Var(addr), exp2)
           | Bil.BinOp(Bil.MINUS, Bil.Var(addr), exp2)
           | Bil.BinOp(Bil.AND, Bil.Var(addr), exp2)
           | Bil.BinOp(Bil.OR, Bil.Var(addr), exp2) ->
             if type_of_exp exp2 state project = Some(Ok(Register.Data)) then
-              { state with State.reg = Map.add state.State.reg addr (Ok(Register.Pointer)) }
+              { state with TypeInfo.reg = Map.add state.TypeInfo.reg addr (Ok(Register.Pointer)) }
             else
               state
           | _ -> state
@@ -251,19 +251,19 @@ let add_mem_address_registers state exp ~project =
    TODO: Bil.AND, Bil.OR are ignored because we do not track alignment yet. *)
 let update_stack_offset state def ~project =
   let stack_register = Symbol_utils.stack_register project in
-  if Def.lhs def = stack_register && Option.is_some state.State.stack_offset then
+  if Def.lhs def = stack_register && Option.is_some state.TypeInfo.stack_offset then
     match Def.rhs def with
     | Bil.BinOp(Bil.PLUS, Bil.Var(var), Bil.Int(value)) ->
       if var = stack_register then
-        State.stack_offset_add state value
+        TypeInfo.stack_offset_add state value
       else
-        { state with State.stack_offset = None }
+        { state with TypeInfo.stack_offset = None }
     | Bil.BinOp(Bil.MINUS, Bil.Var(var), Bil.Int(value)) ->
       if var = stack_register then
-        State.stack_offset_add state (Bitvector.neg (Bitvector.signed value))
+        TypeInfo.stack_offset_add state (Bitvector.neg (Bitvector.signed value))
       else
-        { state with State.stack_offset = None }
-    | _ -> { state with State.stack_offset = None }
+        { state with TypeInfo.stack_offset = None }
+    | _ -> { state with TypeInfo.stack_offset = None }
   else
     state
 
@@ -272,11 +272,11 @@ let update_state_def state def ~project =
   let state = add_mem_address_registers state (Def.rhs def) project in
   let state = match type_of_exp (Def.rhs def) state project with
     | Some(value) ->
-      let reg = Map.add state.State.reg (Def.lhs def) value in
-      { state with State.reg = reg }
+      let reg = Map.add state.TypeInfo.reg (Def.lhs def) value in
+      { state with TypeInfo.reg = reg }
     | None -> (* We don't know the type of the new value *)
-      let reg = Map.remove state.State.reg (Def.lhs def) in
-      { state with State.reg = reg } in
+      let reg = Map.remove state.TypeInfo.reg (Def.lhs def) in
+      { state with TypeInfo.reg = reg } in
   (* update stack offset and maybe write something to the stack *)
   let state = update_stack_offset state def ~project in
   let state = set_stack_elem state (Def.rhs def) ~project in
@@ -286,14 +286,14 @@ let update_state_jmp state jmp ~project =
   match Jmp.kind jmp with
   | Call(_)
   | Int(_, _) -> (* TODO: We need stubs and/or interprocedural analysis here *)
-    let empty_state = State.empty() in
+    let empty_state = TypeInfo.empty() in
     { empty_state with
-      State.stack_offset = state.State.stack_offset;
-      State.reg = State.get_stack_pointer_and_flags project } (* Only the stack_offset is kept. *)
+      TypeInfo.stack_offset = state.TypeInfo.stack_offset;
+      TypeInfo.reg = TypeInfo.get_stack_pointer_and_flags project } (* Only the stack_offset is kept. *)
   | Goto(Indirect(Bil.Var(var))) (* TODO: warn when jumping to something that is marked as data. *)
   | Ret(Indirect(Bil.Var(var))) ->
-    let reg = Map.add state.State.reg var (Ok(Register.Pointer)) in
-    { state with State.reg = reg }
+    let reg = Map.add state.TypeInfo.reg var (Ok(Register.Pointer)) in
+    { state with TypeInfo.reg = reg }
   | Goto(_)
   | Ret(_)    -> state
 
@@ -307,23 +307,23 @@ let update_block_analysis block register_state ~project =
       | `Phi phi -> state (* We ignore phi terms for this analysis. *)
       | `Jmp jmp -> update_state_jmp state jmp ~project
     ) in
-  State.remove_virtual_registers register_state (* virtual registers should not be accessed outside of the block where they are defined. *)
+  TypeInfo.remove_virtual_registers register_state (* virtual registers should not be accessed outside of the block where they are defined. *)
 
 
 let intraprocedural_fixpoint func ~project =
   let cfg = Sub.to_cfg func in
   (* default state for nodes *)
-  let only_sp = { (State.empty ()) with State.reg = State.get_stack_pointer_and_flags project } in
+  let only_sp = { (TypeInfo.empty ()) with TypeInfo.reg = TypeInfo.get_stack_pointer_and_flags project } in
   (* Create a starting solution where only the first block of a function knows the stack_offset *)
-  let fn_start_state = State.function_start_state project in
+  let fn_start_state = TypeInfo.function_start_state project in
   let fn_start_block = Option.value_exn (Term.first blk_t func) in
   let fn_start_state = update_block_analysis fn_start_block fn_start_state ~project in
   let fn_start_node = Seq.find_exn (Graphs.Ir.nodes cfg) ~f:(fun node -> (Term.tid fn_start_block) = (Term.tid (Graphs.Ir.Node.label node))) in
   let empty = Map.empty Graphs.Ir.Node.comparator in
   let with_start_node = Map.add empty fn_start_node fn_start_state in
   let init = Graphlib.Std.Solution.create with_start_node only_sp in
-  let equal = State.equal in
-  let merge = State.merge in
+  let equal = TypeInfo.equal in
+  let merge = TypeInfo.merge in
   let f = (fun node state ->
       let block = Graphs.Ir.Node.label node in
       update_block_analysis block state ~project
@@ -334,17 +334,17 @@ let intraprocedural_fixpoint func ~project =
 let extract_start_state node ~cfg ~solution ~project =
   let predecessors = Graphs.Ir.Node.preds node cfg in
   if Seq.is_empty predecessors then
-    State.function_start_state project (* This should be the first block of a function *)
+    TypeInfo.function_start_state project (* This should be the first block of a function *)
   else
-    let only_sp = { (State.empty ()) with State.reg = State.get_stack_pointer_and_flags project } in
+    let only_sp = { (TypeInfo.empty ()) with TypeInfo.reg = TypeInfo.get_stack_pointer_and_flags project } in
     Seq.fold predecessors ~init:only_sp ~f:(fun state node ->
-        State.merge state (Graphlib.Std.Solution.get solution node)
+        TypeInfo.merge state (Graphlib.Std.Solution.get solution node)
       )
 
 (* TODO: remove or refactor to also print stack info. *)
 let print_state state =
   print_string "Register: ";
-  Map.iteri state.State.reg ~f:(fun ~key:var ~data:reg ->
+  Map.iteri state.TypeInfo.reg ~f:(fun ~key:var ~data:reg ->
       match reg with
       | Ok(Register.Pointer) -> print_string (Var.name var ^ ":Pointer, ")
       | Ok(Register.Data) -> print_string (Var.name var ^ ":Data, ")

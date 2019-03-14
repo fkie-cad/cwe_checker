@@ -14,7 +14,7 @@ module Register : sig
 end
 
 (* TODO: Either rename it to something more useful or make it opaque. *)
-module State : sig
+module TypeInfo : sig
   type reg_state = (Register.t, unit) Result.t Var.Map.t [@@deriving bin_io, compare, sexp]
   type t = {
     stack: Register.t Mem_region.t;
@@ -28,8 +28,8 @@ end
 
 (** Compute a map that sends a block tid to its state at the beginning of
     the block. *)
-val compute_pointer_register: Project.t -> State.t Tid.Map.t
+val compute_pointer_register: Project.t -> TypeInfo.t Tid.Map.t
 
 (** Print blocks with an error register at the end of the block. TODO: only for
     testing, remove later. *)
-val print_blocks_with_error_register: State.t Tid.Map.t -> project:Project.t -> unit
+val print_blocks_with_error_register: TypeInfo.t Tid.Map.t -> project:Project.t -> unit
