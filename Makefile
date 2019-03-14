@@ -1,6 +1,6 @@
 .PHONY: all clean test uninstall
 all:
-	cd src; bapbuild -r -Is checkers,utils,analysis -pkgs yojson,unix cwe_checker.plugin; bapbundle install cwe_checker.plugin; cd ..
+	cd src; bapbuild -r -Is checkers,utils,analysis -pkgs yojson,unix,ppx_jane cwe_checker.plugin; bapbundle install cwe_checker.plugin; cd ..
 
 test:
 	dune runtest --profile release # TODO: correct all dune linter warnings so that we can remove --profile release

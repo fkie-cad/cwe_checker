@@ -7,7 +7,8 @@
 open Bap.Std
 open Core_kernel.Std
 
-type 'a t
+type 'a t [@@deriving bin_io, compare, sexp]
+
 
 (** Get an empty memory region- *)
 val empty: unit -> 'a t

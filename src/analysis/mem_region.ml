@@ -8,9 +8,10 @@ type 'a mem_node = {
   pos: Bitvector.t; (* address of the element *)
   size: Bitvector.t; (* size (in bytes) of the element *)
   data: ('a, unit) Result.t;
-}
+} [@@deriving bin_io, compare, sexp]
 
-type 'a t = 'a mem_node list
+type 'a t = 'a mem_node list [@@deriving bin_io, compare, sexp]
+
 
 let empty () : 'a t =
   []

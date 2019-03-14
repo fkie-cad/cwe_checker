@@ -14,6 +14,7 @@ module Register = struct
   type t =
     | Pointer
     | Data
+  [@@deriving bin_io, compare, sexp]
 
   let merge reg1 reg2 =
     if reg1 = reg2 then Some(Ok(reg1)) else Some(Error(()))
@@ -24,12 +25,12 @@ end
 
 
 module State = struct
-  type reg_state = (Register.t, unit) result Map.Make(Var).t
+  type reg_state = (Register.t, unit) Result.t Var.Map.t [@@deriving bin_io, compare, sexp]
   type t = {
     stack: Register.t Mem_region.t;
-    stack_offset: (Bitvector.t, unit) result option; (* If we don't know the offset, this is None, if we have conflicting values for the offset, this is Some(Error()) *)
+    stack_offset: (Bitvector.t, unit) Result.t Option.t; (* If we don't know the offset, this is None, if we have conflicting values for the offset, this is Some(Error()) *)
     reg: reg_state;
-  }
+  } [@@deriving bin_io, compare, sexp]
 
   let merge state1 state2 =
     let stack = Mem_region.merge state1.stack state2.stack ~data_merge:Register.merge in
@@ -58,7 +59,7 @@ module State = struct
 
   (** Get an empty state. *)
   let empty () =
-    let module VarMap = Map.Make(Var) in
+    let module VarMap = Var.Map in
     { stack = Mem_region.empty ();
       stack_offset = None;
       reg = VarMap.empty;
@@ -67,7 +68,7 @@ module State = struct
   (** Returns a register list with only the stack pointer as pointer register and
       only the flag registers as data registers. *)
   let get_stack_pointer_and_flags project =
-    let module VarMap = Map.Make(Var) in
+    let module VarMap = Var.Map in
     let stack_pointer = Symbol_utils.stack_register project in
     let reg = Map.add VarMap.empty ~key:stack_pointer ~data:(Ok(Register.Pointer)) in
     let flags = Symbol_utils.flag_register_list project in
@@ -78,7 +79,7 @@ module State = struct
       registers as known data registers. The stack itself is empty (TODO: Maybe add
       return address to stack) and the offset is 0 (TODO: check correctness). *)
   let function_start_state project =
-    let module VarMap = Map.Make(Var) in
+    let module VarMap = Var.Map in
     let reg = get_stack_pointer_and_flags project in
     { stack = Mem_region.empty ();
       stack_offset = Some(Ok(Bitvector.of_int 0 ~width:(Symbol_utils.arch_pointer_size_in_bytes project * 8))); (* TODO: Check whether this is correct. *)
@@ -103,6 +104,10 @@ module State = struct
     match (register, state.stack_offset) with
     | (Some(var), Some(Ok(base_offset))) when var = (Symbol_utils.stack_register project) -> Some(Bitvector.(+) base_offset offset)
     | _ -> None
+
+  (* TODO: This just prints the sexp, rewrite it if we need nicer output. *)
+  let pp ppf elem =
+    Format.fprintf ppf "%s" (string_of_sexp (sexp_of_t elem))
 
 end (* module *)
 

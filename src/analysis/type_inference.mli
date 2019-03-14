@@ -9,16 +9,21 @@ module Register : sig
   type t =
     | Pointer
     | Data
+  [@@deriving bin_io, compare, sexp]
+
 end
 
 (* TODO: Either rename it to something more useful or make it opaque. *)
 module State : sig
-  type reg_state = (Register.t, unit) result Map.Make(Var).t
+  type reg_state = (Register.t, unit) Result.t Var.Map.t [@@deriving bin_io, compare, sexp]
   type t = {
     stack: Register.t Mem_region.t;
-    stack_offset: (Bitvector.t, unit) result option;
+    stack_offset: (Bitvector.t, unit) Result.t Option.t;
     reg: reg_state;
-  }
+  } [@@deriving bin_io, compare, sexp]
+
+  (* Pretty Printer. *)
+  val pp: Format.formatter -> t -> unit
 end
 
 (** Compute a map that sends a block tid to its state at the beginning of
