@@ -22,14 +22,24 @@ module TypeInfo : sig
     reg: reg_state;
   } [@@deriving bin_io, compare, sexp]
 
-  (* Pretty Printer. *)
+  (* Pretty Printer. At the moment, the output is not pretty at all. *)
   val pp: Format.formatter -> t -> unit
 end
 
-(** Compute a map that sends a block tid to its state at the beginning of
-    the block. *)
-val compute_pointer_register: Project.t -> TypeInfo.t Tid.Map.t
+val type_info_tag: TypeInfo.t Value.tag
+
+(** Computes TypeInfo for the given project. Adds tags to each block containing the
+    TypeInfo at the start of the block. *)
+val compute_pointer_register: Project.t -> Project.t
 
 (** Print blocks with an error register at the end of the block. TODO: only for
     testing, remove later. *)
-val print_blocks_with_error_register: TypeInfo.t Tid.Map.t -> project:Project.t -> unit
+val print_blocks_with_error_register: project:Project.t -> unit
+
+(** Updates the type info for a single element (Phi/Def/Jmp) of a block. Input
+    is the type info before execution of the element, output is the type info
+    after execution of the element. *)
+val update_type_info: Blk.elt -> TypeInfo.t -> project:Project.t -> TypeInfo.t
+
+(* functions made public for unit tests: *)
+val update_block_analysis: Blk.t -> TypeInfo.t -> project:Project.t -> TypeInfo.t

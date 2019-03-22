@@ -8,6 +8,9 @@ open Core_kernel.Std
     extend to track PointerTargets
     TODO: there are no checks yet if a value from the stack of the calling function
     is accessed.
+    TODO: tracking for PointerTargets should also track if another register other
+    than the stack register is used to access values on the stack of the current
+    function.
 *)
 
 module Register = struct
@@ -107,10 +110,14 @@ module TypeInfo = struct
 
   (* TODO: This just prints the sexp, rewrite it if we need nicer output. *)
   let pp ppf elem =
-    Format.fprintf ppf "%s" (string_of_sexp (sexp_of_t elem))
+    Format.fprintf ppf "%s" (Sexp.to_string (sexp_of_t elem))
 
 end (* module *)
 
+(* Create a tag for TypeInfo *)
+let type_info_tag = Value.Tag.register (module TypeInfo)
+    ~name:"type_info"
+    ~uuid:"7a537f19-2dd1-49b6-b343-35b4b1d04c0b"
 
 (** returns a list with all nested expressions. If expr1 is contained in expr2, then
     expr1 will be included after expr2 in the list.
@@ -267,6 +274,13 @@ let update_stack_offset state def ~project =
   else
     state
 
+(* Remove any knowledge of the stack (except the stack_offset) and the registers (except stack and flag registers) from the state. *)
+let keep_only_stack_offset state ~project =
+  let empty_state = TypeInfo.empty() in
+  { empty_state with
+    TypeInfo.stack_offset = state.TypeInfo.stack_offset;
+    TypeInfo.reg = TypeInfo.get_stack_pointer_and_flags project }
+
 let update_state_def state def ~project =
   (* add all registers that are used as address registers in load/store expressions to the state *)
   let state = add_mem_address_registers state (Def.rhs def) project in
@@ -284,12 +298,21 @@ let update_state_def state def ~project =
 
 let update_state_jmp state jmp ~project =
   match Jmp.kind jmp with
-  | Call(_)
+  | Call(call) -> begin match Call.target call with
+      | Direct(tid) ->
+        let program = Project.program project in
+        let func = Term.find_exn sub_t program tid in
+        if List.exists (Cconv.parse_dyn_syms project) ~f:(fun elem -> elem = (Sub.name func)) then (* TODO: also use knowledge saved in Arg.t terms! *)
+          let empty_state = TypeInfo.empty () in (* TODO: to preserve stack information we need to be sure that the callee does not write on the stack => needs pointer source tracking! *)
+          { empty_state with
+            TypeInfo.stack_offset = state.TypeInfo.stack_offset;
+            TypeInfo.reg = Var.Map.filter_keys state.TypeInfo.reg ~f:(fun var -> Cconv.is_callee_saved var project) }
+        else
+          keep_only_stack_offset state project (* TODO: add interprocedural analysis here. *)
+      | Indirect(_) -> keep_only_stack_offset state project (* TODO: when we have value tracking and interprocedural analysis, we can add indirect calls to the regular analysis. *)
+    end
   | Int(_, _) -> (* TODO: We need stubs and/or interprocedural analysis here *)
-    let empty_state = TypeInfo.empty() in
-    { empty_state with
-      TypeInfo.stack_offset = state.TypeInfo.stack_offset;
-      TypeInfo.reg = TypeInfo.get_stack_pointer_and_flags project } (* Only the stack_offset is kept. *)
+    keep_only_stack_offset state project
   | Goto(Indirect(Bil.Var(var))) (* TODO: warn when jumping to something that is marked as data. *)
   | Ret(Indirect(Bil.Var(var))) ->
     let reg = Map.add state.TypeInfo.reg var (Ok(Register.Pointer)) in
@@ -297,15 +320,19 @@ let update_state_jmp state jmp ~project =
   | Goto(_)
   | Ret(_)    -> state
 
+(* This is public for unit test purposes. *)
+let update_type_info block_elem state ~project =
+  match block_elem with
+  | `Def def -> update_state_def state def ~project
+  | `Phi phi -> state (* We ignore phi terms for this analysis. *)
+  | `Jmp jmp -> update_state_jmp state jmp ~project
+
 (** updates a block analysis. *)
 let update_block_analysis block register_state ~project =
   (* get all elements (Defs, Jumps, Phi-nodes) in the correct order *)
   let elements = Blk.elts block in
   let register_state = Seq.fold elements ~init:register_state ~f:(fun state element ->
-      match element with
-      | `Def def -> update_state_def state def ~project
-      | `Phi phi -> state (* We ignore phi terms for this analysis. *)
-      | `Jmp jmp -> update_state_jmp state jmp ~project
+      update_type_info element state ~project
     ) in
   TypeInfo.remove_virtual_registers register_state (* virtual registers should not be accessed outside of the block where they are defined. *)
 
@@ -314,7 +341,7 @@ let intraprocedural_fixpoint func ~project =
   let cfg = Sub.to_cfg func in
   (* default state for nodes *)
   let only_sp = { (TypeInfo.empty ()) with TypeInfo.reg = TypeInfo.get_stack_pointer_and_flags project } in
-  (* Create a starting solution where only the first block of a function knows the stack_offset *)
+  (* Create a starting solution where only the first block of a function knows the stack_offset. *)
   let fn_start_state = TypeInfo.function_start_state project in
   let fn_start_block = Option.value_exn (Term.first blk_t func) in
   let fn_start_state = update_block_analysis fn_start_block fn_start_state ~project in
@@ -334,7 +361,7 @@ let intraprocedural_fixpoint func ~project =
 let extract_start_state node ~cfg ~solution ~project =
   let predecessors = Graphs.Ir.Node.preds node cfg in
   if Seq.is_empty predecessors then
-    TypeInfo.function_start_state project (* This should be the first block of a function *)
+    TypeInfo.function_start_state project (* This should be the first block of a function. Maybe add a test for when there is more than one such block in a function? *)
   else
     let only_sp = { (TypeInfo.empty ()) with TypeInfo.reg = TypeInfo.get_stack_pointer_and_flags project } in
     Seq.fold predecessors ~init:only_sp ~f:(fun state node ->
@@ -366,27 +393,28 @@ let state_list_def node ~cfg ~solution ~project =
 
 
 let compute_pointer_register project =
-  let output_map = Map.empty Tid.comparator in
   let program = Project.program project in
-  let functions = Term.enum sub_t program in
-  Seq.fold functions ~init:output_map ~f:(fun output_map func ->
+  let program_with_tags = Term.map sub_t program ~f:(fun func ->
       let cfg = Sub.to_cfg func in
       let solution = intraprocedural_fixpoint func project in
-      Seq.fold (Graphs.Ir.nodes cfg) ~init:output_map ~f:(fun output_map node ->
+      Seq.fold (Graphs.Ir.nodes cfg) ~init:func ~f:(fun func node ->
           let block = Graphs.Ir.Node.label node in
-          Map.add output_map (Term.tid block) (extract_start_state node cfg solution project)
+          let start_state = extract_start_state node cfg solution project in
+          let tagged_block = Term.set_attr block type_info_tag start_state in
+          Term.update blk_t func tagged_block
         )
-    )
+    ) in
+  Project.with_program project program_with_tags
 
-let print_blocks_with_error_register state_map ~project =
+let print_blocks_with_error_register ~project =
   let program = Project.program project in
   let functions = Term.enum sub_t program in
   Seq.iter functions ~f:(fun func ->
       let blocks = Term.enum blk_t func in
       Seq.iter blocks ~f:(fun block ->
-          let start_state = Map.find_exn state_map (Term.tid block) in
+          let start_state = Option.value_exn (Term.get_attr block type_info_tag) in
           let end_state = update_block_analysis block start_state project in
-          if Map.exists end_state.reg ~f:(fun register -> register = Error(())) then
+          if Map.exists end_state.TypeInfo.reg ~f:(fun register -> register = Error(())) then
             let () = print_string (Blk.pps () block) in
             print_state end_state
         )

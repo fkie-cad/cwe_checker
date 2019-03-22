@@ -1,10 +1,10 @@
 (library
   (name cwe_checker)
   (libraries
-  alcotest
   yojson
   bap
-  core_kernel)
+  core_kernel
+  core)
   (preprocess (pps ppx_jane))
   (wrapped false) ; needed so that all submodules are accessible for library users
 )

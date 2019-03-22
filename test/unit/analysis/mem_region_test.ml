@@ -1,6 +1,5 @@
 open Bap.Std
 open Core_kernel.Std
-open Cwe_checker
 
 let check msg x = Alcotest.(check bool) msg true x
 
@@ -13,6 +12,12 @@ let test_add () : unit =
   check "add_ok" (Some(Ok("Five")) = (Mem_region.get x (bv 3)));
   check "add_err" (Some(Error(())) = (Mem_region.get x (bv 1)));
   check "add_none" (None = (Mem_region.get x (bv 8)))
+
+let test_minus () =
+  let bv num = Bitvector.of_int num ~width:32 in
+  let x = Mem_region.empty () in
+  let x = Mem_region.add x "One" ~pos:(bv (-8)) ~size:(bv 8) in
+  check "negative_index" (Some(Ok("One")) = Mem_region.get x (Bitvector.unsigned (bv (-8))))
 
 let test_remove () =
   let bv num = Bitvector.of_int num ~width:32 in
@@ -63,8 +68,9 @@ let test_equal () =
   check "equal_yes" (Mem_region.equal x y ~data_equal:(fun x y -> x = y))
 
 
-let mem_region_tests = [
+let tests = [
   "Add", `Quick, test_add;
+  "Negative Indices", `Quick, test_minus;
   "Remove", `Quick, test_remove;
   "Mark_error", `Quick, test_mark_error;
   "Merge", `Quick, test_merge;
