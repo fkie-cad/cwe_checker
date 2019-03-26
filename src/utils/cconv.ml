@@ -4,9 +4,10 @@ open Core_kernel.Std
 
     (* TODO: add thumb *)
 
+let dyn_syms = ref None
 
 (** Return a list of registers that are callee-saved. *)
-let callee_saved_register_list project = 
+let callee_saved_register_list project =
   let arch = Project.arch project in
   match arch with
   | `x86_64 -> (* System V ABI *)
@@ -51,20 +52,27 @@ let parse_dyn_sym_line line =
   | _ -> None
 
 let parse_dyn_syms project =
-  match Project.get project filename with
-  | None -> failwith "[CWE-checker] Project has no file name."
-  | Some(fname) -> begin
-      let cmd = Format.sprintf "readelf --dyn-syms %s" fname in
-      try
-        let in_chan = Unix.open_process_in cmd in
-        let lines = In_channel.input_lines in_chan in
-        let () = In_channel.close in_chan in begin
-          match lines with
-          | _ :: _ :: _ :: tail -> (* The first three lines are not part of the table *)
-            List.filter_map tail ~f:parse_dyn_sym_line
-          | _ -> [] (*  *)
-        end
-      with
-        Unix.Unix_error (e,fm,argm) ->
-        failwith (Format.sprintf "[CWE-checker] Parsing of dynamic symbols failed: %s %s %s" (Unix.error_message e) fm argm)
-    end
+  match !dyn_syms with
+  | Some(symbol_set) -> symbol_set
+  | None ->
+    match Project.get project filename with
+    | None -> failwith "[CWE-checker] Project has no file name."
+    | Some(fname) -> begin
+        let cmd = Format.sprintf "readelf --dyn-syms %s" fname in
+        try
+          let in_chan = Unix.open_process_in cmd in
+          let lines = In_channel.input_lines in_chan in
+          let () = In_channel.close in_chan in begin
+            match lines with
+            | _ :: _ :: _ :: tail -> (* The first three lines are not part of the table *)
+              let symbol_set = String.Set.of_list (List.filter_map tail ~f:parse_dyn_sym_line) in
+              dyn_syms := Some(symbol_set);
+              symbol_set
+            | _ ->
+              dyn_syms := Some(String.Set.empty);
+              String.Set.empty              (*  *)
+          end
+        with
+          Unix.Unix_error (e,fm,argm) ->
+          failwith (Format.sprintf "[CWE-checker] Parsing of dynamic symbols failed: %s %s %s" (Unix.error_message e) fm argm)
+      end

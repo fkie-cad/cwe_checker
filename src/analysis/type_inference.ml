@@ -302,7 +302,7 @@ let update_state_jmp state jmp ~project =
       | Direct(tid) ->
         let program = Project.program project in
         let func = Term.find_exn sub_t program tid in
-        if List.exists (Cconv.parse_dyn_syms project) ~f:(fun elem -> elem = (Sub.name func)) then (* TODO: also use knowledge saved in Arg.t terms! *)
+        if String.Set.mem (Cconv.parse_dyn_syms project) (Sub.name func) then (* TODO: also use knowledge saved in Arg.t terms! *)
           let empty_state = TypeInfo.empty () in (* TODO: to preserve stack information we need to be sure that the callee does not write on the stack => needs pointer source tracking! *)
           { empty_state with
             TypeInfo.stack_offset = state.TypeInfo.stack_offset;
