@@ -2,11 +2,12 @@
 open Bap.Std
 open Core_kernel.Std
 
-    (* TODO: add thumb *)
-
 let dyn_syms = ref None
 
-(** Return a list of registers that are callee-saved. *)
+let callee_saved_registers = ref None
+
+(** Return a list of registers that are callee-saved.
+    TODO: At least ARMv7 and PPC have floating point registers that are callee saved. Check their names in bap and then add them. *)
 let callee_saved_register_list project =
   let arch = Project.arch project in
   match arch with
@@ -17,7 +18,9 @@ let callee_saved_register_list project =
   | `x86 -> (* Both Windows and Linux save the same registers *)
     "EBX" :: "ESI" :: "EDI" :: "EBP" :: []
   | `armv4 | `armv5 | `armv6 | `armv7
-  | `armv4eb | `armv5eb | `armv6eb | `armv7eb -> (* ARM 32bit. R13 and SP are both names for the stack pointer. *)
+  | `armv4eb | `armv5eb | `armv6eb | `armv7eb
+  | `thumbv4 | `thumbv5 | `thumbv6 | `thumbv7
+  | `thumbv4eb | `thumbv5eb | `thumbv6eb | `thumbv7eb -> (* ARM 32bit. R13 and SP are both names for the stack pointer. *)
     "R4" :: "R5" :: "R6" :: "R7" :: "R8" :: "R9" :: "R10" :: "R11" :: "R13" :: "SP" :: []
   | `aarch64 | `aarch64_be -> (* ARM 64bit *) (* TODO: This architecture is not contained in the acceptance tests yet? *) (* TODO: check, whether bap uses another name than SP for the stack register. *)
     "X19" :: "X20" :: "X21" :: "X22" :: "X23" :: "X24" :: "X25" :: "X26" :: "X27" :: "X28" :: "X29" :: "SP" :: []
@@ -30,8 +33,11 @@ let callee_saved_register_list project =
   | _ -> failwith "No calling convention implemented for the given architecture."
 
 let is_callee_saved var project =
-  let register_list = callee_saved_register_list project in
-  List.exists register_list ~f:(fun elem -> elem = (Var.name var))
+  match !callee_saved_registers with
+  | Some(register_set) -> String.Set.mem register_set (Var.name var)
+  | None ->
+    callee_saved_registers := Some(String.Set.of_list (callee_saved_register_list project));
+    String.Set.mem (Option.value_exn !callee_saved_registers) (Var.name var)
 
 (** Parse a line from the dyn-syms output table of readelf. Return the name of a symbol if the symbol is an extern function name. *)
 let parse_dyn_sym_line line =
