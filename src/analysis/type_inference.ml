@@ -79,17 +79,18 @@ module TypeInfo = struct
         Map.add state register (Ok(Register.Data)) )
 
   (** create a new state with stack pointer as known pointer register and all flag
-      registers as known data registers. The stack itself is empty (TODO: Maybe add
-      return address to stack) and the offset is 0 (TODO: check correctness). *)
+      registers as known data registers. The stack itself is empty and the offset
+      is 0. (TODO for interprocedural analysis: Ensure that the return address is
+      marked as a pointer!) *)
   let function_start_state project =
     let module VarMap = Var.Map in
     let reg = get_stack_pointer_and_flags project in
     { stack = Mem_region.empty ();
-      stack_offset = Some(Ok(Bitvector.of_int 0 ~width:(Symbol_utils.arch_pointer_size_in_bytes project * 8))); (* TODO: Check whether this is correct. *)
+      stack_offset = Some(Ok(Bitvector.of_int 0 ~width:(Symbol_utils.arch_pointer_size_in_bytes project * 8)));
       reg = reg;
     }
 
-  let remove_virtual_registers state = (* TODO: maybe remove all that is neither a register nor a flag instead *)
+  let remove_virtual_registers state =
     { state with reg = Map.filter_keys state.reg ~f:(fun var -> Var.is_physical var) }
 
   let stack_offset_add state (value:Bitvector.t) =
@@ -108,7 +109,7 @@ module TypeInfo = struct
     | (Some(var), Some(Ok(base_offset))) when var = (Symbol_utils.stack_register project) -> Some(Bitvector.(+) base_offset offset)
     | _ -> None
 
-  (* TODO: This just prints the sexp, rewrite it if we need nicer output. *)
+  (* Pretty printer that just prints the sexp. Needed for the creation of type_info_tag. *)
   let pp ppf elem =
     Format.fprintf ppf "%s" (Sexp.to_string (sexp_of_t elem))
 
@@ -120,8 +121,7 @@ let type_info_tag = Value.Tag.register (module TypeInfo)
     ~uuid:"7a537f19-2dd1-49b6-b343-35b4b1d04c0b"
 
 (** returns a list with all nested expressions. If expr1 is contained in expr2, then
-    expr1 will be included after expr2 in the list.
-    TODO: decide whether to implement the functionality with Exp.visitor instead. *)
+    expr1 will be included after expr2 in the list. *)
 let rec nested_exp_list exp : Exp.t list =
   let nested_exp = match exp with
     | Bil.Load(exp1, exp2, _, _) -> exp :: (nested_exp_list exp1) @ (nested_exp_list exp2)
@@ -167,7 +167,7 @@ let rec type_of_exp exp (state: TypeInfo.t) ~project =
   match exp with
   | Bil.Load(_) -> (* TODO: Right now only the stack is tracked for type infos. *)
     get_stack_elem state exp ~project
-  | Bil.Store(_) -> None (* TODO: when we have type infos on memory regions we have to store type infos here. *)
+  | Bil.Store(_) -> None (* Stores are handled in another function. *)
   | Bil.BinOp(binop, exp1, exp2) -> begin
       match (binop, type_of_exp exp1 state project, type_of_exp exp2 state project) with
       (* pointer arithmetics *)
@@ -197,11 +197,11 @@ let rec type_of_exp exp (state: TypeInfo.t) ~project =
   | Bil.Var(var) -> Map.find state.TypeInfo.reg var
   | Bil.Int(_) -> None (* TODO: For non-relocateable binaries this could be a pointer to a function/global variable *)
   | Bil.Cast(Bil.SIGNED, _, _) -> Some(Ok(Data))
-  | Bil.Cast(_, size, exp) -> (* TODO: unit test, whether size here is really in bits??? *)
+  | Bil.Cast(_, size, exp) ->
     if size = (Symbol_utils.arch_pointer_size_in_bytes project * 8) then type_of_exp exp state project else Some(Ok(Data)) (* TODO: There is probably a special case when 64bit addresses are converted to 32bit addresses here, which can yield pointers *)
-  | Bil.Let(_) -> None (* TODO: Make sure that all let bindings are removed if possible *)
+  | Bil.Let(_) -> None
   | Bil.Unknown(_) -> None
-  | Bil.Ite(if_, then_, else_) -> begin (* TODO: This is not exhaustive. *)
+  | Bil.Ite(if_, then_, else_) -> begin
       match (type_of_exp then_ state project, type_of_exp else_ state project) with
       | (Some(value1), Some(value2)) -> if value1 = value2 then Some(value1) else None
       | _ -> None
@@ -248,7 +248,7 @@ let add_mem_address_registers state exp ~project =
           | Bil.BinOp(Bil.MINUS, Bil.Var(addr), Bil.Int(_))
           | Bil.BinOp(Bil.AND, Bil.Var(addr), Bil.Int(_))
           | Bil.BinOp(Bil.OR, Bil.Var(addr), Bil.Int(_)) ->
-            { state with TypeInfo.reg = Map.add state.TypeInfo.reg addr (Ok(Register.Pointer)) } (* TODO: there are some false positives here for indices in global data array, where the immediate is the pointer. *)
+            { state with TypeInfo.reg = Map.add state.TypeInfo.reg addr (Ok(Register.Pointer)) } (* TODO: there are some false positives here for indices in global data arrays, where the immediate is the pointer. Maybe remove all cases with potential false positives? *)
           | Bil.BinOp(Bil.PLUS, Bil.Var(addr), exp2)
           | Bil.BinOp(Bil.MINUS, Bil.Var(addr), exp2)
           | Bil.BinOp(Bil.AND, Bil.Var(addr), exp2)
@@ -311,7 +311,7 @@ let update_state_jmp state jmp ~project =
       | Direct(tid) ->
         let program = Project.program project in
         let func = Term.find_exn sub_t program tid in
-        if String.Set.mem (Cconv.parse_dyn_syms project) (Sub.name func) then (* TODO: also use knowledge saved in Arg.t terms! *)
+        if String.Set.mem (Cconv.parse_dyn_syms project) (Sub.name func) then
           let empty_state = TypeInfo.empty () in (* TODO: to preserve stack information we need to be sure that the callee does not write on the stack => needs pointer source tracking! *)
           { empty_state with
             TypeInfo.stack_offset = state.TypeInfo.stack_offset;
