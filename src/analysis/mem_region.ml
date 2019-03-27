@@ -4,6 +4,12 @@ open Core_kernel.Std
 
 let (+), (-) = Bitvector.(+), Bitvector.(-)
 
+let (>) x y = Bitvector.(>) (Bitvector.signed x) (Bitvector.signed y)
+let (<) x y = Bitvector.(<) (Bitvector.signed x) (Bitvector.signed y)
+let (>=) x y = Bitvector.(>=) (Bitvector.signed x) (Bitvector.signed y)
+let (<=) x y = Bitvector.(<=) (Bitvector.signed x) (Bitvector.signed y)
+let (=) x y = Bitvector.(=) x y
+
 type 'a mem_node = {
   pos: Bitvector.t; (* address of the element *)
   size: Bitvector.t; (* size (in bytes) of the element *)
@@ -24,6 +30,7 @@ let error_elem ~pos ~size =
 
 
 let rec add mem_region elem ~pos ~size =
+  let () = if pos + size < pos then failwith "[CWE-checker] element out of bounds for mem_region" in
   let new_node = {
     pos=pos;
     size=size;
@@ -79,6 +86,7 @@ let rec remove_until mem_region pos =
 
 
 let rec remove mem_region ~pos ~size =
+  let () = if pos + size < pos then failwith "[CWE-checker] element out of bounds for mem_region" in
   match mem_region with
   | [] -> []
   | hd :: tl ->
@@ -101,6 +109,7 @@ let rec remove mem_region ~pos ~size =
       mem_region
 
 let rec mark_error mem_region ~pos ~size =
+  let () = if pos + size < pos then failwith "[CWE-checker] element out of bounds for mem_region" in
   match mem_region with
   | [] -> (error_elem pos size) :: []
   | hd :: tl ->

@@ -67,6 +67,24 @@ let test_equal () =
   let y = Mem_region.add y "One" ~pos:(bv 0) ~size:(bv 10) in
   check "equal_yes" (Mem_region.equal x y ~data_equal:(fun x y -> x = y))
 
+let test_around_zero () =
+  let bv num = Bitvector.of_int num ~width:32 in
+  let x = Mem_region.empty () in
+  let x = Mem_region.add x "One" ~pos:(bv (-5)) ~size:(bv 10) in
+  let x = Mem_region.add x "Two" ~pos:(bv 0) ~size:(bv 10) in
+  check "around_zero1" (Some(Error()) = Mem_region.get x (bv (-5)));
+  let x = Mem_region.empty () in
+  let x = Mem_region.add x "One" ~pos:(bv 0) ~size:(bv 10) in
+  let x = Mem_region.add x "Two" ~pos:(bv (-5)) ~size:(bv 10) in
+  check "around_zero2" (Some(Error()) = Mem_region.get x (bv 0));
+  let x = Mem_region.empty () in
+  let x = Mem_region.add x "One" ~pos:(bv (-5)) ~size:(bv 20) in
+  let x = Mem_region.add x "Two" ~pos:(bv 0) ~size:(bv 10) in
+  check "around_zero3" (Some(Error()) = Mem_region.get x (bv (-5)));
+  let x = Mem_region.empty () in
+  let x = Mem_region.add x "One" ~pos:(bv 0) ~size:(bv 10) in
+  let x = Mem_region.add x "Two" ~pos:(bv (-5)) ~size:(bv 20) in
+  check "around_zero2" (Some(Error()) = Mem_region.get x (bv 0))
 
 let tests = [
   "Add", `Quick, test_add;
@@ -75,4 +93,5 @@ let tests = [
   "Mark_error", `Quick, test_mark_error;
   "Merge", `Quick, test_merge;
   "Equal", `Quick, test_equal;
+  "Around Zero", `Quick, test_around_zero;
 ]
