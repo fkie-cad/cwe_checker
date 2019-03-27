@@ -9,7 +9,7 @@ let test_add () : unit =
   let x = Mem_region.add x "Five" ~pos:(bv 3) ~size:(bv 5) in
   let x = Mem_region.add x "Seven" ~pos:(bv 9) ~size:(bv 7) in
   let x = Mem_region.add x "Three" ~pos:(bv 0) ~size:(bv 3) in
-  check "add_ok" (Some(Ok("Five")) = (Mem_region.get x (bv 3)));
+  check "add_ok" (Some(Ok("Five", bv 5)) = (Mem_region.get x (bv 3)));
   check "add_err" (Some(Error(())) = (Mem_region.get x (bv 1)));
   check "add_none" (None = (Mem_region.get x (bv 8)))
 
@@ -17,7 +17,7 @@ let test_minus () =
   let bv num = Bitvector.of_int num ~width:32 in
   let x = Mem_region.empty () in
   let x = Mem_region.add x "One" ~pos:(bv (-8)) ~size:(bv 8) in
-  check "negative_index" (Some(Ok("One")) = Mem_region.get x (Bitvector.unsigned (bv (-8))))
+  check "negative_index" (Some(Ok("One", bv 8)) = Mem_region.get x (Bitvector.unsigned (bv (-8))))
 
 let test_remove () =
   let bv num = Bitvector.of_int num ~width:32 in
@@ -53,7 +53,7 @@ let test_merge () =
   let merge_fn a b = if a = b then Some(Ok(a)) else Some(Error()) in
   let z = Mem_region.merge x y ~data_merge:merge_fn in
   check "merge_intersect" (Some(Error()) = Mem_region.get z (bv 0));
-  check "merge_match_ok" (Some(Ok("Two")) = Mem_region.get z (bv 15));
+  check "merge_match_ok" (Some(Ok("Two", bv 5)) = Mem_region.get z (bv 15));
   check "merge_match_error" (Some(Error()) = Mem_region.get z (bv 25))
 
 let test_equal () =

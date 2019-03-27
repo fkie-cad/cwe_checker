@@ -22,9 +22,9 @@ val add: 'a t -> 'a -> pos:Bitvector.t -> size:Bitvector.t -> 'a t
     If elements get partially removed, mark the non-removed parts as Error *)
 val remove: 'a t -> pos:Bitvector.t -> size:Bitvector.t -> 'a t
 
-(** Returns the element at position pos or None, when there is no element at that position.
+(** Returns the element and its size at position pos or None, when there is no element at that position.
     If pos intersects an element but does not match its starting position, it returns Some(Error(())). *)
-val get: 'a t -> Bitvector.t -> ('a, unit) result option
+val get: 'a t -> Bitvector.t -> (('a * Bitvector.t), unit) Result.t Option.t
 
 (** Merge two memory regions. Elements with the same position and size get merged using
     data_merge, other intersecting elements get marked as Error. Note that data_merge

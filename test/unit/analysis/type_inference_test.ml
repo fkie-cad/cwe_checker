@@ -67,7 +67,7 @@ let test_update_stack () =
   let def3 = Def.create register2 (Bil.Load (Bil.var register2, (Bil.binop Bil.MINUS (Bil.var stack_register) (Bil.int (bv 8))), Bitvector.LittleEndian, `r64) ) in
   let block = create_block_from_defs [def1; def2; def3;] in
   let state = update_block_analysis block fn_start_state project in
-  let () = check "write_to_stack" ((Mem_region.get state.TypeInfo.stack (bv (-8))) = Some(Ok(Pointer))) in
+  let () = check "write_to_stack" ((Mem_region.get state.TypeInfo.stack (bv (-8))) = Some(Ok(Pointer, bv (Symbol_utils.arch_pointer_size_in_bytes project)))) in
   let () = check "load_from_stack" (Var.Map.find state.TypeInfo.reg register2 = Some(Ok(Pointer))) in
   ()
 

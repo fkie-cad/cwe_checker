@@ -67,7 +67,7 @@ let rec get mem_region pos =
       None
     else if head.pos = pos then
       match head.data with
-      | Ok(x) -> Some(Ok(x))
+      | Ok(x) -> Some(Ok(x, head.size))
       | Error(_) -> Some(Error(()))
     else if head.pos + head.size <= pos then
       get tail pos

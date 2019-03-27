@@ -143,9 +143,18 @@ let rec nested_exp_list exp : Exp.t list =
     TODO: Bil.AND and Bil.OR are ignored, because we do not track alignment yet. *)
 let get_stack_elem state exp ~project =
   match exp with
-  | Bil.Load(_, addr, endian, size) when (Size.in_bytes size) = (Symbol_utils.arch_pointer_size_in_bytes project) -> begin (* TODO: add a test for correct endianess *)
+  | Bil.Load(_, addr, endian, size) -> begin (* TODO: add a test for correct endianess *)
       match TypeInfo.compute_stack_offset state addr project with
-      | Some(offset) -> Mem_region.get state.TypeInfo.stack offset
+      | Some(offset) -> begin
+          match Mem_region.get state.TypeInfo.stack offset with
+          | Some(Ok(elem, elem_size)) ->
+            if Bitvector.to_int_exn elem_size = (Size.in_bytes size) then
+              Some(Ok(elem))
+            else
+              Some(Error())
+          | Some(Error()) -> Some(Error())
+          | None -> None
+        end
       | None -> None
     end
   | _ -> None
