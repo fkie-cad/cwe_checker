@@ -6,12 +6,15 @@ open Core_kernel.Std
     backward analysis to recognize which constants are pointers and which not.
     extend to track FunctionPointer, DataPointer
     extend to track PointerTargets
-    TODO: there are no checks yet if a value from the stack of the calling function
-    is accessed.
+    TODO: There are no checks yet if a value from the stack of the calling function
+    is accessed. Maybe this should be part of another analysis.
     TODO: tracking for PointerTargets should also track if another register other
     than the stack register is used to access values on the stack of the current
     function.
 *)
+
+let name = "Type Inference"
+let version = "0.1"
 
 module Register = struct
   type t =
@@ -377,17 +380,6 @@ let extract_start_state node ~cfg ~solution ~project =
         TypeInfo.merge state (Graphlib.Std.Solution.get solution node)
       )
 
-(* TODO: remove or refactor to also print stack info. *)
-let print_state state =
-  print_string "Register: ";
-  Map.iteri state.TypeInfo.reg ~f:(fun ~key:var ~data:reg ->
-      match reg with
-      | Ok(Register.Pointer) -> print_string (Var.name var ^ ":Pointer, ")
-      | Ok(Register.Data) -> print_string (Var.name var ^ ":Data, ")
-      | Error(_) -> print_string (Var.name var ^ ":Error, ")
-    );
-  print_endline ""
-
 (** Returns a list of pairs (tid, state) for each def in a (blk_t-)node. The state
 is the state _after execution of the node. *)
 let state_list_def node ~cfg ~solution ~project =
@@ -415,16 +407,32 @@ let compute_pointer_register project =
     ) in
   Project.with_program project program_with_tags
 
-let print_blocks_with_error_register ~project =
+(** Prints type info to debug. *)
+let print_type_info_to_debug state block_tid ~tid_map =
+  let register_list = Map.fold state.TypeInfo.reg ~init:[] ~f:(fun ~key:var ~data:reg str_list ->
+      match reg with
+      | Ok(Register.Pointer) -> (Var.name var ^ ":Pointer, ") :: str_list
+      | Ok(Register.Data) -> (Var.name var ^ ":Data, ") :: str_list
+      | Error(_) -> (Var.name var ^ ":Error, ") :: str_list ) in
+  let register_string = String.concat register_list in
+  let stack_offset_str = match state.TypeInfo.stack_offset with
+    | Some(Ok(x)) -> (string_of_int (Bitvector.to_int_exn (Bitvector.signed x)))
+    | _ -> "Unknown"  in
+  Log_utils.debug
+    "[%s] {%s} TypeInfo at %s:\nRegister: %s\nStackOffset: %s"
+    name
+    version
+    (Address_translation.translate_tid_to_assembler_address_string block_tid tid_map)
+    register_string
+    stack_offset_str
+
+let print_type_info_tags ~project ~tid_map =
   let program = Project.program project in
   let functions = Term.enum sub_t program in
   Seq.iter functions ~f:(fun func ->
       let blocks = Term.enum blk_t func in
       Seq.iter blocks ~f:(fun block ->
           let start_state = Option.value_exn (Term.get_attr block type_info_tag) in
-          let end_state = update_block_analysis block start_state project in
-          if Map.exists end_state.TypeInfo.reg ~f:(fun register -> register = Error(())) then
-            let () = print_string (Blk.pps () block) in
-            print_state end_state
+          print_type_info_to_debug start_state (Term.tid block) ~tid_map
         )
     )

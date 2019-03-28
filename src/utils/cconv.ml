@@ -22,13 +22,13 @@ let callee_saved_register_list project =
   | `thumbv4 | `thumbv5 | `thumbv6 | `thumbv7
   | `thumbv4eb | `thumbv5eb | `thumbv6eb | `thumbv7eb -> (* ARM 32bit. R13 and SP are both names for the stack pointer. *)
     "R4" :: "R5" :: "R6" :: "R7" :: "R8" :: "R9" :: "R10" :: "R11" :: "R13" :: "SP" :: []
-  | `aarch64 | `aarch64_be -> (* ARM 64bit *) (* TODO: This architecture is not contained in the acceptance tests yet? *) (* TODO: check, whether bap uses another name than SP for the stack register. *)
+  | `aarch64 | `aarch64_be -> (* ARM 64bit *) (* TODO: This architecture is not contained in the acceptance tests yet? *)
     "X19" :: "X20" :: "X21" :: "X22" :: "X23" :: "X24" :: "X25" :: "X26" :: "X27" :: "X28" :: "X29" :: "SP" :: []
   | `ppc (* 32bit PowerPC *) (*  TODO: add floating point registers. *) (* TODO: add CR2, CR3, CR4. Test their representation in bap first. *)
   | `ppc64 | `ppc64le -> (* 64bit PowerPC *)
     "R14" :: "R15" :: "R16" :: "R17" :: "R18" :: "R19" :: "R20" :: "R21" :: "R22" :: "R23" ::
     "R24" :: "R25" :: "R26" :: "R27" :: "R28" :: "R29" :: "R30" :: "R31" :: "R1" :: "R2" :: []
-  | `mips | `mips64 | `mips64el | `mipsel -> (* TODO: find a real world example to test this out *) (* TODO: S8 and FP should be the same register, find out which name bap uses. *)
+  | `mips | `mips64 | `mips64el | `mipsel -> (* S8 and FP are the same register. bap uses FP, S8 is left there just in case. *)
     "S0" :: "S1" :: "S2" :: "S3" :: "S4" :: "S5" :: "S6" :: "S7" :: "S8" :: "GP" :: "SP" :: "FP" :: []
   | _ -> failwith "No calling convention implemented for the given architecture."
 
