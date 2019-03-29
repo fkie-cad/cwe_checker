@@ -48,7 +48,8 @@ let report incident location_tbl =
          an out-of-bound write. Find out how to distinguish. *)
       | "memcheck-out-of-bound" -> report_cwe_125 filtered_locs
       | "memcheck-double-release" -> report_cwe_415 filtered_locs
-      | "use-after-release" -> report_cwe_416 filtered_locs
+      (* TODO: check if there are duplicate events and remove duplicates! *)
+      | "memcheck-use-after-release" -> report_cwe_416 filtered_locs
       | _ -> report_cwe_unknown filtered_locs incident_str
     end
   | __ -> failwith "Strange incident sexp encountered"

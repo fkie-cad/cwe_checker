@@ -41,7 +41,6 @@ let convert_location_list loc_list =
   Sexplib__Sexp_with_layout.List.iter loc_list ~f:(fun x -> locs := (convert_location @@ Sexp.to_string x)::(!locs));
   !locs
 
-(* TODO: check if there are duplicate events and remove duplicates! *)
 (** Analyze events and report to the user. *)
 let analyze_events _ =
   let location_tbl = Hashtbl.create (module String) in
