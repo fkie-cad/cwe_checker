@@ -1,5 +1,6 @@
 open Bap.Std
 open Core_kernel.Std
+open Cwe_checker_core
 
 let check msg x = Alcotest.(check bool) msg true x
 
