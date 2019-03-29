@@ -45,7 +45,7 @@ let report incident location_tbl =
       let incident_str = Sexp.to_string name in
       match incident_str with
       (* TODO: we report an out-of-bounds read but actually it could also be
-         an out-of-bound write. Find out how to distinguish. *)
+         an out-of-bound write. Find out how to distinguish between them. *)
       | "memcheck-out-of-bound" -> report_cwe_125 filtered_locs
       | "memcheck-double-release" -> report_cwe_415 filtered_locs
       (* TODO: check if there are duplicate events and remove duplicates! *)
