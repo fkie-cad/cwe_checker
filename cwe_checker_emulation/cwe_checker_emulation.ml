@@ -9,8 +9,6 @@ open Ppx_jane
 
 include Self()
 
-let version = "0.1"
-
 let pp_id = Monad.State.Multi.Id.pp
 
 module Machine = struct
@@ -43,56 +41,16 @@ let convert_location_list loc_list =
   Sexplib__Sexp_with_layout.List.iter loc_list ~f:(fun x -> locs := (convert_location @@ Sexp.to_string x)::(!locs));
   !locs
 
-(** Looks up a concrete address for an id in the location table loc_tbl. *)
-let map_id_to_location id loc_tbl =
-  match Hashtbl.find loc_tbl id with
-  | Some loc -> loc
-  | _ -> failwith "Expected location in hashtbl but failed"
-
-(** Builds a string of a path of addresses. *)
-let build_location_path locations =
-  let rec internal locations path_str =
-  match locations with
-  | [] -> path_str
-  | hd::[] -> internal [] (path_str ^ (Printf.sprintf "0x%x" hd))
-  | hd::tl -> internal tl (path_str ^ (Printf.sprintf "0x%x -> " hd)) in
-  internal locations ""
-
-(** Translates a list of incident ids to a list of concrete addresses. *)
-let get_incident_locations_from_ids ids location_tbl =
-  let incident_locations = ref [] in
-      Sexplib__Sexp_with_layout.List.iter ids ~f:(fun id ->  incident_locations := (map_id_to_location (Sexp.to_string id) location_tbl)::(!incident_locations)); !incident_locations
-
-let report_cwe_415 locs =
-  Log_utils.warn "[CWE415] {%s} (Double Free) %s" version (build_location_path locs)
-
-let report_cwe_unknown locs incident_str =
-  Log_utils.warn "[CWE UNKNOWN] {%s} (%s) %s" version incident_str (build_location_path locs)
-
-(** Reports an incident. *)
-let report_incident incident location_tbl =
-  match incident with
-  | name::ids ->
-    begin
-      let incident_locations = get_incident_locations_from_ids ids location_tbl in 
-      let filtered_locs = Int.Set.to_list (Int.Set.of_list (List.concat incident_locations)) in
-      let incident_str = Sexp.to_string name in
-      match incident_str with
-      | "memcheck-double-release" -> report_cwe_415 filtered_locs
-      | _ -> report_cwe_unknown filtered_locs incident_str
-    end
-  | __ -> failwith "Strange incident sexp encountered"
-
-(** Reports events to the user. *)
-let report_events _ =
+(* TODO: check if there are duplicate events and remove duplicates! *)
+(** Analyze events and report to the user. *)
+let analyze_events _ =
   let location_tbl = Hashtbl.create (module String) in
-  let incident_list = ref [] in
   Array.iter ~f:(fun (p, ev) ->
       begin
         match ev with
         |  Sexp.Atom _ -> failwith "Sexp.Atom not expected in report_events."
-        |  Sexp.List [Sexp.Atom location_id; Sexp.List location_list] -> Hashtbl.add location_tbl location_id (convert_location_list location_list);()
-        |  Sexp.List incident -> report_incident incident location_tbl
+        |  Sexp.List [Sexp.Atom location_id; Sexp.List location_list] -> Hashtbl.add_exn location_tbl location_id (convert_location_list location_list)
+        |  Sexp.List incident -> Incident_reporter.report incident location_tbl
       end) !collected_events
 
 (** Just adds the observed Primus events to the collected_events array. *)
@@ -203,7 +161,7 @@ let main {Config.get=(!)} proj =
   | (Primus.Exn exn,proj) ->
      info "program terminated by a signal: %s" (Primus.Exn.to_string exn);
   end;
-  report_events ();
+  analyze_events ();
   proj
 
 (** At the moment this plugin depends due to Primus on the plugin
