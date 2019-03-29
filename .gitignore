@@ -218,3 +218,5 @@ src/cwe_checker.plugin
 test/artificial_samples/dockcross*
 
 .#*
+
+.sconsign.dblite
