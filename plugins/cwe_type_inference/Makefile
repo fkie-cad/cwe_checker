@@ -6,4 +6,4 @@ clean:
 	bapbuild -clean
 
 uninstall:
-	bapbundle remove cwe_checker.plugin
+	bapbundle remove cwe_type_inference.plugin
