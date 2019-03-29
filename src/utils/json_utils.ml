@@ -1,4 +1,4 @@
-open Core_kernel.Std
+open Core_kernel
 open Yojson.Basic.Util
 
 (** Extracts the symbols to check for from json document.

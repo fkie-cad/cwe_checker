@@ -1,4 +1,4 @@
-open Core_kernel.Std
+open Core_kernel
 open Bap.Std
 
 let translate_tid_to_assembler_address_string tid tid_map =
@@ -11,5 +11,5 @@ let generate_tid_map prog =
     inherit [addr Tid.Map.t] Term.visitor
     method enter_term _ t addrs = match Term.get_attr t address with
       | None -> addrs
-      | Some addr -> Map.add addrs ~key:(Term.tid t) ~data:addr
+      | Some addr -> Map.add_exn addrs ~key:(Term.tid t) ~data:addr
   end)#run prog Tid.Map.empty

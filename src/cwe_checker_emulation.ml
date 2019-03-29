@@ -1,4 +1,4 @@
-open Core_kernel.Std
+open Core_kernel
 open Bap.Std
 open Bap_primus.Std
 open Bap_future.Std
@@ -52,7 +52,7 @@ let rec pp_path locations =
 (* TODO: Annotate events at TID location;
    TODO add checkers to cwe_checker that go through CFGs and dump warnings *)
 let report_events _ =
-  let location_tbl = Hashtbl.create ~hashable:String.hashable () in
+  let location_tbl = Hashtbl.create (module String) in
   let incident_list = ref [] in
   Array.iter ~f:(fun (p, ev) ->
       begin
