@@ -251,13 +251,20 @@ let add_mem_address_registers state exp ~project =
           | Bil.BinOp(Bil.MINUS, Bil.Var(addr), Bil.Int(_))
           | Bil.BinOp(Bil.AND, Bil.Var(addr), Bil.Int(_))
           | Bil.BinOp(Bil.OR, Bil.Var(addr), Bil.Int(_)) ->
-            { state with TypeInfo.reg = Map.add_exn state.TypeInfo.reg addr (Ok(Register.Pointer)) } (* TODO: there are some false positives here for indices in global data arrays, where the immediate is the pointer. Maybe remove all cases with potential false positives? *)
+            (* TODO Did I break something? *)
+            begin
+            try
+              { state with TypeInfo.reg = Map.add_exn state.TypeInfo.reg addr (Ok(Register.Pointer)) } (* TODO: there are some false positives here for indices in global data arrays, where the immediate is the pointer. Maybe remove all cases with potential false positives? *)
+            with _ -> state
+            end
           | Bil.BinOp(Bil.PLUS, Bil.Var(addr), exp2)
           | Bil.BinOp(Bil.MINUS, Bil.Var(addr), exp2)
           | Bil.BinOp(Bil.AND, Bil.Var(addr), exp2)
           | Bil.BinOp(Bil.OR, Bil.Var(addr), exp2) ->
             if type_of_exp exp2 state project = Some(Ok(Register.Data)) then
-              { state with TypeInfo.reg = Map.add_exn state.TypeInfo.reg addr (Ok(Register.Pointer)) }
+              try
+                { state with TypeInfo.reg = Map.add_exn state.TypeInfo.reg addr (Ok(Register.Pointer)) }
+              with _ -> state
             else
               state
           | _ -> state
@@ -298,8 +305,12 @@ let update_state_def state def ~project =
   let state = add_mem_address_registers state (Def.rhs def) project in
   let state = match type_of_exp (Def.rhs def) state project with
     | Some(value) ->
-      let reg = Map.add_exn state.TypeInfo.reg (Def.lhs def) value in
-      { state with TypeInfo.reg = reg }
+      begin
+      try
+        let reg = Map.add_exn state.TypeInfo.reg (Def.lhs def) value in
+        { state with TypeInfo.reg = reg }
+      with _ -> state
+    end
     | None -> (* We don't know the type of the new value *)
       let reg = Map.remove state.TypeInfo.reg (Def.lhs def) in
       { state with TypeInfo.reg = reg } in
@@ -327,8 +338,13 @@ let update_state_jmp state jmp ~project =
     keep_only_stack_offset state project
   | Goto(Indirect(Bil.Var(var))) (* TODO: warn when jumping to something that is marked as data. *)
   | Ret(Indirect(Bil.Var(var))) ->
-    let reg = Map.add_exn state.TypeInfo.reg var (Ok(Register.Pointer)) in
-    { state with TypeInfo.reg = reg }
+    begin
+      (** TODO: Did I break something here?*)
+      try
+        let reg = Map.add_exn state.TypeInfo.reg var (Ok(Register.Pointer)) in
+        { state with TypeInfo.reg = reg }
+      with _ -> state
+    end
   | Goto(_)
   | Ret(_)    -> state
 

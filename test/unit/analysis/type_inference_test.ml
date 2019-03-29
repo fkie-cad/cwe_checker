@@ -1,5 +1,5 @@
 open Bap.Std
-open Core_kernel.Std
+open Core_kernel
 open Cwe_checker_core
 
 open Type_inference
@@ -18,7 +18,7 @@ let create_block_from_defs def_list =
 let start_state stack_register project =
   let bv x = Bitvector.of_int x ~width:(Symbol_utils.arch_pointer_size_in_bytes project * 8) in
   let start_reg = Var.Map.empty in
-  let start_reg = Map.add start_reg ~key:stack_register ~data:(Ok(Register.Pointer)) in
+  let start_reg = Map.add_exn start_reg ~key:stack_register ~data:(Ok(Register.Pointer)) in
   { TypeInfo.stack = Mem_region.empty ();
     TypeInfo.stack_offset = Some (Ok(bv 0));
     TypeInfo.reg = start_reg;
