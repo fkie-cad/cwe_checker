@@ -24,15 +24,18 @@ module Env = Primus.Env.Make(Machine)
 module Lisp = Primus.Lisp.Make(Machine)
 module Eval = Primus.Interpreter.Make(Machine)
 
-(* event collection and reporting  *)
-
+(** this array collects the observed primus events*)
 let collected_events = ref ([||])
 
+(** Converts a hexadecimal string representation of
+an address to an integer. *)
 let convert_location loc =
   match (Str.split (Str.regexp ":") loc) with
   | fst::snd::[] -> Int.of_string ("0x" ^ snd)
   | _ -> failwith "Could not parse location"
 
+(** Converts a list of hexadecimal strings to a
+list of integers. *)
 let convert_location_list loc_list =
   let locs = ref [] in
   Sexplib__Sexp_with_layout.List.iter loc_list ~f:(fun x -> locs := (convert_location @@ Sexp.to_string x)::(!locs));
@@ -43,6 +46,7 @@ let map_id_to_location id loc_tbl =
   | Some loc -> loc
   | _ -> failwith "Expected location in hashtbl but failed"
 
+(** Pretty prints a path of addresses. *)
 let rec pp_path locations =
   match locations with
   | [] -> printf "\n"
@@ -68,16 +72,16 @@ let report_events _ =
                                  | __ -> failwith "Strange incident sexp encountered"
       end) !collected_events
 
+(** Just adds the observed Primus events to the collected_events array. *)
 let collect_events p ev =
   collected_events := Array.append !collected_events [|(p, ev)|]
-
-(*********************)
 
 let string_of_name = function
   | `symbol s -> s
   | `tid t -> Tid.to_string t
 | `addr x -> Addr.string_of_value x
 
+(** Collects all entry points of the program. *)
 let entry_point_collector = object
   inherit [tid list] Term.visitor
   method! enter_term _ t entries =
@@ -86,9 +90,12 @@ let entry_point_collector = object
     else entries
   end
 
+(** Wrapper function around entry_point_collector. *)
 let entry_points prog =
   entry_point_collector#run prog []
 
+(** Collects all subroutines of the program that
+that are not an entry point. *)
 let all_subroutines prog =
   let entries = entry_points prog in
   let non_entry =
@@ -100,6 +107,7 @@ let all_subroutines prog =
   Graphlib.reverse_postorder_traverse (module Graphs.Callgraph) @@
     Program.to_graph prog
 
+(** Executes/forks another Primus machine. *)
 let exec x =
   Machine.current () >>= fun cid ->
   info "Fork %a: starting from the %s entry point"
@@ -127,9 +135,12 @@ let rec run = function
       Eval.halt >>=
       never_returns
 
+(** Checks if a certain Primus.Observation.Provider is equal
+    to a string like 'incident'. *)
 let has_name name p =
   Primus.Observation.Provider.name p = name
 
+(** Register a monitor. *)
 let monitor_provider name ps =
   Primus.Observation.list_providers () |>
   List.find ~f:(has_name name) |> function
@@ -139,7 +150,7 @@ let monitor_provider name ps =
 let parse_monitors =
   List.fold ~init:[] ~f:(fun ps name -> monitor_provider name ps)
 
-
+(** Register monitors for 'incident' related events. *)
 module Monitor(Machine : Primus.Machine.S) = struct
     open Machine.Syntax
 
@@ -151,7 +162,11 @@ module Monitor(Machine : Primus.Machine.S) = struct
       Machine.return ()
 end
 
-
+(** Main logic of program:
+- we monitor all 'incident' related events
+- for all subroutins we fork a Primus machine
+- all monitored events are collected globally
+- after the last Primus machine has terminated we report all observed incidents *)
 let main {Config.get=(!)} proj =
   Primus.Machine.add_component (module Monitor);
   begin
@@ -166,7 +181,8 @@ let main {Config.get=(!)} proj =
   report_events ();
   proj
 
-
+(** At the moment this plugin depends due to Primus on the plugin
+trivial-condition-form. *)
  let deps = [
   "trivial-condition-form"
 ]
