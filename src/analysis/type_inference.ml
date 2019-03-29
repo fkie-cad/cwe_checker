@@ -76,10 +76,10 @@ module TypeInfo = struct
   let get_stack_pointer_and_flags project =
     let module VarMap = Var.Map in
     let stack_pointer = Symbol_utils.stack_register project in
-    let reg = Map.add VarMap.empty ~key:stack_pointer ~data:(Ok(Register.Pointer)) in
+    let reg = Map.add_exn VarMap.empty ~key:stack_pointer ~data:(Ok(Register.Pointer)) in
     let flags = Symbol_utils.flag_register_list project in
     List.fold flags ~init:reg ~f:(fun state register ->
-        Map.add state register (Ok(Register.Data)) )
+        Map.add_exn state register (Ok(Register.Data)) )
 
   (** create a new state with stack pointer as known pointer register and all flag
       registers as known data registers. The stack itself is empty and the offset
@@ -251,13 +251,13 @@ let add_mem_address_registers state exp ~project =
           | Bil.BinOp(Bil.MINUS, Bil.Var(addr), Bil.Int(_))
           | Bil.BinOp(Bil.AND, Bil.Var(addr), Bil.Int(_))
           | Bil.BinOp(Bil.OR, Bil.Var(addr), Bil.Int(_)) ->
-            { state with TypeInfo.reg = Map.add state.TypeInfo.reg addr (Ok(Register.Pointer)) } (* TODO: there are some false positives here for indices in global data arrays, where the immediate is the pointer. Maybe remove all cases with potential false positives? *)
+            { state with TypeInfo.reg = Map.add_exn state.TypeInfo.reg addr (Ok(Register.Pointer)) } (* TODO: there are some false positives here for indices in global data arrays, where the immediate is the pointer. Maybe remove all cases with potential false positives? *)
           | Bil.BinOp(Bil.PLUS, Bil.Var(addr), exp2)
           | Bil.BinOp(Bil.MINUS, Bil.Var(addr), exp2)
           | Bil.BinOp(Bil.AND, Bil.Var(addr), exp2)
           | Bil.BinOp(Bil.OR, Bil.Var(addr), exp2) ->
             if type_of_exp exp2 state project = Some(Ok(Register.Data)) then
-              { state with TypeInfo.reg = Map.add state.TypeInfo.reg addr (Ok(Register.Pointer)) }
+              { state with TypeInfo.reg = Map.add_exn state.TypeInfo.reg addr (Ok(Register.Pointer)) }
             else
               state
           | _ -> state
@@ -298,7 +298,7 @@ let update_state_def state def ~project =
   let state = add_mem_address_registers state (Def.rhs def) project in
   let state = match type_of_exp (Def.rhs def) state project with
     | Some(value) ->
-      let reg = Map.add state.TypeInfo.reg (Def.lhs def) value in
+      let reg = Map.add_exn state.TypeInfo.reg (Def.lhs def) value in
       { state with TypeInfo.reg = reg }
     | None -> (* We don't know the type of the new value *)
       let reg = Map.remove state.TypeInfo.reg (Def.lhs def) in
@@ -327,7 +327,7 @@ let update_state_jmp state jmp ~project =
     keep_only_stack_offset state project
   | Goto(Indirect(Bil.Var(var))) (* TODO: warn when jumping to something that is marked as data. *)
   | Ret(Indirect(Bil.Var(var))) ->
-    let reg = Map.add state.TypeInfo.reg var (Ok(Register.Pointer)) in
+    let reg = Map.add_exn state.TypeInfo.reg var (Ok(Register.Pointer)) in
     { state with TypeInfo.reg = reg }
   | Goto(_)
   | Ret(_)    -> state
@@ -358,8 +358,8 @@ let intraprocedural_fixpoint func ~project =
   let fn_start_block = Option.value_exn (Term.first blk_t func) in
   let fn_start_state = update_block_analysis fn_start_block fn_start_state ~project in
   let fn_start_node = Seq.find_exn (Graphs.Ir.nodes cfg) ~f:(fun node -> (Term.tid fn_start_block) = (Term.tid (Graphs.Ir.Node.label node))) in
-  let empty = Map.empty Graphs.Ir.Node.comparator in
-  let with_start_node = Map.add empty fn_start_node fn_start_state in
+  let empty = Map.empty (module Graphs.Ir.Node) in
+  let with_start_node = Map.add_exn empty fn_start_node fn_start_state in
   let init = Graphlib.Std.Solution.create with_start_node only_sp in
   let equal = TypeInfo.equal in
   let merge = TypeInfo.merge in

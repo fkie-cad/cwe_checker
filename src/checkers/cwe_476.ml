@@ -273,7 +273,7 @@ let check_cwe prog proj tid_map symbol_names parameters =
   Seq.iter subfunctions ~f:(fun subfn ->
       let cfg = Sub.to_cfg subfn in
       let cwe_hits = ref [] in
-      let empty = Map.empty Graphs.Ir.Node.comparator in
+      let empty = Map.empty (module Graphs.Ir.Node) in
       let init = Graphlib.Std.Solution.create empty [] in
       let equal = State.equal in
       let merge = State.union in
