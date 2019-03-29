@@ -49,8 +49,6 @@ let rec pp_path locations =
   | hd::[] -> printf "%x\n" hd
   | hd::tl -> printf "%x -> " hd; pp_path tl
 
-(* TODO: Annotate events at TID location;
-   TODO add checkers to cwe_checker that go through CFGs and dump warnings *)
 let report_events _ =
   let location_tbl = Hashtbl.create (module String) in
   let incident_list = ref [] in
