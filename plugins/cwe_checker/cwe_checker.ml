@@ -3,6 +3,7 @@ open Bap.Std
 open Graphlib.Std
 open Format
 open Yojson.Basic.Util
+open Cwe_checker_core
 
 include Self()
 
@@ -65,10 +66,8 @@ let partial_run project config modules =
       with Not_found -> failwith "[CWE_CHECKER] Unknown CWE module")
 
 let full_run project config =
-  let project = Type_inference.compute_pointer_register project in (* Add type inference tags to the project *)
   let program = Project.program project in
   let tid_address_map = Address_translation.generate_tid_map program in
-  let () = Type_inference.print_type_info_tags ~project ~tid_map:tid_address_map in
   let json = Yojson.Basic.from_file config in
   begin
     List.iter known_modules ~f:(fun cwe -> execute_cwe_module cwe json program project tid_address_map)

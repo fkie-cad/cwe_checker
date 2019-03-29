@@ -1,12 +1,12 @@
 (library
-  (name cwe_checker)
+  (name cwe_checker_core)
+  (public_name cwe_checker_core)
   (libraries
   yojson
   bap
   core_kernel
   core)
   (preprocess (pps ppx_jane))
-  (wrapped false) ; needed so that all submodules are accessible for library users
 )
 
 (include_subdirs unqualified) ; Include all subdirs when looking for source files

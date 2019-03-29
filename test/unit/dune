@@ -4,13 +4,12 @@
   alcotest
   yojson
   bap
-  cwe_checker
+  cwe_checker_core
   core_kernel
   core)
   (preprocess (pps ppx_jane))
 )
 
-(data_only_dirs src)
 (include_subdirs unqualified) ; Include all subdirs when looking for source files
 
 (alias
