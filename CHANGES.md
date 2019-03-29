@@ -8,6 +8,7 @@
 -  Improved cross compiling for acceptance test cases by using dockcross (PR #8)
 -  Added BAP recipe for standard cwe_checker run (PR #9)
 -  Improved check for CWE-476 (NULL Pointer Dereference) using data flow analysis (PR #11)
+-  Switched C build system from make to scons (PR #16)
 
 0.1 (2018-10-08)
 =====
