@@ -44,13 +44,13 @@ let rec add mem_region elem ~pos ~size =
     else if pos + size <= head.pos then
       new_node :: mem_region
     else begin (* head and new node intersect => at the intersection, head gets overwritten and the rest of head gets marked as error. *)
-      let tail = if head.pos + head.size > pos + size then
+      let tail = if head.pos + head.size > pos + size then (* mark the right end of head as error *)
           let err = error_elem ~pos:(pos + size) ~size:(head.pos + head.size - (pos + size)) in
           err :: tail
         else
           tail in
-      let tail = add tail elem ~pos ~size in
-      let tail = if head.pos < pos then
+      let tail = add tail elem ~pos ~size in (* add the new element*)
+      let tail = if head.pos < pos then (* mark the left end of head as error *)
           let err = error_elem ~pos:(head.pos) ~size:(pos - head.pos) in
           err :: tail
         else
