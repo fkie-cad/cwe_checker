@@ -435,3 +435,8 @@ let print_type_info_tags ~project ~tid_map =
           print_type_info_to_debug start_state (Term.tid block) ~tid_map
         )
     )
+
+(* Functions made public for unit tests *)
+module Test = struct
+  let update_block_analysis = update_block_analysis
+end

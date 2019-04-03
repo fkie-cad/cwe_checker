@@ -3,6 +3,7 @@ open Core_kernel
 open Cwe_checker_core
 
 open Type_inference
+open Type_inference.Test
 
 let check msg x = Alcotest.(check bool) msg true x
 

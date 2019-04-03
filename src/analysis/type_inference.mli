@@ -42,4 +42,6 @@ val print_type_info_tags: project:Project.t -> tid_map:word Tid.Map.t -> unit
 val update_type_info: Blk.elt -> TypeInfo.t -> project:Project.t -> TypeInfo.t
 
 (* functions made public for unit tests: *)
-val update_block_analysis: Blk.t -> TypeInfo.t -> project:Project.t -> TypeInfo.t
+module Test : sig
+  val update_block_analysis: Blk.t -> TypeInfo.t -> project:Project.t -> TypeInfo.t
+end
