@@ -13,6 +13,7 @@ test:
 clean:
 	dune clean
 	bapbuild -clean
+	cd test/unit; make clean; cd ../..
 	cd plugins/cwe_checker; make clean; cd ../..
 	cd plugins/cwe_checker_type_inference; make clean; cd ../..
 	cd plugins/cwe_checker_type_inference_print; make clean; cd ../..

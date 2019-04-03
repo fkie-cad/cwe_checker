@@ -4,3 +4,6 @@ all:
 	bapbundle install cwe_checker_unit_tests.plugin
 	bap ../artificial_samples/build/arrays_x64.out --pass=cwe-checker-unit-tests
 	bapbundle remove cwe_checker_unit_tests.plugin
+
+clean:
+	bapbuild -clean
