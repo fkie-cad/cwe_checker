@@ -150,7 +150,7 @@ let get_stack_elem state exp ~project =
       | Some(offset) -> begin
           match Mem_region.get state.TypeInfo.stack offset with
           | Some(Ok(elem, elem_size)) ->
-            if Bitvector.to_int_exn elem_size = (Size.in_bytes size) then
+            if Bitvector.to_int elem_size = Ok(Size.in_bytes size) then
               Some(Ok(elem))
             else
               Some(Error())
@@ -311,9 +311,10 @@ let update_state_jmp state jmp ~project =
   match Jmp.kind jmp with
   | Call(call) -> begin match Call.target call with
       | Direct(tid) ->
-        let program = Project.program project in
-        let func = Term.find_exn sub_t program tid in
-        if String.Set.mem (Cconv.parse_dyn_syms project) (Sub.name func) then
+        let func_name = match String.lsplit2 (Tid.name tid) ~on:'@' with
+          | Some(_left, right) -> right
+          | None -> Tid.name tid in
+        if String.Set.mem (Cconv.parse_dyn_syms project) func_name then
           let empty_state = TypeInfo.empty () in (* TODO: to preserve stack information we need to be sure that the callee does not write on the stack => needs pointer source tracking! *)
           { empty_state with
             TypeInfo.stack_offset = state.TypeInfo.stack_offset;
@@ -352,21 +353,26 @@ let intraprocedural_fixpoint func ~project =
   let cfg = Sub.to_cfg func in
   (* default state for nodes *)
   let only_sp = { (TypeInfo.empty ()) with TypeInfo.reg = TypeInfo.get_stack_pointer_and_flags project } in
-  (* Create a starting solution where only the first block of a function knows the stack_offset. *)
-  let fn_start_state = TypeInfo.function_start_state project in
-  let fn_start_block = Option.value_exn (Term.first blk_t func) in
-  let fn_start_state = update_block_analysis fn_start_block fn_start_state ~project in
-  let fn_start_node = Seq.find_exn (Graphs.Ir.nodes cfg) ~f:(fun node -> (Term.tid fn_start_block) = (Term.tid (Graphs.Ir.Node.label node))) in
-  let empty = Map.empty (module Graphs.Ir.Node) in
-  let with_start_node = Map.set empty fn_start_node fn_start_state in
-  let init = Graphlib.Std.Solution.create with_start_node only_sp in
-  let equal = TypeInfo.equal in
-  let merge = TypeInfo.merge in
-  let f = (fun node state ->
-      let block = Graphs.Ir.Node.label node in
-      update_block_analysis block state ~project
-    ) in
-  Graphlib.Std.Graphlib.fixpoint (module Graphs.Ir) cfg ~steps:100 ~rev:false ~init:init ~equal:equal ~merge:merge ~f:f
+  try
+    (* Create a starting solution where only the first block of a function knows the stack_offset. *)
+    let fn_start_state = TypeInfo.function_start_state project in
+    let fn_start_block = Option.value_exn (Term.first blk_t func) in
+    let fn_start_state = update_block_analysis fn_start_block fn_start_state ~project in
+    let fn_start_node = Seq.find_exn (Graphs.Ir.nodes cfg) ~f:(fun node -> (Term.tid fn_start_block) = (Term.tid (Graphs.Ir.Node.label node))) in
+    let empty = Map.empty (module Graphs.Ir.Node) in
+    let with_start_node = Map.set empty fn_start_node fn_start_state in
+    let init = Graphlib.Std.Solution.create with_start_node only_sp in
+    let equal = TypeInfo.equal in
+    let merge = TypeInfo.merge in
+    let f = (fun node state ->
+        let block = Graphs.Ir.Node.label node in
+        update_block_analysis block state ~project
+      ) in
+    Graphlib.Std.Graphlib.fixpoint (module Graphs.Ir) cfg ~steps:100 ~rev:false ~init:init ~equal:equal ~merge:merge ~f:f
+  with
+  | _ -> (* An exception will be thrown if the function does not contain any blocks. In this case we can simply return an empty solution. *)
+    Graphlib.Std.Solution.create (Map.empty (module Graphs.Ir.Node)) only_sp
+
 
 (** Extract the starting state of a node. *)
 let extract_start_state node ~cfg ~solution ~project =
@@ -415,7 +421,11 @@ let print_type_info_to_debug state block_tid ~tid_map =
       | Error(_) -> (Var.name var ^ ":Error, ") :: str_list ) in
   let register_string = String.concat register_list in
   let stack_offset_str = match state.TypeInfo.stack_offset with
-    | Some(Ok(x)) -> (string_of_int (Bitvector.to_int_exn (Bitvector.signed x)))
+    | Some(Ok(x)) -> begin
+        match Bitvector.to_int (Bitvector.signed x) with
+        | Ok(number) -> string_of_int number
+        | _ -> "NaN"
+      end
     | _ -> "Unknown"  in
   Log_utils.debug
     "[%s] {%s} TypeInfo at %s:\nRegister: %s\nStackOffset: %s"
@@ -431,8 +441,15 @@ let print_type_info_tags ~project ~tid_map =
   Seq.iter functions ~f:(fun func ->
       let blocks = Term.enum blk_t func in
       Seq.iter blocks ~f:(fun block ->
-          let start_state = Option.value_exn (Term.get_attr block type_info_tag) in
-          print_type_info_to_debug start_state (Term.tid block) ~tid_map
+          match Term.get_attr block type_info_tag with
+          | Some(start_state) -> print_type_info_to_debug start_state (Term.tid block) ~tid_map
+          | None -> (* block has no type info tag, which should not happen *)
+            Log_utils.error
+              "[%s] {%s} Block has no TypeInfo at %s (block TID %s)"
+              name
+              version
+              (Address_translation.translate_tid_to_assembler_address_string (Term.tid block) tid_map)
+              (Tid.name (Term.tid block))
         )
     )
 
