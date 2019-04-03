@@ -11,4 +11,4 @@ let main project =
   let tid_map = Address_translation.generate_tid_map program in
   Type_inference.print_type_info_tags project tid_map
 
-let () = Project.register_pass' main ~deps:["cwe-type-inference"]
+let () = Project.register_pass' main ~deps:["cwe-checker-type-inference"]
