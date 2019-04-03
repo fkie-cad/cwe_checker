@@ -1,7 +1,7 @@
 (* This file contains analysis passes for type recognition *)
 
 open Bap.Std
-open Core_kernel.Std
+open Core_kernel
 
 
 (** The register type. *)

@@ -1,6 +1,6 @@
 
 open Bap.Std
-open Core_kernel.Std
+open Core_kernel
 
 let dyn_syms = ref None
 

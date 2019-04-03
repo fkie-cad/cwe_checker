@@ -1,5 +1,5 @@
 open Bap.Std
-open Core_kernel.Std
+open Core_kernel
 
 (** Returns whether a variable is callee saved according to the calling convention
     of the target architecture. Should only used for calls to functions outside

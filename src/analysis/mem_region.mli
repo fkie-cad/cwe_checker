@@ -5,7 +5,7 @@
     TODO: Right now this data structure is unsuited for elements that get only partially loaded. *)
 
 open Bap.Std
-open Core_kernel.Std
+open Core_kernel
 
 type 'a t [@@deriving bin_io, compare, sexp]
 
