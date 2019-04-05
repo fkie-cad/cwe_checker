@@ -7,8 +7,7 @@ services:
 
 install:
   - sudo apt-get update
-  - sudo apt-get install -y execstack
-  - pip3 install --user scons
+  - pip install --user scons
   - docker 
 
 before_script:
