@@ -24,6 +24,7 @@ let known_modules = [{cwe_func = Cwe_190.check_cwe; name = Cwe_190.name; version
                      {cwe_func = Cwe_457.check_cwe; name = Cwe_457.name; version = Cwe_457.version; requires_pairs = false; has_parameters = false};
                      {cwe_func = Cwe_467.check_cwe; name = Cwe_467.name; version = Cwe_467.version; requires_pairs = false; has_parameters = false};
                      {cwe_func = Cwe_476.check_cwe; name = Cwe_476.name; version = Cwe_476.version; requires_pairs = false; has_parameters = true};
+                      {cwe_func = Cwe_560.check_cwe; name = Cwe_560.name; version = Cwe_560.version; requires_pairs = false; has_parameters = false};
                      {cwe_func = Cwe_676.check_cwe; name = Cwe_676.name; version = Cwe_676.version; requires_pairs = false; has_parameters = false};
                      {cwe_func = Cwe_782.check_cwe; name = Cwe_782.name; version = Cwe_782.version; requires_pairs = false; has_parameters = false}]
 
