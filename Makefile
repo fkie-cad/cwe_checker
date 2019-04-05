@@ -1,12 +1,25 @@
 .PHONY: all clean test uninstall
 all:
-	cd src; bapbuild -r -Is checkers,utils -pkgs yojson,unix cwe_checker.plugin; bapbundle install cwe_checker.plugin; cd ..
+	dune build --profile release
+	dune install
+	cd plugins/cwe_checker; make all; cd ../..
+	cd plugins/cwe_checker_type_inference; make all; cd ../..
+	cd plugins/cwe_checker_type_inference_print; make all; cd ../..
 
 test:
+	dune runtest --profile release # TODO: correct all dune linter warnings so that we can remove --profile release
 	pytest -v
 
 clean:
+	dune clean
 	bapbuild -clean
+	cd test/unit; make clean; cd ../..
+	cd plugins/cwe_checker; make clean; cd ../..
+	cd plugins/cwe_checker_type_inference; make clean; cd ../..
+	cd plugins/cwe_checker_type_inference_print; make clean; cd ../..
 
 uninstall:
-	bapbundle remove cwe_checker.plugin
+	dune uninstall
+	cd plugins/cwe_checker; make uninstall; cd ../..
+	cd plugins/cwe_checker_type_inference; make uninstall; cd ../..
+	cd plugins/cwe_checker_type_inference_print; make uninstall; cd ../..
