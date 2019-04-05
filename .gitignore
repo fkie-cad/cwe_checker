@@ -222,3 +222,5 @@ test/run_real_world_samples.sh
 test/artificial_samples/dockcross*
 
 .#*
+
+.sconsign.dblite
