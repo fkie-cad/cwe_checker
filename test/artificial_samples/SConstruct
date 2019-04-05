@@ -1,5 +1,6 @@
 import os
-import shutil
+
+build_path = 'build'
 
 supported_architectures = ['x64', 'x86', 'arm', 'mips', 'ppc']
 
@@ -27,6 +28,13 @@ cpp_flags = {'x64': '-g -fno-stack-protector',
              'mips': '-g -fno-stack-protector',
              'ppc': '-g -fno-stack-protector'}
 
+def which(pgm):
+    path=os.getenv('PATH')
+    for p in path.split(os.path.pathsep):
+        p=os.path.join(p,pgm)
+        if os.path.exists(p) and os.access(p,os.X_OK):
+            return p
+
 def optimize(filename):
     optimize_me = ['cwe_476.c']
     if filename in optimize_me:
@@ -39,7 +47,7 @@ def compile_only_on_x64(filename, arch):
     return filename in only_x64 and arch != 'x64'
 
 def build_c(arch):
-    if shutil.which(c_compilers[arch]) is not None:
+    if which(c_compilers[arch]) is not None:
         c_programs = Glob('*.c')
         for p in c_programs:
             if compile_only_on_x64(str(p), arch):
@@ -47,23 +55,27 @@ def build_c(arch):
                 continue
             env = Environment(CC = c_compilers[arch],
                           CCFLAGS = c_flags[arch] + optimize(str(p)))
-            env.Program('build/%s_%s.out' % (str(p).split('.')[0], arch), 'build/%s' % str(p))
+            print(str(p))
+            env.Program('%s/%s_%s.out' % (build_path, str(p).split('.')[0], arch),
+                        env.Object(target='%s/%s_%s.o' % (build_path, str(p), arch),
+                                   source='%s/%s' % (build_path, str(p))))
     else:
         print('Compiler %s for architecture %s is not installed!' % (c_compilers[arch], arch))
 
 
 def build_cpp(arch):
-    if shutil.which(cpp_compilers[arch]) is not None:
+    if which(cpp_compilers[arch]) is not None:
         cpp_programs = Glob('*.cpp')
         for p in cpp_programs:
             env = Environment(CC = cpp_compilers[arch],
                               CCFLAGS = cpp_flags[arch] + optimize(str(p)))
-            env.Program('build/%s_%s.out' % (str(p).split('.')[0], arch), 'build/%s' % str(p))
+            env.Program('%s/%s_%s.out' % (build_path, str(p).split('.')[0], arch),
+                        '%s/%s' % (build_path, str(p)))
     else:
         print('Compiler %s for architecture %s is not installed!' % (cpp_compilers[arch], arch))
 
 
-VariantDir('build', '.', duplicate=0)
+VariantDir(build_path, '.', duplicate=0)
 for arch in supported_architectures:
     print('Building for architecture %s' % arch)
     build_c(arch)
