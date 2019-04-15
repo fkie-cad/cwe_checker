@@ -1,0 +1,18 @@
+(executable
+  (name cwe_checker_unit_tests)
+  (libraries
+  alcotest
+  yojson
+  bap
+  cwe_checker_core
+  core_kernel
+  core)
+  (preprocess (pps ppx_jane))
+)
+
+(include_subdirs unqualified) ; Include all subdirs when looking for source files
+
+(alias
+ (name runtest)
+ (deps cwe_checker_unit_tests.exe)
+(action (run %{deps} --color=always)))

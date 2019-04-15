@@ -239,13 +239,13 @@ let print_hit tid ~sub ~function_names ~tid_map =
       match Jmp.kind jmp with
       | Call(call) -> begin
           match Call.target call with
-          | Direct(call_tid) -> Option.is_some (List.find function_names ~f:(fun name ->
-              if name = (Tid.name call_tid) then begin
+          | Direct(call_tid) -> Option.is_some (List.find function_names ~f:(fun fn_name ->
+              if fn_name = (Tid.name call_tid) then begin
                 Log_utils.warn "[%s] {%s} (NULL Pointer Dereference) There is no check if the return value is NULL at %s (%s)."
                   name
                   version
                   (Address_translation.translate_tid_to_assembler_address_string tid tid_map)
-                  name;
+                  fn_name;
                 true
               end else
                 false
@@ -273,7 +273,7 @@ let check_cwe prog proj tid_map symbol_names parameters =
   Seq.iter subfunctions ~f:(fun subfn ->
       let cfg = Sub.to_cfg subfn in
       let cwe_hits = ref [] in
-      let empty = Map.empty Graphs.Ir.Node.comparator in
+      let empty = Map.empty (module Graphs.Ir.Node) in
       let init = Graphlib.Std.Solution.create empty [] in
       let equal = State.equal in
       let merge = State.union in
