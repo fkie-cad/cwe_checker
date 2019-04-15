@@ -10,4 +10,4 @@
 (option primus-greedy-scheduler)
 (option primus-limit-max-length 4096)
 
-(option cwe-checker-emulation)
+(option pass cwe-checker-emulation)
