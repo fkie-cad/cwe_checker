@@ -3,6 +3,7 @@ open Bap.Std
 open Graphlib.Std
 open Format
 open Yojson.Basic.Util
+open Cwe_checker_core
 
 include Self()
 

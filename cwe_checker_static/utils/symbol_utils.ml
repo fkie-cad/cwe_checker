@@ -147,3 +147,17 @@ let get_program_entry_points program =
   let entry_points = Seq.filter subfunctions ~f:(fun subfn -> Term.has_attr subfn Sub.entry_point) in
   let main_fn = Seq.filter subfunctions ~f:(fun subfn -> "@main" = Tid.name (Term.tid subfn)) in
   Seq.append main_fn entry_points
+
+let stack_register project =
+  let arch = Project.arch project in
+  let module Target = (val target_of_arch arch) in
+  Target.CPU.sp
+
+let flag_register_list project =
+  let arch = Project.arch project in
+  let module Target = (val target_of_arch arch) in
+  Target.CPU.zf :: Target.CPU.cf :: Target.CPU.vf :: Target.CPU.nf :: []
+
+let arch_pointer_size_in_bytes project : int =
+  let arch = Project.arch project in
+  Size.in_bytes (Arch.addr_size arch)

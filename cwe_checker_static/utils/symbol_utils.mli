@@ -68,3 +68,15 @@ val extract_direct_call_tid_from_block : Bap.Std.blk Bap.Std.term -> Bap.Std.tid
     TODO: The _start entry point usually calls a libc-function which then calls the main function. Since right now only direct
     calls are tracked, our graph traversal may never find the main function. For now, we add it by hand to the entry points. *)
 val get_program_entry_points : Bap.Std.program Bap.Std.term -> Bap.Std.sub Bap.Std.term Bap.Std.Seq.t
+
+(** Returns the stack register on the architecture of the given project. *)
+val stack_register: Bap.Std.Project.t -> Bap.Std.Var.t
+
+(** Returns a list of the known flag registers on the architecture of the given project.
+    TODO: Right now it only returns flag registers that exist on all architectures.
+    We should add known architecture dependend flag registers, too. *)
+val flag_register_list: Bap.Std.Project.t -> Bap.Std.Var.t list
+
+
+(** Returns the pointer size in bytes on the architecture of the given project. *)
+val arch_pointer_size_in_bytes: Bap.Std.Project.t -> int
