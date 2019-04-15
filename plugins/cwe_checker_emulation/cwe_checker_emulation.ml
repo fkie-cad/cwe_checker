@@ -64,32 +64,6 @@ let string_of_name = function
   | `tid t -> Tid.to_string t
 | `addr x -> Addr.string_of_value x
 
-(** Collects all entry points of the program. *)
-let entry_point_collector = object
-  inherit [tid list] Term.visitor
-  method! enter_term _ t entries =
-    if Term.has_attr t Sub.entry_point
-    then Term.tid t :: entries
-    else entries
-  end
-
-(** Wrapper function around entry_point_collector. *)
-let entry_points prog =
-  entry_point_collector#run prog []
-
-(** Collects all subroutines of the program that
-that are not an entry point. *)
-let all_subroutines prog =
-  let entries = entry_points prog in
-  let non_entry =
-    let roots = Tid.Set.of_list entries in
-    fun t -> if Set.mem roots t then None else Some (`tid t) in
-  List.map entries ~f:(fun t -> `tid t) @
-  Seq.to_list @@
-  Seq.filter_map ~f:non_entry @@
-  Graphlib.reverse_postorder_traverse (module Graphs.Callgraph) @@
-    Program.to_graph prog
-
 (** Executes/forks another Primus machine. *)
 let exec x =
   Machine.current () >>= fun cid ->
@@ -157,7 +131,8 @@ let main {Config.get=(!)} proj =
 
   Primus.Machine.add_component (module Monitor);
   begin
-  let targets =  all_subroutines (Project.program proj) in
+  let prog = (Project.program proj) in
+  let targets = Seq.to_list @@ Seq.map (Term.enum sub_t prog) ~f:(fun x -> `tid (Term.tid x)) in
   Main.run ~envp:[||] ~args:[||] proj (run targets) |> function
   | (Primus.Normal,proj)
   | (Primus.Exn Primus.Interpreter.Halt,proj) ->

@@ -23,6 +23,7 @@ Its main focus are ELF binaries that are commonly found on Linux and Unix operat
 -   [CWE-476](https://cwe.mitre.org/data/definitions/476.html): NULL Pointer Dereference
 -   [CWE-676](https://cwe.mitre.org/data/definitions/676.html): Use of Potentially Dangerous Function
 -   [CWE-782](https://cwe.mitre.org/data/definitions/782.html): Exposed IOCTL with Insufficient Access Control
+-   [CWE-787](https://cwe.mitre.org/data/definitions/787.html): Out-of-bounds Write
 
 Please note that some of the above analyses only are partially implemented at the moment. Furthermore, false positives are to be expected due to shortcuts and the nature of static analysis as well as over-approximation.
 
