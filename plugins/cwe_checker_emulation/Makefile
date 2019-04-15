@@ -1,5 +1,5 @@
 all:
-	bapbuild -pkgs yojson,unix,ppx_jane,cwe_checker_core cwe_checker_emulation.plugin
+	bapbuild -pkgs yojson,unix,ppx_jane,bap-primus,monads,graphlib,str,cwe_checker_core cwe_checker_emulation.plugin
 	bapbundle install cwe_checker_emulation.plugin
 
 clean:

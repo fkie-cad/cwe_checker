@@ -2,4 +2,4 @@
 
 (option rooter internal)
 
-(option cwe-checker-config $prefix/../../cwe_checker_static/config.json)
+(option cwe-checker-config $prefix/../../src/config.json)
