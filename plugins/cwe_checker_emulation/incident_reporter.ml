@@ -1,4 +1,5 @@
 open Core_kernel
+open Cwe_checker_core
 
 let version = "0.1"
 
@@ -40,7 +41,7 @@ let report incident location_tbl =
   match incident with
   | name::ids ->
     begin
-      let incident_locations = get_incident_locations_from_ids ids location_tbl in 
+      let incident_locations = get_incident_locations_from_ids ids location_tbl in
       let filtered_locs = Int.Set.to_list (Int.Set.of_list (List.concat incident_locations)) in
       let incident_str = Sexp.to_string name in
       match incident_str with

@@ -75,7 +75,7 @@ setup.data
 setup.log
 
 # Merlin configuring file for Vim and Emacs
-#.merlin
+.merlin
 
 ### Python ###
 # Byte-compiled / optimized / DLL files

@@ -10,6 +10,4 @@
 (option primus-greedy-scheduler)
 (option primus-limit-max-length 4096)
 
-(option cwe-checker-static)
-(option cwe-checker-static-config $prefix/../../cwe_checker_static/config.json)
-(option cwe-checker-emulation)
+(option pass cwe-checker-emulation)

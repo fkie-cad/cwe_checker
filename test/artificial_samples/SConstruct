@@ -10,6 +10,8 @@ c_compilers = {'x64': 'gcc',
                'mips': 'mips-linux-gnu-gcc',
                'ppc': 'powerpc-linux-gnu-gcc'}
 
+c_linkers =   {'x86': './dockcross-linux-x86 gcc -m32'}
+
 cpp_compilers = {'x64': 'g++',
                  'x86': './dockcross-linux-x86 g++',
                  'arm': 'arm-linux-gnueabi-g++-5',
@@ -28,10 +30,15 @@ cpp_flags = {'x64': '-g -fno-stack-protector',
              'mips': '-g -fno-stack-protector',
              'ppc': '-g -fno-stack-protector'}
 
+cpp_linkers =   {'x86': './dockcross-linux-x86 g++ -m32'}
+
 def which(pgm):
-    path=os.getenv('PATH')
+    # TODO: check if dockcross containers are installed
+    if pgm.startswith('.'):
+        return pgm
+    path = os.getenv('PATH')
     for p in path.split(os.path.pathsep):
-        p=os.path.join(p,pgm)
+        p = os.path.join(p,pgm)
         if os.path.exists(p) and os.access(p,os.X_OK):
             return p
 
@@ -53,9 +60,13 @@ def build_c(arch):
             if compile_only_on_x64(str(p), arch):
                 print('Skipping architecture %s for %s' % (arch, str(p)))
                 continue
-            env = Environment(CC = c_compilers[arch],
-                          CCFLAGS = c_flags[arch] + optimize(str(p)))
-            print(str(p))
+
+            env = Environment()
+            env['CC'] = c_compilers[arch]
+            env['CCFLAGS'] = c_flags[arch] + optimize(str(p))
+            if arch in c_linkers:
+                env['LINK'] = c_linkers[arch]
+
             env.Program('%s/%s_%s.out' % (build_path, str(p).split('.')[0], arch),
                         env.Object(target='%s/%s_%s.o' % (build_path, str(p), arch),
                                    source='%s/%s' % (build_path, str(p))))
@@ -67,10 +78,15 @@ def build_cpp(arch):
     if which(cpp_compilers[arch]) is not None:
         cpp_programs = Glob('*.cpp')
         for p in cpp_programs:
-            env = Environment(CC = cpp_compilers[arch],
-                              CCFLAGS = cpp_flags[arch] + optimize(str(p)))
+            env = Environment()
+            env['CCP'] = cpp_compilers[arch]
+            env['CCPFLAGS'] = cpp_flags[arch] + optimize(str(p))
+            if arch in c_linkers:
+                env['CPPLINK'] = cpp_linkers[arch]
+
             env.Program('%s/%s_%s.out' % (build_path, str(p).split('.')[0], arch),
-                        '%s/%s' % (build_path, str(p)))
+                        env.Object(target='%s/%s_%s.o' % (build_path, str(p), arch),
+                                   source='%s/%s' % (build_path, str(p))))
     else:
         print('Compiler %s for architecture %s is not installed!' % (cpp_compilers[arch], arch))
 
