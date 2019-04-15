@@ -19,7 +19,7 @@ class TestCwe416(unittest.TestCase):
         assert res == expect_res
 
     def test_cwe416_01_x64(self):
-        expect_res = 1
+        expect_res = 4
         res = cwe_checker_testlib.execute_emulation_and_check_occurence(self.target, self.target, 'x64', self.string)
         assert res == expect_res
 
