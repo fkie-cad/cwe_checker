@@ -1,27 +1,31 @@
 # cwe_checker #
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/9dbf158110de427d893b40ba397b94bc)](https://www.codacy.com/app/weidenba/cwe_checker?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=fkie-cad/cwe_checker&amp;utm_campaign=Badge_Grade)
-[![Build Status](https://travis-ci.com/fkie-cad/cwe_checker.svg?branch=master)](https://travis-ci.com/fkie-cad/cwe_checker)
+[![Build Status](https://travis-ci.org/fkie-cad/cwe_checker.svg?branch=master)](https://travis-ci.org/fkie-cad/cwe_checker)
 ![Docker-Pulls](https://img.shields.io/docker/pulls/fkiecad/cwe_checker.svg)
 ## What is cwe_checker? ##
-*cwe_checker* detects common bug classes such as use of dangerous functions and simple integer overflows. These bug classes are formally known as [Common Weakness Enumerations](https://cwe.mitre.org/) (CWEs). Its main goal is to aid analysts to quickly find vulnerable code paths.
+*cwe_checker* is a suite of tools to detect common bug classes such as use of dangerous functions and simple integer overflows. These bug classes are formally known as [Common Weakness Enumerations](https://cwe.mitre.org/) (CWEs). Its main goal is to aid analysts to quickly find vulnerable code paths.
 
 Its main focus are ELF binaries that are commonly found on Linux and Unix operating systems. *cwe_checker* is built on top of [BAP](https://github.com/BinaryAnalysisPlatform/bap)(Binary Analysis Platform). By using BAP, we are not restricted to one low level instruction set architectures like Intel x86. BAP lifts several of them to one common intermediate represenetation (IR). cwe_checker implements its analyses on this IR. At time of writing, BAP 1.5 supports Intel x86/x64, ARM, MIPS, and PPC amongst others. Hence, this makes *cwe_checker* a valuable tool for firmware analysis.
 
-*cwe_checker* implements a modular architecture that allows to add new analyses with ease. So far the following analyses are implemented:
--  [CWE-190](https://cwe.mitre.org/data/definitions/190.html): Integer Overflow or Wraparound
--  [CWE-215](https://cwe.mitre.org/data/definitions/215.html): Information Exposure Through Debug Information
--  [CWE-243](https://cwe.mitre.org/data/definitions/243.html): Creation of chroot Jail Without Changing Working Directory
--  [CWE-248](https://cwe.mitre.org/data/definitions/248.html): Uncaught Exception
--  [CWE-332](https://cwe.mitre.org/data/definitions/332.html): Insufficient Entropy in PRNG
--  [CWE-367](https://cwe.mitre.org/data/definitions/367.html): Time-of-check Time-of-use (TOCTOU) Race Condition
--  [CWE-426](https://cwe.mitre.org/data/definitions/426.html): Untrusted Search Path
--  [CWE-457](https://cwe.mitre.org/data/definitions/457.html): Use of Uninitialized Variable
--  [CWE-467](https://cwe.mitre.org/data/definitions/467.html): Use of sizeof() on a Pointer Type
--  [CWE-476](https://cwe.mitre.org/data/definitions/476.html): NULL Pointer Dereference
--  [CWE-676](https://cwe.mitre.org/data/definitions/676.html): Use of Potentially Dangerous Function
--  [CWE-782](https://cwe.mitre.org/data/definitions/782.html): Exposed IOCTL with Insufficient Access Control
+*cwe_checker* implements a modular architecture that allows to add new analyses with ease. So far the following analyses are implemented across several BAP plugins:
+-   [CWE-125](https://cwe.mitre.org/data/definitions/125.html): Out-of-bounds read (via emulation)
+-   [CWE-190](https://cwe.mitre.org/data/definitions/190.html): Integer Overflow or Wraparound
+-   [CWE-215](https://cwe.mitre.org/data/definitions/215.html): Information Exposure Through Debug Information
+-   [CWE-243](https://cwe.mitre.org/data/definitions/243.html): Creation of chroot Jail Without Changing Working Directory
+-   [CWE-248](https://cwe.mitre.org/data/definitions/248.html): Uncaught Exception
+-   [CWE-332](https://cwe.mitre.org/data/definitions/332.html): Insufficient Entropy in PRNG
+-   [CWE-367](https://cwe.mitre.org/data/definitions/367.html): Time-of-check Time-of-use (TOCTOU) Race Condition
+-   [CWE-415](https://cwe.mitre.org/data/definitions/415.html): Double Free (via emulation)
+-   [CWE-416](https://cwe.mitre.org/data/definitions/416.html): Use After Free (UAF) (via emulation)
+-   [CWE-426](https://cwe.mitre.org/data/definitions/426.html): Untrusted Search Path
+-   [CWE-457](https://cwe.mitre.org/data/definitions/457.html): Use of Uninitialized Variable
+-   [CWE-467](https://cwe.mitre.org/data/definitions/467.html): Use of sizeof() on a Pointer Type
+-   [CWE-476](https://cwe.mitre.org/data/definitions/476.html): NULL Pointer Dereference
+-   [CWE-676](https://cwe.mitre.org/data/definitions/676.html): Use of Potentially Dangerous Function
+-   [CWE-782](https://cwe.mitre.org/data/definitions/782.html): Exposed IOCTL with Insufficient Access Control
+-   [CWE-787](https://cwe.mitre.org/data/definitions/787.html): Out-of-bounds Write
 
-Please note that some of the above analyses only are partially implemented at the moment. Furthermore, false positives are to be expected due to shortcuts and the nature of static analysis.
+Please note that some of the above analyses only are partially implemented at the moment. Furthermore, false positives are to be expected due to shortcuts and the nature of static analysis as well as over-approximation.
 
 *cwe_checker* comes with a script called `cwe_checker_to_ida`, which parses the output of *cwe_checker* and generates a IDAPython script. This script annotates the found CWEs in IDA Pro, which helps during manual analysis of a binary. The following screenshot shows some results:
 

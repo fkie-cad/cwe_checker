@@ -7,7 +7,7 @@ services:
 
 install:
   - sudo apt-get update
-  - pip install --user scons
+  - pip install scons
   - docker 
 
 before_script:
