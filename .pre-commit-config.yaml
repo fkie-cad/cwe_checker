@@ -35,3 +35,11 @@ repos:
     rev: v0.1.0
     hooks:
       - id: dockerfilelint
+
+-   repo: local
+    hooks:
+      - id: ocp-indent
+        name: ocp-indent
+        language: system
+        verbose: true
+        entry: .hooks/ocp-indent.sh
