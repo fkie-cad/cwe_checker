@@ -35,10 +35,10 @@ let rec get_all_paths_from_node node g current_path =
   | [] -> [current_path]
   | succs -> List.concat_map succs
                ~f:(fun succ ->
-                   if node_already_visited_on_path succ current_path then
-                     []
-                   else
-                     get_all_paths_from_node succ g (fork_path current_path node))
+                 if node_already_visited_on_path succ current_path then
+                   []
+                 else
+                   get_all_paths_from_node succ g (fork_path current_path node))
 
 (* Please mind the path explosion !!! *)
 let enumerate_paths_between_blks sub blk_start_tid blk_end_tid limit =
