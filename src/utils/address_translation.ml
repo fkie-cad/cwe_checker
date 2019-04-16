@@ -1,4 +1,4 @@
-open Core_kernel.Std
+open Core_kernel
 open Bap.Std
 
 let translate_tid_to_assembler_address_string tid tid_map =

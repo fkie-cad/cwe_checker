@@ -1,5 +1,5 @@
+open Core_kernel
 open Bap.Std
-open Core_kernel.Std
 
 let name = "CWE248"
 let version = "0.1"
