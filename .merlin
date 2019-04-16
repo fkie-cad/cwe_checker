@@ -1,7 +1,0 @@
-PKG yojson unix bap-primus monads graphlib ppx_jane str
-
-S cwe_checker_static/**
-S cwe_checker_emulation/**
-
-B cwe_checker_static/_build/**
-B cwe_checker_emulation/_build/**
