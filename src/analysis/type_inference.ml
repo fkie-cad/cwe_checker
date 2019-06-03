@@ -4,14 +4,10 @@ open Core_kernel
 (** TODO:
     interprocedural analysis
     backward analysis to recognize which constants are pointers and which not.
-    extend to track FunctionPointer, DataPointer
-    extend to track PointerTargets
+    maybe extend to track FunctionPointer,
     TODO: There are no checks yet if a value from the stack of the calling function
     is accessed. Maybe this should be part of another analysis.
-    TODO: tracking for PointerTargets should also track if another register other
-    than the stack register is used to access values on the stack of the current
-    function.
-    TODO: the fixpoint analysis does not track, whether a pointer could have an
+    TODO: the fixpoint analysis does not track whether a pointer could have an
     unknown target as long as it has at least one known target. This should be
     tracked in an extra analysis step after the fixpoint analysis finished.
 *)
@@ -49,11 +45,15 @@ let merge_result_map val1 val2 ~value_merge =
     | `Both(_, _) -> Some(Error(()))
   )
 
-(** module PointerTarget: contains information about the memory area a pointer points to.
-    It contains:
-    - offset: the offset relative to the base address of the memory area if known
-    - alignment: the alignment of the base address of the memory area if known
-*) (*TODO: move to .mli*)
+(* generic equal of two ('a, unit) Result.t Option.t)*)
+let equal_result_option val1 val2 ~value_equal =
+  match (val1, val2) with
+  | (Some(Ok(x)), Some(Ok(y))) -> value_equal x y
+  | (Some(Error(())), Some(Error(()))) -> true
+  | (None, None) -> true
+  | _ -> false
+
+
 module PointerTargetInfo = struct
   type t = {
     offset: (Bitvector.t, unit) Result.t Option.t;
@@ -65,16 +65,10 @@ module PointerTargetInfo = struct
       alignment = merge_result_option info1.alignment info2.alignment; }
 
   let equal info1 info2 =
-    info1 = info2
+    equal_result_option info1.offset info2.offset ~value_equal:Bitvector.(=) && equal_result_option info1.alignment info2.alignment ~value_equal: Int.(=)
 end (* module *)
 
-(** The Register type. A register holds either arbitrary data or a pointer to some
-    memory region. We do track possible targets of the pointer as follows:
-    - heap objects: tid of corresponding call instruction to malloc, calloc, etc.
-    - current stack frame: sub_tid of current function
-    - some other stack frame: tid of corresponding call that left the stack frame.
-    This way we can distinguish between current stack pointers and pointers to the
-    stack frame of the same function coming from recursive calls. *)
+
 module Register = struct
   type t =
     | Pointer of PointerTargetInfo.t Tid.Map.t
@@ -93,9 +87,12 @@ module Register = struct
     | (Data, Data) -> Ok(Data)
     | _ -> Error(())
 
-  (* TODO: write unit tests to check whether equal works as intended*)
+  (* Checks whether two registers hold the same data *)
   let equal reg1 reg2 =
-    reg1 = reg2
+    match (reg1, reg2) with
+    | (Pointer(targets1), Pointer(targets2)) -> Map.equal PointerTargetInfo.equal targets1 targets2
+    | (Data, Data) -> true
+    | _ -> false
 
   (** add to the offsets of all possible targets of the register. *)
   let add_to_offsets register value_res_opt =
@@ -143,9 +140,12 @@ module TypeInfo = struct
     }
 
     let equal state1 state2 =
-      if Mem_region.equal state1.stack state2.stack ~data_equal:Register.equal &&
-         Map.equal (fun reg1 reg2 -> reg1 = reg2) state1.reg state2.reg then
-        true
+      if Mem_region.equal state1.stack state2.stack ~data_equal:Register.equal then
+         Map.equal (fun reg1 reg2 -> match (reg1, reg2) with
+           | (Ok(register1), Ok(register2)) -> Register.equal register1 register2
+           | (Error(()), Error(())) -> true
+           | _ -> false
+         ) state1.reg state2.reg
       else
         false
 
@@ -175,7 +175,7 @@ module TypeInfo = struct
     { state with reg = Map.set state.reg stack_register (Ok(Register.Pointer(stack_target_map))); }
 
   (** Returns a TypeInfo.t with only the stack pointer as pointer register (with
-      unknown offset) and only the flag registers as data registers. The stack is empty. *) (* TODO: check that all users really want unknown stack offset*)
+      unknown offset) and only the flag registers as data registers. The stack is empty. *)
   let only_stack_pointer_and_flags sub_tid project  =
     let state = empty () in
     let state = add_flags state project in
@@ -193,7 +193,6 @@ module TypeInfo = struct
     let state = set_stack_register state ~offset:zero_offset ?alignment:None ~sub_tid ~project in
     state
 
-  (* TODO: check whether I should check against CPU.is_reg instead. *)
   let remove_virtual_registers state =
     { state with reg = Map.filter_keys state.reg ~f:(fun var -> Var.is_physical var) }
 
@@ -288,13 +287,13 @@ let get_stack_elem state exp ~sub_tid ~project =
   | _ -> None
 
 (* compute the value of an expression. This is a stub and will be replaced when we
-   have a proper pass for value inference. (TODO) *)
+   have a proper pass for value inference. *)
 let value_of_exp exp =
   match exp with
   | Bil.Int(x) -> Some(Ok(x))
   | _ -> None
 
-(* TODO: type_of_exp probably should update target info (especially offsets) *)
+
 let rec type_of_exp exp (state: TypeInfo.t) ~sub_tid ~project =
   let open Register in
   match exp with
@@ -399,17 +398,23 @@ let add_mem_address_registers state exp ~sub_tid ~project =
           match addr_exp with
           | Bil.Var(addr)
           | Bil.BinOp(Bil.PLUS, Bil.Var(addr), Bil.Int(_))
+          | Bil.BinOp(Bil.PLUS, Bil.Int(_), Bil.Var(addr))
           | Bil.BinOp(Bil.MINUS, Bil.Var(addr), Bil.Int(_))
           | Bil.BinOp(Bil.AND, Bil.Var(addr), Bil.Int(_))
-          | Bil.BinOp(Bil.OR, Bil.Var(addr), Bil.Int(_)) ->
+          | Bil.BinOp(Bil.AND, Bil.Int(_), Bil.Var(addr))
+          | Bil.BinOp(Bil.OR, Bil.Var(addr), Bil.Int(_))
+          | Bil.BinOp(Bil.OR, Bil.Int(_), Bil.Var(addr)) ->
               begin match Map.find state.TypeInfo.reg addr with
               | Some(Ok(Pointer(_))) -> state
               | _ ->   { state with TypeInfo.reg = Map.set state.TypeInfo.reg addr (Ok(Register.Pointer(Tid.Map.empty))) } (* TODO: there are some false positives here for indices in global data arrays, where the immediate is the pointer. Maybe remove all cases with potential false positives? *)
               end
           | Bil.BinOp(Bil.PLUS, Bil.Var(addr), exp2)
+          | Bil.BinOp(Bil.PLUS, exp2, Bil.Var(addr))
           | Bil.BinOp(Bil.MINUS, Bil.Var(addr), exp2)
           | Bil.BinOp(Bil.AND, Bil.Var(addr), exp2)
-          | Bil.BinOp(Bil.OR, Bil.Var(addr), exp2) ->
+          | Bil.BinOp(Bil.AND, exp2, Bil.Var(addr))
+          | Bil.BinOp(Bil.OR, Bil.Var(addr), exp2)
+          | Bil.BinOp(Bil.OR, exp2, Bil.Var(addr))            ->
             if type_of_exp exp2 state sub_tid project = Some(Ok(Register.Data)) then
               begin match Map.find state.TypeInfo.reg addr with
               | Some(Ok(Pointer(_))) -> state
@@ -455,6 +460,44 @@ let add_to_stack_offset state num ~project =
       { state with TypeInfo.reg = Map.set state.TypeInfo.reg ~key:(Symbol_utils.stack_register project) ~data:(Ok(new_stack_value)) }
   | _ -> state (* There is no known stack offset, so we return the old state. *)
 
+(* TODO: Add entry to config for this? Since type inference is its own bap-pass, this may need a new config file...
+   Also important: update_state_jmp makes a lot of assumptions about the functions (like it does not interact with the stack).
+   If this list gets configurable, we probably need a concept how to annotate these types of assumptions in config files. *)
+(** returns a list of known malloc-like functions. *)
+let malloc_like_function_list () =
+  ["malloc"; "calloc"; "realloc";]
+
+(** updates the state on a call to a malloc-like function. Notable assumptions for
+    malloc-like functions:
+    - only one return register, which returns a unique pointer to a newly allocated
+      memory region. Note: Possible zero returns are handled by the CWE-476-check.
+    - the malloc-like-function does not touch the stack
+    - the standard calling convention of the target architecture is used. *)
+let update_state_malloc_call state malloc_like_tid jmp_term ~project =
+  (* only keep callee-saved register information. Stack information is also kept. TODO: maybe add a "cut"-function to remove all stack info below the stack pointer? *)
+  let state = { state with TypeInfo.reg = Var.Map.filter_keys state.TypeInfo.reg ~f:(fun var -> Cconv.is_callee_saved var project) } in
+  (* add the return register with its new pointer target. The target is identified by the tid of the jmp instruction. *)
+  let malloc_like_fn = Term.find_exn sub_t (Project.program project) malloc_like_tid in
+  let arguments = Term.enum arg_t malloc_like_fn in
+  let return_arg_opt = Seq.find arguments ~f:(fun arg -> (* TODO: check whether there exists more than one return register! *)
+    match Bap.Std.Arg.intent arg with
+    | Some(Out) | Some(Both) -> true
+    | _ -> false
+  ) in
+  let return_arg = match return_arg_opt with
+    | Some(x) -> x
+    | None -> failwith "[CWE-checker] malloc-like function has no return register" in
+  let return_reg = match Bap.Std.Arg.rhs return_arg with
+    | Bil.Var(var) -> var
+    | _ -> failwith "[CWE-checker] Return register of malloc-like function wasn't a register." in
+  let target_map = Map.set Tid.Map.empty (Term.tid jmp_term) { PointerTargetInfo.offset = Some(Ok(Bitvector.of_int 0 ~width:(Symbol_utils.arch_pointer_size_in_bytes project * 8))); alignment = None} in
+  { state with TypeInfo.reg = Var.Map.set state.reg ~key:return_reg ~data:(Ok(Pointer(target_map))) }
+
+
+(* TODO: Right now the conditional expression is not checked! Thus for conditional calls
+   (if bap generates conditional calls) the state would always be the state as if the call
+   branch has been taken even for the other branch. The way that the bap fixpoint function
+   works this could be quite complicated to implement. *)
 let update_state_jmp state jmp ~sub_tid ~project =
   match Jmp.kind jmp with
   | Call(call) ->
@@ -464,9 +507,13 @@ let update_state_jmp state jmp ~sub_tid ~project =
           | Some(_left, right) -> right
           | None -> Tid.name tid in
         if String.Set.mem (Cconv.parse_dyn_syms project) func_name then
-          let empty_state = TypeInfo.empty () in (* TODO: to preserve stack information we need to be sure that the callee does not write on the stack. Can we already check that? *)
-          { empty_state with
-            TypeInfo.reg = Var.Map.filter_keys state.TypeInfo.reg ~f:(fun var -> Cconv.is_callee_saved var project) }
+          begin if List.exists (malloc_like_function_list ()) ~f:(fun elem -> elem = func_name) then
+              update_state_malloc_call state tid jmp project
+            else
+              let empty_state = TypeInfo.empty () in (* TODO: to preserve stack information we need to be sure that the callee does not write on the stack. Can we already check that? *)
+              { empty_state with
+                TypeInfo.reg = Var.Map.filter_keys state.TypeInfo.reg ~f:(fun var -> Cconv.is_callee_saved var project) }
+          end
         else
           keep_only_stack_register state sub_tid project (* TODO: add interprocedural analysis here. *)
       | Indirect(_) -> keep_only_stack_register state sub_tid project in (* TODO: when we have value tracking and interprocedural analysis, we can add indirect calls to the regular analysis. *)
@@ -633,4 +680,6 @@ module Private = struct
   let only_stack_pointer_and_flags = TypeInfo.only_stack_pointer_and_flags
 
   let merge_type_infos = TypeInfo.merge
+
+let type_info_equal = TypeInfo.equal
 end

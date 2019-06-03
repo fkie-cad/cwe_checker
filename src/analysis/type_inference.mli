@@ -1,4 +1,10 @@
-(* This file contains analysis passes for type recognition *)
+(* This file contains analysis passes for type recognition.
+
+   It can annotate whether registers or values on the stack hold data or pointers
+   to memory. For the latter the target memory location is also tracked if known.
+   Pointers to the heap are tracked by tracking calls to malloc, calloc and realloc.
+   This analysis does not check whether the return values of these calls are checked
+   for NULL values (see cwe_476 for that). *)
 
 open Bap.Std
 open Core_kernel
@@ -13,7 +19,13 @@ module PointerTargetInfo : sig
   } [@@deriving bin_io, compare, sexp]
 end
 
-(** The register type. *)
+(** The Register.t type. A register holds either arbitrary data or a pointer to some
+    memory region. We do track possible targets of the pointer as follows:
+    - heap objects: tid of corresponding call instruction to malloc, calloc, etc.
+    - current stack frame: sub_tid of current function
+    - some other stack frame: tid of corresponding call that left the stack frame.
+      This way we can distinguish between current stack pointers and pointers to the
+      stack frame of the same function coming from recursive calls. *)
 module Register : sig
   type t =
     | Pointer of PointerTargetInfo.t Tid.Map.t
@@ -21,7 +33,9 @@ module Register : sig
   [@@deriving bin_io, compare, sexp]
 end
 
-
+(** The TypeInfo module. A TypeInfo.t structure holds a list of registers with known
+    type information (see Register.t type) and known type information for values
+    on the stack. *)
 module TypeInfo : sig
   type reg_state = (Register.t, unit) Result.t Var.Map.t [@@deriving bin_io, compare, sexp]
   type t = {
@@ -33,6 +47,8 @@ module TypeInfo : sig
   val pp: Format.formatter -> t -> unit
 end
 
+(** A tag for TypeInfo.t, so that we can annotate basic blocks with known type information
+using bap tags. *)
 val type_info_tag: TypeInfo.t Value.tag
 
 (** Computes TypeInfo for the given project. Adds tags to each block containing the
@@ -60,4 +76,6 @@ module Private : sig
   val only_stack_pointer_and_flags: Tid.t -> Project.t -> TypeInfo.t
 
   val merge_type_infos: TypeInfo.t -> TypeInfo.t -> TypeInfo.t
+
+  val type_info_equal: TypeInfo.t -> TypeInfo.t -> bool
 end
