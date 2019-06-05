@@ -1,0 +1,37 @@
+opam-version: "2.0"
+name: "CWE_checker"
+version: "0.2"
+synopsis: "CWE_checker"
+description: """
+CWE_checker is a suite of tools to detect common bug classes (known as CWEs) in binary files.
+"""
+maintainer: "CWE_checker Team <firmware-security@fkie.fraunhofer.de>"
+authors: [ "Thomas Barabosch <thomas.barabosch@fkie.fraunhofer.de>" "Nils-Edvin Enkelmann <nils-edvin.enkelmann@fkie.fraunhofer.de>" ]
+license: "GPL-3.0-or-later"
+homepage: "https://github.com/fkie-cad/cwe_checker"
+bug-reports: "https://github.com/fkie-cad/cwe_checker/issues"
+depends: [
+  "ocaml" {>= "4.05"}
+  "dune" {>= "1.5"}
+  "yojson" {>= "1.4.1"}
+  "bap" {>= "1.6"}
+  "alcotest" {>= "0.8.3"}
+  "core_kernel" {>= "v0.11" & < "v0.12"}
+  "ppx_jane" {>= "v0.11" & < "v0.12"}
+  "cwe_checker_core"
+]
+depexts: [
+  "binutils"
+]
+build: [
+  [ "dune" "build" "--profile" "release" ]
+]
+install: [
+  [ make "uninstall" ]
+  [ make "clean" ]
+  [ make "all" ]
+]
+remove: [
+  [ make "uninstall" ]
+  [ make "clean" ]
+]
