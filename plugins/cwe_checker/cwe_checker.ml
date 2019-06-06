@@ -84,8 +84,18 @@ let main config module_versions partial_update project =
     end
   else
     begin
+      let config =
+        if config = "" then
+          (* try the standard installation path for the config file instead *)
+          match Sys.getenv_opt "OPAM_SWITCH_PREFIX" with
+          | Some(prefix) -> prefix ^ "/etc/cwe_checker/config.json"
+          | None -> ""
+        else
+          config in
       if config = "" then
         Log_utils.error "[cwe_checker] No configuration file provided! Aborting..."
+      else if Sys.file_exists config <> true then
+        Log_utils.error "[cwe_checker] Configuration file not found. Aborting..."
       else
         begin
           if partial_update = "" then

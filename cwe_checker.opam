@@ -1,9 +1,9 @@
 opam-version: "2.0"
-name: "CWE_checker"
+name: "cwe_checker"
 version: "0.2"
-synopsis: "CWE_checker"
+synopsis: "BAP plugin collection to detect common bug classes"
 description: """
-CWE_checker is a suite of tools to detect common bug classes (known as CWEs) in binary files.
+cwe_checker is a suite of tools to detect common bug classes such as use of dangerous functions and simple integer overflows. These bug classes are formally known as Common Weakness Enumerations (CWEs).
 """
 maintainer: "CWE_checker Team <firmware-security@fkie.fraunhofer.de>"
 authors: [ "Thomas Barabosch <thomas.barabosch@fkie.fraunhofer.de>" "Nils-Edvin Enkelmann <nils-edvin.enkelmann@fkie.fraunhofer.de>" ]
@@ -19,7 +19,7 @@ depends: [
   "alcotest" {>= "0.8.3"}
   "core_kernel" {>= "v0.11" & < "v0.12"}
   "ppx_jane" {>= "v0.11" & < "v0.12"}
-  "cwe_checker_core"
+  "cwe_checker_core" {= "0.2"}
 ]
 depexts: [
   "binutils"
@@ -31,6 +31,8 @@ install: [
   [ make "uninstall" ]
   [ make "clean" ]
   [ make "all" ]
+  [ "mkdir" "-p" "%{etc}%/cwe_checker" ]
+  [ "cp" "src/config.json" "%{etc}%/cwe_checker/" ]
 ]
 remove: [
   [ make "uninstall" ]

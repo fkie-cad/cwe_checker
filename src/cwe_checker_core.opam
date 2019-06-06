@@ -1,9 +1,9 @@
 opam-version: "2.0"
 name: "cwe_checker_core"
 version: "0.2"
-synopsis: "CWE_checker_core library"
+synopsis: "Core library for the cwe_checker package"
 description: """
-CWE_checker is a suite of tools to detect common bug classes (known as CWEs) in binary files.
+Core library for the cwe_checker suite of tools.
 """
 maintainer: "CWE_checker Team <firmware-security@fkie.fraunhofer.de>"
 authors: [ "Thomas Barabosch <thomas.barabosch@fkie.fraunhofer.de>" "Nils-Edvin Enkelmann <nils-edvin.enkelmann@fkie.fraunhofer.de>" ]
@@ -16,7 +16,6 @@ depends: [
   "dune" {>= "1.5"}
   "yojson" {>= "1.4.1"}
   "bap" {>= "1.6"}
-  "alcotest" {>= "0.8.3"}
   "core_kernel" {>= "v0.11" & < "v0.12"}
   "ppx_jane" {>= "v0.11" & < "v0.12"}
 ]
