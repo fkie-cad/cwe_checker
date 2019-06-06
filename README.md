@@ -39,14 +39,15 @@ The following arguments should convince you to give *cwe_checker* a try:
 -  view results annotated in IDA Pro
 -  *cwe_checker* can be integrated as a plugin into [FACT](https://github.com/fkie-cad/FACT_core)
 ## How to install cwe_checker? ##
-There are several ways to install cwe_checker. The recommended way is to get cwe_checker from the Ocaml package manager Opam. You can install cwe_checker via the package [fkie-cad-cwe-checker](https://opam.ocaml.org/packages/fkie-cad-cwe-checker/) (`opam install fkie-cad-cwe-checker`). This gives you a stable version of cwe_checker. At the moment we depend on the testing version of BAP to include the latest features.  
+There are several ways to install cwe_checker. The recommended way is to get cwe_checker from the Ocaml package manager Opam. You can install cwe_checker via the package [cwe_checker](https://opam.ocaml.org/packages/cwe_checker/) (`opam install cwe_checker`). This gives you a stable version of cwe_checker.
 
 Another option is to pull the latest Docker container from [dockerhub](https://hub.docker.com/r/fkiecad/cwe_checker) (`docker pull fkiecad/cwe_checker`).
 
-The last two ways are preferrable if you plan to develop cwe_checker. First, utilize the installation script `install.sh`, which is just a wrapper around Docker. Make sure to have the latest version of Docker. Second, build it using the provided `Makefile`. In this case you must ensure that all dependencies are fulfilled:
+If you plan to develop cwe_checker, it is recommended to build it using the provided `Makefile`. In this case you must ensure that all dependencies are fulfilled:
 -  Ocaml 4.05.0
 -  Opam 2.0.2
--  BAP 1.6 (testing) (and its dependencies)
+-  dune >= 1.6
+-  BAP 1.6 (and its dependencies)
 -  yojson >= 1.4.1
 -  alcotest >= 0.8.3
 -  Sark (latest) for IDA Pro annotations
@@ -64,7 +65,7 @@ bap PATH_TO_BINARY --recipe=recipes/RECIPE_FOLDER_NAME
 ```
 *cwe_checker* outputs to stdout. This output is parsable (sexep). There is a script `cwe_checker_to_ida` to visualize the results in IDA Pro.
 ## How to extend cwe_checker? ##
-New plugins should be added to src/checkers. Implement a .ml and .mli file. See the existing modules for an interface description. If necessary add a section to `config.json` to allow users to configure your plugin. Finally, add your plugin to `cwe_checker.ml`.
+New plugins should be added to src/checkers. Implement a .ml and .mli file. See the existing modules for an interface description. If necessary add a section to `config.json` to allow users to configure your plugin. Finally, add your plugin to `plugins/cwe_checker/cwe_checker.ml`.
 
 If you plan to open a PR, please utilize [precommit](https://pre-commit.com) in your development environment to catch many issues before the code review.
 ### Contribute ###

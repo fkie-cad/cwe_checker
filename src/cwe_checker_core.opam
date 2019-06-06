@@ -13,7 +13,7 @@ bug-reports: "https://github.com/fkie-cad/cwe_checker/issues"
 dev-repo: "git+https://github.com/fkie-cad/cwe_checker"
 depends: [
   "ocaml" {>= "4.05"}
-  "dune" {>= "1.5"}
+  "dune" {>= "1.6"}
   "yojson" {>= "1.4.1"}
   "bap" {>= "1.6"}
   "core_kernel" {>= "v0.11" & < "v0.12"}
