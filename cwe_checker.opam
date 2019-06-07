@@ -31,8 +31,6 @@ install: [
   [ make "uninstall" ]
   [ make "clean" ]
   [ make "all" ]
-  [ "mkdir" "-p" "%{etc}%/cwe_checker" ]
-  [ "cp" "src/config.json" "%{etc}%/cwe_checker/" ]
 ]
 remove: [
   [ make "uninstall" ]

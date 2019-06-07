@@ -1,0 +1,6 @@
+(install
+  (section etc)
+  (files
+    (src/config.json as config.json)
+  )
+)
