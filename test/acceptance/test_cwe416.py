@@ -18,6 +18,7 @@ class TestCwe416(unittest.TestCase):
         res = cwe_checker_testlib.execute_emulation_and_check_occurence(self.target, self.target, 'x86', self.string)
         self.assertEqual(res, expect_res)
 
+    @unittest.skip("FIXME: broken on Ubuntu 18.04 with the corresponding gcc version")
     def test_cwe416_01_x64(self):
         expect_res = 4
         res = cwe_checker_testlib.execute_emulation_and_check_occurence(self.target, self.target, 'x64', self.string)

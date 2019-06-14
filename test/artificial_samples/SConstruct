@@ -14,9 +14,9 @@ c_linkers =   {'x86': './dockcross-linux-x86 gcc -m32'}
 
 cpp_compilers = {'x64': 'g++',
                  'x86': './dockcross-linux-x86 g++',
-                 'arm': 'arm-linux-gnueabi-g++-5',
-                 'mips': 'mips-linux-gnu-g++-5',
-                 'ppc': 'powerpc-linux-gnu-g++-5'}
+                 'arm': 'arm-linux-gnueabi-g++',
+                 'mips': 'mips-linux-gnu-g++',
+                 'ppc': 'powerpc-linux-gnu-g++'}
 
 c_flags = {'x64': '-g -fno-stack-protector -std=c11',
            'x86': '-g -m32 -fno-stack-protector -std=c11',

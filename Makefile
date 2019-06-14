@@ -9,6 +9,7 @@ all:
 
 test:
 	dune runtest --profile release # TODO: correct all dune linter warnings so that we can remove --profile release
+	cd test/artificial_samples; scons; cd ../..
 	pytest -v
 
 clean:
