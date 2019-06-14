@@ -48,8 +48,9 @@ let parse_dyn_sym_line line =
     line := String.strip left;
     str_list := right :: !str_list;
   done;
+  str_list := !line :: !str_list;
   match !str_list with
-  | _ :: value :: _ :: "FUNC" :: _ :: _ :: _ :: name :: [] -> begin
+  | _ :: value :: _ :: "FUNC" :: _ :: _ :: _ :: name :: _ -> begin
       match ( String.strip ~drop:(fun x -> x = '0') value, String.lsplit2 name ~on:'@') with
       | ("", Some(left, _)) -> Some(left)
       | ("", None) -> Some(name)
