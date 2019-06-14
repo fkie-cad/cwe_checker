@@ -1,3 +1,7 @@
+<p align="center">
+    <img src="doc/images/cwe_checker_logo.png" alt="cwe_checker logo" width="625" height="263"/>
+</p>
+
 # cwe_checker #
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/9dbf158110de427d893b40ba397b94bc)](https://www.codacy.com/app/weidenba/cwe_checker?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=fkie-cad/cwe_checker&amp;utm_campaign=Badge_Grade)
 [![Build Status](https://travis-ci.org/fkie-cad/cwe_checker.svg?branch=master)](https://travis-ci.org/fkie-cad/cwe_checker)
