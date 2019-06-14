@@ -11,4 +11,4 @@ class TestCwe782(unittest.TestCase):
     def test_cwe782_01_x64(self):
         expect_res = 1
         res = cwe_checker_testlib.execute_and_check_occurence(self.target, self.target, 'x64', self.string)
-        assert res == expect_res
+        self.assertEqual(res, expect_res)
