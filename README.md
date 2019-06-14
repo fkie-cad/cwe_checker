@@ -1,5 +1,5 @@
 <p align="center">
-    <img src="doc/images/cwe_checker_logo.png" alt="cwe_checker logo" width="625" height="263"/>
+    <img src="doc/images/cwe_checker_logo.png" alt="cwe_checker logo"/>
 </p>
 
 # cwe_checker #
