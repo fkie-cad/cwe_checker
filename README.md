@@ -25,6 +25,7 @@ Its main focus are ELF binaries that are commonly found on Linux and Unix operat
 -   [CWE-457](https://cwe.mitre.org/data/definitions/457.html): Use of Uninitialized Variable
 -   [CWE-467](https://cwe.mitre.org/data/definitions/467.html): Use of sizeof() on a Pointer Type
 -   [CWE-476](https://cwe.mitre.org/data/definitions/476.html): NULL Pointer Dereference
+-   [CWE-560](https://cwe.mitre.org/data/definitions/560.html): Use of umask() with chmod-style Argument
 -   [CWE-676](https://cwe.mitre.org/data/definitions/676.html): Use of Potentially Dangerous Function
 -   [CWE-782](https://cwe.mitre.org/data/definitions/782.html): Exposed IOCTL with Insufficient Access Control
 -   [CWE-787](https://cwe.mitre.org/data/definitions/787.html): Out-of-bounds Write
