@@ -4,8 +4,7 @@
   (libraries
   yojson
   bap
-  core_kernel
-  core)
+  core_kernel)
   (preprocess (pps ppx_jane))
 )
 

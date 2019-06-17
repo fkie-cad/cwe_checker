@@ -1,9 +1,9 @@
 opam-version: "2.0"
-name: "cwe_checker_core"
+name: "cwe_checker"
 version: "0.2"
-synopsis: "Core library for the cwe_checker package"
+synopsis: "BAP plugin collection to detect common bug classes"
 description: """
-Core library for the cwe_checker suite of tools.
+cwe_checker is a suite of tools to detect common bug classes such as use of dangerous functions and simple integer overflows. These bug classes are formally known as Common Weakness Enumerations (CWEs).
 """
 maintainer: "CWE_checker Team <firmware-security@fkie.fraunhofer.de>"
 authors: [ "Thomas Barabosch <thomas.barabosch@fkie.fraunhofer.de>" "Nils-Edvin Enkelmann <nils-edvin.enkelmann@fkie.fraunhofer.de>" ]
@@ -16,8 +16,10 @@ depends: [
   "dune" {>= "1.6"}
   "yojson" {>= "1.4.1"}
   "bap" {>= "1.6"}
+  "alcotest" {>= "0.8.3"}
   "core_kernel" {>= "v0.11" & < "v0.12"}
   "ppx_jane" {>= "v0.11" & < "v0.12"}
+  "cwe_checker_core" {= "0.2"}
 ]
 depexts: [
   "binutils"
@@ -26,8 +28,11 @@ build: [
   [ "dune" "build" "--profile" "release" ]
 ]
 install: [
-  [ "dune" "install" ]
+  [ make "uninstall" ]
+  [ make "clean" ]
+  [ make "all" ]
 ]
 remove: [
-  [ "dune" "uninstall" ]
+  [ make "uninstall" ]
+  [ make "clean" ]
 ]
