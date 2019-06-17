@@ -69,7 +69,7 @@ New plugins should be added to src/checkers. Implement a .ml and .mli file. See 
 
 If you plan to open a PR, please utilize [precommit](https://pre-commit.com) in your development environment to catch many issues before the code review.
 ### Contribute ###
-Contributions are always welcomed. Just fork it and open a pull request!
+Contributions are always welcome. Just fork it and open a pull request!
 ## Acknowledgements ##
 This project is partly financed by [German Federal Office for Information Security (BSI)](https://www.bsi.bund.de).
 
