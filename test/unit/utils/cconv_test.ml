@@ -24,7 +24,7 @@ let test_parse_dyn_syms () =
   let () = check "__libc_start_main_as_dyn_sym" (String.Set.mem (parse_dyn_syms project) "__libc_start_main") in
   let () = check "malloc_as_dyn_sym" (String.Set.mem (parse_dyn_syms project) "malloc") in
   let () = check "__cxa_finalize_as_dyn_sym" (String.Set.mem (parse_dyn_syms project) "__cxa_finalize") in
-  let () = check "dyn_sym_count" (String.Set.count (parse_dyn_syms project) ~f:(fun elem -> true) = 4) in
+  let () = check "dyn_sym_count" (String.Set.count (parse_dyn_syms project) ~f:(fun _elem -> true) = 4) in
   ()
 
 let tests = [

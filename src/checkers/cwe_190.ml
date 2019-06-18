@@ -7,7 +7,7 @@ let version = "0.1"
 
 let collect_muliplications = Exp.fold ~init:0 (object
     inherit [Int.t] Exp.visitor
-    method! enter_binop op o1 o2 binops = match op with
+    method! enter_binop op _o1 _o2 binops = match op with
       | Bil.TIMES | Bil.LSHIFT -> binops + 1
       | _ -> binops
 end)
@@ -17,7 +17,7 @@ let contains_multiplication d =
   let binops = collect_muliplications rhs in
   binops > 0
 
-let check_multiplication_before_symbol proj prog sub blk jmp tid_map symbols =
+let check_multiplication_before_symbol _proj _prog _sub blk jmp tid_map symbols =
   Seq.iter (Term.enum def_t blk)
     ~f:(fun d -> if contains_multiplication d then
                    Log_utils.warn

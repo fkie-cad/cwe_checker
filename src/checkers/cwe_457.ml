@@ -10,7 +10,7 @@ let get_defs sub_ssa =
 
 let collect_stores_of_exp = Exp.fold ~init:0 (object
           inherit [int] Exp.visitor
-          method! enter_store ~mem:_ ~addr:addr ~exp:exp _ _ stores =
+          method! enter_store ~mem:_ ~addr:_ ~exp:_ _ _ stores =
             stores + 1
         end)
 
@@ -62,7 +62,7 @@ let is_interesting_load_store def fp_pointer =
 (*TODO: implement real filtering*)
 let filter_mem_address i min_fp_offset = Set.filter i ~f:(fun elem -> (Word.of_int  ~width:32 min_fp_offset) < elem)
 
-let check_subfunction prog proj tid_map sub =
+let check_subfunction _prog proj tid_map sub =
   let fp_pointer = get_fp_of_arch (Project.arch proj) in
   let min_fp_offset = get_min_fp_offset (Project.arch proj) in
   let stores = ref [||] in
@@ -92,5 +92,5 @@ let check_subfunction prog proj tid_map sub =
             end
         end)
 
-let check_cwe prog proj tid_map symbol_names _ =
+let check_cwe prog proj tid_map _symbol_names _ =
   Seq.iter (Term.enum sub_t prog) ~f:(fun sub -> check_subfunction prog proj tid_map sub)

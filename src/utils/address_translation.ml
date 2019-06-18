@@ -9,7 +9,7 @@ let translate_tid_to_assembler_address_string tid tid_map =
 let generate_tid_map prog =
   (object
     inherit [addr Tid.Map.t] Term.visitor
-    method enter_term _ t addrs = match Term.get_attr t address with
+    method! enter_term _ t addrs = match Term.get_attr t address with
       | None -> addrs
       | Some addr -> Map.add_exn addrs ~key:(Term.tid t) ~data:addr
   end)#run prog Tid.Map.empty

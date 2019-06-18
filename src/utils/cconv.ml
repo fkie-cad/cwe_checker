@@ -12,9 +12,11 @@ let callee_saved_register_list project =
   let arch = Project.arch project in
   match arch with
   | `x86_64 -> (* System V ABI *)
-    "RBX" :: "RSP" :: "RBP" :: "R12" :: "R13" :: "R14" :: "R15" :: []
-  | `x86_64 -> (* Microsoft x64 calling convention *) (* TODO: How to distinguish from System V? For the time being, only use the System V ABI, since it saves less registers. *)
-    "RBX" :: "RBP" :: "RDI" :: "RSI" :: "RSP" :: "R12" :: "R13" :: "R14" :: "R15" :: []
+      "RBX" :: "RSP" :: "RBP" :: "R12" :: "R13" :: "R14" :: "R15" :: []
+  (* Microsoft x64 calling convention. Unused at the moment, since Windows binaries are not yet supported.
+  | `x86_64 -> (* Microsoft x64 calling convention *)
+     "RBX" :: "RBP" :: "RDI" :: "RSI" :: "RSP" :: "R12" :: "R13" :: "R14" :: "R15" :: []
+  *)
   | `x86 -> (* Both Windows and Linux save the same registers *)
     "EBX" :: "ESI" :: "EDI" :: "EBP" :: []
   | `armv4 | `armv5 | `armv6 | `armv7

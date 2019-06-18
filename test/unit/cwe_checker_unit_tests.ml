@@ -1,6 +1,6 @@
 open Bap.Std
 open Core_kernel
-open Cwe_checker_core
+
 
 let run_tests project =
   Type_inference_test.example_project := Some(project);

@@ -4,7 +4,7 @@ open Bap.Std
 let name = "CWE676"
 let version = "0.1"
 
-let get_call_to_target cg callee target =
+let get_call_to_target _cg callee target =
    Term.enum blk_t callee |>
    Seq.concat_map ~f:(fun blk ->
        Term.enum jmp_t blk |> Seq.filter_map ~f:(fun j ->
@@ -35,7 +35,7 @@ let resolve_symbols prog symbols =
     Seq.filter ~f:(fun s -> List.exists ~f:(fun x -> x = Sub.name s) symbols)
 
 
-let check_cwe prog proj tid_map symbol_names _ =
+let check_cwe prog _proj tid_map symbol_names _ =
   match symbol_names with
   | hd::[] ->
      let subfunctions = Term.enum sub_t prog in

@@ -27,7 +27,7 @@ let contains_symbol block symbol_name =
   (* Checks whether a subfunction contains a catch block. *)
   let contains_catch subfunction =
     let blocks = Term.enum blk_t subfunction in
-    Seq.exists blocks (fun block -> contains_symbol block "@__cxa_begin_catch")
+    Seq.exists blocks ~f:(fun block -> contains_symbol block "@__cxa_begin_catch")
 
 (* Find all calls to subfunctions that are reachable from this subfunction. The calls are returned
     as a list, except for calls to "@__cxa_throw", which are logged as possibly uncaught exceptions. *)
@@ -59,7 +59,7 @@ let rec find_uncaught_exceptions subfunction already_checked_functions program ~
 (* Search for uncatched exceptions for each entry point into the binary.
     TODO: Exceptions, that are catched when starting from one entry point, but not from another, are masked this
     way. We should check whether this produces a lot of false negatives. *)
-let check_cwe program project tid_map symbol_pairs _ =
+let check_cwe program _project tid_map _symbol_pairs _ =
   let entry_points = Symbol_utils.get_program_entry_points program in
   let _ = Seq.fold entry_points ~init:[] ~f:(fun already_checked_functions sub -> find_uncaught_exceptions ~tid_map:tid_map sub already_checked_functions program) in
   ()

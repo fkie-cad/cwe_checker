@@ -37,7 +37,7 @@ let binop_result_option val1 val2 ~op =
 
 (* generic merge of two ('a, unit) Result.t Map.t*)
 let merge_result_map val1 val2 ~value_merge =
-  Map.merge val1 val2 ~f:(fun ~key values ->
+  Map.merge val1 val2 ~f:(fun ~key:_ values ->
     match values with
     | `Left(x)
     | `Right(x) -> Some(x)
@@ -78,7 +78,7 @@ module Register = struct
   let merge reg1 reg2 =
     match (reg1, reg2) with
     | (Pointer(target_info1), Pointer(target_info2)) ->
-        Ok(Pointer(Map.merge target_info1 target_info2 ~f:(fun ~key values ->
+        Ok(Pointer(Map.merge target_info1 target_info2 ~f:(fun ~key:_ values ->
           match values with
           | `Left(info)
           | `Right(info) -> Some(info)
@@ -118,7 +118,7 @@ module Register = struct
   let set_unknown_offsets register =
     match register with
     | Pointer(targets) ->
-        let new_targets = Map.map targets ~f:(fun target -> { PointerTargetInfo.offset = None; alignment = None }) in
+        let new_targets = Map.map targets ~f:(fun _target -> { PointerTargetInfo.offset = None; alignment = None }) in
         Pointer(new_targets)
     | Data -> Data
 
@@ -172,7 +172,7 @@ module TypeInfo = struct
       | None -> None in
     let stack_info = { PointerTargetInfo.offset = offset; alignment = alignment;} in
     let stack_target_map = Map.set Tid.Map.empty ~key:sub_tid ~data:stack_info in
-    { state with reg = Map.set state.reg stack_register (Ok(Register.Pointer(stack_target_map))); }
+    { state with reg = Map.set state.reg ~key:stack_register ~data:(Ok(Register.Pointer(stack_target_map))); }
 
   (** Returns a TypeInfo.t with only the stack pointer as pointer register (with
       unknown offset) and only the flag registers as data registers. The stack is empty. *)
@@ -195,19 +195,6 @@ module TypeInfo = struct
 
   let remove_virtual_registers state =
     { state with reg = Map.filter_keys state.reg ~f:(fun var -> Var.is_physical var) }
-
-  (** udate offsets of all possible targets of the register by adding the given value *)
-  (* TODO: also implement correct offset for AND and OR if the alignment is known *)
-  let register_offset_add state register (value:Bitvector.t) =
-    match Map.find state.reg register with
-    | Some(Ok(Pointer(targets))) ->
-        let updated_targets = Map.map targets ~f:(fun type_info ->
-          match type_info.offset with
-          | Some(Ok(x)) -> { type_info with offset = Some(Ok(Bitvector.(+) x value ))}
-          | _ -> type_info
-        ) in
-        { state with reg = Map.set state.reg ~key:register ~data:(Ok(Pointer(updated_targets))) }
-    | _ -> state
 
 (** if the addr_exp is a (computable) stack offset, return the offset. In cases where addr_expr
     may or may not be a stack offset (i.e. offset of a register which may point to the stack or
@@ -251,8 +238,8 @@ let rec nested_exp_list exp : Exp.t list =
   let nested_exp = match exp with
     | Bil.Load(exp1, exp2, _, _) -> exp :: (nested_exp_list exp1) @ (nested_exp_list exp2)
     | Bil.Store(exp1, exp2, exp3, _, _) -> nested_exp_list exp1 @ nested_exp_list exp2 @ nested_exp_list exp3
-    | Bil.BinOp(op, exp1, exp2) -> nested_exp_list exp1 @ nested_exp_list exp2
-    | Bil.UnOp(op, exp1) -> nested_exp_list exp1
+    | Bil.BinOp(_op, exp1, exp2) -> nested_exp_list exp1 @ nested_exp_list exp2
+    | Bil.UnOp(_op, exp1) -> nested_exp_list exp1
     | Bil.Var(_) -> []
     | Bil.Int(_) -> []
     | Bil.Cast(_, _, exp1) -> nested_exp_list exp1
@@ -270,8 +257,8 @@ let rec nested_exp_list exp : Exp.t list =
     TODO: Bil.AND and Bil.OR are ignored, because we do not track alignment yet. *)
 let get_stack_elem state exp ~sub_tid ~project =
   match exp with
-  | Bil.Load(_, addr, endian, size) -> begin (* TODO: add a test for correct endianess *)
-      match TypeInfo.compute_stack_offset state addr sub_tid project with
+  | Bil.Load(_, addr, _endian, size) -> begin (* TODO: add a test for correct endianess *)
+      match TypeInfo.compute_stack_offset state addr ~sub_tid ~project with
       | Some(offset) -> begin
           match Mem_region.get state.TypeInfo.stack offset with
           | Some(Ok(elem, elem_size)) ->
@@ -301,26 +288,26 @@ let rec type_of_exp exp (state: TypeInfo.t) ~sub_tid ~project =
     get_stack_elem state exp ~sub_tid ~project
   | Bil.Store(_) -> None (* Stores are handled in another function. *)
   | Bil.BinOp(binop, exp1, exp2) -> begin
-      match (binop, type_of_exp exp1 state sub_tid project, type_of_exp exp2 state sub_tid project) with
+      match (binop, type_of_exp exp1 state ~sub_tid ~project, type_of_exp exp2 state ~sub_tid ~project) with
       (* pointer arithmetics *)
       | (Bil.PLUS, Some(Ok(Pointer(_))), Some(Ok(Pointer(_)))) -> Some(Error(()))
-      | (Bil.PLUS, Some(Ok(Pointer(targets))), summand) -> Some(Ok(Register.add_to_offsets (Pointer(targets)) (value_of_exp exp2)))
-      | (Bil.PLUS, summand, Some(Ok(Pointer(targets)))) -> Some(Ok(Register.add_to_offsets (Pointer(targets)) (value_of_exp exp1)))
+      | (Bil.PLUS, Some(Ok(Pointer(targets))), _summand) -> Some(Ok(Register.add_to_offsets (Pointer(targets)) (value_of_exp exp2)))
+      | (Bil.PLUS, _summand, Some(Ok(Pointer(targets)))) -> Some(Ok(Register.add_to_offsets (Pointer(targets)) (value_of_exp exp1)))
       | (Bil.PLUS, Some(Ok(Data)), Some(Ok(Data))) -> Some(Ok(Data))
       | (Bil.PLUS, _, _) -> None
       | (Bil.MINUS, Some(Ok(Pointer(_))), Some(Ok(Pointer(_)))) -> Some(Ok(Data)) (* Pointer subtraction to determine offset is CWE-469, this should be logged. *)
-      | (Bil.MINUS, Some(Ok(Pointer(targets))), other) -> Some(Ok(Register.sub_from_offsets (Pointer(targets)) (value_of_exp exp2))) (* We assume that other is not a pointer. This can only generate errors in the presence of CWE-469 *)
+      | (Bil.MINUS, Some(Ok(Pointer(targets))), _other) -> Some(Ok(Register.sub_from_offsets (Pointer(targets)) (value_of_exp exp2))) (* We assume that other is not a pointer. This can only generate errors in the presence of CWE-469 *)
       | (Bil.MINUS, Some(Ok(Data)), Some(Ok(Data))) -> Some(Ok(Data))
       | (Bil.MINUS, _, _) -> None
       (* bitwise AND and OR can be used as addition and subtraction if some alignment of the pointer is known *)
       | (Bil.AND, Some(Ok(Pointer(_))), Some(Ok(Pointer(_)))) -> Some(Error(())) (* TODO: This could be a pointer, but is there any case where this is used in practice? *)
-      | (Bil.AND, Some(Ok(Pointer(targets))), other)
-      | (Bil.AND, other, Some(Ok(Pointer(targets)))) -> Some(Ok(Register.set_unknown_offsets (Pointer(targets))))
+      | (Bil.AND, Some(Ok(Pointer(targets))), _other)
+      | (Bil.AND, _other, Some(Ok(Pointer(targets)))) -> Some(Ok(Register.set_unknown_offsets (Pointer(targets))))
       | (Bil.AND, Some(Ok(Data)), Some(Ok(Data))) -> Some(Ok(Data))
       | (Bil.AND, _, _) -> None
       | (Bil.OR, Some(Ok(Pointer(_))), Some(Ok(Pointer(_)))) -> Some(Error(())) (* TODO: This could be a pointer, but is there any case where this is used in practice? *)
-      | (Bil.OR, Some(Ok(Pointer(targets))), other)
-      | (Bil.OR, other, Some(Ok(Pointer(targets)))) -> Some(Ok(Register.set_unknown_offsets (Pointer(targets))))
+      | (Bil.OR, Some(Ok(Pointer(targets))), _other)
+      | (Bil.OR, _other, Some(Ok(Pointer(targets)))) -> Some(Ok(Register.set_unknown_offsets (Pointer(targets))))
       | (Bil.OR, Some(Ok(Data)), Some(Ok(Data))) -> Some(Ok(Data))
       | (Bil.OR, _, _) -> None
       | _ -> Some(Ok(Data)) (* every other operation should not yield valid pointers *)
@@ -330,11 +317,11 @@ let rec type_of_exp exp (state: TypeInfo.t) ~sub_tid ~project =
   | Bil.Int(_) -> None (* TODO: For non-relocateable binaries this could be a pointer to a function/global variable *)
   | Bil.Cast(Bil.SIGNED, _, _) -> Some(Ok(Data))
   | Bil.Cast(_, size, exp) ->
-    if size = (Symbol_utils.arch_pointer_size_in_bytes project * 8) then type_of_exp exp state sub_tid project else Some(Ok(Data)) (* TODO: There is probably a special case when 64bit addresses are converted to 32bit addresses here, which can yield pointers *)
+    if size = (Symbol_utils.arch_pointer_size_in_bytes project * 8) then type_of_exp exp state ~sub_tid ~project else Some(Ok(Data)) (* TODO: There is probably a special case when 64bit addresses are converted to 32bit addresses here, which can yield pointers *)
   | Bil.Let(_) -> None
   | Bil.Unknown(_) -> None
-  | Bil.Ite(if_, then_, else_) -> begin
-      match (type_of_exp then_ state sub_tid project, type_of_exp else_ state sub_tid project) with
+  | Bil.Ite(_if_, then_, else_) -> begin
+      match (type_of_exp then_ state ~sub_tid ~project, type_of_exp else_ state ~sub_tid ~project) with
       | (Some(value1), Some(value2)) -> if value1 = value2 then Some(value1) else None
       | _ -> None
     end
@@ -352,7 +339,7 @@ let pointer_size_as_bitvector project =
    is unclear, whether it really was a store onto the stack or to somewhere else. *)
 let set_stack_elem state exp ~sub_tid ~project =
   match exp with
-  | Bil.Store(_, addr_exp, value_exp, endian, size) ->
+  | Bil.Store(_, addr_exp, value_exp, _endian, size) ->
       let stack_offset = TypeInfo.compute_stack_offset state addr_exp ~sub_tid ~project in
       let value = type_of_exp value_exp state ~sub_tid ~project in
       let addr_type = type_of_exp addr_exp state ~sub_tid ~project in
@@ -406,7 +393,7 @@ let add_mem_address_registers state exp ~sub_tid ~project =
           | Bil.BinOp(Bil.OR, Bil.Int(_), Bil.Var(addr)) ->
               begin match Map.find state.TypeInfo.reg addr with
               | Some(Ok(Pointer(_))) -> state
-              | _ ->   { state with TypeInfo.reg = Map.set state.TypeInfo.reg addr (Ok(Register.Pointer(Tid.Map.empty))) } (* TODO: there are some false positives here for indices in global data arrays, where the immediate is the pointer. Maybe remove all cases with potential false positives? *)
+              | _ ->   { state with TypeInfo.reg = Map.set state.TypeInfo.reg ~key:addr ~data:(Ok(Register.Pointer(Tid.Map.empty))) } (* TODO: there are some false positives here for indices in global data arrays, where the immediate is the pointer. Maybe remove all cases with potential false positives? *)
               end
           | Bil.BinOp(Bil.PLUS, Bil.Var(addr), exp2)
           | Bil.BinOp(Bil.PLUS, exp2, Bil.Var(addr))
@@ -415,10 +402,10 @@ let add_mem_address_registers state exp ~sub_tid ~project =
           | Bil.BinOp(Bil.AND, exp2, Bil.Var(addr))
           | Bil.BinOp(Bil.OR, Bil.Var(addr), exp2)
           | Bil.BinOp(Bil.OR, exp2, Bil.Var(addr))            ->
-            if type_of_exp exp2 state sub_tid project = Some(Ok(Register.Data)) then
+            if type_of_exp exp2 state ~sub_tid ~project = Some(Ok(Register.Data)) then
               begin match Map.find state.TypeInfo.reg addr with
               | Some(Ok(Pointer(_))) -> state
-              | _ ->   { state with TypeInfo.reg = Map.set state.TypeInfo.reg addr (Ok(Register.Pointer(Tid.Map.empty))) }
+              | _ ->   { state with TypeInfo.reg = Map.set state.TypeInfo.reg ~key:addr ~data:(Ok(Register.Pointer(Tid.Map.empty))) }
               end
             else
               state
@@ -433,16 +420,16 @@ let keep_only_stack_register state ~sub_tid ~project =
   let stack_pointer_value = Map.find state.TypeInfo.reg (Symbol_utils.stack_register project) in
   let new_state = TypeInfo.only_stack_pointer_and_flags sub_tid project in
   match stack_pointer_value with
-  | Some(value) -> { new_state with TypeInfo.reg = Map.set state.reg (Symbol_utils.stack_register project) value }
+  | Some(value) -> { new_state with TypeInfo.reg = Map.set state.reg ~key:(Symbol_utils.stack_register project) ~data:value }
   | None -> new_state
 
 let update_state_def state def ~sub_tid ~project =
   (* add all registers that are used as address registers in load/store expressions to the state *)
-  let state = add_mem_address_registers state (Def.rhs def) sub_tid project in
+  let state = add_mem_address_registers state (Def.rhs def) ~sub_tid ~project in
   (* update the lhs of the definition with its new type *)
-  let state = match type_of_exp (Def.rhs def) state sub_tid project with
+  let state = match type_of_exp (Def.rhs def) state ~sub_tid ~project with
     | Some(value) ->
-      let reg = Map.set state.TypeInfo.reg (Def.lhs def) value in
+      let reg = Map.set state.TypeInfo.reg ~key:(Def.lhs def) ~data:value in
       { state with TypeInfo.reg = reg }
     | None -> (* We don't know the type of the new value *)
       let reg = Map.remove state.TypeInfo.reg (Def.lhs def) in
@@ -490,7 +477,7 @@ let update_state_malloc_call state malloc_like_tid jmp_term ~project =
   let return_reg = match Bap.Std.Arg.rhs return_arg with
     | Bil.Var(var) -> var
     | _ -> failwith "[CWE-checker] Return register of malloc-like function wasn't a register." in
-  let target_map = Map.set Tid.Map.empty (Term.tid jmp_term) { PointerTargetInfo.offset = Some(Ok(Bitvector.of_int 0 ~width:(Symbol_utils.arch_pointer_size_in_bytes project * 8))); alignment = None} in
+  let target_map = Map.set Tid.Map.empty ~key:(Term.tid jmp_term) ~data:{ PointerTargetInfo.offset = Some(Ok(Bitvector.of_int 0 ~width:(Symbol_utils.arch_pointer_size_in_bytes project * 8))); alignment = None} in
   { state with TypeInfo.reg = Var.Map.set state.reg ~key:return_reg ~data:(Ok(Pointer(target_map))) }
 
 
@@ -508,25 +495,25 @@ let update_state_jmp state jmp ~sub_tid ~project =
           | None -> Tid.name tid in
         if String.Set.mem (Cconv.parse_dyn_syms project) func_name then
           begin if List.exists (malloc_like_function_list ()) ~f:(fun elem -> elem = func_name) then
-              update_state_malloc_call state tid jmp project
+              update_state_malloc_call state tid jmp ~project
             else
               let empty_state = TypeInfo.empty () in (* TODO: to preserve stack information we need to be sure that the callee does not write on the stack. Can we already check that? *)
               { empty_state with
                 TypeInfo.reg = Var.Map.filter_keys state.TypeInfo.reg ~f:(fun var -> Cconv.is_callee_saved var project) }
           end
         else
-          keep_only_stack_register state sub_tid project (* TODO: add interprocedural analysis here. *)
-      | Indirect(_) -> keep_only_stack_register state sub_tid project in (* TODO: when we have value tracking and interprocedural analysis, we can add indirect calls to the regular analysis. *)
+          keep_only_stack_register state ~sub_tid ~project (* TODO: add interprocedural analysis here. *)
+      | Indirect(_) -> keep_only_stack_register state ~sub_tid ~project in (* TODO: when we have value tracking and interprocedural analysis, we can add indirect calls to the regular analysis. *)
       (* The callee is responsible for removing the return address from the stack, so we have to adjust the stack offset accordingly. *)
       (* TODO: x86/x64, arm, mips and ppc all use descending stacks and we assume here that a descending stack is used. Can this be checked by some info given from bap? Is there an architecture with an upward growing stack? *)
-      add_to_stack_offset return_state (Symbol_utils.arch_pointer_size_in_bytes project) project
+      add_to_stack_offset return_state (Symbol_utils.arch_pointer_size_in_bytes project) ~project
   | Int(_, _) -> (* TODO: We need stubs and/or interprocedural analysis here *)
-      keep_only_stack_register state sub_tid project (* TODO: Are there cases where the stack offset has to be adjusted here? *)
+      keep_only_stack_register state ~sub_tid ~project (* TODO: Are there cases where the stack offset has to be adjusted here? *)
   | Goto(Indirect(Bil.Var(var))) (* TODO: warn when jumping to something that is marked as data. *)
   | Ret(Indirect(Bil.Var(var))) ->
       begin match Map.find state.TypeInfo.reg var with
       | Some(Ok(Pointer(_))) -> state
-      | _ ->   { state with TypeInfo.reg = Map.set state.TypeInfo.reg var (Ok(Register.Pointer(Tid.Map.empty))) }
+      | _ ->   { state with TypeInfo.reg = Map.set state.TypeInfo.reg ~key:var ~data:(Ok(Register.Pointer(Tid.Map.empty))) }
       end
   | Goto(_)
   | Ret(_)    -> state
@@ -535,7 +522,7 @@ let update_state_jmp state jmp ~sub_tid ~project =
 let update_type_info block_elem state ~sub_tid ~project =
   match block_elem with
   | `Def def -> update_state_def state def ~sub_tid ~project
-  | `Phi phi -> state (* We ignore phi terms for this analysis. *)
+  | `Phi _phi -> state (* We ignore phi terms for this analysis. *)
   | `Jmp jmp -> update_state_jmp state jmp ~sub_tid ~project
 
 (** updates a block analysis. *)
@@ -560,7 +547,7 @@ let intraprocedural_fixpoint func ~project =
     let fn_start_state = update_block_analysis fn_start_block fn_start_state ~sub_tid ~project in
     let fn_start_node = Seq.find_exn (Graphs.Ir.nodes cfg) ~f:(fun node -> (Term.tid fn_start_block) = (Term.tid (Graphs.Ir.Node.label node))) in
     let empty = Map.empty (module Graphs.Ir.Node) in
-    let with_start_node = Map.set empty fn_start_node fn_start_state in
+    let with_start_node = Map.set empty ~key:fn_start_node ~data:fn_start_state in
     let init = Graphlib.Std.Solution.create with_start_node only_sp in
     let equal = TypeInfo.equal in
     let merge = TypeInfo.merge in
@@ -585,28 +572,16 @@ let extract_start_state node ~cfg ~solution ~sub_tid ~project =
         TypeInfo.merge state (Graphlib.Std.Solution.get solution node)
       )
 
-(** Returns a list of pairs (tid, state) for each def in a (blk_t-)node. The state
-is the state _after execution of the node. *)
-let state_list_def node ~cfg ~solution ~sub_tid ~project =
-  let input_state = extract_start_state node ~cfg ~solution ~sub_tid ~project in
-  let block = Graphs.Ir.Node.label node in
-  let defs = Term.enum def_t block in
-  let (output, _) = Seq.fold defs ~init:([], input_state) ~f:(fun (list_, state) def ->
-      let state = update_state_def state def sub_tid project in
-      ( (Term.tid def, state) :: list_, state)
-    ) in
-  output
-
 
 let compute_pointer_register project =
   let program = Project.program project in
   let program_with_tags = Term.map sub_t program ~f:(fun func ->
     let cfg = Sub.to_cfg func in
     let sub_tid = Term.tid func in
-      let solution = intraprocedural_fixpoint func project in
+      let solution = intraprocedural_fixpoint func ~project in
       Seq.fold (Graphs.Ir.nodes cfg) ~init:func ~f:(fun func node ->
           let block = Graphs.Ir.Node.label node in
-          let start_state = extract_start_state node cfg solution sub_tid project in
+          let start_state = extract_start_state node ~cfg ~solution ~sub_tid ~project in
           let tagged_block = Term.set_attr block type_info_tag start_state in
           Term.update blk_t func tagged_block
         )
@@ -619,7 +594,7 @@ let print_type_info_to_debug state block_tid ~tid_map ~sub_tid ~project =
       match reg with
       | Ok(Register.Pointer(targets)) ->
           (Var.name var ^ ":Pointer(targets: " ^
-           (Map.fold targets ~init:"" ~f:(fun ~key ~data accum_string -> (Tid.name key) ^ "," ^ accum_string)) ^
+           (Map.fold targets ~init:"" ~f:(fun ~key ~data:_ accum_string -> (Tid.name key) ^ "," ^ accum_string)) ^
            ")") :: str_list
       | Ok(Register.Data) -> (Var.name var ^ ":Data, ") :: str_list
       | Error(_) -> (Var.name var ^ ":Error, ") :: str_list ) in

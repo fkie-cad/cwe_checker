@@ -6,7 +6,7 @@ let (+), (-) = Bitvector.(+), Bitvector.(-)
 
 let (>) x y = Bitvector.(>) (Bitvector.signed x) (Bitvector.signed y)
 let (<) x y = Bitvector.(<) (Bitvector.signed x) (Bitvector.signed y)
-let (>=) x y = Bitvector.(>=) (Bitvector.signed x) (Bitvector.signed y)
+(* let (>=) x y = Bitvector.(>=) (Bitvector.signed x) (Bitvector.signed y) *)
 let (<=) x y = Bitvector.(<=) (Bitvector.signed x) (Bitvector.signed y)
 let (=) x y = Bitvector.(=) x y
 
@@ -74,16 +74,6 @@ let rec get mem_region pos =
     else
       Some(Error(())) (* pos intersects some data, but does not equal its starting address*)
 
-(* Helper function. Removes all elements with position <= pos. *)
-let rec remove_until mem_region pos =
-  match mem_region with
-  | [] -> []
-  | hd :: tl ->
-    if hd.pos <= pos then
-      remove_until tl pos
-    else
-      mem_region
-
 
 let rec remove mem_region ~pos ~size =
   let () = if pos + size < pos then failwith "[CWE-checker] element out of bounds for mem_region" in
@@ -91,11 +81,11 @@ let rec remove mem_region ~pos ~size =
   | [] -> []
   | hd :: tl ->
     if hd.pos + hd.size <= pos then
-      hd :: remove tl pos size
+      hd :: remove tl ~pos ~size
     else if pos + size <= hd.pos then
       mem_region
     else
-      let mem_region = remove tl pos size in
+      let mem_region = remove tl ~pos ~size in
       let mem_region =
         if hd.pos + hd.size > pos + size then
           error_elem ~pos:(pos + size) ~size:(hd.pos + hd.size - (pos + size)) :: mem_region
@@ -111,12 +101,12 @@ let rec remove mem_region ~pos ~size =
 let rec mark_error mem_region ~pos ~size =
   let () = if pos + size < pos then failwith "[CWE-checker] element out of bounds for mem_region" in
   match mem_region with
-  | [] -> (error_elem pos size) :: []
+  | [] -> (error_elem ~pos ~size) :: []
   | hd :: tl ->
     if hd.pos + hd.size <= pos then
-      hd :: (mark_error tl pos size)
+      hd :: (mark_error tl ~pos ~size)
     else if pos + size <= hd.pos then
-      (error_elem pos size) :: mem_region
+      (error_elem ~pos ~size) :: mem_region
     else
       let start_pos = min pos hd.pos in
       let end_pos_plus_one = max (pos + size) (hd.pos + hd.size) in
@@ -130,22 +120,22 @@ let rec merge mem_region1 mem_region2 ~data_merge =
   | ([], value) -> value
   | (hd1 :: tl1, hd2 :: tl2) ->
     if hd1.pos + hd1.size <= hd2.pos then
-      hd1 :: merge tl1 mem_region2 data_merge
+      hd1 :: merge tl1 mem_region2 ~data_merge
     else if hd2.pos + hd2.size <= hd1.pos then
-      hd2 :: merge mem_region1 tl2 data_merge
+      hd2 :: merge mem_region1 tl2 ~data_merge
     else if hd1.pos = hd2.pos && hd1.size = hd2.size then
       match (hd1.data, hd2.data) with
       | (Ok(data1), Ok(data2)) -> begin
           match data_merge data1 data2 with
           | Some(Ok(value)) -> { hd1 with data = Ok(value) } :: merge tl1 tl2 ~data_merge
           | Some(Error(_)) -> {hd1 with data = Error(())} :: merge tl1 tl2 ~data_merge
-          | None -> merge tl1 tl2 data_merge
+          | None -> merge tl1 tl2 ~data_merge
         end
       | _ -> { hd1 with data = Error(()) } :: merge tl1 tl2 ~data_merge
     else
       let start_pos = min hd1.pos hd2.pos in
       let end_pos_plus_one = max (hd1.pos + hd1.size) (hd2.pos + hd2.size) in
-      let mem_region = merge tl1 tl2 data_merge in
+      let mem_region = merge tl1 tl2 ~data_merge in
       mark_error mem_region ~pos:start_pos ~size:(end_pos_plus_one - start_pos)
 
 
@@ -156,8 +146,8 @@ let rec equal (mem_region1:'a t) (mem_region2:'a t) ~data_equal : bool =
     if hd1.pos = hd2.pos && hd1.size = hd2.size then
       match (hd1.data, hd2.data) with
       | (Ok(data1), Ok(data2)) when data_equal data1 data2 ->
-        equal tl1 tl2 data_equal
-      | (Error(()), Error(())) -> equal tl1 tl2 data_equal
+        equal tl1 tl2 ~data_equal
+      | (Error(()), Error(())) -> equal tl1 tl2 ~data_equal
       | _ -> false
     else
       false
