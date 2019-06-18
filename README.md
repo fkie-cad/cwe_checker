@@ -52,7 +52,7 @@ If you plan to develop cwe_checker, it is recommended to build it using the prov
 -  Opam 2.0.2
 -  dune >= 1.6
 -  BAP 1.6 (and its dependencies)
--  yojson >= 1.4.1
+-  yojson >= 1.6.0
 -  alcotest >= 0.8.3
 -  Sark (latest) for IDA Pro annotations
 -  pytest >= 3.5.1
