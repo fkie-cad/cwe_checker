@@ -1,6 +1,6 @@
 open Core_kernel
 open Bap.Std
-open Unix
+
 
 (* TODO: IVG via gitter:
 I see, so you need the CU information, and yes BAP doesn't provide this.
@@ -19,16 +19,6 @@ but in general case it is better to use the approach described above. *)
 let name = "CWE215"
 let version = "0.1"
 
-let read_lines in_chan =
-  let lines = ref [] in
-  try
-    while true; do
-      lines := input_line in_chan :: !lines
-    done; !lines
-  with End_of_file ->
-    In_channel.close in_chan;
-    List.rev !lines
-
 (* TODO: check if program contains strings like "DEBUG"*)
 let check_cwe _ project _ _ _ =
   match Project.get project filename with
@@ -36,7 +26,7 @@ let check_cwe _ project _ _ _ =
       let cmd = Format.sprintf "readelf --debug-dump=decodedline %s | grep CU" fname in
       try
         let in_chan = Unix.open_process_in cmd in
-        read_lines in_chan |> List.iter ~f:(fun l -> Log_utils.warn "[%s] {%s} (Information Exposure Through Debug Information) %s" name version l)
+        In_channel.input_lines in_chan |> List.iter ~f:(fun l -> Log_utils.warn "[%s] {%s} (Information Exposure Through Debug Information) %s" name version l)
       with
         Unix.Unix_error (e,fm,argm) ->
         Log_utils.error "[%s] {%s} %s %s %s" name version (Unix.error_message e) fm argm

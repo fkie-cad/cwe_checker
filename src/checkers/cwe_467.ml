@@ -8,7 +8,7 @@ let version = "0.1"
 let get_pointer_size arch =
   Size.in_bytes @@ Arch.addr_size arch
 
-let check_input_is_pointer_size proj prog sub blk jmp tid_map symbols =
+let check_input_is_pointer_size proj _prog _sub blk jmp tid_map symbols =
   Seq.iter (Term.enum def_t blk) ~f:(fun d ->  match Exp.eval @@ Def.rhs d with
       | Imm w ->
         begin

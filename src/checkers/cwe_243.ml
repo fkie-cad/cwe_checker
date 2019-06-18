@@ -50,7 +50,7 @@ let check_route sub symbols =
   if res then res else res
 
 (** Checks one possible valid path (combination of APIs) of chroot. *)
-let check_path prog tid_map sub path =
+let check_path prog _tid_map sub path =
   let symbols = build_symbols path prog in
   if List.length symbols = List.length path then
   begin
@@ -81,7 +81,7 @@ let check_subfunction prog tid_map sub pathes =
          (Term.name sub)
     end
 
-let check_cwe prog proj tid_map pathes _ =
+let check_cwe prog _proj tid_map pathes _ =
   let chroot_symbol = find_symbol prog "chroot" in
   match chroot_symbol with
   | Some _ ->

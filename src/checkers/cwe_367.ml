@@ -34,7 +34,7 @@ let is_reachable sub source sink =
   let sink_blk = get_blk_tid_of_tid sub sink_tid in
   Graphlib.Std.Graphlib.is_reachable (module Graphs.Tid) cfg source_blk sink_blk
 
-let handle_sub sub program tid_map symbols source sink =
+let handle_sub sub program tid_map _symbols source sink =
   if (Symbol_utils.sub_calls_symbol program sub source) && (Symbol_utils.sub_calls_symbol program sub sink) then
     begin
       let calls = Symbol_utils.get_direct_callsites_of_sub sub in
@@ -57,6 +57,6 @@ let handle_sub sub program tid_map symbols source sink =
   else
     ()
 
-let check_cwe program proj tid_map symbol_pairs _ =
+let check_cwe program _proj tid_map _symbol_pairs _ =
   let symbols = Symbol_utils.build_symbols ["access"; "open";] in
   Seq.iter (Term.enum sub_t program) ~f:(fun s -> handle_sub s program tid_map symbols "access" "open")

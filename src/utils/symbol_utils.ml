@@ -48,7 +48,7 @@ Term.enum blk_t sub |>
           match Jmp.kind j with
           | Goto _ | Ret _ | Int (_,_) -> None
           | Call destination -> begin match Call.target destination with
-            | Direct tid -> Some j
+            | Direct _tid -> Some j
             | _ -> None
             end))
 

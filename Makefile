@@ -1,6 +1,6 @@
 .PHONY: all clean test uninstall
 all:
-	dune build --profile release
+	dune build
 	dune install
 	cd plugins/cwe_checker; make all; cd ../..
 	cd plugins/cwe_checker_emulation; make all; cd ../..
@@ -8,7 +8,7 @@ all:
 	cd plugins/cwe_checker_type_inference_print; make all; cd ../..
 
 test:
-	dune runtest --profile release # TODO: correct all dune linter warnings so that we can remove --profile release
+	dune runtest
 	cd test/artificial_samples; scons; cd ../..
 	pytest -v
 

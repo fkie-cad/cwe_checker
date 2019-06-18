@@ -57,13 +57,13 @@ let partial_run project config modules =
   let tid_address_map = Address_translation.generate_tid_map program in
   let json = Yojson.Basic.from_file config in
   Log_utils.info "[cwe_checker] Just running the following analyses: %s." modules;
-  List.iter (String.split modules ~on: ',') ~f:(fun cwe -> try
-        begin
-          let cwe_mod = List.find_exn known_modules ~f:(fun x -> x.name = cwe) in
-          let program = Project.program project in
-          execute_cwe_module cwe_mod json program project tid_address_map
-        end
-      with Not_found -> failwith "[CWE_CHECKER] Unknown CWE module")
+  List.iter (String.split modules ~on: ',') ~f:(fun cwe ->
+    let cwe_mod = match List.find known_modules ~f:(fun x -> x.name = cwe) with
+      | Some(module_) -> module_
+      | None -> failwith "[CWE_CHECKER] Unknown CWE module" in
+    let program = Project.program project in
+    execute_cwe_module cwe_mod json program project tid_address_map
+  )
 
 let full_run project config =
   let program = Project.program project in

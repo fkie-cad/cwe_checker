@@ -166,7 +166,7 @@ module Make (S: SECTION) = struct
       !prefix
 
   (* example for a shorter timestamp string *)
-  let short_timestamp_str lvl =
+  let _short_timestamp_str lvl =
     sprintf "%.3f %s: " (Unix.gettimeofday()) (string_of_level lvl)
 
   let log lvl fmt =

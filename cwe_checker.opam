@@ -14,7 +14,7 @@ dev-repo: "git+https://github.com/fkie-cad/cwe_checker"
 depends: [
   "ocaml" {>= "4.05"}
   "dune" {>= "1.6"}
-  "yojson" {>= "1.4.1"}
+  "yojson" {>= "1.6.0"}
   "bap" {>= "1.6"}
   "alcotest" {>= "0.8.3"}
   "core_kernel" {>= "v0.11" & < "v0.12"}

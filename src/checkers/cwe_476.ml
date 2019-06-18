@@ -53,7 +53,7 @@ module State = struct
   (** two states are equal if they contain the same set of tainted registers*)
   let equal state1 state2 =
     (List.length state1) = (List.length state2) &&
-    not (List.exists state1 ~f:(fun (var, tid) -> Option.is_none (find state2 var) ))
+    not (List.exists state1 ~f:(fun (var, _tid) -> Option.is_none (find state2 var) ))
 
   (** The union of two states is the union of the tainted registers*)
   let union state1 state2 =
@@ -66,14 +66,14 @@ module State = struct
 
   (** remove virtual registers from the state (useful at the end of a block) *)
   let remove_virtual_registers state =
-    List.filter state ~f:(fun (var, tid) -> Var.is_physical var)
+    List.filter state ~f:(fun (var, _tid) -> Var.is_physical var)
 
 end
 
 (* check whether an expression contains an unchecked value. *)
 let rec contains_unchecked exp state : access_type =
   match exp with
-  | Bil.Load(mem, addr, _, _)->
+  | Bil.Load(_mem, addr, _, _)->
     begin
       let acc = contains_unchecked addr state in
       match acc with
@@ -81,7 +81,7 @@ let rec contains_unchecked exp state : access_type =
       | Access(var) -> MemAccess(var)
       | NoAccess -> NoAccess
     end
-  | Bil.Store(mem, addr, val_expression, _,_) ->
+  | Bil.Store(_mem, addr, val_expression, _,_) ->
     begin
       let acc = union_access (contains_unchecked addr state) (contains_unchecked val_expression state) in
       match acc with
@@ -111,7 +111,7 @@ let rec contains_unchecked exp state : access_type =
    to the source of this return value from state. *)
 let checks_value exp state : State.t =
   match exp with
-  | Bil.Ite(if_, then_, else_) -> begin
+  | Bil.Ite(if_, _then_, _else_) -> begin
       match contains_unchecked if_ state with
       | Access(var) ->
         (* We filter out all registers with the same generating tid, since we have checked
@@ -138,7 +138,7 @@ let flag_any_access exp state ~cwe_hits =
 
 (** flag all unchecked registers as cwe_hits, return empty state *)
 let flag_all_unchecked_registers state ~cwe_hits =
-  let () = List.iter state ~f:(fun (var, tid) ->
+  let () = List.iter state ~f:(fun (_var, tid) ->
       append_to_hits cwe_hits tid) in
   []
 
@@ -190,30 +190,30 @@ let update_state_jmp jmp state ~cwe_hits ~function_names ~program ~block ~strict
     | NoAccess -> state
   end in
   match Jmp.kind jmp with
-  | Goto(Indirect(exp)) -> flag_any_access exp state cwe_hits
+  | Goto(Indirect(exp)) -> flag_any_access exp state ~cwe_hits
   | Goto(Direct(_)) -> state
   | Ret(_) -> if strict_call_policy then
-      flag_all_unchecked_registers state cwe_hits
+      flag_all_unchecked_registers state ~cwe_hits
     else
       state
-  | Int(_, _) -> flag_all_unchecked_registers state cwe_hits
+  | Int(_, _) -> flag_all_unchecked_registers state ~cwe_hits
   | Call(call) ->
     let state = match Call.return call with
-      | Some(Indirect(exp)) -> flag_any_access exp state cwe_hits
+      | Some(Indirect(exp)) -> flag_any_access exp state ~cwe_hits
       | _ -> state in
     let state = match Call.target call with
-      | Indirect(exp) -> flag_any_access exp state cwe_hits
+      | Indirect(exp) -> flag_any_access exp state ~cwe_hits
       | _ -> state in
     let state = match strict_call_policy with
       | true -> (* all unchecked registers get flagged as hits *)
-        flag_all_unchecked_registers state cwe_hits
+        flag_all_unchecked_registers state ~cwe_hits
       | false -> (* we assume that the callee will check all remaining unchecked values *)
         [] in
     match Call.target call with
     | Indirect(_) -> state (* already handled above *)
     | Direct(tid) ->
       if List.exists function_names ~f:(fun elem -> String.(=) elem (Tid.name tid)) then
-        taint_return_registers tid state program block
+        taint_return_registers tid state ~program ~block
       else
         state
 
@@ -227,7 +227,7 @@ let update_block_analysis block register_state ~cwe_hits ~function_names ~progra
   let register_state = Seq.fold elements ~init:register_state ~f:(fun state element ->
       match element with
       | `Def def -> update_state_def def state ~cwe_hits
-      | `Phi phi -> state (* We ignore phi terms for this analysis. *)
+      | `Phi _phi -> state (* We ignore phi terms for this analysis. *)
       | `Jmp jmp -> update_state_jmp jmp state ~cwe_hits ~function_names ~program ~block ~strict_call_policy
     ) in
   State.remove_virtual_registers register_state (* virtual registers should not be accessed outside of the block where they are defined. *)
@@ -255,7 +255,7 @@ let print_hit tid ~sub ~function_names ~tid_map =
       | _ -> false
     ) in ()
 
-let check_cwe prog proj tid_map symbol_names parameters =
+let check_cwe prog _proj tid_map symbol_names parameters =
   let symbols = match symbol_names with
     | hd :: _ -> hd
     | _ -> failwith "[CWE476] symbol_names not as expected" in
