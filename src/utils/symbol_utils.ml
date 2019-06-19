@@ -22,7 +22,7 @@ let build_symbols symbol_names prog =
 let get_symbol_of_string prog name =
   let symbol_address = find_symbol prog name in
   match symbol_address with
-  | Some address -> Some ({
+  | Some _ -> Some ({
                           address = symbol_address
                           ; name = name
                           })
@@ -77,11 +77,15 @@ let sub_calls_symbol prog sub symbol_name =
 let calls_callsite_symbol jmp symbol =
   match Jmp.kind jmp with
   | Goto _ | Ret _ | Int (_,_) -> false
-  | Call dst -> match Call.target dst with
-    | Direct tid -> match symbol.address with
-      | Some symbol_tid -> tid = symbol_tid
-      | None -> false
-  | _ -> false
+  | Call dst -> begin
+      match Call.target dst with
+      | Direct tid -> begin
+            match symbol.address with
+            | Some symbol_tid -> tid = symbol_tid
+            | None -> false
+          end
+      | _ -> false
+    end
 
 
 type concrete_call =

@@ -26,30 +26,30 @@ let check_umask_arg tid_map blk w =
         umask_arg
   with _ -> Log_utils.error "Caught exception in module [CWE560]."
 
-let check_umask_callsite program proj tid_map blk =
+let check_umask_callsite tid_map blk =
   Seq.iter (Term.enum def_t blk) ~f:(fun d ->
    let rhs = Def.rhs d in
    let int_values = collect_int_values rhs in
    List.iter int_values ~f:(fun x -> check_umask_arg tid_map blk x)
   )
 
-let blk_calls_umask sym_umask sub blk =
+let blk_calls_umask sym_umask blk =
   Term.enum jmp_t blk
   |> Seq.exists ~f:(fun callsite -> Symbol_utils.calls_callsite_symbol callsite sym_umask)
 
-let check_subfunction program proj tid_map sym_umask sub =
+let check_subfunction program tid_map sym_umask sub =
   if Symbol_utils.sub_calls_symbol program sub "umask" then
     Term.enum blk_t sub
-    |> Seq.filter ~f:(fun blk -> blk_calls_umask sym_umask sub blk)
-    |> Seq.iter ~f:(fun blk -> check_umask_callsite program proj tid_map blk)
+    |> Seq.filter ~f:(fun blk -> blk_calls_umask sym_umask blk)
+    |> Seq.iter ~f:(fun blk -> check_umask_callsite tid_map blk)
   else
     ()
 
-let check_subfunctions program proj tid_map sym_umask =
-  Seq.iter (Term.enum sub_t program) ~f:(fun sub -> check_subfunction program proj tid_map sym_umask sub)
+let check_subfunctions program tid_map sym_umask =
+  Seq.iter (Term.enum sub_t program) ~f:(fun sub -> check_subfunction program tid_map sym_umask sub)
 
 let check_cwe program proj tid_map _ _ =
     let sym = Symbol_utils.get_symbol_of_string program "umask" in
     match sym with
     | None -> ()
-    | Some sym_umask -> check_subfunctions program proj tid_map sym_umask
+    | Some sym_umask -> check_subfunctions program tid_map sym_umask
