@@ -48,7 +48,7 @@ let check_subfunction program tid_map sym_umask sub =
 let check_subfunctions program tid_map sym_umask =
   Seq.iter (Term.enum sub_t program) ~f:(fun sub -> check_subfunction program tid_map sym_umask sub)
 
-let check_cwe program proj tid_map _ _ =
+let check_cwe program _ tid_map _ _ =
     let sym = Symbol_utils.get_symbol_of_string program "umask" in
     match sym with
     | None -> ()

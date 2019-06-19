@@ -12,6 +12,7 @@
 -   Switched C build system from make to scons (PR #16)
 -   Added type inference pass (PR #14, #18)
 -   Added unit tests to test suite (PR #14)
+-   Added check for CWE-560 (Use of umask() with chmod-style Argument) (PR #21)
 
 0.1 (2018-10-08)
 =====
