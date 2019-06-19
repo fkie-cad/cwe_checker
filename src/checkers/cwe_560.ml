@@ -53,3 +53,9 @@ let check_cwe program _ tid_map _ _ =
     match sym with
     | None -> ()
     | Some sym_umask -> check_subfunctions program tid_map sym_umask
+
+
+(* Functions made available for unit tests *)
+module Private = struct
+  let is_chmod_style_arg = is_chmod_style_arg
+end
