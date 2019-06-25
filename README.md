@@ -9,7 +9,7 @@
 ## What is cwe_checker? ##
 *cwe_checker* is a suite of tools to detect common bug classes such as use of dangerous functions and simple integer overflows. These bug classes are formally known as [Common Weakness Enumerations](https://cwe.mitre.org/) (CWEs). Its main goal is to aid analysts to quickly find vulnerable code paths.
 
-Its main focus are ELF binaries that are commonly found on Linux and Unix operating systems. *cwe_checker* is built on top of [BAP](https://github.com/BinaryAnalysisPlatform/bap)(Binary Analysis Platform). By using BAP, we are not restricted to one low level instruction set architectures like Intel x86. BAP lifts several of them to one common intermediate represenetation (IR). cwe_checker implements its analyses on this IR. At time of writing, BAP 1.5 supports Intel x86/x64, ARM, MIPS, and PPC amongst others. Hence, this makes *cwe_checker* a valuable tool for firmware analysis.
+Its main focus are ELF binaries that are commonly found on Linux and Unix operating systems. *cwe_checker* is built on top of [BAP](https://github.com/BinaryAnalysisPlatform/bap)(Binary Analysis Platform). By using BAP, we are not restricted to one low level instruction set architectures like Intel x86. BAP lifts several of them to one common intermediate representation (IR). cwe_checker implements its analyses on this IR. At time of writing, BAP 1.6 supports Intel x86/x64, ARM, MIPS, and PPC amongst others. Hence, this makes *cwe_checker* a valuable tool for firmware analysis.
 
 *cwe_checker* implements a modular architecture that allows to add new analyses with ease. So far the following analyses are implemented across several BAP plugins:
 -   [CWE-125](https://cwe.mitre.org/data/definitions/125.html): Out-of-bounds read (via emulation)
@@ -28,7 +28,7 @@ Its main focus are ELF binaries that are commonly found on Linux and Unix operat
 -   [CWE-560](https://cwe.mitre.org/data/definitions/560.html): Use of umask() with chmod-style Argument
 -   [CWE-676](https://cwe.mitre.org/data/definitions/676.html): Use of Potentially Dangerous Function
 -   [CWE-782](https://cwe.mitre.org/data/definitions/782.html): Exposed IOCTL with Insufficient Access Control
--   [CWE-787](https://cwe.mitre.org/data/definitions/787.html): Out-of-bounds Write
+-   [CWE-787](https://cwe.mitre.org/data/definitions/787.html): Out-of-bounds Write (via emulation)
 
 Please note that some of the above analyses only are partially implemented at the moment. Furthermore, false positives are to be expected due to shortcuts and the nature of static analysis as well as over-approximation.
 
@@ -64,8 +64,12 @@ The usage is straight forward: adjust the `config.json` (if needed) and call BAP
 ``` bash
 bap PATH_TO_BINARY --pass=cwe-checker --cwe-checker-config=src/config.json
 ```
-For common use cases you can find some recipes in the recipes folder. These can be run with
+The emulation checks can be run with the emulation recipe in the recipes folder.
+``` bash
+bap PATH_TO_BINARY --recipe=recipes/emulation
 ```
+For other common use cases you can find some recipes in the recipes folder. These can be run with
+``` bash
 bap PATH_TO_BINARY --recipe=recipes/RECIPE_FOLDER_NAME
 ```
 *cwe_checker* outputs to stdout. This output is parsable (sexep). There is a script `cwe_checker_to_ida` to visualize the results in IDA Pro.
@@ -81,7 +85,7 @@ This project is partly financed by [German Federal Office for Information Securi
 A special thanks goes out to the BAP community (especially the official gitter) for answering questions and discussing solutions.
 ## License
 ```
-    Copyright (C) 2018 -       Fraunhofer FKIE  (thomas.barabosch@fkie.fraunhofer.de)
+    Copyright (C) 2018 -       Fraunhofer FKIE  (firmware-security@fkie.fraunhofer.de)
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Library General Public

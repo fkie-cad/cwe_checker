@@ -5,7 +5,7 @@ synopsis: "BAP plugin collection to detect common bug classes"
 description: """
 cwe_checker is a suite of tools to detect common bug classes such as use of dangerous functions and simple integer overflows. These bug classes are formally known as Common Weakness Enumerations (CWEs).
 """
-maintainer: "CWE_checker Team <firmware-security@fkie.fraunhofer.de>"
+maintainer: "CWE_checker Team <nils-edvin.enkelmann@fkie.fraunhofer.de>"
 authors: [ "Thomas Barabosch <thomas.barabosch@fkie.fraunhofer.de>" "Nils-Edvin Enkelmann <nils-edvin.enkelmann@fkie.fraunhofer.de>" ]
 license: "LGPL-3.0"
 homepage: "https://github.com/fkie-cad/cwe_checker"
