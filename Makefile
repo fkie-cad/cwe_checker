@@ -1,4 +1,4 @@
-.PHONY: all clean test uninstall
+.PHONY: all clean test uninstall docker
 all:
 	dune build
 	dune install
@@ -27,3 +27,6 @@ uninstall:
 	cd plugins/cwe_checker_emulation; make uninstall; cd ../..
 	cd plugins/cwe_checker_type_inference; make uninstall; cd ../..
 	cd plugins/cwe_checker_type_inference_print; make uninstall; cd ../..
+
+docker:
+	./install.sh
