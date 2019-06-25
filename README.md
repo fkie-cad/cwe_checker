@@ -54,9 +54,10 @@ If you plan to develop cwe_checker, it is recommended to build it using the prov
 -  dune >= 1.6
 -  BAP 1.6 (and its dependencies)
 -  yojson >= 1.6.0
--  alcotest >= 0.8.3
+-  alcotest >= 0.8.3 (for tests)
 -  Sark (latest) for IDA Pro annotations
--  pytest >= 3.5.1
+-  pytest >= 3.5.1 (for tests)
+-  SCons >= 3.0.5 (for tests)
 
 Just run `make all` to compile and register the plugin with BAP. You can run the test suite via `make test`.
 ## How to use cwe_checker? ##
