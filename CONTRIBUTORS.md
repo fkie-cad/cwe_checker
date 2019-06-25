@@ -4,7 +4,7 @@
    -  Original author
 
 -  Nils-Edvin Enkelmann[https://github.com/Enkelmann]
-  -  Current maintainer
+   -  Current maintainer
 
 -  Jörg Stucke[https://github.com/jstucke]
-  -  Docker container 
+   -  Docker container 
