@@ -19,7 +19,6 @@ depends: [
   "alcotest" {>= "0.8.3"}
   "core_kernel" {>= "v0.11" & < "v0.12"}
   "ppx_jane" {>= "v0.11" & < "v0.12"}
-  "cwe_checker_core" {= "0.2"}
 ]
 depexts: [
   "binutils"
