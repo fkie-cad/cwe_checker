@@ -1,4 +1,3 @@
-open Bap.Std
 open Core_kernel
 open Cwe_checker_core
 

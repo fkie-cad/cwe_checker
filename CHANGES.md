@@ -1,4 +1,4 @@
-0.2-dev (2019-XX-XX)
+0.2 (2019-06-25)
 =====
 
 -   Refactoring: Unification of cwe_checker function interface
