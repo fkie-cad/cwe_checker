@@ -49,15 +49,15 @@ There are several ways to install cwe_checker. The recommended way is to get cwe
 Another option is to pull the latest Docker container from [dockerhub](https://hub.docker.com/r/fkiecad/cwe_checker) (`docker pull fkiecad/cwe_checker`).
 
 If you plan to develop cwe_checker, it is recommended to build it using the provided `Makefile`. In this case you must ensure that all dependencies are fulfilled:
--  Ocaml 4.05.0
--  Opam 2.0.2
--  dune >= 1.6
--  BAP 1.6 (and its dependencies)
--  yojson >= 1.6.0
--  alcotest >= 0.8.3 (for tests)
--  Sark (latest) for IDA Pro annotations
--  pytest >= 3.5.1 (for tests)
--  SCons >= 3.0.5 (for tests)
+-   Ocaml 4.05.0
+-   Opam 2.0.2
+-   dune >= 1.6
+-   BAP 1.6 (and its dependencies)
+-   yojson >= 1.6.0
+-   alcotest >= 0.8.3 (for tests)
+-   Sark (latest) for IDA Pro annotations
+-   pytest >= 3.5.1 (for tests)
+-   SCons >= 3.0.5 (for tests)
 
 Just run `make all` to compile and register the plugin with BAP. You can run the test suite via `make test`.
 ## How to use cwe_checker? ##
