@@ -80,6 +80,13 @@ New plugins should be added to src/checkers. Implement a .ml and .mli file. See 
 If you plan to open a PR, please utilize [precommit](https://pre-commit.com) in your development environment to catch many issues before the code review.
 ### Contribute ###
 Contributions are always welcome. Just fork it and open a pull request!
+## How does cwe_checker work internally? ##
+Naturally, the most accurate documentation is the source code. At the moment, we provide documentation in the *doc/*. This includes documentation of how to solve certain tasks with cwe_checker (e.g. implement your own plugin) and also the slides conference presentations on cwe_checker. The slides about cwe_checker should be of special interest for those who would like to get a quick/initial overview of its internals. 
+
+We presented cwe_checker at the following conferences so far:
+- [Pass The SALT 2019](https://2019.pass-the-salt.org/talks/74.html) ([slides](doc/slides/cwe_checker_pts19.pdf))
+- [Black Hat USA 2019](https://www.blackhat.com/us-19/arsenal/schedule/index.html#cwe_checker-hunting-binary-code-vulnerabilities-across-cpu-architectures-16782)
+
 ## Acknowledgements ##
 This project is partly financed by [German Federal Office for Information Security (BSI)](https://www.bsi.bund.de).
 
