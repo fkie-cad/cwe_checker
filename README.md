@@ -37,6 +37,7 @@ Please note that some of the above analyses only are partially implemented at th
 <p align="center">
     <img src="doc/images/example_ida_anotation.png" alt="IDA Pro anotation" width="50%" height="50%"/>
 </p>
+
 ## Why use cwe_checker? ##
 The following arguments should convince you to give *cwe_checker* a try:
 -  it is very easy to setup, just build the Docker container!
