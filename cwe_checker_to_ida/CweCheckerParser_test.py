@@ -51,7 +51,6 @@ class TestCweCheckerParser(unittest.TestCase):
         res = self.parser.parse_path(cwe_warning)
 
         self.assertEqual(res.address, expect_res)
-        
 
     def test_parse_cwe457(self):
         cwe457_warning = '2019-07-04 11:13:05.303 WARN : [CWE457] {0.1} (Use of Uninitialized Variable) Found potentially unitialized stack variable (FP + 0xFFFFFFFC:32u) in function __do_global_dtors_aux at 0x662:32u'
