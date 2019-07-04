@@ -34,7 +34,9 @@ Please note that some of the above analyses only are partially implemented at th
 
 *cwe_checker* comes with a script called `cwe_checker_to_ida`, which parses the output of *cwe_checker* and generates a IDAPython script. This script annotates the found CWEs in IDA Pro, which helps during manual analysis of a binary. The colors represent the serverness of the found issues (yellow, orange, or red). The following screenshot shows some results:
 
-![](https://github.com/fkie-cad/cwe_checker/raw/master/doc/images/example_ida_anotation.png "IDA Pro anotation")
+<p align="center">
+    <img src="doc/images/example_ida_anotation.png" alt="IDA Pro anotation" width="50%" height="50%"/>
+</p>
 ## Why use cwe_checker? ##
 The following arguments should convince you to give *cwe_checker* a try:
 -  it is very easy to setup, just build the Docker container!
