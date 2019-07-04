@@ -3,7 +3,7 @@ import CweCheckerParser
 
 class TestCweCheckerParser(unittest.TestCase):
 
-    def setUp(self): 
+    def setUp(self):
         self.parser = CweCheckerParser.Parser('RESULT_PATH')
 
     def test_parse_cwe125(self):
@@ -97,5 +97,3 @@ class TestCweCheckerParser(unittest.TestCase):
         res = self.parser.parse_path(cwe_warning)
 
         self.assertEqual(res.address, expect_res)
-
-
