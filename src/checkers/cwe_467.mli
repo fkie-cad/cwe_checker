@@ -1,11 +1,30 @@
-(** This module implements a check for CWE-467 (Use of sizeof() on a Pointer Type).
-In a nutshell, it before a function call to symbols like malloc and memmove, which
-take a size parameter and a pointer to data as input, if not accidentally the size
-of the pointer instead of the data is passed. This can have severe consequences.
-The check is quite basic: it checks if before the call an immediate value that
-equals the size of a pointer (e.g. 4 bytes on x86) is referenced (e.g. pushed
-onto the stack).The symbols are configurable in config.json.
-See https://cwe.mitre.org/data/definitions/467.html for detailed description. *)
+(** This module implements a check for CWE-467: Use of sizeof() on a Pointer Type.
+
+    Functions like malloc and memmove take a size parameter of some data size as
+    input. If accidentially the size of a pointer to the data instead of the size of
+    the data itself gets passed to the function, this can have severe consequences.
+
+    See {: https://cwe.mitre.org/data/definitions/467.html} for a detailed description.
+
+    {1 How the check works}
+
+    The check is quite basic: We check whether in the basic block before a call
+    to a function listed in the symbols for CWE467 (configurable in in config.json)
+    an immediate value that equals the size of a pointer (e.g. 4 bytes on x86) is
+    referenced.
+
+    {1 False Positives}
+
+    - It is not checked whether the immediate value is actually an input to the call
+    or not. However, this does not seem to produce false positives in practice.
+    - The size value might be correct and not a bug.
+
+    {1 False Negatives}
+
+    - If the incorrect size value is generated before the basic block that contains
+      the call, the check will not be able to find it.
+*)
+
 val name : string
 val version : string
 
