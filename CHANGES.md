@@ -1,7 +1,7 @@
 dev
 ====
 
--   Added more documentation to checks
+-   Added more documentation to checks (PR #26)
 
 0.2 (2019-06-25)
 =====
