@@ -2,6 +2,7 @@ dev
 ====
 
 -   Added more documentation to checks (PR #26)
+-   Fixed check CWE367: use symbols defined in config.json (PR #28)
 
 0.2 (2019-06-25)
 =====
