@@ -2,6 +2,7 @@ dev
 ====
 
 -   Added more documentation to checks (PR #26)
+-   Added clang as another compiler for test cases, added tests for clang compiled test cases (PR #27)
 
 0.2 (2019-06-25)
 =====
