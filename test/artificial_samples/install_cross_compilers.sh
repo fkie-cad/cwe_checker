@@ -22,4 +22,6 @@ echo "Installing dependencies for x86 compilation"
 sudo docker pull dockcross/linux-x86
 sudo docker run --rm dockcross/linux-x86 > ./dockcross-linux-x86
 chmod +x ./dockcross-linux-x86
+echo "Installing clang for x64 architecture"
+sudo apt install clang
 echo "Done."

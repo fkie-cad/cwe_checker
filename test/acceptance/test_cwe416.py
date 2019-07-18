@@ -24,6 +24,12 @@ class TestCwe416(unittest.TestCase):
         res = cwe_checker_testlib.execute_emulation_and_check_occurence(self.target, self.target, 'x64', 'gcc', self.string)
         self.assertEqual(res, expect_res)
 
+    @unittest.skip("FIXME: broken on Ubuntu 18.04 with the corresponding clang version")
+    def test_cwe416_01_x64_clang(self):
+        expect_res = 4
+        res = cwe_checker_testlib.execute_emulation_and_check_occurence(self.target, self.target, 'x64', 'clang', self.string)
+        self.assertEqual(res, expect_res)
+
     @unittest.skip("Depends on proper MIPS support in BAP")
     def test_cwe416_01_mips_gcc(self):
         expect_res = 1

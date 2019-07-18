@@ -23,6 +23,11 @@ class TestCwe243(unittest.TestCase):
         res = cwe_checker_testlib.execute_and_check_occurence(self.target, self.target, 'x64', 'gcc', self.string)
         self.assertEqual(res, expect_res)
 
+    def test_cwe243_01_x64_clang(self):
+        expect_res = 1
+        res = cwe_checker_testlib.execute_and_check_occurence(self.target, self.target, 'x64', 'clang', self.string)
+        self.assertEqual(res, expect_res)
+
     def test_cwe243_01_ppc_gcc(self):
         expect_res = 1
         res = cwe_checker_testlib.execute_and_check_occurence(self.target, self.target, 'ppc', 'gcc', self.string)
@@ -48,6 +53,11 @@ class TestCwe243(unittest.TestCase):
     def test_cwe243_02_x64_gcc(self):
         expect_res = 0
         res = cwe_checker_testlib.execute_and_check_occurence(self.target + "_clean", self.target, 'x64', 'gcc', self.string)
+        self.assertEqual(res, expect_res)
+
+    def test_cwe243_02_x64_clang(self):
+        expect_res = 0
+        res = cwe_checker_testlib.execute_and_check_occurence(self.target + "_clean", self.target, 'x64', 'clang', self.string)
         self.assertEqual(res, expect_res)
 
     def test_cwe243_02_ppc_gcc(self):
