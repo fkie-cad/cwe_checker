@@ -3,7 +3,8 @@
     "symbols": [
       "xmalloc",
       "malloc",
-      "realloc"
+      "realloc",
+      "calloc"
     ]
   },
   "CWE215": {

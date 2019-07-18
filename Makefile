@@ -15,6 +15,7 @@ test:
 clean:
 	dune clean
 	bapbuild -clean
+	rm -f -r doc/html
 	cd test/unit; make clean; cd ../..
 	cd plugins/cwe_checker; make clean; cd ../..
 	cd plugins/cwe_checker_emulation; make clean; cd ../..
@@ -27,6 +28,10 @@ uninstall:
 	cd plugins/cwe_checker_emulation; make uninstall; cd ../..
 	cd plugins/cwe_checker_type_inference; make uninstall; cd ../..
 	cd plugins/cwe_checker_type_inference_print; make uninstall; cd ../..
+
+documentation:
+	dune build @doc
+	cp -r _build/default/_doc/_html doc/html
 
 docker:
 	./install.sh

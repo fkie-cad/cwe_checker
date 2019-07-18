@@ -61,8 +61,9 @@ If you plan to develop cwe_checker, it is recommended to build it using the prov
 -   Sark (latest) for IDA Pro annotations
 -   pytest >= 3.5.1 (for tests)
 -   SCons >= 3.0.5 (for tests)
+-   odoc >= 1.4 (for documentation)
 
-Just run `make all` to compile and register the plugin with BAP. You can run the test suite via `make test`.
+Just run `make all` to compile and register the plugin with BAP. You can run the test suite via `make test`. Documentation can be built via `make documentation`.
 ## How to use cwe_checker? ##
 The usage is straight forward: adjust the `config.json` (if needed) and call BAP with *cwe_checker* as a pass.
 ``` bash
@@ -84,7 +85,7 @@ If you plan to open a PR, please utilize [precommit](https://pre-commit.com) in 
 ### Contribute ###
 Contributions are always welcome. Just fork it and open a pull request!
 ## How does cwe_checker work internally? ##
-Naturally, the most accurate documentation is the source code. At the moment, we provide documentation in the *doc/*. This includes documentation of how to solve certain tasks with cwe_checker (e.g. implement your own plugin) and also the slides conference presentations on cwe_checker. The slides about cwe_checker should be of special interest for those who would like to get a quick/initial overview of its internals. 
+Documentation can be built via `make documentation` and the found in *doc/html/*. But the most accurate documentation is still the source code. We provide some more information in *doc/*, including the slides of conference presentations on cwe_checker. These should be of special interest for those who would like to get a quick/initial overview of its internals. 
 
 We presented cwe_checker at the following conferences so far:
 - [Pass The SALT 2019](https://2019.pass-the-salt.org/talks/74.html) ([slides](doc/slides/cwe_checker_pts19.pdf))

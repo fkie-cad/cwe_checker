@@ -1,5 +1,23 @@
-(**  This module checks if a binary contains sensitive debugging information that could be leveraged to
-   get a better understanding of it in less time. This is basically CWE-215 (https://cwe.mitre.org/data/definitions/215.html *)
+(** This module implements a check for CWE-215: Information Exposure Through Debug Information.
+
+    Sensitive debugging information can be leveraged to get a better understanding
+    of a binary in less time.
+
+    See {: https://cwe.mitre.org/data/definitions/215.html} for a detailed description.
+
+    {1 How the check works}
+
+    The binary is checked for debug strings using readelf.
+
+    {1 False Positives}
+
+    None known.
+
+    {1 False Negatives}
+
+    - There may be other debug information not found by readelf.
+*)
+
 val name : string
 val version : string
 
