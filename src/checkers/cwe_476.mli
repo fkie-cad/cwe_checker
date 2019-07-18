@@ -9,7 +9,7 @@
     {1 How the check works}
 
     We search for an execution path where a memory access using the return value of
-    a symbol is happens before the return value is checked through a conditional
+    a symbol happens before the return value is checked through a conditional
     jump instruction.
 
     Note that the check relies on Bap-generated stubs to identify return registers of the

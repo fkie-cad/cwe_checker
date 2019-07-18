@@ -4,7 +4,7 @@
     would be calling rand without srand. This could lead to predictable random
     numbers and could, for example, weaken crypto functionality.
 
-    See {: https://cwe.mitre.org/data/definitions/332.html} for detailed description.
+    See {: https://cwe.mitre.org/data/definitions/332.html} for a detailed description.
 
     {1 How the check works}
 

@@ -4,7 +4,7 @@
     path that can be adjusted by an adversary. For example, see Nebula Level 1
     ({: https://exploit-exercises.com/nebula/level01/}).
 
-    According to "man system" the following problems can arise:
+    According to the manual page of system() the following problems can arise:
     "Do not use system() from a program with set-user-ID or set-group-ID privileges,
     because strange values for some environment variables might be used to subvert
     system integrity.  Use the exec(3) family of functions instead, but not execlp(3)
