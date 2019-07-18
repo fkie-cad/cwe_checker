@@ -12,7 +12,7 @@
 
     {1 False Positives}
 
-    - The program could use rand for non-cryptographic purposes.
+    None known
 
     {1 False Negatives}
 
