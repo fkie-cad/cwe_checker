@@ -15,6 +15,7 @@ test:
 clean:
 	dune clean
 	bapbuild -clean
+	rm -f -r doc/html
 	cd test/unit; make clean; cd ../..
 	cd plugins/cwe_checker; make clean; cd ../..
 	cd plugins/cwe_checker_emulation; make clean; cd ../..
