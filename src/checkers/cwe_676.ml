@@ -1,5 +1,6 @@
 open Core_kernel
 open Bap.Std
+open Log_utils
 
 let name = "CWE676"
 let version = "0.1"
@@ -22,13 +23,26 @@ let get_calls_to_symbols cg subfunctions symbols =
 (* FIXME: refactor variable names *)
 let print_calls calls ~tid_map =
    Seq.iter calls ~f:(fun call -> match call with
-      | (a, b, c) -> Log_utils.warn
-                       "[%s] {%s} (Use of Potentially Dangerous Function) %s (%s) -> %s."
-                       name
-                       version
-                       a
-                       (Address_translation.translate_tid_to_assembler_address_string b tid_map)
-                       c)
+                                  | (a, b, c) ->
+                                     begin
+                                       let address = Address_translation.translate_tid_to_assembler_address_string b tid_map in
+                                       let other = [["dangerous_function"; c]] in
+                                       let description = sprintf
+                                                           "(Use of Potentially Dangerous Function) %s (%s) -> %s."
+                                                           a
+                                                           address
+                                                           c in
+                                       let cwe_warning = cwe_warning_factory
+                                                           name
+                                                           version
+                                                           ~other:other
+                                                           ~addresses:[address]
+                                                           ~symbols:[a]
+                                                           description in
+                                       collect_cwe_warning cwe_warning
+
+                                     end
+)
 
 let resolve_symbols prog symbols =
   Term.enum sub_t prog |>

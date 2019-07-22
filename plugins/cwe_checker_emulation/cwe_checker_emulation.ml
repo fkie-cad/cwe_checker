@@ -125,9 +125,6 @@ end
 - all monitored events are collected globally
 - after the last Primus machine has terminated we report all observed incidents *)
 let main {Config.get=(!)} proj =
-  Log_utils.set_log_level Log_utils.DEBUG;
-  Log_utils.set_output stdout;
-  Log_utils.color_on ();
 
   Primus.Machine.add_component (module Monitor);
   begin
@@ -141,6 +138,7 @@ let main {Config.get=(!)} proj =
      info "program terminated by a signal: %s" (Primus.Exn.to_string exn);
   end;
   analyze_events ();
+  Log_utils.emit_cwe_warnings_native ();
   proj
 
 (** At the moment this plugin depends due to Primus on the plugin

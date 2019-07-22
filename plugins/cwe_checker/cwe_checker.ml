@@ -34,9 +34,9 @@ let build_version_sexp () =
   |> String.concat ~sep:" "
 
 let print_module_versions () =
-  Log_utils.info
-    "[cwe_checker] module_versions: (%s)"
-    (build_version_sexp ())
+  Log_utils.info (sprintf
+                    "[cwe_checker] module_versions: (%s)"
+                    (build_version_sexp ()))
 
 let execute_cwe_module cwe json program project tid_address_map =
   let parameters = match cwe.has_parameters with
@@ -57,7 +57,7 @@ let partial_run project config modules =
   let program = Project.program project in
   let tid_address_map = Address_translation.generate_tid_map program in
   let json = Yojson.Basic.from_file config in
-  Log_utils.info "[cwe_checker] Just running the following analyses: %s." modules;
+  Log_utils.info (sprintf "[cwe_checker] Just running the following analyses: %s." modules);
   List.iter (String.split modules ~on: ',') ~f:(fun cwe ->
     let cwe_mod = match List.find known_modules ~f:(fun x -> x.name = cwe) with
       | Some(module_) -> module_
@@ -75,9 +75,6 @@ let full_run project config =
   end
 
 let main config module_versions partial_update project =
-  Log_utils.set_log_level Log_utils.DEBUG;
-  Log_utils.set_output stdout;
-  Log_utils.color_on ();
 
   if module_versions then
     begin
@@ -102,7 +99,8 @@ let main config module_versions partial_update project =
           if partial_update = "" then
             full_run project config
           else
-            partial_run project config partial_update
+            partial_run project config partial_update;
+          Log_utils.emit_cwe_warnings_native ()
         end
     end
 
