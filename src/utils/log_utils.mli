@@ -1,3 +1,19 @@
+(** This module implements the logging logic or cwe_checker.
+
+    Each check may produce a CweWarning, which holds information regarding the current CWE hit.
+    These CweWarnings are stored globally so that we can output at the very end. This may be
+    necessary, for instance, when the output should be a JSON document.
+
+    CWE checks can utilize the function cwe_warning_factory to create CweWarning objects and
+    the function collect_cwe_warning to store them globally.
+
+    At the moment, cwe_checker supports plain text and JSON output. The corresponding functions
+    are emit_cwe_warnings_native and emit_cwe_warnings_json.
+
+    In addition, there are several functions (debug, error, info) to notify the user of certain
+    events. Note that these functions may pollute the output. 
+ *)
+
 module CweWarning : sig
   type t = {
   name : string;
