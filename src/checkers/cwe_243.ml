@@ -1,6 +1,7 @@
 open Core_kernel
 open Bap.Std
 open Symbol_utils
+open Log_utils
 
 include Self()
 
@@ -73,12 +74,14 @@ let check_subfunction prog tid_map sub pathes =
     begin
       let path_checks = List.map pathes ~f:(fun path -> check_path prog tid_map sub path) in
       if not (List.exists path_checks ~f:(fun x -> x = true)) then
-       Log_utils.warn
-         "[%s] {%s} (The program utilizes chroot without dropping privileges and/or changing the directory) at %s (%s)"
-         name
-         version
-         (Address_translation.translate_tid_to_assembler_address_string (Term.tid sub) tid_map)
-         (Term.name sub)
+        let address = (Address_translation.translate_tid_to_assembler_address_string (Term.tid sub) tid_map) in
+        let symbol = (Term.name sub) in
+        let description = sprintf
+                            "(The program utilizes chroot without dropping privileges and/or changing the directory) at %s (%s)"
+                            address
+                            symbol in
+        let cwe_warning = cwe_warning_factory name version description ~addresses:[address] ~symbols:[symbol] in
+        collect_cwe_warning cwe_warning
     end
 
 let check_cwe prog _proj tid_map pathes _ =

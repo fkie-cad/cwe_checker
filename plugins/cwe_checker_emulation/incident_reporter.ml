@@ -1,5 +1,6 @@
 open Core_kernel
 open Cwe_checker_core
+open Log_utils
 
 let version = "0.1"
 
@@ -26,19 +27,28 @@ let get_incident_locations_from_ids ids location_tbl =
   let incident_locations = ref [] in
       Sexplib__Sexp_with_layout.List.iter ids ~f:(fun id ->  incident_locations := (map_id_to_location (Sexp.to_string id) location_tbl)::(!incident_locations)); !incident_locations
 
-let report_cwe_125 location_path = 
-      Log_utils.warn "[CWE125] {%s} (Out-of-bounds Read) %s" version location_path;
-      Log_utils.warn "[CWE787] {%s} (Out-of-bounds Write) %s" version location_path
+let report_cwe_125 location_path =
+  let description = sprintf "(Out-of-bounds Read) %s" location_path in
+  let cwe_warning = cwe_warning_factory "CWE125" version ~other:[["path";location_path]] description in
+  collect_cwe_warning cwe_warning;
+  let description = sprintf "(Out-of-bounds Write) %s" location_path in
+  let cwe_warning = cwe_warning_factory "CWE787" version ~other:[["path";location_path]] description in
+  collect_cwe_warning cwe_warning
 
 let report_cwe_415 location_path =
-  Log_utils.warn "[CWE415] {%s} (Double Free) %s" version location_path
+  let description = sprintf "(Double Free) %s" location_path in
+  let cwe_warning = cwe_warning_factory "CWE415" version ~other:[["path";location_path]] description in
+  collect_cwe_warning cwe_warning
 
 let report_cwe_416 location_path =
-  Log_utils.warn "[CWE416] {%s} (Use After Free) %s" version location_path
+  let description = sprintf "(Use After Free) %s" location_path in
+  let cwe_warning = cwe_warning_factory "CWE416" version ~other:[["path";location_path]] description in
+  collect_cwe_warning cwe_warning
 
 let report_cwe_unknown location_path incident_str =
-  Log_utils.warn "[CWE UNKNOWN] {%s} (%s) %s" version incident_str location_path
-
+  let description = sprintf "(%s) %s" incident_str location_path in
+  let cwe_warning = cwe_warning_factory incident_str version ~other:[["path";location_path]] description in
+  collect_cwe_warning cwe_warning
 
 (** Reports an incident. *)
 let report incident location_tbl =
