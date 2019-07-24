@@ -124,7 +124,7 @@ end
 - for all subroutins we fork a Primus machine
 - all monitored events are collected globally
 - after the last Primus machine has terminated we report all observed incidents *)
-let main json_output proj =
+let main json_output file_output proj =
   Primus.Machine.add_component (module Monitor);
   begin
   let prog = (Project.program proj) in
@@ -140,16 +140,17 @@ let main json_output proj =
   if json_output then
     begin
       match Project.get proj filename with
-      | Some fname -> Log_utils.emit_cwe_warnings_json fname
-      | None -> Log_utils.emit_cwe_warnings_json ""
+      | Some fname -> Log_utils.emit_cwe_warnings_json fname file_output
+      | None -> Log_utils.emit_cwe_warnings_json "" file_output
     end
   else
-    Log_utils.emit_cwe_warnings_native ()
+    Log_utils.emit_cwe_warnings_native file_output
 
 module Cmdline = struct
   open Config
   let json_output = flag "json" ~doc:"Outputs the result as JSON."
-  let () = when_ready (fun ({get=(!!)}) -> Project.register_pass' ~deps:["trivial-condition-form"] (main !!json_output))
+  let file_output = param string "out" ~doc:"Path to output file."
+  let () = when_ready (fun ({get=(!!)}) -> Project.register_pass' ~deps:["trivial-condition-form"] (main !!json_output !!file_output))
   let () = manpage [
                `S "DESCRIPTION";
                `P "This plugin utilizes symbolic execution to find CWEs like Double Free (CWE415) or Use After Free (CWE416)."]

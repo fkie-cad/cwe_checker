@@ -74,7 +74,7 @@ let full_run project config =
     List.iter known_modules ~f:(fun cwe -> execute_cwe_module cwe json program project tid_address_map)
   end
 
-let main config module_versions partial_update json_output project =
+let main config module_versions partial_update json_output file_output project =
 
   if module_versions then
     begin
@@ -103,11 +103,11 @@ let main config module_versions partial_update json_output project =
           if json_output then
             begin
               match Project.get project filename with
-              | Some fname -> Log_utils.emit_cwe_warnings_json fname
-              | None -> Log_utils.emit_cwe_warnings_json ""
+              | Some fname -> Log_utils.emit_cwe_warnings_json fname file_output
+              | None -> Log_utils.emit_cwe_warnings_json "" file_output
             end
           else
-            Log_utils.emit_cwe_warnings_native ()
+            Log_utils.emit_cwe_warnings_native file_output
         end
     end
 
@@ -116,8 +116,9 @@ module Cmdline = struct
   let config = param string "config" ~doc:"Path to configuration file."
   let module_versions = flag "module_versions" ~doc:"Prints out the version numbers of all known modules."
   let json_output = flag "json" ~doc:"Outputs the result as JSON."
+  let file_output = param string "out" ~doc:"Path to output file."
   let partial_update = param string "partial" ~doc:"Comma separated list of modules to apply on binary, e.g. 'CWE332,CWE476,CWE782'"
-  let () = when_ready (fun ({get=(!!)}) -> Project.register_pass' ~deps:["callsites"] (main !!config !!module_versions !!partial_update !!json_output))
+  let () = when_ready (fun ({get=(!!)}) -> Project.register_pass' ~deps:["callsites"] (main !!config !!module_versions !!partial_update !!json_output !!file_output))
   let () = manpage [
                           `S "DESCRIPTION";
                           `P "This plugin checks various CWEs such as Insufficient Entropy in PRNG (CWE-332) or Use of Potentially Dangerous Function (CWE-676)"

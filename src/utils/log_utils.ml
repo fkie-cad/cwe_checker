@@ -33,19 +33,25 @@ let cwe_warning_factory name version ?(other = []) ?(addresses = []) ?(symbols =
 
 let collect_cwe_warning warning = cwe_warning_store := Array.append !cwe_warning_store [|warning|]
 
-let emit_cwe_warnings_json filename =
+let emit_cwe_warnings_json target_path out_path =
   let cwe_warning_result = {
-      CweWarningResult.binary = filename;
+      CweWarningResult.binary = target_path;
       CweWarningResult.time = Unix.time ();
       CweWarningResult.warnings = Array.to_list !cwe_warning_store
     } in
   let output = Yojson.Safe.pretty_to_string (CweWarningResult.to_yojson cwe_warning_result) in
-      print_endline output
+  if out_path = "" then
+    print_endline output
+  else
+    Out_channel.write_all out_path ~data:output
 
-let emit_cwe_warnings_native () =
-  Array.iter !cwe_warning_store ~f:(fun (cwe_warning:CweWarning.t) ->
-      let line = (sprintf "[%s] (%s) " cwe_warning.name cwe_warning.version) ^ cwe_warning.description in
-      print_endline line)
+let emit_cwe_warnings_native out_path =
+  let output_lines = Array.map !cwe_warning_store ~f:(fun (cwe_warning:CweWarning.t) ->
+      sprintf "[%s] (%s) %s" cwe_warning.name cwe_warning.version cwe_warning.description) in
+  if out_path = "" then
+    Array.iter output_lines ~f:print_endline
+  else
+    Out_channel.write_lines out_path (Array.to_list output_lines)
 
 let debug message = print_endline ("DEBUG: " ^ message)
 
