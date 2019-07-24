@@ -4,6 +4,7 @@ dev
 -   Added more documentation to checks (PR #26)
 -   Fixed check CWE367: use symbols defined in config.json (PR #28)
 -   Refactoring of logging and JSON support via --json (PR #30)
+-   Added file output support via --out (PR #30)
 
 0.2 (2019-06-25)
 =====

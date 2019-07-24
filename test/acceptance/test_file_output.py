@@ -7,7 +7,7 @@ class TestFileOutput(unittest.TestCase):
 
     def setUp(self):
         if 'travis' in os.environ['USER']:
-            self.res_file = 'res.json'
+            self.res_file = '/home/travis/build/fkie-cad/cwe_checker/res.json'
             abs_path = os.path.abspath('test/artificial_samples/build/cwe_190_x64.out')
             self.cmd = 'docker run --rm -v %s:/tmp/input cwe-checker:latest bap /tmp/input --pass=cwe-checker  --cwe-checker-config=/home/bap/cwe_checker/src/config.json --cwe-checker-json --cwe-checker-out=%s' % (abs_path, self.res_file)
         else:
