@@ -74,7 +74,7 @@ let full_run project config =
     List.iter known_modules ~f:(fun cwe -> execute_cwe_module cwe json program project tid_address_map)
   end
 
-let main config module_versions partial_update json_output file_output project =
+let main config module_versions partial_update check_path json_output file_output project =
 
   if module_versions then
     begin
@@ -114,11 +114,12 @@ let main config module_versions partial_update json_output file_output project =
 module Cmdline = struct
   open Config
   let config = param string "config" ~doc:"Path to configuration file."
-  let module_versions = flag "module_versions" ~doc:"Prints out the version numbers of all known modules."
+  let module_versions = flag "module-versions" ~doc:"Prints out the version numbers of all known modules."
   let json_output = flag "json" ~doc:"Outputs the result as JSON."
   let file_output = param string "out" ~doc:"Path to output file."
+  let check_path = flag "check-path" ~doc:"Checks if there is a path from an input function to a CWE hit."
   let partial_update = param string "partial" ~doc:"Comma separated list of modules to apply on binary, e.g. 'CWE332,CWE476,CWE782'"
-  let () = when_ready (fun ({get=(!!)}) -> Project.register_pass' ~deps:["callsites"] (main !!config !!module_versions !!partial_update !!json_output !!file_output))
+  let () = when_ready (fun ({get=(!!)}) -> Project.register_pass' ~deps:["callsites"] (main !!config !!module_versions !!partial_update !!check_path !!json_output !!file_output))
   let () = manpage [
                           `S "DESCRIPTION";
                           `P "This plugin checks various CWEs such as Insufficient Entropy in PRNG (CWE-332) or Use of Potentially Dangerous Function (CWE-676)"
