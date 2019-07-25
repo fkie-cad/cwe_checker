@@ -33,9 +33,13 @@ cpp_flags = {'x64': '-g -fno-stack-protector',
 cpp_linkers =   {'x86': './dockcross-linux-x86 g++ -m32'}
 
 def which(pgm):
-    # TODO: check if dockcross containers are installed
-    if pgm.startswith('.'):
+    # check dockcross installation
+    if pgm.startswith('.') and os.path.isfile(pgm):
         return pgm
+    elif pgm.startswith('.') and not (os.path.isfile(pgm)):
+        return None
+
+    # check compilers on path
     path = os.getenv('PATH')
     for p in path.split(os.path.pathsep):
         p = os.path.join(p,pgm)
