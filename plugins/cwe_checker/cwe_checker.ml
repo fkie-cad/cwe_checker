@@ -104,6 +104,12 @@ let main config module_versions partial_update check_path json_output file_outpu
             full_run project config
           else
             partial_run project config partial_update;
+          if check_path then
+            begin
+              let prog = Project.program project in
+              let tid_address_map = Address_translation.generate_tid_map prog in
+              Check_path.check_path prog project tid_address_map [] []
+            end;
           if json_output then
             begin
               match Project.get project filename with
