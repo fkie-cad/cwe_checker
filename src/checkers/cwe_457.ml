@@ -1,5 +1,6 @@
 open Core_kernel
 open Bap.Std
+open Log_utils
 
 let name = "CWE457"
 let version = "0.1"
@@ -47,7 +48,7 @@ let get_fp_of_arch arch =
   | `armv4 | `armv5 | `armv6 | `armv7 | `armv4eb | `armv5eb | `armv6eb | `armv7eb -> "R11"
   | `mips | `mips64 | `mips64el | `mipsel -> "FP"
   | `ppc | `ppc64 | `ppc64le -> "R31"
-  | _ -> Log_utils.error "[%s] {%s} Unknown architecture." name version; "UNKNOWN"
+  | _ -> failwith  "Unknown architecture."
 
 let vars_contain_fp vars fp_pointer =
   let regs = Set.filter vars ~f:(fun var -> Var.to_string var = fp_pointer) in
@@ -61,6 +62,19 @@ let is_interesting_load_store def fp_pointer =
 
 (*TODO: implement real filtering*)
 let filter_mem_address i min_fp_offset = Set.filter i ~f:(fun elem -> (Word.of_int  ~width:32 min_fp_offset) < elem)
+
+let log_cwe_warning sub i d tid_map =
+   let word = Word.to_string i in
+   let other =[["word"; word]] in 
+   let symbol = Sub.name sub in
+   let address = Address_translation.translate_tid_to_assembler_address_string (Term.tid d) tid_map in
+   let description = sprintf
+                       "(Use of Uninitialized Variable) Found potentially unitialized stack variable (FP + %s) in function %s at %s"
+                       word
+                       symbol
+                       address in
+   let cwe_warning = cwe_warning_factory name version ~other:other ~addresses:[address] ~symbols:[symbol] description in
+   collect_cwe_warning cwe_warning
 
 let check_subfunction _prog proj tid_map sub =
   let fp_pointer = get_fp_of_arch (Project.arch proj) in
@@ -81,14 +95,7 @@ let check_subfunction _prog proj tid_map sub =
             begin
               let filter_mem_addresses = filter_mem_address ints min_fp_offset in
               Set.iter filter_mem_addresses ~f:(fun i -> if not (Array.exists !stores ~f:(fun elem -> elem = i)) then
-                                           begin
-                                           Log_utils.warn "[%s] {%s} (Use of Uninitialized Variable) Found potentially unitialized stack variable (FP + %s) in function %s at %s"
-                                             name
-                                             version
-                                             (Word.to_string i)
-                                             (Sub.name sub)
-                                             (Address_translation.translate_tid_to_assembler_address_string (Term.tid d) tid_map)
-                                           end)
+                log_cwe_warning sub i d tid_map)
             end
         end)
 

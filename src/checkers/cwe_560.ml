@@ -1,5 +1,6 @@
 open Core_kernel
 open Bap.Std
+open Log_utils
 
 let name = "CWE560"
 let version = "0.1"
@@ -19,11 +20,16 @@ let check_umask_arg tid_map blk w =
   try
     let umask_arg = Word.to_int_exn w in
     if is_chmod_style_arg umask_arg then
-      Log_utils.warn "[%s] {%s} (Use of umask() with chmod-style Argument) Function %s calls umask with argument %d"
-        name
-        version
-        (Address_translation.translate_tid_to_assembler_address_string (Term.tid blk) tid_map)
-        umask_arg
+      let address = Address_translation.translate_tid_to_assembler_address_string (Term.tid blk) tid_map in
+      let umask_arg_str = sprintf "%d" umask_arg in
+      let description = sprintf
+                          "(Use of umask() with chmod-style Argument) Function %s calls umask with argument %s"
+                          address
+                          umask_arg_str in
+      let other = [["umask_arg"; umask_arg_str]] in
+      let cwe_warning = cwe_warning_factory name version ~addresses:[address] ~other:other description in
+      collect_cwe_warning cwe_warning
+
   with _ -> Log_utils.error "Caught exception in module [CWE560]."
 
 let check_umask_callsite tid_map blk =

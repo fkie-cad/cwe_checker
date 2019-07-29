@@ -1,5 +1,6 @@
 open Core_kernel
 open Bap.Std
+open Log_utils
 
 let name = "CWE476"
 let version = "0.2"
@@ -240,13 +241,21 @@ let print_hit tid ~sub ~function_names ~tid_map =
       | Call(call) -> begin
           match Call.target call with
           | Direct(call_tid) -> Option.is_some (List.find function_names ~f:(fun fn_name ->
-              if fn_name = (Tid.name call_tid) then begin
-                Log_utils.warn "[%s] {%s} (NULL Pointer Dereference) There is no check if the return value is NULL at %s (%s)."
-                  name
-                  version
-                  (Address_translation.translate_tid_to_assembler_address_string tid tid_map)
-                  fn_name;
-                true
+                                                    if fn_name = (Tid.name call_tid) then
+                                                      begin
+                                                      let address = Address_translation.translate_tid_to_assembler_address_string tid tid_map in
+                                                      let description = sprintf
+                                                                          "(NULL Pointer Dereference) There is no check if the return value is NULL at %s (%s)."
+                                                                          address
+                                                                          fn_name in
+                                                      let cwe_warning = cwe_warning_factory
+                                                                          name
+                                                                          version
+                                                                          ~addresses:[address]
+                                                                          ~symbols:[fn_name]
+                                                                          description in
+                                                      collect_cwe_warning cwe_warning;
+                                                      true
               end else
                 false
             ))

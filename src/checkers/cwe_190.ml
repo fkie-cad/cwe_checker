@@ -1,6 +1,7 @@
 open Core_kernel
 open Bap.Std
 open Symbol_utils
+open Log_utils
 
 let name = "CWE190"
 let version = "0.1"
@@ -20,12 +21,11 @@ let contains_multiplication d =
 let check_multiplication_before_symbol _proj _prog _sub blk jmp tid_map symbols =
   Seq.iter (Term.enum def_t blk)
     ~f:(fun d -> if contains_multiplication d then
-                   Log_utils.warn
-                     "[%s] {%s} (Integer Overflow or Wraparound) Potential overflow due to multiplication %s (%s)."
-                     name
-                     version
-                     (Address_translation.translate_tid_to_assembler_address_string (Term.tid blk) tid_map)
-                     (Symbol_utils.get_symbol_name_from_jmp jmp symbols))
+                   let description = "(Integer Overflow or Wraparound) Potential overflow due to multiplication" in
+                   let addresses = [(Address_translation.translate_tid_to_assembler_address_string (Term.tid blk) tid_map)] in
+                   let symbols = [(Symbol_utils.get_symbol_name_from_jmp jmp symbols)] in
+                   let cwe_warning = cwe_warning_factory name version description ~addresses ~symbols in
+                   collect_cwe_warning cwe_warning)
 
 let check_cwe prog proj tid_map symbol_names _ =
   match symbol_names with

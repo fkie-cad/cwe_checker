@@ -617,13 +617,14 @@ let print_type_info_to_debug state block_tid ~tid_map ~sub_tid ~project =
         end
     | _ -> "Unknown"
   in
-  Log_utils.debug
-    "[%s] {%s} TypeInfo at %s:\nRegister: %s\nStackOffset: %s"
-    name
-    version
-    (Address_translation.translate_tid_to_assembler_address_string block_tid tid_map)
-    register_string
-    stack_offset_str
+  let debug_str = sprintf
+                    "[%s] {%s} TypeInfo at %s:\nRegister: %s\nStackOffset: %s"
+                    name
+                    version
+                    (Address_translation.translate_tid_to_assembler_address_string block_tid tid_map)
+                    register_string
+                    stack_offset_str in
+  Log_utils.debug debug_str
 
 let print_type_info_tags ~project ~tid_map =
   let program = Project.program project in
@@ -635,12 +636,13 @@ let print_type_info_tags ~project ~tid_map =
           match Term.get_attr block type_info_tag with
           | Some(start_state) -> print_type_info_to_debug start_state (Term.tid block) ~tid_map ~sub_tid ~project
           | None -> (* block has no type info tag, which should not happen *)
-            Log_utils.error
-              "[%s] {%s} Block has no TypeInfo at %s (block TID %s)"
-              name
-              version
-              (Address_translation.translate_tid_to_assembler_address_string (Term.tid block) tid_map)
-              (Tid.name (Term.tid block))
+             let error_str = sprintf
+                               "[%s] {%s} Block has no TypeInfo at %s (block TID %s)"
+                               name
+                               version
+                               (Address_translation.translate_tid_to_assembler_address_string (Term.tid block) tid_map)
+                               (Tid.name (Term.tid block)) in
+             Log_utils.error error_str
         )
     )
 
