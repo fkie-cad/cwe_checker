@@ -29,7 +29,7 @@ void nested_for_loop(){
   free(bla);
 }
 
-void main(){
+int main(){
   if_statement();
   for_loop();
   nested_for_loop();

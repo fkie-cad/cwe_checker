@@ -5,7 +5,7 @@
 #include <fcntl.h>
 #include <string.h>
 
-void main(){
+int main(){
 
   if (access("file", W_OK) != 0) {
     exit(1);

@@ -2,6 +2,7 @@ dev
 ====
 
 -   Added more documentation to checks (PR #26)
+-   Added clang as another compiler for test cases, added tests for clang compiled test cases (PR #27)
 -   Fixed check CWE367: use symbols defined in config.json (PR #28)
 -   Refactoring of logging and JSON support via --json (PR #30)
 -   Added file output support via --out (PR #30)
