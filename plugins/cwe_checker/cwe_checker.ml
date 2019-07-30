@@ -30,12 +30,12 @@ let known_modules = [{cwe_func = Cwe_190.check_cwe; name = Cwe_190.name; version
                      {cwe_func = Cwe_782.check_cwe; name = Cwe_782.name; version = Cwe_782.version; requires_pairs = false; has_parameters = false}]
 
 let build_version_sexp () =
-  List.map known_modules ~f:(fun cwe -> Format.sprintf "(\"%s\" \"%s\")" cwe.name cwe.version)
-  |> String.concat ~sep:" "
+  List.map known_modules ~f:(fun cwe -> Format.sprintf "\"%s\": \"%s\"" cwe.name cwe.version)
+  |> String.concat ~sep:", "
 
 let print_module_versions () =
   Log_utils.info (sprintf
-                    "[cwe_checker] module_versions: (%s)"
+                    "[cwe_checker] module_versions: {%s}"
                     (build_version_sexp ()))
 
 let execute_cwe_module cwe json program project tid_address_map =
@@ -74,7 +74,12 @@ let full_run project config =
     List.iter known_modules ~f:(fun cwe -> execute_cwe_module cwe json program project tid_address_map)
   end
 
-let main config module_versions partial_update json_output file_output project =
+let main config module_versions partial_update json_output file_output no_logging project =
+
+  if no_logging then
+    begin
+      Log_utils.turn_off_logging ()
+    end;
 
   if module_versions then
     begin
@@ -114,11 +119,12 @@ let main config module_versions partial_update json_output file_output project =
 module Cmdline = struct
   open Config
   let config = param string "config" ~doc:"Path to configuration file."
-  let module_versions = flag "module_versions" ~doc:"Prints out the version numbers of all known modules."
+  let module_versions = flag "module-versions" ~doc:"Prints out the version numbers of all known modules."
   let json_output = flag "json" ~doc:"Outputs the result as JSON."
   let file_output = param string "out" ~doc:"Path to output file."
+  let no_logging = flag "no-logging" ~doc:"Outputs no logging (info, error, warning). This does not pollute STDOUT when output json to it."
   let partial_update = param string "partial" ~doc:"Comma separated list of modules to apply on binary, e.g. 'CWE332,CWE476,CWE782'"
-  let () = when_ready (fun ({get=(!!)}) -> Project.register_pass' ~deps:["callsites"] (main !!config !!module_versions !!partial_update !!json_output !!file_output))
+  let () = when_ready (fun ({get=(!!)}) -> Project.register_pass' ~deps:["callsites"] (main !!config !!module_versions !!partial_update !!json_output !!file_output !!no_logging))
   let () = manpage [
                           `S "DESCRIPTION";
                           `P "This plugin checks various CWEs such as Insufficient Entropy in PRNG (CWE-332) or Use of Potentially Dangerous Function (CWE-676)"

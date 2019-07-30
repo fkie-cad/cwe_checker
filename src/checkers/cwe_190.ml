@@ -21,10 +21,10 @@ let contains_multiplication d =
 let check_multiplication_before_symbol _proj _prog _sub blk jmp tid_map symbols =
   Seq.iter (Term.enum def_t blk)
     ~f:(fun d -> if contains_multiplication d then
-                   let description = "(Integer Overflow or Wraparound) Potential overflow due to multiplication" in
-                   let addresses = [(Address_translation.translate_tid_to_assembler_address_string (Term.tid blk) tid_map)] in
-                   let symbols = [(Symbol_utils.get_symbol_name_from_jmp jmp symbols)] in
-                   let cwe_warning = cwe_warning_factory name version description ~addresses ~symbols in
+                   let address = (Address_translation.translate_tid_to_assembler_address_string (Term.tid blk) tid_map) in
+                   let symbol = (Symbol_utils.get_symbol_name_from_jmp jmp symbols) in
+                   let description = sprintf "(Integer Overflow or Wraparound) Potential overflow due to multiplication at %s (%s)" address symbol in
+                   let cwe_warning = cwe_warning_factory name version description ~addresses:[address] ~symbols:[symbol] in
                    collect_cwe_warning cwe_warning)
 
 let check_cwe prog proj tid_map symbol_names _ =

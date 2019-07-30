@@ -25,6 +25,8 @@ module CweWarning : sig
 }
 end
 
+val turn_off_logging : unit -> unit
+
 val cwe_warning_factory : string -> string -> ?other:string list list -> ?addresses:string list -> ?symbols:string list -> string -> CweWarning.t
 val collect_cwe_warning : CweWarning.t -> unit
 
