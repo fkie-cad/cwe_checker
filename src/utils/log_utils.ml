@@ -21,6 +21,10 @@ end
 
 let cwe_warning_store = ref [||]
 
+let no_logging = ref false
+
+let turn_off_logging () = no_logging := true
+
 let cwe_warning_factory name version ?(other = []) ?(addresses = []) ?(symbols = []) description =
   {
     CweWarning.name = name;
@@ -53,8 +57,8 @@ let emit_cwe_warnings_native out_path =
   else
     Out_channel.write_lines out_path (Array.to_list output_lines)
 
-let debug message = print_endline ("DEBUG: " ^ message)
+let debug message = if !no_logging then () else print_endline ("DEBUG: " ^ message)
 
-let info message = print_endline ("INFO: " ^ message)
+let info message = if !no_logging then () else print_endline ("INFO: " ^ message)
 
-let error message = print_endline ("ERROR: " ^ message)
+let error message = if !no_logging then () else print_endline ("ERROR: " ^ message)
