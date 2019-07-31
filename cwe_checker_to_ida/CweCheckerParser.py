@@ -33,7 +33,8 @@ class CweWarning(object):
         self.address = [self.__fix_address(address) for address in addresses]
         self.highlight = True
 
-    def __fix_address(self, address):
+    @staticmethod
+    def __fix_address(address):
         return address.replace(':32u', '').replace(':64u', '')
 
 class Parser(object):
@@ -41,7 +42,8 @@ class Parser(object):
     def __init__(self, result_path):
         self._result_path = result_path
 
-    def _parse_cwe_warnings(self, j):
+    @staticmethod
+    def _parse_cwe_warnings(j):
         result = []
 
         if 'warnings' in j:
@@ -59,4 +61,3 @@ class Parser(object):
         with open(self._result_path) as fhandle:
             j = json.load(fhandle)
             return self._parse_cwe_warnings(j)
-            
