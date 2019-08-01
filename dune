@@ -4,3 +4,5 @@
     (src/config.json as config.json)
   )
 )
+
+(documentation)

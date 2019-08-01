@@ -47,7 +47,7 @@ def main():
     results = Parser(args.cwe_checker_result).parse()
     generated_script = IdaGenerator(results).generate()
     save_generated_script(args.anotation_script_output, generated_script)
-    print('Done. Now execute generated script %s with IDAPython (alt+F9).'
+    print('Done. Now execute generated script %s with IDAPython (Alt+F7).'
           % args.anotation_script_output)
 
 
