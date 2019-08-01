@@ -108,7 +108,9 @@ let main config module_versions partial_update check_path json_output file_outpu
             begin
               let prog = Project.program project in
               let tid_address_map = Address_translation.generate_tid_map prog in
-              Check_path.check_path prog project tid_address_map [] []
+              let check_path_sources = Json_utils.get_symbol_lists_from_json json "check_path" in
+              let check_path_sinks = [] in 
+              Check_path.check_path prog tid_address_map check_path_sources check_path_sinks
             end;
           if json_output then
             begin

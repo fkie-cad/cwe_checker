@@ -11,4 +11,4 @@ This module is loosely based on the BAP tutorial (https://github.com/BinaryAnaly
 val name : string
 val version : string
 
-val check_path : Bap.Std.program Bap.Std.term -> Bap.Std.project -> Bap.Std.word Bap.Std.Tid.Map.t -> string list -> Log_utils.CweWarning.t list -> unit
+val check_path : Bap.Std.program Bap.Std.term -> Bap.Std.word Bap.Std.Tid.Map.t -> string list -> Log_utils.CweWarning.t list -> unit
