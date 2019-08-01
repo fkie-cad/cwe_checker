@@ -12,3 +12,6 @@ val generate_tid_map :
 val translate_tid_to_assembler_address_string :
   Bap.Std.tid -> Bap.Std.word Bap.Std.Tid.Map.t -> string
 
+(** Collects all TIDs from a subfunction sub *)
+val collect_addresses_sub :
+  Bap.Std.sub Bap.Std.term -> Bap.Std.tid list 
