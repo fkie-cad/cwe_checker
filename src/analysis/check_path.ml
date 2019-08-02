@@ -18,8 +18,8 @@ let format_path get_source get_destination path tid_map =
   let formated_start_node = format_node (get_source (Path.start path)) in
   let formated_rest_nodes = List.map (Seq.to_list @@ Path.edges path) ~f:(fun e -> format_node (get_destination e)) in
   let formated_full_path = "(" ^ formated_start_node ^ ", " ^ (String.concat ~sep:", " formated_rest_nodes) ^ ")" in
-  formated_full_path 
-    
+  formated_full_path
+
 let find_subfunction_name program name =
   Term.enum sub_t program
   |> Seq.find_map ~f:(fun s -> Option.some_if (Sub.name s = name) (Term.tid s))
@@ -27,13 +27,21 @@ let find_subfunction_name program name =
 let get_addresses_from_cwe_hit (cwe_hit: Log_utils.CweWarning.t) =
   cwe_hit.addresses
 
+let collect_addresses_sub sub = 
+  Term.enum blk_t sub |> Seq.concat_map ~f:(fun b -> Seq.map (Blk.elts b) ~f:(fun e -> match e with
+                                                                            | `Def d -> Term.tid d
+                                                                            | `Jmp j -> Term.tid j
+                                                                            | `Phi p -> Term.tid p))
+
+(** At the moment we are only considering the first address of a hit. This is where the CWE starts
+ and this is where we wish to find a path to. *)
 let contains_sub_cwe_hit sub cwe_hit =
   match get_addresses_from_cwe_hit cwe_hit with
   | [] -> false
-  | hd :: tl -> begin
-      let addrs = Address_translation.collect_addresses_sub sub in
+  | hd :: _ -> begin
+      let addrs = collect_addresses_sub sub in
       let addr_tid = Tid.from_string_exn hd in
-      List.exists addrs ~f:(fun a -> a = addr_tid)
+      Seq.exists addrs ~f:(fun a -> a = addr_tid)
       end
 
 let find_subfunction_cwe_hit program cwe_hit =
@@ -53,8 +61,8 @@ let callsites cg target sub =
           | Call destination -> begin match Call.target destination with
             | Direct tid when reaches cg tid target -> Some (Term.tid blk)
             | _ -> None
-            end))
-  
+                                end))
+
 let verify source destination program : proof option =
   let cg = Program.to_graph program in
   match Graphlib.shortest_path (module CG) cg source destination with
@@ -68,6 +76,11 @@ let verify source destination program : proof option =
                 else Graphlib.shortest_path (module CFG) g sc dc))) |>
     Option.map ~f:(fun p -> Sites p)
 
+let cwe_hit_fst_addr_to_str cwe_hit =
+   match get_addresses_from_cwe_hit cwe_hit with
+  | [] -> ""
+  | hd :: _ -> hd
+
 let find_source_sink_pathes source destination program tid_map =
   match Option.both (find_subfunction_name program source) (find_subfunction_cwe_hit program destination) with
       | None -> () (*one or both functions are not utilized.*)
@@ -75,9 +88,9 @@ let find_source_sink_pathes source destination program tid_map =
         | None -> () (*No path between the two APIs found*)
         | Some p ->
           begin match p with
-          | Calls p -> Format.printf "(%s,%s);%s" source destination (format_path CG.Edge.src CG.Edge.dst p tid_map);
+          | Calls p -> Format.printf "(%s,%s);%s" source (cwe_hit_fst_addr_to_str destination) (format_path CG.Edge.src CG.Edge.dst p tid_map);
                        Format.print_newline ()
-          | Sites p -> Format.printf "(%s,%s);%s" source destination (format_path CFG.Edge.src CFG.Edge.dst p tid_map);
+          | Sites p -> Format.printf "(%s,%s);%s" source (cwe_hit_fst_addr_to_str destination) (format_path CFG.Edge.src CFG.Edge.dst p tid_map);
                        Format.print_newline ()
           end
 
