@@ -14,20 +14,22 @@ To use it, just run BAP with {i cwe_checker} as a pass:
 {[bap [BINARY_FILE] --pass=cwe_checker]}
 This runs all static analysis based checks.
 You can find more documentation on these checks at their {{: ../cwe_checker_core/Cwe_checker_core/index.html} module documentation pages}.
-The behaviour of these checks can be modified through a configuration file.
+The behaviour of these checks can be modified through an optional configuration file.
 Just edit the [src/config.json] file and then add [--cwe-checker-config=src/config.json] as a command line option.
 You can find more on the available command line options {{!section:CmdLineOptions} here}.
 
 The symbolic execution based checks can be run with the emulation recipe in the recipes folder.
 {[bap PATH_TO_BINARY --recipe=recipes/emulation]}
+Note that these checks are rather slow at the moment and should only be applied to small binaries.
 
 {2 How to use the docker image}
 
-The docker image can be installed with
+The docker image, which is based on the current master branch of the repository, can be installed with
 {[docker pull fkiecad/cwe_checker]}
 To use it, mount the target binary inside the docker container and call {i bap} with {i cwe_checker} as a pass as usual:
 {[docker run --rm -v [BINARY]:/tmp/input fkiecad/cwe_checker bap /tmp/input --pass=cwe-checker]}
 If you are using a customized [config.json] file, don't forget to mount it inside your container as well!
+If you want to print the output to a file with [--cwe-checker-out], you also need to mount the output file to the docker container, or else the file will be lost once the container gets destroyed.
 
 {1:CmdLineOptions Command line options}
 
@@ -59,7 +61,7 @@ Now open the binary file in IDA Pro and execute the generated [cwe_hits.py] scri
 
 {2 Step 1: Get acquainted with BAP}
 
-{i cwe_checker} uses the {{: https://github.com/BinaryAnalysisPlatform/bap} Binary Analysis Platform} as a backend and you should read its documentation.
+{i cwe_checker} interfaces via OCaml with the {{: https://github.com/BinaryAnalysisPlatform/bap} Binary Analysis Platform} as a backend and you should read its documentation.
 All information about a binary file is gathered through BAP.
 
 {2 Step 2: Write the check}
@@ -77,7 +79,19 @@ val version : string  (* The version of your check (e.g. "0.1"). *)
 
 val check_cwe : Bap.Std.program Bap.Std.term -> Bap.Std.project -> Bap.Std.word Bap.Std.Tid.Map.t -> string list list -> string list -> unit
 ]}
-The {i check_cwe} function has as parameters:
+A corresponding example [your_check.ml] file, which just prints a "hello world" message, would look like this:
+{[
+open Core_kernel
+open Bap.Std    (* To interface with BAP *)
+
+let name = "your_check"
+let version = "0.1"
+
+let check_cwe program project tid_map symbol_pairs parameters =
+  Log_utils.info "Hello world!"
+]}
+In practice you would use the parameters of {i check_cwe}-function to gather the necessary information for the computation of your check.
+These parameters are:
 - [program: Bap.Std.program Bap.Std.term] The program term of the binary
 - [project: Bap.Std.project] The BAP-project term of the binary
 - [Tid_map: Bap.Std.word Bap.Std.Tid.Map.t] A map from the Tids of basic blocks to concrete addresses in the binary file
