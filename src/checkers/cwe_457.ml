@@ -68,12 +68,13 @@ let log_cwe_warning sub i d tid_map =
    let other =[["word"; word]] in 
    let symbol = Sub.name sub in
    let address = Address_translation.translate_tid_to_assembler_address_string (Term.tid d) tid_map in
+   let tid = Address_translation.tid_to_string @@ Term.tid d in
    let description = sprintf
                        "(Use of Uninitialized Variable) Found potentially unitialized stack variable (FP + %s) in function %s at %s"
                        word
                        symbol
                        address in
-   let cwe_warning = cwe_warning_factory name version ~other:other ~addresses:[address] ~symbols:[symbol] description in
+   let cwe_warning = cwe_warning_factory name version ~other:other ~addresses:[address] ~tids:[tid] ~symbols:[symbol] description in
    collect_cwe_warning cwe_warning
 
 let check_subfunction _prog proj tid_map sub =

@@ -244,6 +244,7 @@ let print_hit tid ~sub ~function_names ~tid_map =
                                                     if fn_name = (Tid.name call_tid) then
                                                       begin
                                                       let address = Address_translation.translate_tid_to_assembler_address_string tid tid_map in
+                                                      let tids = [Address_translation.tid_to_string tid] in
                                                       let description = sprintf
                                                                           "(NULL Pointer Dereference) There is no check if the return value is NULL at %s (%s)."
                                                                           address
@@ -252,6 +253,7 @@ let print_hit tid ~sub ~function_names ~tid_map =
                                                                           name
                                                                           version
                                                                           ~addresses:[address]
+                                                                          ~tids:tids
                                                                           ~symbols:[fn_name]
                                                                           description in
                                                       collect_cwe_warning cwe_warning;
