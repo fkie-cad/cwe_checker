@@ -10,7 +10,8 @@ void simple_check_path(){
         void *m = malloc(myInt * 8);
 
         // free data
-        free(m);
+        if (m != NULL)
+                free(m);
 }
 
 int main(void)

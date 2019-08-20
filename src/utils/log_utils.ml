@@ -5,6 +5,7 @@ module CweWarning = struct
     name : string;
     version : string;
     addresses: string list;
+    tids: string list;
     symbols: string list;
     other : string list list;
     description : string;
@@ -21,17 +22,20 @@ end
 
 let cwe_warning_store = ref [||]
 
-let cwe_warning_factory name version ?(other = []) ?(addresses = []) ?(symbols = []) description =
+let cwe_warning_factory name version ?(other = []) ?(addresses = []) ?(tids = []) ?(symbols = []) description =
   {
     CweWarning.name = name;
     CweWarning.version = version;
     CweWarning.description = description;
     CweWarning.other = other;
     CweWarning.addresses = addresses;
+    CweWarning.tids = tids;
     CweWarning.symbols = symbols;
   }
 
 let collect_cwe_warning warning = cwe_warning_store := Array.append !cwe_warning_store [|warning|]
+
+let get_cwe_warnings () = Array.to_list !cwe_warning_store
 
 let emit_cwe_warnings_json target_path out_path =
   let cwe_warning_result = {

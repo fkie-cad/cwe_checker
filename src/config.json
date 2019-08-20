@@ -187,7 +187,7 @@
     "symbols": [
       "recv",
       "fgets",
-      "scanf",
+      "scanf"
     ]
-  },
+  }
 }

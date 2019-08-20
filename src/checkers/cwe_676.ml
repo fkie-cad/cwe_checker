@@ -26,6 +26,7 @@ let print_calls calls ~tid_map =
                                   | (a, b, c) ->
                                      begin
                                        let address = Address_translation.translate_tid_to_assembler_address_string b tid_map in
+                                       let tid = Address_translation.tid_to_string b in
                                        let other = [["dangerous_function"; c]] in
                                        let description = sprintf
                                                            "(Use of Potentially Dangerous Function) %s (%s) -> %s."
@@ -37,6 +38,7 @@ let print_calls calls ~tid_map =
                                                            version
                                                            ~other:other
                                                            ~addresses:[address]
+                                                           ~tids:[tid]
                                                            ~symbols:[a]
                                                            description in
                                        collect_cwe_warning cwe_warning
