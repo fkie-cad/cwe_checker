@@ -14,4 +14,7 @@ let generate_tid_map prog =
       | Some addr -> Map.add_exn addrs ~key:(Term.tid t) ~data:addr
   end)#run prog Tid.Map.empty
 
+(* This is a fix up because there is a bug before Bap 2.x.x. to_string does not
+ * return a parseable string (e.g. with Bap.Std.Tid.from_string_exn). See BAP gitter
+ * and conversation with ivg from 2019-08-20. *)
  let tid_to_string tid = "%" ^ Bap.Std.Tid.to_string tid 
