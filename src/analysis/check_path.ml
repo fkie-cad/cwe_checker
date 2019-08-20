@@ -64,7 +64,6 @@ let callsites cg target sub =
                                 end))
 
 let verify source destination program : proof option =
-  printf "HERE verify\n";
   let cg = Program.to_graph program in
   match Graphlib.shortest_path (module CG) cg source destination with
   | Some path -> Some (Calls path)
@@ -80,7 +79,7 @@ let verify source destination program : proof option =
 let get_fst_tid_from_cwe_hit (cwe_hit: Log_utils.CweWarning.t) =
   match cwe_hit.tids with
   | [] -> None
-  | hd :: _ -> printf "HD: %s\n" hd; Some (Bap.Std.Tid.from_string_exn hd)
+  | hd :: _ -> Some (Bap.Std.Tid.from_string_exn hd)
 
 let cwe_hit_fst_addr_to_str cwe_hit =
    match get_tids_from_cwe_hit cwe_hit with
@@ -88,14 +87,9 @@ let cwe_hit_fst_addr_to_str cwe_hit =
   | hd :: _ -> hd
 
 let find_source_sink_pathes source destination program tid_map =
-  let a = find_subfunction_name program source in
-  match a with
-  | None -> (* printf "NOT FOUND: %s\n" source *) ()
-  | Some _ -> printf "FOUND IT: %s\n" source
-  ;
   match Option.both (find_subfunction_name program source) (get_fst_tid_from_cwe_hit destination) with
       | None -> () (*one or both functions are not utilized.*)
-      | Some (source_tid, destination_tid) -> printf "HUNTING for path from %s to %s\n" (Bap.Std.Tid.to_string source_tid) (Bap.Std.Tid.to_string destination_tid); match verify source_tid destination_tid program with
+      | Some (source_tid, destination_tid) -> printf "HUNTING for path from callsites of %s to %s\n" source (Bap.Std.Tid.to_string destination_tid); match verify source_tid destination_tid program with
         | None -> () (*No path between the two APIs found*)
         | Some p ->
           begin match p with
