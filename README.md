@@ -30,7 +30,7 @@ Its main focus are ELF binaries that are commonly found on Linux and Unix operat
 -   [CWE-782](https://cwe.mitre.org/data/definitions/782.html): Exposed IOCTL with Insufficient Access Control
 -   [CWE-787](https://cwe.mitre.org/data/definitions/787.html): Out-of-bounds Write (via emulation)
 
-Please note that some of the above analyses only are partially implemented at the moment. Furthermore, false positives are to be expected due to shortcuts and the nature of static analysis as well as over-approximation.
+Please note that some of the above analyses only are partially implemented at the moment. Furthermore, false positives are to be expected due to shortcuts and the nature of static analysis as well as over-approximation. For more information about the individual checks you can look at the [online documentation](https://fkie-cad.github.io/cwe_checker/doc/html/cwe_checker/index.html).
 
 *cwe_checker* comes with a script called `cwe_checker_to_ida`, which parses the output of *cwe_checker* and generates a IDAPython script. This script annotates the found CWEs in IDA Pro, which helps during manual analysis of a binary. The colors represent the  severeness of the found issues (yellow, orange, or red). The following screenshot shows some results:
 
@@ -70,27 +70,20 @@ The usage is straight forward: adjust the `config.json` (if needed) and call BAP
 ``` bash
 bap PATH_TO_BINARY --pass=cwe-checker --cwe-checker-config=src/config.json
 ```
-The emulation checks can be run with the emulation recipe in the recipes folder.
-``` bash
-bap PATH_TO_BINARY --recipe=recipes/emulation
-```
-For other common use cases you can find some recipes in the recipes folder. These can be run with
-``` bash
-bap PATH_TO_BINARY --recipe=recipes/RECIPE_FOLDER_NAME
-```
-*cwe_checker* outputs to stdout. This output is parsable (sexep). There is a script `cwe_checker_to_ida` to visualize the results in IDA Pro.
+For further information see the [online documentation](https://fkie-cad.github.io/cwe_checker/doc/html/cwe_checker/index.html). You can also build the documentation locally via `make documentation` and then browse it in the *doc/html/* folder.
+
 ## How to extend cwe_checker? ##
-New plugins should be added to src/checkers. Implement a .ml and .mli file. See the existing modules for an interface description. If necessary add a section to `config.json` to allow users to configure your plugin. Finally, add your plugin to `plugins/cwe_checker/cwe_checker.ml`.
+You can find some information about how to write your own check [here](https://fkie-cad.github.io/cwe_checker/doc/html/cwe_checker/index.html#HackingHowto)
 
 If you plan to open a PR, please utilize [precommit](https://pre-commit.com) in your development environment to catch many issues before the code review.
 ### Contribute ###
 Contributions are always welcome. Just fork it and open a pull request!
 ## How does cwe_checker work internally? ##
-Documentation can be built via `make documentation` and the found in *doc/html/*. But the most accurate documentation is still the source code. We provide some more information in *doc/*, including the slides of conference presentations on cwe_checker. These should be of special interest for those who would like to get a quick/initial overview of its internals. 
+See the [online documentation](https://fkie-cad.github.io/cwe_checker/doc/html/cwe_checker/index.html) or build it locally via `make documentation` and then browse it in the *doc/html/* folder. But the most accurate documentation is still the source code. We also provide some slides of conference presentations on cwe_checker in *doc*. These should be of special interest for those who would like to get a quick/initial overview of its internals.
 
 We presented cwe_checker at the following conferences so far:
-- [Pass The SALT 2019](https://2019.pass-the-salt.org/talks/74.html) ([slides](doc/slides/cwe_checker_pts19.pdf))
-- [Black Hat USA 2019](https://www.blackhat.com/us-19/arsenal/schedule/index.html#cwe_checker-hunting-binary-code-vulnerabilities-across-cpu-architectures-16782)
+-   [Pass The SALT 2019](https://2019.pass-the-salt.org/talks/74.html) ([slides](doc/slides/cwe_checker_pts19.pdf))
+-   [Black Hat USA 2019](https://www.blackhat.com/us-19/arsenal/schedule/index.html#cwe_checker-hunting-binary-code-vulnerabilities-across-cpu-architectures-16782) ([slides](doc/slides/cwe_checker_BlackHatUSA2019.pdf))
 
 ## Acknowledgements ##
 This project is partly financed by [German Federal Office for Information Security (BSI)](https://www.bsi.bund.de).
