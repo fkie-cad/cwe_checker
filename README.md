@@ -82,8 +82,8 @@ Contributions are always welcome. Just fork it and open a pull request!
 See the [online documentation](https://fkie-cad.github.io/cwe_checker/doc/html/cwe_checker/index.html) or build it locally via `make documentation` and then browse it in the *doc/html/* folder. But the most accurate documentation is still the source code. We also provide some slides of conference presentations on cwe_checker in *doc*. These should be of special interest for those who would like to get a quick/initial overview of its internals.
 
 We presented cwe_checker at the following conferences so far:
-- [Pass The SALT 2019](https://2019.pass-the-salt.org/talks/74.html) ([slides](doc/slides/cwe_checker_pts19.pdf))
-- [Black Hat USA 2019](https://www.blackhat.com/us-19/arsenal/schedule/index.html#cwe_checker-hunting-binary-code-vulnerabilities-across-cpu-architectures-16782) ([slides](doc/slides/cwe_checker_BlackHatUSA2019.pdf))
+-   [Pass The SALT 2019](https://2019.pass-the-salt.org/talks/74.html) ([slides](doc/slides/cwe_checker_pts19.pdf))
+-   [Black Hat USA 2019](https://www.blackhat.com/us-19/arsenal/schedule/index.html#cwe_checker-hunting-binary-code-vulnerabilities-across-cpu-architectures-16782) ([slides](doc/slides/cwe_checker_BlackHatUSA2019.pdf))
 
 ## Acknowledgements ##
 This project is partly financed by [German Federal Office for Information Security (BSI)](https://www.bsi.bund.de).
