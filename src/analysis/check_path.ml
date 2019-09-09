@@ -17,11 +17,15 @@ let contains_substring search target =
     String.substr_index ~pattern:search target <> None
 
 let format_path get_source get_destination path tid_map =
-  let format_node n = sprintf "%s" (Address_translation.translate_tid_to_assembler_address_string n tid_map) in
-  let formated_start_node = format_node (get_source (Path.start path)) in
-  let formated_rest_nodes = List.map (Seq.to_list @@ Path.edges path) ~f:(fun e -> format_node (get_destination e)) in
-  let formated_full_path = "(" ^ formated_start_node ^ ", " ^ (String.concat ~sep:", " formated_rest_nodes) ^ ")" in
-  formated_full_path
+  let e_count = List.length (Seq.to_list (Path.edges path)) in
+  if e_count = 0 then "()" else
+    begin
+      let format_node n = sprintf "%s" (Address_translation.translate_tid_to_assembler_address_string n tid_map) in
+      let formated_start_node = format_node (get_source (Path.start path)) in
+      let formated_rest_nodes = List.map (Seq.to_list @@ Path.edges path) ~f:(fun e -> format_node (get_destination e)) in
+      let formated_full_path = "(" ^ formated_start_node ^ ", " ^ (String.concat ~sep:", " formated_rest_nodes) ^ ")" in
+      formated_full_path
+    end
 
 let find_subfunction_name program name =
   Term.enum sub_t program
@@ -63,10 +67,10 @@ let get_fst_tid_from_cwe_hit (cwe_hit: Log_utils.CweWarning.t) =
   | [] -> None
   | hd :: _ -> Some (Bap.Std.Tid.from_string_exn hd)
 
-let cwe_hit_fst_addr_to_str cwe_hit =
+let cwe_hit_fst_addr cwe_hit =
    match get_tids_from_cwe_hit cwe_hit with
-  | [] -> ""
-  | hd :: _ -> hd
+  | [] -> Bap.Std.Tid.from_string_exn "0x00"
+  | hd :: _ -> Bap.Std.Tid.from_string_exn hd
 
 let block_has_callsite blk t =
   Term.enum jmp_t blk |>
@@ -91,33 +95,32 @@ let collect_callsites program t =
 
 let sub_has_tid sub tid =
   Term.enum blk_t sub
-  |> Seq.exists ~f:(fun blk -> Blk.elts blk
+  |> Seq.exists ~f:(fun blk -> Term.tid blk = tid || Blk.elts blk
                                |> Seq.exists ~f:(fun e -> match e with
                                                           | `Def d -> Term.tid d = tid
                                                           | `Jmp j -> Term.tid j = tid
                                                           | `Phi p -> Term.tid p = tid ))
 
-(* FIXME: I break a lot *)
 let find_sub_tid_of_term_tid program tid =
   match tid with
   | Some t -> let s = Term.enum sub_t program
-                      |> Seq.find_exn ~f:(fun s -> sub_has_tid s t) in
-              Some (Term.tid s)
+                      |> Seq.find ~f:(fun s -> sub_has_tid s t) in
+              begin
+                match s with
+                | Some f -> Some (Term.tid f)
+                | None -> printf "Could not find sub for term tid %s\n" (Tid.to_string t); None
+              end
   | None -> None
 
 
 let verify_one program tid_map source destination source_tid destination_tid =
-  printf "HUNTING for path from callsites of %s (%s) to %s\n" source (Bap.Std.Tid.to_string source_tid) (Bap.Std.Tid.to_string destination_tid);
   match verify source_tid destination_tid program with
            | None -> () 
            | Some p ->
               begin match p with
-              | Calls p -> Format.printf "(%s,%s);%s" source (cwe_hit_fst_addr_to_str destination) (format_path CG.Edge.src CG.Edge.dst p tid_map);
-                           Format.print_newline ()
-              | Sites p -> Format.printf "(%s,%s);%s" source (cwe_hit_fst_addr_to_str destination) (format_path CFG.Edge.src CFG.Edge.dst p tid_map);
-                           Format.print_newline ()
+              | Calls p -> printf "Found path from %s to %s: %s\n" source (Address_translation.translate_tid_to_assembler_address_string (cwe_hit_fst_addr destination) tid_map) (format_path CG.Edge.src CG.Edge.dst p tid_map);
+              | Sites p -> Format.printf "Found path from %s to %s: %s\n" source (Address_translation.translate_tid_to_assembler_address_string (cwe_hit_fst_addr destination) tid_map) (format_path CFG.Edge.src CFG.Edge.dst p tid_map);
               end
-
 
 let find_source_sink_pathes source destination program tid_map =
   match Option.both (find_subfunction_name program source) (find_sub_tid_of_term_tid program (get_fst_tid_from_cwe_hit destination)) with
@@ -131,4 +134,5 @@ let find_source_sink_pathes source destination program tid_map =
 
 let check_path prog tid_map input_functions cwe_hits =
   List.iter input_functions ~f:(fun f ->
+      Log_utils.debug ("Checking for input function: " ^ f);
       List.iter cwe_hits ~f:(fun h -> find_source_sink_pathes f h prog tid_map))

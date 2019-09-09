@@ -12,15 +12,23 @@ module CweWarning = struct
   } [@@deriving yojson]
 end
 
+module CheckPath = struct
+  type t = {
+      name : string;
+    } [@@deriving yojson]
+end
+
 module CweWarningResult = struct
   type t = {
       binary : string;
       time : float;
       warnings : CweWarning.t list;
+      check_path : CheckPath.t list;
     } [@@deriving yojson]
 end
 
 let cwe_warning_store = ref [||]
+let check_path_store = ref [||]
 
 let no_logging = ref false
 
@@ -39,13 +47,16 @@ let cwe_warning_factory name version ?(other = []) ?(addresses = []) ?(tids = []
 
 let collect_cwe_warning warning = cwe_warning_store := Array.append !cwe_warning_store [|warning|]
 
+let collect_check_path path = check_path_store := Array.append !check_path_store [|path|]
+
 let get_cwe_warnings () = Array.to_list !cwe_warning_store
 
 let emit_cwe_warnings_json target_path out_path =
   let cwe_warning_result = {
       CweWarningResult.binary = target_path;
       CweWarningResult.time = Unix.time ();
-      CweWarningResult.warnings = Array.to_list !cwe_warning_store
+      CweWarningResult.warnings = Array.to_list !cwe_warning_store;
+      CweWarningResult.check_path = Array.to_list !check_path_store
     } in
   let output = Yojson.Safe.pretty_to_string (CweWarningResult.to_yojson cwe_warning_result) in
   if out_path = "" then
