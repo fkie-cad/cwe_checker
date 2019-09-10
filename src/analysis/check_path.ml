@@ -130,7 +130,6 @@ let verify_one program tid_map source destination source_tid destination_tid =
   match verify source_tid destination_tid program with
            | None -> () 
            | Some p -> log_path p source source_tid destination tid_map
-              
 
 let find_source_sink_pathes source destination program tid_map =
   match Option.both (find_subfunction_name program source) (find_sub_tid_of_term_tid program (get_fst_tid_from_cwe_hit destination)) with

@@ -39,6 +39,7 @@ let no_logging = ref false
 
 let turn_off_logging () = no_logging := true
 
+
 let cwe_warning_factory name version ?(other = []) ?(addresses = []) ?(tids = []) ?(symbols = []) description =
   {
     CweWarning.name = name;

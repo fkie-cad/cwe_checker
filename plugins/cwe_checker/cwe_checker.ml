@@ -74,6 +74,7 @@ let full_run project config =
     List.iter known_modules ~f:(fun cwe -> execute_cwe_module cwe json program project tid_address_map)
   end
 
+
 let main config module_versions partial_update check_path json_output file_output no_logging project =
   if no_logging then
     begin
@@ -130,10 +131,12 @@ module Cmdline = struct
   let module_versions = flag "module-versions" ~doc:"Prints out the version numbers of all known modules."
   let json_output = flag "json" ~doc:"Outputs the result as JSON."
   let file_output = param string "out" ~doc:"Path to output file."
+<<<<<<< HEAD
   let no_logging = flag "no-logging" ~doc:"Outputs no logging (info, error, warning). This does not pollute STDOUT when output json to it."
-  let partial_update = param string "partial" ~doc:"Comma separated list of modules to apply on binary, e.g. 'CWE332,CWE476,CWE782'"
   let check_path = flag "check-path" ~doc:"Checks if there is a path from an input function to a CWE hit."
+  let partial_update = param string "partial" ~doc:"Comma separated list of modules to apply on binary, e.g. 'CWE332,CWE476,CWE782'"
   let () = when_ready (fun ({get=(!!)}) -> Project.register_pass' ~deps:["callsites"] (main !!config !!module_versions !!partial_update !!check_path !!json_output !!file_output !!no_logging))
+>>>>>>> 1dae3f0ed19107c7a026f8ffbbea5b6e69767d28
   let () = manpage [
                           `S "DESCRIPTION";
                           `P "This plugin checks various CWEs such as Insufficient Entropy in PRNG (CWE-332) or Use of Potentially Dangerous Function (CWE-676)"
