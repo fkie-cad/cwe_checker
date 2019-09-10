@@ -234,22 +234,21 @@ let type_info_tag = Value.Tag.register (module TypeInfo)
 
 (** returns a list with all nested expressions. If expr1 is contained in expr2, then
     expr1 will be included after expr2 in the list. *)
-let rec nested_exp_list exp : Exp.t list =
-  let nested_exp = match exp with
-    | Bil.Load(exp1, exp2, _, _) -> exp :: (nested_exp_list exp1) @ (nested_exp_list exp2)
-    | Bil.Store(exp1, exp2, exp3, _, _) -> nested_exp_list exp1 @ nested_exp_list exp2 @ nested_exp_list exp3
-    | Bil.BinOp(_op, exp1, exp2) -> nested_exp_list exp1 @ nested_exp_list exp2
-    | Bil.UnOp(_op, exp1) -> nested_exp_list exp1
-    | Bil.Var(_) -> []
-    | Bil.Int(_) -> []
-    | Bil.Cast(_, _, exp1) -> nested_exp_list exp1
-    | Bil.Let(_, exp1, exp2) -> nested_exp_list exp1 @ nested_exp_list exp2
-    | Bil.Unknown(_) -> []
-    | Bil.Ite(exp1, exp2, exp3) -> nested_exp_list exp1 @ nested_exp_list exp2 @ nested_exp_list exp3
-    | Bil.Extract(_, _, exp1) -> nested_exp_list exp1
-    | Bil.Concat(exp1, exp2) -> nested_exp_list exp1 @ nested_exp_list exp2 in
-  exp :: nested_exp
-
+let nested_exp_list exp : Exp.t list =
+  let rec nested_exp_list exp acc = exp :: match exp with
+    | Bil.Load(exp1, exp2, _, _) -> nested_exp_list exp1 @@ nested_exp_list exp2 acc
+    | Bil.Store(exp1, exp2, exp3, _, _) -> nested_exp_list exp1 @@ nested_exp_list exp2 @@ nested_exp_list exp3 acc
+    | Bil.BinOp(_op, exp1, exp2) -> nested_exp_list exp1 @@ nested_exp_list exp2 acc
+    | Bil.UnOp(_op, exp1) -> nested_exp_list exp1 acc
+    | Bil.Var(_) -> acc
+    | Bil.Int(_) -> acc
+    | Bil.Cast(_, _, exp1) -> nested_exp_list exp1 acc
+    | Bil.Let(_, exp1, exp2) -> nested_exp_list exp1 @@ nested_exp_list exp2 acc
+    | Bil.Unknown(_) -> acc
+    | Bil.Ite(exp1, exp2, exp3) -> nested_exp_list exp1 @@ nested_exp_list exp2 @@ nested_exp_list exp3 acc
+    | Bil.Extract(_, _, exp1) -> nested_exp_list exp1 acc
+    | Bil.Concat(exp1, exp2) -> nested_exp_list exp1 @@ nested_exp_list exp2 acc in
+  nested_exp_list exp []
 
 (** If exp is a load from the stack, return the corresponding element. If it may be
     a load from the stack, but could also be a load from some other memory region,
