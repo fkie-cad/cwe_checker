@@ -8,7 +8,7 @@ class IdaGenerator(object):
     def generate(self):
         script = "import sark\nimport idaapi\n"
         for res in self._results:
-            if isinstance(res) == CweWarning:
+            if isinstance(res, CweWarning):
                 if res.highlight and res.address:
                     first_address = res.address[0]
                     script += "sark.Line(%s).color = %s\n" % (first_address, res.color)
