@@ -34,9 +34,9 @@ cpp_linkers =   {'x86': './dockcross-linux-x86 g++ -m32'}
 
 def which(pgm):
     # check dockcross installation
-    if pgm.startswith('.') and os.path.isfile(pgm):
+    if pgm.startswith('.') and os.path.isfile(pgm.split()[0]):
         return pgm
-    elif pgm.startswith('.') and not (os.path.isfile(pgm)):
+    elif pgm.startswith('.') and not (os.path.isfile(pgm.split()[0])):
         return None
 
     # check compilers on path
