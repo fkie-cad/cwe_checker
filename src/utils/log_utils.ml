@@ -14,11 +14,16 @@ end
 
 module CheckPath = struct
   type t = {
-      name : string;
+      source : string;
+      destination : string;
+      source_addr : string;
+      destination_addr : string;
+      path : string list;
+      path_str : string;
     } [@@deriving yojson]
 end
 
-module CweWarningResult = struct
+module CweCheckerResult = struct
   type t = {
       binary : string;
       time : float;
@@ -45,32 +50,45 @@ let cwe_warning_factory name version ?(other = []) ?(addresses = []) ?(tids = []
     CweWarning.symbols = symbols;
   }
 
+let check_path_factory ?(path = []) ?(path_str = "") source source_addr destination destination_addr  =
+  {
+    CheckPath.source = source;
+    CheckPath.source_addr = source_addr;
+    CheckPath.destination = destination;
+    CheckPath.destination_addr = destination_addr;
+    CheckPath.path = path;
+    CheckPath.path_str = path_str;
+  }
+
 let collect_cwe_warning warning = cwe_warning_store := Array.append !cwe_warning_store [|warning|]
 
 let collect_check_path path = check_path_store := Array.append !check_path_store [|path|]
 
 let get_cwe_warnings () = Array.to_list !cwe_warning_store
 
-let emit_cwe_warnings_json target_path out_path =
+let emit_json target_path out_path =
   let cwe_warning_result = {
-      CweWarningResult.binary = target_path;
-      CweWarningResult.time = Unix.time ();
-      CweWarningResult.warnings = Array.to_list !cwe_warning_store;
-      CweWarningResult.check_path = Array.to_list !check_path_store
+      CweCheckerResult.binary = target_path;
+      CweCheckerResult.time = Unix.time ();
+      CweCheckerResult.warnings = Array.to_list !cwe_warning_store;
+      CweCheckerResult.check_path = Array.to_list !check_path_store
     } in
-  let output = Yojson.Safe.pretty_to_string (CweWarningResult.to_yojson cwe_warning_result) in
+  let output = Yojson.Safe.pretty_to_string (CweCheckerResult.to_yojson cwe_warning_result) in
   if out_path = "" then
     print_endline output
   else
     Out_channel.write_all out_path ~data:output
 
-let emit_cwe_warnings_native out_path =
-  let output_lines = Array.map !cwe_warning_store ~f:(fun (cwe_warning:CweWarning.t) ->
-      sprintf "[%s] (%s) %s" cwe_warning.name cwe_warning.version cwe_warning.description) in
+let emit_native out_path =
+  let output_check_path = Array.map !check_path_store ~f:(fun (check_path:CheckPath.t) ->
+                              sprintf "[CheckPath] %s(%s) -> %s via %s" check_path.source check_path.source_addr check_path.destination_addr check_path.path_str) in
+  let output_warnings = Array.map !cwe_warning_store ~f:(fun (cwe_warning:CweWarning.t) ->
+                            sprintf "[%s] (%s) %s" cwe_warning.name cwe_warning.version cwe_warning.description) in
+  let output_lines = (Array.to_list output_warnings) @ (Array.to_list output_check_path) in
   if out_path = "" then
-    Array.iter output_lines ~f:print_endline
+    List.iter output_lines ~f:print_endline
   else
-    Out_channel.write_lines out_path (Array.to_list output_lines)
+    Out_channel.write_lines out_path output_lines
 
 let debug message = if !no_logging then () else print_endline ("DEBUG: " ^ message)
 

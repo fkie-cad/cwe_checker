@@ -140,11 +140,11 @@ let main json_output file_output proj =
   if json_output then
     begin
       match Project.get proj filename with
-      | Some fname -> Log_utils.emit_cwe_warnings_json fname file_output
-      | None -> Log_utils.emit_cwe_warnings_json "" file_output
+      | Some fname -> Log_utils.emit_json fname file_output
+      | None -> Log_utils.emit_json "" file_output
     end
   else
-    Log_utils.emit_cwe_warnings_native file_output
+    Log_utils.emit_native file_output
 
 module Cmdline = struct
   open Config

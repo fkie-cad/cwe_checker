@@ -16,25 +16,37 @@
 
 module CweWarning : sig
   type t = {
-  name : string;
-  version : string;
-  addresses: string list;
-  tids: string list;
-  symbols: string list;
-  other : string list list;
-  description : string;
-}
+      name : string;
+      version : string;
+      addresses: string list;
+      tids: string list;
+      symbols: string list;
+      other : string list list;
+      description : string;
+    }
+end
+
+module CheckPath : sig
+  type t = {
+      source : string;
+      destination : string;
+      source_addr : string;
+      destination_addr : string;
+      path : string list;
+      path_str : string;
+    }
 end
 
 val turn_off_logging : unit -> unit
 
 val cwe_warning_factory : string -> string -> ?other:string list list -> ?addresses:string list -> ?tids:string list -> ?symbols:string list -> string -> CweWarning.t
+val check_path_factory : ?path:string list -> ?path_str:string -> string -> string -> string -> string -> CheckPath.t
 val collect_cwe_warning : CweWarning.t -> unit
-val get_cwe_warnings : unit -> CweWarning.t list
 val collect_check_path : CheckPath.t -> unit
+val get_cwe_warnings : unit -> CweWarning.t list
 
-val emit_cwe_warnings_json : string -> string -> unit
-val emit_cwe_warnings_native : string -> unit
+val emit_json : string -> string -> unit
+val emit_native : string -> unit
 
 val debug : string -> unit
 val error : string -> unit

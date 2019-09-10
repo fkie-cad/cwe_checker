@@ -116,11 +116,11 @@ let main config module_versions partial_update check_path json_output file_outpu
           if json_output then
             begin
               match Project.get project filename with
-              | Some fname -> Log_utils.emit_cwe_warnings_json fname file_output
-              | None -> Log_utils.emit_cwe_warnings_json "" file_output
+              | Some fname -> Log_utils.emit_json fname file_output
+              | None -> Log_utils.emit_json "" file_output
             end
           else
-            Log_utils.emit_cwe_warnings_native file_output
+            Log_utils.emit_native file_output
         end
     end
 

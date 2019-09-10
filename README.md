@@ -70,6 +70,10 @@ The usage is straight forward: adjust the `config.json` (if needed) and call BAP
 ``` bash
 bap PATH_TO_BINARY --pass=cwe-checker --cwe-checker-config=src/config.json
 ```
+If you wish to search for paths between interesting input functions (e.g. scanf or recv) and a cwe hit then you can use the option `--cwe-checker-check-path`.
+``` bash
+bap PATH_TO_BINARY --pass=cwe-checker --cwe-checker-check-path
+```
 The emulation checks can be run with the emulation recipe in the recipes folder.
 ``` bash
 bap PATH_TO_BINARY --recipe=recipes/emulation
