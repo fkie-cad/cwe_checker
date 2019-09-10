@@ -84,14 +84,9 @@ let block_has_callsite blk t =
 
 let collect_callsites program t =
   Term.enum sub_t program
-  |> Seq.map ~f:(fun s -> if Term.enum blk_t s |>
+  |> Seq.filter_map ~f:(fun s -> if Term.enum blk_t s |>
                                Seq.exists ~f:(fun b -> block_has_callsite b t) then Some s else None)
-  |> Seq.filter ~f:(fun s -> match s with
-                             | None -> false
-                             | _ -> true)
-  |> Seq.map ~f:(fun s -> match s with
-                          | Some s -> Term.tid s
-                          | _ -> failwith "[checkpath] this should not happen.")
+  |> Seq.map ~f:(fun s -> Term.tid s)
 
 let sub_has_tid sub tid =
   Term.enum blk_t sub

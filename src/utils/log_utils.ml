@@ -32,8 +32,8 @@ module CweCheckerResult = struct
     } [@@deriving yojson]
 end
 
-let cwe_warning_store = ref [||]
-let check_path_store = ref [||]
+let cwe_warning_store = ref []
+let check_path_store = ref []
 
 let no_logging = ref false
 
@@ -61,18 +61,18 @@ let check_path_factory ?(path = []) ?(path_str = "") source source_addr destinat
     CheckPath.path_str = path_str;
   }
 
-let collect_cwe_warning warning = cwe_warning_store := Array.append !cwe_warning_store [|warning|]
+let collect_cwe_warning warning = cwe_warning_store := !cwe_warning_store @ [warning]
 
-let collect_check_path path = check_path_store := Array.append !check_path_store [|path|]
+let collect_check_path path = check_path_store := !check_path_store @ [path]
 
-let get_cwe_warnings () = Array.to_list !cwe_warning_store
+let get_cwe_warnings () = !cwe_warning_store
 
 let emit_json target_path out_path =
   let cwe_warning_result = {
       CweCheckerResult.binary = target_path;
       CweCheckerResult.time = Unix.time ();
-      CweCheckerResult.warnings = Array.to_list !cwe_warning_store;
-      CweCheckerResult.check_path = Array.to_list !check_path_store
+      CweCheckerResult.warnings = !cwe_warning_store;
+      CweCheckerResult.check_path = !check_path_store
     } in
   let output = Yojson.Safe.pretty_to_string (CweCheckerResult.to_yojson cwe_warning_result) in
   if out_path = "" then
@@ -81,11 +81,11 @@ let emit_json target_path out_path =
     Out_channel.write_all out_path ~data:output
 
 let emit_native out_path =
-  let output_check_path = Array.map !check_path_store ~f:(fun (check_path:CheckPath.t) ->
+  let output_check_path = List.map !check_path_store ~f:(fun (check_path:CheckPath.t) ->
                               sprintf "[CheckPath] %s(%s) -> %s via %s" check_path.source check_path.source_addr check_path.destination_addr check_path.path_str) in
-  let output_warnings = Array.map !cwe_warning_store ~f:(fun (cwe_warning:CweWarning.t) ->
+  let output_warnings = List.map !cwe_warning_store ~f:(fun (cwe_warning:CweWarning.t) ->
                             sprintf "[%s] (%s) %s" cwe_warning.name cwe_warning.version cwe_warning.description) in
-  let output_lines = (Array.to_list output_warnings) @ (Array.to_list output_check_path) in
+  let output_lines = output_warnings @ output_check_path in
   if out_path = "" then
     List.iter output_lines ~f:print_endline
   else
