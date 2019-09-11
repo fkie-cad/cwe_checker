@@ -35,6 +35,8 @@ If you want to print the output to a file with [--cwe-checker-out], you also nee
 
 All command line options have to be prefixed with [--cwe-checker] (so that BAP knows to forward them to the {i cwe_checker} plugin).
 The available command line options are:
+- [-check-path] Find paths between input functions (configurable in the configuration file) and CWE hits.
+Should be used together with the [-partial] command line option if you are only interested in paths to specific CWEs.
 - [-config=[FILE]] Use [[FILE]] as the configuration file.
 If you omit this option, {i cwe_checker} uses a standard configuration file located at [src/config.json].
 - [-module-versions] Prints the version numbers of each check.
