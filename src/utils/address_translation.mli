@@ -12,3 +12,5 @@ val generate_tid_map :
 val translate_tid_to_assembler_address_string :
   Bap.Std.tid -> Bap.Std.word Bap.Std.Tid.Map.t -> string
 
+val tid_to_string :
+  Bap.Std.tid -> string

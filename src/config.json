@@ -181,5 +181,13 @@
   },
   "CWE782": {
     "symbols": []
+  },
+  "check_path": {
+    "_comment": "functions that take direct user input",
+    "symbols": [
+      "recv",
+      "fgets",
+      "scanf"
+    ]
   }
 }

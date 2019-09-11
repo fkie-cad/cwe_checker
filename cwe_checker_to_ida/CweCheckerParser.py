@@ -22,6 +22,20 @@ colors = {'CWE190': YELLOW,
           'CWE787': RED,
           }
 
+class CheckPath(object):
+
+    def __init__(self, source, source_addr, destination, destination_addr, path_str):
+        self.source = source
+        self.source_addr = self.__fix_address(source_addr)
+        self.destination = self.__fix_address(destination)
+        self.destination_addr = self.__fix_address(destination_addr)
+        self.path_str = self.__fix_address(path_str)
+        self.color = None
+        self.highlight = False
+
+    @staticmethod
+    def __fix_address(address):
+        return address.replace(':32u', '').replace(':64u', '')
 
 class CweWarning(object):
 
@@ -57,7 +71,20 @@ class Parser(object):
 
         return result
 
+    @staticmethod
+    def _parse_check_path(j):
+        result = []
+
+        if 'check_path' in j:
+            for p in j['check_path']:
+                check_path = CheckPath(p['source'], p['source_addr'], p['destination'], p['destination_addr'], p['path_str'])
+                result.append(check_path)
+
+        return result
+
     def parse(self):
         with open(self._result_path) as fhandle:
             j = json.load(fhandle)
-            return self._parse_cwe_warnings(j)
+            warnings = self._parse_cwe_warnings(j)
+            check_path = self._parse_check_path(j)
+            return warnings + check_path
