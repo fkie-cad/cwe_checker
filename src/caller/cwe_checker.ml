@@ -14,35 +14,27 @@ let rec get_config (input : string list): string option =
   match input with
   | [] -> None
   | head::tail ->
-    let index =
-        match (String.substr_index head ~pattern:"-config=") with
-        | Some 0 -> 0
-        | _ -> 1
-    in
-    if index = 0 then (
-      Some head
-    ) else (
-      get_config tail
-    )
+    match (String.substr_index head ~pattern:"-config=") with
+    | Some 0 -> Some head
+    | _ -> get_config tail
 
 
-let config_check_failed : bool =
-  let config = get_config get_user_flags in
+let config_check_failed (input : string list) : bool =
+  let config = get_config input in
 
   match config with
-  | None -> false
+  | None -> true
   | Some c ->
     let file = Stdlib.List.nth (String.split c ~on:'=') 1 in
 
     if (String.substr_index file ~pattern:".json") = None then (
       Printf.printf "File format of %s has to be json.\n" file;
-      false
+      true
     ) else if not (Sys.file_exists file) then (
       Printf.printf "%s is not a valid path.\n" file;
-      false
-    ) else (
       true
-    )
+    ) else false
+
 
 
 (* #############################################################################
@@ -62,8 +54,8 @@ let config_check_failed : bool =
    prefix the flags with --cwe-checker- and return a
    concatenated string
 *)
-let setup_flags : string =
-  let flags = List.map ~f:(fun pre -> "--cwe-checker" ^ pre) get_user_flags in
+let setup_flags (flags : string list) : string =
+  let flags = List.map ~f:(fun pre -> "--cwe-checker" ^ pre) flags in
   String.concat ~sep:" " flags
 
 
@@ -75,11 +67,9 @@ let rec compare_element_wise (user_input : string list) (valid_flags: string lis
   match user_input with
   | [] -> []
   | head::tail ->
-    if (Stdlib.List.mem head valid_flags) then (
-      compare_element_wise tail valid_flags
-    ) else (
-      List.append (compare_element_wise tail valid_flags) [head]
-    )
+    match (Stdlib.List.mem head valid_flags) with
+    | true -> compare_element_wise tail valid_flags
+    | false -> List.append (compare_element_wise tail valid_flags) [head]
 
 
 (* Get valid flags from a json file *)
@@ -90,17 +80,16 @@ let get_from_json : string list =
 
 
 (* Check if binary path is provided and if all flags are valid *)
-let user_input_valid : bool =
+let user_input_valid (input : string list) : bool =
   let valid_flags = get_from_json in
-  let user_input = Array.to_list Sys.argv in
-  let input_len = List.length user_input in
+  let input_len = List.length input in
 
   match input_len with
   | 1 -> print_endline "No binary path provided"; false
   | 2 -> true
   | _ ->
+    let invalid_flags = compare_element_wise input valid_flags in
 
-    let invalid_flags = compare_element_wise get_user_flags valid_flags in
     match invalid_flags with
     | [] -> true
     | _  ->
@@ -109,14 +98,18 @@ let user_input_valid : bool =
 
 
 let main () : int =
-  if config_check_failed then print_endline "Using standard configuration...";
+  let flags = get_user_flags in
 
-  match user_input_valid with
+  let split_flags = List.partition_tf flags
+      ~f:(fun x -> (String.is_prefix x ~prefix:"-config") || (String.is_prefix x ~prefix:"-out") || (String.is_prefix x ~prefix:"-partial")) in
+
+  if config_check_failed (fst split_flags) then print_endline "Using standard configuration...";
+
+  match (user_input_valid (snd split_flags)) with
   | false -> 1
   | true ->
     let path_to_binary = Sys.argv.(1) in
-    let command = "bap " ^ path_to_binary ^ " --pass=cwe-checker " ^ setup_flags in
-    Sys.command command
+    Sys.command ("bap " ^ path_to_binary ^ " --pass=cwe-checker " ^ setup_flags flags)
 
 
 let _ = main ()
