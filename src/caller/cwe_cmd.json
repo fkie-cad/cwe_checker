@@ -1,3 +1,0 @@
-{
-  "flags": ["-config", "-module-versions", "-json", "-no-logging", "-out", "-partial"]
-}
