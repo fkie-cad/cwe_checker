@@ -11,8 +11,49 @@ let known_modules = ["CWE190"; "CWE215"; "CWE243"; "CWE248"; "CWE332";
                      "CWE560"; "CWE676"; "CWE782"]
 
 
+let rec get_difference (set_a : 'a list) (set_b: 'a list) : 'a list =
+  match set_a with
+  | [] -> []
+  | element_of_a::remain_a ->
+    match (Stdlib.List.mem element_of_a set_b) with
+    | true  -> get_difference remain_a set_b
+    | false -> List.append (get_difference remain_a set_b) [element_of_a]
+
+
+let get_user_input ?(position=1) (() : unit) : string list =
+  Array.to_list (Array.sub Sys.argv ~pos:position ~len:(Array.length Sys.argv - position))
+
+
+let rec find_prefix (input : string list) (prefix : string) : string option =
+  match input with
+  | []         -> None
+  | head::tail ->
+    match (String.is_prefix head ~prefix:prefix) with
+    | true  -> Some head
+    | false -> find_prefix tail prefix
+
+
+let rec replace_element (set : string list) (element : string) (replacement : string) : string list =
+  match set with
+  | []         -> []
+  | head::tail ->
+    match String.is_prefix ~prefix:element head with
+    | true  -> replacement::tail
+    | false -> head::replace_element tail element replacement
+
+
+let rec replace_element (set : string list) (element : string) (replacement : string) : string list =
+  match set with
+  | []         -> []
+  | head::tail ->
+    match String.is_prefix ~prefix:element head with
+    | true  -> replacement::tail
+    | false -> head::replace_element tail element replacement
+
+
+
 let config_check (input : string list) : bool =
-  match Helper_functions.find_prefix input "-config" with
+  match find_prefix input "-config" with
   | None   -> print_endline "Using standard configuration..."; true
   | Some c ->
     match Stdlib.List.nth_opt (String.split c ~on:'=') 1 with
@@ -25,14 +66,6 @@ let generate_output_file (path : string) ?(file="/out-" ^ string_of_float (Unix.
   "-out=" ^ path ^ file
 
 
-let check_suffix (path : string) : string =
-match (String.is_suffix path ~suffix:".json" || String.is_suffix path ~suffix:".txt") with
-| false ->
-  Printf.printf "File: %s  is not a valid out file.\nData is written to new file.\n" path;
-  generate_output_file (fst (String.rsplit2_exn path ~on:'/')) ()
-| true -> generate_output_file path ~file:"" ()
-
-
 let build_path (path : string) : string =
   match String.is_suffix path ~suffix:"/" with
   | true  -> generate_output_file path ~file:("out-" ^ string_of_float (Unix.time ())) ()
@@ -42,7 +75,7 @@ let build_path (path : string) : string =
 let out_path (path : string) : string =
   try
     match Sys.is_directory path with
-    | false -> check_suffix path
+    | false -> generate_output_file path ~file:"" ()
     | true  -> build_path path
   with
   | _ -> raise (InvalidPathException "No valid path/file for output provided.")
@@ -50,7 +83,8 @@ let out_path (path : string) : string =
 
 let out_check (input : string) : string =
   try
-    out_path (Stdlib.List.nth (String.split input ~on:'=') 1)
+    let output_file = Stdlib.List.nth (String.split input ~on:'=') 1 in
+    out_path output_file
   with
   | _ -> raise (NoOutputFileException "No output file provided. If -out flag is set please provide an out file.")
 
@@ -60,31 +94,30 @@ let setup_flags (flags : string list) : string =
 
 
 let partial_check (input : string list) : bool =
-  match Helper_functions.find_prefix input "-partial" with
+  match find_prefix input "-partial" with
   | None   -> true
   | Some p ->
     match Stdlib.List.nth_opt (String.split p ~on:'=') 1 with
     | None | Some "" ->  raise (NoModulesException "No modules provided. If -partial flag is set please provide the corresponding modules.")
     | Some modules  ->
       let modules = String.split_on_chars modules ~on:[','] in
-      if Helper_functions.get_difference modules known_modules <> [] then (
+      if get_difference modules known_modules <> [] then (
         let print_modules = String.concat (List.map ~f:(fun x -> x ^ " ") known_modules) in
         raise (InvalidModulesException ("Invalid CWE Modules. Known Modules: " ^ print_modules))
       )
       else true
 
 
-(* Get valid flags from a json file *)
 let get_from_json (path : string): string list =
  let json = Yojson.Basic.from_file path in
  let open Yojson.Basic.Util in
  json |> member "flags" |> to_list |> filter_string
 
 
-(* Check if binary path is provided and if all flags are valid *)
 let user_input_valid (input : string list) : bool =
-  let valid_flags = get_from_json "/home/melvin/Dokumente/Developer/OCaml_Projects/quickstart/bin/cwe_cmd.json" in
-  let invalid_flags = Helper_functions.get_difference input valid_flags in
+  (* let valid_flags = get_from_json "" in *)
+  let valid_flags = ["-config"; "-module-versions"; "-json"; "-no-logging"; "-out"; "-partial"]
+  let invalid_flags = get_difference input valid_flags in
 
   match invalid_flags with
   | [] -> true
@@ -92,7 +125,7 @@ let user_input_valid (input : string list) : bool =
 
 
 let process_flags : string list option =
-  match Helper_functions.get_user_input ~position:2 () with
+  match get_user_input ~position:2 () with
   | [] -> Some []
   | flags  ->
     let split_flags = List.partition_tf flags
@@ -101,10 +134,10 @@ let process_flags : string list option =
     match fst split_flags with
     | [] -> if user_input_valid (snd split_flags) then Some (snd split_flags) else None
     | flags -> (
-      match Helper_functions.find_prefix (flags) "-out" with
+      match find_prefix (flags) "-out" with
       | None -> if partial_check flags && config_check flags then Some flags else None
       | Some o -> (
-        let new_flags = Helper_functions.replace_element (flags) "-out" (out_check o) in
+        let new_flags = replace_element (flags) "-out" (out_check o) in
         if partial_check flags && config_check flags then Some ((snd (split_flags)) @ new_flags) else None
       )
     )
