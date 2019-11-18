@@ -13,9 +13,6 @@ val config_check : string list -> bool
 (** generates the output file path for the -out flag *)
 val generate_output_file : string -> ?file:string -> unit -> string
 
-(** If a valid file for the output is given, it checks wether it ends on .json or .txt *)
-val check_suffix : string -> string
-
 (** builds a valid path for the output *)
 val build_path : string -> string
 

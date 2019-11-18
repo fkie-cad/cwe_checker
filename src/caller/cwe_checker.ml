@@ -42,16 +42,6 @@ let rec replace_element (set : string list) (element : string) (replacement : st
     | false -> head::replace_element tail element replacement
 
 
-let rec replace_element (set : string list) (element : string) (replacement : string) : string list =
-  match set with
-  | []         -> []
-  | head::tail ->
-    match String.is_prefix ~prefix:element head with
-    | true  -> replacement::tail
-    | false -> head::replace_element tail element replacement
-
-
-
 let config_check (input : string list) : bool =
   match find_prefix input "-config" with
   | None   -> print_endline "Using standard configuration..."; true
@@ -116,7 +106,7 @@ let get_from_json (path : string): string list =
 
 let user_input_valid (input : string list) : bool =
   (* let valid_flags = get_from_json "" in *)
-  let valid_flags = ["-config"; "-module-versions"; "-json"; "-no-logging"; "-out"; "-partial"]
+  let valid_flags = ["-config"; "-module-versions"; "-json"; "-no-logging"; "-out"; "-partial"] in
   let invalid_flags = get_difference input valid_flags in
 
   match invalid_flags with
