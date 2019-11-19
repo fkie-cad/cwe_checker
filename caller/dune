@@ -1,0 +1,7 @@
+(executable
+  (name cwe_checker)
+  (public_name cwe_checker)
+  (libraries
+    cwe_checker_core
+    core_kernel)
+)
