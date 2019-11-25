@@ -8,6 +8,7 @@ dev
 -   Added file output support via --out (PR #30)
 -   Surpress logging of info, error and warning to STDOUT via --no-logging (PR #32)
 -   Added check-path feature via --check-path that searches paths between interesting input functions and cwe hits (PR #31)
+-   Added a plugin for integration into Ghidra (PR #42)
 
 0.2 (2019-06-25)
 =====
