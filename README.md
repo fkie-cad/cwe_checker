@@ -32,7 +32,7 @@ Its main focus are ELF binaries that are commonly found on Linux and Unix operat
 
 Please note that some of the above analyses only are partially implemented at the moment. Furthermore, false positives are to be expected due to shortcuts and the nature of static analysis as well as over-approximation. For more information about the individual checks you can look at the [online documentation](https://fkie-cad.github.io/cwe_checker/doc/html/cwe_checker/index.html).
 
-*cwe_checker* comes with a script called `cwe_checker_to_ida`, which parses the output of *cwe_checker* and generates a IDAPython script. This script annotates the found CWEs in IDA Pro, which helps during manual analysis of a binary. The colors represent the  severeness of the found issues (yellow, orange, or red). The following screenshot shows some results:
+*cwe_checker* comes with scripts for IDA Pro and Ghidra, which parse the output of *cwe_checker* and annotate the found CWEs in the disassembler for easier manual analysis. See the [online documentation](https://fkie-cad.github.io/cwe_checker/doc/html/cwe_checker/index.html#ToolIntegration) for their usage. The IDA Pro plugin also uses colors to represent the  severeness of the found issues (yellow, orange, or red). The following screenshot shows some results:
 
 <p align="center">
     <img src="doc/images/example_ida_anotation.png" alt="IDA Pro anotation" width="50%" height="50%"/>
@@ -44,7 +44,7 @@ The following arguments should convince you to give *cwe_checker* a try:
 -  it analyzes ELF binaries of several CPU architectures including x86, ARM, MIPS, and PPC
 -  it is extensible due to its plugin-based architecture
 -  it is configureable, e.g. apply analyses to new APIs
--  view results annotated in IDA Pro
+-  view results annotated in IDA Pro and Ghidra
 -  *cwe_checker* can be integrated as a plugin into [FACT](https://github.com/fkie-cad/FACT_core)
 ## How to install cwe_checker? ##
 There are several ways to install cwe_checker. The recommended way is to get cwe_checker from the Ocaml package manager Opam. You can install cwe_checker via the package [cwe_checker](https://opam.ocaml.org/packages/cwe_checker/) (`opam install cwe_checker`). This gives you a stable version of cwe_checker.
