@@ -32,7 +32,7 @@ Its main focus are ELF binaries that are commonly found on Linux and Unix operat
 
 Please note that some of the above analyses only are partially implemented at the moment. Furthermore, false positives are to be expected due to shortcuts and the nature of static analysis as well as over-approximation. For more information about the individual checks you can look at the [online documentation](https://fkie-cad.github.io/cwe_checker/doc/html/cwe_checker/index.html).
 
-*cwe_checker* comes with a script called `cwe_checker_to_ida`, which parses the output of *cwe_checker* and generates a IDAPython script. This script annotates the found CWEs in IDA Pro, which helps during manual analysis of a binary. The colors represent the  severeness of the found issues (yellow, orange, or red). The following screenshot shows some results:
+*cwe_checker* comes with scripts for IDA Pro and Ghidra, which parse the output of *cwe_checker* and annotate the found CWEs in the disassembler for easier manual analysis. See the [online documentation](https://fkie-cad.github.io/cwe_checker/doc/html/cwe_checker/index.html#ToolIntegration) for their usage. The IDA Pro plugin also uses colors to represent the  severeness of the found issues (yellow, orange, or red). The following screenshot shows some results:
 
 <p align="center">
     <img src="doc/images/example_ida_anotation.png" alt="IDA Pro anotation" width="50%" height="50%"/>
