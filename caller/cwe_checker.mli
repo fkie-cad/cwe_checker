@@ -5,7 +5,7 @@ exception InvalidModulesException of string
 exception NoConfigException of string
 
 (** A list of known CWE modules *)
-val known_modules : string list
+val get_known_modules : string list
 
 (** checks the validity of the -config flag *)
 val config_check : string list -> bool
@@ -33,6 +33,18 @@ val get_from_json : string -> string list
 
 (** checks if valid flags are given *)
 val user_input_valid : string list -> bool
+
+(** gets the first element of the (flag, desc) tuple *)
+val get_flag : string * string -> string
+
+(** gets the second element of the (flag, desc) tuple *)
+val get_desc : string * string -> string
+
+(** prints the help message *)
+val help : unit -> unit
+
+(** calls the help function and removes the help flag from the input if help flag is set *)
+val check_for_help : string list -> string list
 
 (** wrapper for entire flag processing *)
 val process_flags : string list option

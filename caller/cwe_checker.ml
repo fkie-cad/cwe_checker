@@ -6,9 +6,9 @@ exception NoModulesException of string
 exception InvalidModulesException of string
 exception NoConfigException of string
 
-let known_modules = ["CWE190"; "CWE215"; "CWE243"; "CWE248"; "CWE332";
-                     "CWE367"; "CWE426"; "CWE457"; "CWE467"; "CWE476";
-                     "CWE560"; "CWE676"; "CWE782"]
+
+let get_known_modules : string list =
+  List.map ~f:(fun x -> x.name) Cwe_checker_core.Main.known_modules
 
 
 let rec get_difference (set_a : 'a list) (set_b: 'a list) : 'a list =
@@ -40,6 +40,15 @@ let rec replace_element (set : string list) (element : string) (replacement : st
     match String.is_prefix ~prefix:element head with
     | true  -> replacement::tail
     | false -> head::replace_element tail element replacement
+
+
+let rec remove_string (flags : string list) (element: string): string list =
+  match flags with
+  | [] -> []
+  | head::tail ->
+      match String.is_prefix ~prefix:element head with
+      | true -> tail
+      | false -> head::remove_string tail element
 
 
 let config_check (input : string list) : bool =
@@ -91,22 +100,15 @@ let partial_check (input : string list) : bool =
     | None | Some "" ->  raise (NoModulesException "No modules provided. If -partial flag is set please provide the corresponding modules.")
     | Some modules  ->
       let modules = String.split_on_chars modules ~on:[','] in
-      if get_difference modules known_modules <> [] then (
-        let print_modules = String.concat (List.map ~f:(fun x -> x ^ " ") known_modules) in
+      if get_difference modules get_known_modules <> [] then (
+        let print_modules = String.concat (List.map ~f:(fun x -> x ^ " ") get_known_modules) in
         raise (InvalidModulesException ("Invalid CWE Modules. Known Modules: " ^ print_modules))
       )
       else true
 
 
-let get_from_json (path : string): string list =
- let json = Yojson.Basic.from_file path in
- let open Yojson.Basic.Util in
- json |> member "flags" |> to_list |> filter_string
-
-
 let user_input_valid (input : string list) : bool =
-  (* let valid_flags = get_from_json "" in *)
-  let valid_flags = ["-config"; "-module-versions"; "-json"; "-no-logging"; "-out"; "-partial"] in
+  let valid_flags = Cwe_checker_core.Main.cmdline_flags in
   let invalid_flags = get_difference input valid_flags in
 
   match invalid_flags with
@@ -114,31 +116,52 @@ let user_input_valid (input : string list) : bool =
   | _  -> List.iter ~f:(fun x -> Printf.printf "Invalid flag: %s\n" x) invalid_flags; false
 
 
+let get_flag (a, b) : string = a
+let get_desc (a, b) : string = b
+
+
+let help ((): unit) : unit =
+  let flags = Cwe_checker_core.Main.cmdline_flags in
+  let params = Cwe_checker_core.Main.cmdline_params in
+  Printf.printf("Help:\n\nThe CWE checker is called using the following command structure:\n\n
+  cwe_checker path/to/binary -[FLAG] -[PARAM] ...\n\nThe following flags and parameters are available:\n\nFLAGS:\n\n");
+  List.iter ~f:(fun x -> Printf.printf "    -%s: %s\n" (get_flag x) (get_desc x)) flags;
+  Printf.printf("\nPARAMETERS:\n\n");
+  List.iter ~f:(fun x -> Printf.printf "    -%s: %s\n" (get_flag x) (get_desc x)) params
+
+
+let check_for_help (flags: string list) : string list =
+  if List.mem "-help" flags then (
+    help ();
+    remove_string flags "-help"
+  ) else flags
+
+
 let process_flags : string list option =
   match get_user_input ~position:2 () with
   | [] -> Some []
   | flags  ->
-    let split_flags = List.partition_tf flags
-        ~f:(fun x -> (String.is_prefix x ~prefix:"-config") || (String.is_prefix x ~prefix:"-out") || (String.is_prefix x ~prefix:"-partial")) in
+    let split_flags = List.partition_tf flags ~f:(fun x -> (String.is_prefix x ~prefix:"-config") || (String.is_prefix x ~prefix:"-out") || (String.is_prefix x ~prefix:"-partial")) in
+    let flags = check_for_help (snd split_flags) in
 
     match fst split_flags with
-    | [] -> if user_input_valid (snd split_flags) then Some (snd split_flags) else None
-    | flags -> (
-      match find_prefix (flags) "-out" with
-      | None -> if partial_check flags && config_check flags then Some flags else None
+    | [] -> if user_input_valid flags then Some flags else None
+    | params -> (
+      match find_prefix (params) "-out" with
+      | None -> if partial_check params && config_check params then Some params else None
       | Some o -> (
-        let new_flags = replace_element (flags) "-out" (out_check o) in
-        if partial_check flags && config_check flags then Some ((snd (split_flags)) @ new_flags) else None
+        let new_flags = replace_element (params) "-out" (out_check o) in
+        if partial_check params && config_check params then Some (flags @ new_flags) else None
       )
     )
 
 
 let main () : int =
   match Array.length Sys.argv with
-  | 1 -> Sys.command ("bap " ^ Sys.argv.(1) ^ " --pass=cwe-checker ")
+  | 1 -> help (); Sys.command ("bap " ^ Sys.argv.(1) ^ " --pass=cwe-checker ")
   | _ ->
     match process_flags with
-    | None -> 1
+    | None -> help (); 1
     | Some [] -> Sys.command ("bap " ^ Sys.argv.(1) ^ " --pass=cwe-checker ")
     | Some flags -> Sys.command ("bap " ^ Sys.argv.(1) ^ " --pass=cwe-checker " ^ setup_flags flags)
 
