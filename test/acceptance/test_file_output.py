@@ -7,7 +7,7 @@ class TestFileOutput(unittest.TestCase):
 
     def setUp(self):
         self.res_file = '/tmp/res.json'
-        self.cmd = 'bap test/artificial_samples/build/cwe_190_x64.out --pass=cwe-checker --cwe-checker-config=src/config.json --cwe-checker-json --cwe-checker-out=%s' % self.res_file
+        self.cmd = 'bap test/artificial_samples/build/cwe_190_x64_gcc.out --pass=cwe-checker --cwe-checker-config=src/config.json --cwe-checker-json --cwe-checker-out=%s' % self.res_file
 
     def test_can_output_file(self):
         if 'travis' in os.environ['USER']:
