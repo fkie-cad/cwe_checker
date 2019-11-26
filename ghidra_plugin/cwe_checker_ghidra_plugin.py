@@ -28,11 +28,11 @@ def comment_cwe_eol(ghidra_address, text):
 
 
 def comment_cwe_pre(ghidra_address, text):
-    old_comment = getPREComment(ghidra_address)
+    old_comment = getPreComment(ghidra_address)
     if old_comment is None:
-        setPREComment(ghidra_address, text)
+        setPreComment(ghidra_address, text)
     elif text not in old_comment:
-        setPREComment(ghidra_address, old_comment + '\n' + text)
+        setPreComment(ghidra_address, old_comment + '\n' + text)
 
 
 def get_cwe_checker_output():
@@ -43,8 +43,14 @@ def get_cwe_checker_output():
 
 def compute_ghidra_address(address_string):
     fixed_address_string = address_string.replace(':32u', '').replace(':64u', '')
-    address = int(fixed_address_string, 16)
-    return currentProgram.minAddress.add(address)
+    address_int = int(fixed_address_string, 16)
+    # Ghidra sometimes adds an offset to all addresses.
+    # Unfortunately, I havent't found a way to reliably detect this yet.
+    # Instead we detect the obvious case and hope that it works in most cases.
+    if address_int < currentProgram.getMinAddress().getOffset():
+        return currentProgram.getMinAddress().add(address_int)
+    else:
+        return currentProgram.getAddressFactory().getAddress(fixed_address_string)
 
 
 def main():
@@ -57,7 +63,7 @@ def main():
     for warning in warnings:
         if len(warning['addresses']) == 0:
             cwe_text =  '[' + warning['name'] + '] ' + warning['description']
-            ghidra_address = currentProgram.minAddress.add(0)
+            ghidra_address = currentProgram.getMinAddress().add(0)
             bookmark_cwe(ghidra_address, cwe_text)
             comment_cwe_pre(ghidra_address, cwe_text)
         else:
