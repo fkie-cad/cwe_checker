@@ -9,9 +9,9 @@ let version = "0.1"
 let print_uncatched_exception block_tid ~tid_map =
   let address = (Address_translation.translate_tid_to_assembler_address_string block_tid tid_map) in
   let description = sprintf "(Possibly Uncaught Exception) (Exception thrown at %s)." address in
-  let cwe_warning = cwe_warning_factory name version description in
+  let cwe_warning = cwe_warning_factory name version description ~addresses:[address] in
   collect_cwe_warning cwe_warning
-                    
+
 (* Extract the name of a direct call, if the block contains a direct call. *)
 let extract_direct_call_symbol block =
   match Symbol_utils.extract_direct_call_tid_from_block block with
