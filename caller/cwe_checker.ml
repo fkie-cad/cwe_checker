@@ -107,7 +107,8 @@ let partial_check (input : string list) : bool =
       else true
 
 
-let get_first ((a, _) : (string * string)) : string = a
+let get_first ((a, _) : ('a * 'a)) : 'a = a
+let get_second ((_, b) : ('a * 'a)) : 'a = b
 
 
 let user_input_valid (input : string list) : bool =
@@ -119,18 +120,14 @@ let user_input_valid (input : string list) : bool =
   | _  -> List.iter ~f:(fun x -> Printf.printf "Invalid flag: %s\n" x) invalid_flags; false
 
 
-let get_flag (a, _) : string = a
-let get_desc (_, b) : string = b
-
-
 let help ((): unit) : unit =
   let flags = Cwe_checker_core.Main.cmdline_flags in
   let params = Cwe_checker_core.Main.cmdline_params in
   Printf.printf("Help:\n\nThe CWE checker is called using the following command structure:\n\n
   cwe_checker path/to/binary -[FLAG] -[PARAM] ...\n\nThe following flags and parameters are available:\n\nFLAGS:\n\n");
-  List.iter ~f:(fun x -> Printf.printf "    -%s: %s\n" (get_flag x) (get_desc x)) flags;
+  List.iter ~f:(fun x -> Printf.printf "    -%s: %s\n" (get_first x) (get_second x)) flags;
   Printf.printf("\nPARAMETERS:\n\n");
-  List.iter ~f:(fun x -> Printf.printf "    -%s: %s\n" (get_flag x) (get_desc x)) params
+  List.iter ~f:(fun x -> Printf.printf "    -%s: %s\n" (get_first x) (get_second x)) params
 
 
 let check_for_help (flags: string list) : string list =

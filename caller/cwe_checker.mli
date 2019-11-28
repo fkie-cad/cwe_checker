@@ -28,17 +28,14 @@ val setup_flags : string list -> string
 (** checks if modules are given and if they are valid *)
 val partial_check : string list -> bool
 
-(* gets first element of string tuple *)
-val get_first : (string * string) -> string
+(* gets first element of tuple *)
+val get_first : ('a * 'a) -> 'a
+
+(* gets second element of tuple *)
+val get_second : ('a * 'a) -> 'a
 
 (** checks if valid flags are given *)
 val user_input_valid : string list -> bool
-
-(** gets the first element of the (flag, desc) tuple *)
-val get_flag : string * string -> string
-
-(** gets the second element of the (flag, desc) tuple *)
-val get_desc : string * string -> string
 
 (** prints the help message *)
 val help : unit -> unit
