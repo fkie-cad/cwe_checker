@@ -107,8 +107,11 @@ let partial_check (input : string list) : bool =
       else true
 
 
+let get_first ((a, _) : (string * string)) : string = a
+
+
 let user_input_valid (input : string list) : bool =
-  let valid_flags = Cwe_checker_core.Main.cmdline_flags in
+  let valid_flags = List.map ~f:(fun x -> get_first x) Cwe_checker_core.Main.cmdline_flags in
   let invalid_flags = get_difference input valid_flags in
 
   match invalid_flags with
@@ -116,8 +119,8 @@ let user_input_valid (input : string list) : bool =
   | _  -> List.iter ~f:(fun x -> Printf.printf "Invalid flag: %s\n" x) invalid_flags; false
 
 
-let get_flag (a, b) : string = a
-let get_desc (a, b) : string = b
+let get_flag (a, _) : string = a
+let get_desc (_, b) : string = b
 
 
 let help ((): unit) : unit =
@@ -131,7 +134,7 @@ let help ((): unit) : unit =
 
 
 let check_for_help (flags: string list) : string list =
-  if List.mem "-help" flags then (
+  if (Stdlib.List.mem "-help" flags) then (
     help ();
     remove_string flags "-help"
   ) else flags

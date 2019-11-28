@@ -28,8 +28,8 @@ val setup_flags : string list -> string
 (** checks if modules are given and if they are valid *)
 val partial_check : string list -> bool
 
-(** returns a list of valid flags from a json file *)
-val get_from_json : string -> string list
+(* gets first element of string tuple *)
+val get_first : (string * string) -> string
 
 (** checks if valid flags are given *)
 val user_input_valid : string list -> bool
