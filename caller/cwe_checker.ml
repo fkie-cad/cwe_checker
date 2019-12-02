@@ -5,6 +5,15 @@ exception NoOutputFileException of string
 exception NoModulesException of string
 exception InvalidModulesException of string
 exception NoConfigException of string
+exception InvalidFlagException of string
+exception NoArgumentsException of string
+exception NoBinaryPathException of string
+
+
+let get_first ((a, _) : ('a * 'b)) : 'a = a
+
+
+let get_second ((_, b) : ('a * 'b)) : 'b = b
 
 
 let get_known_modules : string list =
@@ -42,22 +51,22 @@ let rec replace_element (set : string list) (element : string) (replacement : st
     | false -> head::replace_element tail element replacement
 
 
-let rec remove_string (flags : string list) (element: string): string list =
+let rec remove_element (flags : string list) (element: string): string list =
   match flags with
   | [] -> []
   | head::tail ->
       match String.is_prefix ~prefix:element head with
       | true -> tail
-      | false -> head::remove_string tail element
+      | false -> head::remove_element tail element
 
 
-let config_check (input : string list) : bool =
+let check_config (input : string list) : unit =
   match find_prefix input "-config" with
-  | None   -> print_endline "Using standard configuration..."; true
+  | None   -> print_endline "Using standard configuration..."
   | Some c ->
     match Stdlib.List.nth_opt (String.split c ~on:'=') 1 with
     | None | Some ""-> raise (NoConfigException "No config file provided. If -config flag set please provide a config file.")
-    | Some f  -> if (Sys.file_exists f) then true else raise (InvalidPathException "Path to config file not valid")
+    | Some f  -> if (Sys.file_exists f) then () else raise (InvalidPathException "Path to config file not valid")
 
 
 let generate_output_file (path : string) ?(file="/out-" ^ string_of_float (Unix.time ())) ((): unit) : string =
@@ -71,53 +80,50 @@ let build_path (path : string) : string =
   | false -> generate_output_file path ()
 
 
-let out_path (path : string) : string =
+let extract_output_path (param : string) : string =
+  try
+    match Stdlib.List.nth (String.split param ~on:'=') 1 with
+    | ""   -> raise (NoOutputFileException "No output file provided. If -out flag is set please provide an out file.")
+    | out  -> out
+  with
+  | _ -> raise (NoOutputFileException "No output file provided. If -out flag is set please provide an out file.")
+
+
+let output_check (input : string) : string =
+  let path = extract_output_path input in
   try
     match Sys.is_directory path with
-    | false -> generate_output_file path ~file:"" ()
+    | false -> "-out=" ^ path
     | true  -> build_path path
   with
   | _ -> raise (InvalidPathException "No valid path/file for output provided.")
-
-
-let out_check (input : string) : string =
-  try
-    let output_file = Stdlib.List.nth (String.split input ~on:'=') 1 in
-    out_path output_file
-  with
-  | _ -> raise (NoOutputFileException "No output file provided. If -out flag is set please provide an out file.")
 
 
 let setup_flags (flags : string list) : string =
   String.concat ~sep:" " (List.map ~f:(fun pre -> "--cwe-checker" ^ pre) flags)
 
 
-let partial_check (input : string list) : bool =
+let check_modules (modules : string list) : unit =
+  match get_difference modules get_known_modules with
+  | [] -> ()
+  | _  -> raise (InvalidModulesException ("Invalid CWE Modules. Known Modules: " ^ (String.concat (List.map ~f:(fun x -> x ^ " ") get_known_modules))))
+
+
+let check_partial (input : string list) : unit =
   match find_prefix input "-partial" with
-  | None   -> true
+  | None   -> ()
   | Some p ->
     match Stdlib.List.nth_opt (String.split p ~on:'=') 1 with
     | None | Some "" ->  raise (NoModulesException "No modules provided. If -partial flag is set please provide the corresponding modules.")
-    | Some modules  ->
-      let modules = String.split_on_chars modules ~on:[','] in
-      if get_difference modules get_known_modules <> [] then (
-        let print_modules = String.concat (List.map ~f:(fun x -> x ^ " ") get_known_modules) in
-        raise (InvalidModulesException ("Invalid CWE Modules. Known Modules: " ^ print_modules))
-      )
-      else true
+    | Some modules   -> check_modules (String.split_on_chars modules ~on:[','])
 
 
-let get_first ((a, _) : ('a * 'a)) : 'a = a
-let get_second ((_, b) : ('a * 'a)) : 'a = b
+let validate_user_input (input : string list) : unit =
+  let valid_flags = List.map ~f:(fun x -> "-" ^ get_first x) Cwe_checker_core.Main.cmdline_flags in
 
-
-let user_input_valid (input : string list) : bool =
-  let valid_flags = List.map ~f:(fun x -> get_first x) Cwe_checker_core.Main.cmdline_flags in
-  let invalid_flags = get_difference input valid_flags in
-
-  match invalid_flags with
-  | [] -> true
-  | _  -> List.iter ~f:(fun x -> Printf.printf "Invalid flag: %s\n" x) invalid_flags; false
+  match get_difference input valid_flags with
+  | []       -> ()
+  | invalid  -> raise (InvalidFlagException ("Invalid flags: " ^ String.concat ~sep:", " invalid))
 
 
 let help ((): unit) : unit =
@@ -130,40 +136,68 @@ let help ((): unit) : unit =
   List.iter ~f:(fun x -> Printf.printf "    -%s: %s\n" (get_first x) (get_second x)) params
 
 
-let check_for_help (flags: string list) : string list =
-  if (Stdlib.List.mem "-help" flags) then (
-    help ();
-    remove_string flags "-help"
-  ) else flags
+let check_for_help (flags: string list) : bool =
+  if (Stdlib.List.mem "-h" flags) then (
+    help (); true
+  ) else if (Stdlib.List.mem "--help" flags) then (
+    help(); true
+  ) else false
 
 
-let process_flags : string list option =
-  match get_user_input ~position:2 () with
-  | [] -> Some []
-  | flags  ->
-    let split_flags = List.partition_tf flags ~f:(fun x -> (String.is_prefix x ~prefix:"-config") || (String.is_prefix x ~prefix:"-out") || (String.is_prefix x ~prefix:"-partial")) in
-    let flags = check_for_help (snd split_flags) in
+let process_flags (flags : string list) : string list =
+  match flags with
+  | [] -> []
+  | _  -> validate_user_input flags; flags
 
-    match fst split_flags with
-    | [] -> if user_input_valid flags then Some flags else None
-    | params -> (
-      match find_prefix (params) "-out" with
-      | None -> if partial_check params && config_check params then Some params else None
-      | Some o -> (
-        let new_flags = replace_element (params) "-out" (out_check o) in
-        if partial_check params && config_check params then Some (flags @ new_flags) else None
-      )
+
+let process_params (params : string list) : string list =
+  match params with
+  | [] -> []
+  | _  -> (
+      match find_prefix params "-out" with
+      | None -> params
+      | Some o  -> replace_element params "-out" (output_check o)
+    )
+
+
+let rec check_for_binary_path (args : string list) : string =
+  match args with
+  | [] -> raise (NoBinaryPathException ("No binary path was provided. If you need help, please call the cwe_checker with the --help or -h flag"))
+  | head::tail ->(
+      try
+        match Sys.is_directory head with
+        | false -> head
+        | true  -> raise (NoBinaryPathException ("No binary path was provided. If you need help, please call the cwe_checker with the --help or -h flag"))
+      with
+      | _ -> check_for_binary_path tail
+   )
+
+
+let process_input : string * string list =
+  match get_user_input () with
+  | [] -> raise (NoBinaryPathException ("No binary path was provided. If you need help, please call the cwe_checker with the --help or -h flag"))
+  | input  -> (
+      match check_for_help input with
+      | true -> exit 0
+      | false -> (
+          let binary_path = check_for_binary_path input in
+          let split_flags = List.partition_tf input ~f:(fun x -> (String.is_prefix x ~prefix:"-config") || (String.is_prefix x ~prefix:"-out") || (String.is_prefix x ~prefix:"-partial")) in
+          let flags = remove_element (snd split_flags) binary_path in
+          let params = fst split_flags in
+          check_partial params; check_config params;
+          (binary_path,  process_params params @ process_flags flags)
+        )
     )
 
 
 let main () : int =
   match Array.length Sys.argv with
-  | 1 -> help (); Sys.command ("bap " ^ Sys.argv.(1) ^ " --pass=cwe-checker ")
+  | 1 -> raise (NoArgumentsException ("No arguments were provided. If you need help, please call the cwe_checker with the --help or -h flag"))
   | _ ->
-    match process_flags with
-    | None -> help (); 1
-    | Some [] -> Sys.command ("bap " ^ Sys.argv.(1) ^ " --pass=cwe-checker ")
-    | Some flags -> Sys.command ("bap " ^ Sys.argv.(1) ^ " --pass=cwe-checker " ^ setup_flags flags)
+    let args = process_input in
+    match get_second args with
+    | [] -> Sys.command ("bap " ^ get_first args ^ " --pass=cwe-checker ")
+    | _  -> Sys.command ("bap " ^ get_first args ^ " --pass=cwe-checker " ^ setup_flags (get_second args))
 
 
 let _ = main ()
