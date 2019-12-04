@@ -11,12 +11,16 @@
 
 {i cwe_checker} is implemented as a plugin for the {{: https://github.com/BinaryAnalysisPlatform/bap} Binary Analysis Platform} (BAP).
 To use it, just run BAP with {i cwe_checker} as a pass:
-{[bap [BINARY_FILE] --pass=cwe_checker]}
+{[bap [BINARY_FILE] --pass=cwe-checker]}
 This runs all static analysis based checks.
 You can find more documentation on these checks at their {{: ../cwe_checker_core/Cwe_checker_core/index.html} module documentation pages}.
 The behaviour of these checks can be modified through an optional configuration file.
 Just edit the [src/config.json] file and then add [--cwe-checker-config=src/config.json] as a command line option.
 You can find more on the available command line options {{!section:CmdLineOptions} here}.
+
+Alternatively, you can run the {i cwe_checker} through the command
+{[cwe_checker [BINARY_FILE] ]}
+Internally, this also calls BAP as above, but enables shorter {{!section:CmdLineOptions} command line options}.
 
 The symbolic execution based checks can be run with the emulation recipe in the recipes folder.
 {[bap PATH_TO_BINARY --recipe=recipes/emulation]}
@@ -33,7 +37,8 @@ If you want to print the output to a file with [--cwe-checker-out], you also nee
 
 {1:CmdLineOptions Command line options}
 
-All command line options have to be prefixed with [--cwe-checker] (so that BAP knows to forward them to the {i cwe_checker} plugin).
+If you run the {i cwe_checker} as a BAP plugin, all command line options have to be prefixed with [--cwe-checker] (so that BAP knows to forward them to the {i cwe_checker} plugin).
+If you run the {i cwe_checker} directly, do not prefix the command line options.
 The available command line options are:
 - [-check-path] Find paths between input functions (configurable in the configuration file) and CWE hits.
 Should be used together with the [-partial] command line option if you are only interested in paths to specific CWEs.
