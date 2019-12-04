@@ -18,6 +18,14 @@ val cmdline_flags: (String.t * String.t) List.t
 
 val cmdline_params: (String.t * String.t) List.t
 
+val print_module_versions: unit -> unit
+
+val check_valid_module_list: string list -> unit
+
+(** prints the help message *)
+val print_help_message: unit -> unit
+
+
 (** The main function drives the execution of the cwe_checker plugin in BAP.
     The command line arguments are passed as maps from their name to to their values
     (Bool.t for flags, String.t for other arguments) to this function.
