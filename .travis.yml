@@ -8,7 +8,7 @@ services:
 install:
   - sudo apt-get update
   - pip install scons
-  - docker 
+  - docker
 
 before_script:
   - ./.travis_prepare.sh
@@ -18,4 +18,4 @@ script:
 
 notifications:
   email:
-    - firmware-security@fkie.fraunhofer.de
+    - nils-edvin.enkelmann@fkie.fraunhofer.de
