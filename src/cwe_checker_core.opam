@@ -1,6 +1,6 @@
 opam-version: "2.0"
 name: "cwe_checker_core"
-version: "0.2"
+version: "0.3"
 synopsis: "Core library for the cwe_checker package"
 description: """
 Core library for the cwe_checker suite of tools.
@@ -15,20 +15,21 @@ depends: [
   "ocaml" {>= "4.05"}
   "dune" {>= "1.6"}
   "yojson" {>= "1.6.0"}
-  "bap" {>= "1.6"}
+  "bap" {>= "1.6" & < "2.0"}
   "core_kernel" {>= "v0.11" & < "v0.12"}
   "ppx_jane" {>= "v0.11" & < "v0.12"}
+  "ppx_deriving_yojson" {>= "3.5.1"}
   "odoc" {>= "1.4"}
 ]
 depexts: [
   "binutils"
+]
+conflicts: [
+  "fkie-cad-cwe-checker" {!= "0.2"}
 ]
 build: [
   [ "dune" "build" "--profile" "release" ]
 ]
 install: [
   [ "dune" "install" ]
-]
-remove: [
-  [ "dune" "uninstall" ]
 ]
