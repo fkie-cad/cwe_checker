@@ -1,4 +1,4 @@
-FROM fkiecad/cwe_checker_travis_docker_image:latest
+FROM fkiecad/cwe_checker_travis_docker_image:v0.3
 
 COPY . /home/bap/cwe_checker/
 
