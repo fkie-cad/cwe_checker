@@ -2,49 +2,49 @@ import os
 
 build_path = 'build'
 
-supported_architectures = ['x64', 'x86', 'arm', 'mips', 'ppc']
+supported_architectures = ['x64', 'x86', 'arm', 'aarch64',
+                           'mips', 'mipsel', 'mips64', 'mips64el', 'ppc',
+                           'ppc64', 'ppc64le', 'x64_PE', 'x68_PE']
 
-c_compilers = {'x64': ['gcc', 'clang'],
-               'x86': ['./dockcross-linux-x86 gcc'],
-               'arm': ['arm-linux-gnueabi-gcc'],
-               'mips': ['mips-linux-gnu-gcc'],
-               'ppc': ['powerpc-linux-gnu-gcc']}
-
-c_linkers =   {'x86': './dockcross-linux-x86 gcc -m32'}
+c_compilers = {'x64': ['gcc', 'clang -target x86_64-linux-gnu'],
+               'x86': ['i686-linux-gnu-gcc', 'clang -target i686-linux-gnu'],
+               'arm': ['arm-linux-gnueabi-gcc', 'clang -target arm-linux-gnueabi'],
+               'aarch64': ['aarch64-linux-gnu-gcc', 'clang -target aarch64-linux-gnu'],
+               'mips': ['mips-linux-gnu-gcc', 'clang -target mips-linux-gnu'],
+               'mipsel': ['mipsel-linux-gnu-gcc', 'clang -target mipsel-linux-gnu'],
+               'mips64': ['mips64-linux-gnuabi64-gcc', 'clang -target mips64-linux-gnuabi64'],
+               'mips64el': ['mips64el-linux-gnuabi64-gcc', 'clang -target mips64el-linux-gnuabi64'],
+               'ppc': ['powerpc-linux-gnu-gcc', 'clang'],
+               'ppc64': ['powerpc64-linux-gnu-gcc', 'clang'],
+               'ppc64le': ['powerpc64le-linux-gnu-gcc', 'clang'],
+               'x64_PE': ['x86_64-w64-mingw32-gcc'],
+               'x86_PE': ['i686-w64-mingw32-gcc']}
 
 cpp_compilers = {'x64': ['g++', 'clang'],
-                 'x86': ['./dockcross-linux-x86 g++'],
+                 'x86': ['i686-linux-gnu-g++'],
                  'arm': ['arm-linux-gnueabi-g++'],
+                 'aarch64': ['aarch64-linux-gnu-g++'],
                  'mips': ['mips-linux-gnu-g++'],
-                 'ppc': ['powerpc-linux-gnu-g++']}
+                 'mipsel': ['mipsel-linux-gnu-g++'],
+                 'mips64': ['mips64-linux-gnuabi64-g++'],
+                 'mips64el': ['mips64el-linux-gnuabi64-g++'],
+                 'ppc': ['powerpc-linux-gnu-g++'],
+                 'ppc64': ['powerpc64-linux-gnu-g++'],
+                 'ppc64le': ['powerpc64le-linux-gnu-g++'],
+                 'x64_PE': ['x86_64-w64-mingw32-g++'],
+                 'x86_PE': ['i686-w64-mingw32-g++']}
 
-c_flags = {'x64': '-g -fno-stack-protector -std=c11',
-           'x86': '-g -m32 -fno-stack-protector -std=c11',
-           'arm': '-g -fno-stack-protector -std=c11',
-           'mips': '-g -fno-stack-protector -std=c11',
-           'ppc': '-g -fno-stack-protector -std=c11'}
-
-cpp_flags = {'x64': '-g -fno-stack-protector',
-             'x86': '-g -m32 -fno-stack-protector',
-             'arm': '-g -fno-stack-protector',
-             'mips': '-g -fno-stack-protector',
-             'ppc': '-g -fno-stack-protector'}
-
-cpp_linkers =   {'x86': './dockcross-linux-x86 g++ -m32'}
+flags = '-g -fno-stack-protector -std=c11'
 
 def which(pgm):
-    # check dockcross installation
-    if pgm.startswith('.') and os.path.isfile(pgm.split()[0]):
-        return pgm
-    elif pgm.startswith('.') and not (os.path.isfile(pgm.split()[0])):
-        return None
-
     # check compilers on path
     path = os.getenv('PATH')
     for p in path.split(os.path.pathsep):
         p = os.path.join(p,pgm)
         if os.path.exists(p) and os.access(p,os.X_OK):
             return p
+
+    return None
 
 def optimize(filename):
     optimize_me = ['cwe_476.c']
@@ -68,21 +68,19 @@ def build_c(arch, compiler):
         c_programs = Glob('*.c')
         for p in c_programs:
             if compile_only_on_x64(str(p), arch):
-                print('Skipping architecture %s for %s' % (arch, str(p)))
+                print('Skipping architecture {} for {}'.format(arch, str(p)))
                 continue
-            
+
             env = Environment()
             env['CC'] = compiler
-            env['CCFLAGS'] = c_flags[arch] + optimize(str(p))
-            if arch in c_linkers:
-                env['LINK'] = c_linkers[arch]
+            env['CCFLAGS'] = flags + optimize(str(p))
 
             compiler_abrev = get_compiler_abrev(compiler)
-            env.Program('%s/%s_%s_%s.out' % (build_path, str(p).split('.')[0], arch, compiler_abrev),
-                        env.Object(target='%s/%s_%s_%s.o' % (build_path, str(p), arch, compiler_abrev),
-                                   source='%s/%s' % (build_path, str(p))))
+            env.Program('{}/{}_{}_{}.out'.format(build_path, str(p).split('.')[0], arch, compiler_abrev),
+                        env.Object(target='{}/{}_{}_{}.o'.format(build_path, str(p), arch, compiler_abrev),
+                                   source='{}/{}'.format(build_path, str(p))))
     else:
-        print('Compiler %s for architecture %s is not installed!' % (compiler, arch))
+        print('Compiler {} for architecture {} is not installed!'.format(compiler, arch))
 
 
 def build_cpp(arch, compiler):
@@ -91,21 +89,19 @@ def build_cpp(arch, compiler):
         for p in cpp_programs:
             env = Environment()
             env['CCP'] = compiler
-            env['CCPFLAGS'] = cpp_flags[arch] + optimize(str(p))
-            if arch in c_linkers:
-                env['CPPLINK'] = cpp_linkers[arch]
+            env['CCPFLAGS'] = flags + optimize(str(p))
 
             compiler_abrev = get_compiler_abrev(compiler)
-            env.Program('%s/%s_%s_%s.out' % (build_path, str(p).split('.')[0], arch, compiler_abrev),
-                        env.Object(target='%s/%s_%s_%s.o' % (build_path, str(p), arch, compiler_abrev),
-                                   source='%s/%s' % (build_path, str(p))))
+            env.Program('{}/{}_{}_{}.out'.format(build_path, str(p).split('.')[0], arch, compiler_abrev),
+                        env.Object(target='{}/{}_{}_{}.o'.format(build_path, str(p), arch, compiler_abrev),
+                                   source='{}/{}'.format(build_path, str(p))))
     else:
-        print('Compiler %s for architecture %s is not installed!' % (compiler, arch))
+        print('Compiler {} for architecture {} is not installed!'.format(compiler, arch))
 
 
 VariantDir(build_path, '.', duplicate=0)
 for arch in supported_architectures:
-    print('Building for architecture %s' % arch)
+    print('Building for architecture {}'.format(arch))
     for compiler in c_compilers[arch]:
         build_c(arch, compiler)
         build_cpp(arch, compiler)
