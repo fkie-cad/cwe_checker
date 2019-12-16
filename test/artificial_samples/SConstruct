@@ -4,8 +4,8 @@ build_path = 'build'
 
 supported_architectures = ['x64', 'x86', 'arm', 'aarch64', 'mips', 'mipsel', 'mips64', 'mips64el', 'ppc', 'ppc64', 'ppc64le']
 
-c_compilers = {'x64': ['gcc', 'clang'],
-               'x86': ['gcc', 'clang'],
+c_compilers = {'x64': ['gcc', 'x86_64-w64-mingw32-gcc', 'clang'],
+               'x86': ['gcc', 'i686-w64-mingw32-gcc', 'clang'],
                'arm': ['arm-linux-gnueabi-gcc', 'clang'],
                'aarch64': ['aarch64-linux-gnu-gcc', 'clang'],
                'mips': ['mips-linux-gnu-gcc', 'clang'],
@@ -16,8 +16,8 @@ c_compilers = {'x64': ['gcc', 'clang'],
                'ppc64': ['powerpc64-linux-gnu-gcc', 'clang'],
                'ppc64le': ['powerpc64le-linux-gnu-gcc', 'clang']}
 
-cpp_compilers = {'x64': ['g++', 'clang++'],
-                 'x86': ['g++'],
+cpp_compilers = {'x64': ['g++', 'x86_64-w64-mingw32-g++', 'clang++'],
+                 'x86': ['g++', 'i686-w64-mingw32-g++', 'clang++'],
                  'arm': ['arm-linux-gnueabi-g++'],
                  'aarch64': ['aarch64-linux-gnu-g++'],
                  'mips': ['mips-linux-gnu-g++'],
@@ -89,8 +89,12 @@ def get_compiler_abrev(compiler_name):
         return 'clang'
     elif 'clang++' == compiler_name:
         return 'clang++'
+    elif 'mingw32-g++' in compiler_name:
+        return 'pe_g++'
     elif 'g++' in compiler_name:
         return 'g++'
+    elif 'mingw32-gcc' in compiler_name:
+        return 'mingw32-gcc'
     else:
         return 'gcc'
 
