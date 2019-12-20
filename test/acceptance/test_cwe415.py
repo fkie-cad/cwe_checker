@@ -13,6 +13,7 @@ class TestCwe415(unittest.TestCase):
         res = cwe_checker_testlib.execute_emulation_and_check_occurence(self.target, self.target, 'arm', 'gcc', self.string)
         self.assertEqual(res, expect_res)
 
+    @unittest.skip("FIXME: yields different results on Ubuntu 16.04 and 18.04")
     def test_cwe415_01_x86_gcc(self):
         expect_res = 5
         res = cwe_checker_testlib.execute_emulation_and_check_occurence(self.target, self.target, 'x86', 'gcc', self.string)
