@@ -8,21 +8,24 @@ let version = "0.3"
 (* TODO: This check is based on Mem_region, which does not support partial access yet.
    Thus partially written tainted values may be marked as error and thus the taint is falsely forgotten. *)
 
+
+(** Each taint is denoted by the Tid of the basic block where it originated from.
+    Each value can be tainted by different sources at the same time. *)
 module Taint = Tid.Set
 
-(* the state contains a list of pairs of register names containing an unchecked
-   return value and the term identifiers of the block where the unchecked
-   return value was generated. *)
+(** The state contains taint information for all registers and stack variables. *)
 module State = struct
   type t = {
     register: Taint.t Var.Map.t;
     stack: Taint.t Mem_region.t;
   } [@@deriving bin_io, compare, sexp]
 
+  (** Get an empty state without tainted values. *)
   let empty : t =
     { register = Var.Map.empty;
       stack = Mem_region.empty () }
 
+  (** equality function for states *)
   let equal (state1: t) (state2: t) : Bool.t =
     let reg_equal = Var.Map.equal Taint.equal state1.register state2.register in
     let stack_equal = Mem_region.equal state1.stack state2.stack ~data_equal:Taint.equal in
@@ -69,7 +72,7 @@ module State = struct
       Tid.Set.diff taint taint_to_remove
     ) in
     { register = cleaned_register;
-      stack = cleaned_stack; } (* TODO: This may save empty taints to the stack! Change that? *)
+      stack = cleaned_stack; }
 
   (** The union of two states is the union of all taints *)
   let union (state1: t) (state2: t) : t =
@@ -96,29 +99,37 @@ module State = struct
 
 end
 
+
+(** The stack info contains all necessary information to access stack variables. *)
 module StackInfo = struct
   type t = {
     type_info: Type_inference.TypeInfo.t;
     sub_tid:  Tid.t;
     project: Project.t;
+    strict_mem_policy: Bool.t;
   }
 
+  (** If the expression denotes an address on the stack, return the address. *)
   let get_address (stack_info: t) (expression: Exp.t) : Bitvector.t Option.t =
     Type_inference.TypeInfo.compute_stack_offset stack_info.type_info expression ~sub_tid:stack_info.sub_tid ~project:stack_info.project
 
-  let assemble (pointer_info_map: Type_inference.TypeInfo.t Tid.Map.t) (term_tid: Tid.t) ~(sub_tid: Tid.t) ~(project: Project.t) : t =
+  (** Assemble a StackInfo.t object. *)
+  let assemble (pointer_info_map: Type_inference.TypeInfo.t Tid.Map.t) (term_tid: Tid.t) ~(sub_tid: Tid.t) ~(project: Project.t) ~(strict_mem_policy: Bool.t) : t =
     { type_info = Tid.Map.find_exn pointer_info_map term_tid;
       sub_tid = sub_tid;
-      project = project; }
+      project = project;
+      strict_mem_policy = strict_mem_policy; }
 
 end
 
+
+(** append taint to the list of already found cwe_hits *)
 let append_to_hits (cwe_hits:Taint.t ref) (taint: Taint.t) : unit =
   cwe_hits := Taint.union !cwe_hits taint
 
 
 (** Check whether an expression contains a tainted value.
-    Memory accesses through tainted values are added to cwe_hits, but the Tids are not cleaned from the state. *)
+    Memory accesses through tainted values are added to cwe_hits, but the Tids are not removed from the state. *)
 let rec contains_taint (exp: Exp.t) (state: State.t) ~(cwe_hits: Taint.t ref) ~(stack: StackInfo.t) : Taint.t =
   match exp with
   | Bil.Load(_mem, addr, _endian, _size)->
@@ -135,9 +146,9 @@ let rec contains_taint (exp: Exp.t) (state: State.t) ~(cwe_hits: Taint.t ref) ~(
       let value_taint = contains_taint val_expression state ~cwe_hits ~stack in
       let () = if Taint.is_empty access_taint = false then append_to_hits cwe_hits access_taint in
       match StackInfo.get_address stack addr with
-      | Some(_) -> Taint.empty (* TODO: Handle Stores separately!! *)
+      | Some(_) -> Taint.empty
       | None ->
-          let () = if Taint.is_empty value_taint = false then append_to_hits cwe_hits value_taint in
+          let () = if stack.strict_mem_policy && (Taint.is_empty value_taint = false) then append_to_hits cwe_hits value_taint in
           Taint.empty
     end
   | Bil.BinOp(Bil.XOR, Bil.Var(var1), Bil.Var(var2)) when var1 = var2 -> Taint.empty (* standard assembly shortcut for setting a register to NULL *)
@@ -173,8 +184,8 @@ let parse_taint_of_exp (exp: Exp.t) (state: State.t) ~(cwe_hits: Taint.t ref) ~(
   (unchecked_taint, state)
 
 
-(* If an formerly unchecked return value was checked then remove all registers pointing
-   to the source of this return value from state. *)
+(** If an formerly unchecked return value was checked then remove all registers pointing
+    to the source of this return value from state. *)
 let checks_value (exp: Exp.t) (state: State.t) ~(cwe_hits: Taint.t ref) ~(stack: StackInfo.t) : State.t =
   match exp with
   | Bil.Ite(if_, _then_, _else_) -> begin
@@ -193,11 +204,13 @@ let flag_any_access (exp: Exp.t) (state: State.t) ~(cwe_hits: Taint.t ref) ~(sta
   let () = append_to_hits cwe_hits taint_to_flag in
   State.remove_taint state taint_to_flag
 
+
 (** flag all unchecked registers and stack variables as cwe_hits, return empty state *)
 let flag_all_unchecked (state: State.t) ~(cwe_hits: Taint.t ref) : State.t =
   let unchecked = State.get_all_tainted_tids state in
   let () = append_to_hits cwe_hits unchecked in
   State.empty
+
 
 (** flag all register taints as cwe_hits, but not taints that are only contained in stack variables *)
 let flag_register_taints (state: State.t) ~(cwe_hits: Taint.t ref) : State.t =
@@ -207,7 +220,8 @@ let flag_register_taints (state: State.t) ~(cwe_hits: Taint.t ref) : State.t =
   let () = append_to_hits cwe_hits taint_to_flag in
   State.remove_taint state taint_to_flag
 
-(* TODO: A list of all input register would be more exact here. Check whether this leads to false positives in practice! *)
+
+(* TODO: A list of all input register would be more exact here. This leads to false positives in practice! *)
 (** Flag all non-callee-saved register as cwe_hits. These registers may be input values to an extern function call. *)
 let flag_non_callee_saved_register (state: State.t) ~(cwe_hits: Taint.t ref) ~(project: Project.t) : State.t =
   let taint_to_flag = Var.Map.fold state.register ~init:Taint.empty ~f:(fun ~key ~data taint_accum ->
@@ -218,6 +232,7 @@ let flag_non_callee_saved_register (state: State.t) ~(cwe_hits: Taint.t ref) ~(p
   ) in
   let () = append_to_hits cwe_hits taint_to_flag in
   State.remove_taint state taint_to_flag
+
 
 (** Remove the taint of non-callee-saved register (without flagging them).
     We assume these taints as checked, thus remove the Tids from other taints also. *)
@@ -230,6 +245,8 @@ let untaint_non_callee_saved_register (state: State.t) ~(project: Project.t) : S
   ) in
   State.remove_taint state taint_to_remove
 
+
+(** If the expression is a store onto a stack variable, write the corresponding taint to the stack. *)
 let update_stack_on_stores (exp: Exp.t) (state: State.t) ~(stack: StackInfo.t) : State.t =
   let pointer_size = Symbol_utils.arch_pointer_size_in_bytes stack.project in
   match exp with
@@ -245,7 +262,7 @@ let update_stack_on_stores (exp: Exp.t) (state: State.t) ~(stack: StackInfo.t) :
     end
   | _ -> state
 
-(* TODO: handle stores!!! *)
+
 (** Updates the state depending on the def. If memory is accessed using an unchecked return value,
     then the access is added to the list of cwe_hits. *)
 let update_state_def (def: Def.t) (state: State.t) ~(cwe_hits: Taint.t ref) ~(stack: StackInfo.t) : State.t =
@@ -258,6 +275,7 @@ let update_state_def (def: Def.t) (state: State.t) ~(cwe_hits: Taint.t ref) ~(st
     else
       State.set_register state lhs rhs_taint in
   update_stack_on_stores rhs state ~stack
+
 
 (** Taint the return registers of a function as unchecked return values. *)
 let taint_return_registers (func_tid: Tid.t) (state: State.t) ~(project: Project.t) ~(block: Blk.t) : State.t =
@@ -273,6 +291,7 @@ let taint_return_registers (func_tid: Tid.t) (state: State.t) ~(project: Project
           | _ -> failwith "[CWE476] Return register wasn't a register." in
         State.set_register state variable (Taint.add Taint.empty (Term.tid block))
     )
+
 
 (** Updates the state depending on the jump. On a jump to a function from the function list
     taint all return registers as unchecked return values. *)
@@ -334,9 +353,6 @@ let update_state_jmp
             state
 
 
-
-
-
 (** updates a block analysis.
     The strict call policy decides the behaviour on call and return instructions:
     strict: unchecked values in registers get flagged as cwe_hits
@@ -349,21 +365,24 @@ let update_block_analysis
       ~(extern_functions: String.Set.t)
       ~(sub_tid: Tid.t)
       ~(project: Project.t)
-      ~(strict_call_policy: Bool.t) : State.t =
+      ~(strict_call_policy: Bool.t)
+      ~(strict_mem_policy: Bool.t)  : State.t =
   let elements = Blk.elts block in
   let type_info_map = Type_inference.get_type_info_of_block ~project block ~sub_tid in
   let state = Seq.fold elements ~init:state ~f:(fun state element ->
       match element with
       | `Def def ->
-          let stack = StackInfo.assemble type_info_map (Term.tid def) ~sub_tid ~project in
+          let stack = StackInfo.assemble type_info_map (Term.tid def) ~sub_tid ~project ~strict_mem_policy in
           update_state_def def state ~cwe_hits ~stack
       | `Phi _phi -> state (* We ignore phi terms for this analysis. *)
       | `Jmp jmp ->
-          let stack = StackInfo.assemble type_info_map (Term.tid jmp) ~sub_tid ~project in
+          let stack = StackInfo.assemble type_info_map (Term.tid jmp) ~sub_tid ~project ~strict_mem_policy in
           update_state_jmp jmp state ~cwe_hits ~malloc_like_functions ~extern_functions ~stack ~block ~strict_call_policy
     ) in
   State.remove_virtual_register state (* virtual registers should not be accessed outside of the block where they are defined. *)
 
+
+(** print a cwe_hit to the log *)
 let print_hit (tid: Tid.t) ~(sub: Sub.t) ~(malloc_like_functions: String.t List.t) ~(tid_map: Word.t Tid.Map.t) : unit =
   let block = Option.value_exn (Term.find blk_t sub tid) in
   let jmps = Term.enum jmp_t block in
@@ -397,15 +416,19 @@ let print_hit (tid: Tid.t) ~(sub: Sub.t) ~(malloc_like_functions: String.t List.
     | _ -> false
   ) in ()
 
+
 let check_cwe (_prog: Program.t) (project: Project.t) (tid_map: Word.t Tid.Map.t) (symbol_names: String.t List.t List.t) (parameters: String.t List.t) =
   let symbols = match symbol_names with
     | hd :: _ -> hd
     | _ -> failwith "[CWE476] symbol_names not as expected" in
-  let (strict_call_policy_string, max_steps_string) = match parameters with
-    | par1 :: par2 :: _ -> (par1, par2)
+  let (strict_call_policy_string, strict_mem_policy_string, max_steps_string) = match parameters with
+    | par1 :: par2 :: par3 :: _ -> (par1, par2, par3)
     | _ -> failwith "[CWE476] parameters not as expected" in
   let strict_call_policy = match String.split strict_call_policy_string ~on:'=' with
     | "strict_call_policy" :: policy :: [] -> bool_of_string policy
+    | _ -> failwith "[CWE476] parameters not as expected" in
+  let strict_mem_policy = match String.split strict_mem_policy_string ~on:'=' with
+    | "strict_memory_policy" :: policy :: [] -> bool_of_string policy
     | _ -> failwith "[CWE476] parameters not as expected" in
   let max_steps = match String.split max_steps_string ~on:'=' with
     | "max_steps" :: num :: [] -> int_of_string num
@@ -424,7 +447,7 @@ let check_cwe (_prog: Program.t) (project: Project.t) (tid_map: Word.t Tid.Map.t
       let merge = State.union in
       let f = (fun node state ->
           let block = Graphs.Ir.Node.label node in
-          update_block_analysis block state ~cwe_hits ~malloc_like_functions ~extern_functions ~sub_tid:(Term.tid subfn) ~project ~strict_call_policy
+          update_block_analysis block state ~cwe_hits ~malloc_like_functions ~extern_functions ~sub_tid:(Term.tid subfn) ~project ~strict_call_policy ~strict_mem_policy
         ) in
       let _ = Graphlib.Std.Graphlib.fixpoint (module Graphs.Ir) cfg ~steps:max_steps ~rev:false ~init:init ~equal:equal ~merge:merge ~f:f in
       Tid.Set.iter (!cwe_hits) ~f:(fun hit -> print_hit hit ~sub:subfn ~malloc_like_functions ~tid_map)

@@ -98,6 +98,7 @@
     "_comment1": "included functions of the following libs: stdlib.h, locale.h, stdio.h, cstring.h, wchar.h",
     "parameters": [
       "strict_call_policy=true",
+      "strict_memory_policy=true",
       "max_steps=100"
     ],
     "symbols": [
