@@ -221,14 +221,14 @@ let flag_register_taints (state: State.t) ~(cwe_hits: Taint.t ref) : State.t =
   State.remove_taint state taint_to_flag
 
 
-(* TODO: A list of all input register would be more exact here. This leads to false positives in practice! *)
-(** Flag all non-callee-saved register as cwe_hits. These registers may be input values to an extern function call. *)
-let flag_non_callee_saved_register (state: State.t) ~(cwe_hits: Taint.t ref) ~(project: Project.t) : State.t =
+(** Flag all possible parameter register as cwe_hits. These registers may be input values to an extern function call.
+    This can lead to false positives if a function does not use all of these registers for argument passing. *)
+let flag_parameter_register (state: State.t) ~(cwe_hits: Taint.t ref) ~(project: Project.t) : State.t =
   let taint_to_flag = Var.Map.fold state.register ~init:Taint.empty ~f:(fun ~key ~data taint_accum ->
-    if Cconv.is_callee_saved key project then
-      taint_accum
-    else
+    if Cconv.is_parameter_register key project then
       Taint.union taint_accum data
+    else
+      taint_accum
   ) in
   let () = append_to_hits cwe_hits taint_to_flag in
   State.remove_taint state taint_to_flag
@@ -336,11 +336,11 @@ let update_state_jmp
               untaint_non_callee_saved_register state ~project:stack.project
             else (* we untaint everything for internal function calls *)
               { state with register = Var.Map.empty }
-        | (Indirect(_), true) -> flag_non_callee_saved_register state ~cwe_hits ~project:stack.project (* TODO: indirect calls are handled as extern calls right now. Change that *)
+        | (Indirect(_), true) -> flag_parameter_register state ~cwe_hits ~project:stack.project (* TODO: indirect calls are handled as extern calls right now. Change that *)
         | (Direct(tid), true) ->
             let sub = Term.find_exn sub_t (Project.program stack.project) tid in
             if Set.mem extern_functions (Sub.name sub) then
-              flag_non_callee_saved_register state ~cwe_hits ~project:stack.project
+              flag_parameter_register state ~cwe_hits ~project:stack.project
             else
               flag_register_taints state ~cwe_hits
       in
