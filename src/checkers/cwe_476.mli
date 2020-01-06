@@ -8,9 +8,8 @@
 
     {1 How the check works}
 
-    We search for an execution path where a memory access using the return value of
-    a symbol happens before the return value is checked through a conditional
-    jump instruction.
+    Using dataflow analysis we search for an execution path where a memory access using the return value of
+    a symbol happens before the return value is checked through a conditional jump instruction.
 
     Note that the check relies on Bap-generated stubs to identify return registers of the
     checked functions. Therefore it only works for functions for which Bap generates
@@ -20,8 +19,14 @@
 
     - strict_call_policy=\{true, false\}: Determines behaviour on call and return instructions.
       If false, we assume that the callee, resp. the caller on a return instruction,
-      checks all unchecked values still contained in the registers. If true, every
+      checks all unchecked values still contained in parameter registers. If true, every
       unchecked value on a call or return instruction gets reported.
+    - strict_mem_policy=|{true, false|}:
+      Determines behaviour on writing an unchecked return value to a memory region other than the stack.
+      If true, these instances get reported.
+      Depending on the coding style, this can lead to a lot false positives if return values are
+      only checked after writing them to their target destination.
+      If false, these instances do not get reported, which in turn can lead to false negatives.
     - max_steps=<num>: Max number of steps for the dataflow fixpoint algorithm.
 
     {2 Symbols configurable in config.json}
@@ -31,9 +36,10 @@
 
     {1 False Positives}
 
-    - The check does not yet track values on the stack. Thus instances, where the
-    return value gets written onto the stack before the check happens get incorrectly
-    flagged. This happens a lot on unoptimized binaries but rarely on optimized ones.
+    - If strict_mem_policy is set to true, writing a return value to memory other than the stack
+    gets reported even if a NULL pointer check happens right afterwards.
+    - The check has no knowledge about the actual number of parameters that an extern function call takes.
+      This can lead to false positives if strict_call_policy is set to true.
 
     {1 False Negatives}
 
@@ -43,6 +49,10 @@
     for the return value being NULL or something else
     - For functions with more than one return value we do not distinguish between
     the return values.
+    - If strict_mem_policy is set to false, unchecked return values that are
+    saved somewhere other than the stack may be missed.
+    - The check has no knowledge about the actual number of parameters that an extern function call takes.
+      This can lead to false negatives, especially if function parameters are passed on the stack.
 *)
 
 val name : string

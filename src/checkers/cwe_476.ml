@@ -235,15 +235,21 @@ let flag_parameter_register (state: State.t) ~(cwe_hits: Taint.t ref) ~(project:
 
 
 (** Remove the taint of non-callee-saved register (without flagging them).
-    We assume these taints as checked, thus remove the Tids from other taints also. *)
+    For taints in parameter register we assume that they are checked by the callee, thus we also remove the corresponding Tids from the state. *)
 let untaint_non_callee_saved_register (state: State.t) ~(project: Project.t) : State.t =
   let taint_to_remove = Var.Map.fold state.register ~init:Taint.empty ~f:(fun ~key ~data taint_accum ->
-    if Cconv.is_callee_saved key project then
+    if Cconv.is_parameter_register key project then
       taint_accum
     else
       Taint.union taint_accum data
   ) in
-  State.remove_taint state taint_to_remove
+  let state = State.remove_taint state taint_to_remove in
+  Var.Map.fold state.register ~init:state ~f:(fun ~key ~data:_ state ->
+    if Cconv.is_callee_saved key project then
+      state
+    else
+      State.remove_register state key
+  )
 
 
 (** If the expression is a store onto a stack variable, write the corresponding taint to the stack. *)
