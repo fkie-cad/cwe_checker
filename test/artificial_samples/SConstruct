@@ -3,7 +3,7 @@ import os
 build_path = 'build'
 
 supported_architectures = ['x64', 'x86', 'arm', 'aarch64', 'mips', 'mipsel', 'mips64', 'mips64el', 'ppc', 'ppc64', 'ppc64le']
-skip_for_pe = ['cwe_436.c', 'cwe_782.c', 'cwe_426.c']
+skip_for_pe = ['cwe_782.c', 'cwe_426.c', 'cwe_243.c', 'cwe_243_clean.c']
 
 c_compilers = {'x64': ['gcc', 'x86_64-w64-mingw32-gcc', 'clang'],
                'x86': ['gcc', 'i686-w64-mingw32-gcc', 'clang'],
@@ -88,16 +88,16 @@ def optimize(filename):
 def get_compiler_abrev(compiler_name):
     if 'clang' == compiler_name:
         return 'clang'
-    elif 'clang++' == compiler_name:
+    if 'clang++' == compiler_name:
         return 'clang++'
-    elif 'mingw32-g++' in compiler_name:
+    if 'mingw32-g++' in compiler_name:
         return 'mingw32-g++'
-    elif 'g++' in compiler_name:
+    if 'g++' in compiler_name:
         return 'g++'
-    elif 'mingw32-gcc' in compiler_name:
+    if 'mingw32-gcc' in compiler_name:
         return 'mingw32-gcc'
-    else:
-        return 'gcc'
+
+    return 'gcc'
 
 
 def compile_only_on_x64(filename, arch):
@@ -123,15 +123,11 @@ def build_c(arch, compiler):
                     env['LINKFLAGS'] = '-m32'
 
             compiler_abrev = get_compiler_abrev(compiler)
-            if compiler_abrev == 'mingw32-gcc':
-                if str(prog) in skip_for_pe:
-                    continue
-                env.Object(target='%s/%s_%s_%s.o' % (build_path, str(prog), arch, compiler_abrev),
-                           source='%s/%s' % (build_path, str(prog)))
-            else:
-                env.Program('%s/%s_%s_%s.out' % (build_path, str(prog).split('.')[0], arch, compiler_abrev),
-                            env.Object(target='%s/%s_%s_%s.o' % (build_path, str(prog), arch, compiler_abrev),
-                                       source='%s/%s' % (build_path, str(prog))))
+            if compiler_abrev == 'mingw32-gcc' and str(prog) in skip_for_pe:
+                continue
+            env.Program('%s/%s_%s_%s.out' % (build_path, str(prog).split('.')[0], arch, compiler_abrev),
+                        env.Object(target='%s/%s_%s_%s.o' % (build_path, str(prog), arch, compiler_abrev),
+                        source='%s/%s' % (build_path, str(prog))))
     else:
         print('Compiler %s for architecture %s is not installed!' % (compiler, arch))
 
@@ -146,15 +142,11 @@ def build_cpp(arch, compiler):
                 env['LINKFLAGS'] = '-m32'
  
             compiler_abrev = get_compiler_abrev(compiler)
-            if compiler_abrev == 'mingw32-g++':
-                if str(prog) in skip_for_pe:
+            if compiler_abrev == 'mingw32-g++' and str(prog) in skip_for_pe:
                     continue
-                env.Object(target='%s/%s_%s_%s.o' % (build_path, str(prog), arch, compiler_abrev),
-                           source='%s/%s' % (build_path, str(prog)))
-            else:
-                env.Program('%s/%s_%s_%s.out' % (build_path, str(prog).split('.')[0], arch, compiler_abrev),
-                            env.Object(target='%s/%s_%s_%s.o' % (build_path, str(prog), arch, compiler_abrev),
-                                       source='%s/%s' % (build_path, str(prog))))
+            env.Program('%s/%s_%s_%s.out' % (build_path, str(prog).split('.')[0], arch, compiler_abrev),
+                        env.Object(target='%s/%s_%s_%s.o' % (build_path, str(prog), arch, compiler_abrev),
+                        source='%s/%s' % (build_path, str(prog))))
     else:
         print('Compiler %s for architecture %s is not installed!' % (compiler, arch))
 

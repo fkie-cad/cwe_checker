@@ -45,12 +45,14 @@ class TestCwe215(unittest.TestCase):
             self.filename, self.target, 'arm', 'clang', self.string)
         self.assertEqual(res, expect_res)
 
+    @unittest.skip('Not supported by BAP. (no recognizable code backtrace)')
     def test_cwe215_01_aarch64_gcc(self):
         expect_res = 1
         res = cwe_checker_testlib.execute_and_check_occurence(
             self.filename, self.target, 'aarch64', 'gcc', self.string)
         self.assertEqual(res, expect_res)
 
+    @unittest.skip('Not supported by BAP. (no recognizable code backtrace)')
     def test_cwe215_01_aarch64_clang(self):
         expect_res = 1
         res = cwe_checker_testlib.execute_and_check_occurence(
@@ -111,12 +113,14 @@ class TestCwe215(unittest.TestCase):
             self.filename, self.target, 'ppc', 'gcc', self.string)
         self.assertEqual(res, expect_res)
 
+    @unittest.skip('Not supported by BAP. (no recognizable code backtrace)')
     def test_cwe215_01_ppc64_gcc(self):
         expect_res = 1
         res = cwe_checker_testlib.execute_and_check_occurence(
             self.filename, self.target, 'ppc64', 'gcc', self.string)
         self.assertEqual(res, expect_res)
 
+    @unittest.skip('Not supported by BAP. (no recognizable code backtrace)')
     def test_cwe215_01_ppc64_clang(self):
         expect_res = 1
         res = cwe_checker_testlib.execute_and_check_occurence(
@@ -133,4 +137,18 @@ class TestCwe215(unittest.TestCase):
         expect_res = 1
         res = cwe_checker_testlib.execute_and_check_occurence(
             self.filename, self.target, 'ppc64le', 'clang', self.string)
+        self.assertEqual(res, expect_res)
+
+    @unittest.skip("FIXME")
+    def test_cwe215_01_x86_mingw_gcc(self):
+        expect_res = 3
+        res = cwe_checker_testlib.execute_and_check_occurence(
+            self.filename, self.target, 'x86', 'mingw32-gcc', self.string)
+        self.assertEqual(res, expect_res)
+
+    @unittest.skip("FIXME")
+    def test_cwe215_01_x64_mingw_gcc(self):
+        expect_res = 3
+        res = cwe_checker_testlib.execute_and_check_occurence(
+            self.filename, self.target, 'x64', 'mingw32-gcc', self.string)
         self.assertEqual(res, expect_res)
