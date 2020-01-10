@@ -87,12 +87,6 @@ module State = struct
     { register = register;
       stack = stack; }
 
-  (** Get a set of all Tids that are currently contained as taint somewhere in the state. *)
-  let get_all_tainted_tids (state: t) : Taint.t =
-    let taint_union = List.fold (Var.Map.data state.register) ~init:Taint.empty ~f:(fun taint_accum taint -> Taint.union taint_accum taint) in
-    let taint_union = List.fold (Mem_region.list_data state.stack) ~init:taint_union ~f:(fun taint_accum taint -> Taint.union taint_accum taint) in
-    taint_union
-
   (** remove virtual register from the state (useful at the end of a block) *)
   let remove_virtual_register (state: t) : t =
     { state with register = Var.Map.filter_keys state.register ~f:(fun var -> Var.is_physical var) }
@@ -205,10 +199,25 @@ let flag_any_access (exp: Exp.t) (state: State.t) ~(cwe_hits: Taint.t ref) ~(sta
   State.remove_taint state taint_to_flag
 
 
-(** flag all unchecked registers and stack variables as cwe_hits, return empty state *)
-let flag_all_unchecked (state: State.t) ~(cwe_hits: Taint.t ref) : State.t =
-  let unchecked = State.get_all_tainted_tids state in
-  let () = append_to_hits cwe_hits unchecked in
+(** flag all unchecked registers and stack variables that may be used as return values.
+    That means stack variables above the return pointer get flagged,
+    but variables below the return pointer are treated as local variables and do not get flagged.
+    Return empty state *)
+let flag_unchecked_return_values (state: State.t) ~(cwe_hits: Taint.t ref) ~(project: Project.t) : State.t =
+  let taint_to_flag = Var.Map.fold state.register ~init:Taint.empty ~f:(fun ~key ~data taint_accum ->
+    if Cconv.is_return_register key project then
+      Taint.union taint_accum data
+    else
+      taint_accum
+  ) in
+  let taint_to_flag = List.fold (Mem_region.list_data_pos state.stack) ~init:taint_to_flag ~f:(fun taint_accum (position_unsigned, taint_value) ->
+    let position = Bitvector.to_int_exn (Bitvector.signed position_unsigned) in
+    if position >= 0 then
+      Taint.union taint_accum taint_value
+    else
+      taint_accum
+  ) in
+  let () = append_to_hits cwe_hits taint_to_flag in
   State.empty
 
 
@@ -323,7 +332,7 @@ let update_state_jmp
   | Goto(Indirect(exp)) -> flag_any_access exp state ~cwe_hits ~stack
   | Goto(Direct(_)) -> state
   | Ret(_) -> if strict_call_policy then
-      flag_all_unchecked state ~cwe_hits
+      flag_unchecked_return_values state ~cwe_hits ~project:stack.project
     else
       state
   | Int(_, _) -> flag_register_taints state ~cwe_hits

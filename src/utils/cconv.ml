@@ -67,6 +67,32 @@ let is_parameter_register (var: Var.t) (project: Project.t) : Bool.t =
   let param_register = get_parameter_register_list project in
   Option.is_some (List.find param_register ~f:(String.equal (Var.name var)))
 
+(** Return all registers that may contain return values of function calls *) (* TODO: Add Floating Point register! *)
+let get_return_register_list (project: Project.t) : String.t List.t =
+  let architecture = Project.arch project in
+  match architecture with
+  | `x86 ->
+      "EAX" :: []
+  | `x86_64 -> (* System V ABI *)
+      "RAX" :: "RDX" :: []
+  | `armv4 | `armv5 | `armv6 | `armv7
+  | `armv4eb | `armv5eb | `armv6eb | `armv7eb
+  | `thumbv4 | `thumbv5 | `thumbv6 | `thumbv7
+  | `thumbv4eb | `thumbv5eb | `thumbv6eb | `thumbv7eb ->
+      "R0" :: "R1" :: "R2" :: "R3" :: []
+  | `aarch64 | `aarch64_be -> (* ARM 64bit *)
+      "X0" :: "X1" :: "X2" :: "X3" :: "X4" :: "X5" :: "X6" :: "X7" :: []
+  | `ppc (* 32bit PowerPC *) (* TODO: add floating point register! *)
+  | `ppc64 | `ppc64le -> (* 64bit PowerPC *)
+      "R3" :: "R4" :: []
+  | `mips | `mips64 | `mips64el | `mipsel ->
+      "V0" :: "V1" :: []
+  | _ -> failwith "No calling convention implemented for the given architecture"
+
+let is_return_register (var: Var.t) (project: Project.t) : Bool.t =
+  let ret_register = get_return_register_list project in
+  Option.is_some (List.find ret_register ~f:(String.equal (Var.name var)))
+
 (** Parse a line from the dyn-syms output table of readelf. Return the name of a symbol if the symbol is an extern function name. *)
 let parse_dyn_sym_line line =
   let line = ref (String.strip line) in

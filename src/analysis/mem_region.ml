@@ -167,3 +167,10 @@ let list_data (mem_region: 'a t) : 'a List.t =
     | Ok(value) -> Some(value)
     | Error(_) -> None
   )
+
+let list_data_pos (mem_region: 'a t) : (Bitvector.t * 'a) List.t =
+  List.filter_map mem_region ~f:(fun mem_node ->
+    match mem_node.data with
+    | Ok(value) -> Some( mem_node.pos, value )
+    | Error(_) -> None
+  )

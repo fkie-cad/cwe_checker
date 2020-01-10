@@ -43,3 +43,6 @@ val map_data: 'a t -> f:('a -> 'b) -> 'b t
 
 (** List the contained data (ignoring error values). *)
 val list_data: 'a t -> 'a List.t
+
+(** List the contained data (ignoring error values) together with their positions. *)
+val list_data_pos: 'a t -> (Bitvector.t * 'a) List.t
