@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <unistd.h>
 
@@ -15,7 +17,7 @@ void chroot_safe2(){
   if (chroot("/tmp") != 0) {
     perror("chroot /tmp");
   }
-  setresuid(1077);
+  setresuid(1077, 1077, 1077);
 }
 
 void chroot_safe3(){
@@ -41,5 +43,3 @@ int main(void) {
   chroot_safe3();
   chroot_safe4();
 }
-
-     

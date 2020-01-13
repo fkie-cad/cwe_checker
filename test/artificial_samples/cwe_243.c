@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <unistd.h>
 
@@ -11,5 +13,3 @@ void chroot_fail(){
 int main(void) {
   chroot_fail();
 }
-
-     
