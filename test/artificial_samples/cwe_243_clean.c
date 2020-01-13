@@ -41,5 +41,3 @@ int main(void) {
   chroot_safe3();
   chroot_safe4();
 }
-
-     

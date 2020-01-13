@@ -20,7 +20,7 @@ class TestCwe426(unittest.TestCase):
             self.target, self.target, 'x64', 'clang', self.string)
         self.assertEqual(res, expect_res)
 
-    @unittest.skip("FIXME")
+    @unittest.skip('FIXME!')
     def test_cwe426_01_x86_gcc(self):
         expect_res = 1
         res = cwe_checker_testlib.execute_and_check_occurence(
@@ -67,6 +67,7 @@ class TestCwe426(unittest.TestCase):
         res = cwe_checker_testlib.execute_and_check_occurence(
             self.target, self.target, 'mips', 'gcc', self.string)
         self.assertEqual(res, expect_res)
+
 
     @unittest.skip('FIXME!')
     def test_cwe426_01_mips_clang(self):

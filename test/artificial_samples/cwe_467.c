@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #define AUTH_SUCCESS 1
 #define AUTH_FAIL 0

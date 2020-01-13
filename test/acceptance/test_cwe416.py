@@ -156,14 +156,14 @@ class TestCwe416(unittest.TestCase):
 
     @unittest.skip("FIXME")
     def test_cwe416_01_x86_mingw_gcc(self):
-        expect_res = 3
+        expect_res = 2
         res = cwe_checker_testlib.execute_emulation_and_check_occurence(
             self.target, self.target, 'x86', 'mingw32-gcc', self.string)
         self.assertEqual(res, expect_res)
 
     @unittest.skip("FIXME")
     def test_cwe416_01_x64_mingw_gcc(self):
-        expect_res = 3
+        expect_res = 4
         res = cwe_checker_testlib.execute_emulation_and_check_occurence(
             self.target, self.target, 'x64', 'mingw32-gcc', self.string)
         self.assertEqual(res, expect_res)
