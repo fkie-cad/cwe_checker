@@ -307,7 +307,6 @@ let taint_return_registers (func_tid: Tid.t) (state: State.t) ~(project: Project
         State.set_register state variable (Taint.add Taint.empty (Term.tid block))
     )
 
-
 (** Updates the state depending on the jump. On a jump to a function from the function list
     taint all return registers as unchecked return values. *)
 let update_state_jmp
@@ -337,28 +336,37 @@ let update_state_jmp
       state
   | Int(_, _) -> flag_register_taints state ~cwe_hits
   | Call(call) ->
+      (* flag tainted values in the call and return expressions of indirect calls *)
       let state = match Call.return call with
         | Some(Indirect(exp)) -> flag_any_access exp state ~cwe_hits ~stack
         | _ -> state in
       let state =  begin match Call.target call with
         | Indirect(exp) -> flag_any_access exp state ~cwe_hits ~stack
         | _ -> state end in
+      (* flag tainted values in the parameter registers (if strict_call_policy is set to true)*)
       let state = match (Call.target call, strict_call_policy) with
-        | (Indirect(_), false) -> untaint_non_callee_saved_register state ~project:stack.project
-        | (Direct(tid), false) ->
-            let sub = Term.find_exn sub_t (Project.program stack.project) tid in
-            if Set.mem extern_functions (Sub.name sub) then
-              untaint_non_callee_saved_register state ~project:stack.project
-            else (* we untaint everything for internal function calls *)
-              { state with register = Var.Map.empty }
+        | (Indirect(_), false)
+        | (Direct(_), false) -> state
         | (Indirect(_), true) -> flag_parameter_register state ~cwe_hits ~project:stack.project (* TODO: indirect calls are handled as extern calls right now. Change that *)
         | (Direct(tid), true) ->
             let sub = Term.find_exn sub_t (Project.program stack.project) tid in
             if Set.mem extern_functions (Sub.name sub) then
               flag_parameter_register state ~cwe_hits ~project:stack.project
-            else
+            else (* flag all registers for intern calls, as these do not necessarily adhere to any calling convention *)
               flag_register_taints state ~cwe_hits
       in
+      (* remove the taint of non-callee-saved registers *)
+      let state = match Call.target call with
+        | Direct(tid) ->
+            let sub = Term.find_exn sub_t (Project.program stack.project) tid in
+            if Set.mem extern_functions (Sub.name sub) then
+              untaint_non_callee_saved_register state ~project:stack.project
+            else (* we untaint all registers for internal function calls, as these do not necessarily adhere to any calling convention *)
+              { state with register = Var.Map.empty }
+        | Indirect(_) -> (* we treat all indirect calls as extern function calls, since we cannot handle indirect calls properly yet *)
+            untaint_non_callee_saved_register state ~project:stack.project
+      in
+      (* introduce new taint for the return values of malloc_like_functions *)
       match Call.target call with
       | Indirect(_) -> state
       | Direct(tid) ->
@@ -466,4 +474,4 @@ let check_cwe (_prog: Program.t) (project: Project.t) (tid_map: Word.t Tid.Map.t
         ) in
       let _ = Graphlib.Std.Graphlib.fixpoint (module Graphs.Ir) cfg ~steps:max_steps ~rev:false ~init:init ~equal:equal ~merge:merge ~f:f in
       Tid.Set.iter (!cwe_hits) ~f:(fun hit -> print_hit hit ~sub:subfn ~malloc_like_functions ~tid_map)
-    )
+  )
