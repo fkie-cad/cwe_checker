@@ -196,10 +196,7 @@ module TypeInfo = struct
   let remove_virtual_registers state =
     { state with reg = Map.filter_keys state.reg ~f:(fun var -> Var.is_physical var) }
 
-(** if the addr_exp is a (computable) stack offset, return the offset. In cases where addr_expr
-    may or may not be a stack offset (i.e. offset of a register which may point to the stack or
-    to some other memory region), it still returns an offset. *)
-  let compute_stack_offset state addr_exp ~sub_tid ~project : Bitvector.t  Option.t =
+  let compute_stack_offset (state: t) (addr_exp: Exp.t) ~(sub_tid: Tid.t) ~(project: Project.t) : Bitvector.t Option.t =
     let (register, offset) = match addr_exp with
       | Bil.Var(var) -> (Some(var), Bitvector.of_int 0 ~width:(Symbol_utils.arch_pointer_size_in_bytes project * 8))
       | Bil.BinOp(Bil.PLUS, Bil.Var(var), Bil.Int(num)) -> (Some(var), num)
@@ -280,7 +277,7 @@ let value_of_exp exp =
   | _ -> None
 
 
-let rec type_of_exp exp (state: TypeInfo.t) ~sub_tid ~project =
+let rec type_of_exp (exp: Exp.t) (state: TypeInfo.t) ~(sub_tid: Tid.t) ~(project: Project.t) : (Register.t, unit) Result.t Option.t =
   let open Register in
   match exp with
   | Bil.Load(_) -> (* TODO: Right now only the stack is tracked for type infos. *)
@@ -321,7 +318,8 @@ let rec type_of_exp exp (state: TypeInfo.t) ~sub_tid ~project =
   | Bil.Unknown(_) -> None
   | Bil.Ite(_if_, then_, else_) -> begin
       match (type_of_exp then_ state ~sub_tid ~project, type_of_exp else_ state ~sub_tid ~project) with
-      | (Some(value1), Some(value2)) -> if value1 = value2 then Some(value1) else None
+      | (Some(Ok(value1)), Some(Ok(value2))) -> if Register.equal value1 value2 then Some(Ok(value1)) else None
+      | (Some(Error ()), Some(Error ())) -> Some(Error ())
       | _ -> None
     end
   | Bil.Extract(_) -> Some(Ok(Data)) (* TODO: Similar to cast: Are there cases of 32bit-64bit-address-conversions here? *)
@@ -643,7 +641,26 @@ let print_type_info_tags ~project ~tid_map =
                                (Tid.name (Term.tid block)) in
              Log_utils.error error_str
         )
-    )
+  )
+
+let get_type_info_of_block ~(project: Project.t) (block: Blk.t) ~(sub_tid: Tid.t) : TypeInfo.t Tid.Map.t =
+  match Term.get_attr block type_info_tag with
+  | Some(start_state) ->
+      let elements = Blk.elts block in
+      let (type_info_map, _) = Seq.fold elements ~init:(Tid.Map.empty, start_state) ~f:(fun (type_info_map, state) element ->
+        match element with
+        | `Phi _ -> (type_info_map, state)
+        | `Def term ->
+            let new_type_info_map = Tid.Map.set type_info_map ~key:(Term.tid term) ~data:state in
+            let new_state = update_type_info element state ~sub_tid ~project in
+            (new_type_info_map, new_state)
+        | `Jmp term ->
+            let new_type_info_map = Tid.Map.set type_info_map ~key:(Term.tid term) ~data:state in
+            let new_state = update_type_info element state ~sub_tid ~project in
+            (new_type_info_map, new_state)
+      ) in
+      type_info_map
+  | None -> failwith "[cwe_checker] Error: Tag not found"
 
 (* Functions made available for unit tests *)
 module Private = struct

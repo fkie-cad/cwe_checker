@@ -78,7 +78,7 @@ def which(pgm):
 
 
 def optimize(filename):
-    optimize_me = ['cwe_476.c']
+    optimize_me = []
     if filename in optimize_me:
         return ' -O3'
     else:
@@ -140,7 +140,7 @@ def build_cpp(arch, compiler):
             env['CXXFLAGS'] = cpp_flags[arch] + optimize(str(prog))
             if arch == 'x86':
                 env['LINKFLAGS'] = '-m32'
- 
+
             compiler_abrev = get_compiler_abrev(compiler)
             if compiler_abrev == 'mingw32-g++' and str(prog) in skip_for_pe:
                     continue

@@ -37,3 +37,12 @@ val equal: 'a t -> 'a t -> data_equal:('a -> 'a -> bool) -> bool
 
 (** Mark an area in the mem_region as containing errors. *)
 val mark_error: 'a t -> pos:Bitvector.t -> size:Bitvector.t -> 'a t
+
+(** Map the contained data to new values. *)
+val map_data: 'a t -> f:('a -> 'b) -> 'b t
+
+(** List the contained data (ignoring error values). *)
+val list_data: 'a t -> 'a List.t
+
+(** List the contained data (ignoring error values) together with their positions. *)
+val list_data_pos: 'a t -> (Bitvector.t * 'a) List.t
