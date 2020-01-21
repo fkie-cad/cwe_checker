@@ -55,7 +55,35 @@
       This can lead to false negatives, especially if function parameters are passed on the stack.
 *)
 
+open Bap.Std
+open Core_kernel
+
 val name : string
 val version : string
 
 val check_cwe : Bap.Std.program Bap.Std.term -> Bap.Std.project -> Bap.Std.word Bap.Std.Tid.Map.t -> string list list -> string list -> unit
+
+
+(**/**)
+(* Functions made public for unit tests *)
+module Private : sig
+
+  module Taint : module type of Tid.Set
+  module State : sig
+    type t
+    val empty: t
+    val set_register: t -> Var.t -> Taint.t -> t
+    val find_register: t -> Var.t -> Taint.t Option.t
+    val union: t -> t -> t
+  end
+
+  module StackInfo : sig
+    type t
+    val assemble_mock_info: Tid.t -> Project.t -> t
+  end
+
+  val flag_unchecked_return_values: State.t -> cwe_hits: Taint.t ref -> project: Project.t -> State.t
+  val flag_register_taints: State.t -> cwe_hits: Taint.t ref -> State.t
+  val flag_parameter_register: State.t -> cwe_hits: Taint.t ref -> project: Project.t -> State.t
+  val untaint_non_callee_saved_register: State.t -> project: Project.t -> State.t
+end

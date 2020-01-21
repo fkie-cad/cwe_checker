@@ -114,6 +114,14 @@ module StackInfo = struct
       project = project;
       strict_mem_policy = strict_mem_policy; }
 
+  (**/**)
+  (* assemble a mock StackInfo for unit tests *)
+  let assemble_mock_info (mock_tid: Tid.t) (project: Project.t) : t =
+    { type_info = { Type_inference.TypeInfo.stack = Mem_region.empty (); Type_inference.TypeInfo.reg = Var.Map.empty};
+      sub_tid = mock_tid;
+      project = project;
+      strict_mem_policy = false; }
+  (**/**)
 end
 
 
@@ -247,7 +255,7 @@ let flag_parameter_register (state: State.t) ~(cwe_hits: Taint.t ref) ~(project:
     For taints in parameter register we assume that they are checked by the callee, thus we also remove the corresponding Tids from the state. *)
 let untaint_non_callee_saved_register (state: State.t) ~(project: Project.t) : State.t =
   let taint_to_remove = Var.Map.fold state.register ~init:Taint.empty ~f:(fun ~key ~data taint_accum ->
-    if Cconv.is_parameter_register key project then
+    if Cconv.is_callee_saved key project then
       taint_accum
     else
       Taint.union taint_accum data
@@ -475,3 +483,15 @@ let check_cwe (_prog: Program.t) (project: Project.t) (tid_map: Word.t Tid.Map.t
       let _ = Graphlib.Std.Graphlib.fixpoint (module Graphs.Ir) cfg ~steps:max_steps ~rev:false ~init:init ~equal:equal ~merge:merge ~f:f in
       Tid.Set.iter (!cwe_hits) ~f:(fun hit -> print_hit hit ~sub:subfn ~malloc_like_functions ~tid_map)
   )
+
+(**/**)
+(* Functions made public for unit tests *)
+module Private = struct
+  module StackInfo = StackInfo
+  module Taint = Taint
+  module State = State
+  let flag_unchecked_return_values = flag_unchecked_return_values
+  let flag_register_taints = flag_register_taints
+  let flag_parameter_register = flag_parameter_register
+  let untaint_non_callee_saved_register = untaint_non_callee_saved_register
+end
