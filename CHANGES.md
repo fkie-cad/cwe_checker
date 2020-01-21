@@ -1,3 +1,9 @@
+dev
+====
+
+-   Added a lot more test cases to acceptance tests (PR #46)
+-   Reworked CWE-476 check to track stack variables (PR #47)
+
 0.3 (2019-12)
 ====
 
