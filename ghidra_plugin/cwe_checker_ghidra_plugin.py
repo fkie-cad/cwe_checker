@@ -6,6 +6,7 @@
 # - Open the binary in Ghidra and run this file as a script. Select the generated json file when prompted.
 
 import json
+from ghidra.app.util.opinion import ElfLoader
 
 
 def bookmark_cwe(ghidra_address, text):
@@ -45,12 +46,16 @@ def compute_ghidra_address(address_string):
     fixed_address_string = address_string.replace(':32u', '').replace(':64u', '')
     address_int = int(fixed_address_string, 16)
     # Ghidra sometimes adds an offset to all addresses.
-    # Unfortunately, I havent't found a way to reliably detect this yet.
-    # Instead we detect the obvious case and hope that it works in most cases.
-    if address_int < currentProgram.getMinAddress().getOffset():
-        return currentProgram.getMinAddress().add(address_int)
-    else:
-        return currentProgram.getAddressFactory().getAddress(fixed_address_string)
+    try:
+        # try for ELF-files
+        offset = currentProgram.getMinAddress().getOffset() - int(ElfLoader.getElfOriginalImageBase(currentProgram))
+        return currentProgram.getAddressFactory().getAddress(fixed_address_string).add(offset)
+    except:
+        # the file is probably not an ELF file, so we use a workaround that should work in most cases.
+        if address_int < currentProgram.getMinAddress().getOffset():
+            return currentProgram.getMinAddress().add(address_int)
+        else:
+            return currentProgram.getAddressFactory().getAddress(fixed_address_string)
 
 
 def main():

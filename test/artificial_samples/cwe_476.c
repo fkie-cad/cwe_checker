@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 
 void func1(){
   void* data = malloc(20000);

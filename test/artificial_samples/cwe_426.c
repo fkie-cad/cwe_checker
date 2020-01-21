@@ -1,5 +1,7 @@
 // taken from https://exploit-exercises.com/nebula/level01/
 
+#define _GNU_SOURCE
+
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>

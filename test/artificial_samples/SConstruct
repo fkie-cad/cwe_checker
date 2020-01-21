@@ -2,49 +2,80 @@ import os
 
 build_path = 'build'
 
-supported_architectures = ['x64', 'x86', 'arm', 'mips', 'ppc']
+supported_architectures = ['x64', 'x86', 'arm', 'aarch64', 'mips', 'mipsel', 'mips64', 'mips64el', 'ppc', 'ppc64', 'ppc64le']
+skip_for_pe = ['cwe_782.c', 'cwe_426.c', 'cwe_243.c', 'cwe_243_clean.c']
 
-c_compilers = {'x64': ['gcc', 'clang'],
-               'x86': ['./dockcross-linux-x86 gcc'],
-               'arm': ['arm-linux-gnueabi-gcc'],
-               'mips': ['mips-linux-gnu-gcc'],
-               'ppc': ['powerpc-linux-gnu-gcc']}
+c_compilers = {'x64': ['gcc', 'x86_64-w64-mingw32-gcc', 'clang'],
+               'x86': ['gcc', 'i686-w64-mingw32-gcc', 'clang'],
+               'arm': ['arm-linux-gnueabi-gcc', 'clang'],
+               'aarch64': ['aarch64-linux-gnu-gcc', 'clang'],
+               'mips': ['mips-linux-gnu-gcc', 'clang'],
+               'mipsel': ['mipsel-linux-gnu-gcc', 'clang'],
+               'mips64': ['mips64-linux-gnuabi64-gcc', 'clang'],
+               'mips64el': ['mips64el-linux-gnuabi64-gcc', 'clang'],
+               'ppc': ['powerpc-linux-gnu-gcc'],
+               'ppc64': ['powerpc64-linux-gnu-gcc', 'clang'],
+               'ppc64le': ['powerpc64le-linux-gnu-gcc', 'clang']}
 
-c_linkers =   {'x86': './dockcross-linux-x86 gcc -m32'}
-
-cpp_compilers = {'x64': ['g++', 'clang'],
-                 'x86': ['./dockcross-linux-x86 g++'],
+cpp_compilers = {'x64': ['g++', 'x86_64-w64-mingw32-g++', 'clang++'],
+                 'x86': ['g++', 'i686-w64-mingw32-g++', 'clang++'],
                  'arm': ['arm-linux-gnueabi-g++'],
+                 'aarch64': ['aarch64-linux-gnu-g++'],
                  'mips': ['mips-linux-gnu-g++'],
-                 'ppc': ['powerpc-linux-gnu-g++']}
+                 'mipsel': ['mipsel-linux-gnu-g++'],
+                 'mips64': ['mips64-linux-gnuabi64-g++'],
+                 'mips64el': ['mips64el-linux-gnuabi64-g++'],
+                 'ppc': ['powerpc-linux-gnu-g++'],
+                 'ppc64': ['powerpc64-linux-gnu-g++'],
+                 'ppc64le': ['powerpc64le-linux-gnu-g++']}
 
-c_flags = {'x64': '-g -fno-stack-protector -std=c11',
-           'x86': '-g -m32 -fno-stack-protector -std=c11',
-           'arm': '-g -fno-stack-protector -std=c11',
-           'mips': '-g -fno-stack-protector -std=c11',
-           'ppc': '-g -fno-stack-protector -std=c11'}
+flags = {'x64': ' -g -fno-stack-protector -std=c11',
+         'x86': ' -g -m32 -fno-stack-protector -std=c11',
+         'arm': ' -g -fno-stack-protector -std=c11',
+         'aarch64': ' -g -fno-stack-protector -std=c11',
+         'mips': ' -g -fno-stack-protector -std=c11',
+         'mipsel': ' -g -fno-stack-protector -std=c11',
+         'mips64': ' -g -fno-stack-protector -std=c11',
+         'mips64el': ' -g -fno-stack-protector -std=c11',
+         'ppc': ' -g -fno-stack-protector -std=c11',
+         'ppc64': ' -g -fno-stack-protector -std=c11',
+         'ppc64le': ' -g -fno-stack-protector -std=c11'}
 
-cpp_flags = {'x64': '-g -fno-stack-protector',
-             'x86': '-g -m32 -fno-stack-protector',
-             'arm': '-g -fno-stack-protector',
-             'mips': '-g -fno-stack-protector',
-             'ppc': '-g -fno-stack-protector'}
+target_flags = {'x64': '',
+               'x86': ' -m32 ',
+               'arm': ' -target arm-linux-gnueabi',
+               'aarch64': ' -target aarch64-linux-gnu',
+               'mips': ' -target mips-linux-gnu',
+               'mipsel': ' -target mipsel-linux-gnu',
+               'mips64': ' -target mips64-linux-gnuabi64',
+               'mips64el': ' -target mips64-linux-gnuabi64',
+               'ppc64': ' -target powerpc64-linux-gnu',
+               'ppc64le': ' -target powerpc64le-linux-gnu'}
 
-cpp_linkers =   {'x86': './dockcross-linux-x86 g++ -m32'}
+
+cpp_flags = {'x64': ' -g -fno-stack-protector',
+             'x86': ' -m32 -g -fno-stack-protector',
+             'arm': ' -g -fno-stack-protector',
+             'aarch64': ' -g -fno-stack-protector',
+             'mips': ' -g -fno-stack-protector',
+             'mipsel': ' -g -fno-stack-protector',
+             'mips64': ' -g -fno-stack-protector',
+             'mips64el': ' -g -fno-stack-protector',
+             'ppc': ' -g -fno-stack-protector',
+             'ppc64': ' -g -fno-stack-protector',
+             'ppc64le': ' -g -fno-stack-protector',}
 
 def which(pgm):
-    # check dockcross installation
-    if pgm.startswith('.') and os.path.isfile(pgm.split()[0]):
-        return pgm
-    elif pgm.startswith('.') and not (os.path.isfile(pgm.split()[0])):
-        return None
-
     # check compilers on path
     path = os.getenv('PATH')
     for p in path.split(os.path.pathsep):
         p = os.path.join(p,pgm)
         if os.path.exists(p) and os.access(p,os.X_OK):
             return p
+    print('Compiler %s not in path!' % pgm)
+
+    return None
+
 
 def optimize(filename):
     optimize_me = ['cwe_476.c']
@@ -53,52 +84,69 @@ def optimize(filename):
     else:
         return ' -O0'
 
+
 def get_compiler_abrev(compiler_name):
-    if 'clang' in compiler_name:
+    if 'clang' == compiler_name:
         return 'clang'
-    else:
-        return 'gcc'
+    if 'clang++' == compiler_name:
+        return 'clang++'
+    if 'mingw32-g++' in compiler_name:
+        return 'mingw32-g++'
+    if 'g++' in compiler_name:
+        return 'g++'
+    if 'mingw32-gcc' in compiler_name:
+        return 'mingw32-gcc'
+
+    return 'gcc'
+
 
 def compile_only_on_x64(filename, arch):
     only_x64 = ['cwe_782.c']
     return filename in only_x64 and arch != 'x64'
 
+
 def build_c(arch, compiler):
     if which(compiler) is not None:
-        c_programs = Glob('*.c')
-        for p in c_programs:
-            if compile_only_on_x64(str(p), arch):
-                print('Skipping architecture %s for %s' % (arch, str(p)))
+        for prog in Glob('*.c'):
+            if compile_only_on_x64(str(prog), arch):
+                print('Skipping architecture %s for %s' % (arch, str(prog)))
                 continue
-            
+
             env = Environment()
             env['CC'] = compiler
-            env['CCFLAGS'] = c_flags[arch] + optimize(str(p))
-            if arch in c_linkers:
-                env['LINK'] = c_linkers[arch]
+            if compiler == 'clang':
+                env['CCFLAGS'] = target_flags[arch] + flags[arch] + optimize(str(prog))
+                env['LINKFLAGS'] = target_flags[arch]
+            else:
+                env['CCFLAGS'] = flags[arch] + optimize(str(prog))
+                if arch == 'x86':
+                    env['LINKFLAGS'] = '-m32'
 
             compiler_abrev = get_compiler_abrev(compiler)
-            env.Program('%s/%s_%s_%s.out' % (build_path, str(p).split('.')[0], arch, compiler_abrev),
-                        env.Object(target='%s/%s_%s_%s.o' % (build_path, str(p), arch, compiler_abrev),
-                                   source='%s/%s' % (build_path, str(p))))
+            if compiler_abrev == 'mingw32-gcc' and str(prog) in skip_for_pe:
+                continue
+            env.Program('%s/%s_%s_%s.out' % (build_path, str(prog).split('.')[0], arch, compiler_abrev),
+                        env.Object(target='%s/%s_%s_%s.o' % (build_path, str(prog), arch, compiler_abrev),
+                        source='%s/%s' % (build_path, str(prog))))
     else:
         print('Compiler %s for architecture %s is not installed!' % (compiler, arch))
 
 
 def build_cpp(arch, compiler):
     if which(compiler) is not None:
-        cpp_programs = Glob('*.cpp')
-        for p in cpp_programs:
+        for prog in Glob('*.cpp'):
             env = Environment()
-            env['CCP'] = compiler
-            env['CCPFLAGS'] = cpp_flags[arch] + optimize(str(p))
-            if arch in c_linkers:
-                env['CPPLINK'] = cpp_linkers[arch]
-
+            env['CXX'] = compiler
+            env['CXXFLAGS'] = cpp_flags[arch] + optimize(str(prog))
+            if arch == 'x86':
+                env['LINKFLAGS'] = '-m32'
+ 
             compiler_abrev = get_compiler_abrev(compiler)
-            env.Program('%s/%s_%s_%s.out' % (build_path, str(p).split('.')[0], arch, compiler_abrev),
-                        env.Object(target='%s/%s_%s_%s.o' % (build_path, str(p), arch, compiler_abrev),
-                                   source='%s/%s' % (build_path, str(p))))
+            if compiler_abrev == 'mingw32-g++' and str(prog) in skip_for_pe:
+                    continue
+            env.Program('%s/%s_%s_%s.out' % (build_path, str(prog).split('.')[0], arch, compiler_abrev),
+                        env.Object(target='%s/%s_%s_%s.o' % (build_path, str(prog), arch, compiler_abrev),
+                        source='%s/%s' % (build_path, str(prog))))
     else:
         print('Compiler %s for architecture %s is not installed!' % (compiler, arch))
 
@@ -108,4 +156,5 @@ for arch in supported_architectures:
     print('Building for architecture %s' % arch)
     for compiler in c_compilers[arch]:
         build_c(arch, compiler)
+    for compiler in cpp_compilers[arch]:
         build_cpp(arch, compiler)

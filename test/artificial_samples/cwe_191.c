@@ -10,7 +10,7 @@ void integer_underflow_subtraction(){
 
 
 
-main (void)
+int main (void)
 {
         integer_underflow_subtraction();
 }
