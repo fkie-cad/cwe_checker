@@ -61,5 +61,5 @@ let rec find_uncaught_exceptions subfunction already_checked_functions program ~
     way. We should check whether this produces a lot of false negatives. *)
 let check_cwe program _project tid_map _symbol_pairs _ =
   let entry_points = Symbol_utils.get_program_entry_points program in
-  let _ = Seq.fold entry_points ~init:[] ~f:(fun already_checked_functions sub -> find_uncaught_exceptions ~tid_map:tid_map sub already_checked_functions program) in
+  let _ = List.fold entry_points ~init:[] ~f:(fun already_checked_functions sub -> find_uncaught_exceptions ~tid_map:tid_map sub already_checked_functions program) in
   ()

@@ -22,5 +22,9 @@ let () =
     Project.register_pass' run_tests
   else
     (* The file was run as a standalone executable. Use make to build and run the unit test plugin *)
-    let () = Sys.chdir (Sys.getenv "PWD" ^ "/test/unit") in
+    let () = try
+        Sys.chdir (Sys.getenv "PWD" ^ "/test/unit")
+      with _ -> (* In the docker image the environment variable PWD is not set *)
+        Sys.chdir "/home/bap/cwe_checker/test/unit"
+    in
     exit (Sys.command "make all")
