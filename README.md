@@ -47,10 +47,13 @@ The following arguments should convince you to give *cwe_checker* a try:
 -  it is configureable, e.g. apply analyses to new APIs
 -  view results annotated in IDA Pro and Ghidra
 -  *cwe_checker* can be integrated as a plugin into [FACT](https://github.com/fkie-cad/FACT_core)
+
 ## How to install cwe_checker? ##
 There are several ways to install cwe_checker. The recommended way is to get cwe_checker from the Ocaml package manager Opam. You can install cwe_checker via the package [cwe_checker](https://opam.ocaml.org/packages/cwe_checker/) (`opam install cwe_checker`). This gives you a stable version of cwe_checker.
 
-Another option is to pull the latest Docker container from [dockerhub](https://hub.docker.com/r/fkiecad/cwe_checker) (`docker pull fkiecad/cwe_checker`).
+Another option is to pull the latest Docker image from [dockerhub](https://hub.docker.com/r/fkiecad/cwe_checker):
+-   `docker pull fkiecad/cwe_checker:latest` yields an image based on the current master branch.
+-   `docker pull fkiecad/cwe_checker:stable` yields an image based on the latest stable release version.
 
 If you plan to develop cwe_checker, it is recommended to build it using the provided `Makefile`. In this case you must ensure that all dependencies are fulfilled:
 -   Ocaml 4.05.0

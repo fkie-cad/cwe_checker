@@ -21,7 +21,7 @@
       If false, we assume that the callee, resp. the caller on a return instruction,
       checks all unchecked values still contained in parameter registers. If true, every
       unchecked value on a call or return instruction gets reported.
-    - strict_mem_policy=|{true, false|}:
+    - strict_mem_policy=\{true, false\}:
       Determines behaviour on writing an unchecked return value to a memory region other than the stack.
       If true, these instances get reported.
       Depending on the coding style, this can lead to a lot false positives if return values are

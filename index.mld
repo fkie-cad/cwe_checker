@@ -26,11 +26,13 @@ The symbolic execution based checks can be run with the emulation recipe in the 
 {[bap PATH_TO_BINARY --recipe=recipes/emulation]}
 Note that these checks are rather slow at the moment and should only be applied to small binaries.
 
-{2 How to use the docker image}
+{2 How to use the docker images}
 
-The docker image, which is based on the current master branch of the repository, can be installed with
-{[docker pull fkiecad/cwe_checker]}
-To use it, mount the target binary inside the docker container and call {i bap} with {i cwe_checker} as a pass as usual:
+There are two docker images containing preinstalled versions of the {i cwe_checker}:
+- [docker pull fkiecad/cwe_checker:latest] pulls the image based on the current master branch.
+- [docker pull fkiecad/cwe_checker:stable] pulls the image based on the current stable release version.
+
+To use them, mount the target binary inside the docker container and call {i bap} with {i cwe_checker} as a pass as usual:
 {[docker run --rm -v [BINARY]:/tmp/input fkiecad/cwe_checker bap /tmp/input --pass=cwe-checker]}
 If you are using a customized [config.json] file, don't forget to mount it inside your container as well!
 If you want to print the output to a file with [--cwe-checker-out], you also need to mount the output file to the docker container, or else the file will be lost once the container gets destroyed.
