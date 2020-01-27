@@ -1,3 +1,3 @@
 #!/bin/bash
-dune runtest
+docker run --rm -t cwe-checker dune runtest
 pytest
