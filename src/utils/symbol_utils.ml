@@ -165,11 +165,16 @@ let extract_direct_call_tid_from_block block =
               Some(tid)
             | _ -> None)
 
-let get_program_entry_points program =
+let get_program_entry_points (program: Program.t) : Sub.t List.t =
   let subfunctions = Term.enum sub_t program in
   let entry_points = Seq.filter subfunctions ~f:(fun subfn -> Term.has_attr subfn Sub.entry_point) in
-  let main_fn = Seq.filter subfunctions ~f:(fun subfn -> "@main" = Tid.name (Term.tid subfn)) in
-  Seq.append main_fn entry_points
+  match Seq.find subfunctions ~f:(fun subfn -> "main" = Sub.name subfn) with
+  | Some(main_fn) ->
+      if Seq.exists entry_points ~f:(fun elem -> elem = main_fn) then
+        Seq.to_list entry_points
+      else
+        main_fn :: (Seq.to_list entry_points)
+  | None -> Seq.to_list entry_points
 
 let stack_register project =
   let arch = Project.arch project in
