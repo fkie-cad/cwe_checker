@@ -56,10 +56,10 @@ Another option is to pull the latest Docker image from [dockerhub](https://hub.d
 -   `docker pull fkiecad/cwe_checker:stable` yields an image based on the latest stable release version.
 
 If you plan to develop cwe_checker, it is recommended to build it using the provided `Makefile`. In this case you must ensure that all dependencies are fulfilled:
--   Ocaml 4.05.0
+-   Ocaml 4.07.1
 -   Opam 2.0.2
 -   dune >= 1.6
--   BAP 1.6 (and its dependencies)
+-   BAP (and its dependencies). Development on the master branch depends on the master branch of BAP which can be added with `opam repo add bap-testing git+https://github.com/BinaryAnalysisPlatform/opam-repository#testing` to the sources of the Opam package manager. The stable release of the *cwe_checker* depends on BAP 1.6.
 -   yojson >= 1.6.0
 -   ppx_deriving_yojson >= 3.5.1
 -   alcotest >= 0.8.3 (for tests)
