@@ -5,8 +5,7 @@
   yojson
   bap
   cwe_checker_core
-  core_kernel
-  core)
+  core_kernel)
   (preprocess (pps ppx_jane))
 )
 
