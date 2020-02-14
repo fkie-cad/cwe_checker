@@ -94,7 +94,7 @@ let is_return_register (var: Var.t) (project: Project.t) : Bool.t =
   Option.is_some (List.find ret_register ~f:(String.equal (Var.name var)))
 
 (** Parse a line from the dyn-syms output table of readelf. Return the name of a symbol if the symbol is an extern function name. *)
-let parse_dyn_sym_line line =
+let parse_dyn_sym_line (line : string) : string option =
   let line = ref (String.strip line) in
   let str_list = ref [] in
   while Option.is_some (String.rsplit2 !line ~on:' ') do
@@ -104,10 +104,14 @@ let parse_dyn_sym_line line =
   done;
   str_list := !line :: !str_list;
   match !str_list with
-  | _ :: value :: _ :: "FUNC" :: _ :: _ :: _ :: name :: _ -> begin
-      match ( String.strip ~drop:(fun x -> x = '0') value, String.lsplit2 name ~on:'@') with
-      | ("", Some(left, _)) -> Some(left)
-      | ("", None) -> Some(name)
+  | value :: func1 :: func2 :: _ -> begin
+      match ( String.strip ~drop:(fun x -> x = '0') value ) with
+      | "" -> begin
+          if (String.equal func1 "DF" || String.equal func2 "DF") then (
+            List.last !str_list
+          )
+          else None
+        end
       | _ -> None (* The symbol has a nonzero value, so we assume that it is not an extern function symbol. *)
     end
   | _ -> None
@@ -119,13 +123,13 @@ let parse_dyn_syms project =
     match Project.get project filename with
     | None -> failwith "[CWE-checker] Project has no file name."
     | Some(fname) -> begin
-        let cmd = Format.sprintf "readelf --dyn-syms %s" fname in
+        let cmd = Format.sprintf "objdump --dynamic-syms %s" fname in
         try
           let in_chan = Unix.open_process_in cmd in
           let lines = In_channel.input_lines in_chan in
           let () = In_channel.close in_chan in begin
             match lines with
-            | _ :: _ :: _ :: tail -> (* The first three lines are not part of the table *)
+            | _ :: _ :: _ :: _ :: tail -> (* The first four lines are not part of the table *)
               let symbol_set = String.Set.of_list (List.filter_map tail ~f:parse_dyn_sym_line) in
               dyn_syms := Some(symbol_set);
               symbol_set
