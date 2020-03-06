@@ -1,5 +1,8 @@
 .PHONY: all clean test uninstall docker
 all:
+	cargo build --release
+	cp target/release/libcwe_checker_rs.a src/libcwe_checker_rs.a
+	cp target/release/libcwe_checker_rs.so src/dllcwe_checker_rs.so
 	dune build
 	dune install
 	cd plugins/cwe_checker; make all; cd ../..
@@ -8,11 +11,15 @@ all:
 	cd plugins/cwe_checker_type_inference_print; make all; cd ../..
 
 test:
+	cargo test
 	dune runtest
 	cd test/artificial_samples; scons; cd ../..
 	pytest -v
 
 clean:
+	cargo clean
+	rm -f src/libcwe_checker_rs.a
+	rm -f src/dllcwe_checker_rs.so
 	dune clean
 	bapbuild -clean
 	rm -f -r doc/html
