@@ -76,6 +76,8 @@ let test_project_conversion () =
   let program = Project.program (Option.value_exn !example_project) in
   let serde = SerdeJson.of_program program in
   let _json = SerdeJson.to_string serde in
+  (* TODO: The unit test for pointer inference should be moved to another file *)
+  Pointer_inference.run (Option.value_exn !example_project);
   check "Project" true
 
 let tests = [

@@ -10,6 +10,7 @@ extern crate ocaml;
 mod bil;
 mod term;
 pub mod ffi;
+mod analysis;
 
 
 

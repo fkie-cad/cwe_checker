@@ -7,6 +7,7 @@ This module contains all functions that interact with Ocaml via the foreign func
 use std::rc::Rc;
 
 pub mod serde;
+pub mod analysis;
 
 /// Helper function for catching panics at the ffi-border.
 /// If a panic occurs while executing F and that panic unwinds the stack,

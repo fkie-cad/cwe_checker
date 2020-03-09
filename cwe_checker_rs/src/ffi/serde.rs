@@ -37,6 +37,7 @@ pub enum JsonBuilder {
     Null,
     Bool(bool),
     Number(isize),
+    PositiveNumber(u64), // currently used only for deserialization of bitvector
     String(String),
     Array(Vec<Rc<JsonBuilder>>),
     Object(Vec<(String, Rc<JsonBuilder>)>),
@@ -51,6 +52,7 @@ impl From<&JsonBuilder> for serde_json::Value {
             JsonBuilder::Null => serde_json::Value::Null,
             JsonBuilder::Bool(val) => serde_json::Value::Bool(*val),
             JsonBuilder::Number(val) => serde_json::Value::Number(serde_json::Number::from(*val)),
+            JsonBuilder::PositiveNumber(val) => serde_json::Value::Number(serde_json::Number::from(*val)),
             JsonBuilder::String(val) => serde_json::Value::String(val.to_string()),
             JsonBuilder::Array(elem_vec) => elem_vec
                 .iter()
@@ -117,7 +119,7 @@ fn build_serde_bitvector(bitvector_string_val: ocaml::Value) -> ocaml::Value {
     let num = parse_int::parse::<u64>(elements[0]).expect("Bitvector value parsing failed");
     let width = isize::from_str(&elements[1][0..(elements[1].len() - 1)]).expect("Bitvector width parsing failed");
     let mut num_list = Vec::new();
-    num_list.push(Rc::new(JsonBuilder::Number(num as isize)));
+    num_list.push(Rc::new(JsonBuilder::PositiveNumber(num)));
     let mut width_list = Vec::new();
     width_list.push(Rc::new(JsonBuilder::Number(width)));
     let result = JsonBuilder::Object(vec![
