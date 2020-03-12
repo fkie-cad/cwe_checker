@@ -6,8 +6,8 @@ pub struct Tid(String);
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Term<T> {
-    tid: Tid,
-    term: T,
+    pub tid: Tid,
+    pub term: T,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]

@@ -17,13 +17,15 @@ use petgraph::graph::{DiGraph, EdgeIndex, NodeIndex};
 use petgraph::visit::EdgeRef;
 use std::collections::{BTreeMap, BinaryHeap};
 
-
 /// A fixpoint problem defines the context for a fixpoint computation.
 ///
 /// All trait methods have access to the FixpointProblem structure, so that context informations are accessible through it.
-pub trait FixpointProblem {
+pub trait Problem {
     type EdgeLabel: Clone;
+    type NodeLabel;
     type NodeValue: PartialEq + Eq;
+
+    fn get_graph(&self) -> &DiGraph<Self::NodeLabel, Self::EdgeLabel>;
 
     /// This function describes how to merge two values
     fn merge(&self, val1: &Self::NodeValue, val2: &Self::NodeValue) -> Self::NodeValue;
@@ -34,13 +36,12 @@ pub trait FixpointProblem {
     fn update_edge(
         &self,
         value: &Self::NodeValue,
-        edge: &Self::EdgeLabel,
+        edge: EdgeIndex,
     ) -> Option<Self::NodeValue>;
 }
 
 /// The solution struct contains an intermediate result of a fixpoint computation.
-struct Solution<'a, T: FixpointProblem> {
-    graph: &'a DiGraph<(), T::EdgeLabel>,
+struct Computation<T: Problem> {
     fp_problem: T,
     node_priority_list: Vec<usize>, // maps a node index to its priority (higher priority nodes get stabilized first)
     priority_to_node_list: Vec<NodeIndex>, // maps a priority to the corresponding node index
@@ -49,14 +50,11 @@ struct Solution<'a, T: FixpointProblem> {
     node_values: FnvHashMap<NodeIndex, T::NodeValue>,
 }
 
-impl<'a, T: FixpointProblem> Solution<'a, T> {
+impl<T: Problem> Computation<T> {
     /// Create a new fixpoint computation from a fixpoint problem, the corresponding graph
     /// and a default value for all nodes if one should exists.
-    pub fn new(
-        fp_problem: T,
-        graph: &'a DiGraph<(), T::EdgeLabel>,
-        default_value: Option<T::NodeValue>,
-    ) -> Self {
+    pub fn new(fp_problem: T, default_value: Option<T::NodeValue>) -> Self {
+        let graph = fp_problem.get_graph();
         // order the nodes in weak topological order
         let sorted_nodes: Vec<NodeIndex> = petgraph::algo::kosaraju_scc(&graph)
             .into_iter()
@@ -75,8 +73,7 @@ impl<'a, T: FixpointProblem> Solution<'a, T> {
                 worklist.push(i);
             }
         }
-        Solution {
-            graph: graph,
+        Computation {
             fp_problem,
             node_priority_list,
             priority_to_node_list: sorted_nodes,
@@ -115,11 +112,15 @@ impl<'a, T: FixpointProblem> Solution<'a, T> {
 
     /// Compute and update the value at the end node of an edge.
     fn update_edge(&mut self, edge: EdgeIndex) {
-        let (start_node, end_node) = self.graph.edge_endpoints(edge).expect("Edge not found");
+        let (start_node, end_node) = self
+            .fp_problem
+            .get_graph()
+            .edge_endpoints(edge)
+            .expect("Edge not found");
         if let Some(start_val) = self.node_values.get(&start_node) {
             if let Some(new_end_val) = self.fp_problem.update_edge(
                 start_val,
-                self.graph.edge_weight(edge).expect("Edge not found"),
+                edge
             ) {
                 self.merge_node_value(end_node, new_end_val);
             }
@@ -129,7 +130,8 @@ impl<'a, T: FixpointProblem> Solution<'a, T> {
     /// Update all outgoing edges of a node.
     fn update_node(&mut self, node: NodeIndex) {
         let edges: Vec<EdgeIndex> = self
-            .graph
+            .fp_problem
+            .get_graph()
             .edges(node)
             .map(|edge_ref| edge_ref.id())
             .collect();
@@ -142,7 +144,7 @@ impl<'a, T: FixpointProblem> Solution<'a, T> {
     /// Each node will be visited at most max_steps times.
     /// If a node does not stabilize after max_steps visits, the end result will not be a fixpoint but only an intermediate result of a fixpoint computation.
     pub fn compute_with_max_steps(&mut self, max_steps: u64) {
-        let mut steps = vec![0; self.graph.node_count()];
+        let mut steps = vec![0; self.fp_problem.get_graph().node_count()];
         while let Some(priority) = self.worklist.pop() {
             let node = self.priority_to_node_list[priority];
             if steps[node.index()] < max_steps {
@@ -166,11 +168,18 @@ impl<'a, T: FixpointProblem> Solution<'a, T> {
 mod tests {
     use super::*;
 
-    struct Problem {}
+    struct FPProblem {
+        graph: DiGraph<(), u64>
+    }
 
-    impl FixpointProblem for Problem {
+    impl Problem for FPProblem {
         type EdgeLabel = u64;
+        type NodeLabel = ();
         type NodeValue = u64;
+
+        fn get_graph(&self) -> &DiGraph<(), u64> {
+            &self.graph
+        }
 
         fn merge(&self, val1: &Self::NodeValue, val2: &Self::NodeValue) -> Self::NodeValue {
             std::cmp::min(*val1, *val2)
@@ -179,9 +188,9 @@ mod tests {
         fn update_edge(
             &self,
             value: &Self::NodeValue,
-            edge: &Self::EdgeLabel,
+            edge: EdgeIndex,
         ) -> Option<Self::NodeValue> {
-            Some(value + edge)
+            Some(value + self.graph.edge_weight(edge).unwrap())
         }
     }
 
@@ -199,7 +208,7 @@ mod tests {
         }
         graph.add_edge(NodeIndex::new(100), NodeIndex::new(0), 0);
 
-        let mut solution = Solution::new(Problem {}, &graph, None);
+        let mut solution = Computation::new(FPProblem {graph}, None);
         solution.set_node_value(NodeIndex::new(0), 0);
         solution.compute_with_max_steps(20);
 
