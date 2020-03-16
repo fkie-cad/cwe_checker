@@ -138,7 +138,7 @@ let main json_output file_output proj =
   end;
   analyze_events ();
   Incident_reporter.parse_reports ();
-  Incident_reporter.coordinate_reports ();
+  Incident_reporter.report_cwe ();
   Incident_reporter.report_unknown_incidents ();
   if json_output then
     begin
@@ -146,8 +146,9 @@ let main json_output file_output proj =
       | Some fname -> Log_utils.emit_json fname file_output
       | None -> Log_utils.emit_json "" file_output
     end
-  else
-    Log_utils.emit_native file_output
+    else
+      Log_utils.emit_native file_output
+
 
 module Cmdline = struct
   open Config
