@@ -62,15 +62,10 @@ let report_cwe _ =
 
 
 let report_unknown_incidents _ =
-  match Array.is_empty !unknown_cwe_incidents with
-  | true -> ()
-  | false -> begin
-    print_endline "Unknown incidents:";
-    Array.iter ~f:(fun (path, inc) ->
-      let description = inc ^ " " ^ path in
-      collect_cwe_warning (cwe_warning_factory inc version ~other:[["path"; path]] description)
-    ) !unknown_cwe_incidents
-    end
+  Array.iter ~f:(fun (path, inc) ->
+    let description = inc ^ " " ^ path in
+    collect_cwe_warning (cwe_warning_factory inc version ~other:[["path"; path]] description)
+  ) !unknown_cwe_incidents
 
 
 let collect_known_incidents (cwe : int) (execution_path : string) =
