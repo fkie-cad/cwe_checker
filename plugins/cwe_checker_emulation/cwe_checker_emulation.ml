@@ -146,8 +146,8 @@ let main json_output file_output proj =
       | Some fname -> Log_utils.emit_json fname file_output
       | None -> Log_utils.emit_json "" file_output
     end
-    else
-      Log_utils.emit_native file_output
+  else
+    Log_utils.emit_native file_output
 
 
 module Cmdline = struct
