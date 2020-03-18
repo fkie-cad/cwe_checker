@@ -8,3 +8,5 @@
 
 -   [Jörg Stucke](https://github.com/jstucke)
     -   Docker container
+
+-   [Melvin Klimke](https://github.com/mellowCS)

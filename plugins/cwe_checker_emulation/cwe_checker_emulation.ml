@@ -121,7 +121,7 @@ end
 
 (** Main logic of program:
 - we monitor all 'incident' related events
-- for all subroutins we fork a Primus machine
+- for all subroutines we fork a Primus machine
 - all monitored events are collected globally
 - after the last Primus machine has terminated we report all observed incidents *)
 let main json_output file_output proj =
@@ -137,6 +137,9 @@ let main json_output file_output proj =
      info "program terminated by a signal: %s" (Primus.Exn.to_string exn);
   end;
   analyze_events ();
+  Incident_reporter.parse_reports ();
+  Incident_reporter.report_cwe ();
+  Incident_reporter.report_unknown_incidents ();
   if json_output then
     begin
       match Project.get proj filename with
@@ -145,6 +148,7 @@ let main json_output file_output proj =
     end
   else
     Log_utils.emit_native file_output
+
 
 module Cmdline = struct
   open Config

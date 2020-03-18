@@ -152,3 +152,25 @@ let rec equal (mem_region1:'a t) (mem_region2:'a t) ~data_equal : bool =
     else
       false
   | _ -> false
+
+let map_data (mem_region: 'a t) ~(f: 'a -> 'b) : 'b t =
+  List.map mem_region ~f:(fun mem_node ->
+    { pos = mem_node.pos;
+      size = mem_node.size;
+      data = Result.map mem_node.data ~f
+    }
+  )
+
+let list_data (mem_region: 'a t) : 'a List.t =
+  List.filter_map mem_region ~f:(fun mem_node ->
+    match mem_node.data with
+    | Ok(value) -> Some(value)
+    | Error(_) -> None
+  )
+
+let list_data_pos (mem_region: 'a t) : (Bitvector.t * 'a) List.t =
+  List.filter_map mem_region ~f:(fun mem_node ->
+    match mem_node.data with
+    | Ok(value) -> Some( mem_node.pos, value )
+    | Error(_) -> None
+  )

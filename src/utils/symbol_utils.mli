@@ -1,5 +1,7 @@
 (** This module implements functionality to work with symbols (e.g. malloc).*)
 
+open Core_kernel
+
 type concrete_call = {
   call_site : Bap.Std.tid
   ; symbol_address : Bap.Std.tid
@@ -76,7 +78,7 @@ val extract_direct_call_tid_from_block : Bap.Std.blk Bap.Std.term -> Bap.Std.tid
 (** Returns a sequence of all entry points of the program.
     TODO: The _start entry point usually calls a libc-function which then calls the main function. Since right now only direct
     calls are tracked, our graph traversal may never find the main function. For now, we add it by hand to the entry points. *)
-val get_program_entry_points : Bap.Std.program Bap.Std.term -> Bap.Std.sub Bap.Std.term Bap.Std.Seq.t
+val get_program_entry_points : Bap.Std.program Bap.Std.term -> Bap.Std.sub Bap.Std.term List.t
 
 (** Returns the stack register on the architecture of the given project. *)
 val stack_register: Bap.Std.Project.t -> Bap.Std.Var.t

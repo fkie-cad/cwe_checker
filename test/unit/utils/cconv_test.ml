@@ -17,17 +17,36 @@ let test_callee_saved () =
   let () = check "caller_saved_register" (is_callee_saved register project = false) in
   ()
 
+let test_parameter_register () =
+  (* this test assumes, that the example project is a x64 binary *)
+  let project = Option.value_exn !example_project in
+  let register = Var.create "RDX" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
+  let () = check "return_register" (is_parameter_register register project) in
+  let register = Var.create "RAX" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
+  let () = check "no_return_register" (is_parameter_register register project = false) in
+  ()
+
+let test_return_register () =
+  (* this test assumes, that the example project is a x64 binary *)
+  let project = Option.value_exn !example_project in
+  let register = Var.create "RAX" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
+  let () = check "return_register" (is_return_register register project) in
+  let register = Var.create "R12" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
+  let () = check "no_return_register" (is_return_register register project = false) in
+  ()
+
 let test_parse_dyn_syms () =
 (* this test assumes, that the example project is the arrays_x64.out binary from the artificial samples. *)
   let project = Option.value_exn !example_project in
   let () = check "free_as_dyn_sym" (String.Set.mem (parse_dyn_syms project) "free") in
   let () = check "__libc_start_main_as_dyn_sym" (String.Set.mem (parse_dyn_syms project) "__libc_start_main") in
   let () = check "malloc_as_dyn_sym" (String.Set.mem (parse_dyn_syms project) "malloc") in
-  let () = check "__cxa_finalize_as_dyn_sym" (String.Set.mem (parse_dyn_syms project) "__cxa_finalize") in
-  let () = check "dyn_sym_count" (String.Set.count (parse_dyn_syms project) ~f:(fun _elem -> true) = 4) in
+  let () = check "realloc_not_a_dyn_sym" (false = String.Set.mem (parse_dyn_syms project) "realloc") in
   ()
 
 let tests = [
   "Callee saved register", `Quick, test_callee_saved;
+  "Parameter register", `Quick, test_parameter_register;
+  "Return register", `Quick, test_return_register;
   "Parse dynamic symbols", `Quick, test_parse_dyn_syms;
 ]

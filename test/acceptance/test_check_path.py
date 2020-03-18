@@ -16,4 +16,4 @@ class TestCheckPath(unittest.TestCase):
         output = subprocess.check_output(self.cmd.split())
         j = json.loads(output)
         self.assertTrue('check_path' in j)
-        self.assertEqual(len(j['check_path']), 7)
+        self.assertEqual(len(j['check_path']), 5)

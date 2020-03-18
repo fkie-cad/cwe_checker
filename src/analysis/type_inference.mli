@@ -45,6 +45,12 @@ module TypeInfo : sig
 
   (* Pretty Printer. At the moment, the output is not pretty at all. *)
   val pp: Format.formatter -> t -> unit
+
+  (** if the addr_exp is a (computable) stack offset, return the offset. In cases where addr_expr
+      may or may not be a stack offset (i.e. offset of a register which may point to the stack or
+      to some other memory region), it still returns an offset. *)
+  val compute_stack_offset: t -> Exp.t -> sub_tid:Tid.t -> project:Project.t -> Bitvector.t Option.t
+
 end
 
 (** A tag for TypeInfo.t, so that we can annotate basic blocks with known type information
@@ -64,6 +70,12 @@ val print_type_info_tags: project:Project.t -> tid_map:word Tid.Map.t -> unit
     after execution of the element. sub_tid is the Tid of the current function
     which is internally used to mark which pointers point to the current stack frame.*)
 val update_type_info: Blk.elt -> TypeInfo.t -> sub_tid:Tid.t -> project:Project.t -> TypeInfo.t
+
+(** Get the type info for each def term and jump term in a block.
+    The returned type info for the tid of a (def/jmp) term is the tid before that term.
+    The sub_tid is the Tid of the current function which is internally used to mark
+    which pointers point to the current stack frame. *)
+val get_type_info_of_block: project:Project.t -> Blk.t -> sub_tid:Tid.t -> TypeInfo.t Tid.Map.t
 
 (* functions made available for unit tests: *)
 module Private : sig

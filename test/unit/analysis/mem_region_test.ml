@@ -87,6 +87,22 @@ let test_around_zero () =
   let x = Mem_region.add x "Two" ~pos:(bv (-5)) ~size:(bv 20) in
   check "around_zero2" (Some(Error()) = Mem_region.get x (bv 0))
 
+let test_list_data () =
+  let bv num = Bitvector.of_int num ~width:32 in
+  let x = Mem_region.empty () in
+  let x = Mem_region.add x "One" ~pos:(bv (15)) ~size:(bv 10) in
+  let x = Mem_region.add x "Two" ~pos:(bv 0) ~size:(bv 10) in
+  let x = Mem_region.add x "Three" ~pos:(bv (-5)) ~size:(bv 10) in
+  let x = Mem_region.add x "Four" ~pos:(bv (-15)) ~size:(bv 10) in
+  let data_list = "Four" :: "Three" :: "One" :: [] in
+  check "list_data" (Mem_region.list_data x = data_list);
+  let data_pos_list = (bv (-15), "Four") :: (bv (-5), "Three") :: (bv 15, "One") ::[] in
+  check "list_data_pos" (Mem_region.list_data_pos x = data_pos_list);
+  let pos_minus = Bitvector.to_int_exn (Bitvector.signed (bv (-5))) in
+  let pos_plus = Bitvector.to_int_exn (Bitvector.signed (bv 5)) in
+  check "expected_sign_minus" (pos_minus < 0);
+  check "expected_sign_plus" (pos_plus > 0)
+
 let tests = [
   "Add", `Quick, test_add;
   "Negative Indices", `Quick, test_minus;
@@ -95,4 +111,5 @@ let tests = [
   "Merge", `Quick, test_merge;
   "Equal", `Quick, test_equal;
   "Around Zero", `Quick, test_around_zero;
+  "List data", `Quick, test_list_data;
 ]
