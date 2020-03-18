@@ -140,11 +140,6 @@ def build_cpp(arch, compiler):
             env['CXXFLAGS'] = cpp_flags[arch] + optimize(str(prog))
             if arch == 'x86':
                 env['LINKFLAGS'] = '-m32'
-<<<<<<< HEAD
- 
-=======
-
->>>>>>> d8c03e5e977013c00b386d4ff3f07357ad69f0bd
             compiler_abrev = get_compiler_abrev(compiler)
             if compiler_abrev == 'mingw32-g++' and str(prog) in skip_for_pe:
                     continue
