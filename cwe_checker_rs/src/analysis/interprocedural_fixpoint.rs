@@ -1,10 +1,46 @@
+/*!
+This module defines a trait for interprocedural fixpoint problems.
+
+## Basic usage
+
+Define a *Context* struct containing all information that does not change during the fixpoint computation.
+In particular, this includes the graph on which the fixpoint computation is run.
+Then implement the *Problem* trait for the *Context* struct.
+The fixpoint computation can now be run as follows:
+```
+let context = MyContext::new(); // MyContext needs to implement Problem
+let mut computation = Computation::new(context, None);
+// add starting node values here with
+computation.compute();
+// computation is done, get solution node values here
+```
+*/
+
 use super::fixpoint::Problem as GeneralFPProblem;
 use super::graph::*;
 use crate::bil::Expression;
 use crate::term::*;
-use petgraph::graph::EdgeIndex;
+use petgraph::graph::{EdgeIndex, NodeIndex};
 use std::marker::PhantomData;
 
+#[derive(PartialEq, Eq)]
+pub enum NodeValue<T: PartialEq + Eq> {
+    Value(T),
+    CallReturnCombinator { call: Option<T>, return_: Option<T> },
+}
+
+impl<T: PartialEq + Eq> NodeValue<T> {
+    pub fn unwrap_value(&self) -> &T {
+        match self {
+            NodeValue::Value(value) => value,
+            _ => panic!("Unexpected node value type"),
+        }
+    }
+}
+
+/// An interprocedural fixpoint problem defines the context for a fixpoint computation.
+///
+/// All trait methods have access to the FixpointProblem structure, so that context informations are accessible through it.
 pub trait Problem<'a> {
     type Value: PartialEq + Eq + Clone;
 
@@ -34,9 +70,19 @@ pub trait Problem<'a> {
     ) -> Option<Self::Value>;
 }
 
+/// This struct is a wrapper to create a general fixpoint problem out of an interprocedural fixpoint problem.
 struct GeneralizedProblem<'a, T: Problem<'a>> {
     problem: T,
     _phantom_graph_reference: PhantomData<Graph<'a>>,
+}
+
+impl<'a, T: Problem<'a>> GeneralizedProblem<'a, T> {
+    pub fn new(problem: T) -> Self {
+        GeneralizedProblem {
+            problem,
+            _phantom_graph_reference: PhantomData,
+        }
+    }
 }
 
 impl<'a, T: Problem<'a>> GeneralFPProblem for GeneralizedProblem<'a, T> {
@@ -118,6 +164,48 @@ impl<'a, T: Problem<'a>> GeneralFPProblem for GeneralizedProblem<'a, T> {
                 .update_jump(node_value.unwrap_value(), jump, *untaken_conditional)
                 .map(|val| NodeValue::Value(val)),
         }
+    }
+}
+
+/// This struct contains an intermediate result of an interprocedural fixpoint cumputation.
+pub struct Computation<'a, T: Problem<'a>> {
+    generalized_computation: super::fixpoint::Computation<GeneralizedProblem<'a, T>>,
+}
+
+impl<'a, T: Problem<'a>> Computation<'a, T> {
+    /// Generate a new computation from the corresponding problem and a default value for nodes.
+    pub fn new(problem: T, default_value: Option<T::Value>) -> Self {
+        let generalized_problem = GeneralizedProblem::new(problem);
+        let computation = super::fixpoint::Computation::new(
+            generalized_problem,
+            default_value.map(|val| NodeValue::Value(val)),
+        );
+        Computation {
+            generalized_computation: computation,
+        }
+    }
+
+    /// Compute the fixpoint.
+    /// Note that this function does not terminate if the fixpoint algorithm does not stabilize
+    pub fn compute(&mut self) {
+        self.generalized_computation.compute()
+    }
+
+    /// Compute the fixpoint while updating each node at most max_steps times.
+    /// Note that the result may not be a stabilized fixpoint, but only an intermediate result of a fixpoint computation.
+    pub fn compute_with_max_steps(&mut self, max_steps: u64) {
+        self.generalized_computation
+            .compute_with_max_steps(max_steps)
+    }
+
+    /// Get the value of a node.
+    pub fn get_node_value(&self, node: NodeIndex) -> Option<&NodeValue<T::Value>> {
+        self.generalized_computation.get_node_value(node)
+    }
+
+    /// Set the value of a node and mark the node as not yet stabilized
+    pub fn set_node_value(&mut self, node: NodeIndex, value: NodeValue<T::Value>) {
+        self.generalized_computation.set_node_value(node, value)
     }
 }
 

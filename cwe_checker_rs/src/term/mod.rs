@@ -4,6 +4,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Tid(String);
 
+impl Tid {
+    pub fn new<T: ToString>(val: T) -> Tid {
+        Tid(val.to_string())
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Term<T> {
     pub tid: Tid,
@@ -45,18 +51,18 @@ pub enum Label {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Blk {
     pub defs: Vec<Term<Def>>,
-    pub jmps: Vec<Term<Jmp>>
+    pub jmps: Vec<Term<Jmp>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Sub {
-    name: String,
-    blocks: Vec<Term<Blk>>
+    pub name: String,
+    pub blocks: Vec<Term<Blk>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Program {
-    subs: Vec<Term<Sub>>,
+    pub subs: Vec<Term<Sub>>,
 }
 
 #[cfg(test)]
@@ -72,8 +78,8 @@ mod tests {
             term: Blk {
                 defs: Vec::new(),
                 jmps: Vec::new(),
-            }
+            },
         };
-        assert_eq!(block_term,serde_json::from_str(&string).unwrap());
+        assert_eq!(block_term, serde_json::from_str(&string).unwrap());
     }
 }

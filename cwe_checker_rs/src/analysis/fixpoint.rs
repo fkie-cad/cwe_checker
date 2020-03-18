@@ -40,8 +40,8 @@ pub trait Problem {
     ) -> Option<Self::NodeValue>;
 }
 
-/// The solution struct contains an intermediate result of a fixpoint computation.
-struct Computation<T: Problem> {
+/// The computation struct contains an intermediate result of a fixpoint computation.
+pub struct Computation<T: Problem> {
     fp_problem: T,
     node_priority_list: Vec<usize>, // maps a node index to its priority (higher priority nodes get stabilized first)
     priority_to_node_list: Vec<NodeIndex>, // maps a priority to the corresponding node index
