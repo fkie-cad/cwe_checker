@@ -84,7 +84,7 @@ let emit_native out_path =
   let output_check_path = List.map !check_path_store ~f:(fun (check_path:CheckPath.t) ->
                               sprintf "[CheckPath] %s(%s) -> %s via %s" check_path.source check_path.source_addr check_path.destination_addr check_path.path_str) in
   let output_warnings = List.map !cwe_warning_store ~f:(fun (cwe_warning:CweWarning.t) ->
-                            sprintf "[%s] (%s) %s" cwe_warning.name cwe_warning.version cwe_warning.description) in
+                            sprintf "[%s] (%s) \n %s" cwe_warning.name cwe_warning.version cwe_warning.description) in
   let output_lines = output_warnings @ output_check_path in
   if out_path = "" then
     List.iter output_lines ~f:print_endline
