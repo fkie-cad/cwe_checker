@@ -113,6 +113,7 @@ class TestCwe416(unittest.TestCase):
             self.target, self.target, 'mips64el', 'clang', self.string)
         self.assertEqual(res, expect_res)
 
+    @unittest.skip('FIXME: Check again when moved to BAP 2.1')
     def test_cwe416_01_ppc_gcc(self):
         expect_res = 1
         res = cwe_checker_testlib.execute_emulation_and_check_occurence(
@@ -154,6 +155,7 @@ class TestCwe416(unittest.TestCase):
             self.target, self.target, 'x86', 'mingw32-gcc', self.string)
         self.assertEqual(res, expect_res)
 
+    @unittest.skip('FIXME: Check again when moved to BAP 2.1')
     def test_cwe416_01_x64_mingw_gcc(self):
         expect_res = 1
         res = cwe_checker_testlib.execute_emulation_and_check_occurence(
