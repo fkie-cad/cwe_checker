@@ -92,7 +92,7 @@ impl<T: Problem> Computation<T> {
         }
     }
 
-    /// Set the value of a node and add mark the node as not yet stabilized.
+    /// Set the value of a node and mark the node as not yet stabilized.
     pub fn set_node_value(&mut self, node: NodeIndex, value: T::NodeValue) {
         self.node_values.insert(node, value);
         self.worklist.push(self.node_priority_list[node.index()]);
