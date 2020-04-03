@@ -96,6 +96,10 @@ let check_for_help (flags: string list) : bool =
     print_help_message (); true
   ) else false
 
+let check_for_version (flags:string list) : bool =
+  if (Stdlib.List.mem "-v" flags) || (Stdlib.List.mem "-version" flags) || (Stdlib.List.mem "--version" flags) then (
+    print_version (); true
+  ) else false
 
 let check_for_module_versions (flags: string list) : bool =
   if Stdlib.List.mem "-module-versions" flags then
@@ -134,6 +138,7 @@ let process_input () : string * string list =
   | [] -> raise (NoBinaryPathException ("No binary path was provided. If you need help, please call the cwe_checker with the --help or -h flag"))
   | input  -> (
       if check_for_help input then exit 0;
+      if check_for_version input then exit 0;
       if check_for_module_versions input then exit 0;
       check_for_no_logging input;
       let binary_path = check_for_binary_path input in

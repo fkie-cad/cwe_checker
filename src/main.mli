@@ -12,6 +12,11 @@ type cwe_module = {
   has_parameters : bool;
 }
 
+val version: String.t
+
+(** prints the version number *)
+val print_version: unit -> unit
+
 val known_modules: cwe_module List.t
 
 val cmdline_flags: (String.t * String.t) List.t
