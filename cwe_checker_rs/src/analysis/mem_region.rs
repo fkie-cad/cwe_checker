@@ -31,9 +31,9 @@ struct Element<T> {
 }
 
 #[derive(Serialize, Deserialize, Debug, Hash, Clone)]
-pub struct MemRegion<T: AbstractDomain + ValueDomain>(Arc<MemRegionData<T>>);
+pub struct MemRegion<T: AbstractDomain + ValueDomain + std::fmt::Debug>(Arc<MemRegionData<T>>);
 
-impl<T: AbstractDomain + ValueDomain> PartialEq for MemRegion<T> {
+impl<T: AbstractDomain + ValueDomain + std::fmt::Debug> PartialEq for MemRegion<T> {
     fn eq(&self, other: &Self) -> bool {
         if Arc::ptr_eq(&self.0, &other.0) {
             true
@@ -43,9 +43,9 @@ impl<T: AbstractDomain + ValueDomain> PartialEq for MemRegion<T> {
     }
 }
 
-impl<T: AbstractDomain + ValueDomain> Eq for MemRegion<T> {}
+impl<T: AbstractDomain + ValueDomain + std::fmt::Debug> Eq for MemRegion<T> {}
 
-impl<T: AbstractDomain + ValueDomain> MemRegion<T> {
+impl<T: AbstractDomain + ValueDomain + std::fmt::Debug> MemRegion<T> {
     pub fn new(address_bitsize: BitSize) -> Self {
         MemRegion(Arc::new(MemRegionData::new(address_bitsize)))
     }
@@ -62,11 +62,11 @@ impl<T: AbstractDomain + ValueDomain> MemRegion<T> {
         }
     }
 
-    pub fn add(&mut self, value: T, position: Bitvector, size_in_bytes: Bitvector) {
-        Arc::make_mut(&mut self.0).add(value, position, size_in_bytes)
+    pub fn add(&mut self, value: T, position: Bitvector) {
+        Arc::make_mut(&mut self.0).add(value, position)
     }
 
-    pub fn get(&self, position: Bitvector, size_in_bytes: Bitvector) -> T {
+    pub fn get(&self, position: Bitvector, size_in_bytes: u64) -> T {
         self.0.get(position, size_in_bytes)
     }
 
@@ -77,12 +77,12 @@ impl<T: AbstractDomain + ValueDomain> MemRegion<T> {
 
 /// An abstract domain representing a continuous region of memory. See the module level description for more.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
-struct MemRegionData<T: AbstractDomain + ValueDomain> {
+struct MemRegionData<T: AbstractDomain + ValueDomain + std::fmt::Debug> {
     address_bitsize: BitSize,
-    values: BTreeMap<i64, Element<T>>,
+    values: BTreeMap<i64, T>,
 }
 
-impl<T: AbstractDomain + ValueDomain> MemRegionData<T> {
+impl<T: AbstractDomain + ValueDomain + std::fmt::Debug> MemRegionData<T> {
     /// create a new, empty MemRegion
     pub fn new(address_bitsize: BitSize) -> MemRegionData<T> {
         MemRegionData {
@@ -102,7 +102,7 @@ impl<T: AbstractDomain + ValueDomain> MemRegionData<T> {
         if let Some((prev_pos, prev_size)) = self
             .values
             .range(..position)
-            .map(|(pos, elem)| (*pos, elem.size))
+            .map(|(pos, elem)| (*pos, elem.bitsize() as i64 / 8))
             .last()
         {
             if prev_pos + prev_size > position {
@@ -121,27 +121,28 @@ impl<T: AbstractDomain + ValueDomain> MemRegionData<T> {
     }
 
     /// Add a value to the memory region.
-    pub fn add(&mut self, value: T, position: Bitvector, size_in_bytes: Bitvector) {
+    pub fn add(&mut self, value: T, position: Bitvector) {
         assert_eq!(position.width().to_usize(), self.address_bitsize as usize);
         let position = Int::from(position).try_to_i64().unwrap();
-        let size = Int::from(size_in_bytes).try_to_i64().unwrap();
-        assert!(size > 0);
+        assert!( value.bitsize() % 8 == 0);
+        let size_in_bytes = value.bitsize() as i64 / 8;
+        assert!(size_in_bytes > 0);
 
-        self.clear_interval(position, size);
-        self.values.insert(position, Element { size, value });
+        self.clear_interval(position, size_in_bytes);
+        self.values.insert(position, value);
     }
 
     /// Get the value at the given position.
     /// If there is no value at the position or the size of the element is not the same as the provided size, return `T::top()`.
-    pub fn get(&self, position: Bitvector, size_in_bytes: Bitvector) -> T {
+    pub fn get(&self, position: Bitvector, size_in_bytes: u64) -> T {
         assert_eq!(position.width().to_usize(), self.address_bitsize as usize);
         let position = Int::from(position).try_to_i64().unwrap();
-        let size = Int::from(size_in_bytes).try_to_i64().unwrap();
+        let size = size_in_bytes as i64;
         assert!(size > 0);
 
         if let Some(elem) = self.values.get(&position) {
-            if elem.size == size {
-                return elem.value.clone();
+            if (elem.bitsize() as i64) == (size * 8) {
+                return elem.clone();
             }
         }
         let bitsize = 8 * size as u16;
@@ -164,7 +165,7 @@ impl<T: AbstractDomain + ValueDomain> MemRegionData<T> {
             return true;
         };
         if let Some((pos_previous, elem_previous)) = self.values.range(..pos).last() {
-            if pos_previous + elem_previous.size > pos {
+            if pos_previous + (elem_previous.bitsize() as i64 / 8) > pos {
                 return true;
             }
         }
@@ -178,16 +179,13 @@ impl<T: AbstractDomain + ValueDomain> MemRegionData<T> {
     pub fn merge(&self, other: &MemRegionData<T>) -> MemRegionData<T> {
         assert_eq!(self.address_bitsize, other.address_bitsize);
 
-        let mut merged_values: BTreeMap<i64, Element<T>> = BTreeMap::new();
+        let mut merged_values: BTreeMap<i64, T> = BTreeMap::new();
 
         // add all elements contained in both memory regions
         for (pos_left, elem_left) in self.values.iter() {
             if let Some((_pos_right, elem_right)) = other.values.get_key_value(pos_left) {
-                if elem_left.size == elem_right.size {
-                    let merged_val = Element {
-                        size: elem_left.size,
-                        value: elem_left.value.merge(&elem_right.value),
-                    };
+                if elem_left.bitsize() == elem_right.bitsize() {
+                    let merged_val = elem_left.merge(&elem_right);
                     merged_values.insert(*pos_left, merged_val);
                 }
             }
@@ -205,26 +203,26 @@ mod tests {
     use super::*;
 
     #[derive(PartialEq, Eq, Clone, Copy, Debug, Hash, PartialOrd, Ord)]
-    struct MockDomain(i64);
+    struct MockDomain(i64, BitSize);
 
     impl AbstractDomain for MockDomain {
         fn top(&self) -> MockDomain {
-            MockDomain::new_top(8)
+            MockDomain::new_top(self.1)
         }
     }
 
     impl ValueDomain for MockDomain {
         fn bitsize(&self) -> BitSize {
-            8 as u16
+            self.1
         }
 
-        fn new_top(_bitsize: BitSize) -> MockDomain {
-            MockDomain(0)
+        fn new_top(bitsize: BitSize) -> MockDomain {
+            MockDomain(0, bitsize)
         }
     }
 
-    fn mock(val: i64) -> MockDomain {
-        MockDomain(val)
+    fn mock(val: i64, bitsize: BitSize) -> MockDomain {
+        MockDomain(val, bitsize)
     }
 
     fn bv(val: i64) -> Bitvector {
@@ -234,27 +232,28 @@ mod tests {
     #[test]
     fn mem_region() {
         let mut region: MemRegion<MockDomain> = MemRegion::new(64);
-        region.add(mock(5), bv(5), bv(3));
-        region.add(mock(7), bv(8), bv(2));
-        assert_eq!(region.get(bv(8), bv(2)), mock(7));
-        assert_eq!(region.get(bv(5), bv(3)), mock(5));
-        assert_eq!(region.get(bv(5), bv(2)), MockDomain::new_top(8));
-        region.add(mock(9), bv(6), bv(2));
-        assert_eq!(region.get(bv(6), bv(2)), mock(9));
-        assert_eq!(region.get(bv(5), bv(3)), MockDomain::new_top(8));
-        assert_eq!(region.get(bv(8), bv(2)), mock(7));
-        region.add(mock(9), bv(-3), bv(11));
-        assert_eq!(region.get(bv(-3), bv(11)), mock(9));
-        assert_eq!(region.get(bv(6), bv(2)), MockDomain::new_top(8));
-        assert_eq!(region.get(bv(8), bv(2)), mock(7));
+        region.add(mock(5, 3*8), bv(5));
+        assert_eq!(region.get(bv(5), 3), mock(5, 3*8));
+        region.add(mock(7, 2*8), bv(8));
+        assert_eq!(region.get(bv(8), 2),  mock(7, 2*8));
+        assert_eq!(region.get(bv(5), 3), mock(5, 3*8));
+        assert_eq!(region.get(bv(5), 2), MockDomain::new_top(2*8));
+        region.add(mock(9, 2*8), bv(6));
+        assert_eq!(region.get(bv(6), 2), mock(9, 2*8));
+        assert_eq!(region.get(bv(5), 3), MockDomain::new_top(3*8));
+        assert_eq!(region.get(bv(8), 2), mock(7, 2*8));
+        region.add(mock(9, 11*8), bv(-3));
+        assert_eq!(region.get(bv(-3), 11), mock(9, 11*8));
+        assert_eq!(region.get(bv(6), 2), MockDomain::new_top(2*8));
+        assert_eq!(region.get(bv(8), 2), mock(7, 2*8));
 
         let mut other_region = MemRegion::new(64);
-        other_region.add(mock(7), bv(8), bv(2));
+        other_region.add(mock(7, 2*8), bv(8));
         assert!(region != other_region);
         let merged_region = region.merge(&other_region);
-        assert_eq!(merged_region.get(bv(8), bv(2)), mock(7));
-        assert_eq!(merged_region.get(bv(-3), bv(11)), MockDomain::new_top(8));
-        other_region.add(mock(9), bv(-3), bv(11));
+        assert_eq!(merged_region.get(bv(8), 2), mock(7, 2*8));
+        assert_eq!(merged_region.get(bv(-3), 11), MockDomain::new_top(11*8));
+        other_region.add(mock(9, 11*8), bv(-3));
         assert_eq!(region, other_region);
     }
 }

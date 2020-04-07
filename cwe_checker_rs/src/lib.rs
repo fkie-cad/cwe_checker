@@ -11,6 +11,7 @@ pub mod analysis;
 pub mod bil;
 pub mod ffi;
 pub mod term;
+pub mod utils;
 
 mod prelude {
     pub use apint::Width;
@@ -18,6 +19,7 @@ mod prelude {
 
     pub use crate::bil::{BitSize, Bitvector};
     pub use crate::term::Tid;
+    pub use anyhow::{Error, anyhow};
 }
 
 #[cfg(test)]

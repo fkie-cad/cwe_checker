@@ -33,20 +33,44 @@ pub trait ValueDomain: AbstractDomain {
 
     /// Return a new top element with the given bitsize
     fn new_top(bitsize: BitSize) -> Self;
+
+    /// Compute the (abstract) result of a binary operation
+    fn bin_op(&self, op: BinOpType, rhs: &Self) -> Self {
+        Self::new_top(self.bitsize())
+    }
+
+    /// Compute the (abstract) result of a unary operation
+    fn un_op(&self, op: UnOpType) -> Self {
+        Self::new_top(self.bitsize())
+    }
+
+    /// extract a sub-bitvector
+    fn extract(&self, low_bit: BitSize, high_bit: BitSize) -> Self {
+        Self::new_top(high_bit - low_bit) // TODO: This needs a unit test whether the result has the correct bitwidth!
+    }
+
+    /// Extend a bitvector using the given cast type
+    fn cast(&self, kind: CastType, width: BitSize) -> Self {
+        Self::new_top(width)
+    }
+
+    /// Concatenate two bitvectors
+    fn concat(&self, other: &Self) -> Self {
+        Self::new_top(self.bitsize() + other.bitsize())
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub enum BitvectorDomain {
     Top(BitSize),
-    Value(Bitvector),
-    Bottom(BitSize),
+    Value(Bitvector)
 }
 
 impl ValueDomain for BitvectorDomain {
     fn bitsize(&self) -> BitSize {
         use BitvectorDomain::*;
         match self {
-            Top(bitsize) | Bottom(bitsize) => *bitsize,
+            Top(bitsize) => *bitsize,
             Value(bitvec) => bitvec.width().to_usize() as u16
         }
     }
@@ -54,39 +78,94 @@ impl ValueDomain for BitvectorDomain {
     fn new_top(bitsize: BitSize) -> BitvectorDomain {
         BitvectorDomain::Top(bitsize)
     }
-}
 
+    /// Evaluate the given binary operation.
+    /// Note that this function assumes that both values have the same bitsize.
+    /// If not, this function should panic.
+    fn bin_op(&self, op: BinOpType, rhs: &Self) -> Self {
+        assert_eq!(self.bitsize(), rhs.bitsize());
+        match (self, rhs) {
+            (BitvectorDomain::Value(lhs_bitvec), BitvectorDomain::Value(rhs_bitvec)) => {
+                use BinOpType::*;
+                match op {
+                    PLUS => BitvectorDomain::Value(lhs_bitvec + rhs_bitvec),
+                    MINUS => BitvectorDomain::Value(lhs_bitvec - rhs_bitvec),
+                    TIMES => BitvectorDomain::Value(lhs_bitvec * rhs_bitvec),
+                    DIVIDE => BitvectorDomain::Value(lhs_bitvec.clone().into_checked_udiv(rhs_bitvec).unwrap()),
+                    SDIVIDE => BitvectorDomain::Value(lhs_bitvec.clone().into_checked_sdiv(rhs_bitvec).unwrap()),
+                    MOD => BitvectorDomain::Value(lhs_bitvec.clone().into_checked_urem(rhs_bitvec).unwrap()),
+                    SMOD => BitvectorDomain::Value(lhs_bitvec.clone().into_checked_srem(rhs_bitvec).unwrap()),
+                    LSHIFT => BitvectorDomain::Value(lhs_bitvec.clone().into_checked_shl(rhs_bitvec.try_to_u64().unwrap() as usize).unwrap()),
+                    RSHIFT => BitvectorDomain::Value(lhs_bitvec.clone().into_checked_lshr(rhs_bitvec.try_to_u64().unwrap() as usize).unwrap()),
+                    ARSHIFT => BitvectorDomain::Value(lhs_bitvec.clone().into_checked_ashr(rhs_bitvec.try_to_u64().unwrap() as usize).unwrap()),
+                    AND => BitvectorDomain::Value(lhs_bitvec & rhs_bitvec),
+                    OR => BitvectorDomain::Value(lhs_bitvec | rhs_bitvec),
+                    XOR => BitvectorDomain::Value(lhs_bitvec ^ rhs_bitvec),
+                    EQ => {
+                        assert_eq!(lhs_bitvec.width(), rhs_bitvec.width());
+                        BitvectorDomain::Value(Bitvector::from(lhs_bitvec == rhs_bitvec))
+                    },
+                    NEQ => {
+                        assert_eq!(lhs_bitvec.width(), rhs_bitvec.width());
+                        BitvectorDomain::Value(Bitvector::from(lhs_bitvec != rhs_bitvec))
+                    },
+                    LT => BitvectorDomain::Value(Bitvector::from(lhs_bitvec.checked_ult(rhs_bitvec).unwrap())),
+                    LE => BitvectorDomain::Value(Bitvector::from(lhs_bitvec.checked_ule(rhs_bitvec).unwrap())),
+                    SLT => BitvectorDomain::Value(Bitvector::from(lhs_bitvec.checked_slt(rhs_bitvec).unwrap())),
+                    SLE => BitvectorDomain::Value(Bitvector::from(lhs_bitvec.checked_sle(rhs_bitvec).unwrap())),
+                }
+            },
+            _ => BitvectorDomain::new_top(self.bitsize())
+        }
+    }
 
-/// TODO: Decide whether to remove the implementation, since it is not needed
-impl PartialOrd for BitvectorDomain {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        use BitvectorDomain::*;
+    /// Evaluate the given unary operation.
+    fn un_op(&self, op: UnOpType) -> Self {
+        use UnOpType::*;
+        if let BitvectorDomain::Value(bitvec) = self {
+            match op {
+                NEG => BitvectorDomain::Value(-bitvec),
+                NOT => BitvectorDomain::Value(bitvec.clone().into_bitnot())
+            }
+        } else {
+            BitvectorDomain::new_top(self.bitsize())
+        }
+
+    }
+
+    /// Extract a sub-bitvector out of a bitvector
+    fn extract(&self, low_bit: BitSize, high_bit: BitSize) -> Self {
+        if let BitvectorDomain::Value(bitvec) = self {
+            // TODO: Check whether this is correct on a real world example and then write a unit test for it
+            BitvectorDomain::Value(bitvec.clone().into_checked_lshr(low_bit as usize).unwrap().into_truncate((high_bit - low_bit + 1) as usize).unwrap())
+        } else {
+            BitvectorDomain::new_top(self.bitsize())
+        }
+    }
+
+    fn cast(&self, kind: CastType, width: BitSize) -> Self {
+        if let BitvectorDomain::Value(bitvec) = self {
+            use CastType::*;
+            match kind {
+                UNSIGNED => BitvectorDomain::Value(bitvec.clone().into_zero_extend(width as usize).unwrap()),
+                SIGNED => BitvectorDomain::Value(bitvec.clone().into_sign_extend(width as usize).unwrap()),
+                HIGH =>  BitvectorDomain::Value(bitvec.clone().into_checked_lshr((self.bitsize() - width) as usize).unwrap().into_truncate(width as usize).unwrap()),
+                LOW => BitvectorDomain::Value(bitvec.clone().into_truncate(width as usize).unwrap()),
+            }
+        } else {
+            BitvectorDomain::new_top(self.bitsize())
+        }
+    }
+
+    fn concat(&self, other: &Self) -> Self {
         match (self, other) {
-            (Top(x), Top(y)) => {
-                if x == y {
-                    Some(Ordering::Equal)
-                } else {
-                    None
-                }
-            }
-            (Value(x), Value(y)) => {
-                if x == y {
-                    Some(Ordering::Equal)
-                } else {
-                    None
-                }
-            }
-            (Bottom(x), Bottom(y)) => {
-                if x == y {
-                    Some(Ordering::Equal)
-                } else {
-                    None
-                }
-            }
-            (Top(_), _) => Some(Ordering::Greater),
-            (_, Top(_)) => Some(Ordering::Less),
-            (Value(_), _) => Some(Ordering::Greater),
-            (_, Value(_)) => Some(Ordering::Less),
+            (BitvectorDomain::Value(left_bitvec), BitvectorDomain::Value(right_bitvec)) => {
+                let new_bitwidth = (self.bitsize() + other.bitsize()) as usize;
+                let upper_bits = left_bitvec.clone().into_zero_extend(new_bitwidth).unwrap().into_checked_shl(other.bitsize() as usize).unwrap();
+                let lower_bits = right_bitvec.clone().into_zero_extend(new_bitwidth).unwrap();
+                BitvectorDomain::Value(upper_bits | &lower_bits)
+            },
+            _ => BitvectorDomain::new_top(self.bitsize() + other.bitsize())
         }
     }
 }
@@ -97,38 +176,53 @@ impl AbstractDomain for BitvectorDomain {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Hash, Clone)]
-pub struct FastCmpArc<T>(pub Arc<T>);
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-impl<T: PartialEq + Eq> PartialEq for FastCmpArc<T> {
-    fn eq(&self, other:&Self) -> bool {
-        if Arc::ptr_eq(&self.0, &other.0) {
-            true
-        } else {
-            self.eq(other)
-        }
-    }
-}
-
-impl<T: Eq> Eq for FastCmpArc<T> {}
-
-impl<T: AbstractDomain + Clone> AbstractDomain for FastCmpArc<T> {
-    fn top(&self) -> Self {
-        FastCmpArc(Arc::new(self.0.top()))
+    fn bv(value: i64) -> BitvectorDomain {
+        BitvectorDomain::Value(Bitvector::from_i64(value))
     }
 
-    fn merge(&self, other: &Self) -> Self {
-        if Arc::ptr_eq(&self.0, &other.0) {
-            self.clone()
-        } else {
-            FastCmpArc(Arc::new(self.0.merge(&other.0)))
-        }
-    }
-}
+    #[test]
+    fn bitvector_domain_as_value_domain() {
+        use crate::bil::BinOpType::*;
+        use crate::bil::UnOpType::*;
+        use crate::bil::CastType::*;
+        let eight = bv(8);
+        let sixteen = bv(16);
 
-impl<T> Deref for FastCmpArc<T> {
-    type Target = T;
-    fn deref(&self) -> &T {
-        &self.0
+        assert_eq!(sixteen.bin_op(PLUS, &eight), bv(24));
+        assert_eq!(sixteen.bin_op(MINUS, &eight), bv(8));
+        assert_eq!(sixteen.bin_op(TIMES, &eight), bv(16*8));
+        assert_eq!(sixteen.bin_op(DIVIDE, &eight), bv(2));
+        assert_eq!(sixteen.bin_op(SDIVIDE, &eight), bv(2));
+        assert_eq!(sixteen.bin_op(MOD, &eight), bv(0));
+        assert_eq!(sixteen.bin_op(SMOD, &eight), bv(0));
+        assert_eq!(sixteen.bin_op(LSHIFT, &bv(2)), bv(64));
+        assert_eq!(sixteen.bin_op(RSHIFT, &bv(2)), bv(4));
+        assert_eq!(sixteen.bin_op(ARSHIFT, &bv(2)), bv(4));
+        assert_eq!(sixteen.bin_op(AND, &eight), bv(0));
+        assert_eq!(sixteen.bin_op(OR, &eight), bv(24));
+        assert_eq!(sixteen.bin_op(XOR, &eight), bv(24));
+
+        assert_eq!(sixteen.bin_op(EQ, &bv(16)), BitvectorDomain::Value(Bitvector::from_bit(true)));
+        assert_eq!(sixteen.bin_op(NEQ, &bv(16)), BitvectorDomain::Value(Bitvector::from_bit(false)));
+
+        assert_eq!(sixteen.un_op(NEG), bv(-16));
+        assert_eq!(bv(0).un_op(NOT), bv(-1));
+
+        assert_eq!(sixteen.extract(0, 31), BitvectorDomain::Value(Bitvector::from_i32(16)));
+        assert_eq!(sixteen.extract(32, 63), BitvectorDomain::Value(Bitvector::from_i32(0)));
+
+        assert_eq!(BitvectorDomain::Value(Bitvector::from_i32(2)), BitvectorDomain::Value(Bitvector::from_i64(2 << 32)).cast(HIGH, 32));
+
+        assert_eq!(BitvectorDomain::Value(Bitvector::from_i32(-1)).concat(&BitvectorDomain::Value(Bitvector::from_i32(-1))), bv(-1));
+    }
+
+    fn bitvector_domain_as_abstract_domain() {
+        assert_eq!(bv(17).merge(&bv(17)), bv(17));
+        assert_eq!(bv(17).merge(&bv(16)), BitvectorDomain::new_top(64));
+        unimplemented!();
     }
 }

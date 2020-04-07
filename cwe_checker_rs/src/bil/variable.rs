@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use super::BitSize;
+use crate::prelude::*;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Variable {
@@ -18,6 +19,15 @@ pub enum Type {
     Unknown,
 }
 
+impl Variable {
+    pub fn bitsize(&self) -> Result<BitSize, Error> {
+        if let Type::Immediate(bitsize) = self.type_ {
+            Ok(bitsize)
+        } else {
+            Err(anyhow!("Not a register variable"))
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
