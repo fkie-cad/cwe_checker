@@ -116,7 +116,7 @@ let parse_dyn_sym_line (line : string) : string option =
     end
   | _ -> None
 
-let parse_dyn_syms project =
+let parse_dyn_syms (project : Project.t) : String.Set.t =
   match !dyn_syms with
   | Some(symbol_set) -> symbol_set
   | None ->

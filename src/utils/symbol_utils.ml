@@ -8,18 +8,46 @@ type symbol =
   }
 
 
-let find_symbol program name =
-  Term.enum sub_t program |>
-    Seq.find_map ~f:(fun s -> Option.some_if (Sub.name s = name) (Term.tid s))
+type fun_symbol =
+  {
+    address : tid option;
+    name : string;
+    cconv : string option;
+    args : list
+  }
 
-let build_symbols symbol_names prog =
+
+let find_symbol (program : program term) (name : string) : tid option =
+  Term.enum sub_t program |>
+  Seq.find_map ~f:(fun s -> Option.some_if (Sub.name s = name) (Term.tid s))
+
+
+let get_arguments (program : program term) (tid : tid option) =
+  match tid with
+  | Some(tid) -> Term.find_exn Sub.t tid
+  | _ -> 
+
+
+
+let build_fun_symbols (project : Project.t) (program : program term) : fun_symbol list =
+  let extern_symbols = String.Set.to_list (Cconv.parse_dyn_syms project) in
+  let calling_convention = get_project_calling_convention project in
+  let arguments = get_arguments program extern_symbols in
+  List.map extern_symbols ~f:(fun symbol ->
+    let symbol_address = find_symbol program symbol in
+    {address=symbol_address; name=symbol; cconv=calling_convention; args=arguments;}
+  )
+
+
+let build_symbols (symbol_names : string list) (prog : program term) : symbol list =
   List.map symbol_names ~f:(fun symbol -> let symbol_address = find_symbol prog symbol in
                              {address = symbol_address; name = symbol;})
   |> List.filter ~f:(fun symbol -> match symbol.address with
       | Some _ -> true
       | _ -> false)
 
-let get_symbol_of_string prog name =
+
+let get_symbol_of_string (prog : program term) (name : string) : symbol option =
   let symbol_address = find_symbol prog name in
   match symbol_address with
   | Some _ -> Some ({
@@ -28,13 +56,15 @@ let get_symbol_of_string prog name =
                           })
   | None -> None
 
-let get_symbol tid symbols =
+
+let get_symbol (tid : tid) (symbols : symbol list) : symbol option =
   List.find symbols ~f:(
     fun symbol -> match symbol.address with
       | Some address -> tid = address
       | None -> false)
 
-let get_symbol_name_from_jmp jmp symbols =
+
+let get_symbol_name_from_jmp (jmp : Jmp.t) (symbols : symbol list) : string =
     match Jmp.kind jmp with
     | Goto _ | Ret _ | Int (_,_) -> assert(false)
     | Call destination -> begin
@@ -50,7 +80,8 @@ let get_symbol_name_from_jmp jmp symbols =
         | _ -> assert(false)
       end
 
-let get_direct_callsites_of_sub sub =
+
+let get_direct_callsites_of_sub (sub : sub term) : jmp term Sequence.t =
 Term.enum blk_t sub |>
   Seq.concat_map ~f:(fun blk ->
       Term.enum jmp_t blk |> Seq.filter_map ~f:(fun j ->
@@ -61,7 +92,8 @@ Term.enum blk_t sub |>
             | _ -> None
             end))
 
-let sub_calls_symbol prog sub symbol_name =
+
+let sub_calls_symbol (prog : program term) (sub : sub term) (symbol_name : string) : bool =
   let symbol_struct = find_symbol prog symbol_name in
   match symbol_struct with
   | Some s -> begin
@@ -74,7 +106,8 @@ let sub_calls_symbol prog sub symbol_name =
   end
   | _ -> false
 
-let calls_callsite_symbol jmp symbol =
+
+let calls_callsite_symbol (jmp : Jmp.t) (symbol : symbol) : bool =
   match Jmp.kind jmp with
   | Goto _ | Ret _ | Int (_,_) -> false
   | Call dst -> begin
@@ -95,7 +128,8 @@ type concrete_call =
     name : string;
   }
 
-let call_finder = object
+
+let call_finder : (tid * tid) list Term.visitor = object
   inherit [(tid * tid) list] Term.visitor
   method! enter_jmp jmp tid_list = match Jmp.kind jmp with
     | Goto _ | Ret _ | Int (_,_) -> tid_list
@@ -107,12 +141,13 @@ let call_finder = object
 end
 
 
-let transform_call_to_concrete_call (src_tid, dst_tid) symbols =
+let transform_call_to_concrete_call ((src_tid, dst_tid) : tid * tid) (symbols : symbol list) : concrete_call =
   match (get_symbol dst_tid symbols) with
   | Some symbol -> {call_site = src_tid; symbol_address = dst_tid; name = symbol.name}
   | None -> assert(false)
 
-let filter_calls_to_symbols calls symbols =
+
+let filter_calls_to_symbols (calls : (tid * tid) list) (symbols : symbol list) : concrete_call list =
   List.filter calls ~f:(
     fun (_, dst) -> List.exists symbols ~f:(
         fun symbol -> match symbol.address with
@@ -120,7 +155,8 @@ let filter_calls_to_symbols calls symbols =
           | None -> false))
 |> List.map ~f:(fun call -> transform_call_to_concrete_call call symbols)
 
-let is_interesting_callsite jmp relevant_calls =
+
+let is_interesting_callsite (jmp : Jmp.t) (relevant_calls : concrete_call list): bool =
   match Jmp.kind jmp with
           | Goto _ | Ret _ | Int (_,_) -> false
           | Call dst -> match Call.target dst with
@@ -128,7 +164,7 @@ let is_interesting_callsite jmp relevant_calls =
             | _ -> false
 
 
-let check_calls relevant_calls prog proj tid_map symbols check_func =
+let check_calls (relevant_calls : concrete_call list) (prog : program term) (proj : 'a) (tid_map : 'b) (symbols : 'c) (check_func) : unit =
   Seq.iter (Term.enum sub_t prog)
     ~f:(fun sub ->
         begin
@@ -138,7 +174,8 @@ let check_calls relevant_calls prog proj tid_map symbols check_func =
                      check_func proj prog sub blk jmp tid_map symbols))
         end)
 
-let get_symbol_call_count_of_sub symbol_name sub prog =
+
+let get_symbol_call_count_of_sub (symbol_name : string) (sub : Sub.t) (prog : Program.t) : int =
   match find_symbol prog symbol_name with
   | Some s -> begin
                 Seq.to_list (get_direct_callsites_of_sub sub)
@@ -152,7 +189,8 @@ let get_symbol_call_count_of_sub symbol_name sub prog =
               end
   | _ -> 0
 
-let extract_direct_call_tid_from_block block =
+
+let extract_direct_call_tid_from_block (block : blk term) : tid option =
   let jmp_instructions = Term.enum jmp_t block in
   Seq.fold jmp_instructions ~init:None ~f:(fun already_found instr ->
     match already_found with
@@ -165,7 +203,8 @@ let extract_direct_call_tid_from_block block =
               Some(tid)
             | _ -> None)
 
-let get_program_entry_points (program: Program.t) : Sub.t List.t =
+
+let get_program_entry_points (program : program term) : sub term List.t =
   let subfunctions = Term.enum sub_t program in
   let entry_points = Seq.filter subfunctions ~f:(fun subfn -> Term.has_attr subfn Sub.entry_point) in
   match Seq.find subfunctions ~f:(fun subfn -> "main" = Sub.name subfn) with
@@ -176,16 +215,23 @@ let get_program_entry_points (program: Program.t) : Sub.t List.t =
         main_fn :: (Seq.to_list entry_points)
   | None -> Seq.to_list entry_points
 
-let stack_register project =
+
+let stack_register (project : Project.t) : Var.t =
   let arch = Project.arch project in
   let module Target = (val target_of_arch arch) in
   Target.CPU.sp
 
-let flag_register_list project =
+
+let flag_register_list (project : Project.t) : Var.t list =
   let arch = Project.arch project in
   let module Target = (val target_of_arch arch) in
   Target.CPU.zf :: Target.CPU.cf :: Target.CPU.vf :: Target.CPU.nf :: []
 
-let arch_pointer_size_in_bytes project : int =
+
+let arch_pointer_size_in_bytes (project : Project.t) : int =
   let arch = Project.arch project in
   Size.in_bytes (Arch.addr_size arch)
+
+
+let get_project_calling_convention (project : Project.t) : string option =
+  Project.get proj Bap_abi.name
