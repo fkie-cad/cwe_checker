@@ -4,6 +4,7 @@
   (libraries
   yojson
   bap
+  bap-abi
   core_kernel
   ppx_deriving_yojson.runtime)
   (preprocess (pps ppx_jane ppx_deriving_yojson))

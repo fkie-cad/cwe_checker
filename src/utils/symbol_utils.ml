@@ -10,33 +10,35 @@ type symbol =
 
 type fun_symbol =
   {
-    address : tid option;
+    address : tid;
     name : string;
     cconv : string option;
-    args : list
+    args : (Var.t * Exp.t * intent option) list;
   }
 
 
-let find_symbol (program : program term) (name : string) : tid option =
-  Term.enum sub_t program |>
-  Seq.find_map ~f:(fun s -> Option.some_if (Sub.name s = name) (Term.tid s))
-
-
-let get_arguments (program : program term) (tid : tid option) =
-  match tid with
-  | Some(tid) -> Term.find_exn Sub.t tid
-  | _ -> 
-
+let get_project_calling_convention (project : Project.t) : string option =
+  Project.get project Bap_abi.name
 
 
 let build_fun_symbols (project : Project.t) (program : program term) : fun_symbol list =
   let extern_symbols = String.Set.to_list (Cconv.parse_dyn_syms project) in
   let calling_convention = get_project_calling_convention project in
-  let arguments = get_arguments program extern_symbols in
-  List.map extern_symbols ~f:(fun symbol ->
-    let symbol_address = find_symbol program symbol in
-    {address=symbol_address; name=symbol; cconv=calling_convention; args=arguments;}
-  )
+  Seq.to_list (Seq.filter_map (Term.enum sub_t program) ~f:(fun s ->
+    if (Stdlib.List.mem (Sub.name s) extern_symbols) then
+      begin
+        let args = Seq.to_list (Seq.map (Term.enum arg_t s) ~f:(fun a ->
+          (Arg.lhs a, Arg.rhs a, Arg.intent a)
+        )) in
+        Some({address=(Term.tid s); name=(Sub.name s); cconv=calling_convention; args=args;})
+      end
+    else None
+  ))
+
+
+let find_symbol program name =
+  Term.enum sub_t program |>
+  Seq.find_map ~f:(fun s -> Option.some_if (Sub.name s = name) (Term.tid s))
 
 
 let build_symbols (symbol_names : string list) (prog : program term) : symbol list =
@@ -231,7 +233,3 @@ let flag_register_list (project : Project.t) : Var.t list =
 let arch_pointer_size_in_bytes (project : Project.t) : int =
   let arch = Project.arch project in
   Size.in_bytes (Arch.addr_size arch)
-
-
-let get_project_calling_convention (project : Project.t) : string option =
-  Project.get proj Bap_abi.name

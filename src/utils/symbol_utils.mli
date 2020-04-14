@@ -14,6 +14,21 @@ type symbol = {
   ; name : string;
 }
 
+(**This type represents an external symbol.*)
+type fun_symbol = {
+  address : Bap.Std.tid
+  ; name : string
+  ; cconv : string option
+  ; args : (Bap.Std.Var.t * Bap.Std.Exp.t * Bap.Std.intent option) list;
+}
+
+
+(** Returns the calling convention for the whole project inferred by Bap.*)
+val get_project_calling_convention : Bap.Std.Project.t -> string option
+
+(** Builds a list of function symbols type from external function names given by objdump.*)
+val build_fun_symbols : Bap.Std.Project.t -> Bap.Std.program Bap.Std.term -> fun_symbol list
+
 (** Finds a symbol string in a program and returns its IR address (tid). *)
 val find_symbol : Bap.Std.program Bap.Std.term -> string -> Bap.Std.tid option
 
