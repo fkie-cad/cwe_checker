@@ -16,7 +16,9 @@ type symbol = {
 
 (**This type represents an external symbol.*)
 type fun_symbol = {
-  address : Bap.Std.tid
+  tid : Bap.Std.tid
+  ; start_address : Bap.Std.Addr.t
+  ; end_address : Bap.Std.Addr.t
   ; name : string
   ; cconv : string option
   ; args : (Bap.Std.Var.t * Bap.Std.Exp.t * Bap.Std.intent option) list;
@@ -25,6 +27,9 @@ type fun_symbol = {
 
 (** Returns the calling convention for the whole project inferred by Bap.*)
 val get_project_calling_convention : Bap.Std.Project.t -> string option
+
+(** Returns the diassembly start and end address of an external symbol*)
+val get_start_end_address : Bap.Std.Project.t -> string list -> (string, Bap.Std.Addr.t list) Hashtbl.t
 
 (** Builds a list of function symbols type from external function names given by objdump.*)
 val build_fun_symbols : Bap.Std.Project.t -> Bap.Std.program Bap.Std.term -> fun_symbol list

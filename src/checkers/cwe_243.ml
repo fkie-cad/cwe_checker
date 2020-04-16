@@ -31,7 +31,7 @@ let get_call_dests_of_sub sub =
     end
   | _ -> []
 
-let rec check dests symbols =
+let rec check dests (symbols : symbol list) =
   match dests with
   | [] -> (List.length symbols) = 0
   | hd :: tl ->
