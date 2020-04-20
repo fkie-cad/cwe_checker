@@ -14,8 +14,8 @@ type symbol = {
   ; name : string;
 }
 
-(**This type represents an external symbol.*)
-type fun_symbol = {
+(** This type represents an external symbol. *)
+type extern_symbol = {
   tid : Bap.Std.tid
   ; start_address : Bap.Std.Addr.t
   ; end_address : Bap.Std.Addr.t
@@ -25,14 +25,20 @@ type fun_symbol = {
 }
 
 
-(** Returns the calling convention for the whole project inferred by Bap.*)
+(** Returns the calling convention for the whole project inferred by Bap. *)
 val get_project_calling_convention : Bap.Std.Project.t -> string option
 
-(** Returns the diassembly start and end address of an external symbol*)
-val get_start_end_address : Bap.Std.Project.t -> string list -> (string, Bap.Std.Addr.t list) Hashtbl.t
+(** Returns the diassembly start and end address of an external symbol. *)
+val find_symbol_addresses : Bap.Std.Project.t -> string list -> (string, Bap.Std.Addr.t list) Hashtbl.t
 
-(** Builds a list of function symbols type from external function names given by objdump.*)
-val build_fun_symbols : Bap.Std.Project.t -> Bap.Std.program Bap.Std.term -> fun_symbol list
+(** Checks whether the external symbols have already been built. If not, it calls the symbol builder. *)
+val build_and_return_extern_symbols : Bap.Std.Project.t -> Bap.Std.program Bap.Std.term -> extern_symbol list
+
+(** Builds a list of function symbols type from external function names given by objdump. *)
+val build_extern_symbols : Bap.Std.Project.t -> Bap.Std.program Bap.Std.term -> unit
+
+(** Adds an analysed internal symbol to the list of external symbols. *)
+val add_extern_symbol : Bap.Std.Project.t -> Bap.Std.program Bap.Std.term -> string -> unit
 
 (** Finds a symbol string in a program and returns its IR address (tid). *)
 val find_symbol : Bap.Std.program Bap.Std.term -> string -> Bap.Std.tid option

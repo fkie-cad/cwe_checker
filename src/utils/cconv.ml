@@ -93,7 +93,7 @@ let is_return_register (var: Var.t) (project: Project.t) : Bool.t =
   let ret_register = get_return_register_list project in
   Option.is_some (List.find ret_register ~f:(String.equal (Var.name var)))
 
-(** Parse a line from the dyn-syms output table of readelf. Return the name of a symbol if the symbol is an extern function name. *)
+(** Parse a line from the dyn-syms output table of objdump. Return the name of a symbol if the symbol is an extern function name. *)
 let parse_dyn_sym_line (line : string) : string option =
   let line = ref (String.strip line) in
   let str_list = ref [] in
