@@ -14,4 +14,4 @@ let generate_tid_map prog =
       | Some addr -> Map.add_exn addrs ~key:(Term.tid t) ~data:addr
   end)#run prog Tid.Map.empty
 
- let tid_to_string tid = Bap.Std.Tid.name tid 
+let tid_to_string tid = Bap.Std.Tid.name tid

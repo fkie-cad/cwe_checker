@@ -17,8 +17,7 @@ type symbol = {
 (** This type represents an external symbol. *)
 type extern_symbol = {
   tid : Bap.Std.tid
-  ; start_address : Bap.Std.Addr.t
-  ; end_address : Bap.Std.Addr.t
+  ; address : string
   ; name : string
   ; cconv : string option
   ; args : (Bap.Std.Var.t * Bap.Std.Exp.t * Bap.Std.intent option) list;
@@ -27,9 +26,6 @@ type extern_symbol = {
 
 (** Returns the calling convention for the whole project inferred by Bap. *)
 val get_project_calling_convention : Bap.Std.Project.t -> string option
-
-(** Returns the diassembly start and end address of an external symbol. *)
-val find_symbol_addresses : Bap.Std.Project.t -> string list -> (string, Bap.Std.Addr.t list) Hashtbl.t
 
 (** Checks whether the external symbols have already been built. If not, it calls the symbol builder. *)
 val build_and_return_extern_symbols : Bap.Std.Project.t -> Bap.Std.program Bap.Std.term -> extern_symbol list

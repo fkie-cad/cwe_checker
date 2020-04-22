@@ -20,7 +20,7 @@ let () =
     let params: String.t String.Map.t = List.fold cmdline_params ~init:String.Map.empty ~f:(fun param_map (name, bap_param) ->
       String.Map.set param_map ~key:name ~data:(!!bap_param)
     ) in
-    Project.register_pass' ~deps:["callsites"] (main flags params)
+    Project.register_pass' ~deps:["callsites"; "api"] (main flags params)
   ) in
   let () = Config.manpage [
     `S "DESCRIPTION";

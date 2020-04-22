@@ -4,6 +4,7 @@
   (libraries
   yojson
   bap
+  bap-api
   bap-abi
   core_kernel
   ppx_deriving_yojson.runtime)

@@ -1,6 +1,5 @@
 open Core_kernel
 open Bap.Std
-open Graphlib.Std
 
 type symbol =
   {
@@ -12,8 +11,7 @@ type symbol =
 type extern_symbol =
   {
     tid : tid;
-    start_address : Addr.t;
-    end_address : Addr.t;
+    address : string;
     name : string;
     cconv : string option;
     args : (Var.t * Exp.t * intent option) list;
@@ -27,37 +25,20 @@ let get_project_calling_convention (project : Project.t) : string option =
   Project.get project Bap_abi.name
 
 
-let find_symbol_addresses (project : Project.t) (symbols : string list) : (string, Addr.t list) Hashtbl.t =
-  let syms = Project.symbols project in
-  let sym_addr_tbl = Hashtbl.create (module String) ~size:(List.length symbols) in
-  Seq.iter (Symtab.to_sequence syms) ~f:(fun (name, entry, cfg) ->
-      if Stdlib.List.mem name symbols then
-        begin
-          let blks = Seq.to_list (Graphlib.reverse_postorder_traverse (module Graphs.Cfg) ~start:entry cfg) in
-          let last = Memory.min_addr (Block.memory (List.hd_exn blks)) in
-          let first = Memory.max_addr (Block.memory (List.last_exn blks)) in
-          Hashtbl.add_multi sym_addr_tbl ~key:name ~data:first;
-          Hashtbl.add_multi sym_addr_tbl ~key:name ~data:last;
-        end
-      else ()
-    );
-  sym_addr_tbl
-
-
 let build_extern_symbols (project : Project.t) (program : program term) : unit =
   let parsed_symbols = String.Set.to_list (Cconv.parse_dyn_syms project) in
-  let sym_addr_tbl = find_symbol_addresses project parsed_symbols in
   let calling_convention = get_project_calling_convention project in
+  let tid_map = Address_translation.generate_tid_map program in
   extern_symbols := List.append !extern_symbols (Seq.to_list (Seq.filter_map (Term.enum sub_t program) ~f:(fun s ->
     let sub_name = Sub.name s in
-    if (Stdlib.List.mem sub_name parsed_symbols) then
-      begin
-        let start_end = Hashtbl.find_multi sym_addr_tbl sub_name in
+    let sub_tid = Term.tid s in
+    match (Stdlib.List.mem sub_name parsed_symbols) with
+    | true -> begin
+        let addr = Address_translation.translate_tid_to_assembler_address_string sub_tid tid_map in
         let args = Seq.to_list (Seq.map (Term.enum arg_t s) ~f:(fun a -> (Arg.lhs a, Arg.rhs a, Arg.intent a))) in
-        Some({tid=(Term.tid s); start_address=(List.hd_exn start_end); end_address=(List.last_exn start_end); name=sub_name; cconv=calling_convention; args=args;})
+        Some({tid=sub_tid; address=addr; name=sub_name; cconv=calling_convention; args=args;})
       end
-    else None
-  )))
+    | false -> None)))
 
 
 let build_and_return_extern_symbols (project : Project.t) (program : program term) : extern_symbol list =
@@ -70,16 +51,16 @@ let build_and_return_extern_symbols (project : Project.t) (program : program ter
 
 
 let add_extern_symbol (project : Project.t) (program : program term) (symbol : string) : unit =
+  let tid_map = Address_translation.generate_tid_map program in
   Seq.iter (Term.enum sub_t program) ~f:(fun s ->
-    if String.equal (Sub.name s) symbol then
-      begin
+    match String.equal (Sub.name s) symbol with
+    | true -> begin
+        let sub_tid = Term.tid s in
         let args = Seq.to_list (Seq.map (Term.enum arg_t s) ~f:(fun a -> (Arg.lhs a, Arg.rhs a, Arg.intent a))) in
-        let addr_tbl = find_symbol_addresses project [symbol] in
-        let addresses = Hashtbl.find_multi addr_tbl symbol in
-        extern_symbols := List.append !extern_symbols
-                             [{tid=(Term.tid s); start_address=(List.hd_exn addresses); end_address=(List.last_exn addresses);
-                               name=(Sub.name s); cconv=(get_project_calling_convention project); args=args}]
+        let addr = Address_translation.translate_tid_to_assembler_address_string sub_tid tid_map in
+        extern_symbols := List.append !extern_symbols [{tid=sub_tid; address=addr; name=(Sub.name s); cconv=(get_project_calling_convention project); args=args}]
       end
+    | false -> ()
   )
 
 
