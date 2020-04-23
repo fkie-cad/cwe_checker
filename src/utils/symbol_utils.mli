@@ -31,10 +31,10 @@ val get_project_calling_convention : Bap.Std.Project.t -> string option
 val build_and_return_extern_symbols : Bap.Std.Project.t -> Bap.Std.program Bap.Std.term -> extern_symbol list
 
 (** Builds a list of function symbols type from external function names given by objdump. *)
-val build_extern_symbols : Bap.Std.Project.t -> Bap.Std.program Bap.Std.term -> unit
+val build_extern_symbols : Bap.Std.Project.t -> Bap.Std.program Bap.Std.term -> string list -> word Tid.Map.t -> unit
 
 (** Adds an analysed internal symbol to the list of external symbols. *)
-val add_extern_symbol : Bap.Std.Project.t -> Bap.Std.program Bap.Std.term -> string -> unit
+val add_as_extern_symbol : Bap.Std.Project.t -> Bap.Std.program Bap.Std.term -> string -> word Tid.Map.t -> unit
 
 (** Finds a symbol string in a program and returns its IR address (tid). *)
 val find_symbol : Bap.Std.program Bap.Std.term -> string -> Bap.Std.tid option

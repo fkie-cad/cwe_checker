@@ -7,7 +7,7 @@ include Self()
 let main json_output file_output project =
 
   let program = Project.program project in
-  let tid_map = Address_translation.generate_tid_map program in
+  let tid_map = Address_translation.return_tid_map program in
   Type_inference.print_type_info_tags project tid_map;
   if json_output then
     begin

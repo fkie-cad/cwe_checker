@@ -25,10 +25,8 @@ let get_project_calling_convention (project : Project.t) : string option =
   Project.get project Bap_abi.name
 
 
-let build_extern_symbols (project : Project.t) (program : program term) : unit =
-  let parsed_symbols = String.Set.to_list (Cconv.parse_dyn_syms project) in
+let build_extern_symbols (project : Project.t) (program : program term) (parsed_symbols : string list) (tid_map : word Tid.Map.t) : unit =
   let calling_convention = get_project_calling_convention project in
-  let tid_map = Address_translation.generate_tid_map program in
   extern_symbols := List.append !extern_symbols (Seq.to_list (Seq.filter_map (Term.enum sub_t program) ~f:(fun s ->
     let sub_name = Sub.name s in
     let sub_tid = Term.tid s in
@@ -42,16 +40,16 @@ let build_extern_symbols (project : Project.t) (program : program term) : unit =
 
 
 let build_and_return_extern_symbols (project : Project.t) (program : program term) : extern_symbol list =
-  if List.is_empty !extern_symbols then
+  let parsed_symbols = String.Set.to_list (Cconv.parse_dyn_syms project) in
+  if List.is_empty parsed_symbols then
     begin
-      build_extern_symbols project program;
+      build_extern_symbols project program parsed_symbols;
       !extern_symbols
     end
   else !extern_symbols
 
 
-let add_extern_symbol (project : Project.t) (program : program term) (symbol : string) : unit =
-  let tid_map = Address_translation.generate_tid_map program in
+let add_as_extern_symbol (project : Project.t) (program : program term) (symbol : string) (tid_map : word Tid.Map.t) : unit =
   Seq.iter (Term.enum sub_t program) ~f:(fun s ->
     match String.equal (Sub.name s) symbol with
     | true -> begin
