@@ -81,7 +81,7 @@ let check_valid_module_list (modules : string list) : unit =
 
 let partial_run project config modules =
   let program = Project.program project in
-  let tid_address_map = Address_translation.return_tid_map program in
+  let tid_address_map = Address_translation.generate_tid_map program in
   let json = Yojson.Basic.from_file config in
   let () = check_valid_module_list modules in
   Log_utils.info (sprintf "[cwe_checker] Just running the following analyses: %s." (String.concat (List.map ~f:(fun x -> x ^ " ") modules)));
@@ -95,7 +95,7 @@ let partial_run project config modules =
 
 let full_run project config =
   let program = Project.program project in
-  let tid_address_map = Address_translation.return_tid_map program in
+  let tid_address_map = Address_translation.generate_tid_map program in
   let json = Yojson.Basic.from_file config in
   List.iter known_modules ~f:(fun cwe -> execute_cwe_module cwe json program project tid_address_map)
 
@@ -155,7 +155,7 @@ let main flags params project =
           if check_path then
             begin
               let prog = Project.program project in
-              let tid_address_map = Address_translation.return_tid_map prog in
+              let tid_address_map = Address_translation.generate_tid_map prog in
               let json = Yojson.Basic.from_file config in
               let check_path_sources = Json_utils.get_symbols_from_json json "check_path" in
               let check_path_sinks = Log_utils.get_cwe_warnings () in

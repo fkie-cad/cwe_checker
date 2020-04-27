@@ -39,14 +39,14 @@ let build_extern_symbols (project : Project.t) (program : program term) (parsed_
     | false -> None)))
 
 
-let build_and_return_extern_symbols (project : Project.t) (program : program term) : extern_symbol list =
-  let parsed_symbols = String.Set.to_list (Cconv.parse_dyn_syms project) in
-  if List.is_empty parsed_symbols then
-    begin
-      build_extern_symbols project program parsed_symbols;
-      !extern_symbols
-    end
-  else !extern_symbols
+let build_and_return_extern_symbols (project : Project.t) (program : program term) (tid_map : word Tid.Map.t) : extern_symbol list =
+  let parsed_symbols = Cconv.parse_dyn_syms project in
+  if String.Set.is_empty parsed_symbols then []
+  else begin
+    match !extern_symbols with
+    | [] -> build_extern_symbols project program (String.Set.to_list parsed_symbols) tid_map; !extern_symbols
+    | _  -> !extern_symbols
+  end
 
 
 let add_as_extern_symbol (project : Project.t) (program : program term) (symbol : string) (tid_map : word Tid.Map.t) : unit =

@@ -151,10 +151,7 @@ let process_input (() : unit) : string * string list =
 
 
 let setup_command (bin_path : string) (args : string list) : string =
-  let api = List.exists args ~f:(fun arg -> String.is_prefix arg ~prefix:"-api") in
-  let bare_command = match api with
-  | true -> "bap " ^ bin_path ^ " --pass=cwe-checker,api "
-  | false -> "bap " ^ bin_path ^ " --pass=cwe-checker " in
+  let bare_command = "bap " ^ bin_path ^ " --pass=cwe-checker " in
   let command_args = String.concat ~sep:" " (List.map args ~f:(fun arg ->
     match (String.is_prefix arg ~prefix:"-api") with
     | true -> "--api-path=" ^ (Stdlib.List.nth (String.split arg ~on:'=') 1)

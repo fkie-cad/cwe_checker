@@ -28,13 +28,13 @@ type extern_symbol = {
 val get_project_calling_convention : Bap.Std.Project.t -> string option
 
 (** Checks whether the external symbols have already been built. If not, it calls the symbol builder. *)
-val build_and_return_extern_symbols : Bap.Std.Project.t -> Bap.Std.program Bap.Std.term -> extern_symbol list
+val build_and_return_extern_symbols : Bap.Std.Project.t -> Bap.Std.program Bap.Std.term -> Bap.Std.word Bap.Std.Tid.Map.t -> extern_symbol list
 
 (** Builds a list of function symbols type from external function names given by objdump. *)
-val build_extern_symbols : Bap.Std.Project.t -> Bap.Std.program Bap.Std.term -> string list -> word Tid.Map.t -> unit
+val build_extern_symbols : Bap.Std.Project.t -> Bap.Std.program Bap.Std.term -> string list -> Bap.Std.word Bap.Std.Tid.Map.t -> unit
 
 (** Adds an analysed internal symbol to the list of external symbols. *)
-val add_as_extern_symbol : Bap.Std.Project.t -> Bap.Std.program Bap.Std.term -> string -> word Tid.Map.t -> unit
+val add_as_extern_symbol : Bap.Std.Project.t -> Bap.Std.program Bap.Std.term -> string -> Bap.Std.word Bap.Std.Tid.Map.t -> unit
 
 (** Finds a symbol string in a program and returns its IR address (tid). *)
 val find_symbol : Bap.Std.program Bap.Std.term -> string -> Bap.Std.tid option
