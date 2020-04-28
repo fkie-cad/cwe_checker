@@ -39,6 +39,7 @@ let cmdline_params = [
   ("config", "Path to configuration file.");
   ("out", "Path to output file.");
   ("partial", "Comma separated list of modules to apply on binary, e.g. 'CWE332,CWE476,CWE782'");
+  ("api", "C header file for additional subroutine information.")
 ]
 
 let build_version_sexp () =
