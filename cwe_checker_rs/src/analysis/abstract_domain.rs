@@ -176,6 +176,38 @@ impl AbstractDomain for BitvectorDomain {
     }
 }
 
+impl std::ops::Add for BitvectorDomain {
+    type Output = BitvectorDomain;
+
+    fn add(self, rhs: Self) -> Self {
+        assert_eq!(self.bitsize(), rhs.bitsize());
+        self.bin_op(crate::bil::BinOpType::PLUS, &rhs)
+    }
+}
+
+impl std::ops::Sub for BitvectorDomain {
+    type Output = BitvectorDomain;
+
+    fn sub(self, rhs: Self) -> Self {
+        assert_eq!(self.bitsize(), rhs.bitsize());
+        self.bin_op(crate::bil::BinOpType::MINUS, &rhs)
+    }
+}
+
+impl std::ops::Neg for BitvectorDomain {
+    type Output = BitvectorDomain;
+
+    fn neg(self) -> Self {
+        self.un_op(crate::bil::UnOpType::NEG)
+    }
+}
+
+impl std::convert::From<Bitvector> for BitvectorDomain {
+    fn from(bitvector: Bitvector) -> BitvectorDomain {
+        BitvectorDomain::Value(bitvector)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

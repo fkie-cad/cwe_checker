@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use std::sync::Arc;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use crate::analysis::abstract_domain::AbstractDomain;
 
 // TODO: This is a helper not only for abstract domains! It needs its own source file!
@@ -53,5 +53,11 @@ impl<T> Deref for FastCmpArc<T> {
     type Target = T;
     fn deref(&self) -> &T {
         &self.0
+    }
+}
+
+impl<T: Clone> DerefMut for FastCmpArc<T> {
+    fn deref_mut(&mut self) -> &mut T {
+        Arc::make_mut(&mut self.0)
     }
 }

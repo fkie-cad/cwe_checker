@@ -2,7 +2,8 @@ use super::identifier::*;
 use crate::analysis::abstract_domain::*;
 use crate::bil::*;
 use crate::prelude::*;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+use std::convert::TryFrom;
 
 /// An abstract value representing either a pointer or a constant value.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
@@ -15,6 +16,34 @@ pub enum Data {
 impl Data {
     pub fn bitvector(bitv: Bitvector) -> Data {
         Data::Value(BitvectorDomain::Value(bitv))
+    }
+
+    /// For pointer values replace an abstract identifier with another one and add the offset_adjustment to the pointer offset.
+    /// This is needed to adjust stack pointer on call and return instructions.
+    pub fn replace_abstract_id(&mut self, old_id: &AbstractIdentifier, new_id: &AbstractIdentifier, offset_adjustment: &BitvectorDomain) {
+        if let Self::Pointer(pointer) = self {
+            pointer.replace_abstract_id(old_id, new_id, offset_adjustment);
+        }
+    }
+
+    pub fn referenced_ids(&self) -> BTreeSet<AbstractIdentifier> {
+        if let Self::Pointer(pointer) = self {
+            pointer.0.keys().cloned().collect()
+        } else {
+            BTreeSet::new()
+        }
+    }
+}
+
+impl<'a> TryFrom<&'a Data> for &'a Bitvector {
+    type Error = ();
+
+    fn try_from(value: &'a Data) -> Result<&'a Bitvector, Self::Error> {
+        if let Data::Value(BitvectorDomain::Value(bitvector)) = value {
+            Ok(bitvector)
+        } else {
+            Err(())
+        }
     }
 }
 
@@ -33,6 +62,10 @@ impl PointerDomain {
         PointerDomain(map)
     }
 
+    pub fn with_targets(targets: BTreeMap<AbstractIdentifier, BitvectorDomain>) -> PointerDomain {
+        PointerDomain(targets)
+    }
+
     /// get the bitsize of the pointer
     pub fn bitsize(&self) -> BitSize {
         let some_elem = self.0.values().next().unwrap();
@@ -49,6 +82,16 @@ impl PointerDomain {
             }
         }
         PointerDomain(merged_map)
+    }
+
+    /// Replace an abstract identifier with another one and add the offset_adjustment to the pointer offset.
+    /// This is needed to adjust stack pointer on call and return instructions.
+    pub fn replace_abstract_id(&mut self, old_id: &AbstractIdentifier, new_id: &AbstractIdentifier, offset_adjustment: &BitvectorDomain) {
+        if let Some(old_offset) = self.0.get(&old_id) {
+            let new_offset = old_offset.clone() + offset_adjustment.clone();
+            self.0.remove(old_id);
+            self.0.insert(new_id.clone(), new_offset);
+        }
     }
 
     /// add a value to the offset

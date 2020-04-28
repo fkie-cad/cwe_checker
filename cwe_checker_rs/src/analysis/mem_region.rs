@@ -73,6 +73,14 @@ impl<T: AbstractDomain + ValueDomain + std::fmt::Debug> MemRegion<T> {
     pub fn remove(&mut self, position: Bitvector, size_in_bytes: Bitvector) {
         Arc::make_mut(&mut self.0).remove(position, size_in_bytes)
     }
+
+    pub fn iter_values(&self) -> std::collections::btree_map::Values<'_, i64, T> {
+        self.0.values.values()
+    }
+
+    pub fn iter_values_mut(&mut self) -> std::collections::btree_map::ValuesMut<'_, i64, T> {
+        Arc::make_mut(&mut self.0).values.values_mut()
+    }
 }
 
 /// An abstract domain representing a continuous region of memory. See the module level description for more.

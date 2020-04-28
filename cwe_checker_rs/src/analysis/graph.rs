@@ -37,11 +37,11 @@ impl<'a> Node<'a> {
 pub enum Edge<'a> {
     Block,
     Jump(&'a Term<Jmp>, Option<&'a Term<Jmp>>),
-    Call(&'a Call),
+    Call(&'a Term<Jmp>),
     ExternCallStub(&'a Call),
     CRCallStub,
     CRReturnStub,
-    CRCombine,
+    CRCombine(&'a Term<Jmp>),
 }
 
 /// A builder struct for building graphs
@@ -121,7 +121,7 @@ impl<'a> GraphBuilder<'a> {
                         self.graph.add_edge(
                             source,
                             self.jump_targets[&target_tid].0,
-                            Edge::Call(call),
+                            Edge::Call(jump),
                         );
                         if let Some(Label::Direct(ref return_tid)) = call.return_ {
                             let return_index = self.jump_targets[return_tid].0;
@@ -170,13 +170,14 @@ impl<'a> GraphBuilder<'a> {
     ) {
         for (call_node, return_to_node) in self.return_addresses[&return_from_sub.tid].iter() {
             let call_block = self.graph[*call_node].get_block();
+            let call_term = call_block.term.jmps.iter().filter(|jump| {matches!(jump.term.kind, JmpKind::Call(_))}).next().unwrap();
             let cr_combine_node = self.graph.add_node(Node::CallReturn(call_block));
             self.graph
                 .add_edge(*call_node, cr_combine_node, Edge::CRCallStub);
             self.graph
                 .add_edge(return_source, cr_combine_node, Edge::CRReturnStub);
             self.graph
-                .add_edge(cr_combine_node, *return_to_node, Edge::CRCombine);
+                .add_edge(cr_combine_node, *return_to_node, Edge::CRCombine(call_term));
         }
     }
 

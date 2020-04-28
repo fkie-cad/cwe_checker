@@ -65,6 +65,14 @@ pub struct Program {
     pub subs: Vec<Term<Sub>>,
 }
 
+// TODO: Add deserialization from Ocaml to the FFI module for project!
+// TODO: Add other CPU-architecture specific data to this struct!
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
+pub struct Project {
+    pub program: Term<Program>,
+    pub stack_pointer_register: Variable,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

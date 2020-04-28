@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use crate::bil::variable::*;
 use crate::utils::fast_cmp_arc::FastCmpArc;
 use std::sync::Arc;
 
@@ -37,6 +38,17 @@ impl AbstractIdentifier {
 pub enum AbstractLocation {
     Register(String, BitSize),
     Pointer(String, AbstractMemoryLocation),
+}
+
+impl AbstractLocation {
+    /// Create an abstract location from a variable corresponding to a register.
+    /// This function returns an error if the variable is not a physical register.
+    pub fn from_var(variable: &Variable) -> Result<AbstractLocation, Error> {
+        if variable.is_temp {
+            return Err(anyhow!("Cannot create abstract location from temporary variables."));
+        }
+        Ok(AbstractLocation::Register(variable.name.clone(), variable.bitsize()?))
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]

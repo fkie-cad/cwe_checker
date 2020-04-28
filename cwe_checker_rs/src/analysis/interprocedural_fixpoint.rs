@@ -16,6 +16,11 @@ computation.compute();
 ```
 */
 
+// TODO: When indirect jumps are sufficiently supported, the update_jump methods need access to
+// target (and maybe source) nodes/TIDs, to determine which target the current edge points to.
+// Alternatively, this could be achieved through usage of the specialize_conditional function.
+// Currently unclear, which way is better.
+
 use super::fixpoint::Problem as GeneralFPProblem;
 use super::graph::*;
 use crate::bil::Expression;
@@ -55,12 +60,13 @@ pub trait Problem<'a> {
         jump: &Term<Jmp>,
         untaken_conditional: Option<&Term<Jmp>>,
     ) -> Option<Self::Value>;
-    fn update_call(&self, value: &Self::Value, call: &Call) -> Self::Value;
+    fn update_call(&self, value: &Self::Value, call: &Term<Jmp>, target: &Node) -> Self::Value;
     fn update_return(
         &self,
         value: &Self::Value,
         value_before_call: Option<&Self::Value>,
-    ) -> Self::Value;
+        call_term: &Term<Jmp>,
+    ) -> Option<Self::Value>;
     fn update_call_stub(&self, value: &Self::Value, call: &Call) -> Option<Self::Value>;
     fn specialize_conditional(
         &self,
@@ -121,7 +127,7 @@ impl<'a, T: Problem<'a>> GeneralFPProblem for GeneralizedProblem<'a, T> {
         edge: EdgeIndex,
     ) -> Option<Self::NodeValue> {
         let graph = self.problem.get_graph();
-        let (start_node, _end_node) = graph.edge_endpoints(edge).unwrap();
+        let (start_node, end_node) = graph.edge_endpoints(edge).unwrap();
         let block_term = graph.node_weight(start_node).unwrap().get_block();
         match graph.edge_weight(edge).unwrap() {
             Edge::Block => {
@@ -133,7 +139,7 @@ impl<'a, T: Problem<'a>> GeneralFPProblem for GeneralizedProblem<'a, T> {
                 Some(NodeValue::Value(end_val))
             }
             Edge::Call(call) => Some(NodeValue::Value(
-                self.problem.update_call(node_value.unwrap_value(), call),
+                self.problem.update_call(node_value.unwrap_value(), call, &graph[end_node]),
             )),
             Edge::CRCallStub => Some(NodeValue::CallReturnCombinator {
                 call: Some(node_value.unwrap_value().clone()),
@@ -143,13 +149,14 @@ impl<'a, T: Problem<'a>> GeneralFPProblem for GeneralizedProblem<'a, T> {
                 call: None,
                 return_: Some(node_value.unwrap_value().clone()),
             }),
-            Edge::CRCombine => match node_value {
+            Edge::CRCombine(call_term) => match node_value {
                 NodeValue::Value(_) => panic!("Unexpected interprocedural fixpoint graph state"),
                 NodeValue::CallReturnCombinator { call, return_ } => {
                     if let Some(return_value) = return_ {
-                        Some(NodeValue::Value(
-                            self.problem.update_return(return_value, call.as_ref()),
-                        ))
+                        match self.problem.update_return(return_value, call.as_ref(), call_term) {
+                            Some(val) => Some(NodeValue::Value(val)),
+                            None => None
+                        }
                     } else {
                         None
                     }
