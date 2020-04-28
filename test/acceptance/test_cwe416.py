@@ -8,43 +8,38 @@ class TestCwe416(unittest.TestCase):
         self.target = '416'
         self.string = b'Use After Free'
 
-    @unittest.skip("FIXME: broken on Ubuntu 18.04 with the corresponding gcc version")
     def test_cwe416_01_x64_gcc(self):
-        expect_res = 4
+        expect_res = 1
         res = cwe_checker_testlib.execute_emulation_and_check_occurence(
             self.target, self.target, 'x64', 'gcc', self.string)
         self.assertEqual(res, expect_res)
 
-    @unittest.skip("FIXME: broken on Ubuntu 18.04 with the corresponding clang version")
     def test_cwe416_01_x64_clang(self):
-        expect_res = 4
+        expect_res = 1
         res = cwe_checker_testlib.execute_emulation_and_check_occurence(
             self.target, self.target, 'x64', 'clang', self.string)
         self.assertEqual(res, expect_res)
 
-    @unittest.skip("FIXME: yields different results on Ubuntu 16.04 and 18.04")
     def test_cwe416_01_x86_gcc(self):
-        expect_res = 2
+        expect_res = 1
         res = cwe_checker_testlib.execute_emulation_and_check_occurence(
             self.target, self.target, 'x86', 'gcc', self.string)
         self.assertEqual(res, expect_res)
 
     def test_cwe416_01_x86_clang(self):
-        expect_res = 3
+        expect_res = 1
         res = cwe_checker_testlib.execute_emulation_and_check_occurence(
             self.target, self.target, 'x86', 'clang', self.string)
         self.assertEqual(res, expect_res)
 
-    @unittest.skip("FIXME")
     def test_cwe416_01_arm_gcc(self):
-        expect_res = 2
+        expect_res = 1
         res = cwe_checker_testlib.execute_emulation_and_check_occurence(
             self.target, self.target, 'arm', 'gcc', self.string)
         self.assertEqual(res, expect_res)
 
-    @unittest.skip("FIXME")
     def test_cwe416_01_arm_clang(self):
-        expect_res = 2
+        expect_res = 1
         res = cwe_checker_testlib.execute_emulation_and_check_occurence(
             self.target, self.target, 'arm', 'clang', self.string)
         self.assertEqual(res, expect_res)
@@ -70,7 +65,6 @@ class TestCwe416(unittest.TestCase):
             self.target, self.target, 'mips', 'gcc', self.string)
         self.assertEqual(res, expect_res)
 
-    @unittest.skip("FIXME")
     def test_cwe416_01_mips_clang(self):
         expect_res = 1
         res = cwe_checker_testlib.execute_emulation_and_check_occurence(
@@ -119,7 +113,7 @@ class TestCwe416(unittest.TestCase):
             self.target, self.target, 'mips64el', 'clang', self.string)
         self.assertEqual(res, expect_res)
 
-    @unittest.skip("FIXME")
+    @unittest.skip('FIXME: Check again when moved to BAP 2.1')
     def test_cwe416_01_ppc_gcc(self):
         expect_res = 1
         res = cwe_checker_testlib.execute_emulation_and_check_occurence(
@@ -161,9 +155,9 @@ class TestCwe416(unittest.TestCase):
             self.target, self.target, 'x86', 'mingw32-gcc', self.string)
         self.assertEqual(res, expect_res)
 
-    @unittest.skip("FIXME")
+    @unittest.skip('FIXME: Check again when moved to BAP 2.1')
     def test_cwe416_01_x64_mingw_gcc(self):
-        expect_res = 4
+        expect_res = 1
         res = cwe_checker_testlib.execute_emulation_and_check_occurence(
             self.target, self.target, 'x64', 'mingw32-gcc', self.string)
         self.assertEqual(res, expect_res)

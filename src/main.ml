@@ -2,6 +2,7 @@ open Core_kernel
 open Bap.Std
 open Format
 
+let version = "0.3-dev"
 
 type cwe_module = {
   cwe_func :  Bap.Std.program Bap.Std.term -> Bap.Std.project -> Bap.Std.word Bap.Std.Tid.Map.t -> string list list -> string list -> unit;
@@ -27,6 +28,7 @@ let known_modules = [{cwe_func = Cwe_190.check_cwe; name = Cwe_190.name; version
 
 
 let cmdline_flags = [
+  ("version", "Print the version number of the cwe_checker and quit");
   ("module-versions", "Prints out the version numbers of all known modules.");
   ("json", "Outputs the result as JSON.");
   ("no-logging", "Outputs no logging (info, error, warning). This does not pollute STDOUT when output json to it.");
@@ -37,6 +39,7 @@ let cmdline_params = [
   ("config", "Path to configuration file.");
   ("out", "Path to output file.");
   ("partial", "Comma separated list of modules to apply on binary, e.g. 'CWE332,CWE476,CWE782'");
+  ("api", "C header file for additional subroutine information.")
 ]
 
 let build_version_sexp () =
@@ -45,6 +48,9 @@ let build_version_sexp () =
 
 let print_module_versions () =
   Log_utils.info (sprintf "[cwe_checker] module_versions: {%s}" (build_version_sexp ()))
+
+let print_version () =
+  print_endline version
 
 let print_help_message ((): unit) : unit =
   let flags = cmdline_flags in
@@ -117,7 +123,11 @@ let main flags params project =
   let json_output = String.Map.find_exn flags "json" in
   let file_output = String.Map.find_exn params "out" in
   let no_logging = String.Map.find_exn flags "no-logging" in
+  let print_version_flag = String.Map.find_exn flags "version" in
 
+  if print_version_flag then
+    print_version ()
+  else
   if module_versions then
     print_module_versions ()
   else
