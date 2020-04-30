@@ -41,12 +41,22 @@ let is_callee_saved var project =
     callee_saved_registers := Some(String.Set.of_list (callee_saved_register_list project));
     String.Set.mem (Option.value_exn !callee_saved_registers) (Var.name var)
 
+
+let get_x86_parameters_based_on_calling_convention (project : Project.t) : String.t List.t =
+  match (Project.get project Bap_abi.name) with
+  | Some("cdecl")    -> []
+  | Some("stdcall")  -> []
+  | Some("thiscall") -> "ECX" :: []
+  | Some("fastcall") -> "EDX" :: "ECX" :: []
+  | Some("") | None  -> Log_utils.info "No calling convention inferred by BAP. Using cdecl as standard"; []
+  | _ -> failwith "Unknown calling convention."
+
+
 (** Return a list of all registers that may hold function arguments. *)
 let get_parameter_register_list (project: Project.t) : String.t List.t =
   let architecture = Project.arch project in
   match architecture with
-  | `x86 ->
-      [] (* TODO: This is the value for the standard C calling convention. But it is incorrect for some of the other calling conventions for x86! *)
+  | `x86 -> get_x86_parameters_based_on_calling_convention project
   | `x86_64 -> (* System V ABI. TODO: Floationg Point registers are mising! TODO: Microsoft calling convention uses different register. *)
       "RDI" :: "RSI" :: "RDX" :: "RCX" :: "R8" :: "R9" :: []
   | `armv4 | `armv5 | `armv6 | `armv7

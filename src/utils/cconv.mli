@@ -8,6 +8,10 @@ open Core_kernel
 val is_callee_saved: Var.t -> Project.t -> Bool.t
 
 
+(** Specifies x86 parameter registers bases on calling convention inferred by BAP. *)
+val get_x86_parameters_based_on_calling_convention: Project.t -> String.t List.t
+
+
 (** Returns whether a variable may be used to pass parameters to a function.
     This depends on the calling convention of the target architecture and should only be used for extern function calls. *)
 val is_parameter_register: Var.t -> Project.t -> Bool.t
