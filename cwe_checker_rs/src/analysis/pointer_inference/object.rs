@@ -1,13 +1,13 @@
-use crate::prelude::*;
-use std::collections::{BTreeMap, BTreeSet};
+use super::data::*;
+use super::identifier::AbstractIdentifier;
 use crate::analysis::abstract_domain::*;
 use crate::analysis::mem_region::MemRegion;
 use crate::bil::Bitvector;
+use crate::prelude::*;
 use apint::Width;
-use super::data::*;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
-use super::identifier::AbstractIdentifier;
 
 /// The list of all known abstract objects.
 ///
@@ -21,6 +21,20 @@ pub struct AbstractObjectList {
 }
 
 impl AbstractObjectList {
+    /// Create a new abstract object list with just one abstract object corresponding to the stack.
+    /// The offset into the stack object will be set to zero.
+    pub fn from_stack_id(stack_id: AbstractIdentifier, address_bitsize: BitSize) -> AbstractObjectList {
+        let mut objects = Vec::new();
+        let stack_object = AbstractObject::new(ObjectType::Stack, address_bitsize);
+        objects.push(Arc::new(stack_object));
+        let mut ids = BTreeMap::new();
+        ids.insert(stack_id, (0, Bitvector::zero((address_bitsize as usize).into()).into()));
+        AbstractObjectList {
+            objects,
+            ids,
+        }
+    }
+
     /// Get the value at a given address.
     /// If the address is not unique, merge the value of all possible addresses.
     ///
@@ -36,16 +50,17 @@ impl AbstractObjectList {
                     let (abstract_object_index, offset_identifier) = self.ids.get(id).unwrap();
                     let offset = offset_pointer_domain.clone() + offset_identifier.clone();
                     if let BitvectorDomain::Value(concrete_offset) = offset {
-                        let value = self.objects[*abstract_object_index].get_value(concrete_offset, size);
+                        let value =
+                            self.objects[*abstract_object_index].get_value(concrete_offset, size);
                         merged_value = match merged_value {
                             Some(accum) => Some(accum.merge(&value)),
-                            None => Some(value)
+                            None => Some(value),
                         };
                     } else {
                         merged_value = Some(Data::new_top(size));
                         break;
                     }
-                };
+                }
                 merged_value.ok_or(anyhow!("Pointer without targets encountered."))
             }
         }
@@ -94,7 +109,8 @@ impl AbstractObjectList {
             for old_index in target_object_set {
                 index_map.insert(old_index, merged_object_index);
             }
-            let mut new_id_map: BTreeMap<AbstractIdentifier, (usize, BitvectorDomain)> = BTreeMap::new();
+            let mut new_id_map: BTreeMap<AbstractIdentifier, (usize, BitvectorDomain)> =
+                BTreeMap::new();
             for (id, (old_index, offset)) in self.ids.iter() {
                 new_id_map.insert(id.clone(), (index_map[old_index], offset.clone()));
             }
@@ -102,7 +118,8 @@ impl AbstractObjectList {
             self.ids = new_id_map;
             // now we can do the actual write operation on the newly merged object
             // the offset does not matter since the merged object is untracked anyway
-            Arc::make_mut(&mut self.objects[merged_object_index]).set_value(value, BitvectorDomain::new_top(pointer.bitsize()))?;
+            Arc::make_mut(&mut self.objects[merged_object_index])
+                .set_value(value, BitvectorDomain::new_top(pointer.bitsize()))?;
         }
         Ok(())
     }
@@ -116,7 +133,10 @@ impl AbstractObjectList {
                 merged_ids.insert(other_id.clone(), (index, offset.merge(&other_offset)));
             } else {
                 merged_objects.push(other.objects[*other_index].clone());
-                merged_ids.insert(other_id.clone(), (merged_objects.len() - 1, other_offset.clone()));
+                merged_ids.insert(
+                    other_id.clone(),
+                    (merged_objects.len() - 1, other_offset.clone()),
+                );
             }
         }
         AbstractObjectList {
@@ -127,7 +147,12 @@ impl AbstractObjectList {
 
     /// For pointer values replace an abstract identifier with another one and add the offset_adjustment to the pointer offset.
     /// This is needed to adjust stack pointer on call and return instructions.
-    pub fn replace_abstract_id(&mut self, old_id: &AbstractIdentifier, new_id: &AbstractIdentifier, offset_adjustment: &BitvectorDomain) {
+    pub fn replace_abstract_id(
+        &mut self,
+        old_id: &AbstractIdentifier,
+        new_id: &AbstractIdentifier,
+        offset_adjustment: &BitvectorDomain,
+    ) {
         for object in self.objects.iter_mut() {
             Arc::make_mut(object).replace_abstract_id(old_id, new_id, offset_adjustment);
         }
@@ -143,7 +168,13 @@ impl AbstractObjectList {
     }
 
     /// Add a new abstract object to the object list
-    pub fn add_abstract_object(&mut self, object_id: AbstractIdentifier, initial_offset: BitvectorDomain, type_: ObjectType, address_bitsize: BitSize) {
+    pub fn add_abstract_object(
+        &mut self,
+        object_id: AbstractIdentifier,
+        initial_offset: BitvectorDomain,
+        type_: ObjectType,
+        address_bitsize: BitSize,
+    ) {
         let new_object = AbstractObject::new(type_, address_bitsize);
 
         if let Some((index, offset)) = self.ids.get(&object_id) {
@@ -180,7 +211,8 @@ impl AbstractObjectList {
         for id in ids_to_remove {
             self.ids.remove(id);
         }
-        let referenced_objects: BTreeSet<usize> = self.ids.values().map(|(index, _offset)| {*index}).collect();
+        let referenced_objects: BTreeSet<usize> =
+            self.ids.values().map(|(index, _offset)| *index).collect();
         if referenced_objects.len() != self.objects.len() {
             // We have to remove some objects and map the object indices to new values
             let mut new_object_list = Vec::new();
@@ -199,6 +231,43 @@ impl AbstractObjectList {
         }
     }
 
+    /// Mark a memory object as already freed (i.e. pointers to it are dangling).
+    /// If the object cannot be identified uniquely, all possible targets are marked as having an unknown status.
+    pub fn mark_mem_object_as_freed(&mut self, object_pointer: &PointerDomain) {
+        let ids = object_pointer.get_target_ids();
+        if ids.len() > 1 {
+            for id in ids {
+                let object = &mut self.objects[self.ids[&id].0];
+                Arc::make_mut(object).set_state(None);
+            }
+        } else {
+            if let Some(id) = ids.iter().next() {
+                let object = &mut self.objects[self.ids[&id].0];
+                Arc::make_mut(object).set_state(Some(ObjectState::Dangling));
+            }
+        }
+    }
+
+    /// Mark the memory object behind an abstract identifier as untracked.
+    /// Also add new possible reference targets to the object.
+    ///
+    /// This is used as a very coarse approximation for function calls whose effect is unknown.
+    /// Since a function may spawn a new thread constantly writing to this memory object,
+    /// the content of the memory object may not become known later on.
+    /// The new reference targets are added because we also do not know whether the function adds pointers to the memory object.
+    pub fn mark_mem_object_as_untracked(
+        &mut self,
+        object_id: &AbstractIdentifier,
+        new_possible_reference_targets: &BTreeSet<AbstractIdentifier>,
+    ) {
+        let object_index = self.ids[object_id].0;
+        let reference_targets = self.objects[object_index]
+            .get_all_possible_pointer_targets()
+            .union(new_possible_reference_targets)
+            .cloned()
+            .collect();
+        self.objects[object_index] = Arc::new(AbstractObject::Untracked(reference_targets));
+    }
 }
 
 /// An abstract object is either a tracked or an untracked memory object.
@@ -218,7 +287,7 @@ impl AbstractObject {
             is_unique: true,
             state: Some(ObjectState::Alive),
             type_: Some(type_),
-            memory: MemRegion::new(address_bitsize)
+            memory: MemRegion::new(address_bitsize),
         })
     }
 
@@ -231,11 +300,15 @@ impl AbstractObject {
     }
 
     pub fn merge(&self, other: &Self) -> Self {
-        match(self, other) {
-            (Self::Untracked(set1), Self::Untracked(set2)) => Self::Untracked(set1.union(set2).cloned().collect()),
+        match (self, other) {
+            (Self::Untracked(set1), Self::Untracked(set2)) => {
+                Self::Untracked(set1.union(set2).cloned().collect())
+            }
             (Self::Untracked(untracked), Self::Memory(memory))
-            | (Self::Memory(memory), Self::Untracked(untracked)) => Self::Untracked(untracked.union(&memory.pointer_targets).cloned().collect()),
-            (Self::Memory(left), Self::Memory(right)) => Self::Memory(left.merge(right))
+            | (Self::Memory(memory), Self::Untracked(untracked)) => {
+                Self::Untracked(untracked.union(&memory.pointer_targets).cloned().collect())
+            }
+            (Self::Memory(left), Self::Memory(right)) => Self::Memory(left.merge(right)),
         }
     }
 
@@ -243,9 +316,13 @@ impl AbstractObject {
         match self {
             Self::Untracked(target_list) => {
                 if let Data::Pointer(ref pointer) = value {
-                    target_list.extend(pointer.iter_targets().map(|(abstract_id, _offset)| {abstract_id.clone()}) )
+                    target_list.extend(
+                        pointer
+                            .iter_targets()
+                            .map(|(abstract_id, _offset)| abstract_id.clone()),
+                    )
                 };
-            },
+            }
             Self::Memory(memory_object) => {
                 memory_object.set_value(value, offset)?;
             }
@@ -256,20 +333,25 @@ impl AbstractObject {
     pub fn get_all_possible_pointer_targets(&self) -> BTreeSet<AbstractIdentifier> {
         match self {
             Self::Untracked(targets) => targets.clone(),
-            Self::Memory(memory) => memory.get_all_possible_pointer_targets()
+            Self::Memory(memory) => memory.get_all_possible_pointer_targets(),
         }
     }
 
     /// For pointer values replace an abstract identifier with another one and add the offset_adjustment to the pointer offset.
     /// This is needed to adjust stack pointer on call and return instructions.
-    pub fn replace_abstract_id(&mut self, old_id: &AbstractIdentifier, new_id: &AbstractIdentifier, offset_adjustment: &BitvectorDomain) {
+    pub fn replace_abstract_id(
+        &mut self,
+        old_id: &AbstractIdentifier,
+        new_id: &AbstractIdentifier,
+        offset_adjustment: &BitvectorDomain,
+    ) {
         match self {
             Self::Untracked(id_set) => {
                 if id_set.get(old_id).is_some() {
                     id_set.remove(old_id);
                     id_set.insert(new_id.clone());
                 }
-            },
+            }
             Self::Memory(mem_object) => {
                 mem_object.replace_abstract_id(old_id, new_id, offset_adjustment);
             }
@@ -279,7 +361,13 @@ impl AbstractObject {
     pub fn get_referenced_ids(&self) -> BTreeSet<AbstractIdentifier> {
         match self {
             Self::Untracked(ids) => ids.clone(),
-            Self::Memory(object_info) => object_info.pointer_targets.clone()
+            Self::Memory(object_info) => object_info.pointer_targets.clone(),
+        }
+    }
+
+    pub fn set_state(&mut self, new_state: Option<ObjectState>) {
+        if let Self::Memory(object_info) = self {
+            object_info.set_state(new_state)
         }
     }
 }
@@ -312,13 +400,20 @@ impl AbstractObjectInfo {
 
     fn set_value(&mut self, value: Data, offset: BitvectorDomain) -> Result<(), Error> {
         if let Data::Pointer(ref pointer) = value {
-            self.pointer_targets.extend(pointer.iter_targets().map(|(abstract_id, _offset)| {abstract_id.clone()}) )
+            self.pointer_targets.extend(
+                pointer
+                    .iter_targets()
+                    .map(|(abstract_id, _offset)| abstract_id.clone()),
+            )
         };
         if let BitvectorDomain::Value(ref concrete_offset) = offset {
             if self.is_unique {
                 self.memory.add(value, concrete_offset.clone());
             } else {
-                let merged_value = self.memory.get(concrete_offset.clone(), (value.bitsize() / 8) as u64).merge(&value);
+                let merged_value = self
+                    .memory
+                    .get(concrete_offset.clone(), (value.bitsize() / 8) as u64)
+                    .merge(&value);
                 self.memory.add(merged_value, concrete_offset.clone());
             };
         } else {
@@ -341,13 +436,28 @@ impl AbstractObjectInfo {
 
     /// For pointer values replace an abstract identifier with another one and add the offset_adjustment to the pointer offset.
     /// This is needed to adjust stack pointer on call and return instructions.
-    pub fn replace_abstract_id(&mut self, old_id: &AbstractIdentifier, new_id: &AbstractIdentifier, offset_adjustment: &BitvectorDomain) {
+    pub fn replace_abstract_id(
+        &mut self,
+        old_id: &AbstractIdentifier,
+        new_id: &AbstractIdentifier,
+        offset_adjustment: &BitvectorDomain,
+    ) {
         for elem in self.memory.iter_values_mut() {
             elem.replace_abstract_id(old_id, new_id, offset_adjustment);
         }
         if self.pointer_targets.get(&old_id).is_some() {
             self.pointer_targets.remove(&old_id);
             self.pointer_targets.insert(new_id.clone());
+        }
+    }
+
+    pub fn set_state(&mut self, new_state: Option<ObjectState>) {
+        if self.is_unique {
+            self.state = new_state;
+        } else {
+            if self.state != new_state {
+                self.state = None;
+            } // else don't change the state
         }
     }
 }
@@ -365,7 +475,11 @@ impl AbstractDomain for AbstractObjectInfo {
 
     fn merge(&self, other: &Self) -> Self {
         AbstractObjectInfo {
-            pointer_targets: self.pointer_targets.union(&other.pointer_targets).cloned().collect(),
+            pointer_targets: self
+                .pointer_targets
+                .union(&other.pointer_targets)
+                .cloned()
+                .collect(),
             is_unique: self.is_unique && other.is_unique,
             state: same_or_none(&self.state, &other.state),
             type_: same_or_none(&self.type_, &other.type_),
@@ -421,7 +535,6 @@ pub enum ObjectState {
     Dangling,
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -451,16 +564,28 @@ mod tests {
         let three = new_data(3);
         let offset = bv(-15);
         object.set_value(three, offset).unwrap();
-        assert_eq!(object.get_value(Bitvector::from_i64(-16), 64), Data::Top(64));
+        assert_eq!(
+            object.get_value(Bitvector::from_i64(-16), 64),
+            Data::Top(64)
+        );
         assert_eq!(object.get_value(Bitvector::from_i64(-15), 64), new_data(3));
         object.set_value(new_data(4), bv(-12)).unwrap();
-        assert_eq!(object.get_value(Bitvector::from_i64(-15), 64), Data::Top(64));
+        assert_eq!(
+            object.get_value(Bitvector::from_i64(-15), 64),
+            Data::Top(64)
+        );
 
         let mut other_object = new_abstract_object();
         object.set_value(new_data(0), bv(0)).unwrap();
         other_object.set_value(new_data(0), bv(0)).unwrap();
         let merged_object = object.merge(&other_object);
-        assert_eq!(merged_object.get_value(Bitvector::from_i64(-12), 64), Data::Top(64));
-        assert_eq!(merged_object.get_value(Bitvector::from_i64(0), 64), new_data(0));
+        assert_eq!(
+            merged_object.get_value(Bitvector::from_i64(-12), 64),
+            Data::Top(64)
+        );
+        assert_eq!(
+            merged_object.get_value(Bitvector::from_i64(0), 64),
+            new_data(0)
+        );
     }
 }

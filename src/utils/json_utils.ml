@@ -1,6 +1,7 @@
 open Core_kernel
 open Yojson.Basic.Util
 open Bap.Std
+open Symbol_utils
 
 (** Extracts the symbols to check for from json document.
 An example looks like this:
@@ -278,14 +279,47 @@ module SerdeJson = struct
        ]);
     ]
 
-  let of_program (program: Program.t) : t =
+  let of_extern_symbol (symbol: extern_symbol) : t =
+    build_object [
+      ("tid", of_tid symbol.tid);
+      ("address", build_string symbol.address);
+      ("name", build_string symbol.name);
+      ("calling_convention", match symbol.cconv with
+       | Some(cconv) -> build_string cconv
+       | None -> build_null ()
+       );
+      ("arguments", build_array (List.map symbol.args ~f:(fun (var, expr, intent) ->
+         build_object [
+           ("var", of_var var);
+           ("location", of_exp expr);
+           ("intent", match intent with
+            | Some(In) -> build_string "Input"
+            | Some(Out) -> build_string "Output"
+            | Some(Both) -> build_string "Both"
+            | None -> build_string "Unknown"
+           )
+         ]
+       )))
+    ]
+
+  let of_program (program: Program.t) (extern_symbols: extern_symbol List.t) : t =
     let subs = Seq.to_list (Term.enum sub_t program) in
     let subs = List.map subs ~f:(fun sub -> of_sub sub) in
     build_object [
       ("tid", of_tid (Term.tid program));
       ("term", build_object [
          ("subs", build_array subs);
+         ("extern_symbols", build_array (List.map extern_symbols ~f:(fun sym -> of_extern_symbol sym)));
        ]);
+    ]
+
+  let of_project (project: Project.t) (extern_symbols: extern_symbol List.t) : t =
+    build_object [
+      ("program", of_program (Project.program project) extern_symbols);
+      ("cpu_architecture", build_string (Arch.to_string (Project.arch project)));
+      ("stack_pointer_register", of_var (Symbol_utils.stack_register project));
+      ("callee_saved_registers", build_array (List.map (Cconv.callee_saved_register_list project) ~f:(fun reg_name -> build_string reg_name) ));
+      ("parameter_registers", build_array (List.map (Cconv.get_parameter_register_list project) ~f:(fun reg_name -> build_string reg_name) ))
     ]
 
 end

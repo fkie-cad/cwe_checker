@@ -56,6 +56,8 @@ module SerdeJson : sig
   val of_jmp: Jmp.t -> t
   val of_blk: Blk.t -> t
   val of_sub: Sub.t -> t
-  val of_program: Program.t -> t
+  val of_extern_symbol: Symbol_utils.extern_symbol -> t
+  val of_program: Program.t -> Symbol_utils.extern_symbol List.t -> t
+  val of_project: Project.t -> Symbol_utils.extern_symbol List.t -> t
 
 end

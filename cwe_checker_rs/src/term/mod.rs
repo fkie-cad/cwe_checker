@@ -1,5 +1,9 @@
 use crate::bil::*;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+
+pub mod symbol;
+use symbol::ExternSymbol;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
 pub struct Tid(String);
@@ -63,6 +67,7 @@ pub struct Sub {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Program {
     pub subs: Vec<Term<Sub>>,
+    pub extern_symbols: Vec<ExternSymbol>,
 }
 
 // TODO: Add deserialization from Ocaml to the FFI module for project!
@@ -70,7 +75,41 @@ pub struct Program {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Project {
     pub program: Term<Program>,
+    pub cpu_architecture: String,
     pub stack_pointer_register: Variable,
+    pub callee_saved_registers: Vec<String>,
+    pub parameter_registers: Vec<String>
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
+pub struct Arg {
+    pub var: Variable,
+    pub location: Expression,
+    pub intent: ArgIntent,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
+pub enum ArgIntent {
+    Input,
+    Output,
+    Both,
+    Unknown,
+}
+
+impl ArgIntent {
+    pub fn is_input(&self) -> bool {
+        match self {
+            Self::Input | Self::Both | Self::Unknown => true,
+            Self::Output => false,
+        }
+    }
+
+    pub fn is_output(&self) -> bool {
+        match self {
+            Self::Output | Self::Both | Self::Unknown => true,
+            Self::Input => false,
+        }
+    }
 }
 
 #[cfg(test)]

@@ -67,7 +67,7 @@ pub trait Problem<'a> {
         value_before_call: Option<&Self::Value>,
         call_term: &Term<Jmp>,
     ) -> Option<Self::Value>;
-    fn update_call_stub(&self, value: &Self::Value, call: &Call) -> Option<Self::Value>;
+    fn update_call_stub(&self, value: &Self::Value, call: &Term<Jmp>) -> Option<Self::Value>;
     fn specialize_conditional(
         &self,
         value: &Self::Value,

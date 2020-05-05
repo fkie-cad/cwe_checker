@@ -73,11 +73,14 @@ let test_type_conversions () =
   check "Block_term" (json = "{\"term\":{\"defs\":[],\"jmps\":[]},\"tid\":\"@block\"}")
 
 let test_project_conversion () =
-  let program = Project.program (Option.value_exn !example_project) in
-  let serde = SerdeJson.of_program program in
+  let project = Option.value_exn !example_project in
+  let program = Project.program project in
+  let tid_map = Address_translation.generate_tid_map program in
+  let extern_symbols = Symbol_utils.build_and_return_extern_symbols project program tid_map in
+  let serde = SerdeJson.of_program program extern_symbols in
   let _json = SerdeJson.to_string serde in
   (* TODO: The unit test for pointer inference should be moved to another file *)
-  Pointer_inference.run (Option.value_exn !example_project);
+  Pointer_inference.run project tid_map;
   check "Project" true
 
 let tests = [

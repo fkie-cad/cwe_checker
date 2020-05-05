@@ -118,6 +118,10 @@ impl PointerDomain {
     ) -> std::collections::btree_map::Iter<AbstractIdentifier, BitvectorDomain> {
         self.0.iter()
     }
+
+    pub fn get_target_ids(&self) -> BTreeSet<AbstractIdentifier> {
+        self.0.keys().cloned().collect()
+    }
 }
 
 impl ValueDomain for Data {
@@ -199,6 +203,12 @@ impl AbstractDomain for Data {
             (Value(val1), Value(val2)) => Value(val1.merge(val2)),
             (Pointer(_), Value(_)) | (Value(_), Pointer(_)) => Top(self.bitsize()),
         }
+    }
+}
+
+impl From<PointerDomain> for Data {
+    fn from(val: PointerDomain) -> Data {
+        Data::Pointer(val)
     }
 }
 

@@ -1,6 +1,14 @@
 open Bap.Std
 open Core_kernel
 
+(** Returns a list of names of callee-saved registers for the standard calling convention of the given cpu architecture.
+    Note that using this function may lead to errors if other calling conventions are used in a program. *)
+val callee_saved_register_list: Project.t -> String.t List.t
+
+(** Returns a list of names of parameter registers for the standard calling convention of the given cpu architecture.
+    It is used as an approximation for extern functions whose parameters (and the number of parameters) are unknown.
+    Note that using this function may lead to errors if other calling conventions are used in a program. *)
+val get_parameter_register_list: Project.t -> String.t List.t
 
 (** Returns whether a variable is callee saved according to the calling convention
     of the target architecture. Should only used for calls to functions outside

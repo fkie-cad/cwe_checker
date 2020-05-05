@@ -3,6 +3,11 @@ use crate::bil::variable::*;
 use crate::utils::fast_cmp_arc::FastCmpArc;
 use std::sync::Arc;
 
+// TODO: Right now abstract locations are used as giving the location where a pointer to an object is located.
+// But it could also be used to point into the object (at offset 0).
+// Can I solve this possible ambivalence in intended usage in a way such that accidentally wrong usage is prevented?
+// If not, I have to document the intended usage with a big warning sign.
+
 /// An abstract identifier is given by a time identifier and a location identifier.
 ///
 /// For the location identifier see `AbstractLocation`.

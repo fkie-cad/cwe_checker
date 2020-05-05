@@ -38,7 +38,7 @@ pub enum Edge<'a> {
     Block,
     Jump(&'a Term<Jmp>, Option<&'a Term<Jmp>>),
     Call(&'a Term<Jmp>),
-    ExternCallStub(&'a Call),
+    ExternCallStub(&'a Term<Jmp>),
     CRCallStub,
     CRReturnStub,
     CRCombine(&'a Term<Jmp>),
@@ -114,7 +114,7 @@ impl<'a> GraphBuilder<'a> {
                             self.graph.add_edge(
                                 source,
                                 self.jump_targets[&return_tid].0,
-                                Edge::ExternCallStub(call),
+                                Edge::ExternCallStub(jump),
                             );
                         }
                     } else {
@@ -295,6 +295,7 @@ mod tests {
             tid: Tid::new("program"),
             term: Program {
                 subs: vec![sub1, sub2],
+                extern_symbols: Vec::new(),
             },
         };
         program

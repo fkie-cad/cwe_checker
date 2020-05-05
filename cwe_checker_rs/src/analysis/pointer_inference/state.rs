@@ -2,7 +2,7 @@ use crate::prelude::*;
 use std::collections::{BTreeMap, BTreeSet};
 use super::data::*;
 use super::object::AbstractObjectList;
-use super::identifier::AbstractIdentifier;
+use super::identifier::{AbstractIdentifier, AbstractLocation};
 use crate::bil::*;
 use crate::analysis::abstract_domain::*;
 
@@ -26,6 +26,20 @@ pub struct State {
 }
 
 impl State {
+    /// Create a new state that contains only one memory object corresponding to the stack.
+    /// The stack offset will be set to zero.
+    pub fn new(stack_register: &Variable, function_tid: Tid) -> State {
+        let stack_id = AbstractIdentifier::new(function_tid, AbstractLocation::from_var(stack_register).unwrap());
+        let mut register: BTreeMap<String, Data> = BTreeMap::new();
+        register.insert(stack_register.name.clone(), PointerDomain::new(stack_id.clone(), Bitvector::zero((stack_register.bitsize().unwrap() as usize).into()).into()).into());
+        State {
+            register,
+            memory: AbstractObjectList::from_stack_id(stack_id.clone(), stack_register.bitsize().unwrap()),
+            stack_id,
+            caller_ids: BTreeSet::new(),
+        }
+    }
+
     /// evaluate the value of an expression in the current state
     pub fn eval(&self, expression: &Expression) -> Result<Data, Error> {
         use Expression::*;
@@ -159,21 +173,32 @@ impl State {
         }
         referenced_ids.insert(self.stack_id.clone());
         referenced_ids.append(&mut self.caller_ids.clone());
-        let mut unsearched_ids = referenced_ids.clone();
+        self.add_recursively_referenced_ids_to_id_set(&mut referenced_ids);
+        // remove unreferenced ids
+        self.memory.remove_unused_ids(&referenced_ids);
+    }
+
+    pub fn add_recursively_referenced_ids_to_id_set(&self, ids: &mut BTreeSet<AbstractIdentifier>) {
+        let mut unsearched_ids = ids.clone();
         while let Some(id) = unsearched_ids.iter().next() {
             let id = id.clone();
             unsearched_ids.remove(&id);
             let memory_ids = self.memory.get_referenced_ids(&id);
             for mem_id in memory_ids {
-                if referenced_ids.get(&mem_id).is_none() {
-                    referenced_ids.insert(mem_id.clone());
+                if ids.get(&mem_id).is_none() {
+                    ids.insert(mem_id.clone());
                     unsearched_ids.insert(mem_id);
                 }
             }
         }
-        // remove unreferenced ids
-        self.memory.remove_unused_ids(&referenced_ids);
     }
+
+    /// Mark a memory object as already freed (i.e. pointers to it are dangling).
+    /// If the object cannot be identified uniquely, all possible targets are marked as having an unknown status.
+    pub fn mark_mem_object_as_freed(&mut self, object_pointer: &PointerDomain) {
+        self.memory.mark_mem_object_as_freed(object_pointer)
+    }
+
 }
 
 #[cfg(test)]
