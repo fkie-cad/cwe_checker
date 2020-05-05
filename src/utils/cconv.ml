@@ -6,6 +6,42 @@ let dyn_syms = ref None
 
 let callee_saved_registers = ref None
 
+
+let call_objdump (proj : Project.t) (flag : string) (err : string) : string list =
+  match Project.get proj filename with
+  | None -> failwith "[CWE-checker] Project has no file name."
+  | Some(fname) -> begin
+      try
+        let cmd = Format.sprintf ("objdump %s %s") flag fname in
+        let in_chan = Unix.open_process_in cmd in
+        let lines = In_channel.input_lines in_chan in
+        let () = In_channel.close in_chan in
+        lines
+      with
+        Unix.Unix_error (e,fm,argm) ->
+          failwith (Format.sprintf "%s %s %s %s" err (Unix.error_message e) fm argm)
+  end
+
+
+let get_bin_format (project : Project.t) (header : string list) : string option =
+  let arch = Project.arch project in
+  match header with
+  | _::line::_ -> begin
+      let chop_idx = match arch with
+        | `x86_64 -> 2
+        | _ -> 1 in
+      match List.hd_exn (List.drop (List.rev (String.split_on_chars line ~on:[' '; '-'])) chop_idx) with
+      | "elf32" | "elf64" -> Some("elf")
+      | "pei" -> Some("pe")
+      | _ -> None
+  end
+  | _ -> begin
+      match Option.is_some (Symtab.find_by_name (Project.symbols project) "__GetPEImageBase") with
+      | true -> Some("pe")
+      | false -> Some("elf")
+  end
+
+
 (** Return a list of registers that are callee-saved.
     TODO: At least ARMv7 and PPC have floating point registers that are callee saved. Check their names in bap and then add them. *)
 let callee_saved_register_list project =
@@ -15,8 +51,7 @@ let callee_saved_register_list project =
       "RBX" :: "RSP" :: "RBP" :: "R12" :: "R13" :: "R14" :: "R15" :: []
   (* Microsoft x64 calling convention. Unused at the moment, since Windows binaries are not yet supported.
   | `x86_64 -> (* Microsoft x64 calling convention *)
-     "RBX" :: "RBP" :: "RDI" :: "RSI" :: "RSP" :: "R12" :: "R13" :: "R14" :: "R15" :: []
-  *)
+     "RBX" :: "RBP" :: "RDI" :: "RSI" :: "RSP" :: "R12" :: "R13" :: "R14" :: "R15" :: []*)
   | `x86 -> (* Both Windows and Linux save the same registers *)
     "EBX" :: "ESI" :: "EDI" :: "EBP" :: []
   | `armv4 | `armv5 | `armv6 | `armv7
@@ -45,8 +80,7 @@ let is_callee_saved var project =
 let get_x86_parameters_based_on_calling_convention (project : Project.t) : String.t List.t =
   match (Project.get project Bap_abi.name) with
   | Some("cdecl")    -> []
-  | Some("stdcall")  -> []
-  | Some("thiscall") -> "ECX" :: []
+  | Some("stdcall") | Some("ms") -> []
   | Some("fastcall") -> "EDX" :: "ECX" :: []
   | Some("") | None  -> Log_utils.info "No calling convention inferred by BAP. Using cdecl as standard"; []
   | _ -> failwith "Unknown calling convention."
@@ -129,25 +163,14 @@ let parse_dyn_sym_line (line : string) : string option =
 let parse_dyn_syms (project : Project.t) : String.Set.t =
   match !dyn_syms with
   | Some(symbol_set) -> symbol_set
-  | None ->
-    match Project.get project filename with
-    | None -> failwith "[CWE-checker] Project has no file name."
-    | Some(fname) -> begin
-        let cmd = Format.sprintf "objdump --dynamic-syms %s" fname in
-        try
-          let in_chan = Unix.open_process_in cmd in
-          let lines = In_channel.input_lines in_chan in
-          let () = In_channel.close in_chan in begin
-            match lines with
-            | _ :: _ :: _ :: _ :: tail -> (* The first four lines are not part of the table *)
-              let symbol_set = String.Set.of_list (List.filter_map tail ~f:parse_dyn_sym_line) in
-              dyn_syms := Some(symbol_set);
-              symbol_set
-            | _ ->
-              dyn_syms := Some(String.Set.empty);
-              String.Set.empty              (*  *)
-          end
-        with
-          Unix.Unix_error (e,fm,argm) ->
-          failwith (Format.sprintf "[CWE-checker] Parsing of dynamic symbols failed: %s %s %s" (Unix.error_message e) fm argm)
-      end
+  | None -> begin
+    let lines = call_objdump project "--dynamic-syms" "[CWE-checker] Parsing of dynamic symbols failed:" in
+    match lines with
+    | _ :: _ :: _ :: _ :: tail -> (* The first four lines are not part of the table *)
+      let symbol_set = String.Set.of_list (List.filter_map tail ~f:parse_dyn_sym_line) in
+      dyn_syms := Some(symbol_set);
+      symbol_set
+    | _ ->
+      dyn_syms := Some(String.Set.empty);
+      String.Set.empty
+  end
