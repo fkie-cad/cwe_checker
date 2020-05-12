@@ -8,7 +8,11 @@ let callee_saved_registers = ref None
 
 let bin_format = ref ""
 
-let json = Yojson.Basic.from_file "registers.json"
+let json (() : unit) : Yojson.Basic.t =
+  let path = match Sys.getenv_opt "OPAM_SWITCH_PREFIX" with
+  | Some(prefix) -> prefix ^ "/etc/cwe_checker/registers.json"
+  | None -> "" in
+  Yojson.Basic.from_file path
 
 let supported_architectures = ref []
 
@@ -16,7 +20,7 @@ let supported_architectures = ref []
 let get_supported_architectures (() : unit) : string list =
   match !supported_architectures with
   | [] -> begin
-      supported_architectures := List.append !supported_architectures (List.map (Json_utils.get_arch_list_from_json json "elf") ~f:(fun kv -> match kv with (k, _) -> k));
+      supported_architectures := List.append !supported_architectures (List.map (Json_utils.get_arch_list_from_json (json ()) "elf") ~f:(fun kv -> match kv with (k, _) -> k));
       !supported_architectures
   end
   | _  -> !supported_architectures
@@ -68,7 +72,7 @@ let get_register_list (project : Project.t) (context : string) : string list =
   let arch = Arch.to_string (Project.arch project) in
   match Stdlib.List.mem arch (get_supported_architectures ()) with
   | true -> begin
-      let json_bin = Json_utils.get_bin_format_from_json json (extract_bin_format project) in
+      let json_bin = Json_utils.get_bin_format_from_json (json ()) (extract_bin_format project) in
       match arch with
       | "x86" -> begin
           let conv = match Project.get project Bap_abi.name with
