@@ -14,6 +14,12 @@ impl Tid {
     }
 }
 
+impl std::fmt::Display for Tid {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(formatter, "{}", self.0)
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Term<T> {
     pub tid: Tid,
@@ -68,6 +74,7 @@ pub struct Sub {
 pub struct Program {
     pub subs: Vec<Term<Sub>>,
     pub extern_symbols: Vec<ExternSymbol>,
+    pub entry_points: Vec<Tid>,
 }
 
 // TODO: Add deserialization from Ocaml to the FFI module for project!

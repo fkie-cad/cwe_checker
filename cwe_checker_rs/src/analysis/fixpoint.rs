@@ -162,6 +162,16 @@ impl<T: Problem> Computation<T> {
             self.update_node(node);
         }
     }
+
+    /// Get a reference to the internal map where one can look up the current values of all nodes
+    pub fn node_values(&self) -> &FnvHashMap<NodeIndex, T::NodeValue> {
+        &self.node_values
+    }
+
+    /// Get a reference to the underlying graph
+    pub fn get_graph(&self) -> &DiGraph<T::NodeLabel, T::EdgeLabel> {
+        self.fp_problem.get_graph()
+    }
 }
 
 #[cfg(test)]

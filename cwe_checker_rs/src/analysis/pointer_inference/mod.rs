@@ -4,33 +4,128 @@ use crate::bil::{BitSize, Expression};
 use crate::prelude::*;
 use crate::term::symbol::ExternSymbol;
 use crate::term::*;
-use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use petgraph::graph::NodeIndex;
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use super::interprocedural_fixpoint::{NodeValue, Computation};
 
 mod data;
 mod identifier;
 mod object;
+mod object_list;
 mod state;
 
 use data::Data;
 use identifier::*;
-use object::AbstractObjectList;
+use object_list::AbstractObjectList;
 use state::State;
 
+pub struct PointerInference<'a> {
+    computation: Computation<'a, Context<'a>>
+}
+
+impl<'a> PointerInference<'a> {
+    pub fn new(project: &'a Project) -> PointerInference<'a> {
+        let context = Context::new(project);
+
+        let mut entry_sub_to_entry_blocks_map = HashMap::new();
+        let subs: HashMap<Tid, &Term<Sub>> = project
+            .program
+            .term
+            .subs
+            .iter()
+            .map(|sub| (sub.tid.clone(), sub))
+            .collect();
+        for sub_tid in project.program.term.entry_points.iter() {
+            if let Some(sub) = subs.get(sub_tid) {
+                if let Some(entry_block) = sub.term.blocks.iter().next() {
+                    entry_sub_to_entry_blocks_map.insert(sub_tid, entry_block.tid.clone());
+                }
+            }
+        }
+        let tid_to_graph_indices_map = super::graph::get_indices_of_block_nodes(
+            &context.graph,
+            entry_sub_to_entry_blocks_map.values(),
+        );
+        let entry_sub_to_entry_node_map: HashMap<Tid, NodeIndex> = entry_sub_to_entry_blocks_map
+            .into_iter()
+            .filter_map(|(sub_tid, block_tid)| {
+                if let Some((start_node_index, end_node_index)) =
+                    tid_to_graph_indices_map.get(&block_tid)
+                {
+                    Some((sub_tid.clone(), start_node_index.clone()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let mut fixpoint_computation = super::interprocedural_fixpoint::Computation::new(context, None);
+        for (sub_tid, start_node_index) in entry_sub_to_entry_node_map.into_iter() {
+            fixpoint_computation.set_node_value(
+                start_node_index,
+                super::interprocedural_fixpoint::NodeValue::Value(State::new(
+                    &project.stack_pointer_register,
+                    sub_tid,
+                )),
+            );
+        }
+        PointerInference {
+            computation: fixpoint_computation
+        }
+    }
+
+    pub fn compute(&mut self) {
+        self.computation.compute_with_max_steps(100); // TODO: make max_steps configurable!
+    }
+
+    pub fn print_yaml(&self) {
+        // Print results serialized as YAML to stdout
+        let graph = self.computation.get_graph();
+        for (node_index, value) in self.computation.node_values().iter() {
+            let node = graph.node_weight(*node_index).unwrap();
+            if let Ok(string) = serde_yaml::to_string(&(node, value)) {
+                println!("{}", string);
+            } else {
+                println!(
+                    "Serializing failed at {:?} with {:?}",
+                    node_index,
+                    serde_yaml::to_string(value)
+                );
+            }
+        }
+    }
+
+    pub fn generate_compact_json(&self) -> serde_json::Value {
+        let graph = self.computation.get_graph();
+        let mut json_nodes = serde_json::Map::new();
+        for (node_index, node_value) in self.computation.node_values().iter() {
+            let node = graph.node_weight(*node_index).unwrap();
+            if let NodeValue::Value(value) = node_value {
+                json_nodes.insert(format!("{}", node), value.to_json_compact());
+            }
+        }
+        serde_json::Value::Object(json_nodes)
+    }
+
+    pub fn print_compact_json(&self) {
+        println!("{:#}", self.generate_compact_json());
+    }
+}
+
+pub fn run_and_print_debug(project: &Project) {
+    let mut computation = PointerInference::new(project);
+    computation.compute();
+    computation.print_compact_json();
+}
+
 pub fn run(project: &Project) {
-    let context = Context::new(project);
-    let mut fixpoint_computation = super::interprocedural_fixpoint::Computation::new(context, None);
-    // TODO: Add starting nodes!
-    // TODO: compute!
-    // TODO: print results in some form!
-    println!("It works!");
-    todo!()
+    run_and_print_debug(project);
+    panic!("Not ready for production yet?")
 }
 
 struct Context<'a> {
-    graph: Graph<'a>,
-    project: &'a Project,
-    extern_symbol_map: BTreeMap<Tid, &'a ExternSymbol>,
+    pub graph: Graph<'a>,
+    pub project: &'a Project,
+    pub extern_symbol_map: BTreeMap<Tid, &'a ExternSymbol>,
 }
 
 impl<'a> Context<'a> {
@@ -39,7 +134,13 @@ impl<'a> Context<'a> {
         for symbol in project.program.term.extern_symbols.iter() {
             extern_symbol_map.insert(symbol.tid.clone(), symbol);
         }
-        let extern_symbol_tid_set: HashSet<Tid> = project.program.term.extern_symbols.iter().map(|symb| {symb.tid.clone()}).collect();
+        let extern_symbol_tid_set: HashSet<Tid> = project
+            .program
+            .term
+            .extern_symbols
+            .iter()
+            .map(|symb| symb.tid.clone())
+            .collect();
         let graph = super::graph::get_program_cfg(&project.program, extern_symbol_tid_set);
         Context {
             graph,
@@ -51,9 +152,12 @@ impl<'a> Context<'a> {
     fn clear_stack_parameter(&self, state: &mut State, extern_call: &ExternSymbol) {
         for arg in &extern_call.arguments {
             match &arg.location {
-                Expression::Var(_) => {},
+                Expression::Var(_) => {}
                 location_expression => {
-                    let arg_size = arg.var.bitsize().expect("Encountered argument with unknown size");
+                    let arg_size = arg
+                        .var
+                        .bitsize()
+                        .expect("Encountered argument with unknown size");
                     let data_top = Data::new_top(arg_size);
                     *state = self.write_to_address(state, location_expression, data_top);
                 }
@@ -106,12 +210,14 @@ impl<'a> super::interprocedural_fixpoint::Problem<'a> for Context<'a> {
                 let mut register = state.register.clone();
                 // TODO: error messages while evaluating instructions are ignored at the moment.
                 // These should be somehow made visible for the user or for debug purposes
-                register.insert(
-                    def.term.lhs.name.clone(),
-                    state
-                        .eval(&expression)
-                        .unwrap_or(Data::new_top(def.term.lhs.bitsize().unwrap())),
-                );
+                let new_value = state
+                    .eval(&expression)
+                    .unwrap_or(Data::new_top(def.term.lhs.bitsize().unwrap()));
+                if new_value.is_top() {
+                    register.remove(&def.term.lhs);
+                } else {
+                    register.insert(def.term.lhs.clone(), new_value);
+                }
                 State {
                     register,
                     ..state.clone()
@@ -127,7 +233,9 @@ impl<'a> super::interprocedural_fixpoint::Problem<'a> for Context<'a> {
         untaken_conditional: Option<&Term<Jmp>>,
     ) -> Option<State> {
         // TODO: Implement some real specialization of conditionals!
-        Some(value.clone())
+        let mut new_value = value.clone();
+        new_value.remove_virtual_register();
+        Some(new_value)
     }
 
     fn update_call(
@@ -156,6 +264,7 @@ impl<'a> super::interprocedural_fixpoint::Problem<'a> for Context<'a> {
             let address_bitsize = self.project.stack_pointer_register.bitsize().unwrap();
 
             let mut callee_state = state.clone();
+            callee_state.remove_virtual_register();
             // Replace the caller stack id with one determined by the call instruction.
             // This has to be done *before* adding the new callee stack id to avoid confusing caller and callee stack ids in case of recursive calls.
             callee_state.replace_abstract_id(
@@ -205,6 +314,7 @@ impl<'a> super::interprocedural_fixpoint::Problem<'a> for Context<'a> {
         let stack_offset_on_call = self.get_current_stack_offset(state_before_call);
 
         let mut state_after_return = state_before_return.clone();
+        state_after_return.remove_virtual_register();
         state_after_return.replace_abstract_id(
             &caller_stack_id,
             original_caller_stack_id,
@@ -234,9 +344,16 @@ impl<'a> super::interprocedural_fixpoint::Problem<'a> for Context<'a> {
             JmpKind::Call(call_inner) => &call_inner.target,
             _ => panic!("Malformed control flow graph encountered."),
         };
-        // Clear non-callee-saved registers from the state
+        // Clear non-callee-saved registers from the state.
+        // This automatically also clears all virtual registers from the state.
         for register in state.register.keys() {
-            if self.project.callee_saved_registers.iter().find(|reg_name| {reg_name == &register}).is_none() {
+            if self
+                .project
+                .callee_saved_registers
+                .iter()
+                .find(|reg_name| **reg_name == register.name)
+                .is_none()
+            {
                 new_state.register.remove(register);
             }
         }
@@ -261,8 +378,13 @@ impl<'a> super::interprocedural_fixpoint::Problem<'a> for Context<'a> {
                                     object::ObjectType::Heap,
                                     address_bitsize,
                                 );
-                                let pointer = data::PointerDomain::new(object_id, Bitvector::zero((address_bitsize as usize).into()).into());
-                                new_state.register.insert(return_register.name.clone(), pointer.into());
+                                let pointer = data::PointerDomain::new(
+                                    object_id,
+                                    Bitvector::zero((address_bitsize as usize).into()).into(),
+                                );
+                                new_state
+                                    .register
+                                    .insert(return_register.clone(), pointer.into());
                                 return Some(new_state);
                             } else {
                                 // We cannot track the new object, since we do not know where to store the pointer to it.
@@ -272,21 +394,23 @@ impl<'a> super::interprocedural_fixpoint::Problem<'a> for Context<'a> {
                         }
                         "free" => {
                             if let Ok(parameter_register) = get_parameter_register(extern_symbol) {
-                                if let Ok(memory_object_pointer) = state.eval(&Expression::Var(parameter_register.clone())) {
+                                if let Ok(memory_object_pointer) =
+                                    state.eval(&Expression::Var(parameter_register.clone()))
+                                {
                                     if let Data::Pointer(pointer) = memory_object_pointer {
                                         new_state.mark_mem_object_as_freed(&pointer);
                                     } // TODO: add diagnostics for else case
                                     return Some(new_state);
                                 } else {
                                     // TODO: add diagnostics message for the user here
-                                    return Some(new_state)
+                                    return Some(new_state);
                                 }
                             } else {
                                 // We do not know which memory object to free
                                 // TODO: Add a diagnostics message for the user here
                                 return Some(new_state);
                             }
-                        },
+                        }
                         _ => {
                             self.clear_stack_parameter(&mut new_state, extern_symbol);
                             let mut possible_referenced_ids = BTreeSet::new();
@@ -294,31 +418,50 @@ impl<'a> super::interprocedural_fixpoint::Problem<'a> for Context<'a> {
                                 // TODO: We assume here that we do not know the parameters and approximate them by all parameter registers.
                                 // This approximation is wrong if the function is known but has neither parameters nor return values.
                                 // We need to somehow distinguish these two cases.
-                                for parameter_register_name in self.project.parameter_registers.iter() {
-                                    if let Some(register_value) = state.register.get(parameter_register_name) {
-                                        possible_referenced_ids.append(&mut register_value.referenced_ids());
+                                for parameter_register_name in
+                                    self.project.parameter_registers.iter()
+                                {
+                                    if let Some(register_value) =
+                                        state.register.iter().find_map(|(register, reg_value)| {
+                                            if register.name == *parameter_register_name {
+                                                Some(reg_value)
+                                            } else {
+                                                None
+                                            }
+                                        })
+                                    {
+                                        possible_referenced_ids
+                                            .append(&mut register_value.referenced_ids());
                                     }
                                 }
                             } else {
-                                for parameter in extern_symbol.arguments.iter().filter(|arg| {arg.intent.is_input()}) {
+                                for parameter in extern_symbol
+                                    .arguments
+                                    .iter()
+                                    .filter(|arg| arg.intent.is_input())
+                                {
                                     if let Ok(data) = state.eval(&parameter.location) {
                                         possible_referenced_ids.append(&mut data.referenced_ids());
                                     }
                                 }
                             }
-                            state.add_recursively_referenced_ids_to_id_set(&mut possible_referenced_ids);
+                            state.add_recursively_referenced_ids_to_id_set(
+                                &mut possible_referenced_ids,
+                            );
                             // Delete content of all referenced objects, as the function may write to them.
                             for id in possible_referenced_ids.iter() {
-                                new_state.memory.mark_mem_object_as_untracked(id, &possible_referenced_ids);
+                                new_state
+                                    .memory
+                                    .mark_mem_object_as_untracked(id, &possible_referenced_ids);
                             }
                             return Some(new_state);
-                        },
+                        }
                     }
                 } else {
                     panic!("Extern symbol not found.");
                 }
             }
-            Label::Indirect(_) => unimplemented!(), // Right now this case should not exist. Decide how to handle only after it can actually occur.
+            Label::Indirect(_) => unimplemented!("Handling of indirect edges not yet implemented"), // Right now this case should not exist. Decide how to handle only after it can actually occur.
         }
     }
 
@@ -336,7 +479,7 @@ impl<'a> super::interprocedural_fixpoint::Problem<'a> for Context<'a> {
 impl<'a> Context<'a> {
     fn get_current_stack_offset(&self, state: &State) -> BitvectorDomain {
         if let Data::Pointer(ref stack_pointer) =
-            state.register[&self.project.stack_pointer_register.name]
+            state.register[&self.project.stack_pointer_register]
         {
             if stack_pointer.iter_targets().len() == 1 {
                 // TODO: add sanity check that the stack id is the expected id

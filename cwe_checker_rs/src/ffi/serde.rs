@@ -118,7 +118,11 @@ fn build_serde_bitvector(bitvector_string_val: ocaml::Value) -> ocaml::Value {
     let elements: Vec<&str> = string.split(':').collect();
     let num = parse_int::parse::<u64>(elements[0]).expect("Bitvector value parsing failed");
     let width = isize::from_str(&elements[1][0..(elements[1].len() - 1)]).expect("Bitvector width parsing failed");
+    assert!(width > 0);
     let mut num_list = Vec::new();
+    for _i in 0..((width-1)/64) {
+        num_list.push(Rc::new(JsonBuilder::PositiveNumber(0)));
+    }
     num_list.push(Rc::new(JsonBuilder::PositiveNumber(num)));
     let mut width_list = Vec::new();
     width_list.push(Rc::new(JsonBuilder::Number(width)));
@@ -126,6 +130,10 @@ fn build_serde_bitvector(bitvector_string_val: ocaml::Value) -> ocaml::Value {
         ("digits".to_string(), Rc::new(JsonBuilder::Array(num_list))),
         ("width".to_string(), Rc::new(JsonBuilder::Array(width_list))),
     ]);
+    // TODO: remove deserialization check
+    let check_serde = serde_json::to_string(&serde_json::Value::from(&result)).unwrap();
+    let _bitv: apint::ApInt = serde_json::from_str(&check_serde).expect(&format!("Invalid value generated: {}", check_serde));
+
     result.to_ocaml()
 }
 

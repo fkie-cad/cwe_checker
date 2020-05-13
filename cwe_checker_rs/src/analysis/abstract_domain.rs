@@ -23,6 +23,11 @@ pub trait AbstractDomain: Sized + Eq + Clone {
             self.top()
         }
     }
+
+    /// Returns whether the element represents the top element or not.
+    fn is_top(&self) -> bool {
+        *self == self.top()
+    }
 }
 
 /// A trait for abstract domains that represent values that can be loaded into register or written onto the stack.
@@ -205,6 +210,15 @@ impl std::ops::Neg for BitvectorDomain {
 impl std::convert::From<Bitvector> for BitvectorDomain {
     fn from(bitvector: Bitvector) -> BitvectorDomain {
         BitvectorDomain::Value(bitvector)
+    }
+}
+
+impl std::fmt::Display for BitvectorDomain {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::Top(bitsize) => write!(formatter, "Top:i{}", bitsize),
+            Self::Value(bitvector) => write!(formatter, "0x{:016x}:i{:?}", bitvector, bitvector.width().to_usize()),
+        }
     }
 }
 

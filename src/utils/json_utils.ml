@@ -174,7 +174,7 @@ module SerdeJson = struct
           ("type_", of_var_type typ);
         ]);]
     | Ite(if_, then_, else_) ->
-        build_object [ ("Ite", build_object [
+        build_object [ ("IfThenElse", build_object [
           ("condition", of_exp if_);
           ("true_exp", of_exp then_);
           ("false_exp", of_exp else_);
@@ -302,7 +302,7 @@ module SerdeJson = struct
        )))
     ]
 
-  let of_program (program: Program.t) (extern_symbols: extern_symbol List.t) : t =
+  let of_program (program: Program.t) (extern_symbols: extern_symbol List.t) (entry_points: Tid.t List.t) : t =
     let subs = Seq.to_list (Term.enum sub_t program) in
     let subs = List.map subs ~f:(fun sub -> of_sub sub) in
     build_object [
@@ -310,12 +310,13 @@ module SerdeJson = struct
       ("term", build_object [
          ("subs", build_array subs);
          ("extern_symbols", build_array (List.map extern_symbols ~f:(fun sym -> of_extern_symbol sym)));
+         ("entry_points", build_array (List.map entry_points ~f:(fun tid -> of_tid tid)));
        ]);
     ]
 
-  let of_project (project: Project.t) (extern_symbols: extern_symbol List.t) : t =
+  let of_project (project: Project.t) (extern_symbols: extern_symbol List.t) (entry_points: Tid.t List.t) : t =
     build_object [
-      ("program", of_program (Project.program project) extern_symbols);
+      ("program", of_program (Project.program project) extern_symbols entry_points);
       ("cpu_architecture", build_string (Arch.to_string (Project.arch project)));
       ("stack_pointer_register", of_var (Symbol_utils.stack_register project));
       ("callee_saved_registers", build_array (List.map (Cconv.callee_saved_register_list project) ~f:(fun reg_name -> build_string reg_name) ));

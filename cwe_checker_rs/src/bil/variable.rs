@@ -2,14 +2,14 @@ use serde::{Deserialize, Serialize};
 use super::BitSize;
 use crate::prelude::*;
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct Variable {
     pub name: String,
     pub type_: Type,
     pub is_temp: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 pub enum Type {
     Immediate(BitSize),
     Memory {

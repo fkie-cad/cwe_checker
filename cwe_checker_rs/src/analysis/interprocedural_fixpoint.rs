@@ -21,14 +21,16 @@ computation.compute();
 // Alternatively, this could be achieved through usage of the specialize_conditional function.
 // Currently unclear, which way is better.
 
+use crate::prelude::*;
 use super::fixpoint::Problem as GeneralFPProblem;
 use super::graph::*;
 use crate::bil::Expression;
 use crate::term::*;
-use petgraph::graph::{EdgeIndex, NodeIndex};
+use petgraph::graph::{DiGraph, EdgeIndex, NodeIndex};
 use std::marker::PhantomData;
+use fnv::FnvHashMap;
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Serialize, Deserialize)]
 pub enum NodeValue<T: PartialEq + Eq> {
     Value(T),
     CallReturnCombinator { call: Option<T>, return_: Option<T> },
@@ -213,6 +215,16 @@ impl<'a, T: Problem<'a>> Computation<'a, T> {
     /// Set the value of a node and mark the node as not yet stabilized
     pub fn set_node_value(&mut self, node: NodeIndex, value: NodeValue<T::Value>) {
         self.generalized_computation.set_node_value(node, value)
+    }
+
+    /// Get a reference to the internal map where one can look up the current values of all nodes
+    pub fn node_values(&self) -> &FnvHashMap<NodeIndex, NodeValue<T::Value>> {
+        self.generalized_computation.node_values()
+    }
+
+    /// Get a reference to the underlying graph
+    pub fn get_graph(&self) -> &Graph {
+        self.generalized_computation.get_graph()
     }
 }
 

@@ -9,6 +9,7 @@ all:
 	cd plugins/cwe_checker_emulation; make all; cd ../..
 	cd plugins/cwe_checker_type_inference; make all; cd ../..
 	cd plugins/cwe_checker_type_inference_print; make all; cd ../..
+	cd plugins/cwe_checker_pointer_inference_debug; make all; cd ../..
 
 test:
 	cargo test
@@ -28,6 +29,7 @@ clean:
 	cd plugins/cwe_checker_emulation; make clean; cd ../..
 	cd plugins/cwe_checker_type_inference; make clean; cd ../..
 	cd plugins/cwe_checker_type_inference_print; make clean; cd ../..
+	cd plugins/cwe_checker_pointer_inference_debug; make clean; cd ../..
 
 uninstall:
 	dune uninstall
@@ -35,6 +37,7 @@ uninstall:
 	cd plugins/cwe_checker_emulation; make uninstall; cd ../..
 	cd plugins/cwe_checker_type_inference; make uninstall; cd ../..
 	cd plugins/cwe_checker_type_inference_print; make uninstall; cd ../..
+	cd plugins/cwe_checker_pointer_inference_debug; make uninstall; cd ../..
 
 documentation:
 	dune build @doc

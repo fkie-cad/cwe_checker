@@ -27,6 +27,16 @@ impl<'a> Node<'a> {
     }
 }
 
+impl<'a> std::fmt::Display for Node<'a> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::BlkStart(block) => write!(formatter, "BlkStart @ {}", block.tid),
+            Self::BlkEnd(block) => write!(formatter, "BlkEnd @ {}", block.tid),
+            Self::CallReturn(block) => write!(formatter, "CallReturn (caller @ {})", block.tid),
+        }
+    }
+}
+
 // TODO: document that we assume that the graph only has blocks with either:
 // - one unconditional call instruction
 // - one return instruction
@@ -224,6 +234,26 @@ pub fn get_program_cfg(program: &Term<Program>, extern_subs: HashSet<Tid>) -> Gr
     return builder.build();
 }
 
+/// For a given set of block TIDs generate a map from the TIDs to the indices of the BlkStart and BlkEnd nodes
+/// corresponding to the block.
+pub fn get_indices_of_block_nodes<'a, I: Iterator<Item = &'a Tid>>(graph: &'a Graph, block_tids: I) -> HashMap<Tid, (NodeIndex, NodeIndex)> {
+    let tids: HashSet<Tid> = block_tids.cloned().collect();
+    let mut tid_to_indices_map = HashMap::new();
+    for node_index in graph.node_indices() {
+        if let Some(tid) = tids.get(&graph[node_index].get_block().tid) {
+            match graph[node_index] {
+                Node::BlkStart(_block_term) => {
+                    let start_index = node_index;
+                    let end_index = graph.neighbors(start_index).next().unwrap();
+                    tid_to_indices_map.insert(tid.clone(), (start_index, end_index));
+                },
+                _ => (),
+            }
+        }
+    }
+    return tid_to_indices_map;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -296,6 +326,7 @@ mod tests {
             term: Program {
                 subs: vec![sub1, sub2],
                 extern_symbols: Vec::new(),
+                entry_points: Vec::new(),
             },
         };
         program

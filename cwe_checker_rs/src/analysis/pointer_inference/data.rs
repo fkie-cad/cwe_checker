@@ -20,7 +20,12 @@ impl Data {
 
     /// For pointer values replace an abstract identifier with another one and add the offset_adjustment to the pointer offset.
     /// This is needed to adjust stack pointer on call and return instructions.
-    pub fn replace_abstract_id(&mut self, old_id: &AbstractIdentifier, new_id: &AbstractIdentifier, offset_adjustment: &BitvectorDomain) {
+    pub fn replace_abstract_id(
+        &mut self,
+        old_id: &AbstractIdentifier,
+        new_id: &AbstractIdentifier,
+        offset_adjustment: &BitvectorDomain,
+    ) {
         if let Self::Pointer(pointer) = self {
             pointer.replace_abstract_id(old_id, new_id, offset_adjustment);
         }
@@ -31,6 +36,24 @@ impl Data {
             pointer.0.keys().cloned().collect()
         } else {
             BTreeSet::new()
+        }
+    }
+}
+
+impl Data {
+    pub fn to_json_compact(&self) -> serde_json::Value {
+        match self {
+            Self::Top(bitsize) => serde_json::Value::String(format!("Top:{}", bitsize)),
+            Self::Pointer(pointer) => {
+                let target_iter = pointer.iter_targets().map(|(id, offset)| {
+                    (format!("{}", id), serde_json::Value::String(format!("{}", offset)))
+                });
+                let targets = serde_json::Value::Object(target_iter.collect());
+                let mut obj_map = serde_json::Map::new();
+                obj_map.insert("Pointer".to_string(), targets);
+                serde_json::Value::Object(obj_map)
+            },
+            Self::Value(bitvector) => serde_json::Value::String(format!("Value: {}", bitvector))
         }
     }
 }
@@ -86,7 +109,12 @@ impl PointerDomain {
 
     /// Replace an abstract identifier with another one and add the offset_adjustment to the pointer offset.
     /// This is needed to adjust stack pointer on call and return instructions.
-    pub fn replace_abstract_id(&mut self, old_id: &AbstractIdentifier, new_id: &AbstractIdentifier, offset_adjustment: &BitvectorDomain) {
+    pub fn replace_abstract_id(
+        &mut self,
+        old_id: &AbstractIdentifier,
+        new_id: &AbstractIdentifier,
+        offset_adjustment: &BitvectorDomain,
+    ) {
         if let Some(old_offset) = self.0.get(&old_id) {
             let new_offset = old_offset.clone() + offset_adjustment.clone();
             self.0.remove(old_id);
@@ -121,6 +149,22 @@ impl PointerDomain {
 
     pub fn get_target_ids(&self) -> BTreeSet<AbstractIdentifier> {
         self.0.keys().cloned().collect()
+    }
+}
+
+impl PointerDomain {
+    pub fn to_json_compact(&self) -> serde_json::Value {
+        serde_json::Value::Object(
+            self.0
+                .iter()
+                .map(|(id, offset)| {
+                    (
+                        format!("{}", id),
+                        serde_json::Value::String(format!("{}", offset)),
+                    )
+                })
+                .collect(),
+        )
     }
 }
 
@@ -204,6 +248,11 @@ impl AbstractDomain for Data {
             (Pointer(_), Value(_)) | (Value(_), Pointer(_)) => Top(self.bitsize()),
         }
     }
+
+    /// Return whether the element represents a top element or not.
+    fn is_top(&self) -> bool {
+        matches!(self, Self::Top(_))
+    }
 }
 
 impl From<PointerDomain> for Data {
@@ -267,7 +316,10 @@ mod tests {
         assert_eq!(pointer.bin_op(PLUS, &three), new_pointer("Rax".into(), 3));
         assert_eq!(three.un_op(crate::bil::UnOpType::NEG), new_value(-3));
 
-        assert_eq!(three.extract(0, 31), Data::Value(BitvectorDomain::Value(Bitvector::from_i32(3))));
+        assert_eq!(
+            three.extract(0, 31),
+            Data::Value(BitvectorDomain::Value(Bitvector::from_i32(3)))
+        );
 
         assert_eq!(data.cast(crate::bil::CastType::SIGNED, 128).bitsize(), 128);
 

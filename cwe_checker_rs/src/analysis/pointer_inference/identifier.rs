@@ -34,6 +34,12 @@ impl AbstractIdentifier {
     }
 }
 
+impl std::fmt::Display for AbstractIdentifier {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(formatter, "{} @ {}", self.0.time, self.0.location)
+    }
+}
+
 /// An abstract location describes how to find the value of a variable in memory at a given time.
 ///
 /// It is defined recursively, where the root is always a register.
@@ -43,6 +49,15 @@ impl AbstractIdentifier {
 pub enum AbstractLocation {
     Register(String, BitSize),
     Pointer(String, AbstractMemoryLocation),
+}
+
+impl std::fmt::Display for AbstractLocation {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::Register(name, _size) => write!(formatter, "{}", name),
+            Self::Pointer(reg_name, location) => write!(formatter, "{}->{}", reg_name, location),
+        }
+    }
 }
 
 impl AbstractLocation {
@@ -67,6 +82,15 @@ pub enum AbstractMemoryLocation {
         size: usize,
         target: Box<AbstractMemoryLocation>
     },
+}
+
+impl std::fmt::Display for AbstractMemoryLocation {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::Location{offset, ..} => write!(formatter, "({})", offset),
+            Self::Pointer{offset, size, target} => write!(formatter, "({})->{}", offset, target),
+        }
+    }
 }
 
 #[cfg(test)]

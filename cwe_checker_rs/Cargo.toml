@@ -10,6 +10,7 @@ edition = "2018"
 apint = "0.2"
 serde = {version = "1.0", features = ["derive", "rc"]}
 serde_json = "1.0"
+serde_yaml = "0.8"
 ocaml = "0.9.2"
 parse_int = "0.4"
 petgraph = { version = "0.5", features = ["default", "serde-1"] }

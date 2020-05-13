@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use std::collections::{BTreeMap, BTreeSet};
 use super::data::*;
-use super::object::AbstractObjectList;
+use super::object_list::AbstractObjectList;
 use super::identifier::{AbstractIdentifier, AbstractLocation};
 use crate::bil::*;
 use crate::analysis::abstract_domain::*;
@@ -19,7 +19,7 @@ use crate::analysis::abstract_domain::*;
 /// This way we can distinguish caller stack frames even if one function calls another several times.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct State {
-    pub register: BTreeMap<String, Data>,
+    pub register: BTreeMap<Variable, Data>,
     pub memory: AbstractObjectList,
     pub stack_id: AbstractIdentifier,
     pub caller_ids: BTreeSet<AbstractIdentifier>,
@@ -30,8 +30,8 @@ impl State {
     /// The stack offset will be set to zero.
     pub fn new(stack_register: &Variable, function_tid: Tid) -> State {
         let stack_id = AbstractIdentifier::new(function_tid, AbstractLocation::from_var(stack_register).unwrap());
-        let mut register: BTreeMap<String, Data> = BTreeMap::new();
-        register.insert(stack_register.name.clone(), PointerDomain::new(stack_id.clone(), Bitvector::zero((stack_register.bitsize().unwrap() as usize).into()).into()).into());
+        let mut register: BTreeMap<Variable, Data> = BTreeMap::new();
+        register.insert(stack_register.clone(), PointerDomain::new(stack_id.clone(), Bitvector::zero((stack_register.bitsize().unwrap() as usize).into()).into()).into());
         State {
             register,
             memory: AbstractObjectList::from_stack_id(stack_id.clone(), stack_register.bitsize().unwrap()),
@@ -45,7 +45,7 @@ impl State {
         use Expression::*;
         match expression {
             Var(variable) => {
-                if let Some(data) = self.register.get(&variable.name) {
+                if let Some(data) = self.register.get(&variable) {
                     Ok(data.clone())
                 } else {
                     Ok(Data::new_top(variable.bitsize()?))
@@ -103,8 +103,8 @@ impl State {
     pub fn merge(&self, other: &Self) -> Self {
         assert_eq!(self.stack_id, other.stack_id);
         let mut merged_register = self.register.clone();
-        for (reg_name, other_value) in other.register.iter() {
-            merged_register.entry(reg_name.to_string()).and_modify(|value| {*value = value.merge(other_value); }).or_insert(other_value.clone());
+        for (register, other_value) in other.register.iter() {
+            merged_register.entry(register.clone()).and_modify(|value| {*value = value.merge(other_value); }).or_insert(other_value.clone());
         };
         let merged_memory_objects = self.memory.merge(&other.memory);
         State {
@@ -199,6 +199,31 @@ impl State {
         self.memory.mark_mem_object_as_freed(object_pointer)
     }
 
+    /// Remove all virtual register from the state.
+    /// This should only be done in cases where it is known that no virtual registers can be alive.
+    /// Example: At the start of a basic block no virtual registers should be alive.
+    pub fn remove_virtual_register(&mut self) {
+        self.register = self.register.clone().into_iter().filter(|(register, _value)| {
+            register.is_temp == false
+        }).collect();
+    }
+}
+
+impl State {
+    pub fn to_json_compact(&self) -> serde_json::Value {
+        use serde_json::*;
+        let mut state_map = Map::new();
+        let register = self.register.iter().map(|(var, data)| {
+            (var.name.clone(), data.to_json_compact())
+        }).collect();
+        let register = Value::Object(register);
+        state_map.insert("register".into(), register);
+        state_map.insert("memory".into(), self.memory.to_json_compact());
+        state_map.insert("stack_id".into(), Value::String(format!("{}", self.stack_id)));
+        state_map.insert("caller_ids".into(), Value::Array(self.caller_ids.iter().map(|id| {Value::String(format!("{}", id))}).collect()));
+
+        Value::Object(state_map)
+    }
 }
 
 #[cfg(test)]
