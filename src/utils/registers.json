@@ -27,7 +27,7 @@
       }
     },
     "x86_64" : {
-      "callee_saved" : ["RBX", "RBP", "RDI", "RSI", "R12", "R13", "R14", "R15"],
+      "callee_saved" : ["RBX", "RBP", "RSP", "RDI", "RSI", "R12", "R13", "R14", "R15"],
       "float_callee_saved" : ["XMM6", "XMM7", "XMM8", "XMM9", "XMM10", "XMM11", "XMM12", "XXM13", "XMM14", "XMM15"],
       "params" : ["RCX", "RDX", "R8", "R9"],
       "float_params" : ["XMM0", "XMM1", "XMM2", "XMM3", "YMM0", "YMM1", "YMM2", "YMM3", "ZMM0", "ZMM1", "ZMM2", "ZMM3"],
@@ -329,7 +329,7 @@
       }
     },
     "x86_64" : {
-      "callee_saved" : ["RBP", "RBX", "R12", "R13", "R14", "R15"],
+      "callee_saved" : ["RBP", "RSP", "RBX", "R12", "R13", "R14", "R15"],
       "float_callee_saved" : [],
       "params" : ["RDI", "RSI", "RDX", "RCX", "R8", "R9"],
       "float_params" : ["XMM0", "XMM1", "XMM2", "XMM3", "XMM4", "XMM5", "XMM6", "XMM7",
