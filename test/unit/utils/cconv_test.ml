@@ -13,7 +13,11 @@ let test_callee_saved () =
   let project = Option.value_exn !example_project in
   let register = Var.create "RBX" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
   let () = check "callee_saved_register" (is_callee_saved register project) in
+  let register = Var.create "R15" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
+  let () = check "callee_saved_register" (is_callee_saved register project) in
   let register = Var.create "RAX" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
+  let () = check "caller_saved_register" (is_callee_saved register project = false) in
+  let register = Var.create "R8" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
   let () = check "caller_saved_register" (is_callee_saved register project = false) in
   ()
 
@@ -22,7 +26,11 @@ let test_parameter_register () =
   let project = Option.value_exn !example_project in
   let register = Var.create "RDX" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
   let () = check "return_register" (is_parameter_register register project) in
+  let register = Var.create "R9" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
+  let () = check "return_register" (is_parameter_register register project) in
   let register = Var.create "RAX" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
+  let () = check "no_return_register" (is_parameter_register register project = false) in
+  let register = Var.create "R14" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
   let () = check "no_return_register" (is_parameter_register register project = false) in
   ()
 
@@ -34,6 +42,7 @@ let test_return_register () =
   let register = Var.create "R12" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
   let () = check "no_return_register" (is_return_register register project = false) in
   ()
+
 
 let test_parse_dyn_syms () =
 (* this test assumes, that the example project is the arrays_x64.out binary from the artificial samples. *)
