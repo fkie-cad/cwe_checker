@@ -2,6 +2,10 @@ open Bap.Std
 open Core_kernel
 
 
+(** Returns a json object for registers.json. If not yet in memory, the json file is read. *)
+val get_json: unit -> Yojson.Basic.t
+
+
 (** Returns whether a variable is callee saved according to the calling convention
     of the target architecture. Should only used for calls to functions outside
     of the program, not for calls between functions inside the program. *)
@@ -29,7 +33,7 @@ val get_supported_architectures : unit -> string list
 
 
 (** Calls objdump with customisable flag and error message. Returns output lines as string list. *)
-val call_objdump : Project.t -> string -> string -> string list
+val call_objdump : Project.t -> flag:string -> err:string -> string list
 
 
 (** Infers the binary format using the file's symbol table. *)

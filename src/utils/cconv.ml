@@ -8,11 +8,17 @@ let callee_saved_registers = ref None
 
 let bin_format = ref ""
 
-let json (() : unit) : Yojson.Basic.t =
-  let path = match Sys.getenv_opt "OPAM_SWITCH_PREFIX" with
-  | Some(prefix) -> prefix ^ "/etc/cwe_checker/registers.json"
-  | None -> "" in
-  Yojson.Basic.from_file path
+let json = ref None
+
+let get_json (() : unit) : Yojson.Basic.t =
+  match !json with
+  | Some(json) -> !json
+  | None -> begin
+    let path = match Sys.getenv_opt "OPAM_SWITCH_PREFIX" with
+    | Some(prefix) -> prefix ^ "/etc/cwe_checker/registers.json"
+    | None -> failwith "[cwe_checker] registers.json not found." in
+    Yojson.Basic.from_file path
+  end
 
 let supported_architectures = ref []
 
@@ -20,13 +26,13 @@ let supported_architectures = ref []
 let get_supported_architectures (() : unit) : string list =
   match !supported_architectures with
   | [] -> begin
-      supported_architectures := List.append !supported_architectures (List.map (Json_utils.get_arch_list_from_json (json ()) "elf") ~f:(fun kv -> match kv with (k, _) -> k));
+      supported_architectures := List.append !supported_architectures (List.map (Json_utils.get_arch_list_from_json (get_json ()) "elf") ~f:(fun kv -> match kv with (k, _) -> k));
       !supported_architectures
   end
   | _  -> !supported_architectures
 
 
-let call_objdump (proj : Project.t) (flag : string) (err : string) : string list =
+let call_objdump (proj : Project.t) ~flag:(flag : string) ~err:(err : string) : string list =
   match Project.get proj filename with
   | None -> failwith "[cwe_checker] Project has no file name."
   | Some(fname) -> begin
@@ -51,7 +57,7 @@ let infer_bin_format_from_symbols (project : Project.t) : string =
 let extract_bin_format (project : Project.t) : string =
   match !bin_format with
   | "" -> begin
-    let header = call_objdump project "-f" "[cwe_checker] Parsing of file header failed:" in
+    let header = call_objdump project ~flag:"-f" ~err:"[cwe_checker] Parsing of file header failed:" in
     let arch = Project.arch project in
     match header with
     | _::line::_ -> begin
@@ -76,12 +82,12 @@ let get_register_list (project : Project.t) (context : string) : string list =
     | _      -> bap_arch in
   match Stdlib.List.mem arch (get_supported_architectures ()) with
   | true -> begin
-      let json_bin = Json_utils.get_bin_format_from_json (json ()) (extract_bin_format project) in
+      let json_bin = Json_utils.get_bin_format_from_json (get_json ()) (extract_bin_format project) in
       match arch with
       | "x86" -> begin
           let conv = match Project.get project Bap_abi.name with
             | Some(c) -> c
-            | _ -> Log_utils.info "[cwe_checker] Could not infer calling convention. Assuming cdelc as standard"; "cdecl" in
+            | _ -> Log_utils.info "[cwe_checker] Could not infer calling convention. Assuming cdecl as standard"; "cdecl" in
           let json_arch = Json_utils.get_arch_from_json json_bin ~conv:conv arch in
           Json_utils.get_registers_from_json json_arch context
         end
@@ -139,7 +145,7 @@ let parse_dyn_syms (project : Project.t) : String.Set.t =
   match !dyn_syms with
   | Some(symbol_set) -> symbol_set
   | None -> begin
-    let lines = call_objdump project "--dynamic-syms" "[cwe_checker] Parsing of dynamic symbols failed:" in
+    let lines = call_objdump project ~flag:"--dynamic-syms" ~err:"[cwe_checker] Parsing of dynamic symbols failed:" in
     match lines with
     | _ :: _ :: _ :: _ :: tail -> (* The first four lines are not part of the table *)
       let symbol_set = String.Set.of_list (List.filter_map tail ~f:parse_dyn_sym_line) in
