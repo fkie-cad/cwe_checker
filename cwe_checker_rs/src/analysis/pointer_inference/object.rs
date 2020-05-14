@@ -112,6 +112,13 @@ impl AbstractObject {
             object_info.set_state(new_state)
         }
     }
+
+    pub fn get_state(&self) -> Option<ObjectState> {
+        match self {
+            Self::Untracked(_) => None,
+            Self::Memory(mem) => mem.state
+        }
+    }
 }
 
 impl AbstractObject {
@@ -146,7 +153,7 @@ impl AbstractObject {
 pub struct AbstractObjectInfo {
     pointer_targets: BTreeSet<AbstractIdentifier>,
     pub is_unique: bool,
-    state: Option<ObjectState>,
+    pub state: Option<ObjectState>,
     type_: Option<ObjectType>,
     memory: MemRegion<Data>,
 }
@@ -195,8 +202,8 @@ impl AbstractObjectInfo {
         return targets;
     }
 
-    /// For pointer values replace an abstract identifier with another one and add the offset_adjustment to the pointer offset.
-    /// This is needed to adjust stack pointer on call and return instructions.
+    /// For pointer values replace an abstract identifier with another one and add the offset_adjustment to the pointer offsets.
+    /// This is needed to adjust stack pointers on call and return instructions.
     pub fn replace_abstract_id(
         &mut self,
         old_id: &AbstractIdentifier,

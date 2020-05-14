@@ -1,6 +1,6 @@
 use super::abstract_domain::*;
 use super::graph::Graph;
-use crate::bil::{BitSize, Expression};
+use crate::bil::Expression;
 use crate::prelude::*;
 use crate::term::symbol::ExternSymbol;
 use crate::term::*;
@@ -16,7 +16,6 @@ mod state;
 
 use data::Data;
 use identifier::*;
-use object_list::AbstractObjectList;
 use state::State;
 
 pub struct PointerInference<'a> {
@@ -260,7 +259,7 @@ impl<'a> super::interprocedural_fixpoint::Problem<'a> for Context<'a> {
                 call_term.tid.clone(),
                 AbstractLocation::from_var(&self.project.stack_pointer_register).unwrap(),
             );
-            let stack_offset_adjustment = -stack_offset_domain.clone();
+            let stack_offset_adjustment = stack_offset_domain.clone();
             let address_bitsize = self.project.stack_pointer_register.bitsize().unwrap();
 
             let mut callee_state = state.clone();
@@ -318,12 +317,12 @@ impl<'a> super::interprocedural_fixpoint::Problem<'a> for Context<'a> {
         state_after_return.replace_abstract_id(
             &caller_stack_id,
             original_caller_stack_id,
-            &stack_offset_on_call,
+            &(-stack_offset_on_call.clone()),
         );
         state_after_return.replace_abstract_id(
             callee_stack_id,
             original_caller_stack_id,
-            &stack_offset_on_call,
+            &(-stack_offset_on_call.clone()),
         ); // TODO: check correctness with unit tests!
         state_after_return.stack_id = original_caller_stack_id.clone();
         state_after_return.caller_ids = state_before_call.caller_ids.clone();
@@ -445,9 +444,7 @@ impl<'a> super::interprocedural_fixpoint::Problem<'a> for Context<'a> {
                                     }
                                 }
                             }
-                            state.add_recursively_referenced_ids_to_id_set(
-                                &mut possible_referenced_ids,
-                            );
+                            possible_referenced_ids = state.add_recursively_referenced_ids_to_id_set(possible_referenced_ids);
                             // Delete content of all referenced objects, as the function may write to them.
                             for id in possible_referenced_ids.iter() {
                                 new_state

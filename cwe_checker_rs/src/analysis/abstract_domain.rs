@@ -158,7 +158,7 @@ impl ValueDomain for BitvectorDomain {
                 LOW => BitvectorDomain::Value(bitvec.clone().into_truncate(width as usize).unwrap()),
             }
         } else {
-            BitvectorDomain::new_top(self.bitsize())
+            BitvectorDomain::new_top(width)
         }
     }
 

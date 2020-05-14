@@ -157,8 +157,13 @@ impl AbstractObjectList {
         }
     }
 
-    /// For pointer values replace an abstract identifier with another one and add the offset_adjustment to the pointer offset.
-    /// This is needed to adjust stack pointer on call and return instructions.
+    /// Replace one abstract identifier with another one. Adjust offsets of all pointers accordingly.
+    ///
+    /// **Example:**
+    /// Assume the old_id points to offset 0 in the corresponding memory object and the new_id points to offset -32.
+    /// Then the offset_adjustment is -32.
+    /// The offset_adjustment gets *added* to the base offset in self.memory.ids (so that it points to offset -32 in the memory object),
+    /// while it gets *subtracted* from all pointer values (so that they still point to the same spot in the corresponding memory object).
     pub fn replace_abstract_id(
         &mut self,
         old_id: &AbstractIdentifier,
@@ -166,14 +171,14 @@ impl AbstractObjectList {
         offset_adjustment: &BitvectorDomain,
     ) {
         for object in self.objects.iter_mut() {
-            Arc::make_mut(object).replace_abstract_id(old_id, new_id, offset_adjustment);
+            Arc::make_mut(object).replace_abstract_id(old_id, new_id, &(-offset_adjustment.clone()));
         }
         if let Some((index, offset)) = self.ids.get(old_id) {
             let index = *index;
             // Note that we have to *subtract* the offset offset_adjustment to get the new offset,
             // since the offset_adjustment gets added to all pointers.
             // This way all pointers will still point to the same place in memory.
-            let new_offset = offset.clone() - offset_adjustment.clone();
+            let new_offset = offset.clone() + offset_adjustment.clone();
             self.ids.remove(old_id);
             self.ids.insert(new_id.clone(), (index, new_offset));
         }
@@ -215,8 +220,8 @@ impl AbstractObjectList {
         }
     }
 
-    // Remove all abstract identifier not contained in the provided set of identifier.
-    // Then remove all objects not longer referenced by any identifier.
+    /// Remove all abstract identifier not contained in the provided set of identifier.
+    /// Then remove all objects not longer referenced by any identifier.
     pub fn remove_unused_ids(&mut self, ids_to_keep: &BTreeSet<AbstractIdentifier>) {
         let all_ids: BTreeSet<AbstractIdentifier> = self.ids.keys().cloned().collect();
         let ids_to_remove = all_ids.difference(ids_to_keep);
@@ -279,6 +284,11 @@ impl AbstractObjectList {
             .cloned()
             .collect();
         self.objects[object_index] = Arc::new(AbstractObject::Untracked(reference_targets));
+    }
+
+    /// Get the number of objects that are currently tracked.
+    pub fn get_num_objects(&self) -> usize {
+        self.objects.len()
     }
 }
 
@@ -356,11 +366,19 @@ mod tests {
 
         let modified_heap_pointer = PointerDomain::new(new_id("ID2".into()), bv(8));
         other_obj_list.replace_abstract_id(&new_id("RAX".into()), &new_id("ID2".into()), &bv(0));
-        assert_eq!(other_obj_list.get_value(&Data::Pointer(pointer.clone()), 64).unwrap(), Data::Pointer(modified_heap_pointer));
+        assert_eq!(other_obj_list.get_value(&Data::Pointer(pointer.clone()), 64).unwrap(), Data::Pointer(modified_heap_pointer.clone()));
         assert_eq!(other_obj_list.ids.get(&new_id("RAX".into())), None);
         assert!(matches!(other_obj_list.ids.get(&new_id("ID2".into())), Some(_)));
 
-        todo!("remove unused ids");
-        todo!("mark mem object as freed or untracked")
+        let mut ids_to_keep = BTreeSet::new();
+        ids_to_keep.insert(new_id("ID2".into()));
+        other_obj_list.remove_unused_ids(&ids_to_keep);
+        assert_eq!(other_obj_list.objects.len(), 1);
+        assert_eq!(other_obj_list.ids.len(), 1);
+        assert_eq!(other_obj_list.ids.iter().next().unwrap(), (&new_id("ID2".into()), &(0, bv(0))));
+
+        assert_eq!(other_obj_list.objects[0].get_state(), Some(crate::analysis::pointer_inference::object::ObjectState::Alive));
+        other_obj_list.mark_mem_object_as_freed(&modified_heap_pointer);
+        assert_eq!(other_obj_list.objects[0].get_state(), Some(crate::analysis::pointer_inference::object::ObjectState::Dangling));
     }
 }

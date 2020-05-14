@@ -102,9 +102,15 @@ impl State {
     /// merge two states
     pub fn merge(&self, other: &Self) -> Self {
         assert_eq!(self.stack_id, other.stack_id);
-        let mut merged_register = self.register.clone();
+        let mut merged_register = BTreeMap::new();
         for (register, other_value) in other.register.iter() {
-            merged_register.entry(register.clone()).and_modify(|value| {*value = value.merge(other_value); }).or_insert(other_value.clone());
+            if let Some(value) = self.register.get(register) {
+                let merged_value = value.merge(other_value);
+                if merged_value.is_top() == false {
+                    // We only have to keep non-top elements.
+                    merged_register.insert(register.clone(), merged_value);
+                }
+            }
         };
         let merged_memory_objects = self.memory.merge(&other.memory);
         State {
@@ -118,42 +124,59 @@ impl State {
     /// If the pointer contains a reference to the stack with offset >= 0, replace it with a pointer
     /// pointing to all possible caller ids.
     fn adjust_pointer_for_read(&self, address: &Data) -> Data {
+        // TODO: There is a rare special case that is not handled correctly
+        // and might need a change in the way caller_ids get tracked to fix:
+        // If no caller_id is present, one can read (and write) to addresses on the stack with positive offset
+        // But if such a state gets merged with a state with caller_ids,
+        // then these values at positive offsets get overshadowed by the new callers,
+        // but they get not properly merged with the values from the other callers!
         if let Data::Pointer(pointer) = address {
-            let mut new_targets: BTreeMap<AbstractIdentifier, BitvectorDomain> = BTreeMap::new();
+            let mut new_targets = PointerDomain::with_targets(BTreeMap::new());
             for (id, offset) in pointer.iter_targets() {
                 if *id == self.stack_id {
                     match offset {
                         BitvectorDomain::Value(offset_val) => {
-                            if offset_val.try_to_i64().unwrap() >= 0 {
+                            if offset_val.try_to_i64().unwrap() >= 0 && self.caller_ids.len() > 0 {
                                 for caller_id in self.caller_ids.iter() {
-                                    new_targets.insert(caller_id.clone(), offset.clone());
+                                    new_targets.add_target(caller_id.clone(), offset.clone());
                                 }
                                 // Note that the id of the current stack frame was *not* added.
+                            } else {
+                                new_targets.add_target(id.clone(), offset.clone());
                             }
                         },
                         BitvectorDomain::Top(bitsize) => {
                             for caller_id in self.caller_ids.iter() {
-                                new_targets.insert(caller_id.clone(), offset.clone());
+                                new_targets.add_target(caller_id.clone(), offset.clone());
                             }
                             // Note that we also add the id of the current stack frame
-                            new_targets.insert(id.clone(), offset.clone());
+                            new_targets.add_target(id.clone(), offset.clone());
                         },
                     }
                 } else {
-                    new_targets.insert(id.clone(), offset.clone());
+                    new_targets.add_target(id.clone(), offset.clone());
                 }
             }
-            return Data::Pointer(PointerDomain::with_targets(new_targets));
+            return Data::Pointer(new_targets);
         } else {
             return address.clone();
         }
     }
 
-    /// For pointer values replace an abstract identifier with another one and add the offset_adjustment to the pointer offset.
-    /// This is needed to adjust stack pointer on call and return instructions.
+    /// Replace all occurences of old_id with new_id and adjust offsets accordingly.
+    /// This is needed to replace stack/caller ids on call and return instructions.
+    ///
+    /// **Example:**
+    /// Assume the old_id points to offset 0 in the corresponding memory object and the new_id points to offset -32.
+    /// Then the offset_adjustment is -32.
+    /// The offset_adjustment gets *added* to the base offset in self.memory.ids (so that it points to offset -32 in the memory object),
+    /// while it gets *subtracted* from all pointer values (so that they still point to the same spot in the corresponding memory object).
     pub fn replace_abstract_id(&mut self, old_id: &AbstractIdentifier, new_id: &AbstractIdentifier, offset_adjustment: &BitvectorDomain) {
+        // TODO: This function does not adjust stack frame/caller stack frame relations!
+        // Refactor so that the corresponding logic is contained in State.
+        // Else this function can be used to generate invalid state on improper use!
         for register_data in self.register.values_mut() {
-            register_data.replace_abstract_id(old_id, new_id, offset_adjustment);
+            register_data.replace_abstract_id(old_id, new_id, &(-offset_adjustment.clone()));
         }
         self.memory.replace_abstract_id(old_id, new_id, offset_adjustment);
         if &self.stack_id == old_id {
@@ -173,12 +196,12 @@ impl State {
         }
         referenced_ids.insert(self.stack_id.clone());
         referenced_ids.append(&mut self.caller_ids.clone());
-        self.add_recursively_referenced_ids_to_id_set(&mut referenced_ids);
+        referenced_ids = self.add_recursively_referenced_ids_to_id_set(referenced_ids);
         // remove unreferenced ids
         self.memory.remove_unused_ids(&referenced_ids);
     }
 
-    pub fn add_recursively_referenced_ids_to_id_set(&self, ids: &mut BTreeSet<AbstractIdentifier>) {
+    pub fn add_recursively_referenced_ids_to_id_set(&self, mut ids: BTreeSet<AbstractIdentifier>) -> BTreeSet<AbstractIdentifier> {
         let mut unsearched_ids = ids.clone();
         while let Some(id) = unsearched_ids.iter().next() {
             let id = id.clone();
@@ -191,6 +214,7 @@ impl State {
                 }
             }
         }
+        return ids;
     }
 
     /// Mark a memory object as already freed (i.e. pointers to it are dangling).
@@ -230,8 +254,69 @@ impl State {
 mod tests {
     use super::*;
 
+    fn bv(value: i64) -> BitvectorDomain {
+        BitvectorDomain::Value(Bitvector::from_i64(value))
+    }
+
+    fn new_id(name: String) -> AbstractIdentifier {
+        AbstractIdentifier::new(Tid::new("time0"), AbstractLocation::Register(name, 64))
+    }
+
+    fn register(name: &str) -> Variable {
+        Variable {
+            name: name.into(),
+            type_: crate::bil::variable::Type::Immediate(64),
+            is_temp: false,
+        }
+    }
+
     #[test]
-    fn test_name() {
-        unimplemented!()
+    fn state() {
+        use crate::bil::Expression::*;
+        use crate::analysis::pointer_inference::object::*;
+        let mut state = State::new(&register("RSP"), Tid::new("time0"));
+        let stack_id = new_id("RSP".into());
+        let stack_addr = Data::Pointer(PointerDomain::new(stack_id.clone(), bv(8)));
+        state.store_value(&stack_addr, &Data::Value(bv(42))).unwrap();
+        state.register.insert(register("RSP"), stack_addr.clone());
+        let load_expr = Load {
+            memory: Box::new(Var(register("RSP"))), // This is wrong, but the memory var is not checked at the moment (since we have only the one for RAM)
+            address: Box::new(Var(register("RSP"))),
+            endian: Endianness::LittleEndian,
+            size: 64 as BitSize
+        };
+        assert_eq!(state.eval(&load_expr).unwrap(), Data::Value(bv(42)));
+
+        let mut other_state = State::new(&register("RSP"), Tid::new("time0"));
+        state.register.insert(register("RAX"), Data::Value(bv(42)));
+        other_state.register.insert(register("RSP"), stack_addr.clone());
+        other_state.register.insert(register("RAX"), Data::Value(bv(42)));
+        other_state.register.insert(register("RBX"), Data::Value(bv(35)));
+        let merged_state = state.merge(&other_state);
+        assert_eq!(merged_state.register[&register("RAX")], Data::Value(bv(42)));
+        assert_eq!(merged_state.register.get(&register("RBX")), None);
+        assert_eq!(merged_state.eval(&load_expr).unwrap(), Data::new_top(64));
+
+        // Test pointer adjustment on reads
+        state.memory.add_abstract_object(new_id("caller".into()), bv(0), ObjectType::Stack, 64);
+        state.caller_ids.insert(new_id("caller".into()));
+        state.store_value(&stack_addr, &Data::Value(bv(15))).unwrap();
+        assert_eq!(state.memory.get_value(&Data::Pointer(PointerDomain::new(new_id("caller".into()), bv(8))), 64).unwrap(), Data::Value(bv(15)));
+        assert_eq!(state.eval(&load_expr).unwrap(), Data::Value(bv(15)));
+
+        // Test replace_abstract_id
+        let pointer = Data::Pointer(PointerDomain::new(stack_id.clone(), bv(-16)));
+        state.register.insert(register("RSP"), pointer.clone());
+        state.store_value(&pointer, &Data::Value(bv(7))).unwrap();
+        assert_eq!(state.eval(&load_expr).unwrap(), Data::Value(bv(7)));
+        state.replace_abstract_id(&stack_id, &new_id("callee".into()), &bv(-8));
+        assert_eq!(state.eval(&load_expr).unwrap(), Data::Value(bv(7)));
+        assert_eq!(state.memory.get_value(&Data::Pointer(PointerDomain::new(new_id("callee".into()), bv(-8))), 64).unwrap(), Data::Value(bv(7)));
+        assert_eq!(state.memory.get_value(&Data::Pointer(PointerDomain::new(new_id("callee".into()), bv(-16))), 64).unwrap(), Data::new_top(64));
+
+        state.memory.add_abstract_object(new_id("heap_obj".into()), bv(0), ObjectType::Heap, 64);
+        assert_eq!(state.memory.get_num_objects(), 3);
+        state.remove_unreferenced_objects();
+        assert_eq!(state.memory.get_num_objects(), 2);
     }
 }

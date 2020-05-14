@@ -107,6 +107,17 @@ impl PointerDomain {
         PointerDomain(merged_map)
     }
 
+    /// Add a new target to the pointer.
+    /// If the pointer already contains a target with the same abstract identifier, the offsets of both targets get merged.
+    pub fn add_target(&mut self, target: AbstractIdentifier, offset: BitvectorDomain) {
+        if let Some(old_offset) = self.0.get(&target) {
+            let merged_offset = old_offset.merge(&offset);
+            self.0.insert(target, merged_offset);
+        } else {
+            self.0.insert(target, offset);
+        }
+    }
+
     /// Replace an abstract identifier with another one and add the offset_adjustment to the pointer offset.
     /// This is needed to adjust stack pointer on call and return instructions.
     pub fn replace_abstract_id(
