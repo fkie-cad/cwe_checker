@@ -4,7 +4,7 @@ COPY . /home/bap/cwe_checker/
 
 RUN sudo chown -R bap:bap /home/bap/cwe_checker \
     && cd /home/bap/cwe_checker \
-    && make all
+    && make clean && make all
 
 WORKDIR /home/bap/cwe_checker
 
