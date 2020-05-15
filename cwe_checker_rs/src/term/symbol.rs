@@ -1,5 +1,6 @@
+use super::Arg;
+use crate::bil::*;
 use crate::prelude::*;
-use super::{Term, Arg};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct ExternSymbol {
@@ -10,16 +11,49 @@ pub struct ExternSymbol {
     pub arguments: Vec<Arg>,
 }
 
-/*
-(** This type represents an external symbol. *)
-type extern_symbol = {
-  tid : Bap.Std.tid
-  ; address : string
-  ; name : string
-  ; cconv : string option
-  ; args : (Bap.Std.Var.t * Bap.Std.Exp.t * Bap.Std.intent option) list;
+impl ExternSymbol {
+    /// Returns the return register of an extern symbol.
+    /// Returns an error if the function has not exactly one return argument
+    /// or if the return argument is not a register.
+    pub fn get_unique_return_register(&self) -> Result<&crate::bil::variable::Variable, Error> {
+        let return_args: Vec<_> = self
+            .arguments
+            .iter()
+            .filter(|arg| arg.intent.is_output())
+            .collect();
+        if return_args.len() != 1 {
+            return Err(anyhow!(
+                "Wrong number of return register: Got {}, expected 1",
+                return_args.len()
+            ));
+        }
+        match &return_args[0].location {
+            Expression::Var(var) => Ok(var),
+            _ => Err(anyhow!("Return location is not a register"))?,
+        }
+    }
+
+    /// Returns the parameter register of an extern symbol.
+    /// Returns an error if the function has not exactly one parameter argument
+    /// or if the parameter argument is not a register.
+    pub fn get_unique_parameter_register(&self) -> Result<&crate::bil::variable::Variable, Error> {
+        let param_args: Vec<_> = self
+            .arguments
+            .iter()
+            .filter(|arg| arg.intent.is_input())
+            .collect();
+        if param_args.len() != 1 {
+            return Err(anyhow!(
+                "Wrong number of return register: Got {}, expected 1",
+                param_args.len()
+            ));
+        }
+        match &param_args[0].location {
+            Expression::Var(var) => Ok(var),
+            _ => Err(anyhow!("Parameter location is not a register"))?,
+        }
+    }
 }
-*/
 
 #[cfg(test)]
 mod tests {
