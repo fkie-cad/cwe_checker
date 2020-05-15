@@ -8,7 +8,6 @@ services:
 install:
   - sudo apt-get update
   - pip install scons
-  - docker
 
 before_script:
   - ./.travis_prepare.sh
