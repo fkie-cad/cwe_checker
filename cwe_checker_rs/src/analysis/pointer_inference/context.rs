@@ -1,8 +1,8 @@
-use crate::prelude::*;
 use crate::analysis::abstract_domain::*;
 use crate::analysis::graph::Graph;
 use crate::analysis::interprocedural_fixpoint::{Computation, NodeValue};
 use crate::bil::Expression;
+use crate::prelude::*;
 use crate::term::symbol::ExternSymbol;
 use crate::term::*;
 use petgraph::graph::NodeIndex;
@@ -31,7 +31,8 @@ impl<'a> Context<'a> {
             .iter()
             .map(|symb| symb.tid.clone())
             .collect();
-        let graph = crate::analysis::graph::get_program_cfg(&project.program, extern_symbol_tid_set);
+        let graph =
+            crate::analysis::graph::get_program_cfg(&project.program, extern_symbol_tid_set);
         Context {
             graph,
             project,
@@ -162,14 +163,24 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
                 &new_caller_stack_id,
                 &stack_offset_adjustment,
             );
-            // set the new stack_id
-            callee_state.stack_id = new_caller_stack_id.clone();
             // add a new memory object for the callee stack frame
             callee_state.memory.add_abstract_object(
-                callee_stack_id,
+                callee_stack_id.clone(),
                 Bitvector::zero(apint::BitWidth::new(address_bitsize as usize).unwrap()).into(),
                 super::object::ObjectType::Stack,
                 address_bitsize,
+            );
+            // set the new stack_id
+            callee_state.stack_id = callee_stack_id.clone();
+            // Set the stack pointer register to the callee stack id.
+            // At the beginning of a function this is the only known pointer to the new stack frame.
+            callee_state.register.insert(
+                self.project.stack_pointer_register.clone(),
+                super::data::PointerDomain::new(
+                    callee_stack_id,
+                    Bitvector::zero(apint::BitWidth::new(address_bitsize as usize).unwrap()).into(),
+                )
+                .into(),
             );
             // set the list of caller stack ids to only this caller id
             callee_state.caller_ids = BTreeSet::new();
@@ -386,15 +397,136 @@ impl<'a> Context<'a> {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::bil::variable::*;
+
+    fn bv(value: i64) -> BitvectorDomain {
+        BitvectorDomain::Value(Bitvector::from_i64(value))
+    }
+
+    fn new_id(time: &str, reg_name: &str) -> AbstractIdentifier {
+        AbstractIdentifier::new(
+            Tid::new(time),
+            AbstractLocation::Register(reg_name.to_string(), 64),
+        )
+    }
+
+    fn mock_extern_symbol(name: &str) -> ExternSymbol {
+        use crate::bil;
+        let arg = Arg {
+            var: register("RAX"),
+            location: bil::Expression::Var(register("RAX")),
+            intent: ArgIntent::Both,
+        };
+        ExternSymbol {
+            tid: Tid::new("extern_".to_string() + name),
+            address: "somewhere".into(),
+            name: name.into(),
+            calling_convention: None,
+            arguments: vec![arg],
+        }
+    }
+
+    fn register(name: &str) -> Variable {
+        Variable {
+            name: name.into(),
+            type_: crate::bil::variable::Type::Immediate(64),
+            is_temp: false,
+        }
+    }
+
+    fn mock_project() -> Project {
+        let program = Program {
+            subs: Vec::new(),
+            extern_symbols: vec![mock_extern_symbol("malloc"), mock_extern_symbol("free")],
+            entry_points: Vec::new(),
+        };
+        let program_term = Term {
+            tid: Tid::new("program"),
+            term: program,
+        };
+        Project {
+            program: program_term,
+            cpu_architecture: "mock_arch".to_string(),
+            stack_pointer_register: register("RSP"),
+            callee_saved_registers: vec!["callee_saved_reg".to_string()],
+            parameter_registers: vec!["param_reg".to_string()],
+        }
+    }
 
     #[test]
-    fn context() {
+    fn context_problem_implementation() {
+        use crate::analysis::interprocedural_fixpoint::Problem;
+        use crate::analysis::pointer_inference::data::*;
+        use crate::bil::*;
+        use Expression::*;
 
-        todo!("Context tests");
+        let project = mock_project();
+        let context = Context::new(&project);
+        let mut state = State::new(&register("RSP"), Tid::new("main"));
+
+        let def = Term {
+            tid: Tid::new("def"),
+            term: Def {
+                lhs: register("RSP"),
+                rhs: BinOp {
+                    op: BinOpType::PLUS,
+                    lhs: Box::new(Var(register("RSP"))),
+                    rhs: Box::new(Const(Bitvector::from_i64(-16))),
+                },
+            },
+        };
+        let store_term = Term {
+            tid: Tid::new("store"),
+            term: Def {
+                lhs: register("memory"), // technically false, but not checked at the moment
+                rhs: Store {
+                    address: Box::new(Var(register("RSP"))),
+                    endian: Endianness::LittleEndian,
+                    memory: Box::new(Var(register("memory"))), // This is technically false, but the field is ignored at the moment
+                    value: Box::new(Const(Bitvector::from_i64(42))),
+                    size: 64,
+                },
+            },
+        };
+
+        // test update_def
+        state = context.update_def(&state, &def);
+        let stack_pointer = Data::Pointer(PointerDomain::new(new_id("main", "RSP"), bv(-16)));
+        assert_eq!(state.eval(&Var(register("RSP"))).unwrap(), stack_pointer);
+        state = context.update_def(&state, &store_term);
+
+        // Test update_call
+        let target_block = Term {
+            tid: Tid::new("func_start"),
+            term: Blk {
+                defs: Vec::new(),
+                jmps: Vec::new(),
+            },
+        };
+        let target_node = crate::analysis::graph::Node::BlkStart(&target_block);
+        let call = Call {
+            target: Label::Direct(Tid::new("func")),
+            return_: None,
+        };
+        let call_term = Term {
+            tid: Tid::new("call".to_string()),
+            term: Jmp {
+                condition: None,
+                kind: JmpKind::Call(call),
+            },
+        };
+        state = context.update_call(&state, &call_term, &target_node);
+        assert_eq!(state.stack_id, new_id("func", "RSP"));
+        assert_eq!(state.caller_ids.len(), 1);
+        assert_eq!(state.caller_ids.iter().next().unwrap(), &new_id("call", "RSP"));
+
+        println!("{:#}", state.to_json_compact());
+
+        todo!("update_return");
+        todo!("update_call_stub");
 
         unimplemented!()
     }

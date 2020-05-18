@@ -117,16 +117,3 @@ pub fn run(project: &Project) {
     run_and_print_debug(project);
     panic!("Not ready for production yet?")
 }
-
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test() {
-        
-
-        unimplemented!()
-    }
-}
