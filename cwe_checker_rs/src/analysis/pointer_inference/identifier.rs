@@ -92,13 +92,3 @@ impl std::fmt::Display for AbstractMemoryLocation {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_abstract_identifier() {
-        unimplemented!()
-    }
-}

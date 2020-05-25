@@ -115,5 +115,4 @@ pub fn run_and_print_debug(project: &Project) {
 
 pub fn run(project: &Project) {
     run_and_print_debug(project);
-    panic!("Not ready for production yet?")
 }

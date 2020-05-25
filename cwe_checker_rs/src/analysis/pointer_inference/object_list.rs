@@ -184,6 +184,11 @@ impl AbstractObjectList {
         }
     }
 
+    /// Remove the pointer from the object_id to the corresponding memory object.
+    pub fn remove_object_pointer(&mut self, object_id: &AbstractIdentifier) {
+        self.ids.remove(object_id);
+    }
+
     /// Add a new abstract object to the object list
     pub fn add_abstract_object(
         &mut self,
@@ -311,6 +316,14 @@ impl AbstractObjectList {
             object_list.push(Value::Object(obj_map));
         }
         Value::Array(object_list)
+    }
+}
+
+#[cfg(test)]
+impl AbstractObjectList {
+    /// Get access to the internal id map for unit tests
+    pub fn get_internal_id_map(&self) -> &BTreeMap<AbstractIdentifier, (usize, BitvectorDomain)> {
+        &self.ids
     }
 }
 

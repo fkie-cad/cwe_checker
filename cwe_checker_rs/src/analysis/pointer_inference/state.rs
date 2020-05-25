@@ -217,6 +217,23 @@ impl State {
         return ids;
     }
 
+    /// Merge the callee stack with the caller stack.
+    ///
+    /// This deletes the pointer from the callee_id to the corresponding memory object
+    /// and updates all other references pointing to the callee_id to point to the caller_id.
+    /// The offset adjustment is handled as in `replace_abstract_id`.
+    ///
+    /// Note that right now the content of the callee memory object is not merged into the caller memory object.
+    /// In general this is the correct behaviour as the content below the stack pointer should be considered uninitialized memory after returning to the caller.
+    /// TODO: Check whether compilers may deviate from this convention when optimizing aggressively.
+    /// TODO: Also merge the memory objects!
+    // TODO: write unit tests
+    pub fn merge_callee_stack_to_caller_stack(&mut self, callee_id: &AbstractIdentifier, caller_id: &AbstractIdentifier, offset_adjustment: &BitvectorDomain) {
+        self.memory.remove_object_pointer(callee_id);
+        self.replace_abstract_id(callee_id, caller_id, offset_adjustment);
+        // TODO: Add a check that makes sure no other ids point to the now obsolete callee stack object!
+    }
+
     /// Mark a memory object as already freed (i.e. pointers to it are dangling).
     /// If the object cannot be identified uniquely, all possible targets are marked as having an unknown status.
     pub fn mark_mem_object_as_freed(&mut self, object_pointer: &PointerDomain) {

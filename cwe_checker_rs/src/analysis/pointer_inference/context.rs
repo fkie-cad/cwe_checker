@@ -221,21 +221,19 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
             original_caller_stack_id,
             &(-stack_offset_on_call.clone()),
         );
-        state_after_return.replace_abstract_id(
+        state_after_return.merge_callee_stack_to_caller_stack(
             callee_stack_id,
             original_caller_stack_id,
             &(-stack_offset_on_call.clone()),
-        ); // TODO: check correctness with unit tests!
+        );
         state_after_return.stack_id = original_caller_stack_id.clone();
         state_after_return.caller_ids = state_before_call.caller_ids.clone();
         // remove non-referenced objects from the state
         state_after_return.remove_unreferenced_objects();
-        // TODO: Check that callee objects can actually be forgotten! If not, adjust handling of referenced objects in tracked memory.
-        // Or alternatively try to merge abstract ids of untracked objects?
 
-        // TODO: In theory all references to the callee stack frame are deleted, thus the callee stack frame gets deleted by remove_unreferenced_objects.
-        // Check that!
-        // Also, I need to detect and report cases where pointers to objects on the callee stack get returned, as this has its own CWE number!
+        // TODO: I need to detect and report cases where pointers to objects on the callee stack get returned, as this has its own CWE number!
+        // Detect and report cases, where knowledge about the offset of the stack pointer gets lost on return!
+        // Maybe add a fallback repair mechanism in these cases.
         Some(state_after_return)
     }
 
@@ -258,6 +256,20 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
                 new_state.register.remove(register);
             }
         }
+        // Set the stack register value.
+        // TODO: This is wrong if the extern call clears more from the stack than just the return address.
+        // TODO: a check on validity of the return address could also be useful here.
+        let stack_register = &self.project.stack_pointer_register;
+        if let Some(stack_pointer) = state.register.get(stack_register) {
+            let offset = Bitvector::from_u8(8)
+                .into_zero_extend(stack_register.bitsize().unwrap() as usize)
+                .unwrap();
+            new_state.register.insert(
+                stack_register.clone(),
+                stack_pointer.bin_op(crate::bil::BinOpType::PLUS, &Data::bitvector(offset)),
+            );
+        }
+
         match call_target {
             Label::Direct(tid) => {
                 if let Some(extern_symbol) = self.extern_symbol_map.get(tid) {
@@ -304,6 +316,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
                                     if let Data::Pointer(pointer) = memory_object_pointer {
                                         new_state.mark_mem_object_as_freed(&pointer);
                                     } // TODO: add diagnostics for else case
+                                    new_state.remove_unreferenced_objects();
                                     return Some(new_state);
                                 } else {
                                     // TODO: add diagnostics message for the user here
@@ -322,6 +335,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
                                 // TODO: We assume here that we do not know the parameters and approximate them by all parameter registers.
                                 // This approximation is wrong if the function is known but has neither parameters nor return values.
                                 // We need to somehow distinguish these two cases.
+                                // TODO: We need to cleanup stack memory below the current position of the stack pointer.
                                 for parameter_register_name in
                                     self.project.parameter_registers.iter()
                                 {
@@ -437,10 +451,24 @@ mod tests {
         }
     }
 
+    fn call_term(target_name: &str) -> Term<Jmp> {
+        let call = Call {
+            target: Label::Direct(Tid::new(target_name)),
+            return_: None,
+        };
+        Term {
+            tid: Tid::new(format!("call_{}", target_name)),
+            term: Jmp {
+                condition: None,
+                kind: JmpKind::Call(call),
+            },
+        }
+    }
+
     fn mock_project() -> Project {
         let program = Program {
             subs: Vec::new(),
-            extern_symbols: vec![mock_extern_symbol("malloc"), mock_extern_symbol("free")],
+            extern_symbols: vec![mock_extern_symbol("malloc"), mock_extern_symbol("free"), mock_extern_symbol("other")],
             entry_points: Vec::new(),
         };
         let program_term = Term {
@@ -452,7 +480,7 @@ mod tests {
             cpu_architecture: "mock_arch".to_string(),
             stack_pointer_register: register("RSP"),
             callee_saved_registers: vec!["callee_saved_reg".to_string()],
-            parameter_registers: vec!["param_reg".to_string()],
+            parameter_registers: vec!["RAX".to_string()],
         }
     }
 
@@ -507,27 +535,118 @@ mod tests {
             },
         };
         let target_node = crate::analysis::graph::Node::BlkStart(&target_block);
-        let call = Call {
-            target: Label::Direct(Tid::new("func")),
-            return_: None,
-        };
-        let call_term = Term {
-            tid: Tid::new("call".to_string()),
-            term: Jmp {
-                condition: None,
-                kind: JmpKind::Call(call),
-            },
-        };
-        state = context.update_call(&state, &call_term, &target_node);
-        assert_eq!(state.stack_id, new_id("func", "RSP"));
-        assert_eq!(state.caller_ids.len(), 1);
-        assert_eq!(state.caller_ids.iter().next().unwrap(), &new_id("call", "RSP"));
+        let call = call_term("func");
+        let mut callee_state = context.update_call(&state, &call, &target_node);
+        assert_eq!(callee_state.stack_id, new_id("func", "RSP"));
+        assert_eq!(callee_state.caller_ids.len(), 1);
+        assert_eq!(
+            callee_state.caller_ids.iter().next().unwrap(),
+            &new_id("call_func", "RSP")
+        );
 
-        println!("{:#}", state.to_json_compact());
+        callee_state
+            .memory
+            .set_value(
+                PointerDomain::new(new_id("func", "RSP"), bv(-30)),
+                Data::Value(bv(33).into()),
+            )
+            .unwrap();
+        let return_state = context
+            .update_return(&callee_state, Some(&state), &call)
+            .unwrap();
+        assert_eq!(return_state.stack_id, new_id("main", "RSP"));
+        assert_eq!(return_state.caller_ids, BTreeSet::new());
+        assert_eq!(
+            return_state.memory.get_internal_id_map(),
+            state.memory.get_internal_id_map()
+        );
+        assert_eq!(
+            return_state.register.get(&register("RSP")).unwrap(),
+            state.register.get(&register("RSP")).unwrap()
+        );
 
-        todo!("update_return");
-        todo!("update_call_stub");
+        state
+            .register
+            .insert(register("callee_saved_reg"), Data::Value(bv(13)));
+        state
+            .register
+            .insert(register("other_reg"), Data::Value(bv(14)));
 
-        unimplemented!()
+        let malloc = call_term("extern_malloc");
+        let mut state_after_malloc = context.update_call_stub(&state, &malloc).unwrap();
+        assert_eq!(
+            state_after_malloc.register.get(&register("RAX")).unwrap(),
+            &Data::Pointer(PointerDomain::new(
+                new_id("call_extern_malloc", "RAX"),
+                bv(0)
+            ))
+        );
+        assert_eq!(state_after_malloc.memory.get_num_objects(), 2);
+        assert_eq!(
+            state_after_malloc.register.get(&register("RSP")).unwrap(),
+            &state
+                .register
+                .get(&register("RSP"))
+                .unwrap()
+                .bin_op(BinOpType::PLUS, &Data::Value(bv(8)))
+        );
+        assert_eq!(
+            state_after_malloc
+                .register
+                .get(&register("callee_saved_reg"))
+                .unwrap(),
+            &Data::Value(bv(13))
+        );
+        assert_eq!(
+            state_after_malloc.register.get(&register("other_reg")),
+            None
+        );
+
+        state_after_malloc.register.insert(
+            register("callee_saved_reg"),
+            Data::Pointer(PointerDomain::new(
+                new_id("call_extern_malloc", "RAX"),
+                bv(0),
+            )),
+        );
+        let free = call_term("extern_free");
+        let state_after_free = context
+            .update_call_stub(&state_after_malloc, &free)
+            .unwrap();
+        assert_eq!(state_after_free.register.get(&register("RAX")), None);
+        assert_eq!(state_after_free.memory.get_num_objects(), 2);
+        assert_eq!(
+            state_after_free
+                .register
+                .get(&register("callee_saved_reg"))
+                .unwrap(),
+            &Data::Pointer(PointerDomain::new(
+                new_id("call_extern_malloc", "RAX"),
+                bv(0)
+            ))
+        );
+        
+        let other_extern_fn = call_term("extern_other");
+        let state_after_other_fn = context.update_call_stub(&state, &other_extern_fn).unwrap();
+
+        assert_eq!(
+            state_after_other_fn.register.get(&register("RSP")).unwrap(),
+            &state
+                .register
+                .get(&register("RSP"))
+                .unwrap()
+                .bin_op(BinOpType::PLUS, &Data::Value(bv(8)))
+        );
+        assert_eq!(
+            state_after_other_fn
+                .register
+                .get(&register("callee_saved_reg"))
+                .unwrap(),
+            &Data::Value(bv(13))
+        );
+        assert_eq!(
+            state_after_other_fn.register.get(&register("other_reg")),
+            None
+        );
     }
 }
