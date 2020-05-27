@@ -15,7 +15,7 @@ test:
 	cargo test
 	dune runtest
 	cd test/artificial_samples; scons; cd ../..
-	pytest -v
+	pytest -v --ignore=_build
 
 clean:
 	cargo clean
