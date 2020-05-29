@@ -395,8 +395,8 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
 
 impl<'a> Context<'a> {
     fn get_current_stack_offset(&self, state: &State) -> BitvectorDomain {
-        if let Data::Pointer(ref stack_pointer) =
-            state.register[&self.project.stack_pointer_register]
+        if let Some(Data::Pointer(ref stack_pointer)) =
+            state.register.get(&self.project.stack_pointer_register)
         {
             if stack_pointer.iter_targets().len() == 1 {
                 // TODO: add sanity check that the stack id is the expected id
@@ -625,7 +625,7 @@ mod tests {
                 bv(0)
             ))
         );
-        
+
         let other_extern_fn = call_term("extern_other");
         let state_after_other_fn = context.update_call_stub(&state, &other_extern_fn).unwrap();
 
