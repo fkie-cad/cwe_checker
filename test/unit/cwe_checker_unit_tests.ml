@@ -12,6 +12,7 @@ let run_tests project =
     "Cconv_tests", Cconv_test.tests;
     "CWE_476_tests", Cwe_476_test.tests;
     "CWE_560_tests", Cwe_560_test.tests;
+    "Address_translation_tests", Address_translation_test.tests;
      ]
 
 let () =
