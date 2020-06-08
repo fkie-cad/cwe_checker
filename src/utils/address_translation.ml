@@ -10,7 +10,7 @@ let translate_tid_to_assembler_address_string (tid : tid) (tid_map : word Tid.Ma
 
 let generate_tid_map (prog : program term) : word Tid.Map.t =
 
-  let last_addr = ref None
+  let last_addr = ref None in
 
   (object
     inherit [addr Tid.Map.t] Term.visitor

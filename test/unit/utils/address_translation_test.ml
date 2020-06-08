@@ -8,9 +8,6 @@ open Address_translation
 let check msg x = Alcotest.(check bool) msg true x
 
 
-let example_project = ref None
-
-
 let test_translate_tid_to_assembler_address_string () =
   let tid_map = Tid.Map.empty in
   let tid_1 = Tid.create () in
