@@ -95,9 +95,12 @@ impl<'a> GraphBuilder<'a> {
     /// add all subs to the jump targets so that call instructions can be linked to the starting block of the corresponding sub.
     fn add_subs_to_jump_targets(&mut self) {
         for sub in self.program.term.subs.iter() {
-            let start_block = &sub.term.blocks[0];
-            let target_index = self.jump_targets[&start_block.tid];
-            self.jump_targets.insert(sub.tid.clone(), target_index);
+            if sub.term.blocks.len() > 0 {
+                let start_block = &sub.term.blocks[0];
+                let target_index = self.jump_targets[&start_block.tid];
+                self.jump_targets.insert(sub.tid.clone(), target_index);
+            }
+            // TODO: Generate Log-Message for Subs without blocks.
         }
     }
 
@@ -128,11 +131,14 @@ impl<'a> GraphBuilder<'a> {
                             );
                         }
                     } else {
-                        self.graph.add_edge(
-                            source,
-                            self.jump_targets[&target_tid].0,
-                            Edge::Call(jump),
-                        );
+                        if let Some(target) = self.jump_targets.get(&target_tid) {
+                            self.graph.add_edge(
+                                source,
+                                target.0,
+                                Edge::Call(jump),
+                            );
+                        }
+
                         if let Some(Label::Direct(ref return_tid)) = call.return_ {
                             let return_index = self.jump_targets[return_tid].0;
                             self.return_addresses

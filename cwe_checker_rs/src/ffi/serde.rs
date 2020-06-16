@@ -52,7 +52,9 @@ impl From<&JsonBuilder> for serde_json::Value {
             JsonBuilder::Null => serde_json::Value::Null,
             JsonBuilder::Bool(val) => serde_json::Value::Bool(*val),
             JsonBuilder::Number(val) => serde_json::Value::Number(serde_json::Number::from(*val)),
-            JsonBuilder::PositiveNumber(val) => serde_json::Value::Number(serde_json::Number::from(*val)),
+            JsonBuilder::PositiveNumber(val) => {
+                serde_json::Value::Number(serde_json::Number::from(*val))
+            }
             JsonBuilder::String(val) => serde_json::Value::String(val.to_string()),
             JsonBuilder::Array(elem_vec) => elem_vec
                 .iter()
@@ -116,23 +118,43 @@ caml!(rs_build_serde_number(number) {
 fn build_serde_bitvector(bitvector_string_val: ocaml::Value) -> ocaml::Value {
     let string = <&str>::from_value(bitvector_string_val);
     let elements: Vec<&str> = string.split(':').collect();
-    let num = parse_int::parse::<u64>(elements[0]).expect("Bitvector value parsing failed");
-    let width = isize::from_str(&elements[1][0..(elements[1].len() - 1)]).expect("Bitvector width parsing failed");
+    let width = usize::from_str(&elements[1][0..(elements[1].len() - 1)])
+        .expect("Bitvector width parsing failed");
     assert!(width > 0);
+
     let mut num_list = Vec::new();
-    for _i in 0..((width-1)/64) {
+    let mut number_slice: &str = elements[0];
+    if number_slice.starts_with("0x") {
+        number_slice = &number_slice[2..];
+    }
+    while number_slice.len() > 0 {
+        if number_slice.len() > 16 {
+            let digit = u64::from_str_radix(&number_slice[(number_slice.len() - 16)..], 16)
+                .expect("Bitvector value parsing failed");
+            num_list.push(Rc::new(JsonBuilder::PositiveNumber(digit)));
+            number_slice = &number_slice[..(number_slice.len() - 16)];
+        } else {
+            let digit =
+                u64::from_str_radix(&number_slice, 16).expect("Bitvector value parsing failed");
+            num_list.push(Rc::new(JsonBuilder::PositiveNumber(digit)));
+            number_slice = "";
+        };
+    }
+    while num_list.len() <= (width - 1) / 64 {
         num_list.push(Rc::new(JsonBuilder::PositiveNumber(0)));
     }
-    num_list.push(Rc::new(JsonBuilder::PositiveNumber(num)));
+    num_list.reverse(); // since the digits were parsed in reverse order
+
     let mut width_list = Vec::new();
-    width_list.push(Rc::new(JsonBuilder::Number(width)));
+    width_list.push(Rc::new(JsonBuilder::Number(width as isize)));
     let result = JsonBuilder::Object(vec![
         ("digits".to_string(), Rc::new(JsonBuilder::Array(num_list))),
         ("width".to_string(), Rc::new(JsonBuilder::Array(width_list))),
     ]);
     // TODO: remove deserialization check
     let check_serde = serde_json::to_string(&serde_json::Value::from(&result)).unwrap();
-    let _bitv: apint::ApInt = serde_json::from_str(&check_serde).expect(&format!("Invalid value generated: {}", check_serde));
+    let _bitv: apint::ApInt = serde_json::from_str(&check_serde)
+        .expect(&format!("Invalid value generated: {}", check_serde));
 
     result.to_ocaml()
 }
