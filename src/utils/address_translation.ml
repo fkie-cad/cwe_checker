@@ -17,12 +17,12 @@ let generate_tid_map (prog : program term) : word Tid.Map.t =
     method! enter_term _ t addrs = match Term.get_attr t address with
       | None -> begin
           match !last_addr with
-          | Some addr -> Map.add_exn addrs ~key:(Term.tid t) ~data:addr
+          | Some addr -> Map.set addrs ~key:(Term.tid t) ~data:addr
           | None -> addrs
       end
       | Some addr -> begin
           last_addr := Some addr;
-          Map.add_exn addrs ~key:(Term.tid t) ~data:addr
+          Map.set addrs ~key:(Term.tid t) ~data:addr
         end
     end)#run prog Tid.Map.empty
 
