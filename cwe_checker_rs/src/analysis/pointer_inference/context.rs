@@ -1,7 +1,7 @@
 use crate::analysis::abstract_domain::*;
 use crate::analysis::graph::Graph;
 use crate::analysis::interprocedural_fixpoint::{Computation, NodeValue};
-use crate::bil::Expression;
+use crate::bil::{Expression, Variable};
 use crate::prelude::*;
 use crate::term::symbol::ExternSymbol;
 use crate::term::*;
@@ -69,6 +69,49 @@ impl<'a> Context<'a> {
             return state.clone();
         }
     }
+
+    /// Evaluate the given store expression on the given state and return the resulting state.
+    fn handle_store_exp(&self, state: &State, store_exp: &Expression) -> State {
+        if let Expression::Store {
+            memory: _,
+            address,
+            value,
+            endian: _,
+            size,
+        } = store_exp
+        {
+            let data = state.eval(value).unwrap_or(Data::new_top(*size));
+            assert_eq!(data.bitsize(), *size);
+            // TODO: At the moment, both memory and endianness are ignored. Change that!
+            return self.write_to_address(state, address, data);
+        } else {
+            panic!("Expected store expression")
+        }
+    }
+
+    /// Evaluate expression on the given state and write the result in the target register.
+    fn handle_register_assign(
+        &self,
+        state: &State,
+        target: &Variable,
+        expression: &Expression,
+    ) -> State {
+        let mut register = state.register.clone();
+        // TODO: error messages while evaluating instructions are ignored at the moment.
+        // These should be somehow made visible for the user or for debug purposes
+        let new_value = state
+            .eval(&expression)
+            .unwrap_or(Data::new_top(target.bitsize().unwrap()));
+        if new_value.is_top() {
+            register.remove(&target);
+        } else {
+            register.insert(target.clone(), new_value);
+        }
+        State {
+            register,
+            ..state.clone()
+        }
+    }
 }
 
 impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> {
@@ -85,35 +128,38 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
     fn update_def(&self, state: &Self::Value, def: &Term<Def>) -> Self::Value {
         // TODO: handle loads in the right hand side expression for their side effects!
         match &def.term.rhs {
-            Expression::Store {
-                memory: _,
-                address,
-                value,
-                endian: _,
-                size,
+            Expression::Store { .. } => self.handle_store_exp(state, &def.term.rhs),
+            Expression::IfThenElse {
+                condition,
+                true_exp,
+                false_exp,
             } => {
-                let data = state.eval(value).unwrap_or(Data::new_top(*size));
-                assert_eq!(data.bitsize(), *size);
-                // TODO: At the moment, both memory and endianness are ignored. Change that!
-                return self.write_to_address(state, address, data);
-            }
-            expression => {
-                let mut register = state.register.clone();
-                // TODO: error messages while evaluating instructions are ignored at the moment.
-                // These should be somehow made visible for the user or for debug purposes
-                let new_value = state
-                    .eval(&expression)
-                    .unwrap_or(Data::new_top(def.term.lhs.bitsize().unwrap()));
-                if new_value.is_top() {
-                    register.remove(&def.term.lhs);
+                // IfThenElse needs special handling, because it may encode conditional store instructions.
+                let true_state = if let Expression::Store { .. } = **true_exp {
+                    self.handle_store_exp(state, true_exp)
                 } else {
-                    register.insert(def.term.lhs.clone(), new_value);
-                }
-                State {
-                    register,
-                    ..state.clone()
+                    self.handle_register_assign(state, &def.term.lhs, true_exp)
+                };
+                let false_state = if let Expression::Store { .. } = **false_exp {
+                    self.handle_store_exp(state, false_exp)
+                } else {
+                    self.handle_register_assign(state, &def.term.lhs, false_exp)
+                };
+                match state.eval(condition) {
+                    Ok(Data::Value(cond)) => {
+                        if cond == Bitvector::from_bit(true).into() {
+                            true_state
+                        } else if cond == Bitvector::from_bit(false).into() {
+                            false_state
+                        } else {
+                            panic!("IfThenElse with wrong condition bitsize encountered")
+                        }
+                    }
+                    Ok(_) => true_state.merge(&false_state),
+                    Err(err) => panic!("IfThenElse-Condition evaluation failed: {}", err),
                 }
             }
+            expression => self.handle_register_assign(state, &def.term.lhs, expression),
         }
     }
 
@@ -468,7 +514,11 @@ mod tests {
     fn mock_project() -> Project {
         let program = Program {
             subs: Vec::new(),
-            extern_symbols: vec![mock_extern_symbol("malloc"), mock_extern_symbol("free"), mock_extern_symbol("other")],
+            extern_symbols: vec![
+                mock_extern_symbol("malloc"),
+                mock_extern_symbol("free"),
+                mock_extern_symbol("other"),
+            ],
             entry_points: Vec::new(),
         };
         let program_term = Term {
