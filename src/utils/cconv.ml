@@ -104,15 +104,11 @@ let parse_dyn_sym_line (line : string) : string option =
   done;
   str_list := !line :: !str_list;
   match !str_list with
-  | value :: func1 :: func2 :: _ -> begin
-      match ( String.strip ~drop:(fun x -> x = '0') value ) with
-      | "" -> begin
-          if (String.equal func1 "DF" || String.equal func2 "DF") then (
-            List.last !str_list
-          )
-          else None
-        end
-      | _ -> None (* The symbol has a nonzero value, so we assume that it is not an extern function symbol. *)
+  | _value :: func1 :: func2 :: _ -> begin
+      if (String.equal func1 "DF" || String.equal func2 "DF") then (
+        List.last !str_list
+      )
+      else None
     end
   | _ -> None
 
