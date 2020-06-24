@@ -96,6 +96,15 @@ impl<'a> Context<'a> {
         target: &Variable,
         expression: &Expression,
     ) -> State {
+        if let Expression::Var(variable) = expression {
+            if target == variable {
+                // The assign does nothing. Occurs as "do nothing"-path in conditional stores.
+                // Needs special handling, since it is the only case where the target is allowed
+                // to denote memory instead of a register.
+                return state.clone();
+            }
+        }
+
         let mut register = state.register.clone();
         // TODO: error messages while evaluating instructions are ignored at the moment.
         // These should be somehow made visible for the user or for debug purposes
