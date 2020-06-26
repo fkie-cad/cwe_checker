@@ -5,6 +5,7 @@ dev
 -   Reworked CWE-476 check to track stack variables (PR #47)
 -   Switched to BAP 2.0 (PR #49)
 -   Several internal code improvements (PRs #51, #58, #62)
+-   Added deprecation warnings to the emulation based checks (PR #66)
 
 0.3 (2019-12)
 ====
