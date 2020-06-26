@@ -11,7 +11,7 @@
     are emit_native and emit_json.
 
     In addition, there are several functions (debug, error, info) to notify the user of certain
-    events. Note that these functions may pollute the output. 
+    events. Note that these functions may pollute the output.
  *)
 
 module CweWarning : sig
@@ -53,8 +53,9 @@ It takes the following input parameters:
 - tids: list of relevant TIDs as strings
 - symbols: list of associated symbols as strings
 - description: string description of the CWE
- *)
+*)
 val cwe_warning_factory : string -> string -> ?other:string list list -> ?addresses:string list -> ?tids:string list -> ?symbols:string list -> string -> CweWarning.t
+
 (**
 Factory function to easily build an element of type CheckPath.t.
 It takes the following input parameters:
@@ -71,10 +72,12 @@ val check_path_factory : ?path:string list -> ?path_str:string -> string -> stri
 Add one CweWarning.t element to an internal store. All elements are emited by calling one of the emit_* functions.
  *)
 val collect_cwe_warning : CweWarning.t -> unit
+
 (**
 Add one CheckPath.t element to an internal store. All elements are emited by calling one of the emit_* functions.
  *)
 val collect_check_path : CheckPath.t -> unit
+
 (**
 Returns the internal store of CweWarning.t elements as a list.
  *)
@@ -85,6 +88,7 @@ Emits stored CweWarning.t and CheckPath.t elements as json.
 target_path is the path of the current BAP project and out_path is the path a json output file.
  *)
 val emit_json : string -> string -> unit
+
 (**
 Emits stored CweWarning.t and CheckPath.t elements.
 target_path is the path of the current BAP project and out_path is the path an output file.
