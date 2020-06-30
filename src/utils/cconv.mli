@@ -10,6 +10,10 @@ val callee_saved_register_list: Project.t -> String.t List.t
     Note that using this function may lead to errors if other calling conventions are used in a program. *)
 val get_parameter_register_list: Project.t -> String.t List.t
 
+(** Returns a json object for registers.json. If not yet in memory, the json file is read. *)
+val get_json: unit -> Yojson.Basic.t
+
+
 (** Returns whether a variable is callee saved according to the calling convention
     of the target architecture. Should only used for calls to functions outside
     of the program, not for calls between functions inside the program. *)
@@ -30,3 +34,24 @@ val is_return_register: Var.t -> Project.t -> Bool.t
     TODO: Since we do not do name demangling here, check whether bap name demangling
     yields different function names for the symbols. *)
 val parse_dyn_syms: Project.t -> String.Set.t
+
+
+(** Returns a string list of supported architectures from the registers.json. *)
+val get_supported_architectures : unit -> string list
+
+
+(** Calls objdump with customisable flag and error message. Returns output lines as string list. *)
+val call_objdump : Project.t -> flag:string -> err:string -> string list
+
+
+(** Infers the binary format using the file's symbol table. *)
+val infer_bin_format_from_symbols : Project.t -> string
+
+
+(** Returns the binary format by either an objdump call or via the file's symbol table. *)
+val extract_bin_format : Project.t -> string
+
+
+(** Returns a list of registers based on the file's binary format, architecture,
+    calling_convention and context (e.g. callee saved, parameter etc.) *)
+val get_register_list : Project.t -> string -> string list

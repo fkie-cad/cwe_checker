@@ -53,7 +53,7 @@ It takes the following input parameters:
 - tids: list of relevant TIDs as strings
 - symbols: list of associated symbols as strings
 - description: string description of the CWE
- *)
+*)
 val cwe_warning_factory : string -> string -> ?other:string list list -> ?addresses:string list -> ?tids:string list -> ?symbols:string list -> string -> CweWarning.t
 
 (**

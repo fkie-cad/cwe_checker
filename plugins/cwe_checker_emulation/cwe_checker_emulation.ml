@@ -125,6 +125,7 @@ end
 - all monitored events are collected globally
 - after the last Primus machine has terminated we report all observed incidents *)
 let main json_output file_output proj =
+  print_endline "INFO: The emulation based checks in this plugin have been deprecated. Please look at https://github.com/BinaryAnalysisPlatform/bap-toolkit for an alternative." ;
   Primus.Machine.add_component (module Monitor);
   begin
   let prog = (Project.program proj) in

@@ -14,6 +14,7 @@ let run_tests project =
     "Json_utils_tests", Json_utils_test.tests;
     "CWE_476_tests", Cwe_476_test.tests;
     "CWE_560_tests", Cwe_560_test.tests;
+    "Address_translation_tests", Address_translation_test.tests;
      ]
 
 let () =
