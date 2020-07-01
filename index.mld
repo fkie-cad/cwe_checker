@@ -24,7 +24,10 @@ Internally, this also calls BAP as above, but enables shorter {{!section:CmdLine
 
 The symbolic execution based checks can be run with the emulation recipe in the recipes folder.
 {[bap PATH_TO_BINARY --recipe=recipes/emulation]}
-Note that these checks are rather slow at the moment and should only be applied to small binaries.
+Note that these checks are rather slow and should only be applied to small binaries.
+{e Deprecation warning:} We recently decided to deprecate support for the symbolic execution based checks and they will be removed in a future version.
+Users of these checks should take a look at the {{: https://github.com/BinaryAnalysisPlatform/bap-toolkit} BAP toolkit},
+which provides better-maintained versions of these checks.
 
 {2 How to use the docker images}
 
@@ -35,7 +38,8 @@ There are two docker images containing preinstalled versions of the {i cwe_check
 To use them, mount the target binary inside the docker container and call {i bap} with {i cwe_checker} as a pass as usual:
 {[docker run --rm -v [BINARY]:/tmp/input fkiecad/cwe_checker bap /tmp/input --pass=cwe-checker]}
 If you are using a customized [config.json] file, don't forget to mount it inside your container as well!
-If you want to print the output to a file with [--cwe-checker-out], you also need to mount the output file to the docker container, or else the file will be lost once the container gets destroyed.
+If you want to print the output to a file with [--cwe-checker-out], you also need to mount the output file to the docker container,
+or else the file will be lost once the container gets destroyed.
 
 {1:CmdLineOptions Command line options}
 

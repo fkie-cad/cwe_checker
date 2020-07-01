@@ -7,6 +7,7 @@
 [![Build Status](https://travis-ci.com/fkie-cad/cwe_checker.svg?branch=master)](https://travis-ci.com/fkie-cad/cwe_checker)
 ![Docker-Pulls](https://img.shields.io/docker/pulls/fkiecad/cwe_checker.svg)
 [![Documentation](https://img.shields.io/badge/doc-stable-green.svg)](https://fkie-cad.github.io/cwe_checker/doc/html/cwe_checker/index.html)
+
 ## What is cwe_checker? ##
 *cwe_checker* is a suite of tools to detect common bug classes such as use of dangerous functions and simple integer overflows. These bug classes are formally known as [Common Weakness Enumerations](https://cwe.mitre.org/) (CWEs). Its main goal is to aid analysts to quickly find vulnerable code paths.
 
@@ -20,8 +21,6 @@ Its main focus are ELF binaries that are commonly found on Linux and Unix operat
 -   [CWE-248](https://cwe.mitre.org/data/definitions/248.html): Uncaught Exception
 -   [CWE-332](https://cwe.mitre.org/data/definitions/332.html): Insufficient Entropy in PRNG
 -   [CWE-367](https://cwe.mitre.org/data/definitions/367.html): Time-of-check Time-of-use (TOCTOU) Race Condition
--   [CWE-415](https://cwe.mitre.org/data/definitions/415.html): Double Free (via emulation)
--   [CWE-416](https://cwe.mitre.org/data/definitions/416.html): Use After Free (UAF) (via emulation)
 -   [CWE-426](https://cwe.mitre.org/data/definitions/426.html): Untrusted Search Path
 -   [CWE-457](https://cwe.mitre.org/data/definitions/457.html): Use of Uninitialized Variable
 -   [CWE-467](https://cwe.mitre.org/data/definitions/467.html): Use of sizeof() on a Pointer Type
@@ -29,7 +28,8 @@ Its main focus are ELF binaries that are commonly found on Linux and Unix operat
 -   [CWE-560](https://cwe.mitre.org/data/definitions/560.html): Use of umask() with chmod-style Argument
 -   [CWE-676](https://cwe.mitre.org/data/definitions/676.html): Use of Potentially Dangerous Function
 -   [CWE-782](https://cwe.mitre.org/data/definitions/782.html): Exposed IOCTL with Insufficient Access Control
--   [CWE-787](https://cwe.mitre.org/data/definitions/787.html): Out-of-bounds Write (via emulation)
+
+**NOTE:** We recently decided to deprecate the support for the emulation based checks for CWEs 415, 416 and 787. Users of these checks should take a look at the [BAP toolkit](https://github.com/BinaryAnalysisPlatform/bap-toolkit), which provides better-maintained versions of these checks.
 
 Please note that some of the above analyses only are partially implemented at the moment. Furthermore, false positives are to be expected due to shortcuts and the nature of static analysis as well as over-approximation. For more information about the individual checks you can look at the [online documentation](https://fkie-cad.github.io/cwe_checker/doc/html/cwe_checker/index.html).
 
@@ -69,6 +69,7 @@ If you plan to develop cwe_checker, it is recommended to build it using the prov
 -   odoc >= 1.4 (for documentation)
 
 Just run `make all` to compile and register the plugin with BAP. You can run the test suite via `make test`. Documentation can be built via `make documentation`.
+
 ## How to use cwe_checker? ##
 The usage is straight forward: adjust the `config.json` (if needed) and call BAP with *cwe_checker* as a pass.
 ``` bash
@@ -80,8 +81,10 @@ For further information see the [online documentation](https://fkie-cad.github.i
 You can find some information about how to write your own check [here](https://fkie-cad.github.io/cwe_checker/doc/html/cwe_checker/index.html#HackingHowto)
 
 If you plan to open a PR, please utilize [precommit](https://pre-commit.com) in your development environment to catch many issues before the code review.
+
 ### Contribute ###
 Contributions are always welcome. Just fork it and open a pull request!
+
 ## How does cwe_checker work internally? ##
 See the [online documentation](https://fkie-cad.github.io/cwe_checker/doc/html/cwe_checker/index.html) or build it locally via `make documentation` and then browse it in the *doc/html/* folder. But the most accurate documentation is still the source code. We also provide some slides of conference presentations on cwe_checker in *doc*. These should be of special interest for those who would like to get a quick/initial overview of its internals.
 
@@ -93,6 +96,7 @@ We presented cwe_checker at the following conferences so far:
 This project is partly financed by [German Federal Office for Information Security (BSI)](https://www.bsi.bund.de).
 
 A special thanks goes out to the BAP community (especially the official gitter) for answering questions and discussing solutions.
+
 ## License
 ```
     Copyright (C) 2018 -       Fraunhofer FKIE  (firmware-security@fkie.fraunhofer.de)
