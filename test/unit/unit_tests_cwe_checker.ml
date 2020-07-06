@@ -1,3 +1,26 @@
+(**
+   This module contains the unit test infrastructure to coordiate
+   each unit test in the cwe_checker/unit/ folder.
+
+   To add an unit test and the corresponding test file,
+   a few steps have to be performed before execution:
+
+   - add the parameter for your unit test to the input_test_map in this module:
+     the key contains the parameter name and the value is the name of the test
+
+   - add the test list from your unit test to unit_test_list in this module
+
+   - if your unit test utilises a example project, it has to be added to the set_example_project
+     in this module.
+
+   - add your corresponding test file to the testfiles folder in cwe_checker/unit/
+
+   - call the unit test as bap plugin in the Makefile contained in the unit folder.
+     The compiled test file will lie in the tmp folder.
+
+   - lastly, run compile_testfile.sh in the specify_test_files_for_compilation contained in the unit folder
+*)
+
 open Bap.Std
 open Core_kernel
 

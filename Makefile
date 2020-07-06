@@ -8,6 +8,7 @@ all:
 	cd plugins/cwe_checker_type_inference_print; make all; cd ../..
 
 test:
+	cd test/unit/ && ./specify_test_files_for_compilation.sh
 	dune runtest
 	cd test/artificial_samples; scons; cd ../..
 	pytest -v
