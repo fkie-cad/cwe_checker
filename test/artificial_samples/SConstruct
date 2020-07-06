@@ -48,7 +48,7 @@ target_flags = {'x64': '',
                'mips': ' -target mips-linux-gnu',
                'mipsel': ' -target mipsel-linux-gnu',
                'mips64': ' -target mips64-linux-gnuabi64',
-               'mips64el': ' -target mips64-linux-gnuabi64',
+               'mips64el': ' -target mips64el-linux-gnuabi64',
                'ppc64': ' -target powerpc64-linux-gnu',
                'ppc64le': ' -target powerpc64le-linux-gnu'}
 
