@@ -6,17 +6,23 @@ pub mod symbol;
 use symbol::ExternSymbol;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
-pub struct Tid(String);
+pub struct Tid {
+    id: String,
+    pub address: String,
+}
 
 impl Tid {
     pub fn new<T: ToString>(val: T) -> Tid {
-        Tid(val.to_string())
+        Tid {
+            id: val.to_string(),
+            address: "UNKNOWN".to_string(),
+        }
     }
 }
 
 impl std::fmt::Display for Tid {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(formatter, "{}", self.0)
+        write!(formatter, "{}", self.id)
     }
 }
 
@@ -85,7 +91,7 @@ pub struct Project {
     pub cpu_architecture: String,
     pub stack_pointer_register: Variable,
     pub callee_saved_registers: Vec<String>,
-    pub parameter_registers: Vec<String>
+    pub parameter_registers: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
@@ -125,8 +131,8 @@ mod tests {
 
     #[test]
     fn term_deserialization() {
-        let string = "{\"term\":{\"defs\":[],\"jmps\":[]},\"tid\":\"@block\"}";
-        let tid = Tid("@block".to_string());
+        let string = "{\"term\":{\"defs\":[],\"jmps\":[]},\"tid\":{\"id\":\"@block\",\"address\":\"UNKNOWN\"}}";
+        let tid = Tid::new("@block".to_string());
         let block_term = Term {
             tid: tid,
             term: Blk {
@@ -134,6 +140,7 @@ mod tests {
                 jmps: Vec::new(),
             },
         };
+        println!("{}", serde_json::to_string(&block_term).unwrap());
         assert_eq!(block_term, serde_json::from_str(&string).unwrap());
     }
 }

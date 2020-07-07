@@ -163,96 +163,99 @@ let rec of_exp (exp: Exp.t) : t =
       ]);]
   end
 
-let of_tid (tid: Tid.t) : t =
-  build_string (Tid.name tid)
-
-let of_def (def: Def.t) : t =
+let of_tid (tid: Tid.t) (tid_map: word Tid.Map.t) : t =
   build_object [
-    ("tid", of_tid (Term.tid def));
+    ("id", build_string @@ Tid.name tid);
+    ("address", build_string @@ Address_translation.translate_tid_to_assembler_address_string tid tid_map);
+  ]
+
+let of_def (def: Def.t) (tid_map: word Tid.Map.t) : t =
+  build_object [
+    ("tid", of_tid (Term.tid def) tid_map);
     ("term", build_object [
        ("lhs", of_var (Def.lhs def));
        ("rhs", of_exp (Def.rhs def));
      ]);
   ]
 
-let of_jmp_label (jmp_label: label) : t =
+let of_jmp_label (jmp_label: label) (tid_map: word Tid.Map.t) : t =
   match jmp_label with
   | Direct(tid) ->
       build_object [
-        ("Direct", of_tid tid);
+        ("Direct", of_tid tid tid_map);
       ]
   | Indirect(exp) ->
       build_object [
         ("Indirect", of_exp exp);
       ]
 
-let of_call (call: Call.t) : t =
+let of_call (call: Call.t) (tid_map: word Tid.Map.t) : t =
   build_object [
-    ("target", of_jmp_label (Call.target call));
+    ("target", of_jmp_label (Call.target call) tid_map);
     ("return_", match Call.return call with
-     | Some(target) -> of_jmp_label target
+     | Some(target) -> of_jmp_label target tid_map
      | None -> build_null ()
     );
   ]
 
-let of_jmp_kind (kind: jmp_kind) : t =
+let of_jmp_kind (kind: jmp_kind) (tid_map: word Tid.Map.t) : t =
   match kind with
   | Call(call) ->
       build_object [
-        ("Call", of_call call);
+        ("Call", of_call call tid_map);
       ]
   | Goto(label) ->
       build_object [
-        ("Goto", of_jmp_label label);
+        ("Goto", of_jmp_label label tid_map);
       ]
   | Ret(label) ->
       build_object [
-        ("Return", of_jmp_label label);
+        ("Return", of_jmp_label label tid_map);
       ]
   | Int(interrupt_num, tid) ->
       build_object [
         ("Interrupt", build_object [
            ("value", build_number interrupt_num );
-           ("return_addr", of_tid tid)
+           ("return_addr", of_tid tid tid_map)
          ]);
       ]
 
-let of_jmp (jmp: Jmp.t) : t =
+let of_jmp (jmp: Jmp.t) (tid_map: word Tid.Map.t) : t =
   build_object [
-    ("tid", of_tid (Term.tid jmp));
+    ("tid", of_tid (Term.tid jmp) tid_map);
     ("term", build_object [
        ("condition", if Option.is_some (Jmp.guard jmp) then of_exp (Jmp.cond jmp) else build_null ());
-       ("kind", of_jmp_kind (Jmp.kind jmp));
+       ("kind", of_jmp_kind (Jmp.kind jmp) tid_map);
      ]);
   ]
 
-let of_blk (blk: Blk.t) : t =
+let of_blk (blk: Blk.t) (tid_map: word Tid.Map.t) : t =
   let defs = Seq.to_list (Term.enum def_t blk) in
-  let defs = List.map defs ~f:(fun def -> of_def def) in
+  let defs = List.map defs ~f:(fun def -> of_def def tid_map) in
   let jmps = Seq.to_list (Term.enum jmp_t blk) in
-  let jmps = List.map jmps ~f:(fun jmp -> of_jmp jmp) in
+  let jmps = List.map jmps ~f:(fun jmp -> of_jmp jmp tid_map) in
   build_object [
-    ("tid", of_tid (Term.tid blk));
+    ("tid", of_tid (Term.tid blk) tid_map);
     ("term", build_object [
        ("defs", build_array defs);
        ("jmps", build_array jmps);
      ]);
   ]
 
-let of_sub (sub: Sub.t) : t =
+let of_sub (sub: Sub.t) (tid_map: word Tid.Map.t) : t =
   let blocks = Seq.to_list (Term.enum blk_t sub) in
-  let blocks = List.map blocks ~f:(fun block -> of_blk block) in
+  let blocks = List.map blocks ~f:(fun block -> of_blk block tid_map) in
   build_object [
-    ("tid", of_tid (Term.tid sub));
+    ("tid", of_tid (Term.tid sub) tid_map);
     ("term", build_object [
        ("name", build_string (Sub.name sub));
        ("blocks", build_array blocks);
      ]);
   ]
 
-let of_extern_symbol (symbol: extern_symbol) : t =
+let of_extern_symbol (symbol: extern_symbol) (tid_map: word Tid.Map.t) : t =
   build_object [
-    ("tid", of_tid symbol.tid);
+    ("tid", of_tid symbol.tid tid_map);
     ("address", build_string symbol.address);
     ("name", build_string symbol.name);
     ("calling_convention", match symbol.cconv with
@@ -273,21 +276,21 @@ let of_extern_symbol (symbol: extern_symbol) : t =
      )))
   ]
 
-let of_program (program: Program.t) (extern_symbols: extern_symbol List.t) (entry_points: Tid.t List.t) : t =
+let of_program (program: Program.t) (extern_symbols: extern_symbol List.t) (entry_points: Tid.t List.t) (tid_map: word Tid.Map.t) : t =
   let subs = Seq.to_list (Term.enum sub_t program) in
-  let subs = List.map subs ~f:(fun sub -> of_sub sub) in
+  let subs = List.map subs ~f:(fun sub -> of_sub sub tid_map) in
   build_object [
-    ("tid", of_tid (Term.tid program));
+    ("tid", of_tid (Term.tid program) tid_map);
     ("term", build_object [
        ("subs", build_array subs);
-       ("extern_symbols", build_array (List.map extern_symbols ~f:(fun sym -> of_extern_symbol sym)));
-       ("entry_points", build_array (List.map entry_points ~f:(fun tid -> of_tid tid)));
+       ("extern_symbols", build_array (List.map extern_symbols ~f:(fun sym -> of_extern_symbol sym tid_map)));
+       ("entry_points", build_array (List.map entry_points ~f:(fun tid -> of_tid tid tid_map)));
      ]);
   ]
 
-let of_project (project: Project.t) (extern_symbols: extern_symbol List.t) (entry_points: Tid.t List.t) : t =
+let of_project (project: Project.t) (extern_symbols: extern_symbol List.t) (entry_points: Tid.t List.t) (tid_map: word Tid.Map.t) : t =
   build_object [
-    ("program", of_program (Project.program project) extern_symbols entry_points);
+    ("program", of_program (Project.program project) extern_symbols entry_points tid_map);
     ("cpu_architecture", build_string (Arch.to_string (Project.arch project)));
     ("stack_pointer_register", of_var (Symbol_utils.stack_register project));
     ("callee_saved_registers", build_array (List.map (Cconv.get_register_list project "callee_saved") ~f:(fun reg_name -> build_string reg_name) ));

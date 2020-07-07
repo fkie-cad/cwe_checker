@@ -1,6 +1,7 @@
 use super::interprocedural_fixpoint::{Computation, NodeValue};
 use crate::prelude::*;
 use crate::term::*;
+use crate::utils::log::CweWarning;
 use petgraph::graph::NodeIndex;
 use std::collections::HashMap;
 
@@ -19,8 +20,8 @@ pub struct PointerInference<'a> {
 }
 
 impl<'a> PointerInference<'a> {
-    pub fn new(project: &'a Project) -> PointerInference<'a> {
-        let context = Context::new(project);
+    pub fn new(project: &'a Project, cwe_sender: crossbeam_channel::Sender<CweWarning>) -> PointerInference<'a> {
+        let context = Context::new(project, cwe_sender);
 
         let mut entry_sub_to_entry_blocks_map = HashMap::new();
         let subs: HashMap<Tid, &Term<Sub>> = project
@@ -107,12 +108,31 @@ impl<'a> PointerInference<'a> {
     }
 }
 
-pub fn run_and_print_debug(project: &Project) {
-    let mut computation = PointerInference::new(project);
-    computation.compute();
-    computation.print_compact_json();
+pub fn run(project: &Project, print_debug: bool) -> Vec<CweWarning> {
+    let (cwe_sender, cwe_receiver) = crossbeam_channel::unbounded();
+
+    let warning_collector_thread = std::thread::spawn(move || {collect_cwe_warnings(cwe_receiver)});
+
+    {   // Scope the computation object so that it is dropped before the warning collector thread is joined.
+        // Else the warning collector thread will not terminate (the cwe_sender needs to be dropped for it to terminate).
+        let mut computation = PointerInference::new(project, cwe_sender);
+
+        computation.compute();
+        if print_debug {
+            computation.print_compact_json();
+        }
+    }
+    // Return the CWE warnings
+    warning_collector_thread.join().unwrap()
 }
 
-pub fn run(project: &Project) {
-    run_and_print_debug(project);
+fn collect_cwe_warnings(receiver: crossbeam_channel::Receiver<CweWarning>) -> Vec<CweWarning> {
+    let mut collected_warnings = HashMap::new();
+    while let Ok(warning) = receiver.recv() {
+        match &warning.addresses[..] {
+            [] => unimplemented!(),
+            [address, ..] => { collected_warnings.insert(address.clone(), warning); },
+        }
+    }
+    collected_warnings.drain().map(|(_key, value)| {value}).collect()
 }

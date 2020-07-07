@@ -39,14 +39,14 @@ val of_unop_type: Bil.Types.unop -> t
 val of_endianness: Bitvector.endian -> t
 val of_bitvector: Bitvector.t -> t
 val of_exp: Exp.t -> t
-val of_tid: Tid.t -> t
-val of_def: Def.t -> t
-val of_jmp_label: Label.t -> t
-val of_call: Call.t -> t
-val of_jmp_kind: jmp_kind -> t
-val of_jmp: Jmp.t -> t
-val of_blk: Blk.t -> t
-val of_sub: Sub.t -> t
-val of_extern_symbol: Symbol_utils.extern_symbol -> t
-val of_program: Program.t -> Symbol_utils.extern_symbol List.t -> Tid.t List.t -> t
-val of_project: Project.t -> Symbol_utils.extern_symbol List.t -> Tid.t List.t -> t
+val of_tid: Tid.t -> word Tid.Map.t -> t
+val of_def: Def.t -> word Tid.Map.t -> t
+val of_jmp_label: Label.t -> word Tid.Map.t -> t
+val of_call: Call.t -> word Tid.Map.t -> t
+val of_jmp_kind: jmp_kind -> word Tid.Map.t -> t
+val of_jmp: Jmp.t -> word Tid.Map.t -> t
+val of_blk: Blk.t -> word Tid.Map.t -> t
+val of_sub: Sub.t -> word Tid.Map.t -> t
+val of_extern_symbol: Symbol_utils.extern_symbol -> word Tid.Map.t -> t
+val of_program: Program.t -> Symbol_utils.extern_symbol List.t -> Tid.t List.t -> word Tid.Map.t -> t
+val of_project: Project.t -> Symbol_utils.extern_symbol List.t -> Tid.t List.t -> word Tid.Map.t -> t

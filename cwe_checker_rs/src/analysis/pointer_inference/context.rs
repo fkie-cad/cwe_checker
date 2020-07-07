@@ -5,6 +5,7 @@ use crate::bil::{Expression, Variable};
 use crate::prelude::*;
 use crate::term::symbol::ExternSymbol;
 use crate::term::*;
+use crate::utils::log::CweWarning;
 use petgraph::graph::NodeIndex;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
@@ -16,10 +17,11 @@ pub struct Context<'a> {
     pub graph: Graph<'a>,
     pub project: &'a Project,
     pub extern_symbol_map: BTreeMap<Tid, &'a ExternSymbol>,
+    pub cwe_collector: crossbeam_channel::Sender<CweWarning>,
 }
 
 impl<'a> Context<'a> {
-    pub fn new(project: &Project) -> Context {
+    pub fn new(project: &Project, cwe_collector: crossbeam_channel::Sender<CweWarning>) -> Context {
         let mut extern_symbol_map = BTreeMap::new();
         for symbol in project.program.term.extern_symbols.iter() {
             extern_symbol_map.insert(symbol.tid.clone(), symbol);
@@ -37,6 +39,7 @@ impl<'a> Context<'a> {
             graph,
             project,
             extern_symbol_map,
+            cwe_collector,
         }
     }
 
@@ -135,6 +138,19 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
     }
 
     fn update_def(&self, state: &Self::Value, def: &Term<Def>) -> Self::Value {
+        // first check for use-after-frees
+        if state.contains_access_of_dangling_memory(&def.term.rhs) {
+            let warning = CweWarning {
+                name: "CWE416".to_string(),
+                version: "0.1".to_string(),
+                addresses: vec![def.tid.address.clone()],
+                tids: vec![format!("{}", def.tid)],
+                symbols: Vec::new(),
+                other: Vec::new(),
+                description: format!("(Use after free) Access through a dangling pointer at {}", def.tid.address),
+            };
+            self.cwe_collector.send(warning).unwrap();
+        }
         // TODO: handle loads in the right hand side expression for their side effects!
         match &def.term.rhs {
             Expression::Store { .. } => self.handle_store_exp(state, &def.term.rhs),
@@ -369,7 +385,18 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
                                     state.eval(&Expression::Var(parameter_register.clone()))
                                 {
                                     if let Data::Pointer(pointer) = memory_object_pointer {
-                                        new_state.mark_mem_object_as_freed(&pointer);
+                                        if let Err(possible_double_free_object_ids) = new_state.mark_mem_object_as_freed(&pointer) {
+                                            let warning = CweWarning {
+                                                name: "CWE415".to_string(),
+                                                version: "0.1".to_string(),
+                                                addresses: vec![call.tid.address.clone()],
+                                                tids: vec![format!("{}", call.tid)],
+                                                symbols: Vec::new(),
+                                                other: vec![possible_double_free_object_ids.into_iter().map(|id| {format!("{}", id)}).collect()],
+                                                description: format!("(Double Free) Object may have been freed before at {}", call.tid.address),
+                                            };
+                                            self.cwe_collector.send(warning).unwrap();
+                                        }
                                     } // TODO: add diagnostics for else case
                                     new_state.remove_unreferenced_objects();
                                     return Some(new_state);
@@ -551,7 +578,8 @@ mod tests {
         use Expression::*;
 
         let project = mock_project();
-        let context = Context::new(&project);
+        let (cwe_sender, _cwe_receiver) = crossbeam_channel::unbounded();
+        let context = Context::new(&project, cwe_sender);
         let mut state = State::new(&register("RSP"), Tid::new("main"));
 
         let def = Term {

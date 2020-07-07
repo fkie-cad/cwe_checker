@@ -85,6 +85,36 @@ impl State {
         }
     }
 
+    /// Check if an expression contains a use-after-free
+    pub fn contains_access_of_dangling_memory(&self, expression: &Expression) -> bool {
+        use Expression::*;
+        match expression {
+            Var(_) | Const(_) | Unknown{..} => false,
+            Load {address: address_exp, ..} => {
+                if let Ok(pointer) = self.eval(address_exp) {
+                    self.memory.is_dangling_pointer(&pointer) || self.contains_access_of_dangling_memory(address_exp)
+                } else {
+                    false
+                }
+            },
+            Store { memory: _, address: address_exp, value: value_exp, .. } => {
+                let address_check = if let Ok(pointer) = self.eval(address_exp) {
+                    self.memory.is_dangling_pointer(&pointer)
+                } else {
+                    false
+                };
+                address_check || self.contains_access_of_dangling_memory(address_exp) || self.contains_access_of_dangling_memory(value_exp)
+            }
+            BinOp{op: _, lhs, rhs} => self.contains_access_of_dangling_memory(lhs) || self.contains_access_of_dangling_memory(rhs),
+            UnOp{op: _, arg} => self.contains_access_of_dangling_memory(arg),
+            Cast{kind: _, width: _, arg} => self.contains_access_of_dangling_memory(arg),
+            Let{var: _, bound_exp, body_exp} => self.contains_access_of_dangling_memory(bound_exp) || self.contains_access_of_dangling_memory(body_exp),
+            IfThenElse{condition, true_exp, false_exp} => self.contains_access_of_dangling_memory(condition) || self.contains_access_of_dangling_memory(true_exp) || self.contains_access_of_dangling_memory(false_exp),
+            Extract{low_bit: _, high_bit: _, arg} => self.contains_access_of_dangling_memory(arg),
+            Concat{left, right} => self.contains_access_of_dangling_memory(left) || self.contains_access_of_dangling_memory(right),
+        }
+    }
+
     pub fn store_value(&mut self, address: &Data, value: &Data) -> Result<(), Error> {
         if let Data::Pointer(pointer) = self.adjust_pointer_for_read(address) {
             // TODO: This is a very inexact shortcut, as this write will unnecessarily merge caller memory regions.
@@ -236,7 +266,10 @@ impl State {
 
     /// Mark a memory object as already freed (i.e. pointers to it are dangling).
     /// If the object cannot be identified uniquely, all possible targets are marked as having an unknown status.
-    pub fn mark_mem_object_as_freed(&mut self, object_pointer: &PointerDomain) {
+    ///
+    /// If this may cause double frees (i.e. the object in question may have been freed already),
+    /// an error with the list of possibly already freed objects is returned.
+    pub fn mark_mem_object_as_freed(&mut self, object_pointer: &PointerDomain) -> Result<(),Vec<AbstractIdentifier>> {
         self.memory.mark_mem_object_as_freed(object_pointer)
     }
 

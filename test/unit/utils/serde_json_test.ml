@@ -66,10 +66,11 @@ let test_type_conversions () =
   check "Expression" (json = "{\"BinOp\":{\"lhs\":{\"Const\":{\"digits\":[234],\"width\":[8]}},\"op\":\"PLUS\",\"rhs\":{\"Const\":{\"digits\":[234],\"width\":[8]}}}}");
   let tid = Tid.for_name "block" in
   let term = Blk.create ~tid () in
-  let serde = Serde_json.of_blk term in
+  let tid_map = Tid.Map.empty in
+  let serde = Serde_json.of_blk term tid_map in
   let json = Serde_json.to_string serde in
   print_endline json;
-  check "Block_term" (json = "{\"term\":{\"defs\":[],\"jmps\":[]},\"tid\":\"@block\"}")
+  check "Block_term" (json = "{\"term\":{\"defs\":[],\"jmps\":[]},\"tid\":{\"address\":\"UNKNOWN\",\"id\":\"@block\"}}";)
 
 let test_project_conversion () =
   let project = Option.value_exn !example_project in
@@ -77,10 +78,12 @@ let test_project_conversion () =
   let tid_map = Address_translation.generate_tid_map program in
   let extern_symbols = Symbol_utils.build_and_return_extern_symbols project program tid_map in
   let entry_points = [] in
-  let serde = Serde_json.of_program program extern_symbols entry_points in
+  let serde = Serde_json.of_program program extern_symbols entry_points tid_map in
   let _json = Serde_json.to_string serde in
   (* TODO: The unit test for pointer inference should be moved to another file *)
   Pointer_inference.run project tid_map;
+  Log_utils.emit_json "bin" "";
+  Log_utils.emit_native "";
   check "Project" true
 
 let tests = [

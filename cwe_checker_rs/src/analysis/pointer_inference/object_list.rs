@@ -6,6 +6,7 @@ use crate::bil::Bitvector;
 use crate::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
+use std::ops::Deref;
 use std::sync::Arc;
 
 /// The list of all known abstract objects.
@@ -22,16 +23,39 @@ pub struct AbstractObjectList {
 impl AbstractObjectList {
     /// Create a new abstract object list with just one abstract object corresponding to the stack.
     /// The offset into the stack object will be set to zero.
-    pub fn from_stack_id(stack_id: AbstractIdentifier, address_bitsize: BitSize) -> AbstractObjectList {
+    pub fn from_stack_id(
+        stack_id: AbstractIdentifier,
+        address_bitsize: BitSize,
+    ) -> AbstractObjectList {
         let mut objects = Vec::new();
         let stack_object = AbstractObject::new(ObjectType::Stack, address_bitsize);
         objects.push(Arc::new(stack_object));
         let mut ids = BTreeMap::new();
-        ids.insert(stack_id, (0, Bitvector::zero((address_bitsize as usize).into()).into()));
-        AbstractObjectList {
-            objects,
-            ids,
+        ids.insert(
+            stack_id,
+            (0, Bitvector::zero((address_bitsize as usize).into()).into()),
+        );
+        AbstractObjectList { objects, ids }
+    }
+
+    /// Check the state of a memory object at a given address.
+    /// Returns True if at least one of the targets of the pointer is dangling.
+    /// May lead to false negatives, as objects with unknown object states are treated the same as alive objects.
+    pub fn is_dangling_pointer(&self, address: &Data) -> bool {
+        match address {
+            Data::Value(_) | Data::Top(_) => (),
+            Data::Pointer(pointer) => {
+                for (id, _offset) in pointer.iter_targets() {
+                    let (object_index, _offset_id) = self.ids.get(id).unwrap();
+                    if let AbstractObject::Memory(ref object) = *self.objects[*object_index] {
+                        if object.state == Some(ObjectState::Dangling) {
+                            return true;
+                        }
+                    }
+                }
+            }
         }
+        return false;
     }
 
     /// Get the value at a given address.
@@ -49,8 +73,11 @@ impl AbstractObjectList {
                     let (abstract_object_index, offset_identifier) = self.ids.get(id).unwrap();
                     let offset = offset_pointer_domain.clone() + offset_identifier.clone();
                     if let BitvectorDomain::Value(concrete_offset) = offset {
-                        let value =
-                            self.objects.get(*abstract_object_index).unwrap().get_value(concrete_offset, size);
+                        let value = self
+                            .objects
+                            .get(*abstract_object_index)
+                            .unwrap()
+                            .get_value(concrete_offset, size);
                         merged_value = match merged_value {
                             Some(accum) => Some(accum.merge(&value)),
                             None => Some(value),
@@ -87,7 +114,10 @@ impl AbstractObjectList {
                     None => Some(adjusted_offset),
                 }
             }
-            let object = self.objects.get_mut(*target_object_set.iter().next().unwrap()).unwrap();
+            let object = self
+                .objects
+                .get_mut(*target_object_set.iter().next().unwrap())
+                .unwrap();
             Arc::make_mut(object).set_value(value, target_offset.unwrap())?; // TODO: Write unit test whether this is correctly written to the self.objects vector!
         } else {
             // There is more than one object that the pointer may write to.
@@ -97,7 +127,13 @@ impl AbstractObjectList {
             // Get all pointer targets the object may point to
             let mut inner_targets: BTreeSet<AbstractIdentifier> = BTreeSet::new();
             for object in target_object_set.iter() {
-                inner_targets.append(&mut self.objects.get(*object).unwrap().get_all_possible_pointer_targets());
+                inner_targets.append(
+                    &mut self
+                        .objects
+                        .get(*object)
+                        .unwrap()
+                        .get_all_possible_pointer_targets(),
+                );
             }
             // Generate the new (untracked) object that all other objects are merged to
             let new_object = AbstractObject::Untracked(inner_targets);
@@ -139,7 +175,8 @@ impl AbstractObjectList {
                 merged_ids.insert(other_id.clone(), (index, offset.merge(&other_offset)));
                 if index < self.objects.len() {
                     // The object already existed in self, so we have to merge it with the object in other
-                    merged_objects[index] = Arc::new(merged_objects[index].merge(&other.objects[*other_index]));
+                    merged_objects[index] =
+                        Arc::new(merged_objects[index].merge(&other.objects[*other_index]));
                     // TODO: This is still inefficient, since we may end up merging the same objects more than once (if several ids point to it)
                 }
             } else {
@@ -171,7 +208,11 @@ impl AbstractObjectList {
         offset_adjustment: &BitvectorDomain,
     ) {
         for object in self.objects.iter_mut() {
-            Arc::make_mut(object).replace_abstract_id(old_id, new_id, &(-offset_adjustment.clone()));
+            Arc::make_mut(object).replace_abstract_id(
+                old_id,
+                new_id,
+                &(-offset_adjustment.clone()),
+            );
         }
         if let Some((index, offset)) = self.ids.get(old_id) {
             let index = *index;
@@ -255,18 +296,45 @@ impl AbstractObjectList {
 
     /// Mark a memory object as already freed (i.e. pointers to it are dangling).
     /// If the object cannot be identified uniquely, all possible targets are marked as having an unknown status.
-    pub fn mark_mem_object_as_freed(&mut self, object_pointer: &PointerDomain) {
+    pub fn mark_mem_object_as_freed(
+        &mut self,
+        object_pointer: &PointerDomain,
+    ) -> Result<(), Vec<AbstractIdentifier>> {
         let ids = object_pointer.get_target_ids();
+        let mut possible_double_free_ids = Vec::new();
         if ids.len() > 1 {
             for id in ids {
                 let object = &mut self.objects[self.ids[&id].0];
+                if let AbstractObject::Memory(tracked_mem) = Arc::deref(object) {
+                    if (tracked_mem.state != Some(ObjectState::Alive) && tracked_mem.is_unique)
+                        || tracked_mem.state == Some(ObjectState::Dangling)
+                    {
+                        // Possible double free detected
+                        // TODO: Check rate of false positives.
+                        // If too high, only mark those with explicit dangling state.
+                        possible_double_free_ids.push(id.clone());
+                    }
+                }
                 Arc::make_mut(object).set_state(None);
             }
         } else {
             if let Some(id) = ids.iter().next() {
                 let object = &mut self.objects[self.ids[&id].0];
+                if let AbstractObject::Memory(tracked_mem) = Arc::deref(object) {
+                    if tracked_mem.state != Some(ObjectState::Alive) {
+                        // Possible double free detected
+                        // TODO: Check rate of false positives.
+                        // If too high, only mark those with explicit dangling state.
+                        possible_double_free_ids.push(id.clone());
+                    }
+                }
                 Arc::make_mut(object).set_state(Some(ObjectState::Dangling));
             }
+        }
+        if possible_double_free_ids.is_empty() {
+            return Ok(());
+        } else {
+            return Err(possible_double_free_ids);
         }
     }
 
@@ -302,13 +370,17 @@ impl AbstractObjectList {
         use serde_json::*;
         let mut object_list = Vec::new();
         for (index, object) in self.objects.iter().enumerate() {
-            let id_list: Vec<Value> = self.ids.iter().filter_map(|(id, (obj_index, offset))| {
-                if *obj_index == index {
-                    Some(Value::String(format!("{}:{}", id, offset)))
-                } else {
-                    None
-                }
-            }).collect();
+            let id_list: Vec<Value> = self
+                .ids
+                .iter()
+                .filter_map(|(id, (obj_index, offset))| {
+                    if *obj_index == index {
+                        Some(Value::String(format!("{}:{}", id, offset)))
+                    } else {
+                        None
+                    }
+                })
+                .collect();
             let id_list = Value::Array(id_list);
             let mut obj_map = Map::new();
             obj_map.insert("ids".into(), id_list);
@@ -348,50 +420,121 @@ mod tests {
         assert_eq!(*obj_list.ids.values().next().unwrap(), (0, bv(0)));
 
         let pointer = PointerDomain::new(new_id("RSP".into()), bv(8));
-        obj_list.set_value(pointer.clone(), Data::Value(bv(42))).unwrap();
-        assert_eq!(obj_list.get_value(&Data::Pointer(pointer.clone()), 64).unwrap(), Data::Value(bv(42)));
+        obj_list
+            .set_value(pointer.clone(), Data::Value(bv(42)))
+            .unwrap();
+        assert_eq!(
+            obj_list
+                .get_value(&Data::Pointer(pointer.clone()), 64)
+                .unwrap(),
+            Data::Value(bv(42))
+        );
 
         let mut other_obj_list = AbstractObjectList::from_stack_id(new_id("RSP".into()), 64);
         let second_pointer = PointerDomain::new(new_id("RSP".into()), bv(-8));
-        other_obj_list.set_value(pointer.clone(), Data::Value(bv(42))).unwrap();
-        other_obj_list.set_value(second_pointer.clone(), Data::Value(bv(35))).unwrap();
-        assert_eq!(other_obj_list.get_value(&Data::Pointer(second_pointer.clone()), 64).unwrap(), Data::Value(bv(35)));
+        other_obj_list
+            .set_value(pointer.clone(), Data::Value(bv(42)))
+            .unwrap();
+        other_obj_list
+            .set_value(second_pointer.clone(), Data::Value(bv(35)))
+            .unwrap();
+        assert_eq!(
+            other_obj_list
+                .get_value(&Data::Pointer(second_pointer.clone()), 64)
+                .unwrap(),
+            Data::Value(bv(35))
+        );
 
         other_obj_list.add_abstract_object(new_id("RAX".into()), bv(0), ObjectType::Heap, 64);
         let heap_pointer = PointerDomain::new(new_id("RAX".into()), bv(8));
-        other_obj_list.set_value(heap_pointer.clone(), Data::Value(bv(3))).unwrap();
+        other_obj_list
+            .set_value(heap_pointer.clone(), Data::Value(bv(3)))
+            .unwrap();
 
         let mut merged = obj_list.merge(&other_obj_list);
-        assert_eq!(merged.get_value(&Data::Pointer(pointer.clone()), 64).unwrap(), Data::Value(bv(42)));
-        assert_eq!(merged.get_value(&Data::Pointer(second_pointer.clone()), 64).unwrap(), Data::new_top(64));
-        assert_eq!(merged.get_value(&Data::Pointer(heap_pointer.clone()), 64).unwrap(), Data::Value(bv(3)));
+        assert_eq!(
+            merged
+                .get_value(&Data::Pointer(pointer.clone()), 64)
+                .unwrap(),
+            Data::Value(bv(42))
+        );
+        assert_eq!(
+            merged
+                .get_value(&Data::Pointer(second_pointer.clone()), 64)
+                .unwrap(),
+            Data::new_top(64)
+        );
+        assert_eq!(
+            merged
+                .get_value(&Data::Pointer(heap_pointer.clone()), 64)
+                .unwrap(),
+            Data::Value(bv(3))
+        );
         assert_eq!(merged.objects.len(), 2);
         assert_eq!(merged.ids.len(), 2);
 
-        merged.set_value(pointer.merge(&heap_pointer), Data::Value(bv(3))).unwrap();
-        assert_eq!(merged.get_value(&Data::Pointer(pointer.clone()), 64).unwrap(), Data::new_top(64));
+        merged
+            .set_value(pointer.merge(&heap_pointer), Data::Value(bv(3)))
+            .unwrap();
+        assert_eq!(
+            merged
+                .get_value(&Data::Pointer(pointer.clone()), 64)
+                .unwrap(),
+            Data::new_top(64)
+        );
         // assert_eq!(merged.get_value(&Data::Pointer(heap_pointer.clone()), 64).unwrap(), Data::Value(bv(3)));
         assert_eq!(merged.objects.len(), 1); // This will fail in the future when the set_value function does no automatic merging to untracked objects anymore.
 
-        other_obj_list.set_value(pointer.clone(), Data::Pointer(heap_pointer.clone())).unwrap();
-        assert_eq!(other_obj_list.get_referenced_ids(&new_id("RSP".into())).len(), 1);
-        assert_eq!(*other_obj_list.get_referenced_ids(&new_id("RSP".into())).iter().next().unwrap(), new_id("RAX".into()));
+        other_obj_list
+            .set_value(pointer.clone(), Data::Pointer(heap_pointer.clone()))
+            .unwrap();
+        assert_eq!(
+            other_obj_list
+                .get_referenced_ids(&new_id("RSP".into()))
+                .len(),
+            1
+        );
+        assert_eq!(
+            *other_obj_list
+                .get_referenced_ids(&new_id("RSP".into()))
+                .iter()
+                .next()
+                .unwrap(),
+            new_id("RAX".into())
+        );
 
         let modified_heap_pointer = PointerDomain::new(new_id("ID2".into()), bv(8));
         other_obj_list.replace_abstract_id(&new_id("RAX".into()), &new_id("ID2".into()), &bv(0));
-        assert_eq!(other_obj_list.get_value(&Data::Pointer(pointer.clone()), 64).unwrap(), Data::Pointer(modified_heap_pointer.clone()));
+        assert_eq!(
+            other_obj_list
+                .get_value(&Data::Pointer(pointer.clone()), 64)
+                .unwrap(),
+            Data::Pointer(modified_heap_pointer.clone())
+        );
         assert_eq!(other_obj_list.ids.get(&new_id("RAX".into())), None);
-        assert!(matches!(other_obj_list.ids.get(&new_id("ID2".into())), Some(_)));
+        assert!(matches!(
+            other_obj_list.ids.get(&new_id("ID2".into())),
+            Some(_)
+        ));
 
         let mut ids_to_keep = BTreeSet::new();
         ids_to_keep.insert(new_id("ID2".into()));
         other_obj_list.remove_unused_ids(&ids_to_keep);
         assert_eq!(other_obj_list.objects.len(), 1);
         assert_eq!(other_obj_list.ids.len(), 1);
-        assert_eq!(other_obj_list.ids.iter().next().unwrap(), (&new_id("ID2".into()), &(0, bv(0))));
+        assert_eq!(
+            other_obj_list.ids.iter().next().unwrap(),
+            (&new_id("ID2".into()), &(0, bv(0)))
+        );
 
-        assert_eq!(other_obj_list.objects[0].get_state(), Some(crate::analysis::pointer_inference::object::ObjectState::Alive));
+        assert_eq!(
+            other_obj_list.objects[0].get_state(),
+            Some(crate::analysis::pointer_inference::object::ObjectState::Alive)
+        );
         other_obj_list.mark_mem_object_as_freed(&modified_heap_pointer);
-        assert_eq!(other_obj_list.objects[0].get_state(), Some(crate::analysis::pointer_inference::object::ObjectState::Dangling));
+        assert_eq!(
+            other_obj_list.objects[0].get_state(),
+            Some(crate::analysis::pointer_inference::object::ObjectState::Dangling)
+        );
     }
 }
