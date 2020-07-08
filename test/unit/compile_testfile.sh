@@ -4,7 +4,7 @@ tmp="$HOME/cwe_checker/test/unit/tmp/"
 
 # create a tmp directory if not yet created
 if [ ! -d $tmp ]; then
-  mkdir -p $tmp;
+  mkdir -p -m 777 $tmp;
 fi
 
 
