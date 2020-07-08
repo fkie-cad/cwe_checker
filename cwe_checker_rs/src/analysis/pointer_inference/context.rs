@@ -5,7 +5,7 @@ use crate::bil::{Expression, Variable};
 use crate::prelude::*;
 use crate::term::symbol::ExternSymbol;
 use crate::term::*;
-use crate::utils::log::CweWarning;
+use crate::utils::log::*;
 use petgraph::graph::NodeIndex;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
@@ -18,10 +18,11 @@ pub struct Context<'a> {
     pub project: &'a Project,
     pub extern_symbol_map: BTreeMap<Tid, &'a ExternSymbol>,
     pub cwe_collector: crossbeam_channel::Sender<CweWarning>,
+    pub log_collector: crossbeam_channel::Sender<LogMessage>,
 }
 
 impl<'a> Context<'a> {
-    pub fn new(project: &Project, cwe_collector: crossbeam_channel::Sender<CweWarning>) -> Context {
+    pub fn new(project: &Project, cwe_collector: crossbeam_channel::Sender<CweWarning>, log_collector: crossbeam_channel::Sender<LogMessage>) -> Context {
         let mut extern_symbol_map = BTreeMap::new();
         for symbol in project.program.term.extern_symbols.iter() {
             extern_symbol_map.insert(symbol.tid.clone(), symbol);
@@ -40,55 +41,7 @@ impl<'a> Context<'a> {
             project,
             extern_symbol_map,
             cwe_collector,
-        }
-    }
-
-    fn clear_stack_parameter(&self, state: &mut State, extern_call: &ExternSymbol) {
-        for arg in &extern_call.arguments {
-            match &arg.location {
-                Expression::Var(_) => {}
-                location_expression => {
-                    let arg_size = arg
-                        .var
-                        .bitsize()
-                        .expect("Encountered argument with unknown size");
-                    let data_top = Data::new_top(arg_size);
-                    *state = self.write_to_address(state, location_expression, data_top);
-                }
-            }
-        }
-    }
-
-    /// Write the value given by data to the address one gets when evaluating the address expression.
-    /// Return the modified state.
-    fn write_to_address(&self, state: &State, address: &Expression, data: Data) -> State {
-        if let Ok(Data::Pointer(pointer)) = state.eval(address) {
-            let mut state = state.clone();
-            state.store_value(&Data::Pointer(pointer), &data);
-            return state;
-        } else {
-            // TODO: Implement proper error handling here.
-            // Depending on the separation logic, the alternative to not changing the state would be to invaluate all knowledge about memory here.
-            return state.clone();
-        }
-    }
-
-    /// Evaluate the given store expression on the given state and return the resulting state.
-    fn handle_store_exp(&self, state: &State, store_exp: &Expression) -> State {
-        if let Expression::Store {
-            memory: _,
-            address,
-            value,
-            endian: _,
-            size,
-        } = store_exp
-        {
-            let data = state.eval(value).unwrap_or(Data::new_top(*size));
-            assert_eq!(data.bitsize(), *size);
-            // TODO: At the moment, both memory and endianness are ignored. Change that!
-            return self.write_to_address(state, address, data);
-        } else {
-            panic!("Expected store expression")
+            log_collector
         }
     }
 
@@ -124,6 +77,17 @@ impl<'a> Context<'a> {
             ..state.clone()
         }
     }
+
+    pub fn log_debug<'_lt>(&self, result: Result<(), Error>, location: Option<&'_lt Tid>) {
+        if let Err(err) = result {
+            let log_message = LogMessage {
+                text: format!("Pointer Inference: {}", err),
+                level: LogLevel::Debug,
+                location: location.cloned(),
+            };
+            self.log_collector.send(log_message).unwrap();
+        }
+    }
 }
 
 impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> {
@@ -153,7 +117,11 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
         }
         // TODO: handle loads in the right hand side expression for their side effects!
         match &def.term.rhs {
-            Expression::Store { .. } => self.handle_store_exp(state, &def.term.rhs),
+            Expression::Store { .. } => {
+                let mut state = state.clone();
+                self.log_debug(state.handle_store_exp(&def.term.rhs), Some(&def.tid));
+                state
+            },
             Expression::IfThenElse {
                 condition,
                 true_exp,
@@ -161,12 +129,16 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
             } => {
                 // IfThenElse needs special handling, because it may encode conditional store instructions.
                 let true_state = if let Expression::Store { .. } = **true_exp {
-                    self.handle_store_exp(state, true_exp)
+                    let mut true_state = state.clone();
+                    self.log_debug(true_state.handle_store_exp(true_exp), Some(&def.tid));
+                    true_state
                 } else {
                     self.handle_register_assign(state, &def.term.lhs, true_exp)
                 };
                 let false_state = if let Expression::Store { .. } = **false_exp {
-                    self.handle_store_exp(state, false_exp)
+                    let mut false_state = state.clone();
+                    self.log_debug(false_state.handle_store_exp(false_exp), Some(&def.tid));
+                    false_state
                 } else {
                     self.handle_register_assign(state, &def.term.lhs, false_exp)
                 };
@@ -411,7 +383,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
                             }
                         }
                         _ => {
-                            self.clear_stack_parameter(&mut new_state, extern_symbol);
+                            self.log_debug(new_state.clear_stack_parameter(extern_symbol), Some(&call.tid));
                             let mut possible_referenced_ids = BTreeSet::new();
                             if extern_symbol.arguments.len() == 0 {
                                 // TODO: We assume here that we do not know the parameters and approximate them by all parameter registers.
@@ -579,7 +551,8 @@ mod tests {
 
         let project = mock_project();
         let (cwe_sender, _cwe_receiver) = crossbeam_channel::unbounded();
-        let context = Context::new(&project, cwe_sender);
+        let (log_sender, _log_receiver) = crossbeam_channel::unbounded();
+        let context = Context::new(&project, cwe_sender, log_sender);
         let mut state = State::new(&register("RSP"), Tid::new("main"));
 
         let def = Term {

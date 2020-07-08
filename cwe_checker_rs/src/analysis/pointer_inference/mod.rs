@@ -1,7 +1,7 @@
 use super::interprocedural_fixpoint::{Computation, NodeValue};
 use crate::prelude::*;
 use crate::term::*;
-use crate::utils::log::CweWarning;
+use crate::utils::log::*;
 use petgraph::graph::NodeIndex;
 use std::collections::HashMap;
 
@@ -20,8 +20,8 @@ pub struct PointerInference<'a> {
 }
 
 impl<'a> PointerInference<'a> {
-    pub fn new(project: &'a Project, cwe_sender: crossbeam_channel::Sender<CweWarning>) -> PointerInference<'a> {
-        let context = Context::new(project, cwe_sender);
+    pub fn new(project: &'a Project, cwe_sender: crossbeam_channel::Sender<CweWarning>, log_sender: crossbeam_channel::Sender<LogMessage>) -> PointerInference<'a> {
+        let context = Context::new(project, cwe_sender, log_sender);
 
         let mut entry_sub_to_entry_blocks_map = HashMap::new();
         let subs: HashMap<Tid, &Term<Sub>> = project
@@ -108,14 +108,16 @@ impl<'a> PointerInference<'a> {
     }
 }
 
-pub fn run(project: &Project, print_debug: bool) -> Vec<CweWarning> {
+pub fn run(project: &Project, print_debug: bool) -> (Vec<CweWarning>, Vec<String>) {
     let (cwe_sender, cwe_receiver) = crossbeam_channel::unbounded();
+    let (log_sender, log_receiver) = crossbeam_channel::unbounded();
 
     let warning_collector_thread = std::thread::spawn(move || {collect_cwe_warnings(cwe_receiver)});
+    let log_collector_thread = std::thread::spawn(move || {collect_logs(log_receiver)});
 
     {   // Scope the computation object so that it is dropped before the warning collector thread is joined.
         // Else the warning collector thread will not terminate (the cwe_sender needs to be dropped for it to terminate).
-        let mut computation = PointerInference::new(project, cwe_sender);
+        let mut computation = PointerInference::new(project, cwe_sender, log_sender);
 
         computation.compute();
         if print_debug {
@@ -123,7 +125,7 @@ pub fn run(project: &Project, print_debug: bool) -> Vec<CweWarning> {
         }
     }
     // Return the CWE warnings
-    warning_collector_thread.join().unwrap()
+    (warning_collector_thread.join().unwrap(), log_collector_thread.join().unwrap())
 }
 
 fn collect_cwe_warnings(receiver: crossbeam_channel::Receiver<CweWarning>) -> Vec<CweWarning> {
@@ -135,4 +137,17 @@ fn collect_cwe_warnings(receiver: crossbeam_channel::Receiver<CweWarning>) -> Ve
         }
     }
     collected_warnings.drain().map(|(_key, value)| {value}).collect()
+}
+
+fn collect_logs(receiver: crossbeam_channel::Receiver<LogMessage>) -> Vec<String> {
+    let mut logs_with_address = HashMap::new();
+    let mut general_logs = Vec::new();
+    while let Ok(log_message) = receiver.recv() {
+        if let Some(ref tid) = log_message.location {
+            logs_with_address.insert(tid.address.clone(), log_message);
+        } else {
+            general_logs.push(log_message);
+        }
+    }
+    logs_with_address.values().cloned().chain(general_logs.into_iter()).map(|msg| {msg.to_string()}).collect()
 }

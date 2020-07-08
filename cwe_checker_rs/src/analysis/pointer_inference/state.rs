@@ -5,6 +5,7 @@ use super::object_list::AbstractObjectList;
 use super::identifier::{AbstractIdentifier, AbstractLocation};
 use crate::bil::*;
 use crate::analysis::abstract_domain::*;
+use crate::term::symbol::ExternSymbol;
 
 /// This struct contains all information known about the state at a specific point of time.
 ///
@@ -127,6 +128,60 @@ impl State {
             // Needs implementation of reads from global data first.
             return Err(anyhow!("Memory write to non-pointer data"));
         }
+    }
+
+    /// Write a value to the address one gets when evaluating the address expression.
+    pub fn write_to_address(&mut self, address: &Expression, value: &Data) -> Result<(), Error> {
+        // TODO: Depending on the separation logic, some memory may need to be invalidated in the error case.
+        match self.eval(address) {
+            Ok(address_data) => self.store_value(&address_data, value),
+            Err(err) => Err(err)
+        }
+    }
+
+    /// Evaluate the given store expression on the given state and return the resulting state.
+    ///
+    /// The function panics if given anything else than a store expression.
+    pub fn handle_store_exp(&mut self, store_exp: &Expression) -> Result<(), Error> {
+        if let Expression::Store {
+            memory: _,
+            address,
+            value,
+            endian: _,
+            size,
+        } = store_exp
+        {
+            let data = self.eval(value).unwrap_or(Data::new_top(*size));
+            assert_eq!(data.bitsize(), *size);
+            // TODO: At the moment, both memory and endianness are ignored. Change that!
+            return self.write_to_address(address, &data);
+        } else {
+            panic!("Expected store expression")
+        }
+    }
+
+    /// Mark those parameter values of an extern function call, that are passed on the stack,
+    /// as unknown data (since the function may modify them).
+    pub fn clear_stack_parameter(&mut self, extern_call: &ExternSymbol) -> Result<(), Error> {
+        // TODO: This needs a unit test to check whether stack parameters are cleared as expected!
+        let mut result_log = Ok(());
+        for arg in &extern_call.arguments {
+            match &arg.location {
+                Expression::Var(_) => {}
+                location_expression => {
+                    let arg_size = arg
+                        .var
+                        .bitsize()
+                        .expect("Encountered argument with unknown size");
+                    let data_top = Data::new_top(arg_size);
+                    if let Err(err) = self.write_to_address(location_expression, &data_top) {
+                        result_log = Err(err);
+                    }
+                }
+            }
+        }
+        // We only return the last error encountered.
+        return result_log;
     }
 
     /// merge two states
