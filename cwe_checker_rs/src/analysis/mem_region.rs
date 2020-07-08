@@ -144,7 +144,11 @@ impl<T: AbstractDomain + ValueDomain + std::fmt::Debug> MemRegionData<T> {
         assert!(size_in_bytes > 0);
 
         self.clear_interval(position, size_in_bytes);
-        self.values.insert(position, value);
+        if !value.is_top() {
+            // top()-values do not need to be explicitly saved, as they don't contain any information anyway.
+            self.values.insert(position, value);
+        }
+
     }
 
     /// Get the value at the given position.
@@ -201,7 +205,11 @@ impl<T: AbstractDomain + ValueDomain + std::fmt::Debug> MemRegionData<T> {
             if let Some((_pos_right, elem_right)) = other.values.get_key_value(pos_left) {
                 if elem_left.bitsize() == elem_right.bitsize() {
                     let merged_val = elem_left.merge(&elem_right);
-                    merged_values.insert(*pos_left, merged_val);
+                    if !merged_val.is_top() {
+                        // we discard top()-values, as they don't contain information
+                        merged_values.insert(*pos_left, merged_val);
+                    }
+
                 }
             }
         }
@@ -270,5 +278,20 @@ mod tests {
         assert_eq!(merged_region.get(bv(-3), 11), MockDomain::new_top(11*8));
         other_region.add(mock(9, 11*8), bv(-3));
         assert_eq!(region, other_region);
+    }
+
+    #[test]
+    fn do_not_save_top_elements() {
+        let mut region: MemRegionData<MockDomain> = MemRegionData::new(64);
+        region.add(MockDomain::new_top(4*8), bv(5));
+        assert_eq!(region.values.len(), 0);
+
+        let mut other_region: MemRegionData<MockDomain> = MemRegionData::new(64);
+        region.add(mock(5, 4*8), bv(5));
+        other_region.add(mock(7, 4*8), bv(5));
+        let merged_region = region.merge(&other_region);
+        assert_eq!(region.values.len(), 1);
+        assert_eq!(other_region.values.len(), 1);
+        assert_eq!(merged_region.values.len(), 0);
     }
 }
