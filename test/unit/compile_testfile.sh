@@ -1,6 +1,6 @@
 #!/bin/bash
 
-tmp="$HOME/cwe_checker/test/unit/tmp/"
+tmp="tmp/"
 
 # create a tmp directory if not yet created
 if [ ! -d $tmp ]; then
