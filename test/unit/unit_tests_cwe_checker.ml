@@ -5,9 +5,6 @@
    To add an unit test and the corresponding test file,
    a few steps have to be performed before execution:
 
-   - add the parameter for your unit test to the input_test_map in this module:
-     the key contains the parameter name and the value is the name of the test
-
    - add the test list from your unit test to unit_test_list in this module
 
    - if your unit test utilises a example project, it has to be added to the set_example_project
@@ -27,69 +24,54 @@ open Core_kernel
 include Self()
 
 let cmdline_params = [
-  ("partial", "Comma separated list defining which tests should be executed with the current test file. e.g. MemRegion,TypeInference,CWE476,...")
-]
-
-
-let input_test_map = Map.of_alist_exn (module String) [
-  "MemRegion", "Mem_region_tests";
-  "TypeInference", "Type_inference_tests";
-  "CWE476", "CWE_476_tests";
-  "CWE560", "CWE_560_tests";
-  "AddrTrans", "Address_translation_tests";
-  "Cconv", "Cconv_tests"
+  ("tests", "Comma separated list defining which tests should be executed with the current test file. e.g. MemRegion,TypeInference,CWE476,...")
 ]
 
 let unit_test_list = [
-  "Mem_region_tests", Mem_region_test.tests;
-  "Type_inference_tests", Type_inference_test.tests;
-  "Cconv_tests", Cconv_test.tests;
-  "CWE_476_tests", Cwe_476_test.tests;
-  "CWE_560_tests", Cwe_560_test.tests;
-  "Address_translation_tests", Address_translation_test.tests;
+  "MemRegion", Mem_region_test.tests;
+  "TypeInference", Type_inference_test.tests;
+  "Cconv", Cconv_test.tests;
+  "CWE476", Cwe_476_test.tests;
+  "CWE560", Cwe_560_test.tests;
+  "AddrTrans", Address_translation_test.tests;
 ]
 
 
 let set_example_project (project : Project.t) (tests : string list) =
   List.iter tests ~f:(fun test ->
     match test with
-    | "Type_inference_tests" -> Type_inference_test.example_project := Some(project)
-    | "Cconv_tests" -> Cconv_test.example_project := Some(project)
-    | "CWE_476_tests" -> Cwe_476_test.example_project := Some(project)
+    | "TypeInference" -> Type_inference_test.example_project := Some(project)
+    | "Cconv" -> Cconv_test.example_project := Some(project)
+    | "CWE476" -> Cwe_476_test.example_project := Some(project)
     | _ -> ()
   )
 
 
-let full_run (project : Project.t) =
-  set_example_project project (List.map unit_test_list ~f:(fun test -> match test with (key, _) -> key));
-  Alcotest.run "Unit tests" ~argv:[|"DoNotComplainWhenRunAsABapPlugin";"--color=always";|] unit_test_list
-
-let partial_run (project : Project.t) (tests : string list) =
-  set_example_project project tests;
-  Alcotest.run "Unit tests" ~argv:[|"DoNotComplainWhenRunAsABapPlugin";"--color=always";|]
-    (List.filter unit_test_list ~f:(fun (name, _) ->
-       match Stdlib.List.mem name tests with
-       | true -> true
-       | false -> false
-     ))
+let check_user_input (tests : string list) =
+  let test_list = List.map unit_test_list ~f:(fun test -> match test with (name, _) -> name) in
+  List.iter tests ~f:(fun test ->
+    match Stdlib.List.mem test test_list with
+    | true -> ()
+    | false -> failwith (Printf.sprintf "Test %s is not a valid test." test)
+  )
 
 
-let check_and_translate_input (tests : string list) : string list =
-  List.map tests ~f:(fun test ->
-    match String.Map.find input_test_map test with
-    | Some(tst) -> tst
-    | None -> failwith (Printf.sprintf "Test: %s is invalid." test)
+let filter_tests (tests : string list) : (string * unit Alcotest.test_case list) list =
+  List.filter unit_test_list ~f:(fun (name, _) ->
+     match Stdlib.List.mem name tests with
+     | true -> true
+     | false -> false
   )
 
 
 let run_tests (params : String.t String.Map.t) (project : Project.t) =
-  let tests = String.Map.find_exn params "partial" in
-  match tests with
-  | "" -> full_run project
-  | _  -> begin
-      let test_ids = check_and_translate_input (String.split tests ~on: ',') in
-      partial_run project test_ids
-    end
+  let test_param = match String.Map.find params "tests" with
+  | Some(param) -> param
+  | None -> failwith "No tests were provided to the unittest plugin." in
+  let tests = (String.split test_param ~on: ',') in
+  check_user_input tests;
+  set_example_project project tests;
+  Alcotest.run "Unit tests" ~argv:[|"DoNotComplainWhenRunAsABapPlugin";"--color=always";|] (filter_tests tests)
 
 
 let generate_bap_params params =
