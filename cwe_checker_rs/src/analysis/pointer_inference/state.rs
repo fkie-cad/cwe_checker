@@ -1,11 +1,11 @@
-use crate::prelude::*;
-use std::collections::{BTreeMap, BTreeSet};
 use super::data::*;
-use super::object_list::AbstractObjectList;
 use super::identifier::{AbstractIdentifier, AbstractLocation};
-use crate::bil::*;
+use super::object_list::AbstractObjectList;
 use crate::analysis::abstract_domain::*;
+use crate::bil::*;
+use crate::prelude::*;
 use crate::term::symbol::ExternSymbol;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// This struct contains all information known about the state at a specific point of time.
 ///
@@ -20,7 +20,7 @@ use crate::term::symbol::ExternSymbol;
 /// This way we can distinguish caller stack frames even if one function calls another several times.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct State {
-    pub register: BTreeMap<Variable, Data>,
+    register: BTreeMap<Variable, Data>,
     pub memory: AbstractObjectList,
     pub stack_id: AbstractIdentifier,
     pub caller_ids: BTreeSet<AbstractIdentifier>,
@@ -30,59 +30,173 @@ impl State {
     /// Create a new state that contains only one memory object corresponding to the stack.
     /// The stack offset will be set to zero.
     pub fn new(stack_register: &Variable, function_tid: Tid) -> State {
-        let stack_id = AbstractIdentifier::new(function_tid, AbstractLocation::from_var(stack_register).unwrap());
+        let stack_id = AbstractIdentifier::new(
+            function_tid,
+            AbstractLocation::from_var(stack_register).unwrap(),
+        );
         let mut register: BTreeMap<Variable, Data> = BTreeMap::new();
-        register.insert(stack_register.clone(), PointerDomain::new(stack_id.clone(), Bitvector::zero((stack_register.bitsize().unwrap() as usize).into()).into()).into());
+        register.insert(
+            stack_register.clone(),
+            PointerDomain::new(
+                stack_id.clone(),
+                Bitvector::zero((stack_register.bitsize().unwrap() as usize).into()).into(),
+            )
+            .into(),
+        );
         State {
             register,
-            memory: AbstractObjectList::from_stack_id(stack_id.clone(), stack_register.bitsize().unwrap()),
+            memory: AbstractObjectList::from_stack_id(
+                stack_id.clone(),
+                stack_register.bitsize().unwrap(),
+            ),
             stack_id,
             caller_ids: BTreeSet::new(),
         }
+    }
+
+    /// Get the value of a register or Top() if no value is known.
+    ///
+    /// Returns an error if the variable is not a register.
+    pub fn get_register(&self, variable: &Variable) -> Result<Data, Error> {
+        if let Some(data) = self.register.get(variable) {
+            Ok(data.clone())
+        } else {
+            Ok(Data::new_top(variable.bitsize()?))
+        }
+    }
+
+    /// Get the value of a register by its name.
+    ///
+    /// Returns None if no value is set for the register.
+    pub fn get_register_by_name(&self, reg_name: &str) -> Option<Data> {
+        self.register.iter().find_map(|(key, value)| {
+            if key.name == reg_name {
+                Some(value.clone())
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Set the value of a register.
+    ///
+    /// Returns an error if the variable is not a register.
+    pub fn set_register(&mut self, variable: &Variable, value: Data) -> Result<(), Error> {
+        if let variable::Type::Immediate(_bitsize) = variable.type_ {
+            if !value.is_top() {
+                self.register.insert(variable.clone(), value);
+            } else {
+                self.register.remove(variable);
+            }
+            Ok(())
+        } else {
+            return Err(anyhow!("Variable is not a register type"));
+        }
+    }
+
+    /// Evaluate expression on the given state and write the result to the target register.
+    pub fn handle_register_assign(
+        &mut self,
+        target: &Variable,
+        expression: &Expression,
+    ) -> Result<(), Error> {
+        if let Expression::Var(variable) = expression {
+            if target == variable {
+                // The assign does nothing. Occurs as "do nothing"-path in conditional stores.
+                // Needs special handling, since it is the only case where the target is allowed
+                // to denote memory instead of a register.
+                return Ok(());
+            }
+        }
+        match self.eval(expression) {
+            Ok(new_value) => {
+                self.set_register(target, new_value)?;
+                Ok(())
+            }
+            Err(err) => {
+                self.set_register(target, Data::new_top(target.bitsize()?))?;
+                Err(err)
+            }
+        }
+    }
+
+    /// Clear all non-callee-saved registers from the state.
+    /// This automatically also removes all virtual registers.
+    /// The parameter is a list of callee-saved register names.
+    pub fn clear_non_callee_saved_register(&mut self, callee_saved_register_names: &[String]) {
+        let register = self
+            .register
+            .iter()
+            .filter_map(|(register, value)| {
+                if callee_saved_register_names
+                    .iter()
+                    .find(|reg_name| **reg_name == register.name)
+                    .is_some()
+                {
+                    Some((register.clone(), value.clone()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        self.register = register;
     }
 
     /// evaluate the value of an expression in the current state
     pub fn eval(&self, expression: &Expression) -> Result<Data, Error> {
         use Expression::*;
         match expression {
-            Var(variable) => {
-                if let Some(data) = self.register.get(&variable) {
-                    Ok(data.clone())
-                } else {
-                    Ok(Data::new_top(variable.bitsize()?))
-                }
-            },
-            Const(bitvector) => {
-                Ok(Data::bitvector(bitvector.clone()))
-            },
+            Var(variable) => self.get_register(&variable),
+            Const(bitvector) => Ok(Data::bitvector(bitvector.clone())),
             // TODO: implement handling of endianness for loads and writes!
-            Load{memory: _, address, endian: _, size} => Ok(self.memory.get_value(&self.adjust_pointer_for_read(&self.eval(address)?), *size)?),
-            Store{..} => {
+            Load {
+                memory: _,
+                address,
+                endian: _,
+                size,
+            } => Ok(self
+                .memory
+                .get_value(&self.adjust_pointer_for_read(&self.eval(address)?), *size)?),
+            Store { .. } => {
                 // This does not return an error, but panics outright.
                 // If this would return an error, it would hide a side effect, which is not allowed to happen.
                 panic!("Store expression cannot be evaluated!")
-            },
-            BinOp{op, lhs, rhs} => {
+            }
+            BinOp { op, lhs, rhs } => {
                 if *op == crate::bil::BinOpType::XOR && lhs == rhs {
                     // TODO: implement bitsize() for expressions to remove the state.eval(lhs) hack
-                    return Ok(Data::Value(BitvectorDomain::Value(Bitvector::zero(apint::BitWidth::new(self.eval(lhs)?.bitsize() as usize)?))));
+                    return Ok(Data::Value(BitvectorDomain::Value(Bitvector::zero(
+                        apint::BitWidth::new(self.eval(lhs)?.bitsize() as usize)?,
+                    ))));
                 }
                 let (left, right) = (self.eval(lhs)?, self.eval(rhs)?);
                 Ok(left.bin_op(*op, &right))
-            },
-            UnOp{op, arg} => Ok(self.eval(arg)?.un_op(*op)),
-            Cast{kind, width, arg} => Ok(self.eval(arg)?.cast(*kind, *width)),
-            Let{var: _, bound_exp: _, body_exp: _} => Err(anyhow!("Let binding expression handling not implemented")),
-            Unknown{description, type_} => {
+            }
+            UnOp { op, arg } => Ok(self.eval(arg)?.un_op(*op)),
+            Cast { kind, width, arg } => Ok(self.eval(arg)?.cast(*kind, *width)),
+            Let {
+                var: _,
+                bound_exp: _,
+                body_exp: _,
+            } => Err(anyhow!("Let binding expression handling not implemented")),
+            Unknown { description, type_ } => {
                 if let crate::bil::variable::Type::Immediate(bitsize) = type_ {
                     Ok(Data::new_top(*bitsize))
                 } else {
                     Err(anyhow!("Unknown Memory operation: {}", description))
                 }
-            },
-            IfThenElse{condition: _, true_exp, false_exp} => Ok(self.eval(true_exp)?.merge(&self.eval(false_exp)?)),
-            Extract{low_bit, high_bit, arg} => Ok(self.eval(arg)?.extract(*low_bit, *high_bit)),
-            Concat{left, right} => Ok(self.eval(left)?.concat(&self.eval(right)?)),
+            }
+            IfThenElse {
+                condition: _,
+                true_exp,
+                false_exp,
+            } => Ok(self.eval(true_exp)?.merge(&self.eval(false_exp)?)),
+            Extract {
+                low_bit,
+                high_bit,
+                arg,
+            } => Ok(self.eval(arg)?.extract(*low_bit, *high_bit)),
+            Concat { left, right } => Ok(self.eval(left)?.concat(&self.eval(right)?)),
         }
     }
 
@@ -90,29 +204,69 @@ impl State {
     pub fn contains_access_of_dangling_memory(&self, expression: &Expression) -> bool {
         use Expression::*;
         match expression {
-            Var(_) | Const(_) | Unknown{..} => false,
-            Load {address: address_exp, ..} => {
+            Var(_) | Const(_) | Unknown { .. } => false,
+            Load {
+                address: address_exp,
+                ..
+            } => {
                 if let Ok(pointer) = self.eval(address_exp) {
-                    self.memory.is_dangling_pointer(&pointer) || self.contains_access_of_dangling_memory(address_exp)
+                    self.memory.is_dangling_pointer(&pointer)
+                        || self.contains_access_of_dangling_memory(address_exp)
                 } else {
                     false
                 }
-            },
-            Store { memory: _, address: address_exp, value: value_exp, .. } => {
+            }
+            Store {
+                memory: _,
+                address: address_exp,
+                value: value_exp,
+                ..
+            } => {
                 let address_check = if let Ok(pointer) = self.eval(address_exp) {
                     self.memory.is_dangling_pointer(&pointer)
                 } else {
                     false
                 };
-                address_check || self.contains_access_of_dangling_memory(address_exp) || self.contains_access_of_dangling_memory(value_exp)
+                address_check
+                    || self.contains_access_of_dangling_memory(address_exp)
+                    || self.contains_access_of_dangling_memory(value_exp)
             }
-            BinOp{op: _, lhs, rhs} => self.contains_access_of_dangling_memory(lhs) || self.contains_access_of_dangling_memory(rhs),
-            UnOp{op: _, arg} => self.contains_access_of_dangling_memory(arg),
-            Cast{kind: _, width: _, arg} => self.contains_access_of_dangling_memory(arg),
-            Let{var: _, bound_exp, body_exp} => self.contains_access_of_dangling_memory(bound_exp) || self.contains_access_of_dangling_memory(body_exp),
-            IfThenElse{condition, true_exp, false_exp} => self.contains_access_of_dangling_memory(condition) || self.contains_access_of_dangling_memory(true_exp) || self.contains_access_of_dangling_memory(false_exp),
-            Extract{low_bit: _, high_bit: _, arg} => self.contains_access_of_dangling_memory(arg),
-            Concat{left, right} => self.contains_access_of_dangling_memory(left) || self.contains_access_of_dangling_memory(right),
+            BinOp { op: _, lhs, rhs } => {
+                self.contains_access_of_dangling_memory(lhs)
+                    || self.contains_access_of_dangling_memory(rhs)
+            }
+            UnOp { op: _, arg } => self.contains_access_of_dangling_memory(arg),
+            Cast {
+                kind: _,
+                width: _,
+                arg,
+            } => self.contains_access_of_dangling_memory(arg),
+            Let {
+                var: _,
+                bound_exp,
+                body_exp,
+            } => {
+                self.contains_access_of_dangling_memory(bound_exp)
+                    || self.contains_access_of_dangling_memory(body_exp)
+            }
+            IfThenElse {
+                condition,
+                true_exp,
+                false_exp,
+            } => {
+                self.contains_access_of_dangling_memory(condition)
+                    || self.contains_access_of_dangling_memory(true_exp)
+                    || self.contains_access_of_dangling_memory(false_exp)
+            }
+            Extract {
+                low_bit: _,
+                high_bit: _,
+                arg,
+            } => self.contains_access_of_dangling_memory(arg),
+            Concat { left, right } => {
+                self.contains_access_of_dangling_memory(left)
+                    || self.contains_access_of_dangling_memory(right)
+            }
         }
     }
 
@@ -135,7 +289,7 @@ impl State {
         // TODO: Depending on the separation logic, some memory may need to be invalidated in the error case.
         match self.eval(address) {
             Ok(address_data) => self.store_value(&address_data, value),
-            Err(err) => Err(err)
+            Err(err) => Err(err),
         }
     }
 
@@ -196,13 +350,13 @@ impl State {
                     merged_register.insert(register.clone(), merged_value);
                 }
             }
-        };
+        }
         let merged_memory_objects = self.memory.merge(&other.memory);
         State {
             register: merged_register,
             memory: merged_memory_objects,
             stack_id: self.stack_id.clone(),
-            caller_ids: self.caller_ids.union(&other.caller_ids).cloned().collect()
+            caller_ids: self.caller_ids.union(&other.caller_ids).cloned().collect(),
         }
     }
 
@@ -225,18 +379,18 @@ impl State {
                                 for caller_id in self.caller_ids.iter() {
                                     new_targets.add_target(caller_id.clone(), offset.clone());
                                 }
-                                // Note that the id of the current stack frame was *not* added.
+                            // Note that the id of the current stack frame was *not* added.
                             } else {
                                 new_targets.add_target(id.clone(), offset.clone());
                             }
-                        },
+                        }
                         BitvectorDomain::Top(bitsize) => {
                             for caller_id in self.caller_ids.iter() {
                                 new_targets.add_target(caller_id.clone(), offset.clone());
                             }
                             // Note that we also add the id of the current stack frame
                             new_targets.add_target(id.clone(), offset.clone());
-                        },
+                        }
                     }
                 } else {
                     new_targets.add_target(id.clone(), offset.clone());
@@ -256,14 +410,20 @@ impl State {
     /// Then the offset_adjustment is -32.
     /// The offset_adjustment gets *added* to the base offset in self.memory.ids (so that it points to offset -32 in the memory object),
     /// while it gets *subtracted* from all pointer values (so that they still point to the same spot in the corresponding memory object).
-    pub fn replace_abstract_id(&mut self, old_id: &AbstractIdentifier, new_id: &AbstractIdentifier, offset_adjustment: &BitvectorDomain) {
+    pub fn replace_abstract_id(
+        &mut self,
+        old_id: &AbstractIdentifier,
+        new_id: &AbstractIdentifier,
+        offset_adjustment: &BitvectorDomain,
+    ) {
         // TODO: This function does not adjust stack frame/caller stack frame relations!
         // Refactor so that the corresponding logic is contained in State.
         // Else this function can be used to generate invalid state on improper use!
         for register_data in self.register.values_mut() {
             register_data.replace_abstract_id(old_id, new_id, &(-offset_adjustment.clone()));
         }
-        self.memory.replace_abstract_id(old_id, new_id, offset_adjustment);
+        self.memory
+            .replace_abstract_id(old_id, new_id, offset_adjustment);
         if &self.stack_id == old_id {
             self.stack_id = new_id.clone();
         }
@@ -286,7 +446,10 @@ impl State {
         self.memory.remove_unused_ids(&referenced_ids);
     }
 
-    pub fn add_recursively_referenced_ids_to_id_set(&self, mut ids: BTreeSet<AbstractIdentifier>) -> BTreeSet<AbstractIdentifier> {
+    pub fn add_recursively_referenced_ids_to_id_set(
+        &self,
+        mut ids: BTreeSet<AbstractIdentifier>,
+    ) -> BTreeSet<AbstractIdentifier> {
         let mut unsearched_ids = ids.clone();
         while let Some(id) = unsearched_ids.iter().next() {
             let id = id.clone();
@@ -313,7 +476,12 @@ impl State {
     /// TODO: Check whether compilers may deviate from this convention when optimizing aggressively.
     /// TODO: Also merge the memory objects!
     // TODO: write unit tests
-    pub fn merge_callee_stack_to_caller_stack(&mut self, callee_id: &AbstractIdentifier, caller_id: &AbstractIdentifier, offset_adjustment: &BitvectorDomain) {
+    pub fn merge_callee_stack_to_caller_stack(
+        &mut self,
+        callee_id: &AbstractIdentifier,
+        caller_id: &AbstractIdentifier,
+        offset_adjustment: &BitvectorDomain,
+    ) {
         self.memory.remove_object_pointer(callee_id);
         self.replace_abstract_id(callee_id, caller_id, offset_adjustment);
         // TODO: Add a check that makes sure no other ids point to the now obsolete callee stack object!
@@ -324,7 +492,10 @@ impl State {
     ///
     /// If this may cause double frees (i.e. the object in question may have been freed already),
     /// an error with the list of possibly already freed objects is returned.
-    pub fn mark_mem_object_as_freed(&mut self, object_pointer: &PointerDomain) -> Result<(),Vec<AbstractIdentifier>> {
+    pub fn mark_mem_object_as_freed(
+        &mut self,
+        object_pointer: &PointerDomain,
+    ) -> Result<(), Vec<AbstractIdentifier>> {
         self.memory.mark_mem_object_as_freed(object_pointer)
     }
 
@@ -332,9 +503,12 @@ impl State {
     /// This should only be done in cases where it is known that no virtual registers can be alive.
     /// Example: At the start of a basic block no virtual registers should be alive.
     pub fn remove_virtual_register(&mut self) {
-        self.register = self.register.clone().into_iter().filter(|(register, _value)| {
-            register.is_temp == false
-        }).collect();
+        self.register = self
+            .register
+            .clone()
+            .into_iter()
+            .filter(|(register, _value)| register.is_temp == false)
+            .collect();
     }
 }
 
@@ -342,14 +516,27 @@ impl State {
     pub fn to_json_compact(&self) -> serde_json::Value {
         use serde_json::*;
         let mut state_map = Map::new();
-        let register = self.register.iter().map(|(var, data)| {
-            (var.name.clone(), data.to_json_compact())
-        }).collect();
+        let register = self
+            .register
+            .iter()
+            .map(|(var, data)| (var.name.clone(), data.to_json_compact()))
+            .collect();
         let register = Value::Object(register);
         state_map.insert("register".into(), register);
         state_map.insert("memory".into(), self.memory.to_json_compact());
-        state_map.insert("stack_id".into(), Value::String(format!("{}", self.stack_id)));
-        state_map.insert("caller_ids".into(), Value::Array(self.caller_ids.iter().map(|id| {Value::String(format!("{}", id))}).collect()));
+        state_map.insert(
+            "stack_id".into(),
+            Value::String(format!("{}", self.stack_id)),
+        );
+        state_map.insert(
+            "caller_ids".into(),
+            Value::Array(
+                self.caller_ids
+                    .iter()
+                    .map(|id| Value::String(format!("{}", id)))
+                    .collect(),
+            ),
+        );
 
         Value::Object(state_map)
     }
@@ -377,36 +564,57 @@ mod tests {
 
     #[test]
     fn state() {
-        use crate::bil::Expression::*;
         use crate::analysis::pointer_inference::object::*;
+        use crate::bil::Expression::*;
         let mut state = State::new(&register("RSP"), Tid::new("time0"));
         let stack_id = new_id("RSP".into());
         let stack_addr = Data::Pointer(PointerDomain::new(stack_id.clone(), bv(8)));
-        state.store_value(&stack_addr, &Data::Value(bv(42))).unwrap();
+        state
+            .store_value(&stack_addr, &Data::Value(bv(42)))
+            .unwrap();
         state.register.insert(register("RSP"), stack_addr.clone());
         let load_expr = Load {
             memory: Box::new(Var(register("RSP"))), // This is wrong, but the memory var is not checked at the moment (since we have only the one for RAM)
             address: Box::new(Var(register("RSP"))),
             endian: Endianness::LittleEndian,
-            size: 64 as BitSize
+            size: 64 as BitSize,
         };
         assert_eq!(state.eval(&load_expr).unwrap(), Data::Value(bv(42)));
 
         let mut other_state = State::new(&register("RSP"), Tid::new("time0"));
         state.register.insert(register("RAX"), Data::Value(bv(42)));
-        other_state.register.insert(register("RSP"), stack_addr.clone());
-        other_state.register.insert(register("RAX"), Data::Value(bv(42)));
-        other_state.register.insert(register("RBX"), Data::Value(bv(35)));
+        other_state
+            .register
+            .insert(register("RSP"), stack_addr.clone());
+        other_state
+            .register
+            .insert(register("RAX"), Data::Value(bv(42)));
+        other_state
+            .register
+            .insert(register("RBX"), Data::Value(bv(35)));
         let merged_state = state.merge(&other_state);
         assert_eq!(merged_state.register[&register("RAX")], Data::Value(bv(42)));
         assert_eq!(merged_state.register.get(&register("RBX")), None);
         assert_eq!(merged_state.eval(&load_expr).unwrap(), Data::new_top(64));
 
         // Test pointer adjustment on reads
-        state.memory.add_abstract_object(new_id("caller".into()), bv(0), ObjectType::Stack, 64);
+        state
+            .memory
+            .add_abstract_object(new_id("caller".into()), bv(0), ObjectType::Stack, 64);
         state.caller_ids.insert(new_id("caller".into()));
-        state.store_value(&stack_addr, &Data::Value(bv(15))).unwrap();
-        assert_eq!(state.memory.get_value(&Data::Pointer(PointerDomain::new(new_id("caller".into()), bv(8))), 64).unwrap(), Data::Value(bv(15)));
+        state
+            .store_value(&stack_addr, &Data::Value(bv(15)))
+            .unwrap();
+        assert_eq!(
+            state
+                .memory
+                .get_value(
+                    &Data::Pointer(PointerDomain::new(new_id("caller".into()), bv(8))),
+                    64
+                )
+                .unwrap(),
+            Data::Value(bv(15))
+        );
         assert_eq!(state.eval(&load_expr).unwrap(), Data::Value(bv(15)));
 
         // Test replace_abstract_id
@@ -416,10 +624,30 @@ mod tests {
         assert_eq!(state.eval(&load_expr).unwrap(), Data::Value(bv(7)));
         state.replace_abstract_id(&stack_id, &new_id("callee".into()), &bv(-8));
         assert_eq!(state.eval(&load_expr).unwrap(), Data::Value(bv(7)));
-        assert_eq!(state.memory.get_value(&Data::Pointer(PointerDomain::new(new_id("callee".into()), bv(-8))), 64).unwrap(), Data::Value(bv(7)));
-        assert_eq!(state.memory.get_value(&Data::Pointer(PointerDomain::new(new_id("callee".into()), bv(-16))), 64).unwrap(), Data::new_top(64));
+        assert_eq!(
+            state
+                .memory
+                .get_value(
+                    &Data::Pointer(PointerDomain::new(new_id("callee".into()), bv(-8))),
+                    64
+                )
+                .unwrap(),
+            Data::Value(bv(7))
+        );
+        assert_eq!(
+            state
+                .memory
+                .get_value(
+                    &Data::Pointer(PointerDomain::new(new_id("callee".into()), bv(-16))),
+                    64
+                )
+                .unwrap(),
+            Data::new_top(64)
+        );
 
-        state.memory.add_abstract_object(new_id("heap_obj".into()), bv(0), ObjectType::Heap, 64);
+        state
+            .memory
+            .add_abstract_object(new_id("heap_obj".into()), bv(0), ObjectType::Heap, 64);
         assert_eq!(state.memory.get_num_objects(), 3);
         state.remove_unreferenced_objects();
         assert_eq!(state.memory.get_num_objects(), 2);

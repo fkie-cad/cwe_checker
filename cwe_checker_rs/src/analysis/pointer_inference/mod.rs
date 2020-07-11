@@ -1,26 +1,33 @@
 use super::interprocedural_fixpoint::{Computation, NodeValue};
+use crate::analysis::graph::{Graph, Node};
 use crate::prelude::*;
 use crate::term::*;
 use crate::utils::log::*;
 use petgraph::graph::NodeIndex;
-use std::collections::HashMap;
+use petgraph::visit::IntoNodeReferences;
+use petgraph::Direction;
+use std::collections::{HashMap, HashSet};
 
+mod context;
 mod data;
 mod identifier;
 mod object;
 mod object_list;
 mod state;
-mod context;
 
-use state::State;
 use context::Context;
+use state::State;
 
 pub struct PointerInference<'a> {
     computation: Computation<'a, Context<'a>>,
 }
 
 impl<'a> PointerInference<'a> {
-    pub fn new(project: &'a Project, cwe_sender: crossbeam_channel::Sender<CweWarning>, log_sender: crossbeam_channel::Sender<LogMessage>) -> PointerInference<'a> {
+    pub fn new(
+        project: &'a Project,
+        cwe_sender: crossbeam_channel::Sender<CweWarning>,
+        log_sender: crossbeam_channel::Sender<LogMessage>,
+    ) -> PointerInference<'a> {
         let context = Context::new(project, cwe_sender, log_sender);
 
         let mut entry_sub_to_entry_blocks_map = HashMap::new();
@@ -57,6 +64,7 @@ impl<'a> PointerInference<'a> {
         let mut fixpoint_computation =
             super::interprocedural_fixpoint::Computation::new(context, None);
         for (sub_tid, start_node_index) in entry_sub_to_entry_node_map.into_iter() {
+            println!("Adding entry point for {}", sub_tid); // TODO: Remove!
             fixpoint_computation.set_node_value(
                 start_node_index,
                 super::interprocedural_fixpoint::NodeValue::Value(State::new(
@@ -106,26 +114,112 @@ impl<'a> PointerInference<'a> {
     pub fn print_compact_json(&self) {
         println!("{:#}", self.generate_compact_json());
     }
+
+    pub fn get_graph(&self) -> &Graph {
+        self.computation.get_graph()
+    }
+
+    /// Add speculative entry points to the fixpoint algorithm state.
+    ///
+    /// Since indirect jumps and calls are not handled yet (TODO: change that),
+    /// the analysis may miss a *lot* of code in some cases.
+    /// To remedy this somewhat,
+    /// we mark all function starts, that are also roots in the control flow graph,
+    /// and do not have a state assigned to them yet, as additional entry points.
+    fn add_speculative_entry_points(&mut self, project: &Project) {
+        // TODO: Refactor the fixpoint computation structs, so that the project reference can be extracted from them.
+        let mut start_block_to_sub_map: HashMap<&Tid, &Term<Sub>> = HashMap::new();
+        for sub in project.program.term.subs.iter() {
+            if project
+                .program
+                .term
+                .extern_symbols
+                .iter()
+                .find(|symbol| symbol.tid == sub.tid)
+                .is_some()
+            {
+                continue; // We ignore functions marked as extern symbols.
+            }
+            if let Some(start_block) = sub.term.blocks.first() {
+                start_block_to_sub_map.insert(&start_block.tid, sub);
+            }
+        }
+        let graph = self.computation.get_graph();
+        let mut new_entry_points = Vec::new();
+        for (node_id, node) in graph.node_references() {
+            if let Node::BlkStart(block) = node {
+                if start_block_to_sub_map.get(&block.tid).is_some()
+                    && self.computation.get_node_value(node_id).is_none()
+                    && graph
+                        .neighbors_directed(node_id, Direction::Incoming)
+                        .next()
+                        .is_none()
+                {
+                    new_entry_points.push(node_id);
+                }
+            }
+        }
+        for entry in new_entry_points {
+            let sub_tid = start_block_to_sub_map
+                [&self.computation.get_graph()[entry].get_block().tid]
+                .tid
+                .clone();
+            println!("Adding speculative entry point for {}", sub_tid); // TODO: Remove!
+            self.computation.set_node_value(
+                entry,
+                super::interprocedural_fixpoint::NodeValue::Value(State::new(
+                    &project.stack_pointer_register,
+                    sub_tid,
+                )),
+            );
+        }
+    }
+
+    fn count_blocks_with_state(&self) {
+        let graph = self.computation.get_graph();
+        let mut stateful_blocks : i64 = 0;
+        let mut all_blocks : i64 = 0;
+        for (node_id, node) in graph.node_references() {
+            if let Node::BlkStart(_block) = node {
+                all_blocks += 1;
+                if self.computation.get_node_value(node_id).is_some() {
+                    stateful_blocks += 1;
+                }
+            }
+        }
+        println!("Blocks with state: {} / {}", stateful_blocks, all_blocks)
+    }
 }
 
 pub fn run(project: &Project, print_debug: bool) -> (Vec<CweWarning>, Vec<String>) {
     let (cwe_sender, cwe_receiver) = crossbeam_channel::unbounded();
     let (log_sender, log_receiver) = crossbeam_channel::unbounded();
 
-    let warning_collector_thread = std::thread::spawn(move || {collect_cwe_warnings(cwe_receiver)});
-    let log_collector_thread = std::thread::spawn(move || {collect_logs(log_receiver)});
+    let warning_collector_thread = std::thread::spawn(move || collect_cwe_warnings(cwe_receiver));
+    let log_collector_thread = std::thread::spawn(move || collect_logs(log_receiver));
 
-    {   // Scope the computation object so that it is dropped before the warning collector thread is joined.
+    {
+        // Scope the computation object so that it is dropped before the warning collector thread is joined.
         // Else the warning collector thread will not terminate (the cwe_sender needs to be dropped for it to terminate).
         let mut computation = PointerInference::new(project, cwe_sender, log_sender);
 
         computation.compute();
+        computation.count_blocks_with_state(); // TODO: Remove!
+
+        // Now compute again with speculative entry points added
+        computation.add_speculative_entry_points(project);
+        computation.compute();
+        computation.count_blocks_with_state(); // TODO: Remove!
+
         if print_debug {
             computation.print_compact_json();
         }
     }
     // Return the CWE warnings
-    (warning_collector_thread.join().unwrap(), log_collector_thread.join().unwrap())
+    (
+        warning_collector_thread.join().unwrap(),
+        log_collector_thread.join().unwrap(),
+    )
 }
 
 fn collect_cwe_warnings(receiver: crossbeam_channel::Receiver<CweWarning>) -> Vec<CweWarning> {
@@ -133,10 +227,15 @@ fn collect_cwe_warnings(receiver: crossbeam_channel::Receiver<CweWarning>) -> Ve
     while let Ok(warning) = receiver.recv() {
         match &warning.addresses[..] {
             [] => unimplemented!(),
-            [address, ..] => { collected_warnings.insert(address.clone(), warning); },
+            [address, ..] => {
+                collected_warnings.insert(address.clone(), warning);
+            }
         }
     }
-    collected_warnings.drain().map(|(_key, value)| {value}).collect()
+    collected_warnings
+        .drain()
+        .map(|(_key, value)| value)
+        .collect()
 }
 
 fn collect_logs(receiver: crossbeam_channel::Receiver<LogMessage>) -> Vec<String> {
@@ -149,5 +248,10 @@ fn collect_logs(receiver: crossbeam_channel::Receiver<LogMessage>) -> Vec<String
             general_logs.push(log_message);
         }
     }
-    logs_with_address.values().cloned().chain(general_logs.into_iter()).map(|msg| {msg.to_string()}).collect()
+    logs_with_address
+        .values()
+        .cloned()
+        .chain(general_logs.into_iter())
+        .map(|msg| msg.to_string())
+        .collect()
 }

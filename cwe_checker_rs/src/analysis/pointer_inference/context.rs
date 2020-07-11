@@ -22,7 +22,11 @@ pub struct Context<'a> {
 }
 
 impl<'a> Context<'a> {
-    pub fn new(project: &Project, cwe_collector: crossbeam_channel::Sender<CweWarning>, log_collector: crossbeam_channel::Sender<LogMessage>) -> Context {
+    pub fn new(
+        project: &Project,
+        cwe_collector: crossbeam_channel::Sender<CweWarning>,
+        log_collector: crossbeam_channel::Sender<LogMessage>,
+    ) -> Context {
         let mut extern_symbol_map = BTreeMap::new();
         for symbol in project.program.term.extern_symbols.iter() {
             extern_symbol_map.insert(symbol.tid.clone(), symbol);
@@ -41,40 +45,7 @@ impl<'a> Context<'a> {
             project,
             extern_symbol_map,
             cwe_collector,
-            log_collector
-        }
-    }
-
-    /// Evaluate expression on the given state and write the result in the target register.
-    fn handle_register_assign(
-        &self,
-        state: &State,
-        target: &Variable,
-        expression: &Expression,
-    ) -> State {
-        if let Expression::Var(variable) = expression {
-            if target == variable {
-                // The assign does nothing. Occurs as "do nothing"-path in conditional stores.
-                // Needs special handling, since it is the only case where the target is allowed
-                // to denote memory instead of a register.
-                return state.clone();
-            }
-        }
-
-        let mut register = state.register.clone();
-        // TODO: error messages while evaluating instructions are ignored at the moment.
-        // These should be somehow made visible for the user or for debug purposes
-        let new_value = state
-            .eval(&expression)
-            .unwrap_or(Data::new_top(target.bitsize().unwrap()));
-        if new_value.is_top() {
-            register.remove(&target);
-        } else {
-            register.insert(target.clone(), new_value);
-        }
-        State {
-            register,
-            ..state.clone()
+            log_collector,
         }
     }
 
@@ -111,7 +82,10 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
                 tids: vec![format!("{}", def.tid)],
                 symbols: Vec::new(),
                 other: Vec::new(),
-                description: format!("(Use after free) Access through a dangling pointer at {}", def.tid.address),
+                description: format!(
+                    "(Use after free) Access through a dangling pointer at {}",
+                    def.tid.address
+                ),
             };
             self.cwe_collector.send(warning).unwrap();
         }
@@ -121,26 +95,30 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
                 let mut state = state.clone();
                 self.log_debug(state.handle_store_exp(&def.term.rhs), Some(&def.tid));
                 state
-            },
+            }
             Expression::IfThenElse {
                 condition,
                 true_exp,
                 false_exp,
             } => {
                 // IfThenElse needs special handling, because it may encode conditional store instructions.
-                let true_state = if let Expression::Store { .. } = **true_exp {
-                    let mut true_state = state.clone();
+                let mut true_state = state.clone();
+                if let Expression::Store { .. } = **true_exp {
                     self.log_debug(true_state.handle_store_exp(true_exp), Some(&def.tid));
-                    true_state
                 } else {
-                    self.handle_register_assign(state, &def.term.lhs, true_exp)
+                    self.log_debug(
+                        true_state.handle_register_assign(&def.term.lhs, true_exp),
+                        Some(&def.tid),
+                    );
                 };
-                let false_state = if let Expression::Store { .. } = **false_exp {
-                    let mut false_state = state.clone();
+                let mut false_state = state.clone();
+                if let Expression::Store { .. } = **false_exp {
                     self.log_debug(false_state.handle_store_exp(false_exp), Some(&def.tid));
-                    false_state
                 } else {
-                    self.handle_register_assign(state, &def.term.lhs, false_exp)
+                    self.log_debug(
+                        false_state.handle_register_assign(&def.term.lhs, false_exp),
+                        Some(&def.tid),
+                    );
                 };
                 match state.eval(condition) {
                     Ok(Data::Value(cond)) => {
@@ -156,7 +134,14 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
                     Err(err) => panic!("IfThenElse-Condition evaluation failed: {}", err),
                 }
             }
-            expression => self.handle_register_assign(state, &def.term.lhs, expression),
+            expression => {
+                let mut new_state = state.clone();
+                self.log_debug(
+                    new_state.handle_register_assign(&def.term.lhs, expression),
+                    Some(&def.tid),
+                );
+                new_state
+            }
         }
     }
 
@@ -217,8 +202,8 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
             callee_state.stack_id = callee_stack_id.clone();
             // Set the stack pointer register to the callee stack id.
             // At the beginning of a function this is the only known pointer to the new stack frame.
-            callee_state.register.insert(
-                self.project.stack_pointer_register.clone(),
+            callee_state.set_register(
+                &self.project.stack_pointer_register,
                 super::data::PointerDomain::new(
                     callee_stack_id,
                     Bitvector::zero(apint::BitWidth::new(address_bitsize as usize).unwrap()).into(),
@@ -287,28 +272,18 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
             _ => panic!("Malformed control flow graph encountered."),
         };
         // Clear non-callee-saved registers from the state.
-        // This automatically also clears all virtual registers from the state.
-        for register in state.register.keys() {
-            if self
-                .project
-                .callee_saved_registers
-                .iter()
-                .find(|reg_name| **reg_name == register.name)
-                .is_none()
-            {
-                new_state.register.remove(register);
-            }
-        }
+        new_state.clear_non_callee_saved_register(&self.project.callee_saved_registers[..]);
         // Set the stack register value.
         // TODO: This is wrong if the extern call clears more from the stack than just the return address.
         // TODO: a check on validity of the return address could also be useful here.
         let stack_register = &self.project.stack_pointer_register;
-        if let Some(stack_pointer) = state.register.get(stack_register) {
+        {
+            let stack_pointer = state.get_register(stack_register).unwrap();
             let offset = Bitvector::from_u8(8)
                 .into_zero_extend(stack_register.bitsize().unwrap() as usize)
                 .unwrap();
-            new_state.register.insert(
-                stack_register.clone(),
+            new_state.set_register(
+                stack_register,
                 stack_pointer.bin_op(crate::bil::BinOpType::PLUS, &Data::bitvector(offset)),
             );
         }
@@ -319,6 +294,38 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
                     // TODO: Replace the hardcoded symbol matching by something configurable in config.json!
                     // TODO: This implementation ignores that allocation functions may return Null,
                     // since this is not yet representable in the state object.
+
+                    // Check all parameter register for dangling pointers and report possible use-after-free if one is found.
+                    for argument in extern_symbol
+                        .arguments
+                        .iter()
+                        .filter(|arg| arg.intent.is_input())
+                    {
+                        match state.eval(&argument.location) {
+                            Ok(value) => {
+                                if state.memory.is_dangling_pointer(&value) {
+                                    let warning = CweWarning {
+                                        name: "CWE416".to_string(),
+                                        version: "0.1".to_string(),
+                                        addresses: vec![call.tid.address.clone()],
+                                        tids: vec![format!("{}", call.tid)],
+                                        symbols: Vec::new(),
+                                        other: Vec::new(),
+                                        description: format!("(Use after free) Call to {} may access freed memory at {}", extern_symbol.name, call.tid.address),
+                                    };
+                                    self.cwe_collector.send(warning).unwrap();
+                                }
+                            }
+                            Err(err) => self.log_debug(
+                                Err(err.context(format!(
+                                    "Function argument expression {:?} could not be evaluated",
+                                    argument.location
+                                ))),
+                                Some(&call.tid),
+                            ),
+                        }
+                    }
+
                     match extern_symbol.name.as_str() {
                         "malloc" | "calloc" | "realloc" | "xmalloc" => {
                             if let Ok(return_register) = extern_symbol.get_unique_return_register()
@@ -339,9 +346,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
                                     object_id,
                                     Bitvector::zero((address_bitsize as usize).into()).into(),
                                 );
-                                new_state
-                                    .register
-                                    .insert(return_register.clone(), pointer.into());
+                                new_state.set_register(return_register, pointer.into());
                                 return Some(new_state);
                             } else {
                                 // We cannot track the new object, since we do not know where to store the pointer to it.
@@ -357,7 +362,9 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
                                     state.eval(&Expression::Var(parameter_register.clone()))
                                 {
                                     if let Data::Pointer(pointer) = memory_object_pointer {
-                                        if let Err(possible_double_free_object_ids) = new_state.mark_mem_object_as_freed(&pointer) {
+                                        if let Err(possible_double_free_object_ids) =
+                                            new_state.mark_mem_object_as_freed(&pointer)
+                                        {
                                             let warning = CweWarning {
                                                 name: "CWE415".to_string(),
                                                 version: "0.1".to_string(),
@@ -383,7 +390,10 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
                             }
                         }
                         _ => {
-                            self.log_debug(new_state.clear_stack_parameter(extern_symbol), Some(&call.tid));
+                            self.log_debug(
+                                new_state.clear_stack_parameter(extern_symbol),
+                                Some(&call.tid),
+                            );
                             let mut possible_referenced_ids = BTreeSet::new();
                             if extern_symbol.arguments.len() == 0 {
                                 // TODO: We assume here that we do not know the parameters and approximate them by all parameter registers.
@@ -394,13 +404,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
                                     self.project.parameter_registers.iter()
                                 {
                                     if let Some(register_value) =
-                                        state.register.iter().find_map(|(register, reg_value)| {
-                                            if register.name == *parameter_register_name {
-                                                Some(reg_value)
-                                            } else {
-                                                None
-                                            }
-                                        })
+                                        state.get_register_by_name(parameter_register_name)
                                     {
                                         possible_referenced_ids
                                             .append(&mut register_value.referenced_ids());
@@ -449,8 +453,8 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
 
 impl<'a> Context<'a> {
     fn get_current_stack_offset(&self, state: &State) -> BitvectorDomain {
-        if let Some(Data::Pointer(ref stack_pointer)) =
-            state.register.get(&self.project.stack_pointer_register)
+        if let Ok(Data::Pointer(ref stack_pointer)) =
+            state.get_register(&self.project.stack_pointer_register)
         {
             if stack_pointer.iter_targets().len() == 1 {
                 // TODO: add sanity check that the stack id is the expected id
@@ -621,49 +625,43 @@ mod tests {
             state.memory.get_internal_id_map()
         );
         assert_eq!(
-            return_state.register.get(&register("RSP")).unwrap(),
-            state.register.get(&register("RSP")).unwrap()
+            return_state.get_register(&register("RSP")).unwrap(),
+            state.get_register(&register("RSP")).unwrap()
         );
 
-        state
-            .register
-            .insert(register("callee_saved_reg"), Data::Value(bv(13)));
-        state
-            .register
-            .insert(register("other_reg"), Data::Value(bv(14)));
+        state.set_register(&register("callee_saved_reg"), Data::Value(bv(13)));
+        state.set_register(&register("other_reg"), Data::Value(bv(14)));
 
         let malloc = call_term("extern_malloc");
         let mut state_after_malloc = context.update_call_stub(&state, &malloc).unwrap();
         assert_eq!(
-            state_after_malloc.register.get(&register("RAX")).unwrap(),
-            &Data::Pointer(PointerDomain::new(
+            state_after_malloc.get_register(&register("RAX")).unwrap(),
+            Data::Pointer(PointerDomain::new(
                 new_id("call_extern_malloc", "RAX"),
                 bv(0)
             ))
         );
         assert_eq!(state_after_malloc.memory.get_num_objects(), 2);
         assert_eq!(
-            state_after_malloc.register.get(&register("RSP")).unwrap(),
-            &state
-                .register
-                .get(&register("RSP"))
+            state_after_malloc.get_register(&register("RSP")).unwrap(),
+            state
+                .get_register(&register("RSP"))
                 .unwrap()
                 .bin_op(BinOpType::PLUS, &Data::Value(bv(8)))
         );
         assert_eq!(
             state_after_malloc
-                .register
-                .get(&register("callee_saved_reg"))
+                .get_register(&register("callee_saved_reg"))
                 .unwrap(),
-            &Data::Value(bv(13))
+            Data::Value(bv(13))
         );
-        assert_eq!(
-            state_after_malloc.register.get(&register("other_reg")),
-            None
-        );
+        assert!(state_after_malloc
+            .get_register(&register("other_reg"))
+            .unwrap()
+            .is_top());
 
-        state_after_malloc.register.insert(
-            register("callee_saved_reg"),
+        state_after_malloc.set_register(
+            &register("callee_saved_reg"),
             Data::Pointer(PointerDomain::new(
                 new_id("call_extern_malloc", "RAX"),
                 bv(0),
@@ -673,14 +671,16 @@ mod tests {
         let state_after_free = context
             .update_call_stub(&state_after_malloc, &free)
             .unwrap();
-        assert_eq!(state_after_free.register.get(&register("RAX")), None);
+        assert!(state_after_free
+            .get_register(&register("RAX"))
+            .unwrap()
+            .is_top());
         assert_eq!(state_after_free.memory.get_num_objects(), 2);
         assert_eq!(
             state_after_free
-                .register
-                .get(&register("callee_saved_reg"))
+                .get_register(&register("callee_saved_reg"))
                 .unwrap(),
-            &Data::Pointer(PointerDomain::new(
+            Data::Pointer(PointerDomain::new(
                 new_id("call_extern_malloc", "RAX"),
                 bv(0)
             ))
@@ -690,23 +690,21 @@ mod tests {
         let state_after_other_fn = context.update_call_stub(&state, &other_extern_fn).unwrap();
 
         assert_eq!(
-            state_after_other_fn.register.get(&register("RSP")).unwrap(),
-            &state
-                .register
-                .get(&register("RSP"))
+            state_after_other_fn.get_register(&register("RSP")).unwrap(),
+            state
+                .get_register(&register("RSP"))
                 .unwrap()
                 .bin_op(BinOpType::PLUS, &Data::Value(bv(8)))
         );
         assert_eq!(
             state_after_other_fn
-                .register
-                .get(&register("callee_saved_reg"))
+                .get_register(&register("callee_saved_reg"))
                 .unwrap(),
-            &Data::Value(bv(13))
+            Data::Value(bv(13))
         );
-        assert_eq!(
-            state_after_other_fn.register.get(&register("other_reg")),
-            None
-        );
+        assert!(state_after_other_fn
+            .get_register(&register("other_reg"))
+            .unwrap()
+            .is_top());
     }
 }
