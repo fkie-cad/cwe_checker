@@ -1,9 +1,6 @@
 use crate::bil::*;
 use serde::{Deserialize, Serialize};
-use std::cmp::Ordering;
-use apint::Width;
-use std::sync::Arc;
-use std::ops::Deref;
+use crate::prelude::*;
 
 /// The main trait describing an abstract domain.
 ///
@@ -40,14 +37,10 @@ pub trait ValueDomain: AbstractDomain {
     fn new_top(bitsize: BitSize) -> Self;
 
     /// Compute the (abstract) result of a binary operation
-    fn bin_op(&self, op: BinOpType, rhs: &Self) -> Self {
-        Self::new_top(self.bitsize())
-    }
+    fn bin_op(&self, op: BinOpType, rhs: &Self) -> Self;
 
     /// Compute the (abstract) result of a unary operation
-    fn un_op(&self, op: UnOpType) -> Self {
-        Self::new_top(self.bitsize())
-    }
+    fn un_op(&self, op: UnOpType) -> Self;
 
     /// extract a sub-bitvector
     fn extract(&self, low_bit: BitSize, high_bit: BitSize) -> Self {
@@ -55,9 +48,7 @@ pub trait ValueDomain: AbstractDomain {
     }
 
     /// Extend a bitvector using the given cast type
-    fn cast(&self, kind: CastType, width: BitSize) -> Self {
-        Self::new_top(width)
-    }
+    fn cast(&self, kind: CastType, width: BitSize) -> Self;
 
     /// Concatenate two bitvectors
     fn concat(&self, other: &Self) -> Self {
@@ -266,9 +257,11 @@ mod tests {
         assert_eq!(BitvectorDomain::Value(Bitvector::from_i32(-1)).concat(&BitvectorDomain::Value(Bitvector::from_i32(-1))), bv(-1));
     }
 
+    #[test]
     fn bitvector_domain_as_abstract_domain() {
         assert_eq!(bv(17).merge(&bv(17)), bv(17));
         assert_eq!(bv(17).merge(&bv(16)), BitvectorDomain::new_top(64));
-        unimplemented!();
+        assert!(!bv(17).is_top());
+        assert!(BitvectorDomain::new_top(64).is_top());
     }
 }

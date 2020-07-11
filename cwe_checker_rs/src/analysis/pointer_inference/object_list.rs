@@ -99,7 +99,7 @@ impl AbstractObjectList {
     // TODO: Implement write-merging to  still tracked objects!
     pub fn set_value(&mut self, pointer: PointerDomain, value: Data) -> Result<(), Error> {
         let mut target_object_set: BTreeSet<usize> = BTreeSet::new();
-        for (id, offset) in pointer.iter_targets() {
+        for (id, _offset) in pointer.iter_targets() {
             target_object_set.insert(self.ids.get(id).unwrap().0);
         }
         if target_object_set.len() == 0 {
@@ -360,6 +360,7 @@ impl AbstractObjectList {
     }
 
     /// Get the number of objects that are currently tracked.
+    #[cfg(test)]
     pub fn get_num_objects(&self) -> usize {
         self.objects.len()
     }
@@ -531,7 +532,7 @@ mod tests {
             other_obj_list.objects[0].get_state(),
             Some(crate::analysis::pointer_inference::object::ObjectState::Alive)
         );
-        other_obj_list.mark_mem_object_as_freed(&modified_heap_pointer);
+        other_obj_list.mark_mem_object_as_freed(&modified_heap_pointer).unwrap();
         assert_eq!(
             other_obj_list.objects[0].get_state(),
             Some(crate::analysis::pointer_inference::object::ObjectState::Dangling)

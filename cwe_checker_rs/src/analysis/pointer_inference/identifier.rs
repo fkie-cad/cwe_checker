@@ -88,7 +88,7 @@ impl std::fmt::Display for AbstractMemoryLocation {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Self::Location{offset, ..} => write!(formatter, "({})", offset),
-            Self::Pointer{offset, size, target} => write!(formatter, "({})->{}", offset, target),
+            Self::Pointer{offset, size: _, target} => write!(formatter, "({})->{}", offset, target),
         }
     }
 }

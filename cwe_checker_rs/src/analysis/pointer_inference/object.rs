@@ -5,11 +5,8 @@ use crate::analysis::mem_region::MemRegion;
 use crate::bil::Bitvector;
 use crate::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
-use std::sync::Arc;
+use std::collections::BTreeSet;
 use std::iter::FromIterator;
-
-use serde_json::json;
 
 
 /// An abstract object is either a tracked or an untracked memory object.
@@ -113,6 +110,7 @@ impl AbstractObject {
         }
     }
 
+    #[cfg(test)]
     pub fn get_state(&self) -> Option<ObjectState> {
         match self {
             Self::Untracked(_) => None,

@@ -384,7 +384,7 @@ impl State {
                                 new_targets.add_target(id.clone(), offset.clone());
                             }
                         }
-                        BitvectorDomain::Top(bitsize) => {
+                        BitvectorDomain::Top(_bitsize) => {
                             for caller_id in self.caller_ids.iter() {
                                 new_targets.add_target(caller_id.clone(), offset.clone());
                             }

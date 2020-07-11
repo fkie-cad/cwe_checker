@@ -1,6 +1,5 @@
 use crate::bil::*;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 
 pub mod symbol;
 use symbol::ExternSymbol;
@@ -134,7 +133,7 @@ mod tests {
         let string = "{\"term\":{\"defs\":[],\"jmps\":[]},\"tid\":{\"id\":\"@block\",\"address\":\"UNKNOWN\"}}";
         let tid = Tid::new("@block".to_string());
         let block_term = Term {
-            tid: tid,
+            tid,
             term: Blk {
                 defs: Vec::new(),
                 jmps: Vec::new(),

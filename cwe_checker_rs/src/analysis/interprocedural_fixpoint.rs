@@ -26,7 +26,7 @@ use super::fixpoint::Problem as GeneralFPProblem;
 use super::graph::*;
 use crate::bil::Expression;
 use crate::term::*;
-use petgraph::graph::{DiGraph, EdgeIndex, NodeIndex};
+use petgraph::graph::{EdgeIndex, NodeIndex};
 use std::marker::PhantomData;
 use fnv::FnvHashMap;
 

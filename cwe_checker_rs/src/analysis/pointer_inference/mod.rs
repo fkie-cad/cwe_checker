@@ -1,12 +1,11 @@
 use super::interprocedural_fixpoint::{Computation, NodeValue};
 use crate::analysis::graph::{Graph, Node};
-use crate::prelude::*;
 use crate::term::*;
 use crate::utils::log::*;
 use petgraph::graph::NodeIndex;
 use petgraph::visit::IntoNodeReferences;
 use petgraph::Direction;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 mod context;
 mod data;
@@ -52,7 +51,7 @@ impl<'a> PointerInference<'a> {
         let entry_sub_to_entry_node_map: HashMap<Tid, NodeIndex> = entry_sub_to_entry_blocks_map
             .into_iter()
             .filter_map(|(sub_tid, block_tid)| {
-                if let Some((start_node_index, end_node_index)) =
+                if let Some((start_node_index, _end_node_index)) =
                     tid_to_graph_indices_map.get(&block_tid)
                 {
                     Some((sub_tid.clone(), start_node_index.clone()))

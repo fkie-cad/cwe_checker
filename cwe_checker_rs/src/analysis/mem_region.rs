@@ -178,19 +178,6 @@ impl<T: AbstractDomain + ValueDomain + std::fmt::Debug> MemRegionData<T> {
         self.clear_interval(position, size);
     }
 
-    /// Returns true if the memory region contains at least one element overlapping the interval starting at *pos* with length *size*.
-    fn contains_overlapping(&self, pos: i64, size: i64) -> bool {
-        if self.values.range(pos..(pos + size)).next().is_some() {
-            return true;
-        };
-        if let Some((pos_previous, elem_previous)) = self.values.range(..pos).last() {
-            if pos_previous + (elem_previous.bitsize() as i64 / 8) > pos {
-                return true;
-            }
-        }
-        return false;
-    }
-
     /// Merge two memory regions.
     ///
     /// Values at the same position and with the same size get merged via their merge function.
@@ -241,6 +228,18 @@ mod tests {
 
         fn new_top(bitsize: BitSize) -> MockDomain {
             MockDomain(0, bitsize)
+        }
+
+        fn bin_op(&self, _op: crate::bil::BinOpType, _rhs: &Self) -> Self {
+            Self::new_top(self.1)
+        }
+
+        fn un_op(&self, _op: crate::bil::UnOpType) -> Self {
+            Self::new_top(self.1)
+        }
+
+        fn cast(&self, _kind: crate::bil::CastType, width: BitSize) -> Self {
+            Self::new_top(width)
         }
     }
 
