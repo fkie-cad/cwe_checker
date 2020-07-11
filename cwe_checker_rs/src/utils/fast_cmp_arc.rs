@@ -1,14 +1,14 @@
-use crate::prelude::*;
-use std::sync::Arc;
-use std::ops::{Deref, DerefMut};
 use crate::analysis::abstract_domain::AbstractDomain;
+use crate::prelude::*;
+use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
 
 // TODO: This is a helper not only for abstract domains! It needs its own source file!
 #[derive(Serialize, Deserialize, Debug, Hash, Clone)]
 pub struct FastCmpArc<T>(pub Arc<T>);
 
 impl<T: PartialEq + Eq> PartialEq for FastCmpArc<T> {
-    fn eq(&self, other:&Self) -> bool {
+    fn eq(&self, other: &Self) -> bool {
         if Arc::ptr_eq(&self.0, &other.0) {
             true
         } else {

@@ -1,5 +1,5 @@
-use crate::prelude::*;
 use crate::bil::variable::*;
+use crate::prelude::*;
 use crate::utils::fast_cmp_arc::FastCmpArc;
 use std::sync::Arc;
 
@@ -27,9 +27,9 @@ pub struct AbstractIdentifierData {
 impl AbstractIdentifier {
     /// create a new abstract identifier
     pub fn new(time: Tid, location: AbstractLocation) -> AbstractIdentifier {
-        AbstractIdentifier(FastCmpArc(Arc::new(AbstractIdentifierData{
+        AbstractIdentifier(FastCmpArc(Arc::new(AbstractIdentifierData {
             time,
-            location
+            location,
         })))
     }
 }
@@ -65,9 +65,14 @@ impl AbstractLocation {
     /// This function returns an error if the variable is not a physical register.
     pub fn from_var(variable: &Variable) -> Result<AbstractLocation, Error> {
         if variable.is_temp {
-            return Err(anyhow!("Cannot create abstract location from temporary variables."));
+            return Err(anyhow!(
+                "Cannot create abstract location from temporary variables."
+            ));
         }
-        Ok(AbstractLocation::Register(variable.name.clone(), variable.bitsize()?))
+        Ok(AbstractLocation::Register(
+            variable.name.clone(),
+            variable.bitsize()?,
+        ))
     }
 }
 
@@ -80,15 +85,19 @@ pub enum AbstractMemoryLocation {
     Pointer {
         offset: isize,
         size: usize,
-        target: Box<AbstractMemoryLocation>
+        target: Box<AbstractMemoryLocation>,
     },
 }
 
 impl std::fmt::Display for AbstractMemoryLocation {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Self::Location{offset, ..} => write!(formatter, "({})", offset),
-            Self::Pointer{offset, size: _, target} => write!(formatter, "({})->{}", offset, target),
+            Self::Location { offset, .. } => write!(formatter, "({})", offset),
+            Self::Pointer {
+                offset,
+                size: _,
+                target,
+            } => write!(formatter, "({})->{}", offset, target),
         }
     }
 }

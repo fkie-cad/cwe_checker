@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::iter::FromIterator;
 
-
 /// An abstract object is either a tracked or an untracked memory object.
 /// In the untracked case we still track whether the object may contain pointers to other objects.
 /// This way we do not necessarily need to invalidate all abstract objects
@@ -114,7 +113,7 @@ impl AbstractObject {
     pub fn get_state(&self) -> Option<ObjectState> {
         match self {
             Self::Untracked(_) => None,
-            Self::Memory(mem) => mem.state
+            Self::Memory(mem) => mem.state,
         }
     }
 }
@@ -125,13 +124,26 @@ impl AbstractObject {
             Self::Untracked(_) => serde_json::Value::String("Untracked".into()),
             Self::Memory(object_info) => {
                 let mut elements = Vec::new();
-                elements.push(("is_unique".to_string(), serde_json::Value::String(format!("{}", object_info.is_unique))));
-                elements.push(("state".to_string(), serde_json::Value::String(format!("{:?}", object_info.state))));
-                elements.push(("type".to_string(), serde_json::Value::String(format!("{:?}", object_info.type_))));
-                let memory = object_info.memory.iter().map(|(index, value)| {
-                    (format!("{}", index), value.to_json_compact())
-                });
-                elements.push(("memory".to_string(), serde_json::Value::Object(serde_json::Map::from_iter(memory))));
+                elements.push((
+                    "is_unique".to_string(),
+                    serde_json::Value::String(format!("{}", object_info.is_unique)),
+                ));
+                elements.push((
+                    "state".to_string(),
+                    serde_json::Value::String(format!("{:?}", object_info.state)),
+                ));
+                elements.push((
+                    "type".to_string(),
+                    serde_json::Value::String(format!("{:?}", object_info.type_)),
+                ));
+                let memory = object_info
+                    .memory
+                    .iter()
+                    .map(|(index, value)| (format!("{}", index), value.to_json_compact()));
+                elements.push((
+                    "memory".to_string(),
+                    serde_json::Value::Object(serde_json::Map::from_iter(memory)),
+                ));
                 serde_json::Value::Object(serde_json::Map::from_iter(elements.into_iter()))
             }
         }

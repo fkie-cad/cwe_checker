@@ -8,14 +8,14 @@ pub struct CweWarning {
     pub tids: Vec<String>,
     pub symbols: Vec<String>,
     pub other: Vec<Vec<String>>,
-    pub description: String
+    pub description: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
 pub struct LogMessage {
     pub text: String,
     pub level: LogLevel,
-    pub location: Option<Tid>
+    pub location: Option<Tid>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]

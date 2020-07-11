@@ -19,7 +19,7 @@ mod prelude {
 
     pub use crate::bil::{BitSize, Bitvector};
     pub use crate::term::Tid;
-    pub use anyhow::{Error, anyhow};
+    pub use anyhow::{anyhow, Error};
 }
 
 #[cfg(test)]

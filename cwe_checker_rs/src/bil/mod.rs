@@ -132,7 +132,7 @@ mod tests {
     fn expression_deserialization() {
         let string = "{\"BinOp\":{\"lhs\":{\"Const\":{\"digits\":[234],\"width\":[8]}},\"op\":\"PLUS\",\"rhs\":{\"Const\":{\"digits\":[234],\"width\":[8]}}}}";
         let bitv = Bitvector::from_u8(234);
-        let exp = Expression::BinOp{
+        let exp = Expression::BinOp {
             op: BinOpType::PLUS,
             lhs: Box::new(Expression::Const(bitv.clone())),
             rhs: Box::new(Expression::Const(bitv)),

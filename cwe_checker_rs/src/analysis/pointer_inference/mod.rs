@@ -176,8 +176,8 @@ impl<'a> PointerInference<'a> {
 
     fn count_blocks_with_state(&self) {
         let graph = self.computation.get_graph();
-        let mut stateful_blocks : i64 = 0;
-        let mut all_blocks : i64 = 0;
+        let mut stateful_blocks: i64 = 0;
+        let mut all_blocks: i64 = 0;
         for (node_id, node) in graph.node_references() {
             if let Node::BlkStart(_block) = node {
                 all_blocks += 1;

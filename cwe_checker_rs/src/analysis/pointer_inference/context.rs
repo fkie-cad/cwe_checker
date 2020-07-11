@@ -200,14 +200,18 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
             callee_state.stack_id = callee_stack_id.clone();
             // Set the stack pointer register to the callee stack id.
             // At the beginning of a function this is the only known pointer to the new stack frame.
-            self.log_debug(callee_state.set_register(
-                &self.project.stack_pointer_register,
-                super::data::PointerDomain::new(
-                    callee_stack_id,
-                    Bitvector::zero(apint::BitWidth::new(address_bitsize as usize).unwrap()).into(),
-                )
-                .into(),
-            ), Some(&call_term.tid));
+            self.log_debug(
+                callee_state.set_register(
+                    &self.project.stack_pointer_register,
+                    super::data::PointerDomain::new(
+                        callee_stack_id,
+                        Bitvector::zero(apint::BitWidth::new(address_bitsize as usize).unwrap())
+                            .into(),
+                    )
+                    .into(),
+                ),
+                Some(&call_term.tid),
+            );
             // set the list of caller stack ids to only this caller id
             callee_state.caller_ids = BTreeSet::new();
             callee_state.caller_ids.insert(new_caller_stack_id.clone());
@@ -280,10 +284,13 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
             let offset = Bitvector::from_u8(8)
                 .into_zero_extend(stack_register.bitsize().unwrap() as usize)
                 .unwrap();
-            self.log_debug(new_state.set_register(
-                stack_register,
-                stack_pointer.bin_op(crate::bil::BinOpType::PLUS, &Data::bitvector(offset)),
-            ), Some(&call.tid));
+            self.log_debug(
+                new_state.set_register(
+                    stack_register,
+                    stack_pointer.bin_op(crate::bil::BinOpType::PLUS, &Data::bitvector(offset)),
+                ),
+                Some(&call.tid),
+            );
         }
 
         match call_target {
@@ -344,7 +351,10 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
                                     object_id,
                                     Bitvector::zero((address_bitsize as usize).into()).into(),
                                 );
-                                self.log_debug(new_state.set_register(return_register, pointer.into()), Some(&call.tid));
+                                self.log_debug(
+                                    new_state.set_register(return_register, pointer.into()),
+                                    Some(&call.tid),
+                                );
                                 return Some(new_state);
                             } else {
                                 // We cannot track the new object, since we do not know where to store the pointer to it.
@@ -627,8 +637,12 @@ mod tests {
             state.get_register(&register("RSP")).unwrap()
         );
 
-        state.set_register(&register("callee_saved_reg"), Data::Value(bv(13))).unwrap();
-        state.set_register(&register("other_reg"), Data::Value(bv(14))).unwrap();
+        state
+            .set_register(&register("callee_saved_reg"), Data::Value(bv(13)))
+            .unwrap();
+        state
+            .set_register(&register("other_reg"), Data::Value(bv(14)))
+            .unwrap();
 
         let malloc = call_term("extern_malloc");
         let mut state_after_malloc = context.update_call_stub(&state, &malloc).unwrap();
@@ -658,13 +672,15 @@ mod tests {
             .unwrap()
             .is_top());
 
-        state_after_malloc.set_register(
-            &register("callee_saved_reg"),
-            Data::Pointer(PointerDomain::new(
-                new_id("call_extern_malloc", "RAX"),
-                bv(0),
-            )),
-        ).unwrap();
+        state_after_malloc
+            .set_register(
+                &register("callee_saved_reg"),
+                Data::Pointer(PointerDomain::new(
+                    new_id("call_extern_malloc", "RAX"),
+                    bv(0),
+                )),
+            )
+            .unwrap();
         let free = call_term("extern_free");
         let state_after_free = context
             .update_call_stub(&state_after_malloc, &free)

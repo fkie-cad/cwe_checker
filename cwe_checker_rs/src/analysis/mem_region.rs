@@ -89,7 +89,6 @@ impl<T: AbstractDomain + ValueDomain + std::fmt::Debug> MemRegion<T> {
     }
 }
 
-
 /// An abstract domain representing a continuous region of memory. See the module level description for more.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 struct MemRegionData<T: AbstractDomain + ValueDomain + std::fmt::Debug> {
@@ -139,7 +138,7 @@ impl<T: AbstractDomain + ValueDomain + std::fmt::Debug> MemRegionData<T> {
     pub fn add(&mut self, value: T, position: Bitvector) {
         assert_eq!(position.width().to_usize(), self.address_bitsize as usize);
         let position = Int::from(position).try_to_i64().unwrap();
-        assert!( value.bitsize() % 8 == 0);
+        assert!(value.bitsize() % 8 == 0);
         let size_in_bytes = value.bitsize() as i64 / 8;
         assert!(size_in_bytes > 0);
 
@@ -148,7 +147,6 @@ impl<T: AbstractDomain + ValueDomain + std::fmt::Debug> MemRegionData<T> {
             // top()-values do not need to be explicitly saved, as they don't contain any information anyway.
             self.values.insert(position, value);
         }
-
     }
 
     /// Get the value at the given position.
@@ -196,7 +194,6 @@ impl<T: AbstractDomain + ValueDomain + std::fmt::Debug> MemRegionData<T> {
                         // we discard top()-values, as they don't contain information
                         merged_values.insert(*pos_left, merged_val);
                     }
-
                 }
             }
         }
@@ -254,40 +251,40 @@ mod tests {
     #[test]
     fn mem_region() {
         let mut region: MemRegion<MockDomain> = MemRegion::new(64);
-        region.add(mock(5, 3*8), bv(5));
-        assert_eq!(region.get(bv(5), 3), mock(5, 3*8));
-        region.add(mock(7, 2*8), bv(8));
-        assert_eq!(region.get(bv(8), 2),  mock(7, 2*8));
-        assert_eq!(region.get(bv(5), 3), mock(5, 3*8));
-        assert_eq!(region.get(bv(5), 2), MockDomain::new_top(2*8));
-        region.add(mock(9, 2*8), bv(6));
-        assert_eq!(region.get(bv(6), 2), mock(9, 2*8));
-        assert_eq!(region.get(bv(5), 3), MockDomain::new_top(3*8));
-        assert_eq!(region.get(bv(8), 2), mock(7, 2*8));
-        region.add(mock(9, 11*8), bv(-3));
-        assert_eq!(region.get(bv(-3), 11), mock(9, 11*8));
-        assert_eq!(region.get(bv(6), 2), MockDomain::new_top(2*8));
-        assert_eq!(region.get(bv(8), 2), mock(7, 2*8));
+        region.add(mock(5, 3 * 8), bv(5));
+        assert_eq!(region.get(bv(5), 3), mock(5, 3 * 8));
+        region.add(mock(7, 2 * 8), bv(8));
+        assert_eq!(region.get(bv(8), 2), mock(7, 2 * 8));
+        assert_eq!(region.get(bv(5), 3), mock(5, 3 * 8));
+        assert_eq!(region.get(bv(5), 2), MockDomain::new_top(2 * 8));
+        region.add(mock(9, 2 * 8), bv(6));
+        assert_eq!(region.get(bv(6), 2), mock(9, 2 * 8));
+        assert_eq!(region.get(bv(5), 3), MockDomain::new_top(3 * 8));
+        assert_eq!(region.get(bv(8), 2), mock(7, 2 * 8));
+        region.add(mock(9, 11 * 8), bv(-3));
+        assert_eq!(region.get(bv(-3), 11), mock(9, 11 * 8));
+        assert_eq!(region.get(bv(6), 2), MockDomain::new_top(2 * 8));
+        assert_eq!(region.get(bv(8), 2), mock(7, 2 * 8));
 
         let mut other_region = MemRegion::new(64);
-        other_region.add(mock(7, 2*8), bv(8));
+        other_region.add(mock(7, 2 * 8), bv(8));
         assert!(region != other_region);
         let merged_region = region.merge(&other_region);
-        assert_eq!(merged_region.get(bv(8), 2), mock(7, 2*8));
-        assert_eq!(merged_region.get(bv(-3), 11), MockDomain::new_top(11*8));
-        other_region.add(mock(9, 11*8), bv(-3));
+        assert_eq!(merged_region.get(bv(8), 2), mock(7, 2 * 8));
+        assert_eq!(merged_region.get(bv(-3), 11), MockDomain::new_top(11 * 8));
+        other_region.add(mock(9, 11 * 8), bv(-3));
         assert_eq!(region, other_region);
     }
 
     #[test]
     fn do_not_save_top_elements() {
         let mut region: MemRegionData<MockDomain> = MemRegionData::new(64);
-        region.add(MockDomain::new_top(4*8), bv(5));
+        region.add(MockDomain::new_top(4 * 8), bv(5));
         assert_eq!(region.values.len(), 0);
 
         let mut other_region: MemRegionData<MockDomain> = MemRegionData::new(64);
-        region.add(mock(5, 4*8), bv(5));
-        other_region.add(mock(7, 4*8), bv(5));
+        region.add(mock(5, 4 * 8), bv(5));
+        other_region.add(mock(7, 4 * 8), bv(5));
         let merged_region = region.merge(&other_region);
         assert_eq!(region.values.len(), 1);
         assert_eq!(other_region.values.len(), 1);

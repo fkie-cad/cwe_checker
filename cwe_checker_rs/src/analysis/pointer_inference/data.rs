@@ -46,14 +46,17 @@ impl Data {
             Self::Top(bitsize) => serde_json::Value::String(format!("Top:{}", bitsize)),
             Self::Pointer(pointer) => {
                 let target_iter = pointer.iter_targets().map(|(id, offset)| {
-                    (format!("{}", id), serde_json::Value::String(format!("{}", offset)))
+                    (
+                        format!("{}", id),
+                        serde_json::Value::String(format!("{}", offset)),
+                    )
                 });
                 let targets = serde_json::Value::Object(target_iter.collect());
                 let mut obj_map = serde_json::Map::new();
                 obj_map.insert("Pointer".to_string(), targets);
                 serde_json::Value::Object(obj_map)
-            },
-            Self::Value(bitvector) => serde_json::Value::String(format!("Value: {}", bitvector))
+            }
+            Self::Value(bitvector) => serde_json::Value::String(format!("Value: {}", bitvector)),
         }
     }
 }

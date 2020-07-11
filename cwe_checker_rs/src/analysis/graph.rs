@@ -132,11 +132,7 @@ impl<'a> GraphBuilder<'a> {
                         }
                     } else {
                         if let Some(target) = self.jump_targets.get(&target_tid) {
-                            self.graph.add_edge(
-                                source,
-                                target.0,
-                                Edge::Call(jump),
-                            );
+                            self.graph.add_edge(source, target.0, Edge::Call(jump));
                         }
 
                         if let Some(Label::Direct(ref return_tid)) = call.return_ {
@@ -186,7 +182,13 @@ impl<'a> GraphBuilder<'a> {
     ) {
         for (call_node, return_to_node) in self.return_addresses[&return_from_sub.tid].iter() {
             let call_block = self.graph[*call_node].get_block();
-            let call_term = call_block.term.jmps.iter().filter(|jump| {matches!(jump.term.kind, JmpKind::Call(_))}).next().unwrap();
+            let call_term = call_block
+                .term
+                .jmps
+                .iter()
+                .filter(|jump| matches!(jump.term.kind, JmpKind::Call(_)))
+                .next()
+                .unwrap();
             let cr_combine_node = self.graph.add_node(Node::CallReturn(call_block));
             self.graph
                 .add_edge(*call_node, cr_combine_node, Edge::CRCallStub);
@@ -242,7 +244,10 @@ pub fn get_program_cfg(program: &Term<Program>, extern_subs: HashSet<Tid>) -> Gr
 
 /// For a given set of block TIDs generate a map from the TIDs to the indices of the BlkStart and BlkEnd nodes
 /// corresponding to the block.
-pub fn get_indices_of_block_nodes<'a, I: Iterator<Item = &'a Tid>>(graph: &'a Graph, block_tids: I) -> HashMap<Tid, (NodeIndex, NodeIndex)> {
+pub fn get_indices_of_block_nodes<'a, I: Iterator<Item = &'a Tid>>(
+    graph: &'a Graph,
+    block_tids: I,
+) -> HashMap<Tid, (NodeIndex, NodeIndex)> {
     let tids: HashSet<Tid> = block_tids.cloned().collect();
     let mut tid_to_indices_map = HashMap::new();
     for node_index in graph.node_indices() {
@@ -252,7 +257,7 @@ pub fn get_indices_of_block_nodes<'a, I: Iterator<Item = &'a Tid>>(graph: &'a Gr
                     let start_index = node_index;
                     let end_index = graph.neighbors(start_index).next().unwrap();
                     tid_to_indices_map.insert(tid.clone(), (start_index, end_index));
-                },
+                }
                 _ => (),
             }
         }

@@ -21,14 +21,14 @@ computation.compute();
 // Alternatively, this could be achieved through usage of the specialize_conditional function.
 // Currently unclear, which way is better.
 
-use crate::prelude::*;
 use super::fixpoint::Problem as GeneralFPProblem;
 use super::graph::*;
 use crate::bil::Expression;
+use crate::prelude::*;
 use crate::term::*;
+use fnv::FnvHashMap;
 use petgraph::graph::{EdgeIndex, NodeIndex};
 use std::marker::PhantomData;
-use fnv::FnvHashMap;
 
 #[derive(PartialEq, Eq, Serialize, Deserialize)]
 pub enum NodeValue<T: PartialEq + Eq> {
@@ -140,9 +140,11 @@ impl<'a, T: Problem<'a>> GeneralFPProblem for GeneralizedProblem<'a, T> {
                 });
                 Some(NodeValue::Value(end_val))
             }
-            Edge::Call(call) => Some(NodeValue::Value(
-                self.problem.update_call(node_value.unwrap_value(), call, &graph[end_node]),
-            )),
+            Edge::Call(call) => Some(NodeValue::Value(self.problem.update_call(
+                node_value.unwrap_value(),
+                call,
+                &graph[end_node],
+            ))),
             Edge::CRCallStub => Some(NodeValue::CallReturnCombinator {
                 call: Some(node_value.unwrap_value().clone()),
                 return_: None,
@@ -155,9 +157,12 @@ impl<'a, T: Problem<'a>> GeneralFPProblem for GeneralizedProblem<'a, T> {
                 NodeValue::Value(_) => panic!("Unexpected interprocedural fixpoint graph state"),
                 NodeValue::CallReturnCombinator { call, return_ } => {
                     if let Some(return_value) = return_ {
-                        match self.problem.update_return(return_value, call.as_ref(), call_term) {
+                        match self
+                            .problem
+                            .update_return(return_value, call.as_ref(), call_term)
+                        {
                             Some(val) => Some(NodeValue::Value(val)),
-                            None => None
+                            None => None,
                         }
                     } else {
                         None

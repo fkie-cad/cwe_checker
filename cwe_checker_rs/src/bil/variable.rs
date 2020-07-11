@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize};
 use super::BitSize;
 use crate::prelude::*;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct Variable {
@@ -38,21 +38,27 @@ mod tests {
         let typ = Type::Immediate(64);
         let string = serde_json::to_string_pretty(&typ).expect("Serialization failed");
         println!("{}", &string);
-        let _ : Type = serde_json::from_str(&string).expect("Deserialization failed");
-        let typ = Type::Memory{ addr_size: 64, elem_size: 8};
+        let _: Type = serde_json::from_str(&string).expect("Deserialization failed");
+        let typ = Type::Memory {
+            addr_size: 64,
+            elem_size: 8,
+        };
         let string = serde_json::to_string_pretty(&typ).expect("Serialization failed");
         println!("{}", &string);
-        let _ : Type = serde_json::from_str(&string).expect("Deserialization failed");
+        let _: Type = serde_json::from_str(&string).expect("Deserialization failed");
         let typ = Type::Unknown;
         let string = serde_json::to_string_pretty(&typ).expect("Serialization failed");
         println!("{}", &string);
-        let _ : Type = serde_json::from_str(&string).expect("Deserialization failed");
+        let _: Type = serde_json::from_str(&string).expect("Deserialization failed");
     }
 
     #[test]
     fn var_type_from_ocaml() {
         let json_string = "{\"Memory\":{\"addr_size\":64,\"elem_size\":8}}";
-        let typ = Type::Memory{ addr_size: 64, elem_size: 8};
+        let typ = Type::Memory {
+            addr_size: 64,
+            elem_size: 8,
+        };
         assert_eq!(typ, serde_json::from_str(json_string).unwrap())
     }
 
@@ -61,8 +67,11 @@ mod tests {
         let json_string = "{\"is_temp\":false,\"name\":\"RAX\",\"type_\":{\"Memory\":{\"addr_size\":64,\"elem_size\":8}}}";
         let var = Variable {
             name: "RAX".to_string(),
-            type_: Type::Memory{ addr_size: 64, elem_size: 8},
-            is_temp: false
+            type_: Type::Memory {
+                addr_size: 64,
+                elem_size: 8,
+            },
+            is_temp: false,
         };
         assert_eq!(var, serde_json::from_str(json_string).unwrap())
     }

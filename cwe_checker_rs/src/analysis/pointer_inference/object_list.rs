@@ -532,7 +532,9 @@ mod tests {
             other_obj_list.objects[0].get_state(),
             Some(crate::analysis::pointer_inference::object::ObjectState::Alive)
         );
-        other_obj_list.mark_mem_object_as_freed(&modified_heap_pointer).unwrap();
+        other_obj_list
+            .mark_mem_object_as_freed(&modified_heap_pointer)
+            .unwrap();
         assert_eq!(
             other_obj_list.objects[0].get_state(),
             Some(crate::analysis::pointer_inference::object::ObjectState::Dangling)

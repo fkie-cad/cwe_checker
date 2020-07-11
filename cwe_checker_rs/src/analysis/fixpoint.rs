@@ -33,11 +33,7 @@ pub trait Problem {
     /// This function describes how the value at the end node of an edge is computed from the value at the start node of the edge.
     /// The function can return None to indicate that no end value gets generated through this edge.
     /// E.g. In a control flow graph, if the edge cannot be taken for the given start value, this function should return None.
-    fn update_edge(
-        &self,
-        value: &Self::NodeValue,
-        edge: EdgeIndex,
-    ) -> Option<Self::NodeValue>;
+    fn update_edge(&self, value: &Self::NodeValue, edge: EdgeIndex) -> Option<Self::NodeValue>;
 }
 
 /// The computation struct contains an intermediate result of a fixpoint computation.
@@ -118,10 +114,7 @@ impl<T: Problem> Computation<T> {
             .edge_endpoints(edge)
             .expect("Edge not found");
         if let Some(start_val) = self.node_values.get(&start_node) {
-            if let Some(new_end_val) = self.fp_problem.update_edge(
-                start_val,
-                edge
-            ) {
+            if let Some(new_end_val) = self.fp_problem.update_edge(start_val, edge) {
                 self.merge_node_value(end_node, new_end_val);
             }
         }
@@ -179,7 +172,7 @@ mod tests {
     use super::*;
 
     struct FPProblem {
-        graph: DiGraph<(), u64>
+        graph: DiGraph<(), u64>,
     }
 
     impl Problem for FPProblem {
@@ -195,11 +188,7 @@ mod tests {
             std::cmp::min(*val1, *val2)
         }
 
-        fn update_edge(
-            &self,
-            value: &Self::NodeValue,
-            edge: EdgeIndex,
-        ) -> Option<Self::NodeValue> {
+        fn update_edge(&self, value: &Self::NodeValue, edge: EdgeIndex) -> Option<Self::NodeValue> {
             Some(value + self.graph.edge_weight(edge).unwrap())
         }
     }
@@ -218,7 +207,7 @@ mod tests {
         }
         graph.add_edge(NodeIndex::new(100), NodeIndex::new(0), 0);
 
-        let mut solution = Computation::new(FPProblem {graph}, None);
+        let mut solution = Computation::new(FPProblem { graph }, None);
         solution.set_node_value(NodeIndex::new(0), 0);
         solution.compute_with_max_steps(20);
 
