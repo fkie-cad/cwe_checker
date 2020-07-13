@@ -42,9 +42,9 @@ let test_callee_saved () =
         let () = check "callee_saved_register" (is_callee_saved register project = false) in
         ()
     end
-    | _ -> ()
+    | _ -> failwith "Not a supported architecture"
   end
-  | _ -> ()
+  | _ -> failwith "Not a supported calling convention"
 
 
 let test_parameter_register () =
