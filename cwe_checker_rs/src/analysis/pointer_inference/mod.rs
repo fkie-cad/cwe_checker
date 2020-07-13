@@ -136,7 +136,9 @@ impl<'a> PointerInference<'a> {
     /// To remedy this somewhat,
     /// we mark all function starts, that are also roots in the control flow graph,
     /// and do not have a state assigned to them yet, as additional entry points.
-    fn add_speculative_entry_points(&mut self, project: &Project) {
+    ///
+    /// If `only_cfg_roots` is set to `false`, then all function starts without a state are marked as roots.
+    fn add_speculative_entry_points(&mut self, project: &Project, only_cfg_roots: bool) {
         // TODO: Refactor the fixpoint computation structs, so that the project reference can be extracted from them.
         let mut start_block_to_sub_map: HashMap<&Tid, &Term<Sub>> = HashMap::new();
         for sub in project.program.term.subs.iter() {
@@ -160,12 +162,17 @@ impl<'a> PointerInference<'a> {
             if let Node::BlkStart(block) = node {
                 if start_block_to_sub_map.get(&block.tid).is_some()
                     && self.computation.get_node_value(node_id).is_none()
-                    && graph
-                        .neighbors_directed(node_id, Direction::Incoming)
-                        .next()
-                        .is_none()
                 {
-                    new_entry_points.push(node_id);
+                    if only_cfg_roots
+                        && graph
+                            .neighbors_directed(node_id, Direction::Incoming)
+                            .next()
+                            .is_none()
+                    {
+                        new_entry_points.push(node_id);
+                    } else if !only_cfg_roots {
+                        new_entry_points.push(node_id);
+                    }
                 }
             }
         }
@@ -200,7 +207,10 @@ impl<'a> PointerInference<'a> {
                 }
             }
         }
-        self.log_debug(format!("Pointer Inference: Blocks with state: {} / {}", stateful_blocks, all_blocks));
+        self.log_debug(format!(
+            "Pointer Inference: Blocks with state: {} / {}",
+            stateful_blocks, all_blocks
+        ));
     }
 
     fn log_debug(&self, msg: impl Into<String>) {
@@ -229,7 +239,12 @@ pub fn run(project: &Project, print_debug: bool) -> (Vec<CweWarning>, Vec<String
         computation.count_blocks_with_state(); // TODO: Remove!
 
         // Now compute again with speculative entry points added
-        computation.add_speculative_entry_points(project);
+        computation.add_speculative_entry_points(project, true);
+        computation.compute();
+        computation.count_blocks_with_state(); // TODO: Remove!
+
+        // Now compute again with all missed functions as additional entry points
+        computation.add_speculative_entry_points(project, false);
         computation.compute();
         computation.count_blocks_with_state(); // TODO: Remove!
 

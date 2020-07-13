@@ -98,18 +98,32 @@ impl ValueDomain for BitvectorDomain {
                 SMOD => BitvectorDomain::Value(
                     lhs_bitvec.clone().into_checked_srem(rhs_bitvec).unwrap(),
                 ),
-                LSHIFT => BitvectorDomain::Value(
-                    lhs_bitvec
-                        .clone()
-                        .into_checked_shl(rhs_bitvec.try_to_u64().unwrap() as usize)
-                        .unwrap(),
-                ),
-                RSHIFT => BitvectorDomain::Value(
-                    lhs_bitvec
-                        .clone()
-                        .into_checked_lshr(rhs_bitvec.try_to_u64().unwrap() as usize)
-                        .unwrap(),
-                ),
+                LSHIFT => {
+                    let shift_amount = rhs_bitvec.try_to_u64().unwrap() as usize;
+                    if shift_amount < lhs_bitvec.width().to_usize() {
+                        BitvectorDomain::Value(
+                            lhs_bitvec
+                                .clone()
+                                .into_checked_shl(shift_amount)
+                                .unwrap(),
+                        )
+                    } else {
+                        BitvectorDomain::Value(Bitvector::zero(lhs_bitvec.width()))
+                    }
+                }
+                RSHIFT => {
+                    let shift_amount = rhs_bitvec.try_to_u64().unwrap() as usize;
+                    if shift_amount < lhs_bitvec.width().to_usize() {
+                        BitvectorDomain::Value(
+                            lhs_bitvec
+                                .clone()
+                                .into_checked_lshr(shift_amount)
+                                .unwrap(),
+                        )
+                    } else {
+                        BitvectorDomain::Value(Bitvector::zero(lhs_bitvec.width()))
+                    }
+                }
                 ARSHIFT => BitvectorDomain::Value(
                     lhs_bitvec
                         .clone()
