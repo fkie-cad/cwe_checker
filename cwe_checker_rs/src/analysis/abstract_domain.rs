@@ -79,70 +79,72 @@ impl ValueDomain for BitvectorDomain {
     /// Note that this function assumes that both values have the same bitsize.
     /// If not, this function should panic.
     fn bin_op(&self, op: BinOpType, rhs: &Self) -> Self {
+        use BinOpType::*;
         assert_eq!(self.bitsize(), rhs.bitsize());
         match (self, rhs) {
-            (BitvectorDomain::Value(lhs_bitvec), BitvectorDomain::Value(rhs_bitvec)) => {
-                use BinOpType::*;
-                match op {
-                    PLUS => BitvectorDomain::Value(lhs_bitvec + rhs_bitvec),
-                    MINUS => BitvectorDomain::Value(lhs_bitvec - rhs_bitvec),
-                    TIMES => BitvectorDomain::Value(lhs_bitvec * rhs_bitvec),
-                    DIVIDE => BitvectorDomain::Value(
-                        lhs_bitvec.clone().into_checked_udiv(rhs_bitvec).unwrap(),
-                    ),
-                    SDIVIDE => BitvectorDomain::Value(
-                        lhs_bitvec.clone().into_checked_sdiv(rhs_bitvec).unwrap(),
-                    ),
-                    MOD => BitvectorDomain::Value(
-                        lhs_bitvec.clone().into_checked_urem(rhs_bitvec).unwrap(),
-                    ),
-                    SMOD => BitvectorDomain::Value(
-                        lhs_bitvec.clone().into_checked_srem(rhs_bitvec).unwrap(),
-                    ),
-                    LSHIFT => BitvectorDomain::Value(
-                        lhs_bitvec
-                            .clone()
-                            .into_checked_shl(rhs_bitvec.try_to_u64().unwrap() as usize)
-                            .unwrap(),
-                    ),
-                    RSHIFT => BitvectorDomain::Value(
-                        lhs_bitvec
-                            .clone()
-                            .into_checked_lshr(rhs_bitvec.try_to_u64().unwrap() as usize)
-                            .unwrap(),
-                    ),
-                    ARSHIFT => BitvectorDomain::Value(
-                        lhs_bitvec
-                            .clone()
-                            .into_checked_ashr(rhs_bitvec.try_to_u64().unwrap() as usize)
-                            .unwrap(),
-                    ),
-                    AND => BitvectorDomain::Value(lhs_bitvec & rhs_bitvec),
-                    OR => BitvectorDomain::Value(lhs_bitvec | rhs_bitvec),
-                    XOR => BitvectorDomain::Value(lhs_bitvec ^ rhs_bitvec),
-                    EQ => {
-                        assert_eq!(lhs_bitvec.width(), rhs_bitvec.width());
-                        BitvectorDomain::Value(Bitvector::from(lhs_bitvec == rhs_bitvec))
-                    }
-                    NEQ => {
-                        assert_eq!(lhs_bitvec.width(), rhs_bitvec.width());
-                        BitvectorDomain::Value(Bitvector::from(lhs_bitvec != rhs_bitvec))
-                    }
-                    LT => BitvectorDomain::Value(Bitvector::from(
-                        lhs_bitvec.checked_ult(rhs_bitvec).unwrap(),
-                    )),
-                    LE => BitvectorDomain::Value(Bitvector::from(
-                        lhs_bitvec.checked_ule(rhs_bitvec).unwrap(),
-                    )),
-                    SLT => BitvectorDomain::Value(Bitvector::from(
-                        lhs_bitvec.checked_slt(rhs_bitvec).unwrap(),
-                    )),
-                    SLE => BitvectorDomain::Value(Bitvector::from(
-                        lhs_bitvec.checked_sle(rhs_bitvec).unwrap(),
-                    )),
+            (BitvectorDomain::Value(lhs_bitvec), BitvectorDomain::Value(rhs_bitvec)) => match op {
+                PLUS => BitvectorDomain::Value(lhs_bitvec + rhs_bitvec),
+                MINUS => BitvectorDomain::Value(lhs_bitvec - rhs_bitvec),
+                TIMES => BitvectorDomain::Value(lhs_bitvec * rhs_bitvec),
+                DIVIDE => BitvectorDomain::Value(
+                    lhs_bitvec.clone().into_checked_udiv(rhs_bitvec).unwrap(),
+                ),
+                SDIVIDE => BitvectorDomain::Value(
+                    lhs_bitvec.clone().into_checked_sdiv(rhs_bitvec).unwrap(),
+                ),
+                MOD => BitvectorDomain::Value(
+                    lhs_bitvec.clone().into_checked_urem(rhs_bitvec).unwrap(),
+                ),
+                SMOD => BitvectorDomain::Value(
+                    lhs_bitvec.clone().into_checked_srem(rhs_bitvec).unwrap(),
+                ),
+                LSHIFT => BitvectorDomain::Value(
+                    lhs_bitvec
+                        .clone()
+                        .into_checked_shl(rhs_bitvec.try_to_u64().unwrap() as usize)
+                        .unwrap(),
+                ),
+                RSHIFT => BitvectorDomain::Value(
+                    lhs_bitvec
+                        .clone()
+                        .into_checked_lshr(rhs_bitvec.try_to_u64().unwrap() as usize)
+                        .unwrap(),
+                ),
+                ARSHIFT => BitvectorDomain::Value(
+                    lhs_bitvec
+                        .clone()
+                        .into_checked_ashr(rhs_bitvec.try_to_u64().unwrap() as usize)
+                        .unwrap(),
+                ),
+                AND => BitvectorDomain::Value(lhs_bitvec & rhs_bitvec),
+                OR => BitvectorDomain::Value(lhs_bitvec | rhs_bitvec),
+                XOR => BitvectorDomain::Value(lhs_bitvec ^ rhs_bitvec),
+                EQ => {
+                    assert_eq!(lhs_bitvec.width(), rhs_bitvec.width());
+                    BitvectorDomain::Value(Bitvector::from(lhs_bitvec == rhs_bitvec))
                 }
-            }
-            _ => BitvectorDomain::new_top(self.bitsize()),
+                NEQ => {
+                    assert_eq!(lhs_bitvec.width(), rhs_bitvec.width());
+                    BitvectorDomain::Value(Bitvector::from(lhs_bitvec != rhs_bitvec))
+                }
+                LT => BitvectorDomain::Value(Bitvector::from(
+                    lhs_bitvec.checked_ult(rhs_bitvec).unwrap(),
+                )),
+                LE => BitvectorDomain::Value(Bitvector::from(
+                    lhs_bitvec.checked_ule(rhs_bitvec).unwrap(),
+                )),
+                SLT => BitvectorDomain::Value(Bitvector::from(
+                    lhs_bitvec.checked_slt(rhs_bitvec).unwrap(),
+                )),
+                SLE => BitvectorDomain::Value(Bitvector::from(
+                    lhs_bitvec.checked_sle(rhs_bitvec).unwrap(),
+                )),
+            },
+            _ => match op {
+                PLUS | MINUS | TIMES | DIVIDE | SDIVIDE | MOD | SMOD | LSHIFT | RSHIFT
+                | ARSHIFT | AND | OR | XOR => BitvectorDomain::new_top(self.bitsize()),
+                EQ | NEQ | LT | LE | SLT | SLE => BitvectorDomain::new_top(1),
+            },
         }
     }
 

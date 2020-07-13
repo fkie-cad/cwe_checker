@@ -19,6 +19,7 @@ use state::State;
 
 pub struct PointerInference<'a> {
     computation: Computation<'a, Context<'a>>,
+    log_collector: crossbeam_channel::Sender<LogMessage>,
 }
 
 impl<'a> PointerInference<'a> {
@@ -27,7 +28,7 @@ impl<'a> PointerInference<'a> {
         cwe_sender: crossbeam_channel::Sender<CweWarning>,
         log_sender: crossbeam_channel::Sender<LogMessage>,
     ) -> PointerInference<'a> {
-        let context = Context::new(project, cwe_sender, log_sender);
+        let context = Context::new(project, cwe_sender, log_sender.clone());
 
         let mut entry_sub_to_entry_blocks_map = HashMap::new();
         let subs: HashMap<Tid, &Term<Sub>> = project
@@ -62,8 +63,17 @@ impl<'a> PointerInference<'a> {
             .collect();
         let mut fixpoint_computation =
             super::interprocedural_fixpoint::Computation::new(context, None);
+        log_sender
+            .send(LogMessage {
+                text: format!(
+                    "Pointer Inference: Adding {} entry points",
+                    entry_sub_to_entry_node_map.len()
+                ),
+                level: LogLevel::Debug,
+                location: None,
+            })
+            .unwrap();
         for (sub_tid, start_node_index) in entry_sub_to_entry_node_map.into_iter() {
-            println!("Adding entry point for {}", sub_tid); // TODO: Remove!
             fixpoint_computation.set_node_value(
                 start_node_index,
                 super::interprocedural_fixpoint::NodeValue::Value(State::new(
@@ -74,6 +84,7 @@ impl<'a> PointerInference<'a> {
         }
         PointerInference {
             computation: fixpoint_computation,
+            log_collector: log_sender,
         }
     }
 
@@ -158,12 +169,15 @@ impl<'a> PointerInference<'a> {
                 }
             }
         }
+        self.log_debug(format!(
+            "Pointer Inference: Adding {} speculative entry points",
+            new_entry_points.len()
+        ));
         for entry in new_entry_points {
             let sub_tid = start_block_to_sub_map
                 [&self.computation.get_graph()[entry].get_block().tid]
                 .tid
                 .clone();
-            println!("Adding speculative entry point for {}", sub_tid); // TODO: Remove!
             self.computation.set_node_value(
                 entry,
                 super::interprocedural_fixpoint::NodeValue::Value(State::new(
@@ -186,7 +200,16 @@ impl<'a> PointerInference<'a> {
                 }
             }
         }
-        println!("Blocks with state: {} / {}", stateful_blocks, all_blocks)
+        self.log_debug(format!("Pointer Inference: Blocks with state: {} / {}", stateful_blocks, all_blocks));
+    }
+
+    fn log_debug(&self, msg: impl Into<String>) {
+        let log_msg = LogMessage {
+            text: msg.into(),
+            level: LogLevel::Debug,
+            location: None,
+        };
+        self.log_collector.send(log_msg).unwrap();
     }
 }
 

@@ -15,7 +15,6 @@ That is because the value could be anything if the size read is too big and read
 In that regard, an empty memory region is actually the `top()` element of the domain.
 - TODO: Implement the abstract domain trait for MemRegion.
 - TODO: Remove the implicit saving of element sizes, as ValueDomains have now an intrinsic size.
-- TODO: MemRegion should not save Top(_) elements internally.
 Implementation needs is_top() to be a member function of the ValueDomain trait.
 */
 

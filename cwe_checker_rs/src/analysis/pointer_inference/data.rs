@@ -73,6 +73,12 @@ impl<'a> TryFrom<&'a Data> for &'a Bitvector {
     }
 }
 
+impl From<BitvectorDomain> for Data {
+    fn from(value: BitvectorDomain) -> Data {
+        Data::Value(value)
+    }
+}
+
 /// An abstract value representing a pointer given as a map from an abstract identifier
 /// to the offset in the pointed to object.
 ///
@@ -207,7 +213,22 @@ impl ValueDomain for Data {
             }
             (Pointer(pointer), MINUS, Value(value)) => Pointer(pointer.sub_from_offset(value)),
             // TODO: AND and OR binops may be used to compute pointers when alignment information about the pointer is known.
-            _ => ValueDomain::new_top(self.bitsize()),
+            (_, EQ, _) | (_, NEQ, _) | (_, LT, _) | (_, LE, _) | (_, SLT, _) | (_, SLE, _) => {
+                BitvectorDomain::new_top(1).into()
+            }
+            (_, PLUS, _)
+            | (_, MINUS, _)
+            | (_, TIMES, _)
+            | (_, DIVIDE, _)
+            | (_, SDIVIDE, _)
+            | (_, MOD, _)
+            | (_, SMOD, _)
+            | (_, LSHIFT, _)
+            | (_, RSHIFT, _)
+            | (_, ARSHIFT, _)
+            | (_, AND, _)
+            | (_, OR, _)
+            | (_, XOR, _) => Data::new_top(self.bitsize()),
         }
     }
 

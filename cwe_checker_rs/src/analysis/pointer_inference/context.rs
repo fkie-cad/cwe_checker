@@ -119,7 +119,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
                     );
                 };
                 match state.eval(condition) {
-                    Ok(Data::Value(cond)) => {
+                    Ok(Data::Value(cond)) if !cond.is_top() => {
                         if cond == Bitvector::from_bit(true).into() {
                             true_state
                         } else if cond == Bitvector::from_bit(false).into() {
