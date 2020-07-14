@@ -363,17 +363,16 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
                             }
                         }
                         "free" => {
-                            if let Ok(parameter_register) =
-                                extern_symbol.get_unique_parameter_register()
-                            {
-                                if let Ok(memory_object_pointer) =
-                                    state.eval(&Expression::Var(parameter_register.clone()))
-                                {
-                                    if let Data::Pointer(pointer) = memory_object_pointer {
-                                        if let Err(possible_double_free_object_ids) =
-                                            new_state.mark_mem_object_as_freed(&pointer)
-                                        {
-                                            let warning = CweWarning {
+                            match extern_symbol.get_unique_parameter() {
+                                Ok(parameter_expression) => {
+                                    if let Ok(memory_object_pointer) =
+                                        state.eval(parameter_expression)
+                                    {
+                                        if let Data::Pointer(pointer) = memory_object_pointer {
+                                            if let Err(possible_double_free_object_ids) =
+                                                new_state.mark_mem_object_as_freed(&pointer)
+                                            {
+                                                let warning = CweWarning {
                                                 name: "CWE415".to_string(),
                                                 version: "0.1".to_string(),
                                                 addresses: vec![call.tid.address.clone()],
@@ -382,19 +381,21 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
                                                 other: vec![possible_double_free_object_ids.into_iter().map(|id| {format!("{}", id)}).collect()],
                                                 description: format!("(Double Free) Object may have been freed before at {}", call.tid.address),
                                             };
-                                            self.cwe_collector.send(warning).unwrap();
-                                        }
-                                    } // TODO: add diagnostics for else case
-                                    new_state.remove_unreferenced_objects();
-                                    return Some(new_state);
-                                } else {
-                                    // TODO: add diagnostics message for the user here
+                                                self.cwe_collector.send(warning).unwrap();
+                                            }
+                                        } // TODO: add diagnostics for else case
+                                        new_state.remove_unreferenced_objects();
+                                        return Some(new_state);
+                                    } else {
+                                        // TODO: add diagnostics message for the user here
+                                        return Some(new_state);
+                                    }
+                                }
+                                Err(err) => {
+                                    // We do not know which memory object to free
+                                    self.log_debug(Err(err), Some(&call.tid));
                                     return Some(new_state);
                                 }
-                            } else {
-                                // We do not know which memory object to free
-                                // TODO: Add a diagnostics message for the user here
-                                return Some(new_state);
                             }
                         }
                         _ => {

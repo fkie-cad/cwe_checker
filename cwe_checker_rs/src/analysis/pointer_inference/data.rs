@@ -246,12 +246,16 @@ impl ValueDomain for Data {
         if let Data::Value(value) = self {
             Data::Value(value.extract(low_bit, high_bit))
         } else {
-            Data::new_top(self.bitsize())
+            Data::new_top(high_bit - low_bit + 1)
         }
     }
 
     /// Extend a bitvector using the given cast type
     fn cast(&self, kind: CastType, width: BitSize) -> Self {
+        if self.bitsize() == width {
+            // The cast is a no-op.
+            return self.clone();
+        }
         if let Data::Value(value) = self {
             Data::Value(value.cast(kind, width))
         } else {

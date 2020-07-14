@@ -33,10 +33,9 @@ impl ExternSymbol {
         }
     }
 
-    /// Returns the parameter register of an extern symbol.
-    /// Returns an error if the function has not exactly one parameter argument
-    /// or if the parameter argument is not a register.
-    pub fn get_unique_parameter_register(&self) -> Result<&crate::bil::variable::Variable, Error> {
+    /// Returns the parameter expression of an extern symbol.
+    /// Returns an error if the function has not exactly one parameter argument.
+    pub fn get_unique_parameter(&self) -> Result<&crate::bil::Expression, Error> {
         let param_args: Vec<_> = self
             .arguments
             .iter()
@@ -48,10 +47,7 @@ impl ExternSymbol {
                 param_args.len()
             ));
         }
-        match &param_args[0].location {
-            Expression::Var(var) => Ok(var),
-            _ => Err(anyhow!("Parameter location is not a register"))?,
-        }
+        Ok(&param_args[0].location)
     }
 }
 

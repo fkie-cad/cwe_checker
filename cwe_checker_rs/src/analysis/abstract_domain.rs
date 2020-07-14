@@ -80,7 +80,10 @@ impl ValueDomain for BitvectorDomain {
     /// If not, this function should panic.
     fn bin_op(&self, op: BinOpType, rhs: &Self) -> Self {
         use BinOpType::*;
-        assert_eq!(self.bitsize(), rhs.bitsize());
+        match op {
+            LSHIFT | RSHIFT | ARSHIFT => (),
+            _=> assert_eq!(self.bitsize(), rhs.bitsize())
+        }
         match (self, rhs) {
             (BitvectorDomain::Value(lhs_bitvec), BitvectorDomain::Value(rhs_bitvec)) => match op {
                 PLUS => BitvectorDomain::Value(lhs_bitvec + rhs_bitvec),
@@ -188,7 +191,7 @@ impl ValueDomain for BitvectorDomain {
                     .unwrap(),
             )
         } else {
-            BitvectorDomain::new_top(self.bitsize())
+            BitvectorDomain::new_top(high_bit - low_bit + 1)
         }
     }
 
