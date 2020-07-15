@@ -562,6 +562,51 @@ mod tests {
         }
     }
 
+    fn reg_add(name: &str, value: i64) -> Expression {
+        Expression::BinOp{
+            op: BinOpType::PLUS,
+            lhs: Box::new(Expression::Var(register(name))),
+            rhs: Box::new(Expression::Const(Bitvector::from_i64(value))),
+        }
+    }
+
+    fn reg_sub(name: &str, value: i64) -> Expression {
+        Expression::BinOp{
+            op: BinOpType::MINUS,
+            lhs: Box::new(Expression::Var(register(name))),
+            rhs: Box::new(Expression::Const(Bitvector::from_i64(value))),
+        }
+    }
+
+    fn store_exp(address: Expression, value: Expression) -> Expression {
+        let mem_var = Variable {
+            name: "mem".into(),
+            type_: crate::bil::variable::Type::Memory { addr_size: 64, elem_size: 64 },
+            is_temp: false,
+        };
+        Expression::Store{
+            memory : Box::new(Expression::Var(mem_var)),
+            address: Box::new(address),
+            value: Box::new(value),
+            endian: Endianness::LittleEndian,
+            size: 64,
+        }
+    }
+
+    fn load_exp(address: Expression) -> Expression {
+        let mem_var = Variable {
+            name: "mem".into(),
+            type_: crate::bil::variable::Type::Memory { addr_size: 64, elem_size: 64 },
+            is_temp: false,
+        };
+        Expression::Load{
+            memory : Box::new(Expression::Var(mem_var)),
+            address: Box::new(address),
+            endian: Endianness::LittleEndian,
+            size: 64,
+        }
+    }
+
     #[test]
     fn state() {
         use crate::analysis::pointer_inference::object::*;
@@ -651,5 +696,27 @@ mod tests {
         assert_eq!(state.memory.get_num_objects(), 3);
         state.remove_unreferenced_objects();
         assert_eq!(state.memory.get_num_objects(), 2);
+    }
+
+    #[test]
+    fn handle_store() {
+        use crate::bil::Expression::*;
+        let mut state = State::new(&register("RSP"), Tid::new("time0"));
+        let stack_id = new_id("RSP".into());
+        assert_eq!(state.eval(&Var(register("RSP"))).unwrap(), Data::Pointer(PointerDomain::new(stack_id.clone(), bv(0))));
+
+        state.handle_register_assign(&register("RSP"), &reg_sub("RSP", 32)).unwrap();
+        assert_eq!(state.eval(&Var(register("RSP"))).unwrap(), Data::Pointer(PointerDomain::new(stack_id.clone(), bv(-32))));
+        state.handle_register_assign(&register("RSP"), &reg_add("RSP", -8)).unwrap();
+        assert_eq!(state.eval(&Var(register("RSP"))).unwrap(), Data::Pointer(PointerDomain::new(stack_id.clone(), bv(-40))));
+
+        state.handle_store_exp(&store_exp(reg_add("RSP", 8), Const(Bitvector::from_i64(1)))).unwrap();
+        state.handle_store_exp(&store_exp(reg_sub("RSP", 8), Const(Bitvector::from_i64(2)))).unwrap();
+        state.handle_store_exp(&store_exp(reg_add("RSP", -16), Const(Bitvector::from_i64(3)))).unwrap();
+        state.handle_register_assign(&register("RSP"), &reg_sub("RSP", 4)).unwrap();
+
+        assert_eq!(state.eval(&load_exp(reg_add("RSP", 12))).unwrap(), bv(1).into());
+        assert_eq!(state.eval(&load_exp(reg_sub("RSP", 4))).unwrap(), bv(2).into());
+        assert_eq!(state.eval(&load_exp(reg_add("RSP", -12))).unwrap(), bv(3).into());
     }
 }

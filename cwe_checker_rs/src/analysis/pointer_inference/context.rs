@@ -81,7 +81,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
                 symbols: Vec::new(),
                 other: Vec::new(),
                 description: format!(
-                    "(Use after free) Access through a dangling pointer at {}",
+                    "(Use After Free) Access through a dangling pointer at {}",
                     def.tid.address
                 ),
             };
@@ -281,7 +281,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
         let stack_register = &self.project.stack_pointer_register;
         {
             let stack_pointer = state.get_register(stack_register).unwrap();
-            let offset = Bitvector::from_u8(8)
+            let offset = Bitvector::from_u16(stack_register.bitsize().unwrap() / 8)
                 .into_zero_extend(stack_register.bitsize().unwrap() as usize)
                 .unwrap();
             self.log_debug(
@@ -316,7 +316,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
                                         tids: vec![format!("{}", call.tid)],
                                         symbols: Vec::new(),
                                         other: Vec::new(),
-                                        description: format!("(Use after free) Call to {} may access freed memory at {}", extern_symbol.name, call.tid.address),
+                                        description: format!("(Use After Free) Call to {} may access freed memory at {}", extern_symbol.name, call.tid.address),
                                     };
                                     self.cwe_collector.send(warning).unwrap();
                                 }
