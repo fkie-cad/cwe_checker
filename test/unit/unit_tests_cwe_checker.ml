@@ -43,12 +43,22 @@ let check_for_cconv (project : Project.t) (arch : string) =
   | _ -> ()
 
 
+let get_test_bin_format (project : Project.t) =
+  let filename = match (Project.get project filename) with
+    | Some(f) -> f
+    | _ -> failwith "Test file has no file name" in
+  match String.is_substring filename ~substring:"mingw32" with
+  | true -> "pe"
+  | false -> "elf"
+
+
 let set_example_project (project : Project.t) (tests : string list) =
   let arch = Arch.to_string (Project.arch project) in
   List.iter tests ~f:(fun test ->
     match test with
     | "TypeInference" -> Type_inference_test.example_project := Some(project)
-    | "Cconv" -> Cconv_test.example_project := Some(project); Cconv_test.example_arch := Some(arch); check_for_cconv project arch
+    | "Cconv" -> Cconv_test.example_project := Some(project); Cconv_test.example_arch := Some(arch);
+        check_for_cconv project arch; Cconv_test.example_bin_format := Some(get_test_bin_format project)
     | "CWE476" -> Cwe_476_test.example_project := Some(project)
     | _ -> ()
   )
