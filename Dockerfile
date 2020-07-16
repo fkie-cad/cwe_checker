@@ -9,3 +9,4 @@ RUN sudo chown -R bap:bap /home/bap/cwe_checker \
 WORKDIR /home/bap/cwe_checker
 
 ENTRYPOINT ["opam", "config", "exec", "--"]
+CMD cwe_checker /tmp/input
