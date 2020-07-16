@@ -13,6 +13,7 @@ all:
 
 test:
 	cargo test
+	cd test/unit/ && ./specify_test_files_for_compilation.sh
 	dune runtest
 	cd test/artificial_samples; scons; cd ../..
 	pytest -v --ignore=_build

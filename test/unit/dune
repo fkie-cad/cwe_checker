@@ -1,5 +1,5 @@
 (executable
-  (name cwe_checker_unit_tests)
+  (name unit_tests_cwe_checker)
   (libraries
   alcotest
   yojson
@@ -13,6 +13,6 @@
 
 (rule
   (alias runtest)
-  (deps cwe_checker_unit_tests.exe)
+  (deps unit_tests_cwe_checker.exe)
   (action (run %{deps} --color=always))
 )

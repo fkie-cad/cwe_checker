@@ -79,7 +79,9 @@ let get_register_list (project : Project.t) (context : string) : string list =
   let arch = match bap_arch with
     | "i386" | "i686" -> "x86"
     | "powerpc" -> "ppc"
-    | _      -> bap_arch in
+    | "powerpc64" -> "ppc64"
+    | "powerpc64le" -> "ppc64le"
+    | _ -> bap_arch in
   match Stdlib.List.mem arch (get_supported_architectures ()) with
   | true -> begin
       let json_bin = Json_utils.get_bin_format_from_json (get_json ()) (extract_bin_format project) in
