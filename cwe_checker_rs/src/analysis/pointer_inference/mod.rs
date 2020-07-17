@@ -236,17 +236,17 @@ pub fn run(project: &Project, print_debug: bool) -> (Vec<CweWarning>, Vec<String
         let mut computation = PointerInference::new(project, cwe_sender, log_sender);
 
         computation.compute();
-        computation.count_blocks_with_state(); // TODO: Remove!
+        computation.count_blocks_with_state();
 
         // Now compute again with speculative entry points added
         computation.add_speculative_entry_points(project, true);
         computation.compute();
-        computation.count_blocks_with_state(); // TODO: Remove!
+        computation.count_blocks_with_state();
 
         // Now compute again with all missed functions as additional entry points
         computation.add_speculative_entry_points(project, false);
         computation.compute();
-        computation.count_blocks_with_state(); // TODO: Remove!
+        computation.count_blocks_with_state();
 
         if print_debug {
             computation.print_compact_json();
