@@ -2,7 +2,6 @@ open Bap.Std
 open Core_kernel
 
 
-
 external rs_run_pointer_inference: Serde_json.t -> string = "rs_run_pointer_inference"
 external rs_run_pointer_inference_and_print_debug: Serde_json.t -> unit = "rs_run_pointer_inference_and_print_debug"
 
