@@ -9,7 +9,7 @@ all:
 	bap tmp/arrays_mips64_gcc.out --pass=unit-tests-cwe-checker --unit-tests-cwe-checker-tests=Cconv
 	bap tmp/arrays_powerpc_gcc.out --pass=unit-tests-cwe-checker --unit-tests-cwe-checker-tests=Cconv
 	bap tmp/arrays_gcc.out --pass=unit-tests-cwe-checker --unit-tests-cwe-checker-tests=MemRegion,TypeInference,CWE476
-	bap tmp/c_constructs_gcc.out --pass=unit-tests-cwe-checker --unit-tests-cwe-checker-tests=CWE560,AddrTrans
+	bap tmp/c_constructs_gcc.out --pass=unit-tests-cwe-checker --unit-tests-cwe-checker-tests=CWE560,AddrTrans,Symbols
 	bapbundle remove unit_tests_cwe_checker.plugin
 
 clean:

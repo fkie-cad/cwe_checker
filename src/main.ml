@@ -148,14 +148,15 @@ let main flags params project =
         Log_utils.error "[cwe_checker] Configuration file not found. Aborting..."
       else
         begin
+          let prog = Project.program project in
+          let tid_address_map = Address_translation.generate_tid_map prog in
+          Symbol_utils.check_if_symbols_resolved project prog tid_address_map;
           if partial_update = "" then
             full_run project config
           else
             partial_run project config (String.split partial_update ~on: ',');
           if check_path then
             begin
-              let prog = Project.program project in
-              let tid_address_map = Address_translation.generate_tid_map prog in
               let json = Yojson.Basic.from_file config in
               let check_path_sources = Json_utils.get_symbols_from_json json "check_path" in
               let check_path_sinks = Log_utils.get_cwe_warnings () in

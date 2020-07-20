@@ -18,7 +18,54 @@ type extern_symbol =
   }
 
 
+let extern_symbol_blacklist = [
+  "__cxa_atexit"
+]
+
+
 let extern_symbols = ref []
+
+let dyn_syms = ref None
+
+
+(** Parse a line from the dyn-syms output table of objdump. Return the name of a symbol if the symbol is an extern function name. *)
+let parse_dyn_sym_line (line : string) : string option =
+  let line = ref (String.strip line) in
+  let str_list = ref [] in
+  while Option.is_some (String.rsplit2 !line ~on:' ') do
+    let (left, right) = Option.value_exn (String.rsplit2 !line ~on:' ') in
+    line := String.strip left;
+    str_list := right :: !str_list;
+  done;
+  str_list := !line :: !str_list;
+  match !str_list with
+  | value :: func1 :: func2 :: _ -> begin
+      match ( String.strip ~drop:(fun x -> x = '0') value ) with
+      | "" -> begin
+          if (String.equal func1 "DF" || String.equal func2 "DF") then (
+            List.last !str_list
+          )
+          else None
+        end
+      | _ -> None (* The symbol has a nonzero value, so we assume that it is not an extern function symbol. *)
+    end
+  | _ -> None
+
+
+let parse_dyn_syms (project : Project.t) : String.Set.t =
+  match !dyn_syms with
+  | Some(symbol_set) -> symbol_set
+  | None -> begin
+      let lines = Support_functions.call_objdump project ~flag:"--dynamic-syms" ~err:"[cwe_checker] Parsing of dynamic symbols failed:" in
+      match lines with
+      | _ :: _ :: _ :: _ :: tail -> (* The first four lines are not part of the table *)
+          let symbol_set = String.Set.of_list (List.filter_map tail ~f:parse_dyn_sym_line) in
+          dyn_syms := Some(symbol_set);
+          symbol_set
+      | _ ->
+          dyn_syms := Some(String.Set.empty);
+          String.Set.empty
+    end
 
 
 let get_project_calling_convention (project : Project.t) : string option =
@@ -40,7 +87,7 @@ let build_extern_symbols (project : Project.t) (program : program term) (parsed_
 
 
 let build_and_return_extern_symbols (project : Project.t) (program : program term) (tid_map : word Tid.Map.t) : extern_symbol list =
-  let parsed_symbols = Cconv.parse_dyn_syms project in
+  let parsed_symbols = parse_dyn_syms project in
   if String.Set.is_empty parsed_symbols then []
   else begin
     match !extern_symbols with
@@ -167,6 +214,19 @@ let call_finder : (tid * tid) list Term.visitor = object
         | _ -> tid_list
       end
 end
+
+
+let check_if_symbols_resolved (project : Project.t) (program : program term) (tid_map : word Tid.Map.t) =
+  let extern = build_and_return_extern_symbols project program tid_map in
+  let extern = List.filter extern ~f:(fun e ->
+    match Stdlib.List.mem e.name extern_symbol_blacklist with
+    | false -> true
+    | true -> false
+  ) in
+  match List.is_empty extern with
+  | true -> Log_utils.error "BAP is not able to resolve external symbols."
+  | false -> ()
+
 
 
 let transform_call_to_concrete_call ((src_tid, dst_tid) : tid * tid) (symbols : symbol list) : concrete_call =
