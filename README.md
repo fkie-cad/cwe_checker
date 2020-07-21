@@ -62,7 +62,7 @@ You can adjust the behavior of most checks via a configuration file located at `
 
 For more information on usage instructions and available command line flags, see the [online documentation](https://fkie-cad.github.io/cwe_checker/doc/html/cwe_checker/index.html). You can also build the documentation locally via `make documentation` and then browse it in the *doc/html/* folder.
 
-## Implemented Checks <a name=checks></a>
+## Implemented Checks <a name=checks></a> ##
 So far the following analyses are implemented:
 -   [CWE-125](https://cwe.mitre.org/data/definitions/125.html): Out-of-bounds read (via emulation)
 -   [CWE-190](https://cwe.mitre.org/data/definitions/190.html): Integer Overflow or Wraparound
