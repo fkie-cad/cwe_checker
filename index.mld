@@ -67,6 +67,7 @@ The names of all available modules can be printed with the [-module-versions] co
 
 To annotate CWE-hits in IDA Pro or Ghidra, first run {i cwe_checker} and save the JSON-formatted output to a file.
 {[bap [BINARY] --pass=cwe-checker --cwe-checker-json --cwe-checker-out=cwe_hits.json]}
+After that execute the tool-specific script to import the results:
 - For IDA Pro run the [cwe_checker_to_ida.py] script located in the [cwe_checker_to_ida] folder.
 {[python3 cwe_checker_to_ida.py -i cwe_hits.json -o cwe_hits.py]}
 Now open the binary file in IDA Pro and execute the generated [cwe_hits.py] script from within IDA Pro (Alt+F7).

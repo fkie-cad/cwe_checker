@@ -4,8 +4,10 @@ dev
 -   Added a lot more test cases to acceptance tests (PR #46)
 -   Reworked CWE-476 check to track stack variables (PR #47)
 -   Switched to BAP 2.0 (PR #49)
--   Several internal code improvements (PRs #51, #58, #62)
+-   Several internal code improvements (PRs #51, #58, #62, #67)
 -   Added deprecation warnings to the emulation based checks (PR #66)
+-   Added a new (still experimental) engine for data-flow analysis written in Rust (PR #70)
+-   Added new, data-flow based checks for CWEs 415 and 416 (PR #70)
 
 0.3 (2019-12)
 ====

@@ -1,4 +1,5 @@
-(* This module implements functionality related to parsing the JSON configuration file. *)
+(** This module implements functionality related to parsing the JSON configuration file.
+*)
 
 
 (** Returns pairs of symbols for a given CWE check. *)

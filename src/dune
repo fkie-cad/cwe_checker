@@ -9,6 +9,8 @@
   core_kernel
   ppx_deriving_yojson.runtime)
   (preprocess (pps ppx_jane ppx_deriving_yojson))
+  (foreign_archives cwe_checker_rs)
+  (c_library_flags (-lpthread -lc -lm)) ; needed for linking the Rust runtime
 )
 
 (include_subdirs unqualified) ; Include all subdirs when looking for source files

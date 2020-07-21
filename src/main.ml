@@ -24,7 +24,8 @@ let known_modules = [{cwe_func = Cwe_190.check_cwe; name = Cwe_190.name; version
                      {cwe_func = Cwe_476.check_cwe; name = Cwe_476.name; version = Cwe_476.version; requires_pairs = false; has_parameters = true};
                      {cwe_func = Cwe_560.check_cwe; name = Cwe_560.name; version = Cwe_560.version; requires_pairs = false; has_parameters = false};
                      {cwe_func = Cwe_676.check_cwe; name = Cwe_676.name; version = Cwe_676.version; requires_pairs = false; has_parameters = false};
-                     {cwe_func = Cwe_782.check_cwe; name = Cwe_782.name; version = Cwe_782.version; requires_pairs = false; has_parameters = false}]
+                     {cwe_func = Cwe_782.check_cwe; name = Cwe_782.name; version = Cwe_782.version; requires_pairs = false; has_parameters = false};
+                     {cwe_func = Memory_cwes.check_cwe; name = Memory_cwes.name; version = Memory_cwes.version; requires_pairs = false; has_parameters = false}]
 
 
 let cmdline_flags = [
@@ -97,7 +98,10 @@ let full_run project config =
   let program = Project.program project in
   let tid_address_map = Address_translation.generate_tid_map program in
   let json = Yojson.Basic.from_file config in
-  List.iter known_modules ~f:(fun cwe -> execute_cwe_module cwe json program project tid_address_map)
+  let full_run_modules = List.filter known_modules ~f:(fun cwe_module ->
+    cwe_module.name <> "Memory" (* TODO: Remove this when the memory check is more stable *)
+  ) in
+  List.iter full_run_modules ~f:(fun cwe -> execute_cwe_module cwe json program project tid_address_map)
 
 
 let build_output_path (path : string) : string =

@@ -1,0 +1,20 @@
+[package]
+name = "cwe_checker_rs"
+version = "0.1.0"
+authors = ["Nils-Edvin Enkelmann <nils-edvin.enkelmann@fkie.fraunhofer.de>"]
+edition = "2018"
+
+[dependencies]
+apint = "0.2"
+serde = {version = "1.0", features = ["derive", "rc"]}
+serde_json = "1.0"
+serde_yaml = "0.8"
+ocaml = "0.9.2"
+petgraph = { version = "0.5", features = ["default", "serde-1"] }
+fnv = "1.0" # a faster hash function for small keys like integers
+anyhow = "1.0" # for easy error types
+crossbeam-channel = "0.4"
+
+[lib]
+name = "cwe_checker_rs"
+crate-type = ["staticlib", "cdylib"]

@@ -11,7 +11,8 @@
 
 (include_subdirs unqualified) ; Include all subdirs when looking for source files
 
-(alias
- (name runtest)
- (deps unit_tests_cwe_checker.exe)
-(action (run %{deps} --color=always)))
+(rule
+  (alias runtest)
+  (deps unit_tests_cwe_checker.exe)
+  (action (run %{deps} --color=always))
+)

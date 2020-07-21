@@ -34,6 +34,7 @@ let unit_test_list = [
   "CWE476", Cwe_476_test.tests;
   "CWE560", Cwe_560_test.tests;
   "AddrTrans", Address_translation_test.tests;
+  "SerdeJson", Serde_json_test.tests;
 ]
 
 
@@ -57,13 +58,14 @@ let set_example_project (project : Project.t) (tests : string list) =
   List.iter tests ~f:(fun test ->
     match test with
     | "TypeInference" -> Type_inference_test.example_project := Some(project)
-    | "Cconv" -> begin 
-        Cconv_test.example_project := Some(project); 
+    | "Cconv" -> begin
+        Cconv_test.example_project := Some(project);
         Cconv_test.example_arch := Some(arch);
-        check_for_cconv project arch; 
+        check_for_cconv project arch;
         Cconv_test.example_bin_format := Some(get_test_bin_format project)
     end
     | "CWE476" -> Cwe_476_test.example_project := Some(project)
+    | "SerdeJson" -> Serde_json_test.example_project := Some(project)
     | _ -> ()
   )
 
