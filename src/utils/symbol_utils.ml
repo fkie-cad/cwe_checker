@@ -27,6 +27,10 @@ let extern_symbols = ref []
 
 let dyn_syms = ref None
 
+let calls = ref []
+
+let call_finder_run = ref false
+
 
 (** Parse a line from the dyn-syms output table of objdump. Return the name of a symbol if the symbol is an extern function name. *)
 let parse_dyn_sym_line (line : string) : string option =
@@ -214,6 +218,16 @@ let call_finder : (tid * tid) list Term.visitor = object
         | _ -> tid_list
       end
 end
+
+
+let get_calls (program : program term) : (tid * tid) list =
+  match !call_finder_run with
+  | true -> !calls
+  | false -> begin
+      call_finder_run := true;
+      calls := call_finder#run program [];
+      !calls
+  end
 
 
 let check_if_symbols_resolved (project : Project.t) (program : program term) (tid_map : word Tid.Map.t) =

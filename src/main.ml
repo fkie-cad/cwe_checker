@@ -12,6 +12,7 @@ type cwe_module = {
   has_parameters : bool;
 }
 
+
 let known_modules = [{cwe_func = Cwe_190.check_cwe; name = Cwe_190.name; version = Cwe_190.version; requires_pairs = false; has_parameters = false};
                      {cwe_func = Cwe_215.check_cwe; name = Cwe_215.name; version = Cwe_215.version; requires_pairs = false; has_parameters = false};
                      {cwe_func = Cwe_243.check_cwe; name = Cwe_243.name; version = Cwe_243.version; requires_pairs = true; has_parameters = false};
@@ -35,6 +36,7 @@ let cmdline_flags = [
   ("check-path", "Checks if there is a path from an input function to a CWE hit.");
 ]
 
+
 let cmdline_params = [
   ("config", "Path to configuration file.");
   ("out", "Path to output file.");
@@ -42,15 +44,19 @@ let cmdline_params = [
   ("api", "C header file for additional subroutine information.")
 ]
 
+
 let build_version_sexp () =
   List.map known_modules ~f:(fun cwe -> Format.sprintf "\"%s\": \"%s\"" cwe.name cwe.version)
   |> String.concat ~sep:", "
 
+
 let print_module_versions () =
   Log_utils.info (sprintf "[cwe_checker] module_versions: {%s}" (build_version_sexp ()))
 
+
 let print_version () =
   print_endline version
+
 
 let print_help_message ((): unit) : unit =
   let flags = cmdline_flags in
@@ -61,7 +67,8 @@ let print_help_message ((): unit) : unit =
   Printf.printf("\nPARAMETERS:\n\n");
   List.iter ~f:(fun x -> Printf.printf "    -%s: %s\n" (fst x) (snd x)) params
 
-let execute_cwe_module cwe json program project tid_address_map =
+
+let execute_cwe_module (cwe : cwe_module) (json : Yojson.Basic.t) (project : Project.t) (program : program term) (tid_address_map : word Tid.Map.t) : unit =
   let parameters = match cwe.has_parameters with
     | false -> []
     | true -> Json_utils.get_parameter_list_from_json json cwe.name in
@@ -72,6 +79,7 @@ let execute_cwe_module cwe json program project tid_address_map =
     let symbols = Json_utils.get_symbols_from_json json cwe.name in
     cwe.cwe_func program project tid_address_map [symbols] parameters
 
+
 let check_valid_module_list (modules : string list) : unit =
   let known_module_names = List.map ~f:(fun x -> x.name) known_modules in
   match List.find modules ~f:(fun module_name -> not (Stdlib.List.mem module_name known_module_names) ) with
@@ -79,25 +87,20 @@ let check_valid_module_list (modules : string list) : unit =
       failwith ("[cwe_checker] Unknown CWE module " ^ module_name ^ ". Known modules: " ^ String.concat (List.map ~f:(fun x -> x ^ " ") known_module_names));
   | None -> ()
 
-let partial_run project config modules =
-  let program = Project.program project in
-  let tid_address_map = Address_translation.generate_tid_map program in
-  let json = Yojson.Basic.from_file config in
+
+let partial_run (json : Yojson.Basic.t) (project : Project.t) (program : program term) (tid_address_map : word Tid.Map.t) (modules : string list) : unit =
   let () = check_valid_module_list modules in
   Log_utils.info (sprintf "[cwe_checker] Just running the following analyses: %s." (String.concat (List.map ~f:(fun x -> x ^ " ") modules)));
   List.iter modules ~f:(fun cwe ->
     let cwe_mod = match List.find known_modules ~f:(fun x -> x.name = cwe) with
       | Some(module_) -> module_
       | None -> failwith "[cwe_checker] Unknown CWE module" in
-    let program = Project.program project in
-    execute_cwe_module cwe_mod json program project tid_address_map
+    execute_cwe_module cwe_mod json project program tid_address_map
   )
 
-let full_run project config =
-  let program = Project.program project in
-  let tid_address_map = Address_translation.generate_tid_map program in
-  let json = Yojson.Basic.from_file config in
-  List.iter known_modules ~f:(fun cwe -> execute_cwe_module cwe json program project tid_address_map)
+
+let full_run (json : Yojson.Basic.t) (project : Project.t) (program : program term) (tid_address_map : word Tid.Map.t) : unit =
+  List.iter known_modules ~f:(fun cwe -> execute_cwe_module cwe json project program tid_address_map)
 
 
 let build_output_path (path : string) : string =
@@ -115,7 +118,7 @@ let build_output_path (path : string) : string =
   | _ -> path  (* file does not exist. We generate a new file with this name. *)
 
 
-let main flags params project =
+let main (flags : Bool.t String.Map.t) (params : String.t String.Map.t) (project : Project.t) =
   let config = String.Map.find_exn params "config" in
   let module_versions = String.Map.find_exn flags "module-versions" in
   let partial_update = String.Map.find_exn params "partial" in
@@ -150,14 +153,14 @@ let main flags params project =
         begin
           let prog = Project.program project in
           let tid_address_map = Address_translation.generate_tid_map prog in
+          let json = Yojson.Basic.from_file config in
           Symbol_utils.check_if_symbols_resolved project prog tid_address_map;
           if partial_update = "" then
-            full_run project config
+            full_run json project prog tid_address_map
           else
-            partial_run project config (String.split partial_update ~on: ',');
+            partial_run json project prog tid_address_map (String.split partial_update ~on: ',');
           if check_path then
             begin
-              let json = Yojson.Basic.from_file config in
               let check_path_sources = Json_utils.get_symbols_from_json json "check_path" in
               let check_path_sinks = Log_utils.get_cwe_warnings () in
               Check_path.check_path prog tid_address_map check_path_sources check_path_sinks
