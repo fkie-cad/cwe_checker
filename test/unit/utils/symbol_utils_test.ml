@@ -1,5 +1,6 @@
 open Core_kernel
 open Cwe_checker_core
+open Bap.Std
 
 open Symbol_utils
 
@@ -8,16 +9,14 @@ let check msg x = Alcotest.(check bool) msg true x
 let example_project = ref None
 
 
-let test_parse_dyn_syms () =
-  (* this test assumes, that the example project is the arrays_x64.out binary from the artificial samples. *)
+let test_check_if_symbols_resolved () =
   let project = Option.value_exn !example_project in
-  let () = check "free_as_dyn_sym" (String.Set.mem (parse_dyn_syms project) "free") in
-  let () = check "__libc_start_main_as_dyn_sym" (String.Set.mem (parse_dyn_syms project) "__libc_start_main") in
-  let () = check "malloc_as_dyn_sym" (String.Set.mem (parse_dyn_syms project) "malloc") in
-  let () = check "realloc_not_a_dyn_sym" (false = String.Set.mem (parse_dyn_syms project) "realloc") in
+  let program = Project.program project in
+  let tid_address_map = Address_translation.generate_tid_map program in
+  let () = check "no_symbols" (check_if_symbols_resolved project program tid_address_map = false) in
   ()
 
 
 let tests = [
-  "Parse Dynamic Symbols", `Quick, test_parse_dyn_syms;
+  "Check if Symbols Resolved", `Quick, test_check_if_symbols_resolved;
 ]

@@ -69,9 +69,9 @@ val calls_callsite_symbol : Bap.Std.Jmp.t -> symbol -> bool
 (** This function finds all (direct) calls in a program. It returns a list of tuples of (callsite, address).*)
 val call_finder : (Bap.Std.tid * Bap.Std.tid) list Bap.Std.Term.visitor
 
-val get_calls : Bap.Std.program Bap.Std.term -> (Bap.Std.tid * Bap.Std.tid) list  
+val get_calls : Bap.Std.program Bap.Std.term -> (Bap.Std.tid * Bap.Std.tid) list
 
-val check_if_symbols_resolved : Bap.Std.Project.t -> Bap.Std.program Bap.Std.term -> Bap.Std.word Bap.Std.Tid.Map.t -> unit
+val check_if_symbols_resolved : Bap.Std.Project.t -> Bap.Std.program Bap.Std.term -> Bap.Std.word Bap.Std.Tid.Map.t -> bool
 
 (** Transform a call (e.g. found with call_finder) to concrete_call with the symbol resolved.*)
 val transform_call_to_concrete_call :

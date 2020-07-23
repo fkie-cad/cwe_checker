@@ -19,7 +19,9 @@ type extern_symbol =
 
 
 let extern_symbol_blacklist = [
-  "__cxa_atexit"
+  "__cxa_atexit";
+  "__libc_start_main";
+  "__cxa_finalize"
 ]
 
 
@@ -27,7 +29,7 @@ let extern_symbols = ref []
 
 let dyn_syms = ref None
 
-let calls = ref []
+let found_calls = ref []
 
 let call_finder_run = ref false
 
@@ -222,15 +224,15 @@ end
 
 let get_calls (program : program term) : (tid * tid) list =
   match !call_finder_run with
-  | true -> !calls
+  | true -> !found_calls
   | false -> begin
       call_finder_run := true;
-      calls := call_finder#run program [];
-      !calls
+      found_calls := call_finder#run program [];
+      !found_calls
   end
 
 
-let check_if_symbols_resolved (project : Project.t) (program : program term) (tid_map : word Tid.Map.t) =
+let check_if_symbols_resolved (project : Project.t) (program : program term) (tid_map : word Tid.Map.t) : bool =
   let extern = build_and_return_extern_symbols project program tid_map in
   let extern = List.filter extern ~f:(fun e ->
     match Stdlib.List.mem e.name extern_symbol_blacklist with
@@ -238,8 +240,18 @@ let check_if_symbols_resolved (project : Project.t) (program : program term) (ti
     | true -> false
   ) in
   match List.is_empty extern with
-  | true -> Log_utils.error "BAP is not able to resolve external symbols."
-  | false -> ()
+  | true -> false
+  | false -> begin
+      let calls = List.map (get_calls program) ~f:(fun c -> match c with (_, dst) -> dst) in
+      let not_resolved = List.filter extern ~f:(fun e ->
+        match Stdlib.List.mem e.tid calls with
+        | true -> false
+        | false -> true
+      ) in
+      match List.length extern = List.length not_resolved with
+      | true -> false
+      | false -> true
+  end
 
 
 

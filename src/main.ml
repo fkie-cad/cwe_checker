@@ -154,7 +154,9 @@ let main (flags : Bool.t String.Map.t) (params : String.t String.Map.t) (project
           let prog = Project.program project in
           let tid_address_map = Address_translation.generate_tid_map prog in
           let json = Yojson.Basic.from_file config in
-          Symbol_utils.check_if_symbols_resolved project prog tid_address_map;
+          match Symbol_utils.check_if_symbols_resolved project prog tid_address_map with
+          | false -> Log_utils.error "BAP is not able to resolve external symbols."
+          | true -> ();
           if partial_update = "" then
             full_run json project prog tid_address_map
           else
