@@ -240,7 +240,7 @@ let check_if_symbols_resolved (project : Project.t) (program : program term) (ti
   | false -> begin
       let calls = List.map (get_calls program) ~f:(fun call -> match call with (_, dst) -> dst) in
       let not_resolved = List.filter extern ~f:(fun ext_sym -> not (Stdlib.List.mem ext_sym.tid calls)) in
-      not (List.length extern = List.length not_resolved)
+      List.length extern <> List.length not_resolved
   end
 
 

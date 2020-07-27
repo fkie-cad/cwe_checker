@@ -1,0 +1,2 @@
+[workspace]
+members = ["cwe_checker_rs"]

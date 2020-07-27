@@ -36,6 +36,7 @@ let unit_test_list = [
   "AddrTrans", Address_translation_test.tests;
   "Symbols", Symbol_utils_test.tests;
   "DynSyms", Parse_dyn_syms_test.tests;
+  "SerdeJson", Serde_json_test.tests;
 ]
 
 
@@ -68,6 +69,7 @@ let set_example_project (project : Project.t) (tests : string list) =
     | "CWE476" -> Cwe_476_test.example_project := Some(project)
     | "Symbols" -> Symbol_utils_test.example_project := Some(project)
     | "DynSyms" -> Parse_dyn_syms_test.example_project := Some(project)
+    | "SerdeJson" -> Serde_json_test.example_project := Some(project)
     | _ -> ()
   )
 

@@ -23,7 +23,7 @@ module CweWarning : sig
       symbols: string list;
       other : string list list;
       description : string;
-    }
+    } [@@deriving yojson]
 end
 
 module CheckPath : sig
