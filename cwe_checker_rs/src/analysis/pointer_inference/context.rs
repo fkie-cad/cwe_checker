@@ -784,15 +784,23 @@ mod tests {
         state_before_return.set_register(&register("RAX"), Data::Pointer(PointerDomain::new(new_id("call_callee_other", "RSP"), bv(-32)))).unwrap();
 
         let state_before_call = State::new(&register("RSP"), Tid::new("original_caller_id"));
-        let state_before_call = context.update_def(&state_before_call, &reg_add_term("RSP", -16, "stack_offset_on_call_adjustment"));
+        let mut state_before_call = context.update_def(&state_before_call, &reg_add_term("RSP", -16, "stack_offset_on_call_adjustment"));
+        let caller_caller_id = new_id("caller_caller", "RSP");
+        state_before_call.memory.add_abstract_object(caller_caller_id.clone(), bv(0).into(), ObjectType::Stack, 64);
+        state_before_call.caller_stack_ids.insert(caller_caller_id.clone());
+        state_before_call.ids_known_to_caller.insert(caller_caller_id.clone());
 
         let state = context.update_return(&state_before_return, Some(&state_before_call), &call_term("callee")).unwrap();
 
-        assert_eq!(state.ids_known_to_caller, BTreeSet::new());
-        assert_eq!(state.caller_stack_ids, BTreeSet::new());
+        let mut caller_caller_set = BTreeSet::new();
+        caller_caller_set.insert(caller_caller_id);
+        assert_eq!(state.ids_known_to_caller, caller_caller_set.clone());
+        assert_eq!(state.caller_stack_ids, caller_caller_set.clone());
         assert_eq!(state.stack_id, new_id("original_caller_id", "RSP"));
-        assert!(state.memory.get_all_object_ids().len() == 1);
+        assert!(state_before_return.memory.get_all_object_ids().len() == 3);
+        assert!(state.memory.get_all_object_ids().len() == 2);
         assert!(state.memory.get_all_object_ids().get(&new_id("original_caller_id", "RSP")).is_some());
+        assert!(state.memory.get_all_object_ids().get(&new_id("caller_caller", "RSP")).is_some());
         assert!(state.get_register(&register("RSP")).is_ok());
         let expected_rsp = Data::Pointer(PointerDomain::new(new_id("original_caller_id", "RSP"), bv(-8)));
         assert_eq!(state.get_register(&register("RSP")).unwrap(), expected_rsp);
