@@ -69,8 +69,11 @@ val calls_callsite_symbol : Bap.Std.Jmp.t -> symbol -> bool
 (** This function finds all (direct) calls in a program. It returns a list of tuples of (callsite, address).*)
 val call_finder : (Bap.Std.tid * Bap.Std.tid) list Bap.Std.Term.visitor
 
+(** Checks whether the call_finder has already extracted the calls from the program, and if so, returns a global variable.
+    Otherwise the call_finder is called *)
 val get_calls : Bap.Std.program Bap.Std.term -> (Bap.Std.tid * Bap.Std.tid) list
 
+(** Checks whether extern symbols have been resolved by Bap. If not a single symbol has been resolved, an error message is returned. *)
 val check_if_symbols_resolved : Bap.Std.Project.t -> Bap.Std.program Bap.Std.term -> Bap.Std.word Bap.Std.Tid.Map.t -> bool
 
 (** Transform a call (e.g. found with call_finder) to concrete_call with the symbol resolved.*)

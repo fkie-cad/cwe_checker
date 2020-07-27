@@ -234,23 +234,13 @@ let get_calls (program : program term) : (tid * tid) list =
 
 let check_if_symbols_resolved (project : Project.t) (program : program term) (tid_map : word Tid.Map.t) : bool =
   let extern = build_and_return_extern_symbols project program tid_map in
-  let extern = List.filter extern ~f:(fun e ->
-    match Stdlib.List.mem e.name extern_symbol_blacklist with
-    | false -> true
-    | true -> false
-  ) in
+  let extern = List.filter extern ~f:(fun ext_sym -> not (Stdlib.List.mem ext_sym.name extern_symbol_blacklist)) in
   match List.is_empty extern with
   | true -> false
   | false -> begin
-      let calls = List.map (get_calls program) ~f:(fun c -> match c with (_, dst) -> dst) in
-      let not_resolved = List.filter extern ~f:(fun e ->
-        match Stdlib.List.mem e.tid calls with
-        | true -> false
-        | false -> true
-      ) in
-      match List.length extern = List.length not_resolved with
-      | true -> false
-      | false -> true
+      let calls = List.map (get_calls program) ~f:(fun call -> match call with (_, dst) -> dst) in
+      let not_resolved = List.filter extern ~f:(fun ext_sym -> not (Stdlib.List.mem ext_sym.tid calls)) in
+      not (List.length extern = List.length not_resolved)
   end
 
 
