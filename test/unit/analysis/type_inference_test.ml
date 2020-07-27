@@ -175,7 +175,7 @@ let test_malloc_call_return_reg () =
   let state = update_block_analysis block fn_start_state ~sub_tid ~project in
   (* test whether the return register is marked as a pointer register. This fails if the example project is not a x64 binary. *)
   let state_reg_list = Map.to_alist state.TypeInfo.reg in
-  let () = String.Set.iter (Cconv.parse_dyn_syms project) ~f:(fun elem -> print_endline elem) in
+  let () = String.Set.iter (Symbol_utils.parse_dyn_syms project) ~f:(fun elem -> print_endline elem) in
   let () = check "malloc_return_register_marked" (match List.find state_reg_list ~f:(fun (var, _register_info) -> Var.name var = "RAX") with
     | Some((_var, register_info)) ->  (* TODO: test whether the target is set correctly. *)
         begin match register_info with

@@ -465,7 +465,7 @@ let check_cwe (_prog: Program.t) (project: Project.t) (tid_map: Word.t Tid.Map.t
     | "max_steps" :: num :: [] -> int_of_string num
     | _ -> failwith "[CWE476] parameters not as expected" in
   let malloc_like_functions = List.map symbols ~f:(fun symb -> "@" ^ symb)  in
-  let extern_functions = Cconv.parse_dyn_syms project in
+  let extern_functions = Symbol_utils.parse_dyn_syms project in
   (* run the pointer inference analysis. TODO: This should be done somewhere else as this analysis will be needed in more than one check! *)
   let project = Type_inference.compute_pointer_register project in
   let subfunctions = Term.enum sub_t (Project.program project) in

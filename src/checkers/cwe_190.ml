@@ -32,7 +32,7 @@ let check_cwe prog proj tid_map symbol_names _ =
   match symbol_names with
   | hd::[] ->
    let symbols = Symbol_utils.build_symbols hd prog in
-   let calls = call_finder#run prog [] in
+   let calls = get_calls prog in
    let relevant_calls = filter_calls_to_symbols calls symbols in
    check_calls relevant_calls prog proj tid_map symbols check_multiplication_before_symbol
   | _ -> failwith "[CWE190] symbol_names not as expected"

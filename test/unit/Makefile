@@ -2,6 +2,8 @@ all:
 	bapbundle remove unit_tests_cwe_checker.plugin
 	bapbuild -r -Is analysis,checkers,utils unit_tests_cwe_checker.plugin -pkgs alcotest,yojson,unix,ppx_jane,cwe_checker_core
 	bapbundle install unit_tests_cwe_checker.plugin
+	bap tmp/no_symbols_gcc.out --pass=unit-tests-cwe-checker --unit-tests-cwe-checker-tests=Symbols
+	bap tmp/arrays_gcc.out --pass=unit-tests-cwe-checker --unit-tests-cwe-checker-tests=DynSyms
 	bap tmp/arrays_x86_64-w64-mingw32_gcc.out --pass=unit-tests-cwe-checker --unit-tests-cwe-checker-tests=Cconv
 	bap tmp/arrays_i686-w64-mingw32_gcc.out --pass=unit-tests-cwe-checker --unit-tests-cwe-checker-tests=Cconv
 	bap tmp/arrays_x86_clang.out --pass=unit-tests-cwe-checker --unit-tests-cwe-checker-tests=Cconv

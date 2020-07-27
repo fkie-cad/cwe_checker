@@ -17,7 +17,7 @@ let check_input_is_pointer_size proj _prog _sub blk jmp tid_map symbols =
           if get_pointer_size (Project.arch proj) = (Word.to_int_exn w) then
             begin
               let address = Address_translation.translate_tid_to_assembler_address_string (Term.tid blk) tid_map in
-              let tid = Address_translation.tid_to_string @@ Term.tid blk in 
+              let tid = Address_translation.tid_to_string @@ Term.tid blk in
               let symbol = Symbol_utils.get_symbol_name_from_jmp jmp symbols in
               let description = sprintf
                                   "(Use of sizeof on a Pointer Type) sizeof on pointer at %s (%s)."
@@ -35,7 +35,7 @@ let check_cwe prog proj tid_map symbol_names _ =
   match symbol_names with
   | hd::[] ->
      let symbols = Symbol_utils.build_symbols hd prog in
-     let calls = call_finder#run prog [] in
+     let calls = get_calls prog in
      let relevant_calls = filter_calls_to_symbols calls symbols in
      check_calls relevant_calls prog proj tid_map symbols check_input_is_pointer_size
   | _ -> failwith "[CWE467] symbol_names not as expected"

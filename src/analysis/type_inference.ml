@@ -490,7 +490,7 @@ let update_state_jmp state jmp ~sub_tid ~project =
         let func_name = match String.lsplit2 (Tid.name tid) ~on:'@' with
           | Some(_left, right) -> right
           | None -> Tid.name tid in
-        if String.Set.mem (Cconv.parse_dyn_syms project) func_name then
+        if String.Set.mem (Symbol_utils.parse_dyn_syms project) func_name then
           begin if List.exists (malloc_like_function_list ()) ~f:(fun elem -> elem = func_name) then
               update_state_malloc_call state tid jmp ~project
             else
