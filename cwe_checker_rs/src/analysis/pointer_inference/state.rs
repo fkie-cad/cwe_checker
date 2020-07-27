@@ -12,18 +12,25 @@ use std::collections::{BTreeMap, BTreeSet};
 /// Notes:
 /// - The *stack_id* is the identifier of the current stack frame.
 /// Only reads and writes with offset less than 0 are permitted for it
-/// - The *caller_ids* contain all known identifier of caller stack frames.
+/// - The *caller_stack_ids* contain all known identifier of caller stack frames.
 /// If a read to an offset >= 0 corresponding to the current stack frame happens, it is considered
 /// a merge read to all caller stack frames.
 /// A write to an offset >= 0 corresponding to the current stack frame writes to all caller stack frames.
-/// - The caller_ids are given by the stack pointer at time of the call.
+/// - The caller_stack_ids are given by the stack pointer at time of the call.
 /// This way we can distinguish caller stack frames even if one function calls another several times.
+/// - The ids_known_to_caller contains all ids directly known to some caller.
+/// Objects referenced by these ids cannot be removed from the state, as some caller may have a reference to them.
+/// This is not recursive, i.e. ids only known to the caller of the caller are not included.
+/// If a caller does not pass a reference to a memory object to the callee (directly or indirectly),
+/// it will not be included in ids_known_to_caller.
+/// This way the caller can check on return, which memory objects could not have been accessed by the callee.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct State {
     register: BTreeMap<Variable, Data>,
     pub memory: AbstractObjectList,
     pub stack_id: AbstractIdentifier,
-    pub caller_ids: BTreeSet<AbstractIdentifier>,
+    pub caller_stack_ids: BTreeSet<AbstractIdentifier>,
+    pub ids_known_to_caller: BTreeSet<AbstractIdentifier>,
 }
 
 impl State {
@@ -50,7 +57,8 @@ impl State {
                 stack_register.bitsize().unwrap(),
             ),
             stack_id,
-            caller_ids: BTreeSet::new(),
+            caller_stack_ids: BTreeSet::new(),
+            ids_known_to_caller: BTreeSet::new(),
         }
     }
 
@@ -356,7 +364,8 @@ impl State {
             register: merged_register,
             memory: merged_memory_objects,
             stack_id: self.stack_id.clone(),
-            caller_ids: self.caller_ids.union(&other.caller_ids).cloned().collect(),
+            caller_stack_ids: self.caller_stack_ids.union(&other.caller_stack_ids).cloned().collect(),
+            ids_known_to_caller: self.ids_known_to_caller.union(&other.ids_known_to_caller).cloned().collect(),
         }
     }
 
@@ -375,8 +384,8 @@ impl State {
                 if *id == self.stack_id {
                     match offset {
                         BitvectorDomain::Value(offset_val) => {
-                            if offset_val.try_to_i64().unwrap() >= 0 && self.caller_ids.len() > 0 {
-                                for caller_id in self.caller_ids.iter() {
+                            if offset_val.try_to_i64().unwrap() >= 0 && self.caller_stack_ids.len() > 0 {
+                                for caller_id in self.caller_stack_ids.iter() {
                                     new_targets.add_target(caller_id.clone(), offset.clone());
                                 }
                             // Note that the id of the current stack frame was *not* added.
@@ -385,7 +394,7 @@ impl State {
                             }
                         }
                         BitvectorDomain::Top(_bitsize) => {
-                            for caller_id in self.caller_ids.iter() {
+                            for caller_id in self.caller_stack_ids.iter() {
                                 new_targets.add_target(caller_id.clone(), offset.clone());
                             }
                             // Note that we also add the id of the current stack frame
@@ -427,9 +436,13 @@ impl State {
         if &self.stack_id == old_id {
             self.stack_id = new_id.clone();
         }
-        if self.caller_ids.get(old_id).is_some() {
-            self.caller_ids.remove(old_id);
-            self.caller_ids.insert(new_id.clone());
+        if self.caller_stack_ids.get(old_id).is_some() {
+            self.caller_stack_ids.remove(old_id);
+            self.caller_stack_ids.insert(new_id.clone());
+        }
+        if self.ids_known_to_caller.get(old_id).is_some() {
+            self.ids_known_to_caller.remove(old_id);
+            self.ids_known_to_caller.insert(new_id.clone());
         }
     }
 
@@ -440,7 +453,8 @@ impl State {
             referenced_ids.append(&mut data.referenced_ids());
         }
         referenced_ids.insert(self.stack_id.clone());
-        referenced_ids.append(&mut self.caller_ids.clone());
+        referenced_ids.append(&mut self.caller_stack_ids.clone());
+        referenced_ids.append(&mut self.ids_known_to_caller.clone());
         referenced_ids = self.add_recursively_referenced_ids_to_id_set(referenced_ids);
         // remove unreferenced ids
         self.memory.remove_unused_ids(&referenced_ids);
@@ -510,6 +524,23 @@ impl State {
             .filter(|(register, _value)| register.is_temp == false)
             .collect();
     }
+
+    /// Recursively remove all caller_stack_ids not corresponding to the given caller.
+    pub fn remove_other_caller_stack_ids(&mut self, caller_id: &AbstractIdentifier) {
+        let mut ids_to_remove = self.caller_stack_ids.clone();
+        ids_to_remove.remove(caller_id);
+        for register_value in self.register.values_mut() {
+            register_value.remove_ids(&ids_to_remove);
+        }
+        self.memory.remove_ids(&ids_to_remove);
+        self.caller_stack_ids = BTreeSet::new();
+        self.caller_stack_ids.insert(caller_id.clone());
+        self.ids_known_to_caller = self.ids_known_to_caller.difference(&ids_to_remove).cloned().collect();
+    }
+
+    pub fn readd_caller_objects(&mut self, caller_state: &State) {
+        self.memory.append_unknown_objects(&caller_state.memory);
+    }
 }
 
 impl State {
@@ -529,9 +560,18 @@ impl State {
             Value::String(format!("{}", self.stack_id)),
         );
         state_map.insert(
-            "caller_ids".into(),
+            "caller_stack_ids".into(),
             Value::Array(
-                self.caller_ids
+                self.caller_stack_ids
+                    .iter()
+                    .map(|id| Value::String(format!("{}", id)))
+                    .collect(),
+            ),
+        );
+        state_map.insert(
+            "ids_known_to_caller".into(),
+            Value::Array(
+                self.ids_known_to_caller
                     .iter()
                     .map(|id| Value::String(format!("{}", id)))
                     .collect(),
@@ -646,7 +686,7 @@ mod tests {
         state
             .memory
             .add_abstract_object(new_id("caller".into()), bv(0), ObjectType::Stack, 64);
-        state.caller_ids.insert(new_id("caller".into()));
+        state.caller_stack_ids.insert(new_id("caller".into()));
         state
             .store_value(&stack_addr, &Data::Value(bv(15)))
             .unwrap();

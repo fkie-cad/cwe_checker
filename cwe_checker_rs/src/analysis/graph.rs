@@ -180,6 +180,9 @@ impl<'a> GraphBuilder<'a> {
         return_from_sub: &Term<Sub>,
         return_source: NodeIndex,
     ) {
+        if self.return_addresses.get(&return_from_sub.tid).is_none() {
+            return;
+        }
         for (call_node, return_to_node) in self.return_addresses[&return_from_sub.tid].iter() {
             let call_block = self.graph[*call_node].get_block();
             let call_term = call_block

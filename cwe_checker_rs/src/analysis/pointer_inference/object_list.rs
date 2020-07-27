@@ -294,6 +294,11 @@ impl AbstractObjectList {
         }
     }
 
+    /// Get all object ids
+    pub fn get_all_object_ids(&self) -> BTreeSet<AbstractIdentifier> {
+        self.ids.keys().cloned().collect()
+    }
+
     /// Mark a memory object as already freed (i.e. pointers to it are dangling).
     /// If the object cannot be identified uniquely, all possible targets are marked as having an unknown status.
     pub fn mark_mem_object_as_freed(
@@ -363,6 +368,43 @@ impl AbstractObjectList {
     #[cfg(test)]
     pub fn get_num_objects(&self) -> usize {
         self.objects.len()
+    }
+
+    /// Append those objects from another object list, whose abstract IDs are not known to self.
+    /// We also add all abstract IDs pointing to the added objects to the ID map.
+    pub fn append_unknown_objects(&mut self, other_object_list: &AbstractObjectList) {
+        let mut objects_already_known = vec![false; other_object_list.objects.len()];
+        for (id, (index, _offset)) in other_object_list.ids.iter() {
+            if self.ids.get(id).is_some() {
+                objects_already_known[*index] = true;
+            }
+        }
+        let mut old_to_new_index_map: BTreeMap<usize, usize> = BTreeMap::new();
+        for old_index in 0..other_object_list.objects.len() {
+            if objects_already_known[old_index] == false {
+                old_to_new_index_map.insert(old_index, self.objects.len());
+                self.objects.push(other_object_list.objects[old_index].clone());
+            }
+        }
+        for (id, (old_index, offset)) in other_object_list.ids.iter() {
+            if old_to_new_index_map.get(old_index).is_some() {
+                self.ids.insert(id.clone(), (old_to_new_index_map[old_index], offset.clone()));
+            }
+        }
+    }
+
+    pub fn remove_ids(&mut self, ids_to_remove: &BTreeSet<AbstractIdentifier>) {
+        for object in self.objects.iter_mut() {
+            let object = Arc::make_mut(object);
+            object.remove_ids(ids_to_remove);
+        }
+        self.ids = self.ids.iter().filter_map(|(id, (index, offset))| {
+            if ids_to_remove.get(id).is_none() {
+                Some((id.clone(), (*index, offset.clone())))
+            } else {
+                None
+            }
+        }).collect();
     }
 }
 

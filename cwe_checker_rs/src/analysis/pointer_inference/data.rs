@@ -38,6 +38,24 @@ impl Data {
             BTreeSet::new()
         }
     }
+
+    pub fn remove_ids(&mut self, ids_to_remove: &BTreeSet<AbstractIdentifier>) {
+        // TODO: Some callers don't want to get Top(..) values. Probably has to be handled at the respective callsites.
+        if let Data::Pointer(pointer) = self {
+            let remaining_targets: BTreeMap<AbstractIdentifier, BitvectorDomain> = pointer.iter_targets().filter_map(|(id, offset)| {
+                if ids_to_remove.get(id).is_none() {
+                    Some((id.clone(), offset.clone()))
+                } else {
+                    None
+                }
+            }).collect();
+            if remaining_targets.len() == 0 {
+                *self = Data::new_top(self.bitsize());
+            } else {
+                *self = Data::Pointer(PointerDomain::with_targets(remaining_targets));
+            }
+        }
+    }
 }
 
 impl Data {

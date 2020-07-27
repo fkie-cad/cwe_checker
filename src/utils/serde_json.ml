@@ -221,11 +221,25 @@ let of_jmp_kind (kind: jmp_kind) (tid_map: word Tid.Map.t) : t =
       ]
 
 let of_jmp (jmp: Jmp.t) (tid_map: word Tid.Map.t) : t =
+  (* Since BAP 2.0 doesn't emit return statements anymore,
+     we have check the is_return hint to correct the jump kind for return statements. *)
+  let is_return = match Term.get_attr jmp Disasm.insn with
+    | None -> false
+    | Some(insn) -> Insn.(is return) insn in
+  let jmp_kind = if is_return then
+      match Jmp.kind jmp with
+      | Call(call) -> begin match Call.target call with
+        | Indirect(exp) -> Ret(Indirect(exp))
+        | _ -> Jmp.kind jmp
+      end
+      | _ -> Jmp.kind jmp
+    else
+      Jmp.kind jmp in
   build_object [
     ("tid", of_tid (Term.tid jmp) tid_map);
     ("term", build_object [
        ("condition", if Option.is_some (Jmp.guard jmp) then of_exp (Jmp.cond jmp) else build_null ());
-       ("kind", of_jmp_kind (Jmp.kind jmp) tid_map);
+       ("kind", of_jmp_kind jmp_kind tid_map);
      ]);
   ]
 
