@@ -538,6 +538,12 @@ impl State {
         self.ids_known_to_caller = self.ids_known_to_caller.difference(&ids_to_remove).cloned().collect();
     }
 
+    /// Add those objects from the caller_state to self, that are not known to self.
+    ///
+    /// Since self does not know these objects, we assume that the current function could not have accessed
+    /// them in any way during execution.
+    /// This means they are unchanged from the moment of the call until the return from the call,
+    /// thus we can simply copy their object-state from the moment of the call.
     pub fn readd_caller_objects(&mut self, caller_state: &State) {
         self.memory.append_unknown_objects(&caller_state.memory);
     }

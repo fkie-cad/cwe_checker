@@ -393,6 +393,11 @@ impl AbstractObjectList {
         }
     }
 
+    /// Remove the provided IDs as targets from all pointers in all objects.
+    /// Also forget whether the provided IDs point to objects in the object list.
+    ///
+    /// This may leave objects without known IDs pointing to them.
+    /// This function does *not* trim these objects from the object list.
     pub fn remove_ids(&mut self, ids_to_remove: &BTreeSet<AbstractIdentifier>) {
         for object in self.objects.iter_mut() {
             let object = Arc::make_mut(object);

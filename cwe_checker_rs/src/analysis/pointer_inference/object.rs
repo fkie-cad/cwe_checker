@@ -109,6 +109,7 @@ impl AbstractObject {
         }
     }
 
+    /// Remove the provided IDs from all possible target lists, including all pointers.
     pub fn remove_ids(&mut self, ids_to_remove: &BTreeSet<AbstractIdentifier>) {
         match self {
             Self::Untracked(targets) => {
@@ -251,6 +252,8 @@ impl AbstractObjectInfo {
         }
     }
 
+    /// Remove the provided IDs from the target lists of all pointers in the memory object.
+    /// Also remove them from the pointer_targets list.
     pub fn remove_ids(&mut self, ids_to_remove: &BTreeSet<AbstractIdentifier>) {
         self.pointer_targets = self.pointer_targets.difference(ids_to_remove).cloned().collect();
         for value in self.memory.iter_values_mut() {

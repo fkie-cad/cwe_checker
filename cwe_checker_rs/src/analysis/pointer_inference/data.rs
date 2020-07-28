@@ -39,6 +39,8 @@ impl Data {
         }
     }
 
+    /// If *self* is a pointer, remove all provided IDs from the target list of it.
+    /// If this would leave the pointer without any targets, replace it with Data::Top(..).
     pub fn remove_ids(&mut self, ids_to_remove: &BTreeSet<AbstractIdentifier>) {
         // TODO: Some callers don't want to get Top(..) values. Probably has to be handled at the respective callsites.
         if let Data::Pointer(pointer) = self {
