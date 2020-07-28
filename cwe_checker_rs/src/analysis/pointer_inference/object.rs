@@ -109,6 +109,19 @@ impl AbstractObject {
         }
     }
 
+    /// Remove the provided IDs from all possible target lists, including all pointers.
+    pub fn remove_ids(&mut self, ids_to_remove: &BTreeSet<AbstractIdentifier>) {
+        match self {
+            Self::Untracked(targets) => {
+                let remaining_targets = targets.difference(ids_to_remove).cloned().collect();
+                *self = Self::Untracked(remaining_targets);
+            }
+            Self::Memory(mem) => {
+                mem.remove_ids(ids_to_remove);
+            }
+        }
+    }
+
     #[cfg(test)]
     pub fn get_state(&self) -> Option<ObjectState> {
         match self {
@@ -236,6 +249,15 @@ impl AbstractObjectInfo {
             if self.state != new_state {
                 self.state = None;
             } // else don't change the state
+        }
+    }
+
+    /// Remove the provided IDs from the target lists of all pointers in the memory object.
+    /// Also remove them from the pointer_targets list.
+    pub fn remove_ids(&mut self, ids_to_remove: &BTreeSet<AbstractIdentifier>) {
+        self.pointer_targets = self.pointer_targets.difference(ids_to_remove).cloned().collect();
+        for value in self.memory.iter_values_mut() {
+            value.remove_ids(ids_to_remove);
         }
     }
 }
