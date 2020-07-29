@@ -364,8 +364,16 @@ impl State {
             register: merged_register,
             memory: merged_memory_objects,
             stack_id: self.stack_id.clone(),
-            caller_stack_ids: self.caller_stack_ids.union(&other.caller_stack_ids).cloned().collect(),
-            ids_known_to_caller: self.ids_known_to_caller.union(&other.ids_known_to_caller).cloned().collect(),
+            caller_stack_ids: self
+                .caller_stack_ids
+                .union(&other.caller_stack_ids)
+                .cloned()
+                .collect(),
+            ids_known_to_caller: self
+                .ids_known_to_caller
+                .union(&other.ids_known_to_caller)
+                .cloned()
+                .collect(),
         }
     }
 
@@ -384,7 +392,9 @@ impl State {
                 if *id == self.stack_id {
                     match offset {
                         BitvectorDomain::Value(offset_val) => {
-                            if offset_val.try_to_i64().unwrap() >= 0 && self.caller_stack_ids.len() > 0 {
+                            if offset_val.try_to_i64().unwrap() >= 0
+                                && self.caller_stack_ids.len() > 0
+                            {
                                 for caller_id in self.caller_stack_ids.iter() {
                                     new_targets.add_target(caller_id.clone(), offset.clone());
                                 }
@@ -535,7 +545,11 @@ impl State {
         self.memory.remove_ids(&ids_to_remove);
         self.caller_stack_ids = BTreeSet::new();
         self.caller_stack_ids.insert(caller_id.clone());
-        self.ids_known_to_caller = self.ids_known_to_caller.difference(&ids_to_remove).cloned().collect();
+        self.ids_known_to_caller = self
+            .ids_known_to_caller
+            .difference(&ids_to_remove)
+            .cloned()
+            .collect();
     }
 
     /// Add those objects from the caller_state to self, that are not known to self.
@@ -609,7 +623,7 @@ mod tests {
     }
 
     fn reg_add(name: &str, value: i64) -> Expression {
-        Expression::BinOp{
+        Expression::BinOp {
             op: BinOpType::PLUS,
             lhs: Box::new(Expression::Var(register(name))),
             rhs: Box::new(Expression::Const(Bitvector::from_i64(value))),
@@ -617,7 +631,7 @@ mod tests {
     }
 
     fn reg_sub(name: &str, value: i64) -> Expression {
-        Expression::BinOp{
+        Expression::BinOp {
             op: BinOpType::MINUS,
             lhs: Box::new(Expression::Var(register(name))),
             rhs: Box::new(Expression::Const(Bitvector::from_i64(value))),
@@ -627,11 +641,14 @@ mod tests {
     fn store_exp(address: Expression, value: Expression) -> Expression {
         let mem_var = Variable {
             name: "mem".into(),
-            type_: crate::bil::variable::Type::Memory { addr_size: 64, elem_size: 64 },
+            type_: crate::bil::variable::Type::Memory {
+                addr_size: 64,
+                elem_size: 64,
+            },
             is_temp: false,
         };
-        Expression::Store{
-            memory : Box::new(Expression::Var(mem_var)),
+        Expression::Store {
+            memory: Box::new(Expression::Var(mem_var)),
             address: Box::new(address),
             value: Box::new(value),
             endian: Endianness::LittleEndian,
@@ -642,11 +659,14 @@ mod tests {
     fn load_exp(address: Expression) -> Expression {
         let mem_var = Variable {
             name: "mem".into(),
-            type_: crate::bil::variable::Type::Memory { addr_size: 64, elem_size: 64 },
+            type_: crate::bil::variable::Type::Memory {
+                addr_size: 64,
+                elem_size: 64,
+            },
             is_temp: false,
         };
-        Expression::Load{
-            memory : Box::new(Expression::Var(mem_var)),
+        Expression::Load {
+            memory: Box::new(Expression::Var(mem_var)),
             address: Box::new(address),
             endian: Endianness::LittleEndian,
             size: 64,
@@ -749,20 +769,53 @@ mod tests {
         use crate::bil::Expression::*;
         let mut state = State::new(&register("RSP"), Tid::new("time0"));
         let stack_id = new_id("RSP".into());
-        assert_eq!(state.eval(&Var(register("RSP"))).unwrap(), Data::Pointer(PointerDomain::new(stack_id.clone(), bv(0))));
+        assert_eq!(
+            state.eval(&Var(register("RSP"))).unwrap(),
+            Data::Pointer(PointerDomain::new(stack_id.clone(), bv(0)))
+        );
 
-        state.handle_register_assign(&register("RSP"), &reg_sub("RSP", 32)).unwrap();
-        assert_eq!(state.eval(&Var(register("RSP"))).unwrap(), Data::Pointer(PointerDomain::new(stack_id.clone(), bv(-32))));
-        state.handle_register_assign(&register("RSP"), &reg_add("RSP", -8)).unwrap();
-        assert_eq!(state.eval(&Var(register("RSP"))).unwrap(), Data::Pointer(PointerDomain::new(stack_id.clone(), bv(-40))));
+        state
+            .handle_register_assign(&register("RSP"), &reg_sub("RSP", 32))
+            .unwrap();
+        assert_eq!(
+            state.eval(&Var(register("RSP"))).unwrap(),
+            Data::Pointer(PointerDomain::new(stack_id.clone(), bv(-32)))
+        );
+        state
+            .handle_register_assign(&register("RSP"), &reg_add("RSP", -8))
+            .unwrap();
+        assert_eq!(
+            state.eval(&Var(register("RSP"))).unwrap(),
+            Data::Pointer(PointerDomain::new(stack_id.clone(), bv(-40)))
+        );
 
-        state.handle_store_exp(&store_exp(reg_add("RSP", 8), Const(Bitvector::from_i64(1)))).unwrap();
-        state.handle_store_exp(&store_exp(reg_sub("RSP", 8), Const(Bitvector::from_i64(2)))).unwrap();
-        state.handle_store_exp(&store_exp(reg_add("RSP", -16), Const(Bitvector::from_i64(3)))).unwrap();
-        state.handle_register_assign(&register("RSP"), &reg_sub("RSP", 4)).unwrap();
+        state
+            .handle_store_exp(&store_exp(reg_add("RSP", 8), Const(Bitvector::from_i64(1))))
+            .unwrap();
+        state
+            .handle_store_exp(&store_exp(reg_sub("RSP", 8), Const(Bitvector::from_i64(2))))
+            .unwrap();
+        state
+            .handle_store_exp(&store_exp(
+                reg_add("RSP", -16),
+                Const(Bitvector::from_i64(3)),
+            ))
+            .unwrap();
+        state
+            .handle_register_assign(&register("RSP"), &reg_sub("RSP", 4))
+            .unwrap();
 
-        assert_eq!(state.eval(&load_exp(reg_add("RSP", 12))).unwrap(), bv(1).into());
-        assert_eq!(state.eval(&load_exp(reg_sub("RSP", 4))).unwrap(), bv(2).into());
-        assert_eq!(state.eval(&load_exp(reg_add("RSP", -12))).unwrap(), bv(3).into());
+        assert_eq!(
+            state.eval(&load_exp(reg_add("RSP", 12))).unwrap(),
+            bv(1).into()
+        );
+        assert_eq!(
+            state.eval(&load_exp(reg_sub("RSP", 4))).unwrap(),
+            bv(2).into()
+        );
+        assert_eq!(
+            state.eval(&load_exp(reg_add("RSP", -12))).unwrap(),
+            bv(3).into()
+        );
     }
 }

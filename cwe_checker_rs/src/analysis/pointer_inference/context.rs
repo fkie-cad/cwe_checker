@@ -214,7 +214,9 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
             );
             // set the list of caller stack ids to only this caller id
             callee_state.caller_stack_ids = BTreeSet::new();
-            callee_state.caller_stack_ids.insert(new_caller_stack_id.clone());
+            callee_state
+                .caller_stack_ids
+                .insert(new_caller_stack_id.clone());
             // Remove non-referenced objects and objects, only the caller knows about, from the state.
             callee_state.ids_known_to_caller = BTreeSet::new();
             callee_state.remove_unreferenced_objects();
@@ -255,7 +257,10 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
 
         // Check whether state_before_return actually knows the caller_stack_id.
         // If not, we are returning from a state that cannot correspond to this callsite.
-        if !state_before_return.caller_stack_ids.contains(&caller_stack_id) {
+        if !state_before_return
+            .caller_stack_ids
+            .contains(&caller_stack_id)
+        {
             return None;
         }
 
@@ -541,7 +546,7 @@ mod tests {
     }
 
     fn reg_add_term(name: &str, value: i64, tid_name: &str) -> Term<Def> {
-        let add_expr = Expression::BinOp{
+        let add_expr = Expression::BinOp {
             op: crate::bil::BinOpType::PLUS,
             lhs: Box::new(Expression::Var(register(name))),
             rhs: Box::new(Expression::Const(Bitvector::from_i64(value))),
@@ -551,7 +556,7 @@ mod tests {
             term: Def {
                 lhs: register(name),
                 rhs: add_expr,
-            }
+            },
         }
     }
 
@@ -763,34 +768,81 @@ mod tests {
     #[test]
     fn update_return() {
         use crate::analysis::interprocedural_fixpoint::Problem;
-        use crate::analysis::pointer_inference::object::ObjectType;
         use crate::analysis::pointer_inference::data::*;
+        use crate::analysis::pointer_inference::object::ObjectType;
         let project = mock_project();
         let (cwe_sender, _cwe_receiver) = crossbeam_channel::unbounded();
         let (log_sender, _log_receiver) = crossbeam_channel::unbounded();
         let context = Context::new(&project, cwe_sender, log_sender);
         let state_before_return = State::new(&register("RSP"), Tid::new("callee"));
-        let mut state_before_return = context.update_def(&state_before_return, &reg_add_term("RSP", 8, "stack_offset_on_return_adjustment"));
+        let mut state_before_return = context.update_def(
+            &state_before_return,
+            &reg_add_term("RSP", 8, "stack_offset_on_return_adjustment"),
+        );
 
         let callsite_id = new_id("call_callee", "RSP");
-        state_before_return.memory.add_abstract_object(callsite_id.clone(), bv(0).into(), ObjectType::Stack, 64);
-        state_before_return.caller_stack_ids.insert(callsite_id.clone());
-        state_before_return.ids_known_to_caller.insert(callsite_id.clone());
+        state_before_return.memory.add_abstract_object(
+            callsite_id.clone(),
+            bv(0).into(),
+            ObjectType::Stack,
+            64,
+        );
+        state_before_return
+            .caller_stack_ids
+            .insert(callsite_id.clone());
+        state_before_return
+            .ids_known_to_caller
+            .insert(callsite_id.clone());
 
         let other_callsite_id = new_id("call_callee_other", "RSP");
-        state_before_return.memory.add_abstract_object(other_callsite_id.clone(), bv(0).into(), ObjectType::Stack, 64);
-        state_before_return.caller_stack_ids.insert(other_callsite_id.clone());
-        state_before_return.ids_known_to_caller.insert(other_callsite_id.clone());
-        state_before_return.set_register(&register("RAX"), Data::Pointer(PointerDomain::new(new_id("call_callee_other", "RSP"), bv(-32)))).unwrap();
+        state_before_return.memory.add_abstract_object(
+            other_callsite_id.clone(),
+            bv(0).into(),
+            ObjectType::Stack,
+            64,
+        );
+        state_before_return
+            .caller_stack_ids
+            .insert(other_callsite_id.clone());
+        state_before_return
+            .ids_known_to_caller
+            .insert(other_callsite_id.clone());
+        state_before_return
+            .set_register(
+                &register("RAX"),
+                Data::Pointer(PointerDomain::new(
+                    new_id("call_callee_other", "RSP"),
+                    bv(-32),
+                )),
+            )
+            .unwrap();
 
         let state_before_call = State::new(&register("RSP"), Tid::new("original_caller_id"));
-        let mut state_before_call = context.update_def(&state_before_call, &reg_add_term("RSP", -16, "stack_offset_on_call_adjustment"));
+        let mut state_before_call = context.update_def(
+            &state_before_call,
+            &reg_add_term("RSP", -16, "stack_offset_on_call_adjustment"),
+        );
         let caller_caller_id = new_id("caller_caller", "RSP");
-        state_before_call.memory.add_abstract_object(caller_caller_id.clone(), bv(0).into(), ObjectType::Stack, 64);
-        state_before_call.caller_stack_ids.insert(caller_caller_id.clone());
-        state_before_call.ids_known_to_caller.insert(caller_caller_id.clone());
+        state_before_call.memory.add_abstract_object(
+            caller_caller_id.clone(),
+            bv(0).into(),
+            ObjectType::Stack,
+            64,
+        );
+        state_before_call
+            .caller_stack_ids
+            .insert(caller_caller_id.clone());
+        state_before_call
+            .ids_known_to_caller
+            .insert(caller_caller_id.clone());
 
-        let state = context.update_return(&state_before_return, Some(&state_before_call), &call_term("callee")).unwrap();
+        let state = context
+            .update_return(
+                &state_before_return,
+                Some(&state_before_call),
+                &call_term("callee"),
+            )
+            .unwrap();
 
         let mut caller_caller_set = BTreeSet::new();
         caller_caller_set.insert(caller_caller_id);
@@ -799,10 +851,21 @@ mod tests {
         assert_eq!(state.stack_id, new_id("original_caller_id", "RSP"));
         assert!(state_before_return.memory.get_all_object_ids().len() == 3);
         assert!(state.memory.get_all_object_ids().len() == 2);
-        assert!(state.memory.get_all_object_ids().get(&new_id("original_caller_id", "RSP")).is_some());
-        assert!(state.memory.get_all_object_ids().get(&new_id("caller_caller", "RSP")).is_some());
+        assert!(state
+            .memory
+            .get_all_object_ids()
+            .get(&new_id("original_caller_id", "RSP"))
+            .is_some());
+        assert!(state
+            .memory
+            .get_all_object_ids()
+            .get(&new_id("caller_caller", "RSP"))
+            .is_some());
         assert!(state.get_register(&register("RSP")).is_ok());
-        let expected_rsp = Data::Pointer(PointerDomain::new(new_id("original_caller_id", "RSP"), bv(-8)));
+        let expected_rsp = Data::Pointer(PointerDomain::new(
+            new_id("original_caller_id", "RSP"),
+            bv(-8),
+        ));
         assert_eq!(state.get_register(&register("RSP")).unwrap(), expected_rsp);
     }
 }

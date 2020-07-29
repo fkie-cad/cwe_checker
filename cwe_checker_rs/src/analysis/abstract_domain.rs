@@ -82,7 +82,7 @@ impl ValueDomain for BitvectorDomain {
         use BinOpType::*;
         match op {
             LSHIFT | RSHIFT | ARSHIFT => (),
-            _=> assert_eq!(self.bitsize(), rhs.bitsize())
+            _ => assert_eq!(self.bitsize(), rhs.bitsize()),
         }
         match (self, rhs) {
             (BitvectorDomain::Value(lhs_bitvec), BitvectorDomain::Value(rhs_bitvec)) => match op {
@@ -105,10 +105,7 @@ impl ValueDomain for BitvectorDomain {
                     let shift_amount = rhs_bitvec.try_to_u64().unwrap() as usize;
                     if shift_amount < lhs_bitvec.width().to_usize() {
                         BitvectorDomain::Value(
-                            lhs_bitvec
-                                .clone()
-                                .into_checked_shl(shift_amount)
-                                .unwrap(),
+                            lhs_bitvec.clone().into_checked_shl(shift_amount).unwrap(),
                         )
                     } else {
                         BitvectorDomain::Value(Bitvector::zero(lhs_bitvec.width()))
@@ -118,21 +115,29 @@ impl ValueDomain for BitvectorDomain {
                     let shift_amount = rhs_bitvec.try_to_u64().unwrap() as usize;
                     if shift_amount < lhs_bitvec.width().to_usize() {
                         BitvectorDomain::Value(
-                            lhs_bitvec
-                                .clone()
-                                .into_checked_lshr(shift_amount)
-                                .unwrap(),
+                            lhs_bitvec.clone().into_checked_lshr(shift_amount).unwrap(),
                         )
                     } else {
                         BitvectorDomain::Value(Bitvector::zero(lhs_bitvec.width()))
                     }
                 }
-                ARSHIFT => BitvectorDomain::Value(
-                    lhs_bitvec
-                        .clone()
-                        .into_checked_ashr(rhs_bitvec.try_to_u64().unwrap() as usize)
-                        .unwrap(),
-                ),
+                ARSHIFT => {
+                    let shift_amount = rhs_bitvec.try_to_u64().unwrap() as usize;
+                    if shift_amount < lhs_bitvec.width().to_usize() {
+                        BitvectorDomain::Value(
+                            lhs_bitvec.clone().into_checked_ashr(shift_amount).unwrap(),
+                        )
+                    } else {
+                        let signed_bitvec = apint::Int::from(lhs_bitvec.clone());
+                        if signed_bitvec.is_negative() {
+                            let minus_one = Bitvector::zero(lhs_bitvec.width())
+                                - &Bitvector::one(lhs_bitvec.width());
+                            BitvectorDomain::Value(minus_one)
+                        } else {
+                            BitvectorDomain::Value(Bitvector::zero(lhs_bitvec.width()))
+                        }
+                    }
+                }
                 AND => BitvectorDomain::Value(lhs_bitvec & rhs_bitvec),
                 OR => BitvectorDomain::Value(lhs_bitvec | rhs_bitvec),
                 XOR => BitvectorDomain::Value(lhs_bitvec ^ rhs_bitvec),
@@ -361,5 +366,30 @@ mod tests {
         assert_eq!(bv(17).merge(&bv(16)), BitvectorDomain::new_top(64));
         assert!(!bv(17).is_top());
         assert!(BitvectorDomain::new_top(64).is_top());
+    }
+
+    #[test]
+    fn arshift() {
+        use crate::bil::BinOpType::ARSHIFT;
+        let positive_x = BitvectorDomain::Value(Bitvector::from_i64(31));
+        let negative_x = BitvectorDomain::Value(Bitvector::from_i64(-31));
+        let shift_3 = BitvectorDomain::Value(Bitvector::from_u8(3));
+        let shift_70 = BitvectorDomain::Value(Bitvector::from_u8(70));
+        assert_eq!(
+            positive_x.bin_op(ARSHIFT, &shift_3),
+            BitvectorDomain::Value(Bitvector::from_i64(3))
+        );
+        assert_eq!(
+            positive_x.bin_op(ARSHIFT, &shift_70),
+            BitvectorDomain::Value(Bitvector::from_i64(0))
+        );
+        assert_eq!(
+            negative_x.bin_op(ARSHIFT, &shift_3),
+            BitvectorDomain::Value(Bitvector::from_i64(-4))
+        );
+        assert_eq!(
+            negative_x.bin_op(ARSHIFT, &shift_70),
+            BitvectorDomain::Value(Bitvector::from_i64(-1))
+        );
     }
 }
