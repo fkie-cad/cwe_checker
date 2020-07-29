@@ -383,12 +383,16 @@ impl AbstractObjectList {
         for old_index in 0..other_object_list.objects.len() {
             if objects_already_known[old_index] == false {
                 old_to_new_index_map.insert(old_index, self.objects.len());
-                self.objects.push(other_object_list.objects[old_index].clone());
+                self.objects
+                    .push(other_object_list.objects[old_index].clone());
             }
         }
         for (id, (old_index, offset)) in other_object_list.ids.iter() {
             if old_to_new_index_map.get(old_index).is_some() {
-                self.ids.insert(id.clone(), (old_to_new_index_map[old_index], offset.clone()));
+                self.ids.insert(
+                    id.clone(),
+                    (old_to_new_index_map[old_index], offset.clone()),
+                );
             }
         }
     }
@@ -403,13 +407,17 @@ impl AbstractObjectList {
             let object = Arc::make_mut(object);
             object.remove_ids(ids_to_remove);
         }
-        self.ids = self.ids.iter().filter_map(|(id, (index, offset))| {
-            if ids_to_remove.get(id).is_none() {
-                Some((id.clone(), (*index, offset.clone())))
-            } else {
-                None
-            }
-        }).collect();
+        self.ids = self
+            .ids
+            .iter()
+            .filter_map(|(id, (index, offset))| {
+                if ids_to_remove.get(id).is_none() {
+                    Some((id.clone(), (*index, offset.clone())))
+                } else {
+                    None
+                }
+            })
+            .collect();
     }
 }
 
