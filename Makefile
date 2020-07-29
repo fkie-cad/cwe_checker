@@ -18,6 +18,10 @@ test:
 	cd test/artificial_samples; scons; cd ../..
 	pytest -v --ignore=_build
 
+codestyle-check:
+	cargo fmt -- --check
+	cargo clippy -- -D clippy::all
+
 clean:
 	cargo clean
 	rm -f src/libcwe_checker_rs.a
