@@ -224,7 +224,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
             callee_state.ids_known_to_caller = callee_state.memory.get_all_object_ids();
             callee_state.ids_known_to_caller.remove(&callee_stack_id);
 
-            return callee_state;
+            callee_state
         } else {
             panic!("Indirect call edges not yet supported.")
             // TODO: Support indirect call edges!
@@ -382,11 +382,11 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
                                     new_state.set_register(return_register, pointer.into()),
                                     Some(&call.tid),
                                 );
-                                return Some(new_state);
+                                Some(new_state)
                             } else {
                                 // We cannot track the new object, since we do not know where to store the pointer to it.
                                 // TODO: Return a diagnostics message to the user here.
-                                return Some(new_state);
+                                Some(new_state)
                             }
                         }
                         "free" => {
@@ -412,16 +412,16 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
                                             }
                                         } // TODO: add diagnostics for else case
                                         new_state.remove_unreferenced_objects();
-                                        return Some(new_state);
+                                        Some(new_state)
                                     } else {
                                         // TODO: add diagnostics message for the user here
-                                        return Some(new_state);
+                                        Some(new_state)
                                     }
                                 }
                                 Err(err) => {
                                     // We do not know which memory object to free
                                     self.log_debug(Err(err), Some(&call.tid));
-                                    return Some(new_state);
+                                    Some(new_state)
                                 }
                             }
                         }
@@ -465,7 +465,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
                                     .memory
                                     .mark_mem_object_as_untracked(id, &possible_referenced_ids);
                             }
-                            return Some(new_state);
+                            Some(new_state)
                         }
                     }
                 } else {

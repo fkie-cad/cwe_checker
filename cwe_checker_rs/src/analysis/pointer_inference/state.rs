@@ -98,7 +98,7 @@ impl State {
             }
             Ok(())
         } else {
-            return Err(anyhow!("Variable is not a register type"));
+            Err(anyhow!("Variable is not a register type"))
         }
     }
 
@@ -284,11 +284,11 @@ impl State {
             // A more precise solution would write to every caller memory region separately,
             // but would also need to check first whether the target memory region is unique or not.
             self.memory.set_value(pointer, value.clone())?;
-            return Ok(());
+            Ok(())
         } else {
             // TODO: Implement recognition of stores to global memory.
             // Needs implementation of reads from global data first.
-            return Err(anyhow!("Memory write to non-pointer data"));
+            Err(anyhow!("Memory write to non-pointer data"))
         }
     }
 
@@ -316,7 +316,7 @@ impl State {
             let data = self.eval(value).unwrap_or(Data::new_top(*size));
             assert_eq!(data.bitsize(), *size);
             // TODO: At the moment, both memory and endianness are ignored. Change that!
-            return self.write_to_address(address, &data);
+            self.write_to_address(address, &data)
         } else {
             panic!("Expected store expression")
         }
@@ -343,7 +343,7 @@ impl State {
             }
         }
         // We only return the last error encountered.
-        return result_log;
+        result_log
     }
 
     /// merge two states
@@ -415,9 +415,9 @@ impl State {
                     new_targets.add_target(id.clone(), offset.clone());
                 }
             }
-            return Data::Pointer(new_targets);
+            Data::Pointer(new_targets)
         } else {
-            return address.clone();
+            address.clone()
         }
     }
 
@@ -486,7 +486,7 @@ impl State {
                 }
             }
         }
-        return ids;
+        ids
     }
 
     /// Merge the callee stack with the caller stack.

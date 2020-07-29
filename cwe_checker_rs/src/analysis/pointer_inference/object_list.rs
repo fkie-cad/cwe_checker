@@ -55,7 +55,7 @@ impl AbstractObjectList {
                 }
             }
         }
-        return false;
+        false
     }
 
     /// Get the value at a given address.
@@ -322,24 +322,22 @@ impl AbstractObjectList {
                 }
                 Arc::make_mut(object).set_state(None);
             }
-        } else {
-            if let Some(id) = ids.iter().next() {
-                let object = &mut self.objects[self.ids[&id].0];
-                if let AbstractObject::Memory(tracked_mem) = Arc::deref(object) {
-                    if tracked_mem.state != Some(ObjectState::Alive) {
-                        // Possible double free detected
-                        // TODO: Check rate of false positives.
-                        // If too high, only mark those with explicit dangling state.
-                        possible_double_free_ids.push(id.clone());
-                    }
+        } else if let Some(id) = ids.iter().next() {
+            let object = &mut self.objects[self.ids[&id].0];
+            if let AbstractObject::Memory(tracked_mem) = Arc::deref(object) {
+                if tracked_mem.state != Some(ObjectState::Alive) {
+                    // Possible double free detected
+                    // TODO: Check rate of false positives.
+                    // If too high, only mark those with explicit dangling state.
+                    possible_double_free_ids.push(id.clone());
                 }
-                Arc::make_mut(object).set_state(Some(ObjectState::Dangling));
             }
+            Arc::make_mut(object).set_state(Some(ObjectState::Dangling));
         }
         if possible_double_free_ids.is_empty() {
-            return Ok(());
+            Ok(())
         } else {
-            return Err(possible_double_free_ids);
+            Err(possible_double_free_ids)
         }
     }
 

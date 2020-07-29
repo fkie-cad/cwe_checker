@@ -242,7 +242,7 @@ impl<'a> GraphBuilder<'a> {
 /// This function builds the interprocedural control flow graph for a program term.
 pub fn get_program_cfg(program: &Term<Program>, extern_subs: HashSet<Tid>) -> Graph {
     let builder = GraphBuilder::new(program, extern_subs);
-    return builder.build();
+    builder.build()
 }
 
 /// For a given set of block TIDs generate a map from the TIDs to the indices of the BlkStart and BlkEnd nodes
@@ -265,7 +265,7 @@ pub fn get_indices_of_block_nodes<'a, I: Iterator<Item = &'a Tid>>(
             }
         }
     }
-    return tid_to_indices_map;
+    tid_to_indices_map
 }
 
 #[cfg(test)]

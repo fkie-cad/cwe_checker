@@ -210,7 +210,7 @@ impl AbstractObjectInfo {
         } else {
             self.memory = MemRegion::new(self.memory.get_address_bitsize());
         }
-        return Ok(());
+        Ok(())
     }
 
     fn get_all_possible_pointer_targets(&self) -> BTreeSet<AbstractIdentifier> {
@@ -222,7 +222,7 @@ impl AbstractObjectInfo {
                 }
             };
         }
-        return targets;
+        targets
     }
 
     /// For pointer values replace an abstract identifier with another one and add the offset_adjustment to the pointer offsets.
@@ -245,11 +245,9 @@ impl AbstractObjectInfo {
     pub fn set_state(&mut self, new_state: Option<ObjectState>) {
         if self.is_unique {
             self.state = new_state;
-        } else {
-            if self.state != new_state {
-                self.state = None;
-            } // else don't change the state
-        }
+        } else if self.state != new_state {
+            self.state = None;
+        } // else don't change the state
     }
 
     /// Remove the provided IDs from the target lists of all pointers in the memory object.

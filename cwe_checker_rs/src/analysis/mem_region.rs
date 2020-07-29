@@ -162,7 +162,7 @@ impl<T: AbstractDomain + ValueDomain + std::fmt::Debug> MemRegionData<T> {
             }
         }
         let bitsize = 8 * size as u16;
-        return T::new_top(bitsize);
+        T::new_top(bitsize)
     }
 
     /// Remove all elements intersecting the provided interval.
