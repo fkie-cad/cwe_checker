@@ -146,8 +146,7 @@ impl<'a> PointerInference<'a> {
                 .program
                 .term
                 .extern_symbols
-                .iter()
-                .any(|symbol| symbol.tid == sub.tid)
+                .iter().any(|symbol| symbol.tid == sub.tid)
             {
                 continue; // We ignore functions marked as extern symbols.
             }
