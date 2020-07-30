@@ -166,7 +166,6 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
         } else {
             panic!("Malformed control flow graph: Encountered call edge with a non-call jump term.")
         };
-        let stack_offset_domain = self.get_current_stack_offset(state);
 
         if let Label::Direct(ref callee_tid) = call.target {
             let callee_stack_id = AbstractIdentifier::new(
@@ -177,7 +176,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
                 call_term.tid.clone(),
                 AbstractLocation::from_var(&self.project.stack_pointer_register).unwrap(),
             );
-            let stack_offset_adjustment = stack_offset_domain.clone();
+            let stack_offset_adjustment = self.get_current_stack_offset(state);
             let address_bitsize = self.project.stack_pointer_register.bitsize().unwrap();
 
             let mut callee_state = state.clone();
@@ -214,9 +213,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
             );
             // set the list of caller stack ids to only this caller id
             callee_state.caller_stack_ids = BTreeSet::new();
-            callee_state
-                .caller_stack_ids
-                .insert(new_caller_stack_id.clone());
+            callee_state.caller_stack_ids.insert(new_caller_stack_id);
             // Remove non-referenced objects and objects, only the caller knows about, from the state.
             callee_state.ids_known_to_caller = BTreeSet::new();
             callee_state.remove_unreferenced_objects();
@@ -224,7 +221,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
             callee_state.ids_known_to_caller = callee_state.memory.get_all_object_ids();
             callee_state.ids_known_to_caller.remove(&callee_stack_id);
 
-            return callee_state;
+            callee_state
         } else {
             panic!("Indirect call edges not yet supported.")
             // TODO: Support indirect call edges!
@@ -277,7 +274,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
         state_after_return.merge_callee_stack_to_caller_stack(
             callee_stack_id,
             original_caller_stack_id,
-            &(-stack_offset_on_call.clone()),
+            &(-stack_offset_on_call),
         );
         state_after_return.stack_id = original_caller_stack_id.clone();
         state_after_return.caller_stack_ids = state_before_call.caller_stack_ids.clone();
@@ -382,11 +379,11 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
                                     new_state.set_register(return_register, pointer.into()),
                                     Some(&call.tid),
                                 );
-                                return Some(new_state);
+                                Some(new_state)
                             } else {
                                 // We cannot track the new object, since we do not know where to store the pointer to it.
                                 // TODO: Return a diagnostics message to the user here.
-                                return Some(new_state);
+                                Some(new_state)
                             }
                         }
                         "free" => {
@@ -412,16 +409,16 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
                                             }
                                         } // TODO: add diagnostics for else case
                                         new_state.remove_unreferenced_objects();
-                                        return Some(new_state);
+                                        Some(new_state)
                                     } else {
                                         // TODO: add diagnostics message for the user here
-                                        return Some(new_state);
+                                        Some(new_state)
                                     }
                                 }
                                 Err(err) => {
                                     // We do not know which memory object to free
                                     self.log_debug(Err(err), Some(&call.tid));
-                                    return Some(new_state);
+                                    Some(new_state)
                                 }
                             }
                         }
@@ -431,7 +428,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
                                 Some(&call.tid),
                             );
                             let mut possible_referenced_ids = BTreeSet::new();
-                            if extern_symbol.arguments.len() == 0 {
+                            if extern_symbol.arguments.is_empty() {
                                 // TODO: We assume here that we do not know the parameters and approximate them by all parameter registers.
                                 // This approximation is wrong if the function is known but has neither parameters nor return values.
                                 // We need to somehow distinguish these two cases.
@@ -465,7 +462,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
                                     .memory
                                     .mark_mem_object_as_untracked(id, &possible_referenced_ids);
                             }
-                            return Some(new_state);
+                            Some(new_state)
                         }
                     }
                 } else {

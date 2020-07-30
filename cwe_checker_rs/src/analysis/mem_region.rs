@@ -21,8 +21,10 @@ Implementation needs is_top() to be a member function of the ValueDomain trait.
 use super::abstract_domain::*;
 use crate::bil::{BitSize, Bitvector};
 use apint::{Int, Width};
+use derive_more::Deref;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::ops::DerefMut;
 use std::sync::Arc;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
@@ -31,21 +33,17 @@ struct Element<T> {
     value: T,
 }
 
-#[derive(Serialize, Deserialize, Debug, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, Hash, Clone, PartialEq, Eq, Deref)]
+#[deref(forward)]
 pub struct MemRegion<T: AbstractDomain + ValueDomain + std::fmt::Debug>(Arc<MemRegionData<T>>);
 
-impl<T: AbstractDomain + ValueDomain + std::fmt::Debug> PartialEq for MemRegion<T> {
-    fn eq(&self, other: &Self) -> bool {
-        if Arc::ptr_eq(&self.0, &other.0) {
-            true
-        } else {
-            self.0 == other.0
-        }
+impl<T: AbstractDomain + ValueDomain + std::fmt::Debug> DerefMut for MemRegion<T> {
+    fn deref_mut(&mut self) -> &mut MemRegionData<T> {
+        Arc::make_mut(&mut self.0)
     }
 }
 
-impl<T: AbstractDomain + ValueDomain + std::fmt::Debug> Eq for MemRegion<T> {}
-
+// TODO: most of the functions in this impl block should be moved to MemRegionData (or removed, if they are only thin wrappers).
 impl<T: AbstractDomain + ValueDomain + std::fmt::Debug> MemRegion<T> {
     pub fn new(address_bitsize: BitSize) -> Self {
         MemRegion(Arc::new(MemRegionData::new(address_bitsize)))
@@ -90,7 +88,7 @@ impl<T: AbstractDomain + ValueDomain + std::fmt::Debug> MemRegion<T> {
 
 /// An abstract domain representing a continuous region of memory. See the module level description for more.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
-struct MemRegionData<T: AbstractDomain + ValueDomain + std::fmt::Debug> {
+pub struct MemRegionData<T: AbstractDomain + ValueDomain + std::fmt::Debug> {
     address_bitsize: BitSize,
     values: BTreeMap<i64, T>,
 }
@@ -162,7 +160,7 @@ impl<T: AbstractDomain + ValueDomain + std::fmt::Debug> MemRegionData<T> {
             }
         }
         let bitsize = 8 * size as u16;
-        return T::new_top(bitsize);
+        T::new_top(bitsize)
     }
 
     /// Remove all elements intersecting the provided interval.

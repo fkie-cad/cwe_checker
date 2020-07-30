@@ -55,7 +55,7 @@ impl<'a> PointerInference<'a> {
                 if let Some((start_node_index, _end_node_index)) =
                     tid_to_graph_indices_map.get(&block_tid)
                 {
-                    Some((sub_tid.clone(), start_node_index.clone()))
+                    Some((sub_tid.clone(), *start_node_index))
                 } else {
                     None
                 }
@@ -147,8 +147,7 @@ impl<'a> PointerInference<'a> {
                 .term
                 .extern_symbols
                 .iter()
-                .find(|symbol| symbol.tid == sub.tid)
-                .is_some()
+                .any(|symbol| symbol.tid == sub.tid)
             {
                 continue; // We ignore functions marked as extern symbols.
             }
@@ -160,19 +159,15 @@ impl<'a> PointerInference<'a> {
         let mut new_entry_points = Vec::new();
         for (node_id, node) in graph.node_references() {
             if let Node::BlkStart(block) = node {
-                if start_block_to_sub_map.get(&block.tid).is_some()
-                    && self.computation.get_node_value(node_id).is_none()
-                {
-                    if only_cfg_roots
+                if !(start_block_to_sub_map.get(&block.tid).is_none()
+                    || self.computation.get_node_value(node_id).is_some()
+                    || only_cfg_roots
                         && graph
                             .neighbors_directed(node_id, Direction::Incoming)
                             .next()
-                            .is_none()
-                    {
-                        new_entry_points.push(node_id);
-                    } else if !only_cfg_roots {
-                        new_entry_points.push(node_id);
-                    }
+                            .is_some())
+                {
+                    new_entry_points.push(node_id);
                 }
             }
         }

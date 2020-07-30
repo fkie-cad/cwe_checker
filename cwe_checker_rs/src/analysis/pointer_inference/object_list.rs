@@ -55,7 +55,7 @@ impl AbstractObjectList {
                 }
             }
         }
-        return false;
+        false
     }
 
     /// Get the value at a given address.
@@ -87,7 +87,7 @@ impl AbstractObjectList {
                         break;
                     }
                 }
-                merged_value.ok_or(anyhow!("Pointer without targets encountered."))
+                merged_value.ok_or_else(|| anyhow!("Pointer without targets encountered."))
             }
         }
     }
@@ -102,7 +102,7 @@ impl AbstractObjectList {
         for (id, _offset) in pointer.iter_targets() {
             target_object_set.insert(self.ids.get(id).unwrap().0);
         }
-        if target_object_set.len() == 0 {
+        if target_object_set.is_empty() {
             return Err(anyhow!("Pointer without targets encountered"));
         }
         if target_object_set.len() == 1 {
@@ -170,7 +170,7 @@ impl AbstractObjectList {
         let mut merged_objects = self.objects.clone();
         let mut merged_ids = self.ids.clone();
         for (other_id, (other_index, other_offset)) in other.ids.iter() {
-            if let Some((index, offset)) = merged_ids.get(&other_id).clone() {
+            if let Some((index, offset)) = merged_ids.get(&other_id) {
                 let (index, offset) = (*index, offset.clone());
                 merged_ids.insert(other_id.clone(), (index, offset.merge(&other_offset)));
                 if index < self.objects.len() {
@@ -322,24 +322,22 @@ impl AbstractObjectList {
                 }
                 Arc::make_mut(object).set_state(None);
             }
-        } else {
-            if let Some(id) = ids.iter().next() {
-                let object = &mut self.objects[self.ids[&id].0];
-                if let AbstractObject::Memory(tracked_mem) = Arc::deref(object) {
-                    if tracked_mem.state != Some(ObjectState::Alive) {
-                        // Possible double free detected
-                        // TODO: Check rate of false positives.
-                        // If too high, only mark those with explicit dangling state.
-                        possible_double_free_ids.push(id.clone());
-                    }
+        } else if let Some(id) = ids.iter().next() {
+            let object = &mut self.objects[self.ids[&id].0];
+            if let AbstractObject::Memory(tracked_mem) = Arc::deref(object) {
+                if tracked_mem.state != Some(ObjectState::Alive) {
+                    // Possible double free detected
+                    // TODO: Check rate of false positives.
+                    // If too high, only mark those with explicit dangling state.
+                    possible_double_free_ids.push(id.clone());
                 }
-                Arc::make_mut(object).set_state(Some(ObjectState::Dangling));
             }
+            Arc::make_mut(object).set_state(Some(ObjectState::Dangling));
         }
         if possible_double_free_ids.is_empty() {
-            return Ok(());
+            Ok(())
         } else {
-            return Err(possible_double_free_ids);
+            Err(possible_double_free_ids)
         }
     }
 
@@ -380,11 +378,10 @@ impl AbstractObjectList {
             }
         }
         let mut old_to_new_index_map: BTreeMap<usize, usize> = BTreeMap::new();
-        for old_index in 0..other_object_list.objects.len() {
-            if objects_already_known[old_index] == false {
+        for (old_index, old_object) in other_object_list.objects.iter().enumerate() {
+            if !objects_already_known[old_index] {
                 old_to_new_index_map.insert(old_index, self.objects.len());
-                self.objects
-                    .push(other_object_list.objects[old_index].clone());
+                self.objects.push(old_object.clone());
             }
         }
         for (id, (old_index, offset)) in other_object_list.ids.iter() {

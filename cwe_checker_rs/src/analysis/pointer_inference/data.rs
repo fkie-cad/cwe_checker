@@ -54,7 +54,7 @@ impl Data {
                     }
                 })
                 .collect();
-            if remaining_targets.len() == 0 {
+            if remaining_targets.is_empty() {
                 *self = Data::new_top(self.bitsize());
             } else {
                 *self = Data::Pointer(PointerDomain::with_targets(remaining_targets));
