@@ -95,7 +95,7 @@ impl<'a> GraphBuilder<'a> {
     /// add all subs to the jump targets so that call instructions can be linked to the starting block of the corresponding sub.
     fn add_subs_to_jump_targets(&mut self) {
         for sub in self.program.term.subs.iter() {
-            if sub.term.blocks.len() > 0 {
+            if !sub.term.blocks.is_empty() {
                 let start_block = &sub.term.blocks[0];
                 let target_index = self.jump_targets[&start_block.tid];
                 self.jump_targets.insert(sub.tid.clone(), target_index);
@@ -140,7 +140,7 @@ impl<'a> GraphBuilder<'a> {
                             self.return_addresses
                                 .entry(target_tid.clone())
                                 .and_modify(|vec| vec.push((source, return_index)))
-                                .or_insert(vec![(source, return_index)]);
+                                .or_insert_with(|| vec![(source, return_index)]);
                         }
                         // TODO: Non-returning calls and tail calls both have no return target in BAP.
                         // Thus we need to distinguish them somehow to correctly handle tail calls.
@@ -189,8 +189,7 @@ impl<'a> GraphBuilder<'a> {
                 .term
                 .jmps
                 .iter()
-                .filter(|jump| matches!(jump.term.kind, JmpKind::Call(_)))
-                .next()
+                .find(|jump| matches!(jump.term.kind, JmpKind::Call(_)))
                 .unwrap();
             let cr_combine_node = self.graph.add_node(Node::CallReturn(call_block));
             self.graph
@@ -210,8 +209,7 @@ impl<'a> GraphBuilder<'a> {
                     .term
                     .jmps
                     .iter()
-                    .find(|jmp| matches!(jmp.term.kind, JmpKind::Return(_)))
-                    .is_some()
+                    .any(|jmp| matches!(jmp.term.kind, JmpKind::Return(_)))
                 {
                     let return_from_node = self.jump_targets[&block.tid].1;
                     self.add_call_return_node_and_edges(sub, return_from_node);
@@ -255,13 +253,10 @@ pub fn get_indices_of_block_nodes<'a, I: Iterator<Item = &'a Tid>>(
     let mut tid_to_indices_map = HashMap::new();
     for node_index in graph.node_indices() {
         if let Some(tid) = tids.get(&graph[node_index].get_block().tid) {
-            match graph[node_index] {
-                Node::BlkStart(_block_term) => {
-                    let start_index = node_index;
-                    let end_index = graph.neighbors(start_index).next().unwrap();
-                    tid_to_indices_map.insert(tid.clone(), (start_index, end_index));
-                }
-                _ => (),
+            if let Node::BlkStart(_block_term) = graph[node_index] {
+                let start_index = node_index;
+                let end_index = graph.neighbors(start_index).next().unwrap();
+                tid_to_indices_map.insert(tid.clone(), (start_index, end_index));
             }
         }
     }

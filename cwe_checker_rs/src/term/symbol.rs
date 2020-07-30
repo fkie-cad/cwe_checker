@@ -29,7 +29,7 @@ impl ExternSymbol {
         }
         match &return_args[0].location {
             Expression::Var(var) => Ok(var),
-            _ => Err(anyhow!("Return location is not a register"))?,
+            _ => Err(anyhow!("Return location is not a register")),
         }
     }
 

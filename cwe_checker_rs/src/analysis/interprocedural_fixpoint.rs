@@ -172,11 +172,11 @@ impl<'a, T: Problem<'a>> GeneralFPProblem for GeneralizedProblem<'a, T> {
             Edge::ExternCallStub(call) => self
                 .problem
                 .update_call_stub(node_value.unwrap_value(), call)
-                .map(|val| NodeValue::Value(val)),
+                .map(NodeValue::Value),
             Edge::Jump(jump, untaken_conditional) => self
                 .problem
                 .update_jump(node_value.unwrap_value(), jump, *untaken_conditional)
-                .map(|val| NodeValue::Value(val)),
+                .map(NodeValue::Value),
         }
     }
 }
@@ -192,7 +192,7 @@ impl<'a, T: Problem<'a>> Computation<'a, T> {
         let generalized_problem = GeneralizedProblem::new(problem);
         let computation = super::fixpoint::Computation::new(
             generalized_problem,
-            default_value.map(|val| NodeValue::Value(val)),
+            default_value.map(NodeValue::Value),
         );
         Computation {
             generalized_computation: computation,
