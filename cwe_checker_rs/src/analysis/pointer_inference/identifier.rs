@@ -1,6 +1,6 @@
 use crate::bil::variable::*;
 use crate::prelude::*;
-use crate::utils::fast_cmp_arc::FastCmpArc;
+use derive_more::Deref;
 use std::sync::Arc;
 
 // TODO: Right now abstract locations are used as giving the location where a pointer to an object is located.
@@ -14,8 +14,10 @@ use std::sync::Arc;
 /// The time identifier is given by a `Tid`.
 /// If it is the Tid of a basic block, then it describes the point in time *before* execution of the first instruction in the block.
 /// If it is the Tid of a Def or Jmp, then it describes the point in time *after* the execution of the Def or Jmp.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
-pub struct AbstractIdentifier(FastCmpArc<AbstractIdentifierData>);
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord, Deref)]
+#[deref(forward)]
+pub struct AbstractIdentifier(Arc<AbstractIdentifierData>);
 
 /// The data contained in an abstract identifier
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
@@ -27,10 +29,7 @@ pub struct AbstractIdentifierData {
 impl AbstractIdentifier {
     /// create a new abstract identifier
     pub fn new(time: Tid, location: AbstractLocation) -> AbstractIdentifier {
-        AbstractIdentifier(FastCmpArc(Arc::new(AbstractIdentifierData {
-            time,
-            location,
-        })))
+        AbstractIdentifier(Arc::new(AbstractIdentifierData { time, location }))
     }
 }
 
