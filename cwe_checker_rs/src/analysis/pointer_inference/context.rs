@@ -1,4 +1,4 @@
-use crate::analysis::abstract_domain::*;
+use crate::abstract_domain::*;
 use crate::analysis::graph::Graph;
 use crate::bil::Expression;
 use crate::prelude::*;

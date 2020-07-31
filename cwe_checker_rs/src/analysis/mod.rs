@@ -1,4 +1,3 @@
-pub mod abstract_domain;
 pub mod fixpoint;
 pub mod graph;
 pub mod interprocedural_fixpoint;

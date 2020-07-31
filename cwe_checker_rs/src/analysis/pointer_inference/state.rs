@@ -1,7 +1,7 @@
 use super::data::*;
 use super::identifier::{AbstractIdentifier, AbstractLocation};
 use super::object_list::AbstractObjectList;
-use crate::analysis::abstract_domain::*;
+use crate::abstract_domain::*;
 use crate::bil::*;
 use crate::prelude::*;
 use crate::term::symbol::ExternSymbol;

@@ -1,5 +1,5 @@
 use super::identifier::*;
-use crate::analysis::abstract_domain::*;
+use crate::abstract_domain::*;
 use crate::bil::*;
 use crate::prelude::*;
 use std::collections::{BTreeMap, BTreeSet};

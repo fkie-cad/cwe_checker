@@ -18,7 +18,7 @@ In that regard, an empty memory region is actually the `top()` element of the do
 Implementation needs is_top() to be a member function of the ValueDomain trait.
 */
 
-use super::abstract_domain::*;
+use crate::abstract_domain::*;
 use crate::bil::{BitSize, Bitvector};
 use apint::{Int, Width};
 use derive_more::Deref;

@@ -1,7 +1,7 @@
 use super::data::*;
 use super::identifier::AbstractIdentifier;
 use super::object::*;
-use crate::analysis::abstract_domain::*;
+use crate::abstract_domain::*;
 use crate::bil::Bitvector;
 use crate::prelude::*;
 use serde::{Deserialize, Serialize};

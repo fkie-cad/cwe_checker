@@ -12,6 +12,7 @@ pub mod bil;
 pub mod ffi;
 pub mod term;
 pub mod utils;
+pub mod abstract_domain;
 
 mod prelude {
     pub use apint::Width;
