@@ -8,7 +8,7 @@ use std::convert::TryFrom;
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub enum Data {
     Top(BitSize),
-    Pointer(PointerDomain),
+    Pointer(PointerDomain<BitvectorDomain>),
     Value(BitvectorDomain),
 }
 
@@ -32,7 +32,7 @@ impl Data {
 
     pub fn referenced_ids(&self) -> BTreeSet<AbstractIdentifier> {
         if let Self::Pointer(pointer) = self {
-            pointer.0.keys().cloned().collect()
+            pointer.ids().cloned().collect()
         } else {
             BTreeSet::new()
         }
@@ -98,115 +98,6 @@ impl<'a> TryFrom<&'a Data> for &'a Bitvector {
 impl From<BitvectorDomain> for Data {
     fn from(value: BitvectorDomain) -> Data {
         Data::Value(value)
-    }
-}
-
-/// An abstract value representing a pointer given as a map from an abstract identifier
-/// to the offset in the pointed to object.
-///
-/// The map should never be empty. If the map contains more than one key,
-/// it indicates that the pointer may point to any of the contained objects.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
-pub struct PointerDomain(BTreeMap<AbstractIdentifier, BitvectorDomain>);
-
-impl PointerDomain {
-    pub fn new(target: AbstractIdentifier, offset: BitvectorDomain) -> PointerDomain {
-        let mut map = BTreeMap::new();
-        map.insert(target, offset);
-        PointerDomain(map)
-    }
-
-    pub fn with_targets(targets: BTreeMap<AbstractIdentifier, BitvectorDomain>) -> PointerDomain {
-        PointerDomain(targets)
-    }
-
-    /// get the bitsize of the pointer
-    pub fn bitsize(&self) -> BitSize {
-        let some_elem = self.0.values().next().unwrap();
-        some_elem.bitsize()
-    }
-
-    pub fn merge(&self, other: &PointerDomain) -> PointerDomain {
-        let mut merged_map = self.0.clone();
-        for (location, offset) in other.0.iter() {
-            if merged_map.contains_key(location) {
-                merged_map.insert(location.clone(), merged_map[location].merge(offset));
-            } else {
-                merged_map.insert(location.clone(), offset.clone());
-            }
-        }
-        PointerDomain(merged_map)
-    }
-
-    /// Add a new target to the pointer.
-    /// If the pointer already contains a target with the same abstract identifier, the offsets of both targets get merged.
-    pub fn add_target(&mut self, target: AbstractIdentifier, offset: BitvectorDomain) {
-        if let Some(old_offset) = self.0.get(&target) {
-            let merged_offset = old_offset.merge(&offset);
-            self.0.insert(target, merged_offset);
-        } else {
-            self.0.insert(target, offset);
-        }
-    }
-
-    /// Replace an abstract identifier with another one and add the offset_adjustment to the pointer offset.
-    /// This is needed to adjust stack pointer on call and return instructions.
-    pub fn replace_abstract_id(
-        &mut self,
-        old_id: &AbstractIdentifier,
-        new_id: &AbstractIdentifier,
-        offset_adjustment: &BitvectorDomain,
-    ) {
-        if let Some(old_offset) = self.0.get(&old_id) {
-            let new_offset = old_offset.clone() + offset_adjustment.clone();
-            self.0.remove(old_id);
-            self.0.insert(new_id.clone(), new_offset);
-        }
-    }
-
-    /// add a value to the offset
-    pub fn add_to_offset(&self, value: &BitvectorDomain) -> PointerDomain {
-        let mut result = self.clone();
-        for offset in result.0.values_mut() {
-            *offset = offset.bin_op(BinOpType::PLUS, value);
-        }
-        result
-    }
-
-    /// subtract a value from the offset
-    pub fn sub_from_offset(&self, value: &BitvectorDomain) -> PointerDomain {
-        let mut result = self.clone();
-        for offset in result.0.values_mut() {
-            *offset = offset.bin_op(BinOpType::MINUS, value);
-        }
-        result
-    }
-
-    /// Get an iterator over all possible abstract targets (together with the offset in the target) the pointer may point to.
-    pub fn iter_targets(
-        &self,
-    ) -> std::collections::btree_map::Iter<AbstractIdentifier, BitvectorDomain> {
-        self.0.iter()
-    }
-
-    pub fn get_target_ids(&self) -> BTreeSet<AbstractIdentifier> {
-        self.0.keys().cloned().collect()
-    }
-}
-
-impl PointerDomain {
-    pub fn to_json_compact(&self) -> serde_json::Value {
-        serde_json::Value::Object(
-            self.0
-                .iter()
-                .map(|(id, offset)| {
-                    (
-                        format!("{}", id),
-                        serde_json::Value::String(format!("{}", offset)),
-                    )
-                })
-                .collect(),
-        )
     }
 }
 
@@ -320,8 +211,8 @@ impl AbstractDomain for Data {
     }
 }
 
-impl From<PointerDomain> for Data {
-    fn from(val: PointerDomain) -> Data {
+impl From<PointerDomain<BitvectorDomain>> for Data {
+    fn from(val: PointerDomain<BitvectorDomain>) -> Data {
         Data::Pointer(val)
     }
 }
@@ -338,7 +229,7 @@ mod tests {
         AbstractIdentifier::new(Tid::new("time0"), AbstractLocation::Register(name, 64))
     }
 
-    fn new_pointer_domain(location: String, offset: i64) -> PointerDomain {
+    fn new_pointer_domain(location: String, offset: i64) -> PointerDomain<BitvectorDomain> {
         let id = new_id(location);
         PointerDomain::new(id, bv(offset))
     }
@@ -392,22 +283,5 @@ mod tests {
         let two = Data::Value(BitvectorDomain::Value(Bitvector::from_i32(2)));
         let concat = new_value((1 << 32) + 2);
         assert_eq!(one.concat(&two), concat);
-    }
-
-    #[test]
-    fn pointer_domain() {
-        let pointer = new_pointer_domain("Rax".into(), 0);
-        let offset = bv(3);
-
-        let pointer_plus = new_pointer_domain("Rax".into(), 3);
-        let pointer_minus = new_pointer_domain("Rax".into(), -3);
-        assert_eq!(pointer.add_to_offset(&offset), pointer_plus);
-        assert_eq!(pointer.sub_from_offset(&offset), pointer_minus);
-
-        let other_pointer = new_pointer_domain("Rbx".into(), 5);
-        let merged = pointer.merge(&other_pointer);
-        assert_eq!(merged.0.len(), 2);
-        assert_eq!(merged.0.get(&new_id("Rax".into())), Some(&bv(0)));
-        assert_eq!(merged.0.get(&new_id("Rbx".into())), Some(&bv(5)));
     }
 }

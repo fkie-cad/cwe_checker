@@ -201,7 +201,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
             self.log_debug(
                 callee_state.set_register(
                     &self.project.stack_pointer_register,
-                    super::data::PointerDomain::new(
+                    PointerDomain::new(
                         callee_stack_id.clone(),
                         Bitvector::zero(apint::BitWidth::new(address_bitsize as usize).unwrap())
                             .into(),
@@ -370,7 +370,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
                                     super::object::ObjectType::Heap,
                                     address_bitsize,
                                 );
-                                let pointer = super::data::PointerDomain::new(
+                                let pointer = PointerDomain::new(
                                     object_id,
                                     Bitvector::zero((address_bitsize as usize).into()).into(),
                                 );

@@ -385,7 +385,7 @@ impl State {
         // then these values at positive offsets get overshadowed by the new callers,
         // but they get not properly merged with the values from the other callers!
         if let Data::Pointer(pointer) = address {
-            let mut new_targets = PointerDomain::with_targets(BTreeMap::new());
+            let mut new_targets = BTreeMap::new();
             for (id, offset) in pointer.iter_targets() {
                 if *id == self.stack_id {
                     match offset {
@@ -394,26 +394,26 @@ impl State {
                                 && !self.caller_stack_ids.is_empty()
                             {
                                 for caller_id in self.caller_stack_ids.iter() {
-                                    new_targets.add_target(caller_id.clone(), offset.clone());
+                                    new_targets.insert(caller_id.clone(), offset.clone());
                                 }
                             // Note that the id of the current stack frame was *not* added.
                             } else {
-                                new_targets.add_target(id.clone(), offset.clone());
+                                new_targets.insert(id.clone(), offset.clone());
                             }
                         }
                         BitvectorDomain::Top(_bitsize) => {
                             for caller_id in self.caller_stack_ids.iter() {
-                                new_targets.add_target(caller_id.clone(), offset.clone());
+                                new_targets.insert(caller_id.clone(), offset.clone());
                             }
                             // Note that we also add the id of the current stack frame
-                            new_targets.add_target(id.clone(), offset.clone());
+                            new_targets.insert(id.clone(), offset.clone());
                         }
                     }
                 } else {
-                    new_targets.add_target(id.clone(), offset.clone());
+                    new_targets.insert(id.clone(), offset.clone());
                 }
             }
-            Data::Pointer(new_targets)
+            Data::Pointer(PointerDomain::with_targets(new_targets))
         } else {
             address.clone()
         }
@@ -516,7 +516,7 @@ impl State {
     /// an error with the list of possibly already freed objects is returned.
     pub fn mark_mem_object_as_freed(
         &mut self,
-        object_pointer: &PointerDomain,
+        object_pointer: &PointerDomain<BitvectorDomain>,
     ) -> Result<(), Vec<AbstractIdentifier>> {
         self.memory.mark_mem_object_as_freed(object_pointer)
     }
