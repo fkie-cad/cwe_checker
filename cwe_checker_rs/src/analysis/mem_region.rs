@@ -35,16 +35,16 @@ struct Element<T> {
 
 #[derive(Serialize, Deserialize, Debug, Hash, Clone, PartialEq, Eq, Deref)]
 #[deref(forward)]
-pub struct MemRegion<T: AbstractDomain + ValueDomain + std::fmt::Debug>(Arc<MemRegionData<T>>);
+pub struct MemRegion<T: AbstractDomain + HasBitSize + RegisterDomain + std::fmt::Debug>(Arc<MemRegionData<T>>);
 
-impl<T: AbstractDomain + ValueDomain + std::fmt::Debug> DerefMut for MemRegion<T> {
+impl<T: AbstractDomain + HasBitSize + RegisterDomain + std::fmt::Debug> DerefMut for MemRegion<T> {
     fn deref_mut(&mut self) -> &mut MemRegionData<T> {
         Arc::make_mut(&mut self.0)
     }
 }
 
 // TODO: most of the functions in this impl block should be moved to MemRegionData (or removed, if they are only thin wrappers).
-impl<T: AbstractDomain + ValueDomain + std::fmt::Debug> MemRegion<T> {
+impl<T: AbstractDomain + HasBitSize + RegisterDomain + std::fmt::Debug> MemRegion<T> {
     pub fn new(address_bitsize: BitSize) -> Self {
         MemRegion(Arc::new(MemRegionData::new(address_bitsize)))
     }
@@ -88,12 +88,12 @@ impl<T: AbstractDomain + ValueDomain + std::fmt::Debug> MemRegion<T> {
 
 /// An abstract domain representing a continuous region of memory. See the module level description for more.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
-pub struct MemRegionData<T: AbstractDomain + ValueDomain + std::fmt::Debug> {
+pub struct MemRegionData<T: AbstractDomain + HasBitSize + RegisterDomain + std::fmt::Debug> {
     address_bitsize: BitSize,
     values: BTreeMap<i64, T>,
 }
 
-impl<T: AbstractDomain + ValueDomain + std::fmt::Debug> MemRegionData<T> {
+impl<T: AbstractDomain + HasBitSize + RegisterDomain + std::fmt::Debug> MemRegionData<T> {
     /// create a new, empty MemRegion
     pub fn new(address_bitsize: BitSize) -> MemRegionData<T> {
         MemRegionData {
@@ -210,16 +210,33 @@ mod tests {
     struct MockDomain(i64, BitSize);
 
     impl AbstractDomain for MockDomain {
-        fn top(&self) -> MockDomain {
-            MockDomain::new_top(self.1)
+        fn merge(&self, other: &Self) -> Self {
+            assert_eq!(self.1, other.1);
+            if self == other {
+                self.clone()
+            } else {
+                self.top()
+            }
+        }
+
+        fn is_top(&self) -> bool {
+            self == &self.top()
         }
     }
 
-    impl ValueDomain for MockDomain {
+    impl HasBitSize for MockDomain {
         fn bitsize(&self) -> BitSize {
             self.1
         }
+    }
 
+    impl HasTop for MockDomain {
+        fn top(&self) -> Self {
+            Self::new_top(self.1)
+        }
+    }
+
+    impl RegisterDomain for MockDomain {
         fn new_top(bitsize: BitSize) -> MockDomain {
             MockDomain(0, bitsize)
         }

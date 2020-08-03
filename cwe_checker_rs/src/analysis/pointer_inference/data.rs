@@ -211,7 +211,7 @@ impl PointerDomain {
     }
 }
 
-impl ValueDomain for Data {
+impl HasBitSize for Data {
     fn bitsize(&self) -> BitSize {
         use Data::*;
         match self {
@@ -220,7 +220,15 @@ impl ValueDomain for Data {
             Value(bitvec) => bitvec.bitsize(),
         }
     }
+}
 
+impl HasTop for Data {
+    fn top(&self) -> Self {
+        Data::new_top(self.bitsize())
+    }
+}
+
+impl RegisterDomain for Data {
     fn new_top(bitsize: BitSize) -> Data {
         Data::Top(bitsize)
     }
@@ -297,10 +305,6 @@ impl ValueDomain for Data {
 }
 
 impl AbstractDomain for Data {
-    fn top(&self) -> Self {
-        Data::Top(self.bitsize())
-    }
-
     fn merge(&self, other: &Self) -> Self {
         use Data::*;
         match (self, other) {

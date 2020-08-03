@@ -264,7 +264,7 @@ impl AbstractObjectInfo {
     }
 }
 
-impl AbstractDomain for AbstractObjectInfo {
+impl HasTop for AbstractObjectInfo {
     fn top(&self) -> Self {
         AbstractObjectInfo {
             pointer_targets: BTreeSet::new(),
@@ -274,7 +274,9 @@ impl AbstractDomain for AbstractObjectInfo {
             memory: MemRegion::new(self.memory.get_address_bitsize()),
         }
     }
+}
 
+impl AbstractDomain for AbstractObjectInfo {
     fn merge(&self, other: &Self) -> Self {
         AbstractObjectInfo {
             pointer_targets: self
@@ -287,6 +289,11 @@ impl AbstractDomain for AbstractObjectInfo {
             type_: same_or_none(&self.type_, &other.type_),
             memory: self.memory.merge(&other.memory),
         }
+    }
+
+    /// The domain has no *Top* element, thus this function always returns false.
+    fn is_top(&self) -> bool {
+        false
     }
 }
 

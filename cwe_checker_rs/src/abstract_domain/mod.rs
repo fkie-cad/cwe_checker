@@ -1,6 +1,5 @@
 use crate::bil::*;
 use crate::prelude::*;
-use serde::{Deserialize, Serialize};
 
 mod bitvector;
 pub use bitvector::*;
@@ -12,30 +11,39 @@ pub use bitvector::*;
 ///
 /// TODO: Decide if and how to represent intersects and bottom values!
 pub trait AbstractDomain: Sized + Eq + Clone {
-    /// The maximal value of a domain.
-    /// Usually it indicates a value for which nothing is known.
-    fn top(&self) -> Self;
 
-    fn merge(&self, other: &Self) -> Self {
-        if self == other {
-            self.clone()
-        } else {
-            self.top()
-        }
-    }
+    fn merge(&self, other: &Self) -> Self;
 
     /// Returns whether the element represents the top element or not.
-    fn is_top(&self) -> bool {
-        *self == self.top()
-    }
+    fn is_top(&self) -> bool;
 }
 
-/// A trait for abstract domains that represent values that can be loaded into register or written onto the stack.
-/// Every value has a determined and immutable length (in bits).
-pub trait ValueDomain: AbstractDomain {
-    /// Returns the size of the value in bits
+/// A trait for types representing values with a fixed size (in bits).
+/// 
+/// For abstract domains, the bitsize is a parameter of the domain itself,
+/// i.e. you cannot merge values of different bitsizes,
+/// since they lie in different posets (one for each bitsize).
+pub trait HasBitSize {
+    /// Return the size of the represented value in bits.
     fn bitsize(&self) -> BitSize;
+}
 
+/// An abstract domain implementing this trait has a global maximum, i.e. a *Top* element.
+pub trait HasTop {
+    /// Return an instance of the *Top* element.
+    /// 
+    /// Since an abstract domain type may represent a whole family of abstract domains,
+    /// this function takes an instance of the domain as a parameter,
+    /// so it can return the *Top* element of the same family member that the provided instance belongs to.
+    fn top(&self) -> Self;
+}
+
+/// A trait for abstract domains that can represent values loaded into CPU register.
+/// 
+/// The domain implements all general operations used to manipulate register values.
+/// The domain is parametrized by its bitsize (which represents the size of the register).
+/// It has a *Top* element, which is only characterized by its bitsize.
+pub trait RegisterDomain: AbstractDomain + HasBitSize + HasTop {
     /// Return a new top element with the given bitsize
     fn new_top(bitsize: BitSize) -> Self;
 
@@ -47,7 +55,7 @@ pub trait ValueDomain: AbstractDomain {
 
     /// extract a sub-bitvector
     fn extract(&self, low_bit: BitSize, high_bit: BitSize) -> Self {
-        Self::new_top(high_bit - low_bit) // TODO: This needs a unit test whether the result has the correct bitwidth!
+        Self::new_top(high_bit - low_bit + 1) // TODO: This needs a unit test whether the result has the correct bitwidth!
     }
 
     /// Extend a bitvector using the given cast type
@@ -58,4 +66,3 @@ pub trait ValueDomain: AbstractDomain {
         Self::new_top(self.bitsize() + other.bitsize())
     }
 }
-

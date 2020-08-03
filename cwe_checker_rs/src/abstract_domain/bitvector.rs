@@ -1,7 +1,7 @@
 use crate::bil::*;
 use crate::prelude::*;
 use serde::{Deserialize, Serialize};
-use super::{AbstractDomain, ValueDomain};
+use super::*;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub enum BitvectorDomain {
@@ -9,7 +9,27 @@ pub enum BitvectorDomain {
     Value(Bitvector),
 }
 
-impl ValueDomain for BitvectorDomain {
+impl AbstractDomain for BitvectorDomain {
+    fn merge(&self, other: &Self) -> Self {
+        if self == other {
+            self.clone()
+        } else {
+            self.top()
+        }
+    }
+
+    fn is_top(&self) -> bool {
+        matches!(self, Self::Top(_))
+    }
+}
+
+impl HasTop for BitvectorDomain {
+    fn top(&self) -> BitvectorDomain {
+        BitvectorDomain::Top(self.bitsize())
+    }
+}
+
+impl HasBitSize for BitvectorDomain {
     fn bitsize(&self) -> BitSize {
         use BitvectorDomain::*;
         match self {
@@ -17,7 +37,9 @@ impl ValueDomain for BitvectorDomain {
             Value(bitvec) => bitvec.width().to_usize() as u16,
         }
     }
+}
 
+impl RegisterDomain for BitvectorDomain {
     fn new_top(bitsize: BitSize) -> BitvectorDomain {
         BitvectorDomain::Top(bitsize)
     }
@@ -192,11 +214,7 @@ impl ValueDomain for BitvectorDomain {
     }
 }
 
-impl AbstractDomain for BitvectorDomain {
-    fn top(&self) -> BitvectorDomain {
-        BitvectorDomain::Top(self.bitsize())
-    }
-}
+
 
 impl std::ops::Add for BitvectorDomain {
     type Output = BitvectorDomain;
