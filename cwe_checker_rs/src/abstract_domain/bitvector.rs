@@ -1,8 +1,10 @@
+use super::{AbstractDomain, HasBitSize, HasTop, RegisterDomain};
 use crate::bil::*;
 use crate::prelude::*;
-use serde::{Deserialize, Serialize};
-use super::*;
 
+/// The `BitvectorDomain` is a simple abstract domain describing a bitvector of known length.
+///
+/// As values it can only assume a known bitvector or *Top(bitsize)*.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub enum BitvectorDomain {
     Top(BitSize),
@@ -10,6 +12,7 @@ pub enum BitvectorDomain {
 }
 
 impl AbstractDomain for BitvectorDomain {
+    /// merge two values. Returns *Top* if the values are not equal.
     fn merge(&self, other: &Self) -> Self {
         if self == other {
             self.clone()
@@ -18,18 +21,21 @@ impl AbstractDomain for BitvectorDomain {
         }
     }
 
+    /// Check if the value is *Top*.
     fn is_top(&self) -> bool {
         matches!(self, Self::Top(_))
     }
 }
 
 impl HasTop for BitvectorDomain {
+    /// Return a *Top* value with the same bitsize as `self`.
     fn top(&self) -> BitvectorDomain {
         BitvectorDomain::Top(self.bitsize())
     }
 }
 
 impl HasBitSize for BitvectorDomain {
+    /// Return the bitsize of `self`.
     fn bitsize(&self) -> BitSize {
         use BitvectorDomain::*;
         match self {
@@ -40,13 +46,14 @@ impl HasBitSize for BitvectorDomain {
 }
 
 impl RegisterDomain for BitvectorDomain {
+    /// Get a *Top* element with the given bitsize.
     fn new_top(bitsize: BitSize) -> BitvectorDomain {
         BitvectorDomain::Top(bitsize)
     }
 
     /// Evaluate the given binary operation.
-    /// Note that this function assumes that both values have the same bitsize.
-    /// If not, this function should panic.
+    ///
+    /// For non-shift operations, this function will panic if the operands have different bitsizes.
     fn bin_op(&self, op: BinOpType, rhs: &Self) -> Self {
         use BinOpType::*;
         match op {
@@ -155,7 +162,6 @@ impl RegisterDomain for BitvectorDomain {
     /// Extract a sub-bitvector out of a bitvector
     fn extract(&self, low_bit: BitSize, high_bit: BitSize) -> Self {
         if let BitvectorDomain::Value(bitvec) = self {
-            // TODO: Check whether this is correct on a real world example and then write a unit test for it
             BitvectorDomain::Value(
                 bitvec
                     .clone()
@@ -169,6 +175,7 @@ impl RegisterDomain for BitvectorDomain {
         }
     }
 
+    /// Perform a size-changing cast on a bitvector.
     fn cast(&self, kind: CastType, width: BitSize) -> Self {
         if let BitvectorDomain::Value(bitvec) = self {
             use CastType::*;
@@ -196,6 +203,7 @@ impl RegisterDomain for BitvectorDomain {
         }
     }
 
+    /// Concatenate two bitvectors.
     fn concat(&self, other: &Self) -> Self {
         match (self, other) {
             (BitvectorDomain::Value(left_bitvec), BitvectorDomain::Value(right_bitvec)) => {
@@ -214,13 +222,10 @@ impl RegisterDomain for BitvectorDomain {
     }
 }
 
-
-
 impl std::ops::Add for BitvectorDomain {
     type Output = BitvectorDomain;
 
     fn add(self, rhs: Self) -> Self {
-        assert_eq!(self.bitsize(), rhs.bitsize());
         self.bin_op(crate::bil::BinOpType::PLUS, &rhs)
     }
 }
@@ -229,7 +234,6 @@ impl std::ops::Sub for BitvectorDomain {
     type Output = BitvectorDomain;
 
     fn sub(self, rhs: Self) -> Self {
-        assert_eq!(self.bitsize(), rhs.bitsize());
         self.bin_op(crate::bil::BinOpType::MINUS, &rhs)
     }
 }
@@ -245,6 +249,16 @@ impl std::ops::Neg for BitvectorDomain {
 impl std::convert::From<Bitvector> for BitvectorDomain {
     fn from(bitvector: Bitvector) -> BitvectorDomain {
         BitvectorDomain::Value(bitvector)
+    }
+}
+
+impl std::convert::TryFrom<&BitvectorDomain> for Bitvector {
+    type Error = ();
+    fn try_from(bitvec_domain: &BitvectorDomain) -> Result<Bitvector, ()> {
+        match bitvec_domain {
+            BitvectorDomain::Value(bitvec) => Ok(bitvec.clone()),
+            BitvectorDomain::Top(_) => Err(()),
+        }
     }
 }
 

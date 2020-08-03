@@ -35,7 +35,9 @@ struct Element<T> {
 
 #[derive(Serialize, Deserialize, Debug, Hash, Clone, PartialEq, Eq, Deref)]
 #[deref(forward)]
-pub struct MemRegion<T: AbstractDomain + HasBitSize + RegisterDomain + std::fmt::Debug>(Arc<MemRegionData<T>>);
+pub struct MemRegion<T: AbstractDomain + HasBitSize + RegisterDomain + std::fmt::Debug>(
+    Arc<MemRegionData<T>>,
+);
 
 impl<T: AbstractDomain + HasBitSize + RegisterDomain + std::fmt::Debug> DerefMut for MemRegion<T> {
     fn deref_mut(&mut self) -> &mut MemRegionData<T> {
@@ -251,6 +253,14 @@ mod tests {
 
         fn cast(&self, _kind: crate::bil::CastType, width: BitSize) -> Self {
             Self::new_top(width)
+        }
+
+        fn extract(&self, low_bit: BitSize, high_bit: BitSize) -> Self {
+            Self::new_top(high_bit - low_bit + 1)
+        }
+
+        fn concat(&self, other: &Self) -> Self {
+            Self::new_top(self.bitsize() + other.bitsize())
         }
     }
 
