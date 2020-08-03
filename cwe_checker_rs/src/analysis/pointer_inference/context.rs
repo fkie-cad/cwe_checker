@@ -8,7 +8,6 @@ use crate::utils::log::*;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use super::data::Data;
-use super::identifier::*;
 use super::state::State;
 
 pub struct Context<'a> {

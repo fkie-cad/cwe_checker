@@ -3,18 +3,29 @@ use crate::prelude::*;
 use derive_more::Deref;
 use std::sync::Arc;
 
-// TODO: Right now abstract locations are used as giving the location where a pointer to an object is located.
-// But it could also be used to point into the object (at offset 0).
-// Can I solve this possible ambivalence in intended usage in a way such that accidentally wrong usage is prevented?
-// If not, I have to document the intended usage with a big warning sign.
-
+/// An abstract identifier is used to identify an object or a value in an abstract state.
+///
+/// Since many program states can be represented by the same abstract state in data-flow analysis,
+/// one sometimes needs a way to uniquely identify a variable or a memory object in all of the represented program states.
+/// Abstract identifier achieve this by identifying a *time*, i.e. a specific abstract state,
+/// and a *location*, i.e. a recipe for abstracting a concrete value from any concrete state that is represented by the abstract state.
+/// The value in question then serves as the identifier.
+/// For example, a pointer may uniquely determine the memory object it is pointing to.
+/// Or a value may represent the value of a variable at a certain time,
+/// whereas the value of the variable in the current state is given as an offset to the value at the identified time.
+///
+/// Since program points may be visited several times during an execution trace (e.g. in loops),
+/// the *time* component of an abstract identifier may not actually determine an unique point in time of an execution trace.
+/// In this case the meaning of an abstract identifier depends upon its use case.
+/// E.g. it may represent the union of all values at the specific *location* for each time the program point is visited during an execution trace
+/// or it may only represent the value at the last time the program point was visited.
+///
 /// An abstract identifier is given by a time identifier and a location identifier.
 ///
 /// For the location identifier see `AbstractLocation`.
 /// The time identifier is given by a `Tid`.
-/// If it is the Tid of a basic block, then it describes the point in time *before* execution of the first instruction in the block.
-/// If it is the Tid of a Def or Jmp, then it describes the point in time *after* the execution of the Def or Jmp.
-
+/// If it is the `Tid` of a basic block, then it describes the point in time *before* execution of the first instruction in the block.
+/// If it is the `Tid` of a `Def` or `Jmp`, then it describes the point in time *after* the execution of the `Def` or `Jmp`.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord, Deref)]
 #[deref(forward)]
 pub struct AbstractIdentifier(Arc<AbstractIdentifierData>);
@@ -75,6 +86,11 @@ impl AbstractLocation {
     }
 }
 
+/// An abstract memory location is either an offset from the given location, where the actual value can be found,
+/// or an offset to a pointer to another memory location,
+/// where the value can be found by (recursively) following the embedded `target` memory location.
+///
+/// The offset and size variables are given in bytes.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
 pub enum AbstractMemoryLocation {
     Location {

@@ -1,5 +1,4 @@
 use super::data::*;
-use super::identifier::{AbstractIdentifier, AbstractLocation};
 use super::object_list::AbstractObjectList;
 use crate::abstract_domain::*;
 use crate::bil::*;

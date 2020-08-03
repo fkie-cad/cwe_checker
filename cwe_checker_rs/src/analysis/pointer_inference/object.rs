@@ -1,5 +1,4 @@
 use super::data::*;
-use super::identifier::AbstractIdentifier;
 use crate::abstract_domain::*;
 use crate::analysis::mem_region::MemRegion;
 use crate::bil::Bitvector;

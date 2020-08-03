@@ -1,5 +1,4 @@
 use super::data::*;
-use super::identifier::AbstractIdentifier;
 use super::object::*;
 use crate::abstract_domain::*;
 use crate::bil::Bitvector;
@@ -455,7 +454,6 @@ impl AbstractObjectList {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::analysis::pointer_inference::identifier::*;
 
     fn bv(value: i64) -> BitvectorDomain {
         BitvectorDomain::Value(Bitvector::from_i64(value))

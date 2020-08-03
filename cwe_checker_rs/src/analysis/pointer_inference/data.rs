@@ -1,4 +1,3 @@
-use super::identifier::*;
 use crate::abstract_domain::*;
 use crate::bil::*;
 use crate::prelude::*;
