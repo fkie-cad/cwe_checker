@@ -1,24 +1,4 @@
-/*!
-A memory region is an abstract domain representing a continuous region of memory.
-For example, a stack domain containing values written to the stack can be represented with a memory region.
-
-Design notes:
-- The values do not need a fixed size.
-Instead you need to provide the size of an element when adding it to the memory region.
-- Whenever you try to read from an address that is not assigned to a value, the `Value::top()` element gets returned.
-The reason behind this is that the value could be anything.
-- Whenever adding an element intersects existing elements, the existing ones get removed from the memory region.
-The reason is that reading the old positions afterwards could yield anything.
-- Whenever a read from a correct position but with an incorrect size occurs, `Value::top()` gets returned.
-That is because the value could be anything if the size read is too big and reading of partial values is not implemented for this type.
-- An empty memory region could yield anything (in the sense of `Value::top`) at a read at any position.
-In that regard, an empty memory region is actually the `top()` element of the domain.
-- TODO: Implement the abstract domain trait for MemRegion.
-- TODO: Remove the implicit saving of element sizes, as ValueDomains have now an intrinsic size.
-Implementation needs is_top() to be a member function of the ValueDomain trait.
-*/
-
-use crate::abstract_domain::*;
+use super::{AbstractDomain, HasBitSize, HasTop, RegisterDomain};
 use crate::bil::{BitSize, Bitvector};
 use apint::{Int, Width};
 use derive_more::Deref;
@@ -27,12 +7,17 @@ use std::collections::BTreeMap;
 use std::ops::DerefMut;
 use std::sync::Arc;
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
-struct Element<T> {
-    size: i64,
-    value: T,
-}
-
+/// A memory region is an abstract domain representing a continuous region of memory, e.g. the stack frame of a function.
+///
+/// This implementation can only save values of one `RegisterDomain` type
+/// and it can only track values with a known offset, i.e. it cannot handle arrays of any kind.
+/// Offsets are internally saved as signed integers, which allows negative offsets,
+/// e.g. for downward growing stack frames.
+///
+/// An empty memory region means that nothing is known about the values at any offset inside the region.
+/// Thus an empty memory region actually represents the *Top* element of its abstract domain.
+///
+/// To allow cheap cloning of a `MemRegion`, the actual data is wrapped inside an `Arc`.
 #[derive(Serialize, Deserialize, Debug, Hash, Clone, PartialEq, Eq, Deref)]
 #[deref(forward)]
 pub struct MemRegion<T: AbstractDomain + HasBitSize + RegisterDomain + std::fmt::Debug>(
@@ -45,17 +30,12 @@ impl<T: AbstractDomain + HasBitSize + RegisterDomain + std::fmt::Debug> DerefMut
     }
 }
 
-// TODO: most of the functions in this impl block should be moved to MemRegionData (or removed, if they are only thin wrappers).
-impl<T: AbstractDomain + HasBitSize + RegisterDomain + std::fmt::Debug> MemRegion<T> {
-    pub fn new(address_bitsize: BitSize) -> Self {
-        MemRegion(Arc::new(MemRegionData::new(address_bitsize)))
-    }
-
-    pub fn get_address_bitsize(&self) -> BitSize {
-        self.0.get_address_bitsize()
-    }
-
-    pub fn merge(&self, other: &Self) -> Self {
+impl<T: AbstractDomain + HasBitSize + RegisterDomain + std::fmt::Debug> AbstractDomain
+    for MemRegion<T>
+{
+    /// Short-circuting the `MemRegionData::merge` function if `self==other`,
+    /// to prevent unneccessary cloning.
+    fn merge(&self, other: &Self) -> Self {
         if self == other {
             self.clone()
         } else {
@@ -63,32 +43,27 @@ impl<T: AbstractDomain + HasBitSize + RegisterDomain + std::fmt::Debug> MemRegio
         }
     }
 
-    pub fn add(&mut self, value: T, position: Bitvector) {
-        Arc::make_mut(&mut self.0).add(value, position)
-    }
-
-    pub fn get(&self, position: Bitvector, size_in_bytes: u64) -> T {
-        self.0.get(position, size_in_bytes)
-    }
-
-    pub fn remove(&mut self, position: Bitvector, size_in_bytes: Bitvector) {
-        Arc::make_mut(&mut self.0).remove(position, size_in_bytes)
-    }
-
-    pub fn iter_values(&self) -> std::collections::btree_map::Values<'_, i64, T> {
-        self.0.values.values()
-    }
-
-    pub fn iter_values_mut(&mut self) -> std::collections::btree_map::ValuesMut<'_, i64, T> {
-        Arc::make_mut(&mut self.0).values.values_mut()
-    }
-
-    pub fn iter(&self) -> std::collections::btree_map::Iter<i64, T> {
-        self.0.values.iter()
+    /// The *Top* element is represented by an empty memory region.
+    fn is_top(&self) -> bool {
+        self.values.is_empty()
     }
 }
 
-/// An abstract domain representing a continuous region of memory. See the module level description for more.
+impl<T: AbstractDomain + HasBitSize + RegisterDomain + std::fmt::Debug> HasTop for MemRegion<T> {
+    /// Return a new, empty memory region with the same address bitsize as `self`, representing the *Top* element of the abstract domain.
+    fn top(&self) -> Self {
+        Self::new(self.get_address_bitsize())
+    }
+}
+
+impl<T: AbstractDomain + HasBitSize + RegisterDomain + std::fmt::Debug> MemRegion<T> {
+    // Create a new, empty memory region.
+    pub fn new(address_bitsize: BitSize) -> Self {
+        MemRegion(Arc::new(MemRegionData::new(address_bitsize)))
+    }
+}
+
+/// The internal data of a memory region. See the description of `MemRegion` for more.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct MemRegionData<T: AbstractDomain + HasBitSize + RegisterDomain + std::fmt::Debug> {
     address_bitsize: BitSize,
@@ -104,6 +79,7 @@ impl<T: AbstractDomain + HasBitSize + RegisterDomain + std::fmt::Debug> MemRegio
         }
     }
 
+    /// Get the bitsize of pointers for the address space that the memory region belongs to.
     pub fn get_address_bitsize(&self) -> BitSize {
         self.address_bitsize
     }
@@ -149,7 +125,7 @@ impl<T: AbstractDomain + HasBitSize + RegisterDomain + std::fmt::Debug> MemRegio
     }
 
     /// Get the value at the given position.
-    /// If there is no value at the position or the size of the element is not the same as the provided size, return `T::top()`.
+    /// If there is no value at the position or the size of the element is not the same as the provided size, return `T::new_top()`.
     pub fn get(&self, position: Bitvector, size_in_bytes: u64) -> T {
         assert_eq!(position.width().to_usize(), self.address_bitsize as usize);
         let position = Int::from(position).try_to_i64().unwrap();
@@ -200,6 +176,44 @@ impl<T: AbstractDomain + HasBitSize + RegisterDomain + std::fmt::Debug> MemRegio
         MemRegionData {
             address_bitsize: self.address_bitsize,
             values: merged_values,
+        }
+    }
+
+    /// Get an iterator over all elements together with their offset into the memory region.
+    pub fn iter(&self) -> std::collections::btree_map::Iter<i64, T> {
+        self.values.iter()
+    }
+
+    /// Get an iterator over all values in the memory region
+    pub fn values(&self) -> std::collections::btree_map::Values<i64, T> {
+        self.values.values()
+    }
+
+    /// Get an iterator over all values in the memory region for in-place manipulation.
+    /// Note that one can changes values to *Top* using the iterator.
+    /// These values should be removed from the memory region using `clear_top_values()`.
+    pub fn values_mut(&mut self) -> std::collections::btree_map::ValuesMut<i64, T> {
+        self.values.values_mut()
+    }
+
+    /// Remove all values representing the *Top* element from the internal value store,
+    /// as these should not be saved in the internal representation.
+    pub fn clear_top_values(&mut self) {
+        let indices_to_remove: Vec<i64> = self
+            .values
+            .iter()
+            .filter_map(
+                |(index, value)| {
+                    if value.is_top() {
+                        Some(*index)
+                    } else {
+                        None
+                    }
+                },
+            )
+            .collect();
+        for index in indices_to_remove {
+            self.values.remove(&index);
         }
     }
 }
@@ -313,5 +327,37 @@ mod tests {
         assert_eq!(region.values.len(), 1);
         assert_eq!(other_region.values.len(), 1);
         assert_eq!(merged_region.values.len(), 0);
+    }
+
+    #[test]
+    fn value_removals() {
+        let mut region: MemRegionData<MockDomain> = MemRegionData::new(64);
+        region.add(mock(1, 64), bv(0));
+        region.add(mock(2, 64), bv(8));
+        region.add(mock(3, 64), bv(16));
+        region.add(mock(4, 64), bv(24));
+        region.add(mock(5, 64), bv(32));
+
+        assert_eq!(region.values.len(), 5);
+        region.remove(bv(2), bv(3));
+        assert_eq!(region.values.len(), 4);
+        region.remove(bv(7), bv(1));
+        assert_eq!(region.values.len(), 4);
+        region.remove(bv(7), bv(2));
+        assert_eq!(region.values.len(), 3);
+
+        region.clear_interval(15, 1);
+        assert_eq!(region.values.len(), 3);
+        region.clear_interval(15, 3);
+        assert_eq!(region.values.len(), 2);
+
+        for val in region.values_mut() {
+            if *val == mock(5, 64) {
+                *val = mock(0, 64); // This is a *Top* element
+            }
+        }
+        region.clear_top_values();
+        assert_eq!(region.values.len(), 1);
+        assert_eq!(region.get(bv(24), 8), mock(4, 64));
     }
 }

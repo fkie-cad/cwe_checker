@@ -1,6 +1,5 @@
 use super::Data;
 use crate::abstract_domain::*;
-use crate::analysis::mem_region::MemRegion;
 use crate::bil::Bitvector;
 use crate::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -214,7 +213,7 @@ impl AbstractObjectInfo {
 
     fn get_all_possible_pointer_targets(&self) -> BTreeSet<AbstractIdentifier> {
         let mut targets = self.pointer_targets.clone();
-        for elem in self.memory.iter_values() {
+        for elem in self.memory.values() {
             if let Data::Pointer(pointer) = elem {
                 for (id, _) in pointer.iter_targets() {
                     targets.insert(id.clone());
@@ -232,9 +231,10 @@ impl AbstractObjectInfo {
         new_id: &AbstractIdentifier,
         offset_adjustment: &BitvectorDomain,
     ) {
-        for elem in self.memory.iter_values_mut() {
+        for elem in self.memory.values_mut() {
             elem.replace_abstract_id(old_id, new_id, offset_adjustment);
         }
+        self.memory.clear_top_values();
         if self.pointer_targets.get(&old_id).is_some() {
             self.pointer_targets.remove(&old_id);
             self.pointer_targets.insert(new_id.clone());
@@ -257,9 +257,10 @@ impl AbstractObjectInfo {
             .difference(ids_to_remove)
             .cloned()
             .collect();
-        for value in self.memory.iter_values_mut() {
+        for value in self.memory.values_mut() {
             value.remove_ids(ids_to_remove); // TODO: This may leave *Top* values in the memory object. Remove them.
         }
+        self.memory.clear_top_values()
     }
 }
 
