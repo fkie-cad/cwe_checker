@@ -1,5 +1,5 @@
-use super::data::*;
 use super::object::*;
+use super::Data;
 use crate::abstract_domain::*;
 use crate::bil::Bitvector;
 use crate::prelude::*;

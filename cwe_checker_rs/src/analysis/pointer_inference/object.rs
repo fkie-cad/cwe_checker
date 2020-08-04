@@ -1,4 +1,4 @@
-use super::data::*;
+use super::Data;
 use crate::abstract_domain::*;
 use crate::analysis::mem_region::MemRegion;
 use crate::bil::Bitvector;
@@ -258,7 +258,7 @@ impl AbstractObjectInfo {
             .cloned()
             .collect();
         for value in self.memory.iter_values_mut() {
-            value.remove_ids(ids_to_remove);
+            value.remove_ids(ids_to_remove); // TODO: This may leave *Top* values in the memory object. Remove them.
         }
     }
 }

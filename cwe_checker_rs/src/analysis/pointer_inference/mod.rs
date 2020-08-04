@@ -1,4 +1,5 @@
 use super::interprocedural_fixpoint::{Computation, NodeValue};
+use crate::abstract_domain::{BitvectorDomain, DataDomain};
 use crate::analysis::graph::{Graph, Node};
 use crate::term::*;
 use crate::utils::log::*;
@@ -8,13 +9,15 @@ use petgraph::Direction;
 use std::collections::HashMap;
 
 mod context;
-mod data;
 mod object;
 mod object_list;
 mod state;
 
 use context::Context;
 use state::State;
+
+/// The abstract domain type for representing register values.
+type Data = DataDomain<BitvectorDomain>;
 
 pub struct PointerInference<'a> {
     computation: Computation<'a, Context<'a>>,

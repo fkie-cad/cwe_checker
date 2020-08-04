@@ -1,5 +1,5 @@
-use super::data::*;
 use super::object_list::AbstractObjectList;
+use super::Data;
 use crate::abstract_domain::*;
 use crate::bil::*;
 use crate::prelude::*;
@@ -153,7 +153,7 @@ impl State {
         use Expression::*;
         match expression {
             Var(variable) => self.get_register(&variable),
-            Const(bitvector) => Ok(Data::bitvector(bitvector.clone())),
+            Const(bitvector) => Ok(bitvector.clone().into()),
             // TODO: implement handling of endianness for loads and writes!
             Load {
                 memory: _,
@@ -538,7 +538,7 @@ impl State {
         let mut ids_to_remove = self.caller_stack_ids.clone();
         ids_to_remove.remove(caller_id);
         for register_value in self.register.values_mut() {
-            register_value.remove_ids(&ids_to_remove);
+            register_value.remove_ids(&ids_to_remove); // TODO: This may leave *Top* elements in the register_value map. Should I remove them?
         }
         self.memory.remove_ids(&ids_to_remove);
         self.caller_stack_ids = BTreeSet::new();

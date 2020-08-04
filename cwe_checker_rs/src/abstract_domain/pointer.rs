@@ -114,7 +114,7 @@ impl<T: RegisterDomain> PointerDomain<T> {
     }
 
     /// Get an iterator over all abstract IDs that the pointer may target.
-    pub fn ids(&self) -> impl Iterator<Item = &AbstractIdentifier> {
+    pub fn ids(&self) -> std::collections::btree_map::Keys<AbstractIdentifier, T> {
         self.0.keys()
     }
 }

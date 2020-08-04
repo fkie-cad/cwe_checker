@@ -22,11 +22,3 @@ mod prelude {
     pub use crate::term::Tid;
     pub use anyhow::{anyhow, Error};
 }
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
