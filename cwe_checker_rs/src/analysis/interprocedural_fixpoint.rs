@@ -21,7 +21,7 @@ computation.compute();
 // Alternatively, this could be achieved through usage of the specialize_conditional function.
 // Currently unclear, which way is better.
 
-use super::fixpoint::Problem as GeneralFPProblem;
+use super::fixpoint::Context as GeneralFPContext;
 use super::graph::*;
 use crate::bil::Expression;
 use crate::prelude::*;
@@ -48,7 +48,7 @@ impl<T: PartialEq + Eq> NodeValue<T> {
 /// An interprocedural fixpoint problem defines the context for a fixpoint computation.
 ///
 /// All trait methods have access to the FixpointProblem structure, so that context informations are accessible through it.
-pub trait Problem<'a> {
+pub trait Context<'a> {
     type Value: PartialEq + Eq + Clone;
 
     fn get_graph(&self) -> &Graph<'a>;
@@ -79,12 +79,12 @@ pub trait Problem<'a> {
 }
 
 /// This struct is a wrapper to create a general fixpoint problem out of an interprocedural fixpoint problem.
-struct GeneralizedProblem<'a, T: Problem<'a>> {
+struct GeneralizedProblem<'a, T: Context<'a>> {
     problem: T,
     _phantom_graph_reference: PhantomData<Graph<'a>>,
 }
 
-impl<'a, T: Problem<'a>> GeneralizedProblem<'a, T> {
+impl<'a, T: Context<'a>> GeneralizedProblem<'a, T> {
     pub fn new(problem: T) -> Self {
         GeneralizedProblem {
             problem,
@@ -93,7 +93,7 @@ impl<'a, T: Problem<'a>> GeneralizedProblem<'a, T> {
     }
 }
 
-impl<'a, T: Problem<'a>> GeneralFPProblem for GeneralizedProblem<'a, T> {
+impl<'a, T: Context<'a>> GeneralFPContext for GeneralizedProblem<'a, T> {
     type EdgeLabel = Edge<'a>;
     type NodeLabel = Node<'a>;
     type NodeValue = NodeValue<T::Value>;
@@ -182,11 +182,11 @@ impl<'a, T: Problem<'a>> GeneralFPProblem for GeneralizedProblem<'a, T> {
 }
 
 /// This struct contains an intermediate result of an interprocedural fixpoint cumputation.
-pub struct Computation<'a, T: Problem<'a>> {
+pub struct Computation<'a, T: Context<'a>> {
     generalized_computation: super::fixpoint::Computation<GeneralizedProblem<'a, T>>,
 }
 
-impl<'a, T: Problem<'a>> Computation<'a, T> {
+impl<'a, T: Context<'a>> Computation<'a, T> {
     /// Generate a new computation from the corresponding problem and a default value for nodes.
     pub fn new(problem: T, default_value: Option<T::Value>) -> Self {
         let generalized_problem = GeneralizedProblem::new(problem);

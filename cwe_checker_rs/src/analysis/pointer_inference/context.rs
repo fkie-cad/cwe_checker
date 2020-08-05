@@ -58,7 +58,7 @@ impl<'a> Context<'a> {
     }
 }
 
-impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> {
+impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> {
     type Value = State;
 
     fn get_graph(&self) -> &Graph<'a> {
@@ -595,7 +595,7 @@ mod tests {
 
     #[test]
     fn context_problem_implementation() {
-        use crate::analysis::interprocedural_fixpoint::Problem;
+        use crate::analysis::interprocedural_fixpoint::Context as IpFpContext;
         use crate::analysis::pointer_inference::Data;
         use crate::bil::*;
         use Expression::*;
@@ -763,7 +763,7 @@ mod tests {
 
     #[test]
     fn update_return() {
-        use crate::analysis::interprocedural_fixpoint::Problem;
+        use crate::analysis::interprocedural_fixpoint::Context as IpFpContext;
         use crate::analysis::pointer_inference::object::ObjectType;
         use crate::analysis::pointer_inference::Data;
         let project = mock_project();
