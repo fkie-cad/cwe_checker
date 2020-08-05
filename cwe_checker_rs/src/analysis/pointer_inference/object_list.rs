@@ -1,7 +1,6 @@
-use super::data::*;
-use super::identifier::AbstractIdentifier;
 use super::object::*;
-use crate::analysis::abstract_domain::*;
+use super::Data;
+use crate::abstract_domain::*;
 use crate::bil::Bitvector;
 use crate::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -97,7 +96,11 @@ impl AbstractObjectList {
     /// Returns an error if the gitven address has no targets.
     /// If the address has more than one target, all targets are merged to one untracked object.
     // TODO: Implement write-merging to  still tracked objects!
-    pub fn set_value(&mut self, pointer: PointerDomain, value: Data) -> Result<(), Error> {
+    pub fn set_value(
+        &mut self,
+        pointer: PointerDomain<BitvectorDomain>,
+        value: Data,
+    ) -> Result<(), Error> {
         let mut target_object_set: BTreeSet<usize> = BTreeSet::new();
         for (id, _offset) in pointer.iter_targets() {
             target_object_set.insert(self.ids.get(id).unwrap().0);
@@ -303,9 +306,9 @@ impl AbstractObjectList {
     /// If the object cannot be identified uniquely, all possible targets are marked as having an unknown status.
     pub fn mark_mem_object_as_freed(
         &mut self,
-        object_pointer: &PointerDomain,
+        object_pointer: &PointerDomain<BitvectorDomain>,
     ) -> Result<(), Vec<AbstractIdentifier>> {
-        let ids = object_pointer.get_target_ids();
+        let ids: BTreeSet<AbstractIdentifier> = object_pointer.ids().cloned().collect();
         let mut possible_double_free_ids = Vec::new();
         if ids.len() > 1 {
             for id in ids {
@@ -455,7 +458,6 @@ impl AbstractObjectList {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::analysis::pointer_inference::identifier::*;
 
     fn bv(value: i64) -> BitvectorDomain {
         BitvectorDomain::Value(Bitvector::from_i64(value))

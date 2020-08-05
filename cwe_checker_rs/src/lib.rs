@@ -7,6 +7,7 @@ Parts of the cwe_checker that are written in Rust.
 #[macro_use]
 extern crate ocaml;
 
+pub mod abstract_domain;
 pub mod analysis;
 pub mod bil;
 pub mod ffi;
@@ -20,12 +21,4 @@ mod prelude {
     pub use crate::bil::{BitSize, Bitvector};
     pub use crate::term::Tid;
     pub use anyhow::{anyhow, Error};
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
 }

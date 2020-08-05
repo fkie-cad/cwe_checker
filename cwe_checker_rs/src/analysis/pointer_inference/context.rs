@@ -1,4 +1,4 @@
-use crate::analysis::abstract_domain::*;
+use crate::abstract_domain::*;
 use crate::analysis::graph::Graph;
 use crate::bil::Expression;
 use crate::prelude::*;
@@ -7,9 +7,8 @@ use crate::term::*;
 use crate::utils::log::*;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
-use super::data::Data;
-use super::identifier::*;
 use super::state::State;
+use super::Data;
 
 pub struct Context<'a> {
     pub graph: Graph<'a>,
@@ -202,7 +201,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
             self.log_debug(
                 callee_state.set_register(
                     &self.project.stack_pointer_register,
-                    super::data::PointerDomain::new(
+                    PointerDomain::new(
                         callee_stack_id.clone(),
                         Bitvector::zero(apint::BitWidth::new(address_bitsize as usize).unwrap())
                             .into(),
@@ -311,7 +310,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
             self.log_debug(
                 new_state.set_register(
                     stack_register,
-                    stack_pointer.bin_op(crate::bil::BinOpType::PLUS, &Data::bitvector(offset)),
+                    stack_pointer.bin_op(crate::bil::BinOpType::PLUS, &offset.into()),
                 ),
                 Some(&call.tid),
             );
@@ -371,7 +370,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Problem<'a> for Context<'a> 
                                     super::object::ObjectType::Heap,
                                     address_bitsize,
                                 );
-                                let pointer = super::data::PointerDomain::new(
+                                let pointer = PointerDomain::new(
                                     object_id,
                                     Bitvector::zero((address_bitsize as usize).into()).into(),
                                 );
@@ -597,7 +596,7 @@ mod tests {
     #[test]
     fn context_problem_implementation() {
         use crate::analysis::interprocedural_fixpoint::Problem;
-        use crate::analysis::pointer_inference::data::*;
+        use crate::analysis::pointer_inference::Data;
         use crate::bil::*;
         use Expression::*;
 
@@ -765,8 +764,8 @@ mod tests {
     #[test]
     fn update_return() {
         use crate::analysis::interprocedural_fixpoint::Problem;
-        use crate::analysis::pointer_inference::data::*;
         use crate::analysis::pointer_inference::object::ObjectType;
+        use crate::analysis::pointer_inference::Data;
         let project = mock_project();
         let (cwe_sender, _cwe_receiver) = crossbeam_channel::unbounded();
         let (log_sender, _log_receiver) = crossbeam_channel::unbounded();

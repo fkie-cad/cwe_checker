@@ -1,7 +1,5 @@
-use super::data::*;
-use super::identifier::AbstractIdentifier;
-use crate::analysis::abstract_domain::*;
-use crate::analysis::mem_region::MemRegion;
+use super::Data;
+use crate::abstract_domain::*;
 use crate::bil::Bitvector;
 use crate::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -215,7 +213,7 @@ impl AbstractObjectInfo {
 
     fn get_all_possible_pointer_targets(&self) -> BTreeSet<AbstractIdentifier> {
         let mut targets = self.pointer_targets.clone();
-        for elem in self.memory.iter_values() {
+        for elem in self.memory.values() {
             if let Data::Pointer(pointer) = elem {
                 for (id, _) in pointer.iter_targets() {
                     targets.insert(id.clone());
@@ -233,9 +231,10 @@ impl AbstractObjectInfo {
         new_id: &AbstractIdentifier,
         offset_adjustment: &BitvectorDomain,
     ) {
-        for elem in self.memory.iter_values_mut() {
+        for elem in self.memory.values_mut() {
             elem.replace_abstract_id(old_id, new_id, offset_adjustment);
         }
+        self.memory.clear_top_values();
         if self.pointer_targets.get(&old_id).is_some() {
             self.pointer_targets.remove(&old_id);
             self.pointer_targets.insert(new_id.clone());
@@ -258,13 +257,14 @@ impl AbstractObjectInfo {
             .difference(ids_to_remove)
             .cloned()
             .collect();
-        for value in self.memory.iter_values_mut() {
-            value.remove_ids(ids_to_remove);
+        for value in self.memory.values_mut() {
+            value.remove_ids(ids_to_remove); // TODO: This may leave *Top* values in the memory object. Remove them.
         }
+        self.memory.clear_top_values()
     }
 }
 
-impl AbstractDomain for AbstractObjectInfo {
+impl HasTop for AbstractObjectInfo {
     fn top(&self) -> Self {
         AbstractObjectInfo {
             pointer_targets: BTreeSet::new(),
@@ -274,7 +274,9 @@ impl AbstractDomain for AbstractObjectInfo {
             memory: MemRegion::new(self.memory.get_address_bitsize()),
         }
     }
+}
 
+impl AbstractDomain for AbstractObjectInfo {
     fn merge(&self, other: &Self) -> Self {
         AbstractObjectInfo {
             pointer_targets: self
@@ -287,6 +289,11 @@ impl AbstractDomain for AbstractObjectInfo {
             type_: same_or_none(&self.type_, &other.type_),
             memory: self.memory.merge(&other.memory),
         }
+    }
+
+    /// The domain has no *Top* element, thus this function always returns false.
+    fn is_top(&self) -> bool {
+        false
     }
 }
 
