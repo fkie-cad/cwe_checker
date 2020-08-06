@@ -69,7 +69,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
         value1.merge(value2)
     }
 
-    fn update_def(&self, state: &Self::Value, def: &Term<Def>) -> Self::Value {
+    fn update_def(&self, state: &Self::Value, def: &Term<Def>) -> Option<Self::Value> {
         // first check for use-after-frees
         if state.contains_access_of_dangling_memory(&def.term.rhs) {
             let warning = CweWarning {
@@ -91,7 +91,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
             Expression::Store { .. } => {
                 let mut state = state.clone();
                 self.log_debug(state.handle_store_exp(&def.term.rhs), Some(&def.tid));
-                state
+                Some(state)
             }
             Expression::IfThenElse {
                 condition,
@@ -120,14 +120,14 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
                 match state.eval(condition) {
                     Ok(Data::Value(cond)) if !cond.is_top() => {
                         if cond == Bitvector::from_bit(true).into() {
-                            true_state
+                            Some(true_state)
                         } else if cond == Bitvector::from_bit(false).into() {
-                            false_state
+                            Some(false_state)
                         } else {
                             panic!("IfThenElse with wrong condition bitsize encountered")
                         }
                     }
-                    Ok(_) => true_state.merge(&false_state),
+                    Ok(_) => Some(true_state.merge(&false_state)),
                     Err(err) => panic!("IfThenElse-Condition evaluation failed: {}", err),
                 }
             }
@@ -137,7 +137,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
                     new_state.handle_register_assign(&def.term.lhs, expression),
                     Some(&def.tid),
                 );
-                new_state
+                Some(new_state)
             }
         }
     }
@@ -147,6 +147,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
         value: &State,
         _jump: &Term<Jmp>,
         _untaken_conditional: Option<&Term<Jmp>>,
+        _target: &Term<Blk>
     ) -> Option<State> {
         // TODO: Implement some real specialization of conditionals!
         let mut new_value = value.clone();
@@ -159,7 +160,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
         state: &State,
         call_term: &Term<Jmp>,
         _target_node: &crate::analysis::graph::Node,
-    ) -> State {
+    ) -> Option<State> {
         let call = if let JmpKind::Call(ref call) = call_term.term.kind {
             call
         } else {
@@ -220,7 +221,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
             callee_state.ids_known_to_caller = callee_state.memory.get_all_object_ids();
             callee_state.ids_known_to_caller.remove(&callee_stack_id);
 
-            callee_state
+            Some(callee_state)
         } else {
             panic!("Indirect call edges not yet supported.")
             // TODO: Support indirect call edges!
@@ -632,10 +633,10 @@ mod tests {
         };
 
         // test update_def
-        state = context.update_def(&state, &def);
+        state = context.update_def(&state, &def).unwrap();
         let stack_pointer = Data::Pointer(PointerDomain::new(new_id("main", "RSP"), bv(-16)));
         assert_eq!(state.eval(&Var(register("RSP"))).unwrap(), stack_pointer);
-        state = context.update_def(&state, &store_term);
+        state = context.update_def(&state, &store_term).unwrap();
 
         // Test update_call
         let target_block = Term {
@@ -647,7 +648,7 @@ mod tests {
         };
         let target_node = crate::analysis::graph::Node::BlkStart(&target_block);
         let call = call_term("func");
-        let mut callee_state = context.update_call(&state, &call, &target_node);
+        let mut callee_state = context.update_call(&state, &call, &target_node).unwrap();
         assert_eq!(callee_state.stack_id, new_id("func", "RSP"));
         assert_eq!(callee_state.caller_stack_ids.len(), 1);
         assert_eq!(
@@ -771,10 +772,12 @@ mod tests {
         let (log_sender, _log_receiver) = crossbeam_channel::unbounded();
         let context = Context::new(&project, cwe_sender, log_sender);
         let state_before_return = State::new(&register("RSP"), Tid::new("callee"));
-        let mut state_before_return = context.update_def(
-            &state_before_return,
-            &reg_add_term("RSP", 8, "stack_offset_on_return_adjustment"),
-        );
+        let mut state_before_return = context
+            .update_def(
+                &state_before_return,
+                &reg_add_term("RSP", 8, "stack_offset_on_return_adjustment"),
+            )
+            .unwrap();
 
         let callsite_id = new_id("call_callee", "RSP");
         state_before_return.memory.add_abstract_object(
@@ -814,10 +817,12 @@ mod tests {
             .unwrap();
 
         let state_before_call = State::new(&register("RSP"), Tid::new("original_caller_id"));
-        let mut state_before_call = context.update_def(
-            &state_before_call,
-            &reg_add_term("RSP", -16, "stack_offset_on_call_adjustment"),
-        );
+        let mut state_before_call = context
+            .update_def(
+                &state_before_call,
+                &reg_add_term("RSP", -16, "stack_offset_on_call_adjustment"),
+            )
+            .unwrap();
         let caller_caller_id = new_id("caller_caller", "RSP");
         state_before_call.memory.add_abstract_object(
             caller_caller_id.clone(),
