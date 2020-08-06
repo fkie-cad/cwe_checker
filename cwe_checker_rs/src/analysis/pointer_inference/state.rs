@@ -386,7 +386,7 @@ impl State {
         // but they get not properly merged with the values from the other callers!
         if let Data::Pointer(pointer) = address {
             let mut new_targets = BTreeMap::new();
-            for (id, offset) in pointer.iter_targets() {
+            for (id, offset) in pointer.targets() {
                 if *id == self.stack_id {
                     match offset {
                         BitvectorDomain::Value(offset_val) => {
@@ -478,9 +478,9 @@ impl State {
             unsearched_ids.remove(&id);
             let memory_ids = self.memory.get_referenced_ids(&id);
             for mem_id in memory_ids {
-                if ids.get(&mem_id).is_none() {
+                if ids.get(mem_id).is_none() {
                     ids.insert(mem_id.clone());
-                    unsearched_ids.insert(mem_id);
+                    unsearched_ids.insert(mem_id.clone());
                 }
             }
         }

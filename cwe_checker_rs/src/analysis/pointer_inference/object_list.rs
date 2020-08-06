@@ -5,8 +5,6 @@ use crate::bil::Bitvector;
 use crate::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
-use std::ops::Deref;
-use std::sync::Arc;
 
 /// The list of all known abstract objects.
 ///
@@ -15,7 +13,7 @@ use std::sync::Arc;
 /// these two objects will be merged to one object.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct AbstractObjectList {
-    objects: Vec<Arc<AbstractObject>>,
+    objects: Vec<AbstractObject>,
     ids: BTreeMap<AbstractIdentifier, (usize, BitvectorDomain)>,
 }
 
@@ -28,7 +26,7 @@ impl AbstractObjectList {
     ) -> AbstractObjectList {
         let mut objects = Vec::new();
         let stack_object = AbstractObject::new(ObjectType::Stack, address_bitsize);
-        objects.push(Arc::new(stack_object));
+        objects.push(stack_object);
         let mut ids = BTreeMap::new();
         ids.insert(
             stack_id,
@@ -44,12 +42,10 @@ impl AbstractObjectList {
         match address {
             Data::Value(_) | Data::Top(_) => (),
             Data::Pointer(pointer) => {
-                for (id, _offset) in pointer.iter_targets() {
+                for id in pointer.ids() {
                     let (object_index, _offset_id) = self.ids.get(id).unwrap();
-                    if let AbstractObject::Memory(ref object) = *self.objects[*object_index] {
-                        if object.state == Some(ObjectState::Dangling) {
-                            return true;
-                        }
+                    if self.objects[*object_index].get_state() == Some(ObjectState::Dangling) {
+                        return true;
                     }
                 }
             }
@@ -68,7 +64,7 @@ impl AbstractObjectList {
             Data::Pointer(pointer) => {
                 // TODO: Document the design decisions behind the implementation!
                 let mut merged_value: Option<Data> = None;
-                for (id, offset_pointer_domain) in pointer.iter_targets() {
+                for (id, offset_pointer_domain) in pointer.targets() {
                     let (abstract_object_index, offset_identifier) = self.ids.get(id).unwrap();
                     let offset = offset_pointer_domain.clone() + offset_identifier.clone();
                     if let BitvectorDomain::Value(concrete_offset) = offset {
@@ -93,7 +89,7 @@ impl AbstractObjectList {
 
     /// Set the value at a given address.
     ///
-    /// Returns an error if the gitven address has no targets.
+    /// Returns an error if the given address has no targets.
     /// If the address has more than one target, all targets are merged to one untracked object.
     // TODO: Implement write-merging to  still tracked objects!
     pub fn set_value(
@@ -102,15 +98,13 @@ impl AbstractObjectList {
         value: Data,
     ) -> Result<(), Error> {
         let mut target_object_set: BTreeSet<usize> = BTreeSet::new();
-        for (id, _offset) in pointer.iter_targets() {
+        for id in pointer.ids() {
             target_object_set.insert(self.ids.get(id).unwrap().0);
         }
-        if target_object_set.is_empty() {
-            return Err(anyhow!("Pointer without targets encountered"));
-        }
+        assert!(!target_object_set.is_empty());
         if target_object_set.len() == 1 {
             let mut target_offset: Option<BitvectorDomain> = None;
-            for (id, pointer_offset) in pointer.iter_targets() {
+            for (id, pointer_offset) in pointer.targets() {
                 let adjusted_offset = pointer_offset.clone() + self.ids.get(id).unwrap().1.clone();
                 target_offset = match target_offset {
                     Some(offset) => Some(offset.merge(&adjusted_offset)),
@@ -121,50 +115,15 @@ impl AbstractObjectList {
                 .objects
                 .get_mut(*target_object_set.iter().next().unwrap())
                 .unwrap();
-            Arc::make_mut(object).set_value(value, target_offset.unwrap())?; // TODO: Write unit test whether this is correctly written to the self.objects vector!
+            object.set_value(value, target_offset.unwrap())?; // TODO: Write unit test whether this is correctly written to the self.objects vector!
         } else {
             // There is more than one object that the pointer may write to.
-            // We merge all targets to one untracked object
-            // TODO: Implement merging to a still tracked object!
-
-            // Get all pointer targets the object may point to
-            let mut inner_targets: BTreeSet<AbstractIdentifier> = BTreeSet::new();
-            for object in target_object_set.iter() {
-                inner_targets.append(
-                    &mut self
-                        .objects
-                        .get(*object)
-                        .unwrap()
-                        .get_all_possible_pointer_targets(),
-                );
+            // We merge-write to all possible targets
+            for (id, offset) in pointer.targets() {
+                let (object_index, object_offset) = self.ids.get(id).unwrap();
+                let adjusted_offset = offset.clone() + object_offset.clone();
+                self.objects[*object_index].merge_value(value.clone(), adjusted_offset);
             }
-            // Generate the new (untracked) object that all other objects are merged to
-            let new_object = AbstractObject::Untracked(inner_targets);
-            // generate the ne map from abstract identifier to index of corresponding memory object
-            let mut index_map = BTreeMap::new();
-            let mut new_object_vec: Vec<Arc<AbstractObject>> = Vec::new();
-            for old_index in 0..self.objects.len() {
-                if target_object_set.get(&old_index).is_none() {
-                    index_map.insert(old_index, new_object_vec.len());
-                    new_object_vec.push(self.objects.get(old_index).unwrap().clone());
-                }
-            }
-            new_object_vec.push(Arc::new(new_object));
-            let merged_object_index = new_object_vec.len() - 1;
-            for old_index in target_object_set {
-                index_map.insert(old_index, merged_object_index);
-            }
-            let mut new_id_map: BTreeMap<AbstractIdentifier, (usize, BitvectorDomain)> =
-                BTreeMap::new();
-            for (id, (old_index, offset)) in self.ids.iter() {
-                new_id_map.insert(id.clone(), (index_map[old_index], offset.clone()));
-            }
-            self.objects = new_object_vec;
-            self.ids = new_id_map;
-            // now we can do the actual write operation on the newly merged object
-            // the offset does not matter since the merged object is untracked anyway
-            Arc::make_mut(self.objects.get_mut(merged_object_index).unwrap())
-                .set_value(value, BitvectorDomain::new_top(pointer.bitsize()))?;
         }
         Ok(())
     }
@@ -179,7 +138,7 @@ impl AbstractObjectList {
                 if index < self.objects.len() {
                     // The object already existed in self, so we have to merge it with the object in other
                     merged_objects[index] =
-                        Arc::new(merged_objects[index].merge(&other.objects[*other_index]));
+                        merged_objects[index].merge(&other.objects[*other_index]);
                     // TODO: This is still inefficient, since we may end up merging the same objects more than once (if several ids point to it)
                 }
             } else {
@@ -211,11 +170,7 @@ impl AbstractObjectList {
         offset_adjustment: &BitvectorDomain,
     ) {
         for object in self.objects.iter_mut() {
-            Arc::make_mut(object).replace_abstract_id(
-                old_id,
-                new_id,
-                &(-offset_adjustment.clone()),
-            );
+            object.replace_abstract_id(old_id, new_id, &(-offset_adjustment.clone()));
         }
         if let Some((index, offset)) = self.ids.get(old_id) {
             let index = *index;
@@ -245,27 +200,25 @@ impl AbstractObjectList {
 
         if let Some((index, offset)) = self.ids.get(&object_id) {
             // If the identifier already exists, we have to assume that more than one object may be referred by this identifier.
-            let object = Arc::make_mut(&mut self.objects[*index]);
-            if let AbstractObject::Memory(object_info) = object {
-                object_info.is_unique = false;
-            }
+            let object = &mut self.objects[*index];
+            object.is_unique = false;
             *object = object.merge(&new_object);
             let index = *index;
             let merged_offset = offset.merge(&initial_offset);
             self.ids.insert(object_id, (index, merged_offset));
         } else {
             let index = self.objects.len();
-            self.objects.push(Arc::new(new_object));
+            self.objects.push(new_object);
             self.ids.insert(object_id, (index, initial_offset));
         }
     }
 
     /// return all ids that get referenced by the memory object pointed to by the given id
-    pub fn get_referenced_ids(&self, id: &AbstractIdentifier) -> BTreeSet<AbstractIdentifier> {
+    pub fn get_referenced_ids(&self, id: &AbstractIdentifier) -> &BTreeSet<AbstractIdentifier> {
         if let Some((index, _offset)) = self.ids.get(id) {
             self.objects[*index].get_referenced_ids()
         } else {
-            BTreeSet::new()
+            panic!("Abstract ID not associated to an object")
         }
     }
 
@@ -313,29 +266,25 @@ impl AbstractObjectList {
         if ids.len() > 1 {
             for id in ids {
                 let object = &mut self.objects[self.ids[&id].0];
-                if let AbstractObject::Memory(tracked_mem) = Arc::deref(object) {
-                    if (tracked_mem.state != Some(ObjectState::Alive) && tracked_mem.is_unique)
-                        || tracked_mem.state == Some(ObjectState::Dangling)
-                    {
-                        // Possible double free detected
-                        // TODO: Check rate of false positives.
-                        // If too high, only mark those with explicit dangling state.
-                        possible_double_free_ids.push(id.clone());
-                    }
-                }
-                Arc::make_mut(object).set_state(None);
-            }
-        } else if let Some(id) = ids.iter().next() {
-            let object = &mut self.objects[self.ids[&id].0];
-            if let AbstractObject::Memory(tracked_mem) = Arc::deref(object) {
-                if tracked_mem.state != Some(ObjectState::Alive) {
+                if (object.get_state() != Some(ObjectState::Alive) && object.is_unique)
+                    || object.get_state() == Some(ObjectState::Dangling)
+                {
                     // Possible double free detected
                     // TODO: Check rate of false positives.
                     // If too high, only mark those with explicit dangling state.
                     possible_double_free_ids.push(id.clone());
                 }
+                object.set_state(None);
             }
-            Arc::make_mut(object).set_state(Some(ObjectState::Dangling));
+        } else if let Some(id) = ids.iter().next() {
+            let object = &mut self.objects[self.ids[&id].0];
+            if object.get_state() != Some(ObjectState::Alive) {
+                // Possible double free detected
+                // TODO: Check rate of false positives.
+                // If too high, only mark those with explicit dangling state.
+                possible_double_free_ids.push(id.clone());
+            }
+            object.set_state(Some(ObjectState::Dangling));
         }
         if possible_double_free_ids.is_empty() {
             Ok(())
@@ -344,25 +293,21 @@ impl AbstractObjectList {
         }
     }
 
-    /// Mark the memory object behind an abstract identifier as untracked.
-    /// Also add new possible reference targets to the object.
+    /// Assume that arbitrary writes happened to a memory object,
+    /// including adding pointers to targets contained in `new_possible_reference_targets` to it.
     ///
-    /// This is used as a very coarse approximation for function calls whose effect is unknown.
-    /// Since a function may spawn a new thread constantly writing to this memory object,
-    /// the content of the memory object may not become known later on.
-    /// The new reference targets are added because we also do not know whether the function adds pointers to the memory object.
-    pub fn mark_mem_object_as_untracked(
+    /// This is used as a coarse approximation for function calls whose effect is unknown.
+    /// Note that this may still underestimate the effect of a function call:
+    /// We do not assume that the state of the object changes (i.e. no memory freed), which may not be true.
+    /// We assume that pointers to the object are *not* given to other threads or the operating system,
+    /// which could result in arbitrary writes to the object even after the function call returned.
+    pub fn assume_arbitrary_writes_to_object(
         &mut self,
         object_id: &AbstractIdentifier,
         new_possible_reference_targets: &BTreeSet<AbstractIdentifier>,
     ) {
         let object_index = self.ids[object_id].0;
-        let reference_targets = self.objects[object_index]
-            .get_all_possible_pointer_targets()
-            .union(new_possible_reference_targets)
-            .cloned()
-            .collect();
-        self.objects[object_index] = Arc::new(AbstractObject::Untracked(reference_targets));
+        self.objects[object_index].assume_arbitrary_writes(new_possible_reference_targets);
     }
 
     /// Get the number of objects that are currently tracked.
@@ -404,7 +349,6 @@ impl AbstractObjectList {
     /// This function does *not* trim these objects from the object list.
     pub fn remove_ids(&mut self, ids_to_remove: &BTreeSet<AbstractIdentifier>) {
         for object in self.objects.iter_mut() {
-            let object = Arc::make_mut(object);
             object.remove_ids(ids_to_remove);
         }
         self.ids = self
@@ -535,10 +479,15 @@ mod tests {
             merged
                 .get_value(&Data::Pointer(pointer.clone()), 64)
                 .unwrap(),
-            Data::new_top(64)
+            Data::Value(BitvectorDomain::new_top(64))
         );
-        // assert_eq!(merged.get_value(&Data::Pointer(heap_pointer.clone()), 64).unwrap(), Data::Value(bv(3)));
-        assert_eq!(merged.objects.len(), 1); // This will fail in the future when the set_value function does no automatic merging to untracked objects anymore.
+        assert_eq!(
+            merged
+                .get_value(&Data::Pointer(heap_pointer.clone()), 64)
+                .unwrap(),
+            Data::Value(bv(3))
+        );
+        assert_eq!(merged.objects.len(), 2);
 
         other_obj_list
             .set_value(pointer.clone(), Data::Pointer(heap_pointer.clone()))

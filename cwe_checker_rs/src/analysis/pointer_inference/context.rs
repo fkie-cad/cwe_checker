@@ -458,9 +458,10 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
                                 .add_recursively_referenced_ids_to_id_set(possible_referenced_ids);
                             // Delete content of all referenced objects, as the function may write to them.
                             for id in possible_referenced_ids.iter() {
-                                new_state
-                                    .memory
-                                    .mark_mem_object_as_untracked(id, &possible_referenced_ids);
+                                new_state.memory.assume_arbitrary_writes_to_object(
+                                    id,
+                                    &possible_referenced_ids,
+                                );
                             }
                             Some(new_state)
                         }
@@ -489,9 +490,10 @@ impl<'a> Context<'a> {
         if let Ok(Data::Pointer(ref stack_pointer)) =
             state.get_register(&self.project.stack_pointer_register)
         {
-            if stack_pointer.iter_targets().len() == 1 {
+            if stack_pointer.targets().len() == 1 {
                 // TODO: add sanity check that the stack id is the expected id
-                let (_stack_id, stack_offset_domain) = stack_pointer.iter_targets().next().unwrap();
+                let (_stack_id, stack_offset_domain) =
+                    stack_pointer.targets().iter().next().unwrap();
                 stack_offset_domain.clone()
             } else {
                 BitvectorDomain::new_top(self.project.stack_pointer_register.bitsize().unwrap())

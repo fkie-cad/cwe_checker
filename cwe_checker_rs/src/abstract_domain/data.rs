@@ -43,7 +43,8 @@ impl<T: RegisterDomain> DataDomain<T> {
     pub fn remove_ids(&mut self, ids_to_remove: &BTreeSet<AbstractIdentifier>) {
         if let Self::Pointer(pointer) = self {
             let remaining_targets: BTreeMap<AbstractIdentifier, T> = pointer
-                .iter_targets()
+                .targets()
+                .iter()
                 .filter_map(|(id, offset)| {
                     if ids_to_remove.get(id).is_none() {
                         Some((id.clone(), offset.clone()))
@@ -98,8 +99,8 @@ impl<T: RegisterDomain> RegisterDomain for DataDomain<T> {
             (Pointer(pointer), MINUS, Value(value)) => Pointer(pointer.sub_from_offset(value)),
             (Pointer(pointer_lhs), MINUS, Pointer(pointer_rhs)) => {
                 if pointer_lhs.ids().len() == 1 && pointer_rhs.ids().len() == 1 {
-                    let (id_lhs, offset_lhs) = pointer_lhs.iter_targets().next().unwrap();
-                    let (id_rhs, offset_rhs) = pointer_rhs.iter_targets().next().unwrap();
+                    let (id_lhs, offset_lhs) = pointer_lhs.targets().iter().next().unwrap();
+                    let (id_rhs, offset_rhs) = pointer_rhs.targets().iter().next().unwrap();
                     if id_lhs == id_rhs {
                         Self::Value(offset_lhs.bin_op(MINUS, offset_rhs))
                     } else {
@@ -214,7 +215,7 @@ impl<T: RegisterDomain + Display> DataDomain<T> {
         match self {
             Self::Top(bitsize) => serde_json::Value::String(format!("Top:{}", bitsize)),
             Self::Pointer(pointer) => {
-                let target_iter = pointer.iter_targets().map(|(id, offset)| {
+                let target_iter = pointer.targets().iter().map(|(id, offset)| {
                     (
                         format!("{}", id),
                         serde_json::Value::String(format!("{}", offset)),

@@ -2,161 +2,33 @@ use super::Data;
 use crate::abstract_domain::*;
 use crate::bil::Bitvector;
 use crate::prelude::*;
+use derive_more::Deref;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::iter::FromIterator;
+use std::ops::DerefMut;
+use std::sync::Arc;
 
-/// An abstract object is either a tracked or an untracked memory object.
-/// In the untracked case we still track whether the object may contain pointers to other objects.
-/// This way we do not necessarily need to invalidate all abstract objects
-/// if a pointer contained in an untracked object is used for a memory write.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
-pub enum AbstractObject {
-    Untracked(BTreeSet<AbstractIdentifier>),
-    Memory(AbstractObjectInfo),
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Deref)]
+#[deref(forward)]
+pub struct AbstractObject(Arc<AbstractObjectInfo>);
+
+impl DerefMut for AbstractObject {
+    fn deref_mut(&mut self) -> &mut AbstractObjectInfo {
+        Arc::make_mut(&mut self.0)
+    }
 }
 
 impl AbstractObject {
     pub fn new(type_: ObjectType, address_bitsize: BitSize) -> AbstractObject {
-        Self::Memory(AbstractObjectInfo {
-            pointer_targets: BTreeSet::new(),
-            is_unique: true,
-            state: Some(ObjectState::Alive),
-            type_: Some(type_),
-            memory: MemRegion::new(address_bitsize),
-        })
-    }
-
-    pub fn get_value(&self, offset: Bitvector, bitsize: BitSize) -> Data {
-        if let Self::Memory(object_info) = self {
-            object_info.get_value(offset, bitsize)
-        } else {
-            Data::new_top(bitsize)
-        }
+        AbstractObject(Arc::new(AbstractObjectInfo::new(type_, address_bitsize)))
     }
 
     pub fn merge(&self, other: &Self) -> Self {
-        match (self, other) {
-            (Self::Untracked(set1), Self::Untracked(set2)) => {
-                Self::Untracked(set1.union(set2).cloned().collect())
-            }
-            (Self::Untracked(untracked), Self::Memory(memory))
-            | (Self::Memory(memory), Self::Untracked(untracked)) => {
-                Self::Untracked(untracked.union(&memory.pointer_targets).cloned().collect())
-            }
-            (Self::Memory(left), Self::Memory(right)) => Self::Memory(left.merge(right)),
-        }
-    }
-
-    pub fn set_value(&mut self, value: Data, offset: BitvectorDomain) -> Result<(), Error> {
-        match self {
-            Self::Untracked(target_list) => {
-                if let Data::Pointer(ref pointer) = value {
-                    target_list.extend(
-                        pointer
-                            .iter_targets()
-                            .map(|(abstract_id, _offset)| abstract_id.clone()),
-                    )
-                };
-            }
-            Self::Memory(memory_object) => {
-                memory_object.set_value(value, offset)?;
-            }
-        };
-        Ok(())
-    }
-
-    pub fn get_all_possible_pointer_targets(&self) -> BTreeSet<AbstractIdentifier> {
-        match self {
-            Self::Untracked(targets) => targets.clone(),
-            Self::Memory(memory) => memory.get_all_possible_pointer_targets(),
-        }
-    }
-
-    /// For pointer values replace an abstract identifier with another one and add the offset_adjustment to the pointer offset.
-    /// This is needed to adjust stack pointer on call and return instructions.
-    pub fn replace_abstract_id(
-        &mut self,
-        old_id: &AbstractIdentifier,
-        new_id: &AbstractIdentifier,
-        offset_adjustment: &BitvectorDomain,
-    ) {
-        match self {
-            Self::Untracked(id_set) => {
-                if id_set.get(old_id).is_some() {
-                    id_set.remove(old_id);
-                    id_set.insert(new_id.clone());
-                }
-            }
-            Self::Memory(mem_object) => {
-                mem_object.replace_abstract_id(old_id, new_id, offset_adjustment);
-            }
-        }
-    }
-
-    pub fn get_referenced_ids(&self) -> BTreeSet<AbstractIdentifier> {
-        match self {
-            Self::Untracked(ids) => ids.clone(),
-            Self::Memory(object_info) => object_info.pointer_targets.clone(),
-        }
-    }
-
-    pub fn set_state(&mut self, new_state: Option<ObjectState>) {
-        if let Self::Memory(object_info) = self {
-            object_info.set_state(new_state)
-        }
-    }
-
-    /// Remove the provided IDs from all possible target lists, including all pointers.
-    pub fn remove_ids(&mut self, ids_to_remove: &BTreeSet<AbstractIdentifier>) {
-        match self {
-            Self::Untracked(targets) => {
-                let remaining_targets = targets.difference(ids_to_remove).cloned().collect();
-                *self = Self::Untracked(remaining_targets);
-            }
-            Self::Memory(mem) => {
-                mem.remove_ids(ids_to_remove);
-            }
-        }
-    }
-
-    #[cfg(test)]
-    pub fn get_state(&self) -> Option<ObjectState> {
-        match self {
-            Self::Untracked(_) => None,
-            Self::Memory(mem) => mem.state,
-        }
-    }
-}
-
-impl AbstractObject {
-    pub fn to_json_compact(&self) -> serde_json::Value {
-        match self {
-            Self::Untracked(_) => serde_json::Value::String("Untracked".into()),
-            Self::Memory(object_info) => {
-                let mut elements = Vec::new();
-                elements.push((
-                    "is_unique".to_string(),
-                    serde_json::Value::String(format!("{}", object_info.is_unique)),
-                ));
-                elements.push((
-                    "state".to_string(),
-                    serde_json::Value::String(format!("{:?}", object_info.state)),
-                ));
-                elements.push((
-                    "type".to_string(),
-                    serde_json::Value::String(format!("{:?}", object_info.type_)),
-                ));
-                let memory = object_info
-                    .memory
-                    .iter()
-                    .map(|(index, value)| (format!("{}", index), value.to_json_compact()));
-                elements.push((
-                    "memory".to_string(),
-                    serde_json::Value::Object(serde_json::Map::from_iter(memory)),
-                ));
-                serde_json::Value::Object(serde_json::Map::from_iter(elements.into_iter()))
-            }
+        if self == other {
+            self.clone()
+        } else {
+            AbstractObject(Arc::new(self.0.merge(other)))
         }
     }
 }
@@ -174,26 +46,32 @@ impl AbstractObject {
 pub struct AbstractObjectInfo {
     pointer_targets: BTreeSet<AbstractIdentifier>,
     pub is_unique: bool,
-    pub state: Option<ObjectState>,
+    state: Option<ObjectState>,
     type_: Option<ObjectType>,
     memory: MemRegion<Data>,
 }
 
 impl AbstractObjectInfo {
-    fn get_value(&self, offset: Bitvector, bitsize: BitSize) -> Data {
+    pub fn new(type_: ObjectType, address_bitsize: BitSize) -> AbstractObjectInfo {
+        AbstractObjectInfo {
+            pointer_targets: BTreeSet::new(),
+            is_unique: true,
+            state: Some(ObjectState::Alive),
+            type_: Some(type_),
+            memory: MemRegion::new(address_bitsize),
+        }
+    }
+
+    pub fn get_value(&self, offset: Bitvector, bitsize: BitSize) -> Data {
         // TODO: This function does not check whether a data read is "sound", e.g. that the offset is inside the object.
         // Make sure that this is checked somewhere!
         assert_eq!(bitsize % 8, 0);
         self.memory.get(offset, (bitsize / 8) as u64)
     }
 
-    fn set_value(&mut self, value: Data, offset: BitvectorDomain) -> Result<(), Error> {
+    pub fn set_value(&mut self, value: Data, offset: BitvectorDomain) -> Result<(), Error> {
         if let Data::Pointer(ref pointer) = value {
-            self.pointer_targets.extend(
-                pointer
-                    .iter_targets()
-                    .map(|(abstract_id, _offset)| abstract_id.clone()),
-            )
+            self.pointer_targets.extend(pointer.ids().cloned());
         };
         if let BitvectorDomain::Value(ref concrete_offset) = offset {
             if self.is_unique {
@@ -211,16 +89,24 @@ impl AbstractObjectInfo {
         Ok(())
     }
 
-    fn get_all_possible_pointer_targets(&self) -> BTreeSet<AbstractIdentifier> {
-        let mut targets = self.pointer_targets.clone();
-        for elem in self.memory.values() {
-            if let Data::Pointer(pointer) = elem {
-                for (id, _) in pointer.iter_targets() {
-                    targets.insert(id.clone());
-                }
-            };
+    /// Merge `value` at position `offset` with the value currently saved at that position.
+    pub fn merge_value(&mut self, value: Data, offset: BitvectorDomain) {
+        if let Data::Pointer(ref pointer) = value {
+            self.pointer_targets.extend(pointer.ids().cloned());
+        };
+        if let BitvectorDomain::Value(ref concrete_offset) = offset {
+            let merged_value = self
+                .memory
+                .get(concrete_offset.clone(), (value.bitsize() / 8) as u64)
+                .merge(&value);
+            self.memory.add(merged_value, concrete_offset.clone());
+        } else {
+            self.memory = MemRegion::new(self.memory.get_address_bitsize());
         }
-        targets
+    }
+
+    pub fn get_referenced_ids(&self) -> &BTreeSet<AbstractIdentifier> {
+        &self.pointer_targets
     }
 
     /// For pointer values replace an abstract identifier with another one and add the offset_adjustment to the pointer offsets.
@@ -262,17 +148,18 @@ impl AbstractObjectInfo {
         }
         self.memory.clear_top_values()
     }
-}
 
-impl HasTop for AbstractObjectInfo {
-    fn top(&self) -> Self {
-        AbstractObjectInfo {
-            pointer_targets: BTreeSet::new(),
-            is_unique: false,
-            state: None,
-            type_: None,
-            memory: MemRegion::new(self.memory.get_address_bitsize()),
-        }
+    pub fn get_state(&self) -> Option<ObjectState> {
+        self.state
+    }
+
+    /// Invalidates all memory and adds the `additional_targets` to the pointer targets.
+    /// Represents the effect of unknown write instructions to the object
+    /// which may include writing pointers to targets from the `additional_targets` set to the object.
+    pub fn assume_arbitrary_writes(&mut self, additional_targets: &BTreeSet<AbstractIdentifier>) {
+        self.memory = MemRegion::new(self.memory.get_address_bitsize());
+        self.pointer_targets
+            .extend(additional_targets.iter().cloned());
     }
 }
 
@@ -294,6 +181,33 @@ impl AbstractDomain for AbstractObjectInfo {
     /// The domain has no *Top* element, thus this function always returns false.
     fn is_top(&self) -> bool {
         false
+    }
+}
+
+impl AbstractObjectInfo {
+    pub fn to_json_compact(&self) -> serde_json::Value {
+        let mut elements = Vec::new();
+        elements.push((
+            "is_unique".to_string(),
+            serde_json::Value::String(format!("{}", self.is_unique)),
+        ));
+        elements.push((
+            "state".to_string(),
+            serde_json::Value::String(format!("{:?}", self.state)),
+        ));
+        elements.push((
+            "type".to_string(),
+            serde_json::Value::String(format!("{:?}", self.type_)),
+        ));
+        let memory = self
+            .memory
+            .iter()
+            .map(|(index, value)| (format!("{}", index), value.to_json_compact()));
+        elements.push((
+            "memory".to_string(),
+            serde_json::Value::Object(serde_json::Map::from_iter(memory)),
+        ));
+        serde_json::Value::Object(serde_json::Map::from_iter(elements.into_iter()))
     }
 }
 
@@ -332,7 +246,7 @@ mod tests {
             type_: Some(ObjectType::Heap),
             memory: MemRegion::new(64),
         };
-        AbstractObject::Memory(obj_info)
+        AbstractObject(Arc::new(obj_info))
     }
 
     fn new_data(number: i64) -> Data {
