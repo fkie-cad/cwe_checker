@@ -1,24 +1,66 @@
-/*!
-This module implements functions to generate (interprocedural) control flow graphs out of a program term.
-*/
+//! Generate control flow graphs out of a program term.
+//!
+//! The generated graphs follow some basic principles:
+//! * **Nodes** denote specific (abstract) points in time during program execution,
+//! i.e. information does not change on a node.
+//! So a basic block itself is not a node,
+//! but the points in time before and after execution of the basic block can be nodes.
+//! * **Edges** denote either transitions between the points in time of their start and end nodes during program execution
+//! or they denote (artificial) information flow between nodes. See the `CRCallStub` edges of interprocedural control flow graphs
+//! for an example of an edge that is only meant for information flow and not actual control flow.
+//!
+//! # General assumptions
+//!
+//! The graph construction algorithm assumes
+//! that each basic block of the program term ends with zero, one or two jump instructions.
+//! In the case of two jump instructions the first one is a conditional jump
+//! and the second one is an unconditional jump.
+//! Conditional calls are not supported.
+//! Missing jump instructions are supported to indicate incomplete information about the control flow,
+//! i.e. points where the control flow reconstruction failed.
+//! These points are converted to dead ends in the control flow graphs.
+//!
+//! # Interprocedural control flow graph
+//!
+//! The function [`get_program_cfg`](fn.get_program_cfg.html) builds an interprocedural control flow graph out of a program term as follows:
+//! * Each basic block is converted into two nodes, *BlkStart* and *BlkEnd*,
+//! and a *block* edge from *BlkStart* to *BlkEnd*.
+//! * Jumps and calls inside the program are converted to *Jump* or *Call* edges from the *BlkEnd* node of their source
+//! to the *BlkStart* node of their target (which is the first block of the target function in case of calls).
+//! * Calls to library functions outside the program are converted to *ExternCallStub* edges
+//! from the *BlkEnd* node of the callsite to the *BlkStart* node of the basic block the call returns to
+//! (if the call returns at all).
+//! * For each in-program call and corresponding return jump one node and three edges are generated:
+//!   * An artificial node *CallReturn*
+//!   * A *CRCallStub* edge from the *BlkEnd* node of the callsite to *CallReturn*
+//!   * A *CRReturnStub* edge from the *BlkEnd* node of the returning from block to *CallReturn*
+//!   * A *CRCombine* edge from *CallReturn* to the *BlkStart* node of the returned to block.
+//!
+//! The artificial *CallReturn* nodes enable enriching the information flowing through a return edge
+//! with information recovered from the corresponding callsite during a fixpoint computation.
 
+use crate::prelude::*;
 use crate::term::*;
 use petgraph::graph::{DiGraph, NodeIndex};
-use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 
 /// The graph type of an interprocedural control flow graph
 pub type Graph<'a> = DiGraph<Node<'a>, Edge<'a>>;
 
 /// The node type of an interprocedural control flow graph
+///
+/// Each node carries a pointer to its associated block with it.
+/// For `CallReturn`nodes the associated block is the callsite block (containing the call instruction)
+/// and *not* the return block (containing the return instruction).
 #[derive(Serialize, Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum Node<'a> {
     BlkStart(&'a Term<Blk>),
     BlkEnd(&'a Term<Blk>),
-    CallReturn(&'a Term<Blk>), // The block is the one from the call instruction
+    CallReturn(&'a Term<Blk>),
 }
 
 impl<'a> Node<'a> {
+    /// Get the block corresponding to the node.
     pub fn get_block(&self) -> &'a Term<Blk> {
         use Node::*;
         match self {
@@ -37,12 +79,14 @@ impl<'a> std::fmt::Display for Node<'a> {
     }
 }
 
-// TODO: document that we assume that the graph only has blocks with either:
-// - one unconditional call instruction
-// - one return instruction
-// - at most 2 intraprocedural jump instructions, i.e. at most one of them is a conditional jump
-
-/// The node type of an interprocedural fixpoint graph
+/// The edge type of an interprocedural fixpoint graph.
+///
+/// Where applicable the edge carries a reference to the corresponding jump instruction.
+/// For `CRCombine` edges the corresponding jump is the call and not the return jump.
+/// Intraprocedural jumps carry a second optional reference,
+/// which is only set if the jump directly follows an conditional jump,
+/// i.e. it represents the "conditional jump not taken" branch.
+/// In this case the other jump reference points to the untaken conditional jump.
 #[derive(Serialize, Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum Edge<'a> {
     Block,
@@ -59,12 +103,14 @@ struct GraphBuilder<'a> {
     program: &'a Term<Program>,
     extern_subs: HashSet<Tid>,
     graph: Graph<'a>,
-    jump_targets: HashMap<Tid, (NodeIndex, NodeIndex)>, // Denotes the NodeIndices of possible jump targets
-    return_addresses: HashMap<Tid, Vec<(NodeIndex, NodeIndex)>>, // for each function the list of return addresses of the corresponding call sites
+    /// Denotes the NodeIndices of possible jump targets
+    jump_targets: HashMap<Tid, (NodeIndex, NodeIndex)>,
+    /// for each function the list of return addresses of the corresponding call sites
+    return_addresses: HashMap<Tid, Vec<(NodeIndex, NodeIndex)>>,
 }
 
 impl<'a> GraphBuilder<'a> {
-    /// create a new builder with an amtpy graph
+    /// create a new builder with an emtpy graph
     pub fn new(program: &'a Term<Program>, extern_subs: HashSet<Tid>) -> GraphBuilder<'a> {
         GraphBuilder {
             program,
@@ -161,7 +207,7 @@ impl<'a> GraphBuilder<'a> {
         let block: &'a Term<Blk> = self.graph[node].get_block();
         let jumps = block.term.jmps.as_slice();
         match jumps {
-            [] => (), // TODO: Decide whether blocks without jumps should be considered hard errors or (silent) dead ends
+            [] => (), // Blocks without jumps are dead ends corresponding to control flow reconstruction errors.
             [jump] => self.add_jump_edge(node, jump, None),
             [if_jump, else_jump] => {
                 self.add_jump_edge(node, if_jump, None);
@@ -173,8 +219,8 @@ impl<'a> GraphBuilder<'a> {
 
     /// For each return instruction and each corresponding call, add the following to the graph:
     /// - a CallReturn node.
-    /// - edges from the callsite and from the returning-from-site to the CallReturn node
-    /// - an edge from the CallReturn node to the return-to-site
+    /// - edges from the callsite and from the returning-from site to the CallReturn node
+    /// - an edge from the CallReturn node to the return-to site
     fn add_call_return_node_and_edges(
         &mut self,
         return_from_sub: &Term<Sub>,
@@ -237,7 +283,7 @@ impl<'a> GraphBuilder<'a> {
     }
 }
 
-/// This function builds the interprocedural control flow graph for a program term.
+/// Build the interprocedural control flow graph for a program term.
 pub fn get_program_cfg(program: &Term<Program>, extern_subs: HashSet<Tid>) -> Graph {
     let builder = GraphBuilder::new(program, extern_subs);
     builder.build()
