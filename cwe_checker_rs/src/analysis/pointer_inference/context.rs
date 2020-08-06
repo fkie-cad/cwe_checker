@@ -147,7 +147,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
         value: &State,
         _jump: &Term<Jmp>,
         _untaken_conditional: Option<&Term<Jmp>>,
-        _target: &Term<Blk>
+        _target: &Term<Blk>,
     ) -> Option<State> {
         // TODO: Implement some real specialization of conditionals!
         let mut new_value = value.clone();
