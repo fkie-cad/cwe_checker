@@ -115,14 +115,14 @@ impl AbstractObjectList {
                 .objects
                 .get_mut(*target_object_set.iter().next().unwrap())
                 .unwrap();
-            object.set_value(value, target_offset.unwrap())?; // TODO: Write unit test whether this is correctly written to the self.objects vector!
+            object.set_value(value, &target_offset.unwrap())?; // TODO: Write unit test whether this is correctly written to the self.objects vector!
         } else {
             // There is more than one object that the pointer may write to.
             // We merge-write to all possible targets
             for (id, offset) in pointer.targets() {
                 let (object_index, object_offset) = self.ids.get(id).unwrap();
                 let adjusted_offset = offset.clone() + object_offset.clone();
-                self.objects[*object_index].merge_value(value.clone(), adjusted_offset);
+                self.objects[*object_index].merge_value(value.clone(), &adjusted_offset);
             }
         }
         Ok(())
