@@ -332,7 +332,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
                     {
                         match state.eval(&argument.location) {
                             Ok(value) => {
-                                if state.memory.is_dangling_pointer(&value) {
+                                if state.memory.is_dangling_pointer(&value, true) {
                                     let warning = CweWarning {
                                         name: "CWE416".to_string(),
                                         version: "0.1".to_string(),
@@ -393,7 +393,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
                                         state.eval(parameter_expression)
                                     {
                                         if let Data::Pointer(pointer) = memory_object_pointer {
-                                            if let Err(possible_double_free_object_ids) =
+                                            if let Err(possible_double_frees) =
                                                 new_state.mark_mem_object_as_freed(&pointer)
                                             {
                                                 let warning = CweWarning {
@@ -402,7 +402,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
                                                 addresses: vec![call.tid.address.clone()],
                                                 tids: vec![format!("{}", call.tid)],
                                                 symbols: Vec::new(),
-                                                other: vec![possible_double_free_object_ids.into_iter().map(|id| {format!("{}", id)}).collect()],
+                                                other: vec![possible_double_frees.into_iter().map(|(id, err)| {format!("{}: {}", id, err)}).collect()],
                                                 description: format!("(Double Free) Object may have been freed before at {}", call.tid.address),
                                             };
                                                 self.cwe_collector.send(warning).unwrap();

@@ -168,6 +168,46 @@ impl AbstractObjectInfo {
         self.pointer_targets
             .extend(additional_targets.iter().cloned());
     }
+
+    /// Mark the memory object as freed.
+    /// Returns an error if a possible double free is detected
+    /// or the memory object may not be a heap object.
+    pub fn mark_as_freed(&mut self) -> Result<(), Error> {
+        if self.type_ != Some(ObjectType::Heap) {
+            self.set_state(Some(ObjectState::Dangling));
+            return Err(anyhow!("Free operation on possibly non-heap memory object"));
+        }
+        match (self.is_unique, self.state) {
+            (true, Some(ObjectState::Alive)) => {
+                self.state = Some(ObjectState::Dangling);
+                Ok(())
+            }
+            (true, _) | (false, Some(ObjectState::Dangling)) => {
+                self.state = Some(ObjectState::Dangling);
+                Err(anyhow!("Object may already have been freed"))
+            }
+            (false, _) => {
+                self.state = None;
+                Ok(())
+            }
+        }
+    }
+
+    /// Mark the memory object as possibly (but not definitely) freed.
+    /// Returns an error if the object was definitely freed before
+    /// or if the object may not be a heap object.
+    pub fn mark_as_maybe_freed(&mut self) -> Result<(), Error> {
+        if self.type_ != Some(ObjectType::Heap) {
+            self.set_state(Some(ObjectState::Dangling));
+            return Err(anyhow!("Free operation on possibly non-heap memory object"));
+        }
+        if self.state != Some(ObjectState::Dangling) {
+            self.state = None;
+            Ok(())
+        } else {
+            Err(anyhow!("Object may already have been freed"))
+        }
+    }
 }
 
 impl AbstractDomain for AbstractObjectInfo {

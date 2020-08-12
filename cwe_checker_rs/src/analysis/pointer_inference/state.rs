@@ -216,7 +216,7 @@ impl State {
                 ..
             } => {
                 if let Ok(pointer) = self.eval(address_exp) {
-                    self.memory.is_dangling_pointer(&pointer)
+                    self.memory.is_dangling_pointer(&pointer, true)
                         || self.contains_access_of_dangling_memory(address_exp)
                 } else {
                     false
@@ -229,7 +229,7 @@ impl State {
                 ..
             } => {
                 let address_check = if let Ok(pointer) = self.eval(address_exp) {
-                    self.memory.is_dangling_pointer(&pointer)
+                    self.memory.is_dangling_pointer(&pointer, true)
                 } else {
                     false
                 };
@@ -517,7 +517,7 @@ impl State {
     pub fn mark_mem_object_as_freed(
         &mut self,
         object_pointer: &PointerDomain<BitvectorDomain>,
-    ) -> Result<(), Vec<AbstractIdentifier>> {
+    ) -> Result<(), Vec<(AbstractIdentifier, Error)>> {
         self.memory.mark_mem_object_as_freed(object_pointer)
     }
 
