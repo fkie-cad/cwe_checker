@@ -22,7 +22,7 @@ pub struct State {
     /// All known IDs of caller stack frames.
     /// Note that these IDs are named after the callsite,
     /// i.e. we can distinguish every callsite and for recursive functions the caller and current stack frames have different IDs.
-    /// 
+    ///
     /// Writes to the current stack frame with offset >= 0 are written to *all* caller stack frames.
     /// Reads to the current stack frame with offset >= 0 are handled as merge-read from all caller stack frames.
     pub caller_stack_ids: BTreeSet<AbstractIdentifier>,
@@ -31,7 +31,7 @@ pub struct State {
     /// The corresponding objects are not allowed to be deleted (even if no pointer to them exists anymore)
     /// so that after returning from a call the caller can recover their modified contents
     /// and the callee does not accidentally delete this information if it loses all pointers to an object.
-    /// 
+    ///
     /// Note that IDs that the callee should not have access to are not included here.
     /// For these IDs the caller can assume that the contents of the corresponding memory object were not accessed or modified by the call.
     pub ids_known_to_caller: BTreeSet<AbstractIdentifier>,
