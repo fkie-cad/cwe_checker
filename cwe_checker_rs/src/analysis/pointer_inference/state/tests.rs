@@ -296,6 +296,27 @@ fn clear_parameters_on_the_stack_on_extern_calls() {
 
 #[test]
 fn merge_callee_stack_to_caller_stack() {
-    
-    todo!();
+    use super::super::object::ObjectType;
+    let mut state = State::new(&register("RSP"), Tid::new("callee"));
+    state
+        .memory
+        .add_abstract_object(new_id("callsite", "RSP"), bv(52), ObjectType::Stack, 64);
+    state.caller_stack_ids.insert(new_id("callsite", "RSP"));
+    // check the state before merging to the caller stack
+    assert_eq!(
+        state.register.get(&register("RSP")).unwrap(),
+        &PointerDomain::new(new_id("callee", "RSP"), bv(0)).into()
+    );
+    assert_eq!(state.memory.get_all_object_ids().len(), 2);
+    // check state after merging to the caller stack
+    state.merge_callee_stack_to_caller_stack(
+        &new_id("callee", "RSP"),
+        &new_id("callsite", "RSP"),
+        &bv(-52),
+    );
+    assert_eq!(
+        state.register.get(&register("RSP")).unwrap(),
+        &PointerDomain::new(new_id("callsite", "RSP"), bv(52)).into()
+    );
+    assert_eq!(state.memory.get_all_object_ids().len(), 1);
 }
