@@ -93,6 +93,12 @@ pub struct Project {
     pub parameter_registers: Vec<String>,
 }
 
+impl Project {
+    pub fn get_pointer_bitsize(&self) -> BitSize {
+        self.stack_pointer_register.bitsize().unwrap()
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Arg {
     pub var: Variable,

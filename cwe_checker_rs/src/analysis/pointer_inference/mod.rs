@@ -16,6 +16,9 @@ mod state;
 use context::Context;
 use state::State;
 
+/// The version number of the analysis.
+const VERSION: &str = "0.1";
+
 /// The abstract domain type for representing register values.
 type Data = DataDomain<BitvectorDomain>;
 

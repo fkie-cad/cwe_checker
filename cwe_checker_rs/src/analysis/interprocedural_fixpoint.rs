@@ -85,6 +85,7 @@ pub trait Context<'a> {
         value: &Self::Value,
         value_before_call: Option<&Self::Value>,
         call_term: &Term<Jmp>,
+        return_term: &Term<Jmp>,
     ) -> Option<Self::Value>;
 
     /// Transition function for calls to functions not contained in the binary.
@@ -158,9 +159,10 @@ impl<'a, T: Context<'a>> GeneralFPContext for GeneralizedContext<'a, T> {
     ) -> Option<Self::NodeValue> {
         let graph = self.context.get_graph();
         let (start_node, end_node) = graph.edge_endpoints(edge).unwrap();
-        let block_term = graph.node_weight(start_node).unwrap().get_block();
+
         match graph.edge_weight(edge).unwrap() {
             Edge::Block => {
+                let block_term = graph.node_weight(start_node).unwrap().get_block();
                 let value = node_value.unwrap_value();
                 let defs = &block_term.term.defs;
                 let end_val = defs.iter().try_fold(value.clone(), |accum, def| {
@@ -183,11 +185,18 @@ impl<'a, T: Context<'a>> GeneralFPContext for GeneralizedContext<'a, T> {
             Edge::CRCombine(call_term) => match node_value {
                 NodeValue::Value(_) => panic!("Unexpected interprocedural fixpoint graph state"),
                 NodeValue::CallReturnCombinator { call, return_ } => {
+                    let return_from_block = match graph.node_weight(start_node) {
+                        Some(Node::CallReturn { call: _, return_ }) => return_,
+                        _ => panic!("Malformed Control flow graph"),
+                    };
+                    let return_from_jmp = &return_from_block.term.jmps[0];
                     if let Some(return_value) = return_ {
-                        match self
-                            .context
-                            .update_return(return_value, call.as_ref(), call_term)
-                        {
+                        match self.context.update_return(
+                            return_value,
+                            call.as_ref(),
+                            call_term,
+                            return_from_jmp,
+                        ) {
                             Some(val) => Some(NodeValue::Value(val)),
                             None => None,
                         }
