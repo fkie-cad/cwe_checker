@@ -91,7 +91,7 @@ fn mock_project() -> Project {
     };
     Project {
         program: program_term,
-        cpu_architecture: "mock_arch".to_string(),
+        cpu_architecture: "x86_64".to_string(),
         stack_pointer_register: register("RSP"),
         callee_saved_registers: vec!["callee_saved_reg".to_string()],
         parameter_registers: vec!["RAX".to_string()],

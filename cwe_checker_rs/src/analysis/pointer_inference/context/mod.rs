@@ -366,24 +366,25 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
         // On x86, remove the return address from the stack (other architectures pass the return address in a register, not on the stack).
         // Note that in some calling conventions the callee also clears function parameters from the stack.
         // We do not detect and handle these cases yet.
+        let stack_register = &self.project.stack_pointer_register;
+        let stack_pointer = state.get_register(stack_register).unwrap();
         match self.project.cpu_architecture.as_str() {
             "x86" | "x86_64" => {
-                let stack_register = &self.project.stack_pointer_register;
-                {
-                    let stack_pointer = state.get_register(stack_register).unwrap();
-                    let offset = Bitvector::from_u16(stack_register.bitsize().unwrap() / 8)
-                        .into_zero_extend(stack_register.bitsize().unwrap() as usize)
-                        .unwrap();
-                    self.log_debug(
-                        new_state.set_register(
-                            stack_register,
-                            stack_pointer.bin_op(crate::bil::BinOpType::PLUS, &offset.into()),
-                        ),
-                        Some(&call.tid),
-                    );
-                }
+                let offset = Bitvector::from_u16(stack_register.bitsize().unwrap() / 8)
+                    .into_zero_extend(stack_register.bitsize().unwrap() as usize)
+                    .unwrap();
+                self.log_debug(
+                    new_state.set_register(
+                        stack_register,
+                        stack_pointer.bin_op(crate::bil::BinOpType::PLUS, &offset.into()),
+                    ),
+                    Some(&call.tid),
+                );
             }
-            _ => (),
+            _ => self.log_debug(
+                new_state.set_register(stack_register, stack_pointer),
+                Some(&call.tid),
+            ),
         }
 
         match call_target {
