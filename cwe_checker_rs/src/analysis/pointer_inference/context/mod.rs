@@ -69,6 +69,48 @@ impl<'a> Context<'a> {
             self.log_collector.send(log_message).unwrap();
         }
     }
+
+    /// Detect and log if the stack pointer is not as expected when returning from a function.
+    fn detect_stack_pointer_information_loss_on_return(
+        &self,
+        state_before_return: &State,
+        return_term: &Term<Jmp>,
+    ) {
+        let expected_stack_pointer_offset = match self.project.cpu_architecture.as_str() {
+            "x86" | "x86_64" => Bitvector::from_u16(self.project.get_pointer_bitsize() / 8)
+                .into_zero_extend(self.project.get_pointer_bitsize() as usize)
+                .unwrap(),
+            _ => Bitvector::zero((self.project.get_pointer_bitsize() as usize).into()),
+        };
+        match state_before_return.get_register(&self.project.stack_pointer_register) {
+            Ok(Data::Pointer(pointer)) => {
+                if pointer.targets().len() == 1 {
+                    let (id, offset) = pointer.targets().iter().next().unwrap();
+                    if *id != state_before_return.stack_id
+                        || *offset != expected_stack_pointer_offset.into()
+                    {
+                        self.log_debug(
+                            Err(anyhow!(
+                                "Unexpected stack register value at return instruction"
+                            )),
+                            Some(&return_term.tid),
+                        );
+                    }
+                }
+            }
+            Ok(Data::Top(_)) => self.log_debug(
+                Err(anyhow!(
+                    "Stack register value lost during function execution"
+                )),
+                Some(&return_term.tid),
+            ),
+            Ok(Data::Value(_)) => self.log_debug(
+                Err(anyhow!("Unexpected stack register value on return")),
+                Some(&return_term.tid),
+            ),
+            Err(err) => self.log_debug(Err(err), Some(&return_term.tid)),
+        }
+    }
 }
 
 impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> {
@@ -275,38 +317,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
         let stack_offset_on_call = self.get_current_stack_offset(state_before_call);
 
         // Detect possible information loss on the stack pointer and report it.
-        match state_before_return.get_register(&self.project.stack_pointer_register) {
-            Ok(Data::Pointer(pointer)) => {
-                if pointer.targets().len() == 1 {
-                    let (id, offset) = pointer.targets().iter().next().unwrap();
-                    if *id != state_before_return.stack_id
-                        || *offset
-                            != Bitvector::from_u16(self.project.get_pointer_bitsize() / 8)
-                                .into_zero_extend(self.project.get_pointer_bitsize() as usize)
-                                .unwrap()
-                                .into()
-                    {
-                        self.log_debug(
-                            Err(anyhow!(
-                                "Unexpected stack register value at return instruction"
-                            )),
-                            Some(&return_term.tid),
-                        );
-                    }
-                }
-            }
-            Ok(Data::Top(_)) => self.log_debug(
-                Err(anyhow!(
-                    "Stack register value lost during function execution"
-                )),
-                Some(&return_term.tid),
-            ),
-            Ok(Data::Value(_)) => self.log_debug(
-                Err(anyhow!("Unexpected stack register value on return")),
-                Some(&return_term.tid),
-            ),
-            Err(err) => self.log_debug(Err(err), Some(&return_term.tid)),
-        }
+        self.detect_stack_pointer_information_loss_on_return(state_before_return, return_term);
 
         // Check whether state_before_return actually knows the `caller_stack_id`.
         // If not, we are returning from a state that cannot correspond to this callsite.
@@ -352,22 +363,27 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
         };
         // Clear non-callee-saved registers from the state.
         new_state.clear_non_callee_saved_register(&self.project.callee_saved_registers[..]);
-        // Set the stack register value.
-        // TODO: This is wrong if the extern call clears more from the stack than just the return address.
-        // TODO: a check on validity of the return address could also be useful here.
-        let stack_register = &self.project.stack_pointer_register;
-        {
-            let stack_pointer = state.get_register(stack_register).unwrap();
-            let offset = Bitvector::from_u16(stack_register.bitsize().unwrap() / 8)
-                .into_zero_extend(stack_register.bitsize().unwrap() as usize)
-                .unwrap();
-            self.log_debug(
-                new_state.set_register(
-                    stack_register,
-                    stack_pointer.bin_op(crate::bil::BinOpType::PLUS, &offset.into()),
-                ),
-                Some(&call.tid),
-            );
+        // On x86, remove the return address from the stack (other architectures pass the return address in a register, not on the stack).
+        // Note that in some calling conventions the callee also clears function parameters from the stack.
+        // We do not detect and handle these cases yet.
+        match self.project.cpu_architecture.as_str() {
+            "x86" | "x86_64" => {
+                let stack_register = &self.project.stack_pointer_register;
+                {
+                    let stack_pointer = state.get_register(stack_register).unwrap();
+                    let offset = Bitvector::from_u16(stack_register.bitsize().unwrap() / 8)
+                        .into_zero_extend(stack_register.bitsize().unwrap() as usize)
+                        .unwrap();
+                    self.log_debug(
+                        new_state.set_register(
+                            stack_register,
+                            stack_pointer.bin_op(crate::bil::BinOpType::PLUS, &offset.into()),
+                        ),
+                        Some(&call.tid),
+                    );
+                }
+            }
+            _ => (),
         }
 
         match call_target {
