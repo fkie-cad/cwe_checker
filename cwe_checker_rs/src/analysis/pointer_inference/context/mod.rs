@@ -16,7 +16,7 @@ use super::{Data, VERSION};
 mod trait_impls;
 
 /// Contains all context information needed for the pointer inference fixpoint computation.
-/// 
+///
 /// The struct also implements the `interprocedural_fixpoint::Context` trait to enable the fixpoint computation.
 pub struct Context<'a> {
     /// The program control flow graph on which the fixpoint will be computed
