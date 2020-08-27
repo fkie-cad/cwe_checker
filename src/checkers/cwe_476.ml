@@ -424,8 +424,8 @@ let print_hit (tid: Tid.t) ~(sub: Sub.t) ~(malloc_like_functions: String.t List.
         | Direct(call_tid) -> Option.is_some (List.find malloc_like_functions ~f:(fun fn_name ->
           if fn_name = (Tid.name call_tid) then
             begin
-              let address = Address_translation.translate_tid_to_assembler_address_string tid tid_map in
-              let tids = [Address_translation.tid_to_string tid] in
+              let address = Address_translation.translate_tid_to_assembler_address_string (Term.tid jmp) tid_map in
+              let tids = [Address_translation.tid_to_string (Term.tid jmp)] in
               let description = sprintf
                                   "(NULL Pointer Dereference) There is no check if the return value is NULL at %s (%s)."
                                   address
