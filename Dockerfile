@@ -4,7 +4,9 @@ COPY . /home/bap/cwe_checker/
 
 RUN sudo chown -R bap:bap /home/bap/cwe_checker \
     && cd /home/bap/cwe_checker \
-    && make clean && make all
+    && make all \
+    && cargo clean \
+    && dune clean
 
 WORKDIR /home/bap/cwe_checker
 
