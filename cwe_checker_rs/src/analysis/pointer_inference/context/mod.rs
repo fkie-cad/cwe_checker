@@ -111,6 +111,209 @@ impl<'a> Context<'a> {
             Err(err) => self.log_debug(Err(err), Some(&return_term.tid)),
         }
     }
+
+    /// Add a new abstract object and a pointer to it in the return register of an extern call.
+    /// This models the behaviour of `malloc`-like functions,
+    /// except that we cannot represent possible `NULL` pointers as return values yet.
+    fn add_new_object_in_call_return_register(
+        &self,
+        mut state: State,
+        call: &Term<Jmp>,
+        extern_symbol: &ExternSymbol,
+    ) -> Option<State> {
+        match extern_symbol.get_unique_return_register() {
+            Ok(return_register) => {
+                let object_id = AbstractIdentifier::new(
+                    call.tid.clone(),
+                    AbstractLocation::from_var(return_register).unwrap(),
+                );
+                let address_bitsize = self.project.stack_pointer_register.bitsize().unwrap();
+                state.memory.add_abstract_object(
+                    object_id.clone(),
+                    Bitvector::zero((address_bitsize as usize).into()).into(),
+                    super::object::ObjectType::Heap,
+                    address_bitsize,
+                );
+                let pointer = PointerDomain::new(
+                    object_id,
+                    Bitvector::zero((address_bitsize as usize).into()).into(),
+                );
+                self.log_debug(
+                    state.set_register(return_register, pointer.into()),
+                    Some(&call.tid),
+                );
+                Some(state)
+            }
+            Err(err) => {
+                // We cannot track the new object, since we do not know where to store the pointer to it.
+                self.log_debug(Err(err), Some(&call.tid));
+                Some(state)
+            }
+        }
+    }
+
+    /// Mark the object that the parameter of a call is pointing to as freed.
+    /// If the object may have been already freed, generate a CWE warning.
+    /// This models the behaviour of `free` and similar functions.
+    fn mark_parameter_object_as_freed(
+        &self,
+        state: &State,
+        mut new_state: State,
+        call: &Term<Jmp>,
+        extern_symbol: &ExternSymbol,
+    ) -> Option<State> {
+        match extern_symbol.get_unique_parameter() {
+            Ok(parameter_expression) => match state.eval(parameter_expression) {
+                Ok(memory_object_pointer) => {
+                    if let Data::Pointer(pointer) = memory_object_pointer {
+                        if let Err(possible_double_frees) =
+                            new_state.mark_mem_object_as_freed(&pointer)
+                        {
+                            let warning = CweWarning {
+                                name: "CWE415".to_string(),
+                                version: VERSION.to_string(),
+                                addresses: vec![call.tid.address.clone()],
+                                tids: vec![format!("{}", call.tid)],
+                                symbols: Vec::new(),
+                                other: vec![possible_double_frees
+                                    .into_iter()
+                                    .map(|(id, err)| format!("{}: {}", id, err))
+                                    .collect()],
+                                description: format!(
+                                    "(Double Free) Object may have been freed before at {}",
+                                    call.tid.address
+                                ),
+                            };
+                            self.cwe_collector.send(warning).unwrap();
+                        }
+                    } else {
+                        self.log_debug(
+                            Err(anyhow!("Free on a non-pointer value called.")),
+                            Some(&call.tid),
+                        );
+                    }
+                    new_state.remove_unreferenced_objects();
+                    Some(new_state)
+                }
+                Err(err) => {
+                    self.log_debug(Err(err), Some(&call.tid));
+                    Some(new_state)
+                }
+            },
+            Err(err) => {
+                // We do not know which memory object to free
+                self.log_debug(Err(err), Some(&call.tid));
+                Some(new_state)
+            }
+        }
+    }
+
+    /// Check all parameter registers of a call for dangling pointers and report possible use-after-frees.
+    fn check_parameter_register_for_dangling_pointer(
+        &self,
+        state: &State,
+        call: &Term<Jmp>,
+        extern_symbol: &ExternSymbol,
+    ) {
+        for argument in extern_symbol
+            .arguments
+            .iter()
+            .filter(|arg| arg.intent.is_input())
+        {
+            match state.eval(&argument.location) {
+                Ok(value) => {
+                    if state.memory.is_dangling_pointer(&value, true) {
+                        let warning = CweWarning {
+                            name: "CWE416".to_string(),
+                            version: VERSION.to_string(),
+                            addresses: vec![call.tid.address.clone()],
+                            tids: vec![format!("{}", call.tid)],
+                            symbols: Vec::new(),
+                            other: Vec::new(),
+                            description: format!(
+                                "(Use After Free) Call to {} may access freed memory at {}",
+                                extern_symbol.name, call.tid.address
+                            ),
+                        };
+                        self.cwe_collector.send(warning).unwrap();
+                    }
+                }
+                Err(err) => self.log_debug(
+                    Err(err.context(format!(
+                        "Function argument expression {:?} could not be evaluated",
+                        argument.location
+                    ))),
+                    Some(&call.tid),
+                ),
+            }
+        }
+    }
+
+    /// Handle an extern symbol call, whose concrete effect on the state is unknown.
+    /// Basically, we assume that the call may write to all memory objects and register that is has access to.
+    fn handle_generic_extern_call(
+        &self,
+        state: &State,
+        mut new_state: State,
+        call: &Term<Jmp>,
+        extern_symbol: &ExternSymbol,
+    ) -> Option<State> {
+        self.log_debug(
+            new_state.clear_stack_parameter(extern_symbol),
+            Some(&call.tid),
+        );
+        let mut possible_referenced_ids = BTreeSet::new();
+        if extern_symbol.arguments.is_empty() {
+            // TODO: We assume here that we do not know the parameters and approximate them by all parameter registers.
+            // This approximation is wrong if the function is known but has neither parameters nor return values.
+            // We need to somehow distinguish these two cases.
+            for parameter_register_name in self.project.parameter_registers.iter() {
+                if let Some(register_value) = state.get_register_by_name(parameter_register_name) {
+                    possible_referenced_ids.append(&mut register_value.referenced_ids());
+                }
+            }
+        } else {
+            for parameter in extern_symbol
+                .arguments
+                .iter()
+                .filter(|arg| arg.intent.is_input())
+            {
+                if let Ok(data) = state.eval(&parameter.location) {
+                    possible_referenced_ids.append(&mut data.referenced_ids());
+                }
+            }
+        }
+        possible_referenced_ids =
+            state.add_recursively_referenced_ids_to_id_set(possible_referenced_ids);
+        // Delete content of all referenced objects, as the function may write to them.
+        for id in possible_referenced_ids.iter() {
+            new_state
+                .memory
+                .assume_arbitrary_writes_to_object(id, &possible_referenced_ids);
+        }
+        Some(new_state)
+    }
+
+    /// Get the offset of the current stack pointer to the base of the current stack frame.
+    fn get_current_stack_offset(&self, state: &State) -> BitvectorDomain {
+        if let Ok(Data::Pointer(ref stack_pointer)) =
+            state.get_register(&self.project.stack_pointer_register)
+        {
+            if stack_pointer.targets().len() == 1 {
+                let (stack_id, stack_offset_domain) =
+                    stack_pointer.targets().iter().next().unwrap();
+                if *stack_id == state.stack_id {
+                    stack_offset_domain.clone()
+                } else {
+                    BitvectorDomain::new_top(stack_pointer.bitsize())
+                }
+            } else {
+                BitvectorDomain::new_top(self.project.stack_pointer_register.bitsize().unwrap())
+            }
+        } else {
+            BitvectorDomain::new_top(self.project.stack_pointer_register.bitsize().unwrap())
+        }
+    }
 }
 
 impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> {
@@ -355,6 +558,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
         Some(state_after_return)
     }
 
+    /// Update the state according to the effect of a call to an extern symbol.
     fn update_call_stub(&self, state: &State, call: &Term<Jmp>) -> Option<State> {
         let mut new_state = state.clone();
         let call_target = match &call.term.kind {
@@ -390,151 +594,19 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
         match call_target {
             Label::Direct(tid) => {
                 if let Some(extern_symbol) = self.extern_symbol_map.get(tid) {
-                    // TODO: Replace the hardcoded symbol matching by something configurable in config.json!
-                    // TODO: This implementation ignores that allocation functions may return Null,
-                    // since this is not yet representable in the state object.
-
-                    // Check all parameter register for dangling pointers and report possible use-after-free if one is found.
-                    for argument in extern_symbol
-                        .arguments
-                        .iter()
-                        .filter(|arg| arg.intent.is_input())
-                    {
-                        match state.eval(&argument.location) {
-                            Ok(value) => {
-                                if state.memory.is_dangling_pointer(&value, true) {
-                                    let warning = CweWarning {
-                                        name: "CWE416".to_string(),
-                                        version: VERSION.to_string(),
-                                        addresses: vec![call.tid.address.clone()],
-                                        tids: vec![format!("{}", call.tid)],
-                                        symbols: Vec::new(),
-                                        other: Vec::new(),
-                                        description: format!("(Use After Free) Call to {} may access freed memory at {}", extern_symbol.name, call.tid.address),
-                                    };
-                                    self.cwe_collector.send(warning).unwrap();
-                                }
-                            }
-                            Err(err) => self.log_debug(
-                                Err(err.context(format!(
-                                    "Function argument expression {:?} could not be evaluated",
-                                    argument.location
-                                ))),
-                                Some(&call.tid),
-                            ),
-                        }
-                    }
+                    // Check parameter for possible use-after-frees
+                    self.check_parameter_register_for_dangling_pointer(state, call, extern_symbol);
 
                     match extern_symbol.name.as_str() {
-                        "malloc" | "calloc" | "realloc" | "xmalloc" => {
-                            if let Ok(return_register) = extern_symbol.get_unique_return_register()
-                            {
-                                let object_id = AbstractIdentifier::new(
-                                    call.tid.clone(),
-                                    AbstractLocation::from_var(return_register).unwrap(),
-                                );
-                                let address_bitsize =
-                                    self.project.stack_pointer_register.bitsize().unwrap();
-                                new_state.memory.add_abstract_object(
-                                    object_id.clone(),
-                                    Bitvector::zero((address_bitsize as usize).into()).into(),
-                                    super::object::ObjectType::Heap,
-                                    address_bitsize,
-                                );
-                                let pointer = PointerDomain::new(
-                                    object_id,
-                                    Bitvector::zero((address_bitsize as usize).into()).into(),
-                                );
-                                self.log_debug(
-                                    new_state.set_register(return_register, pointer.into()),
-                                    Some(&call.tid),
-                                );
-                                Some(new_state)
-                            } else {
-                                // We cannot track the new object, since we do not know where to store the pointer to it.
-                                // TODO: Return a diagnostics message to the user here.
-                                Some(new_state)
-                            }
-                        }
-                        "free" => {
-                            match extern_symbol.get_unique_parameter() {
-                                Ok(parameter_expression) => {
-                                    if let Ok(memory_object_pointer) =
-                                        state.eval(parameter_expression)
-                                    {
-                                        if let Data::Pointer(pointer) = memory_object_pointer {
-                                            if let Err(possible_double_frees) =
-                                                new_state.mark_mem_object_as_freed(&pointer)
-                                            {
-                                                let warning = CweWarning {
-                                                name: "CWE415".to_string(),
-                                                version: VERSION.to_string(),
-                                                addresses: vec![call.tid.address.clone()],
-                                                tids: vec![format!("{}", call.tid)],
-                                                symbols: Vec::new(),
-                                                other: vec![possible_double_frees.into_iter().map(|(id, err)| {format!("{}: {}", id, err)}).collect()],
-                                                description: format!("(Double Free) Object may have been freed before at {}", call.tid.address),
-                                            };
-                                                self.cwe_collector.send(warning).unwrap();
-                                            }
-                                        } // TODO: add diagnostics for else case
-                                        new_state.remove_unreferenced_objects();
-                                        Some(new_state)
-                                    } else {
-                                        // TODO: add diagnostics message for the user here
-                                        Some(new_state)
-                                    }
-                                }
-                                Err(err) => {
-                                    // We do not know which memory object to free
-                                    self.log_debug(Err(err), Some(&call.tid));
-                                    Some(new_state)
-                                }
-                            }
-                        }
-                        _ => {
-                            self.log_debug(
-                                new_state.clear_stack_parameter(extern_symbol),
-                                Some(&call.tid),
-                            );
-                            let mut possible_referenced_ids = BTreeSet::new();
-                            if extern_symbol.arguments.is_empty() {
-                                // TODO: We assume here that we do not know the parameters and approximate them by all parameter registers.
-                                // This approximation is wrong if the function is known but has neither parameters nor return values.
-                                // We need to somehow distinguish these two cases.
-                                // TODO: We need to cleanup stack memory below the current position of the stack pointer.
-                                for parameter_register_name in
-                                    self.project.parameter_registers.iter()
-                                {
-                                    if let Some(register_value) =
-                                        state.get_register_by_name(parameter_register_name)
-                                    {
-                                        possible_referenced_ids
-                                            .append(&mut register_value.referenced_ids());
-                                    }
-                                }
-                            } else {
-                                for parameter in extern_symbol
-                                    .arguments
-                                    .iter()
-                                    .filter(|arg| arg.intent.is_input())
-                                {
-                                    if let Ok(data) = state.eval(&parameter.location) {
-                                        possible_referenced_ids.append(&mut data.referenced_ids());
-                                    }
-                                }
-                            }
-                            possible_referenced_ids = state
-                                .add_recursively_referenced_ids_to_id_set(possible_referenced_ids);
-                            // Delete content of all referenced objects, as the function may write to them.
-                            for id in possible_referenced_ids.iter() {
-                                new_state.memory.assume_arbitrary_writes_to_object(
-                                    id,
-                                    &possible_referenced_ids,
-                                );
-                            }
-                            Some(new_state)
-                        }
+                        "malloc" | "calloc" | "realloc" | "xmalloc" => self
+                            .add_new_object_in_call_return_register(new_state, call, extern_symbol),
+                        "free" => self.mark_parameter_object_as_freed(
+                            state,
+                            new_state,
+                            call,
+                            extern_symbol,
+                        ),
+                        _ => self.handle_generic_extern_call(state, new_state, call, extern_symbol),
                     }
                 } else {
                     panic!("Extern symbol not found.");
@@ -544,33 +616,15 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
         }
     }
 
+    /// Update the state with the knowledge that some conditional evaluated to true or false.
+    /// Currently not implemented, this function just returns the state as it is.
     fn specialize_conditional(
         &self,
         value: &State,
         _condition: &Expression,
         _is_true: bool,
     ) -> Option<State> {
-        // TODO: implement some real specialization of conditionals!
         Some(value.clone())
-    }
-}
-
-impl<'a> Context<'a> {
-    fn get_current_stack_offset(&self, state: &State) -> BitvectorDomain {
-        if let Ok(Data::Pointer(ref stack_pointer)) =
-            state.get_register(&self.project.stack_pointer_register)
-        {
-            if stack_pointer.targets().len() == 1 {
-                // TODO: add sanity check that the stack id is the expected id
-                let (_stack_id, stack_offset_domain) =
-                    stack_pointer.targets().iter().next().unwrap();
-                stack_offset_domain.clone()
-            } else {
-                BitvectorDomain::new_top(self.project.stack_pointer_register.bitsize().unwrap())
-            }
-        } else {
-            BitvectorDomain::new_top(self.project.stack_pointer_register.bitsize().unwrap())
-        }
     }
 }
 
