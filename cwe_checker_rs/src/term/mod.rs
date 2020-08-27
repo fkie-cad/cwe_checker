@@ -82,8 +82,6 @@ pub struct Program {
     pub entry_points: Vec<Tid>,
 }
 
-// TODO: Add deserialization from Ocaml to the FFI module for project!
-// TODO: Add other CPU-architecture specific data to this struct!
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Project {
     pub program: Term<Program>,

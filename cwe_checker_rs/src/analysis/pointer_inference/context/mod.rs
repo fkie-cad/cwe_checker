@@ -16,6 +16,8 @@ use super::{Data, VERSION};
 mod trait_impls;
 
 /// Contains all context information needed for the pointer inference fixpoint computation.
+/// 
+/// The struct also implements the `interprocedural_fixpoint::Context` trait to enable the fixpoint computation.
 pub struct Context<'a> {
     /// The program control flow graph on which the fixpoint will be computed
     pub graph: Graph<'a>,
@@ -269,9 +271,9 @@ impl<'a> Context<'a> {
         );
         let mut possible_referenced_ids = BTreeSet::new();
         if extern_symbol.arguments.is_empty() {
-            // TODO: We assume here that we do not know the parameters and approximate them by all parameter registers.
+            // We assume here that we do not know the parameters and approximate them by all possible parameter registers.
             // This approximation is wrong if the function is known but has neither parameters nor return values.
-            // We need to somehow distinguish these two cases.
+            // We cannot distinguish these two cases yet.
             for parameter_register_name in self.project.parameter_registers.iter() {
                 if let Some(register_value) = state.get_register_by_name(parameter_register_name) {
                     possible_referenced_ids.append(&mut register_value.referenced_ids());

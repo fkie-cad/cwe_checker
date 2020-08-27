@@ -29,7 +29,7 @@ fn run_pointer_inference_and_print_debug(program_jsonbuilder_val: ocaml::Value) 
     let project: Project =
         serde_json::from_value(program_json).expect("Project deserialization failed");
 
-    crate::analysis::pointer_inference::run(&project, true); // TODO: This discard all CweWarnings and log messages. Change that?
+    crate::analysis::pointer_inference::run(&project, true); // Note: This discard all CweWarnings and log messages.
 }
 
 caml!(rs_run_pointer_inference_and_print_debug(program_jsonbuilder_val) {
