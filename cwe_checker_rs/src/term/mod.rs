@@ -82,8 +82,6 @@ pub struct Program {
     pub entry_points: Vec<Tid>,
 }
 
-// TODO: Add deserialization from Ocaml to the FFI module for project!
-// TODO: Add other CPU-architecture specific data to this struct!
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Project {
     pub program: Term<Program>,
@@ -91,6 +89,12 @@ pub struct Project {
     pub stack_pointer_register: Variable,
     pub callee_saved_registers: Vec<String>,
     pub parameter_registers: Vec<String>,
+}
+
+impl Project {
+    pub fn get_pointer_bitsize(&self) -> BitSize {
+        self.stack_pointer_register.bitsize().unwrap()
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]

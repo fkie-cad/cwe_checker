@@ -2,198 +2,80 @@ use super::Data;
 use crate::abstract_domain::*;
 use crate::bil::Bitvector;
 use crate::prelude::*;
+use derive_more::Deref;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::iter::FromIterator;
+use std::ops::DerefMut;
+use std::sync::Arc;
 
-/// An abstract object is either a tracked or an untracked memory object.
-/// In the untracked case we still track whether the object may contain pointers to other objects.
-/// This way we do not necessarily need to invalidate all abstract objects
-/// if a pointer contained in an untracked object is used for a memory write.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
-pub enum AbstractObject {
-    Untracked(BTreeSet<AbstractIdentifier>),
-    Memory(AbstractObjectInfo),
+/// A wrapper struct wrapping `AbstractObjectInfo` in an `Arc`.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Deref)]
+#[deref(forward)]
+pub struct AbstractObject(Arc<AbstractObjectInfo>);
+
+impl DerefMut for AbstractObject {
+    fn deref_mut(&mut self) -> &mut AbstractObjectInfo {
+        Arc::make_mut(&mut self.0)
+    }
 }
 
 impl AbstractObject {
+    /// Create a new abstract object with given object type and address bitsize.
     pub fn new(type_: ObjectType, address_bitsize: BitSize) -> AbstractObject {
-        Self::Memory(AbstractObjectInfo {
-            pointer_targets: BTreeSet::new(),
-            is_unique: true,
-            state: Some(ObjectState::Alive),
-            type_: Some(type_),
-            memory: MemRegion::new(address_bitsize),
-        })
+        AbstractObject(Arc::new(AbstractObjectInfo::new(type_, address_bitsize)))
     }
 
-    pub fn get_value(&self, offset: Bitvector, bitsize: BitSize) -> Data {
-        if let Self::Memory(object_info) = self {
-            object_info.get_value(offset, bitsize)
-        } else {
-            Data::new_top(bitsize)
-        }
-    }
-
+    /// Short-circuits the `AbstractObjectInfo::merge` function if `self==other`.
     pub fn merge(&self, other: &Self) -> Self {
-        match (self, other) {
-            (Self::Untracked(set1), Self::Untracked(set2)) => {
-                Self::Untracked(set1.union(set2).cloned().collect())
-            }
-            (Self::Untracked(untracked), Self::Memory(memory))
-            | (Self::Memory(memory), Self::Untracked(untracked)) => {
-                Self::Untracked(untracked.union(&memory.pointer_targets).cloned().collect())
-            }
-            (Self::Memory(left), Self::Memory(right)) => Self::Memory(left.merge(right)),
-        }
-    }
-
-    pub fn set_value(&mut self, value: Data, offset: BitvectorDomain) -> Result<(), Error> {
-        match self {
-            Self::Untracked(target_list) => {
-                if let Data::Pointer(ref pointer) = value {
-                    target_list.extend(
-                        pointer
-                            .iter_targets()
-                            .map(|(abstract_id, _offset)| abstract_id.clone()),
-                    )
-                };
-            }
-            Self::Memory(memory_object) => {
-                memory_object.set_value(value, offset)?;
-            }
-        };
-        Ok(())
-    }
-
-    pub fn get_all_possible_pointer_targets(&self) -> BTreeSet<AbstractIdentifier> {
-        match self {
-            Self::Untracked(targets) => targets.clone(),
-            Self::Memory(memory) => memory.get_all_possible_pointer_targets(),
-        }
-    }
-
-    /// For pointer values replace an abstract identifier with another one and add the offset_adjustment to the pointer offset.
-    /// This is needed to adjust stack pointer on call and return instructions.
-    pub fn replace_abstract_id(
-        &mut self,
-        old_id: &AbstractIdentifier,
-        new_id: &AbstractIdentifier,
-        offset_adjustment: &BitvectorDomain,
-    ) {
-        match self {
-            Self::Untracked(id_set) => {
-                if id_set.get(old_id).is_some() {
-                    id_set.remove(old_id);
-                    id_set.insert(new_id.clone());
-                }
-            }
-            Self::Memory(mem_object) => {
-                mem_object.replace_abstract_id(old_id, new_id, offset_adjustment);
-            }
-        }
-    }
-
-    pub fn get_referenced_ids(&self) -> BTreeSet<AbstractIdentifier> {
-        match self {
-            Self::Untracked(ids) => ids.clone(),
-            Self::Memory(object_info) => object_info.pointer_targets.clone(),
-        }
-    }
-
-    pub fn set_state(&mut self, new_state: Option<ObjectState>) {
-        if let Self::Memory(object_info) = self {
-            object_info.set_state(new_state)
-        }
-    }
-
-    /// Remove the provided IDs from all possible target lists, including all pointers.
-    pub fn remove_ids(&mut self, ids_to_remove: &BTreeSet<AbstractIdentifier>) {
-        match self {
-            Self::Untracked(targets) => {
-                let remaining_targets = targets.difference(ids_to_remove).cloned().collect();
-                *self = Self::Untracked(remaining_targets);
-            }
-            Self::Memory(mem) => {
-                mem.remove_ids(ids_to_remove);
-            }
-        }
-    }
-
-    #[cfg(test)]
-    pub fn get_state(&self) -> Option<ObjectState> {
-        match self {
-            Self::Untracked(_) => None,
-            Self::Memory(mem) => mem.state,
-        }
-    }
-}
-
-impl AbstractObject {
-    pub fn to_json_compact(&self) -> serde_json::Value {
-        match self {
-            Self::Untracked(_) => serde_json::Value::String("Untracked".into()),
-            Self::Memory(object_info) => {
-                let mut elements = Vec::new();
-                elements.push((
-                    "is_unique".to_string(),
-                    serde_json::Value::String(format!("{}", object_info.is_unique)),
-                ));
-                elements.push((
-                    "state".to_string(),
-                    serde_json::Value::String(format!("{:?}", object_info.state)),
-                ));
-                elements.push((
-                    "type".to_string(),
-                    serde_json::Value::String(format!("{:?}", object_info.type_)),
-                ));
-                let memory = object_info
-                    .memory
-                    .iter()
-                    .map(|(index, value)| (format!("{}", index), value.to_json_compact()));
-                elements.push((
-                    "memory".to_string(),
-                    serde_json::Value::Object(serde_json::Map::from_iter(memory)),
-                ));
-                serde_json::Value::Object(serde_json::Map::from_iter(elements.into_iter()))
-            }
+        if self == other {
+            self.clone()
+        } else {
+            AbstractObject(Arc::new(self.0.merge(other)))
         }
     }
 }
 
 /// The abstract object info contains all information that we track for an abstract object.
-///
-/// Some noteworthy properties:
-/// - The field *is_unique* indicates whether the object is the union of several memory objects
-/// - The *state* indicates whether the object is still alive or not.
-///   This can be used to detect "use after free" bugs.
-/// - Many fields are wrapped in Option<_> to indicate whether the property is known or not.
-/// - The field pointer_targets is a (coarse) upper approximation of all possible targets
-///   for which pointers may exist inside the memory region.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct AbstractObjectInfo {
+    /// An upper approximation of all possible targets for which pointers may exist inside the memory region.
     pointer_targets: BTreeSet<AbstractIdentifier>,
+    /// Tracks whether this may represent more than one actual memory object.
     pub is_unique: bool,
-    pub state: Option<ObjectState>,
+    /// Is the object alive or already destroyed
+    state: Option<ObjectState>,
+    /// Is the object a stack frame or a heap object
     type_: Option<ObjectType>,
+    /// The actual content of the memory object
     memory: MemRegion<Data>,
 }
 
 impl AbstractObjectInfo {
-    fn get_value(&self, offset: Bitvector, bitsize: BitSize) -> Data {
-        // TODO: This function does not check whether a data read is "sound", e.g. that the offset is inside the object.
-        // Make sure that this is checked somewhere!
+    /// Create a new abstract object with known object type and address bitsize
+    pub fn new(type_: ObjectType, address_bitsize: BitSize) -> AbstractObjectInfo {
+        AbstractObjectInfo {
+            pointer_targets: BTreeSet::new(),
+            is_unique: true,
+            state: Some(ObjectState::Alive),
+            type_: Some(type_),
+            memory: MemRegion::new(address_bitsize),
+        }
+    }
+
+    /// Read the value at the given offset of the given size (in bits, not bytes) inside the memory region.
+    pub fn get_value(&self, offset: Bitvector, bitsize: BitSize) -> Data {
         assert_eq!(bitsize % 8, 0);
         self.memory.get(offset, (bitsize / 8) as u64)
     }
 
-    fn set_value(&mut self, value: Data, offset: BitvectorDomain) -> Result<(), Error> {
+    /// Write a value at the given offset to the memory region.
+    ///
+    /// If the abstract object is not unique (i.e. may represent more than one actual object),
+    /// merge the old value at the given offset with the new value.
+    pub fn set_value(&mut self, value: Data, offset: &BitvectorDomain) -> Result<(), Error> {
         if let Data::Pointer(ref pointer) = value {
-            self.pointer_targets.extend(
-                pointer
-                    .iter_targets()
-                    .map(|(abstract_id, _offset)| abstract_id.clone()),
-            )
+            self.pointer_targets.extend(pointer.ids().cloned());
         };
         if let BitvectorDomain::Value(ref concrete_offset) = offset {
             if self.is_unique {
@@ -211,16 +93,25 @@ impl AbstractObjectInfo {
         Ok(())
     }
 
-    fn get_all_possible_pointer_targets(&self) -> BTreeSet<AbstractIdentifier> {
-        let mut targets = self.pointer_targets.clone();
-        for elem in self.memory.values() {
-            if let Data::Pointer(pointer) = elem {
-                for (id, _) in pointer.iter_targets() {
-                    targets.insert(id.clone());
-                }
-            };
+    /// Merge `value` at position `offset` with the value currently saved at that position.
+    pub fn merge_value(&mut self, value: Data, offset: &BitvectorDomain) {
+        if let Data::Pointer(ref pointer) = value {
+            self.pointer_targets.extend(pointer.ids().cloned());
+        };
+        if let BitvectorDomain::Value(ref concrete_offset) = offset {
+            let merged_value = self
+                .memory
+                .get(concrete_offset.clone(), (value.bitsize() / 8) as u64)
+                .merge(&value);
+            self.memory.add(merged_value, concrete_offset.clone());
+        } else {
+            self.memory = MemRegion::new(self.memory.get_address_bitsize());
         }
-        targets
+    }
+
+    /// Get all abstract IDs that the object may contain pointers to.
+    pub fn get_referenced_ids(&self) -> &BTreeSet<AbstractIdentifier> {
+        &self.pointer_targets
     }
 
     /// For pointer values replace an abstract identifier with another one and add the offset_adjustment to the pointer offsets.
@@ -241,6 +132,7 @@ impl AbstractObjectInfo {
         }
     }
 
+    /// If `self.is_unique==true`, set the state of the object. Else merge the new state with the old.
     pub fn set_state(&mut self, new_state: Option<ObjectState>) {
         if self.is_unique {
             self.state = new_state;
@@ -258,25 +150,68 @@ impl AbstractObjectInfo {
             .cloned()
             .collect();
         for value in self.memory.values_mut() {
-            value.remove_ids(ids_to_remove); // TODO: This may leave *Top* values in the memory object. Remove them.
+            value.remove_ids(ids_to_remove);
         }
-        self.memory.clear_top_values()
+        self.memory.clear_top_values(); // In case the previous operation left *Top* values in the memory struct.
     }
-}
 
-impl HasTop for AbstractObjectInfo {
-    fn top(&self) -> Self {
-        AbstractObjectInfo {
-            pointer_targets: BTreeSet::new(),
-            is_unique: false,
-            state: None,
-            type_: None,
-            memory: MemRegion::new(self.memory.get_address_bitsize()),
+    /// Get the state of the memory object.
+    pub fn get_state(&self) -> Option<ObjectState> {
+        self.state
+    }
+
+    /// Invalidates all memory and adds the `additional_targets` to the pointer targets.
+    /// Represents the effect of unknown write instructions to the object
+    /// which may include writing pointers to targets from the `additional_targets` set to the object.
+    pub fn assume_arbitrary_writes(&mut self, additional_targets: &BTreeSet<AbstractIdentifier>) {
+        self.memory = MemRegion::new(self.memory.get_address_bitsize());
+        self.pointer_targets
+            .extend(additional_targets.iter().cloned());
+    }
+
+    /// Mark the memory object as freed.
+    /// Returns an error if a possible double free is detected
+    /// or the memory object may not be a heap object.
+    pub fn mark_as_freed(&mut self) -> Result<(), Error> {
+        if self.type_ != Some(ObjectType::Heap) {
+            self.set_state(Some(ObjectState::Dangling));
+            return Err(anyhow!("Free operation on possibly non-heap memory object"));
+        }
+        match (self.is_unique, self.state) {
+            (true, Some(ObjectState::Alive)) => {
+                self.state = Some(ObjectState::Dangling);
+                Ok(())
+            }
+            (true, _) | (false, Some(ObjectState::Dangling)) => {
+                self.state = Some(ObjectState::Dangling);
+                Err(anyhow!("Object may already have been freed"))
+            }
+            (false, _) => {
+                self.state = None;
+                Ok(())
+            }
+        }
+    }
+
+    /// Mark the memory object as possibly (but not definitely) freed.
+    /// Returns an error if the object was definitely freed before
+    /// or if the object may not be a heap object.
+    pub fn mark_as_maybe_freed(&mut self) -> Result<(), Error> {
+        if self.type_ != Some(ObjectType::Heap) {
+            self.set_state(Some(ObjectState::Dangling));
+            return Err(anyhow!("Free operation on possibly non-heap memory object"));
+        }
+        if self.state != Some(ObjectState::Dangling) {
+            self.state = None;
+            Ok(())
+        } else {
+            Err(anyhow!("Object may already have been freed"))
         }
     }
 }
 
 impl AbstractDomain for AbstractObjectInfo {
+    /// Merge two abstract objects
     fn merge(&self, other: &Self) -> Self {
         AbstractObjectInfo {
             pointer_targets: self
@@ -297,6 +232,36 @@ impl AbstractDomain for AbstractObjectInfo {
     }
 }
 
+impl AbstractObjectInfo {
+    /// Get a more compact json-representation of the abstract object.
+    /// Intended for pretty printing, not useable for serialization/deserialization.
+    pub fn to_json_compact(&self) -> serde_json::Value {
+        let mut elements = Vec::new();
+        elements.push((
+            "is_unique".to_string(),
+            serde_json::Value::String(format!("{}", self.is_unique)),
+        ));
+        elements.push((
+            "state".to_string(),
+            serde_json::Value::String(format!("{:?}", self.state)),
+        ));
+        elements.push((
+            "type".to_string(),
+            serde_json::Value::String(format!("{:?}", self.type_)),
+        ));
+        let memory = self
+            .memory
+            .iter()
+            .map(|(index, value)| (format!("{}", index), value.to_json_compact()));
+        elements.push((
+            "memory".to_string(),
+            serde_json::Value::Object(serde_json::Map::from_iter(memory)),
+        ));
+        serde_json::Value::Object(serde_json::Map::from_iter(elements.into_iter()))
+    }
+}
+
+/// Helper function for merging two `Option<T>` values (merging to `None` if they are not equal).
 fn same_or_none<T: Eq + Clone>(left: &Option<T>, right: &Option<T>) -> Option<T> {
     if left.as_ref()? == right.as_ref()? {
         Some(left.as_ref().unwrap().clone())
@@ -306,7 +271,6 @@ fn same_or_none<T: Eq + Clone>(left: &Option<T>, right: &Option<T>) -> Option<T>
 }
 
 /// An object is either a stack or a heap object.
-/// TODO: add a type for tracking for global variables!
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy, PartialOrd, Ord)]
 pub enum ObjectType {
     Stack,
@@ -332,7 +296,7 @@ mod tests {
             type_: Some(ObjectType::Heap),
             memory: MemRegion::new(64),
         };
-        AbstractObject::Memory(obj_info)
+        AbstractObject(Arc::new(obj_info))
     }
 
     fn new_data(number: i64) -> Data {
@@ -343,26 +307,38 @@ mod tests {
         BitvectorDomain::Value(Bitvector::from_i64(number))
     }
 
+    fn new_id(tid: &str, reg_name: &str) -> AbstractIdentifier {
+        AbstractIdentifier::new(
+            Tid::new(tid),
+            AbstractLocation::Register(reg_name.into(), 64),
+        )
+    }
+
     #[test]
     fn abstract_object() {
         let mut object = new_abstract_object();
         let three = new_data(3);
         let offset = bv(-15);
-        object.set_value(three, offset).unwrap();
+        object.set_value(three, &offset).unwrap();
         assert_eq!(
             object.get_value(Bitvector::from_i64(-16), 64),
             Data::Top(64)
         );
         assert_eq!(object.get_value(Bitvector::from_i64(-15), 64), new_data(3));
-        object.set_value(new_data(4), bv(-12)).unwrap();
+        object.set_value(new_data(4), &bv(-12)).unwrap();
         assert_eq!(
             object.get_value(Bitvector::from_i64(-15), 64),
             Data::Top(64)
         );
+        object.merge_value(new_data(5), &bv(-12));
+        assert_eq!(
+            object.get_value(Bitvector::from_i64(-12), 64),
+            Data::Value(BitvectorDomain::new_top(64))
+        );
 
         let mut other_object = new_abstract_object();
-        object.set_value(new_data(0), bv(0)).unwrap();
-        other_object.set_value(new_data(0), bv(0)).unwrap();
+        object.set_value(new_data(0), &bv(0)).unwrap();
+        other_object.set_value(new_data(0), &bv(0)).unwrap();
         let merged_object = object.merge(&other_object);
         assert_eq!(
             merged_object.get_value(Bitvector::from_i64(-12), 64),
@@ -371,6 +347,69 @@ mod tests {
         assert_eq!(
             merged_object.get_value(Bitvector::from_i64(0), 64),
             new_data(0)
+        );
+    }
+
+    #[test]
+    fn replace_id() {
+        use std::collections::BTreeMap;
+        let mut object = new_abstract_object();
+        let mut target_map = BTreeMap::new();
+        target_map.insert(new_id("time_1", "RAX"), bv(20));
+        target_map.insert(new_id("time_234", "RAX"), bv(30));
+        target_map.insert(new_id("time_1", "RBX"), bv(40));
+        let pointer = PointerDomain::with_targets(target_map.clone());
+        object.set_value(pointer.into(), &bv(-15)).unwrap();
+        assert_eq!(object.get_referenced_ids().len(), 3);
+
+        object.replace_abstract_id(
+            &new_id("time_1", "RAX"),
+            &new_id("time_234", "RAX"),
+            &bv(10),
+        );
+        target_map.remove(&new_id("time_1", "RAX"));
+        let modified_pointer = PointerDomain::with_targets(target_map);
+        assert_eq!(
+            object.get_value(Bitvector::from_i64(-15), 64),
+            modified_pointer.into()
+        );
+
+        object.replace_abstract_id(
+            &new_id("time_1", "RBX"),
+            &new_id("time_234", "RBX"),
+            &bv(10),
+        );
+        let mut target_map = BTreeMap::new();
+        target_map.insert(new_id("time_234", "RAX"), bv(30));
+        target_map.insert(new_id("time_234", "RBX"), bv(50));
+        let modified_pointer = PointerDomain::with_targets(target_map);
+        assert_eq!(
+            object.get_value(Bitvector::from_i64(-15), 64),
+            modified_pointer.into()
+        );
+    }
+
+    #[test]
+    fn remove_ids() {
+        use std::collections::BTreeMap;
+        let mut object = new_abstract_object();
+        let mut target_map = BTreeMap::new();
+        target_map.insert(new_id("time_1", "RAX"), bv(20));
+        target_map.insert(new_id("time_234", "RAX"), bv(30));
+        target_map.insert(new_id("time_1", "RBX"), bv(40));
+        let pointer = PointerDomain::with_targets(target_map.clone());
+        object.set_value(pointer.into(), &bv(-15)).unwrap();
+        assert_eq!(object.get_referenced_ids().len(), 3);
+
+        let ids_to_remove = vec![new_id("time_1", "RAX"), new_id("time_23", "RBX")]
+            .into_iter()
+            .collect();
+        object.remove_ids(&ids_to_remove);
+        assert_eq!(
+            object.get_referenced_ids(),
+            &vec![new_id("time_234", "RAX"), new_id("time_1", "RBX")]
+                .into_iter()
+                .collect()
         );
     }
 }

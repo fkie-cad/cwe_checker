@@ -1,3 +1,16 @@
+//! The pointer inference analysis.
+//!
+//! The goal of the pointer inference analysis is to keep track of all memory objects and pointers
+//! that the program knows about at specific program points during execution.
+//! Possible memory management errors, like access to memory that may already have been freed,
+//! are reported to the user.
+//!
+//! Keep in mind that the analysis operates on a best-effort basis.
+//! In cases where we cannot know
+//! whether an error is due to an error in the memory management of the program under analysis
+//! or due to inexactness of the pointer inference analysis itself,
+//! we try to treat is as the more likely (but not necessarily true) case of the two.
+
 use super::interprocedural_fixpoint::{Computation, NodeValue};
 use crate::abstract_domain::{BitvectorDomain, DataDomain};
 use crate::analysis::graph::{Graph, Node};
@@ -16,15 +29,20 @@ mod state;
 use context::Context;
 use state::State;
 
+/// The version number of the analysis.
+const VERSION: &str = "0.1";
+
 /// The abstract domain type for representing register values.
 type Data = DataDomain<BitvectorDomain>;
 
+/// A wrapper struct for the pointer inference computation object.
 pub struct PointerInference<'a> {
     computation: Computation<'a, Context<'a>>,
     log_collector: crossbeam_channel::Sender<LogMessage>,
 }
 
 impl<'a> PointerInference<'a> {
+    /// Generate a new pointer inference compuation for a project.
     pub fn new(
         project: &'a Project,
         cwe_sender: crossbeam_channel::Sender<CweWarning>,
@@ -90,12 +108,14 @@ impl<'a> PointerInference<'a> {
         }
     }
 
+    /// Compute the fixpoint of the pointer inference analysis.
+    /// Has a `max_steps` bound for the fixpoint algorithm to prevent infinite loops.
     pub fn compute(&mut self) {
         self.computation.compute_with_max_steps(100); // TODO: make max_steps configurable!
     }
 
+    /// Print results serialized as YAML to stdout
     pub fn print_yaml(&self) {
-        // Print results serialized as YAML to stdout
         let graph = self.computation.get_graph();
         for (node_index, value) in self.computation.node_values().iter() {
             let node = graph.node_weight(*node_index).unwrap();
@@ -111,6 +131,9 @@ impl<'a> PointerInference<'a> {
         }
     }
 
+    /// Generate a compacted json representation of the results.
+    /// Note that this output cannot be used for serialization/deserialization,
+    /// but is only intended for user output.
     pub fn generate_compact_json(&self) -> serde_json::Value {
         let graph = self.computation.get_graph();
         let mut json_nodes = serde_json::Map::new();
@@ -136,7 +159,7 @@ impl<'a> PointerInference<'a> {
     /// Since indirect jumps and calls are not handled yet (TODO: change that),
     /// the analysis may miss a *lot* of code in some cases.
     /// To remedy this somewhat,
-    /// we mark all function starts, that are also roots in the control flow graph,
+    /// we mark all function starts, that are also roots in the control flow graph
     /// and do not have a state assigned to them yet, as additional entry points.
     ///
     /// If `only_cfg_roots` is set to `false`, then all function starts without a state are marked as roots.
@@ -192,6 +215,8 @@ impl<'a> PointerInference<'a> {
         }
     }
 
+    /// Print the number of blocks that have a state associated to them.
+    /// Intended for debug purposes.
     fn count_blocks_with_state(&self) {
         let graph = self.computation.get_graph();
         let mut stateful_blocks: i64 = 0;
@@ -220,6 +245,8 @@ impl<'a> PointerInference<'a> {
     }
 }
 
+/// Generate and execute the pointer inference analysis.
+/// Returns a vector of all found CWE warnings and a vector of all log messages generated during analysis.
 pub fn run(project: &Project, print_debug: bool) -> (Vec<CweWarning>, Vec<String>) {
     let (cwe_sender, cwe_receiver) = crossbeam_channel::unbounded();
     let (log_sender, log_receiver) = crossbeam_channel::unbounded();
@@ -256,6 +283,7 @@ pub fn run(project: &Project, print_debug: bool) -> (Vec<CweWarning>, Vec<String
     )
 }
 
+/// Collect CWE warnings from the receiver until the channel is closed. Then return them.
 fn collect_cwe_warnings(receiver: crossbeam_channel::Receiver<CweWarning>) -> Vec<CweWarning> {
     let mut collected_warnings = HashMap::new();
     while let Ok(warning) = receiver.recv() {
@@ -272,6 +300,7 @@ fn collect_cwe_warnings(receiver: crossbeam_channel::Receiver<CweWarning>) -> Ve
         .collect()
 }
 
+/// Collect log messages from the receiver until the channel is closed. Then return them.
 fn collect_logs(receiver: crossbeam_channel::Receiver<LogMessage>) -> Vec<String> {
     let mut logs_with_address = HashMap::new();
     let mut general_logs = Vec::new();

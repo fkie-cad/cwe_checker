@@ -108,9 +108,9 @@ impl<T: RegisterDomain> PointerDomain<T> {
         result
     }
 
-    /// Get an iterator over all possible abstract targets (together with the offset in the target) the pointer may point to.
-    pub fn iter_targets(&self) -> std::collections::btree_map::Iter<AbstractIdentifier, T> {
-        self.0.iter()
+    /// Get all possible abstract targets (together with the offset in the target) the pointer may point to.
+    pub fn targets(&self) -> &BTreeMap<AbstractIdentifier, T> {
+        &self.0
     }
 
     /// Get an iterator over all abstract IDs that the pointer may target.
