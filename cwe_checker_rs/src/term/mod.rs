@@ -92,8 +92,48 @@ pub struct Project {
 }
 
 impl Project {
+    /// Get the bitsize of pointer values for the architecture of the project.
     pub fn get_pointer_bitsize(&self) -> BitSize {
         self.stack_pointer_register.bitsize().unwrap()
+    }
+
+    /// Substitute all let-binding-expressions in the project with equivalent expressions,
+    /// that do not contain the let-bindings.
+    /// This way subsequent analyses do not have to handle expressions containing let-bindings.
+    pub fn replace_let_bindings(&mut self) {
+        for sub in self.program.term.subs.iter_mut() {
+            for blk in sub.term.blocks.iter_mut() {
+                for def in blk.term.defs.iter_mut() {
+                    def.term.rhs.replace_let_bindings();
+                }
+                for jmp in blk.term.jmps.iter_mut() {
+                    if let Some(ref mut condition) = jmp.term.condition {
+                        condition.replace_let_bindings();
+                    }
+                    match &mut jmp.term.kind {
+                        JmpKind::Call(call) => {
+                            call.target.replace_let_bindings();
+                            if let Some(ref mut return_target) = call.return_ {
+                                return_target.replace_let_bindings();
+                            }
+                        }
+                        JmpKind::Goto(label) | JmpKind::Return(label) => {
+                            label.replace_let_bindings()
+                        }
+                        JmpKind::Interrupt { .. } => (),
+                    }
+                }
+            }
+        }
+    }
+}
+
+impl Label {
+    /// Replace let-bindings inside the expression for `Indirect` labels.
+    fn replace_let_bindings(&mut self) {
+        if let Label::Indirect(expression) = self {
+            expression.replace_let_bindings();
+        }
     }
 }
 
