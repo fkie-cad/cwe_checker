@@ -63,6 +63,134 @@ pub enum Expression {
     },
 }
 
+impl Expression {
+    /// Resolve all let-bindings inside an expression to create an equivalent expression without usage of let-bindings.
+    pub fn replace_let_bindings(&mut self) {
+        use Expression::*;
+        match self {
+            Var(_) | Const(_) | Unknown { .. } => (),
+            Load {
+                memory, address, ..
+            } => {
+                memory.replace_let_bindings();
+                address.replace_let_bindings();
+            }
+            Store {
+                memory,
+                address,
+                value,
+                ..
+            } => {
+                memory.replace_let_bindings();
+                address.replace_let_bindings();
+                value.replace_let_bindings();
+            }
+            BinOp { op: _, lhs, rhs } => {
+                lhs.replace_let_bindings();
+                rhs.replace_let_bindings();
+            }
+            UnOp { op: _, arg } => arg.replace_let_bindings(),
+            Cast {
+                kind: _,
+                width: _,
+                arg,
+            } => arg.replace_let_bindings(),
+            Let {
+                var,
+                bound_exp,
+                body_exp,
+            } => {
+                let to_replace = Expression::Var(var.clone());
+                body_exp.replace_let_bindings();
+                body_exp.substitute(&to_replace, bound_exp);
+                *self = *body_exp.clone();
+            }
+            IfThenElse {
+                condition,
+                true_exp,
+                false_exp,
+            } => {
+                condition.replace_let_bindings();
+                true_exp.replace_let_bindings();
+                false_exp.replace_let_bindings();
+            }
+            Extract {
+                low_bit: _,
+                high_bit: _,
+                arg,
+            } => arg.replace_let_bindings(),
+            Concat { left, right } => {
+                left.replace_let_bindings();
+                right.replace_let_bindings();
+            }
+        }
+    }
+
+    /// Substitutes all subexpressions equal to `to_replace` with the expression `replace_with`.
+    fn substitute(&mut self, to_replace: &Expression, replace_with: &Expression) {
+        use Expression::*;
+        if self == to_replace {
+            *self = replace_with.clone();
+        } else {
+            match self {
+                Var(_) | Const(_) | Unknown { .. } => (),
+                Load {
+                    memory, address, ..
+                } => {
+                    memory.substitute(to_replace, replace_with);
+                    address.substitute(to_replace, replace_with);
+                }
+                Store {
+                    memory,
+                    address,
+                    value,
+                    ..
+                } => {
+                    memory.substitute(to_replace, replace_with);
+                    address.substitute(to_replace, replace_with);
+                    value.substitute(to_replace, replace_with);
+                }
+                BinOp { op: _, lhs, rhs } => {
+                    lhs.substitute(to_replace, replace_with);
+                    rhs.substitute(to_replace, replace_with);
+                }
+                UnOp { op: _, arg } => arg.substitute(to_replace, replace_with),
+                Cast {
+                    kind: _,
+                    width: _,
+                    arg,
+                } => arg.substitute(to_replace, replace_with),
+                Let {
+                    var: _,
+                    bound_exp,
+                    body_exp,
+                } => {
+                    bound_exp.substitute(to_replace, replace_with);
+                    body_exp.substitute(to_replace, replace_with);
+                }
+                IfThenElse {
+                    condition,
+                    true_exp,
+                    false_exp,
+                } => {
+                    condition.substitute(to_replace, replace_with);
+                    true_exp.substitute(to_replace, replace_with);
+                    false_exp.substitute(to_replace, replace_with);
+                }
+                Extract {
+                    low_bit: _,
+                    high_bit: _,
+                    arg,
+                } => arg.substitute(to_replace, replace_with),
+                Concat { left, right } => {
+                    left.substitute(to_replace, replace_with);
+                    right.substitute(to_replace, replace_with);
+                }
+            }
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum CastType {
     UNSIGNED,
@@ -110,6 +238,14 @@ pub enum Endianness {
 mod tests {
     use super::*;
 
+    fn register(name: &str) -> Variable {
+        Variable {
+            name: name.into(),
+            type_: Type::Immediate(64),
+            is_temp: false,
+        }
+    }
+
     #[test]
     fn variant_deserialization() {
         let string = "\"UNSIGNED\"";
@@ -139,5 +275,26 @@ mod tests {
         };
         println!("{}", serde_json::to_string(&exp).unwrap());
         assert_eq!(exp, serde_json::from_str(string).unwrap())
+    }
+
+    #[test]
+    fn replace_let_bindings() {
+        let mut source_exp = Expression::Let {
+            var: register("x"),
+            bound_exp: Box::new(Expression::Const(Bitvector::from_u64(12))),
+            body_exp: Box::new(Expression::BinOp {
+                op: BinOpType::PLUS,
+                lhs: Box::new(Expression::Var(register("x"))),
+                rhs: Box::new(Expression::Const(Bitvector::from_u64(42))),
+            }),
+        };
+        let target_exp = Expression::BinOp {
+            op: BinOpType::PLUS,
+            lhs: Box::new(Expression::Const(Bitvector::from_u64(12))),
+            rhs: Box::new(Expression::Const(Bitvector::from_u64(42))),
+        };
+
+        source_exp.replace_let_bindings();
+        assert_eq!(source_exp, target_exp);
     }
 }
