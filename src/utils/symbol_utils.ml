@@ -36,26 +36,12 @@ let call_finder_run = ref false
 
 (** Parse a line from the dyn-syms output table of objdump. Return the name of a symbol if the symbol is an extern function name. *)
 let parse_dyn_sym_line (line : string) : string option =
-  let line = ref (String.strip line) in
-  let str_list = ref [] in
-  while Option.is_some (String.rsplit2 !line ~on:' ') do
-    let (left, right) = Option.value_exn (String.rsplit2 !line ~on:' ') in
-    line := String.strip left;
-    str_list := right :: !str_list;
-  done;
-  str_list := !line :: !str_list;
-  match !str_list with
-  | value :: func1 :: func2 :: _ -> begin
-      match ( String.strip ~drop:(fun x -> x = '0') value ) with
-      | "" -> begin
-          if (String.equal func1 "DF" || String.equal func2 "DF") then (
-            List.last !str_list
-          )
-          else None
-        end
-      | _ -> None (* The symbol has a nonzero value, so we assume that it is not an extern function symbol. *)
-    end
-  | _ -> None
+  let columns = String.split_on_chars ~on:[ ' ' ; '\t' ; '\n' ; '\r' ] line
+                |> List.filter ~f:(fun x -> x <> "") in
+  (* Check whether the symbol is a function --> DF and if it is referenced in the file, but defined outside it --> *UND* *)
+  match ((Stdlib.List.mem "DF" columns) && (Stdlib.List.mem "*UND*" columns)) with
+  | true -> List.last columns
+  | false -> None
 
 
 let parse_dyn_syms (project : Project.t) : String.Set.t =
