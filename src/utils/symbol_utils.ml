@@ -40,7 +40,7 @@ let parse_dyn_sym_line (line : string) : string option =
                 |> List.filter ~f:(fun x -> x <> "") in
   (* Check whether the symbol is a function --> DF and if it is referenced in the file, but defined outside it --> *UND* *)
   match ((Stdlib.List.mem "DF" columns) && (Stdlib.List.mem "*UND*" columns)) with
-  | true -> Some(Array.last (Array.of_list columns))
+  | true -> List.last columns
   | false -> None
 
 
