@@ -8,17 +8,13 @@ use std::collections::{BTreeMap, BTreeSet};
 
 /// The list of all known abstract objects.
 ///
-/// Each abstract object is unique in the sense that each abstract identifier can only point to one abstract object.
+/// Each abstract object is unique in the sense that there is exactly one abstract identifier pointing to it.
 /// However, an abstract object itself can be marked as non-unique
 /// to indicate that it may represent more than one actual memory object.
-/// Also, several abstract identifiers may point to the same abstract object.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct AbstractObjectList {
     /// The abstract objects
-    objects: Vec<AbstractObject>,
-    /// A map from an abstract identifier to the index of the object in the `self.objects` array
-    /// and the offset (as `BitvectorDomain`) inside the object that the identifier is pointing to.
-    ids: BTreeMap<AbstractIdentifier, (usize, BitvectorDomain)>,
+    objects: BTreeMap<AbstractIdentifier, (AbstractObject, BitvectorDomain)>,
 }
 
 impl AbstractObjectList {
@@ -28,15 +24,16 @@ impl AbstractObjectList {
         stack_id: AbstractIdentifier,
         address_bitsize: BitSize,
     ) -> AbstractObjectList {
-        let mut objects = Vec::new();
+        let mut objects = BTreeMap::new();
         let stack_object = AbstractObject::new(ObjectType::Stack, address_bitsize);
-        objects.push(stack_object);
-        let mut ids = BTreeMap::new();
-        ids.insert(
+        objects.insert(
             stack_id,
-            (0, Bitvector::zero((address_bitsize as usize).into()).into()),
+            (
+                stack_object,
+                Bitvector::zero((address_bitsize as usize).into()).into(),
+            ),
         );
-        AbstractObjectList { objects, ids }
+        AbstractObjectList { objects }
     }
 
     /// Check the state of a memory object at a given address.
@@ -50,11 +47,11 @@ impl AbstractObjectList {
             Data::Value(_) | Data::Top(_) => (),
             Data::Pointer(pointer) => {
                 for id in pointer.ids() {
-                    let (object_index, _offset_id) = self.ids.get(id).unwrap();
-                    match (report_none_states, self.objects[*object_index].get_state()) {
+                    let (object, _offset_id) = self.objects.get(id).unwrap();
+                    match (report_none_states, object.get_state()) {
                         (_, Some(ObjectState::Dangling)) => return true,
                         (true, None) => {
-                            if self.objects[*object_index].is_unique {
+                            if object.is_unique {
                                 return true;
                             }
                         }
@@ -63,6 +60,7 @@ impl AbstractObjectList {
                 }
             }
         }
+        // No dangling pointer found
         false
     }
 
@@ -77,14 +75,10 @@ impl AbstractObjectList {
             Data::Pointer(pointer) => {
                 let mut merged_value: Option<Data> = None;
                 for (id, offset_pointer_domain) in pointer.targets() {
-                    let (abstract_object_index, offset_identifier) = self.ids.get(id).unwrap();
+                    let (object, offset_identifier) = self.objects.get(id).unwrap();
                     let offset = offset_pointer_domain.clone() + offset_identifier.clone();
                     if let BitvectorDomain::Value(concrete_offset) = offset {
-                        let value = self
-                            .objects
-                            .get(*abstract_object_index)
-                            .unwrap()
-                            .get_value(concrete_offset, size);
+                        let value = object.get_value(concrete_offset, size);
                         merged_value = match merged_value {
                             Some(accum) => Some(accum.merge(&value)),
                             None => Some(value),
@@ -108,35 +102,23 @@ impl AbstractObjectList {
         pointer: PointerDomain<BitvectorDomain>,
         value: Data,
     ) -> Result<(), Error> {
-        let mut target_object_set: BTreeSet<usize> = BTreeSet::new();
-        for id in pointer.ids() {
-            target_object_set.insert(self.ids.get(id).unwrap().0);
-        }
-        assert!(!target_object_set.is_empty());
-        if target_object_set.len() == 1 {
-            let mut target_offset: Option<BitvectorDomain> = None;
-            for (id, pointer_offset) in pointer.targets() {
-                let adjusted_offset = pointer_offset.clone() + self.ids.get(id).unwrap().1.clone();
-                target_offset = match target_offset {
-                    Some(offset) => Some(offset.merge(&adjusted_offset)),
-                    None => Some(adjusted_offset),
-                }
-            }
-            let object = self
-                .objects
-                .get_mut(*target_object_set.iter().next().unwrap())
-                .unwrap();
-            object.set_value(value, &target_offset.unwrap())?;
+        let targets = pointer.targets();
+        assert!(!targets.is_empty());
+        if targets.len() == 1 {
+            let (id, pointer_offset) = targets.iter().next().unwrap();
+            let (object, id_offset) = self.objects.get_mut(id).unwrap();
+            let adjusted_offset = pointer_offset.clone() + id_offset.clone();
+            object.set_value(value, &adjusted_offset)
         } else {
             // There is more than one object that the pointer may write to.
             // We merge-write to all possible targets
-            for (id, offset) in pointer.targets() {
-                let (object_index, object_offset) = self.ids.get(id).unwrap();
+            for (id, offset) in targets {
+                let (object, object_offset) = self.objects.get_mut(id).unwrap();
                 let adjusted_offset = offset.clone() + object_offset.clone();
-                self.objects[*object_index].merge_value(value.clone(), &adjusted_offset);
+                object.merge_value(value.clone(), &adjusted_offset);
             }
+            Ok(())
         }
-        Ok(())
     }
 
     /// Replace one abstract identifier with another one. Adjust offsets of all pointers accordingly.
@@ -153,20 +135,18 @@ impl AbstractObjectList {
         offset_adjustment: &BitvectorDomain,
     ) {
         let negative_offset = -offset_adjustment.clone();
-        for object in self.objects.iter_mut() {
+        for (object, _) in self.objects.values_mut() {
             object.replace_abstract_id(old_id, new_id, &negative_offset);
         }
-        if let Some((index, offset)) = self.ids.get(old_id) {
-            let (index, offset) = (*index, offset.clone());
-            let new_offset = offset + offset_adjustment.clone();
-            self.ids.remove(old_id);
-            self.ids.insert(new_id.clone(), (index, new_offset));
+        if let Some((object, old_offset)) = self.objects.remove(old_id) {
+            let new_offset = old_offset + offset_adjustment.clone();
+            self.objects.insert(new_id.clone(), (object, new_offset));
         }
     }
 
-    /// Remove the pointer from the object_id to the corresponding memory object.
-    pub fn remove_object_pointer(&mut self, object_id: &AbstractIdentifier) {
-        self.ids.remove(object_id);
+    /// Remove the memory object that `object_id` points to from the object list.
+    pub fn remove_object(&mut self, object_id: &AbstractIdentifier) {
+        self.objects.remove(object_id);
     }
 
     /// Add a new abstract object to the object list
@@ -181,48 +161,40 @@ impl AbstractObjectList {
         address_bitsize: BitSize,
     ) {
         let new_object = AbstractObject::new(type_, address_bitsize);
-
-        if let Some((index, offset)) = self.ids.get(&object_id) {
-            // If the identifier already exists, we have to assume that more than one object may be referred by this identifier.
-            let object = &mut self.objects[*index];
+        if let Some((object, offset)) = self.objects.get_mut(&object_id) {
+            // If the identifier already exists, we have to assume that more than one object may be referenced by this identifier.
             object.is_unique = false;
             *object = object.merge(&new_object);
-            let index = *index;
-            let merged_offset = offset.merge(&initial_offset);
-            self.ids.insert(object_id, (index, merged_offset));
+            *offset = offset.merge(&initial_offset);
         } else {
-            let index = self.objects.len();
-            self.objects.push(new_object);
-            self.ids.insert(object_id, (index, initial_offset));
+            self.objects.insert(object_id, (new_object, initial_offset));
         }
     }
 
     /// Return all IDs that get referenced by the memory object pointed to by the given ID.
     pub fn get_referenced_ids(&self, id: &AbstractIdentifier) -> &BTreeSet<AbstractIdentifier> {
-        if let Some((index, _offset)) = self.ids.get(id) {
-            self.objects[*index].get_referenced_ids()
+        if let Some((object, _offset)) = self.objects.get(id) {
+            object.get_referenced_ids()
         } else {
             panic!("Abstract ID not associated to an object")
         }
     }
 
     /// For abstract IDs not contained in the provided set of IDs
-    /// remove the mapping from the ID to the corresponding abstract object.
-    /// Then remove all objects not longer referenced by any ID.
+    /// remove the corresponding abstract objects.
     ///
     /// This function does not remove any pointer targets in the contained abstract objects.
-    pub fn remove_unused_ids(&mut self, ids_to_keep: &BTreeSet<AbstractIdentifier>) {
-        let all_ids: BTreeSet<AbstractIdentifier> = self.ids.keys().cloned().collect();
+    pub fn remove_unused_objects(&mut self, ids_to_keep: &BTreeSet<AbstractIdentifier>) {
+        let all_ids: BTreeSet<AbstractIdentifier> = self.objects.keys().cloned().collect();
         let ids_to_remove = all_ids.difference(ids_to_keep);
         for id in ids_to_remove {
-            self.ids.remove(id);
+            self.objects.remove(id);
         }
-        self.remove_unreferenced_objects();
     }
 
     /// Get all object IDs.
     pub fn get_all_object_ids(&self) -> BTreeSet<AbstractIdentifier> {
-        self.ids.keys().cloned().collect()
+        self.objects.keys().cloned().collect()
     }
 
     /// Mark a memory object as already freed (i.e. pointers to it are dangling).
@@ -237,12 +209,12 @@ impl AbstractObjectList {
         let mut possible_double_free_ids = Vec::new();
         if ids.len() > 1 {
             for id in ids {
-                if let Err(error) = self.objects[self.ids[&id].0].mark_as_maybe_freed() {
+                if let Err(error) = self.objects.get_mut(&id).unwrap().0.mark_as_maybe_freed() {
                     possible_double_free_ids.push((id.clone(), error));
                 }
             }
         } else if let Some(id) = ids.iter().next() {
-            if let Err(error) = self.objects[self.ids[&id].0].mark_as_freed() {
+            if let Err(error) = self.objects.get_mut(&id).unwrap().0.mark_as_freed() {
                 possible_double_free_ids.push((id.clone(), error));
             }
         } else {
@@ -268,8 +240,11 @@ impl AbstractObjectList {
         object_id: &AbstractIdentifier,
         new_possible_reference_targets: &BTreeSet<AbstractIdentifier>,
     ) {
-        let object_index = self.ids[object_id].0;
-        self.objects[object_index].assume_arbitrary_writes(new_possible_reference_targets);
+        self.objects
+            .get_mut(object_id)
+            .unwrap()
+            .0
+            .assume_arbitrary_writes(new_possible_reference_targets);
     }
 
     /// Get the number of objects that are currently tracked.
@@ -279,71 +254,25 @@ impl AbstractObjectList {
     }
 
     /// Append those objects from another object list, whose abstract IDs are not known to self.
-    /// We also add all abstract IDs pointing to the added objects to the ID map.
     pub fn append_unknown_objects(&mut self, other_object_list: &AbstractObjectList) {
-        let mut objects_already_known = vec![false; other_object_list.objects.len()];
-        for (id, (index, _offset)) in other_object_list.ids.iter() {
-            if self.ids.get(id).is_some() {
-                objects_already_known[*index] = true;
-            }
-        }
-        let mut old_to_new_index_map: BTreeMap<usize, usize> = BTreeMap::new();
-        for (old_index, old_object) in other_object_list.objects.iter().enumerate() {
-            if !objects_already_known[old_index] {
-                old_to_new_index_map.insert(old_index, self.objects.len());
-                self.objects.push(old_object.clone());
-            }
-        }
-        for (id, (old_index, offset)) in other_object_list.ids.iter() {
-            if old_to_new_index_map.get(old_index).is_some() {
-                self.ids.insert(
-                    id.clone(),
-                    (old_to_new_index_map[old_index], offset.clone()),
-                );
+        for (id, (other_object, other_offset)) in other_object_list.objects.iter() {
+            if self.objects.get(id) == None {
+                self.objects
+                    .insert(id.clone(), (other_object.clone(), other_offset.clone()));
             }
         }
     }
 
     /// Remove the provided IDs as targets from all pointers in all objects.
-    /// Also forget whether the provided IDs point to objects in the object list
-    /// and remove objects, that no longer have any ID pointing at them.
+    /// Also remove the objects, that these IDs point to.
     pub fn remove_ids(&mut self, ids_to_remove: &BTreeSet<AbstractIdentifier>) {
-        for object in self.objects.iter_mut() {
-            object.remove_ids(ids_to_remove);
+        for id in ids_to_remove {
+            if self.objects.get(id).is_some() {
+                self.objects.remove(id);
+            }
         }
-        self.ids = self
-            .ids
-            .iter()
-            .filter_map(|(id, (index, offset))| {
-                if ids_to_remove.get(id).is_none() {
-                    Some((id.clone(), (*index, offset.clone())))
-                } else {
-                    None
-                }
-            })
-            .collect();
-        self.remove_unreferenced_objects();
-    }
-
-    /// Remove those objects from the object list that have no abstract ID pointing at them.
-    fn remove_unreferenced_objects(&mut self) {
-        let referenced_objects: BTreeSet<usize> =
-            self.ids.values().map(|(index, _offset)| *index).collect();
-        if referenced_objects.len() != self.objects.len() {
-            // We have to remove some objects and map the object indices to new values
-            let mut new_object_list = Vec::new();
-            let mut index_map = BTreeMap::new();
-            for i in 0..self.objects.len() {
-                if referenced_objects.get(&i).is_some() {
-                    index_map.insert(i, new_object_list.len());
-                    new_object_list.push(self.objects[i].clone());
-                }
-            }
-            self.objects = new_object_list;
-            // map the object indices to their new values
-            for (index, _offset) in self.ids.values_mut() {
-                *index = *index_map.get(index).unwrap();
-            }
+        for (object, _) in self.objects.values_mut() {
+            object.remove_ids(ids_to_remove);
         }
     }
 }
@@ -358,40 +287,16 @@ impl AbstractDomain for AbstractObjectList {
     /// where more than one ID should point to the same object.
     fn merge(&self, other: &Self) -> Self {
         let mut merged_objects = self.objects.clone();
-        let mut merged_ids = self.ids.clone();
-
-        for object_index in 0..other.objects.len() {
-            if other
-                .ids
-                .values()
-                .filter(|(index, _offset)| *index == object_index)
-                .count()
-                > 1
-            {
-                unimplemented!("Object list with more than one ID pointing to the same object encountered. This is not yet supported.")
-            }
-        }
-
-        for (other_id, (other_index, other_offset)) in other.ids.iter() {
-            if let Some((index, offset)) = merged_ids.get(&other_id) {
-                let (index, offset) = (*index, offset.clone());
-                merged_ids.insert(other_id.clone(), (index, offset.merge(&other_offset)));
-                if index < self.objects.len() {
-                    // The object already existed in self, so we have to merge it with the object in other
-                    merged_objects[index] =
-                        merged_objects[index].merge(&other.objects[*other_index]);
-                }
+        for (id, (other_object, other_offset)) in other.objects.iter() {
+            if let Some((object, offset)) = merged_objects.get_mut(id) {
+                *object = object.merge(other_object);
+                *offset = offset.merge(other_offset);
             } else {
-                merged_objects.push(other.objects.get(*other_index).unwrap().clone());
-                merged_ids.insert(
-                    other_id.clone(),
-                    (merged_objects.len() - 1, other_offset.clone()),
-                );
+                merged_objects.insert(id.clone(), (other_object.clone(), other_offset.clone()));
             }
         }
         AbstractObjectList {
             objects: merged_objects,
-            ids: merged_ids,
         }
     }
 
@@ -407,33 +312,15 @@ impl AbstractObjectList {
     pub fn to_json_compact(&self) -> serde_json::Value {
         use serde_json::*;
         let mut object_list = Vec::new();
-        for (index, object) in self.objects.iter().enumerate() {
-            let id_list: Vec<Value> = self
-                .ids
-                .iter()
-                .filter_map(|(id, (obj_index, offset))| {
-                    if *obj_index == index {
-                        Some(Value::String(format!("{}:{}", id, offset)))
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-            let id_list = Value::Array(id_list);
+        for (id, (object, offset)) in self.objects.iter() {
             let mut obj_map = Map::new();
-            obj_map.insert("ids".into(), id_list);
-            obj_map.insert("object".into(), object.to_json_compact());
+            obj_map.insert(
+                format!("{} (base offset {})", id, offset),
+                object.to_json_compact(),
+            );
             object_list.push(Value::Object(obj_map));
         }
         Value::Array(object_list)
-    }
-}
-
-#[cfg(test)]
-impl AbstractObjectList {
-    /// Get access to the internal id map for unit tests
-    pub fn get_internal_id_map(&self) -> &BTreeMap<AbstractIdentifier, (usize, BitvectorDomain)> {
-        &self.ids
     }
 }
 
@@ -456,8 +343,7 @@ mod tests {
     fn abstract_object_list() {
         let mut obj_list = AbstractObjectList::from_stack_id(new_id("RSP".into()), 64);
         assert_eq!(obj_list.objects.len(), 1);
-        assert_eq!(obj_list.ids.len(), 1);
-        assert_eq!(*obj_list.ids.values().next().unwrap(), (0, bv(0)));
+        assert_eq!(obj_list.objects.values().next().unwrap().1, bv(0));
 
         let pointer = PointerDomain::new(new_id("RSP".into()), bv(8));
         obj_list
@@ -511,7 +397,6 @@ mod tests {
             Data::Value(bv(3))
         );
         assert_eq!(merged.objects.len(), 2);
-        assert_eq!(merged.ids.len(), 2);
 
         merged
             .set_value(pointer.merge(&heap_pointer), Data::Value(bv(3)))
@@ -556,31 +441,42 @@ mod tests {
                 .unwrap(),
             Data::Pointer(modified_heap_pointer.clone())
         );
-        assert_eq!(other_obj_list.ids.get(&new_id("RAX".into())), None);
+        assert_eq!(other_obj_list.objects.get(&new_id("RAX".into())), None);
         assert!(matches!(
-            other_obj_list.ids.get(&new_id("ID2".into())),
+            other_obj_list.objects.get(&new_id("ID2".into())),
             Some(_)
         ));
 
         let mut ids_to_keep = BTreeSet::new();
         ids_to_keep.insert(new_id("ID2".into()));
-        other_obj_list.remove_unused_ids(&ids_to_keep);
+        other_obj_list.remove_unused_objects(&ids_to_keep);
         assert_eq!(other_obj_list.objects.len(), 1);
-        assert_eq!(other_obj_list.ids.len(), 1);
         assert_eq!(
-            other_obj_list.ids.iter().next().unwrap(),
-            (&new_id("ID2".into()), &(0, bv(0)))
+            other_obj_list.objects.iter().next().unwrap().0,
+            &new_id("ID2".into())
         );
 
         assert_eq!(
-            other_obj_list.objects[0].get_state(),
+            other_obj_list
+                .objects
+                .values()
+                .next()
+                .unwrap()
+                .0
+                .get_state(),
             Some(crate::analysis::pointer_inference::object::ObjectState::Alive)
         );
         other_obj_list
             .mark_mem_object_as_freed(&modified_heap_pointer)
             .unwrap();
         assert_eq!(
-            other_obj_list.objects[0].get_state(),
+            other_obj_list
+                .objects
+                .values()
+                .next()
+                .unwrap()
+                .0
+                .get_state(),
             Some(crate::analysis::pointer_inference::object::ObjectState::Dangling)
         );
     }
@@ -594,7 +490,7 @@ mod tests {
 
         obj_list.append_unknown_objects(&other_obj_list);
         assert_eq!(obj_list.objects.len(), 2);
-        assert!(obj_list.ids.get(&new_id("stack")).is_some());
-        assert!(obj_list.ids.get(&new_id("heap_obj")).is_some());
+        assert!(obj_list.objects.get(&new_id("stack")).is_some());
+        assert!(obj_list.objects.get(&new_id("heap_obj")).is_some());
     }
 }

@@ -177,10 +177,7 @@ fn context_problem_implementation() {
         .unwrap();
     assert_eq!(return_state.stack_id, new_id("main", "RSP"));
     assert_eq!(return_state.caller_stack_ids, BTreeSet::new());
-    assert_eq!(
-        return_state.memory.get_internal_id_map(),
-        state.memory.get_internal_id_map()
-    );
+    assert_eq!(return_state.memory, state.memory);
     assert_eq!(
         return_state.get_register(&register("RSP")).unwrap(),
         state.get_register(&register("RSP")).unwrap()
