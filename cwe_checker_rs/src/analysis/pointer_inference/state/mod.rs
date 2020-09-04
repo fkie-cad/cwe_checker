@@ -159,8 +159,8 @@ impl State {
         referenced_ids.append(&mut self.caller_stack_ids.clone());
         referenced_ids.append(&mut self.ids_known_to_caller.clone());
         referenced_ids = self.add_recursively_referenced_ids_to_id_set(referenced_ids);
-        // remove unreferenced IDs
-        self.memory.remove_unused_ids(&referenced_ids);
+        // remove unreferenced objects
+        self.memory.remove_unused_objects(&referenced_ids);
     }
 
     /// Search (recursively) through all memory objects referenced by the given IDs
@@ -190,7 +190,7 @@ impl State {
 
     /// Merge the callee stack with the caller stack.
     ///
-    /// This deletes the pointer from the callee_id to the corresponding memory object
+    /// This deletes the memory object corresponding to the callee_id
     /// and updates all other references pointing to the callee_id to point to the caller_id.
     /// The offset adjustment is handled as in `replace_abstract_id`.
     ///
@@ -204,7 +204,7 @@ impl State {
         caller_id: &AbstractIdentifier,
         offset_adjustment: &BitvectorDomain,
     ) {
-        self.memory.remove_object_pointer(callee_id);
+        self.memory.remove_object(callee_id);
         self.replace_abstract_id(callee_id, caller_id, offset_adjustment);
     }
 
