@@ -311,16 +311,14 @@ impl AbstractObjectList {
     /// Intended for pretty printing, not useable for serialization/deserialization.
     pub fn to_json_compact(&self) -> serde_json::Value {
         use serde_json::*;
-        let mut object_list = Vec::new();
+        let mut object_map = Map::new();
         for (id, (object, offset)) in self.objects.iter() {
-            let mut obj_map = Map::new();
-            obj_map.insert(
+            object_map.insert(
                 format!("{} (base offset {})", id, offset),
                 object.to_json_compact(),
             );
-            object_list.push(Value::Object(obj_map));
         }
-        Value::Array(object_list)
+        Value::Object(object_map)
     }
 }
 
