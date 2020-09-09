@@ -1,14 +1,18 @@
 use std::process::Command;
 use structopt::StructOpt;
 
+// TODO: Add validation function for `--partial=???` parameter.
+// TODO: Add module version printing function
+
 #[derive(Debug, StructOpt)]
 /// Find vulnerable patterns in binary executables
 struct CmdlineArgs {
     /// The path to the binary.
-    binary: String,
+    #[structopt(required_unless("module-versions"), validator(check_file_existence))]
+    binary: Option<String>,
 
     /// Path to a custom configuration file to use instead of the standard one.
-    #[structopt(long, short)]
+    #[structopt(long, short, validator(check_file_existence))]
     config: Option<String>,
 
     /// Write the results to a file.
@@ -39,7 +43,11 @@ struct CmdlineArgs {
 fn main() {
     let cmdline_args = CmdlineArgs::from_args();
 
-    if let Some(exit_code) = build_bap_command(&cmdline_args).status().unwrap().code() {
+    if cmdline_args.module_versions {
+        println!("printing module versions");
+        todo!();
+        return;
+    } else if let Some(exit_code) = build_bap_command(&cmdline_args).status().unwrap().code() {
         std::process::exit(exit_code);
     }
 }
@@ -47,7 +55,7 @@ fn main() {
 /// Build the BAP command corresponding to the given command line arguments.
 fn build_bap_command(args: &CmdlineArgs) -> Command {
     let mut command = Command::new("bap");
-    command.arg(&args.binary);
+    command.arg(args.binary.as_ref().unwrap());
     command.arg("--pass=cwe-checker");
     if let Some(ref string) = args.config {
         command.arg("--cwe-checker-config=".to_string() + string);
@@ -71,4 +79,16 @@ fn build_bap_command(args: &CmdlineArgs) -> Command {
         command.arg("--cwe-checker-module-versions");
     }
     command
+}
+
+/// Check the existence of a file
+fn check_file_existence(file_path: String) -> Result<(), String> {
+    if std::fs::metadata(&file_path)
+        .map_err(|err| format!("{}", err))?
+        .is_file()
+    {
+        Ok(())
+    } else {
+        Err(format!("{} is not a file.", file_path))
+    }
 }
