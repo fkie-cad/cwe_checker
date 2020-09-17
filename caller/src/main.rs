@@ -2,6 +2,7 @@ use std::process::Command;
 use structopt::StructOpt;
 
 // TODO: Add validation function for `--partial=???` parameter.
+// TODO: `--partial` option needs better documentation on how to specify the list of checks to run.
 // TODO: Add module version printing function
 
 #[derive(Debug, StructOpt)]
@@ -45,8 +46,7 @@ fn main() {
 
     if cmdline_args.module_versions {
         println!("printing module versions");
-        todo!();
-        return;
+        todo!(); // TODO: implement!
     } else if let Some(exit_code) = build_bap_command(&cmdline_args).status().unwrap().code() {
         std::process::exit(exit_code);
     }

@@ -13,6 +13,8 @@ pub mod bil;
 pub mod ffi;
 pub mod term;
 pub mod utils;
+pub mod pcode;
+pub mod intermediate_representation;
 
 mod prelude {
     pub use apint::Width;
