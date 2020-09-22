@@ -46,3 +46,9 @@ pub struct Blk {
     pub defs: Vec<Term<Def>>,
     pub jmps: Vec<Term<Jmp>>,
 }
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
+pub struct Sub {
+    pub name: String,
+    pub blocks: Vec<Term<Blk>>,
+}
