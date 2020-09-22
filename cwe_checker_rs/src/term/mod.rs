@@ -1,7 +1,9 @@
 use crate::bil::*;
+use crate::intermediate_representation::Blk as IrBlk;
 use crate::intermediate_representation::Def as IrDef;
 use crate::intermediate_representation::Expression as IrExpression;
 use crate::intermediate_representation::Jmp as IrJmp;
+use crate::intermediate_representation::Sub as IrSub;
 use serde::{Deserialize, Serialize};
 
 pub mod symbol;
@@ -178,10 +180,65 @@ pub struct Blk {
     pub jmps: Vec<Term<Jmp>>,
 }
 
+impl From<Blk> for IrBlk {
+    fn from(blk: Blk) -> IrBlk {
+        let mut ir_def_terms = Vec::new();
+        for def_term in blk.defs {
+            let ir_defs = def_term.term.to_ir_defs();
+            assert!(!ir_defs.is_empty());
+            if ir_defs.len() == 1 {
+                ir_def_terms.push(Term {
+                    tid: def_term.tid,
+                    term: ir_defs.into_iter().next().unwrap(),
+                });
+            } else {
+                for (counter, ir_def) in ir_defs.into_iter().enumerate() {
+                    ir_def_terms.push(Term {
+                        tid: Tid {
+                            id: format!("{}_{}", def_term.tid.id, counter),
+                            address: def_term.tid.address.clone(),
+                        },
+                        term: ir_def,
+                    });
+                }
+            }
+        }
+        let ir_jmp_terms = blk
+            .jmps
+            .into_iter()
+            .map(|jmp_term| Term {
+                tid: jmp_term.tid,
+                term: jmp_term.term.into(),
+            })
+            .collect();
+        IrBlk {
+            defs: ir_def_terms,
+            jmps: ir_jmp_terms,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Sub {
     pub name: String,
     pub blocks: Vec<Term<Blk>>,
+}
+
+impl From<Sub> for IrSub {
+    fn from(sub: Sub) -> IrSub {
+        let blocks = sub
+            .blocks
+            .into_iter()
+            .map(|block_term| Term {
+                tid: block_term.tid,
+                term: block_term.term.into(),
+            })
+            .collect();
+        IrSub {
+            name: sub.name,
+            blocks,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]

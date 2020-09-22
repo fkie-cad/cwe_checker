@@ -1,7 +1,9 @@
 use super::{Expression, Variable};
+use crate::intermediate_representation::Blk as IrBlk;
 use crate::intermediate_representation::Def as IrDef;
 use crate::intermediate_representation::Expression as IrExpression;
 use crate::intermediate_representation::Jmp as IrJmp;
+use crate::intermediate_representation::Sub as IrSub;
 use crate::prelude::*;
 use crate::term::{Term, Tid};
 
@@ -151,6 +153,28 @@ pub struct Blk {
     pub jmps: Vec<Term<Jmp>>,
 }
 
+impl From<Blk> for IrBlk {
+    fn from(blk: Blk) -> IrBlk {
+        let defs: Vec<Term<IrDef>> = blk
+            .defs
+            .into_iter()
+            .map(|def_term| Term {
+                tid: def_term.tid,
+                term: def_term.term.into(),
+            })
+            .collect();
+        let jmps: Vec<Term<IrJmp>> = blk
+            .jmps
+            .into_iter()
+            .map(|jmp_term| Term {
+                tid: jmp_term.tid,
+                term: jmp_term.term.into(),
+            })
+            .collect();
+        IrBlk { defs, jmps }
+    }
+}
+
 // TODO: We need a unit test for stack parameter (that use location instead of var)!
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Arg {
@@ -170,6 +194,23 @@ pub enum ArgIntent {
 pub struct Sub {
     pub name: String,
     pub blocks: Vec<Term<Blk>>,
+}
+
+impl From<Sub> for IrSub {
+    fn from(sub: Sub) -> IrSub {
+        let blocks = sub
+            .blocks
+            .into_iter()
+            .map(|block_term| Term {
+                tid: block_term.tid,
+                term: block_term.term.into(),
+            })
+            .collect();
+        IrSub {
+            name: sub.name,
+            blocks,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
