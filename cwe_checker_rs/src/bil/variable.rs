@@ -1,4 +1,5 @@
 use super::BitSize;
+use crate::intermediate_representation::Variable as IrVariable;
 use crate::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -19,12 +20,33 @@ pub enum Type {
     Unknown,
 }
 
+impl Type {
+    pub fn bitsize(&self) -> Result<BitSize, Error> {
+        if let Type::Immediate(bitsize) = self {
+            Ok(*bitsize)
+        } else {
+            Err(anyhow!("Not a register type"))
+        }
+    }
+}
+
 impl Variable {
     pub fn bitsize(&self) -> Result<BitSize, Error> {
-        if let Type::Immediate(bitsize) = self.type_ {
-            Ok(bitsize)
+        self.type_.bitsize()
+    }
+}
+
+impl From<Variable> for IrVariable {
+    fn from(var: Variable) -> IrVariable {
+        let size = if let Type::Immediate(bitsize) = var.type_ {
+            bitsize.into()
         } else {
-            Err(anyhow!("Not a register variable"))
+            panic!()
+        };
+        IrVariable {
+            name: var.name,
+            size,
+            is_temp: var.is_temp,
         }
     }
 }

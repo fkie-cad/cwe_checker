@@ -1,3 +1,9 @@
+use crate::intermediate_representation::BinOpType as IrBinOpType;
+use crate::intermediate_representation::ByteSize;
+use crate::intermediate_representation::CastOpType as IrCastOpType;
+use crate::intermediate_representation::Expression as IrExpression;
+use crate::intermediate_representation::UnOpType as IrUnOpType;
+use apint::Width;
 use serde::{Deserialize, Serialize};
 
 pub mod variable;
@@ -6,6 +12,13 @@ pub use variable::*;
 pub type Bitvector = apint::ApInt;
 
 pub type BitSize = u16;
+
+impl From<BitSize> for ByteSize {
+    /// Convert to `ByteSize`, while always rounding up to the nearest full byte.
+    fn from(bitsize: BitSize) -> ByteSize {
+        ((bitsize as u64 + 7) / 8).into()
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub enum Expression {
@@ -189,6 +202,100 @@ impl Expression {
             }
         }
     }
+
+    pub fn bitsize(&self) -> BitSize {
+        use Expression::*;
+        match self {
+            Var(var) => var.bitsize().unwrap(),
+            Const(bitvector) => bitvector.width().to_usize() as u16,
+            Load { size, .. } => *size,
+            Store { .. } => 0,
+            BinOp { op, lhs, rhs: _ } => {
+                use BinOpType::*;
+                match op {
+                    EQ | NEQ | LT | LE | SLT | SLE => 1,
+                    _ => lhs.bitsize(),
+                }
+            }
+            UnOp { arg, .. } => arg.bitsize(),
+            Cast { width, .. } => *width,
+            Let { .. } => panic!(),
+            Unknown {
+                description: _,
+                type_,
+            } => type_.bitsize().unwrap(),
+            IfThenElse { true_exp, .. } => true_exp.bitsize(),
+            Extract {
+                low_bit, high_bit, ..
+            } => high_bit - low_bit,
+            Concat { left, right } => left.bitsize() + right.bitsize(),
+        }
+    }
+}
+
+impl From<Expression> for IrExpression {
+    fn from(expr: Expression) -> IrExpression {
+        use Expression::*;
+        match expr {
+            Var(var) => IrExpression::Var(var.into()),
+            Const(bitvector) => IrExpression::Const(bitvector),
+            Load { .. } | Store { .. } | Let { .. } | Unknown { .. } | IfThenElse { .. } => {
+                panic!()
+            }
+            BinOp { op, lhs, rhs } => IrExpression::BinOp {
+                op: op.into(),
+                lhs: Box::new(IrExpression::from(*lhs)),
+                rhs: Box::new(IrExpression::from(*rhs)),
+            },
+            UnOp { op, arg } => IrExpression::UnOp {
+                op: op.into(),
+                arg: Box::new(IrExpression::from(*arg)),
+            },
+            Cast { kind, width, arg } => {
+                use CastType::*;
+                match kind {
+                    UNSIGNED => IrExpression::Cast {
+                        arg: Box::new(IrExpression::from(*arg)),
+                        op: IrCastOpType::IntZExt,
+                        size: width.into(),
+                    },
+                    SIGNED => IrExpression::Cast {
+                        arg: Box::new(IrExpression::from(*arg)),
+                        op: IrCastOpType::IntSExt,
+                        size: width.into(),
+                    },
+                    HIGH => {
+                        assert!(width % 8 == 0);
+                        let low_byte = (arg.bitsize() - BitSize::from(width)).into();
+                        IrExpression::Subpiece {
+                            arg: Box::new(IrExpression::from(*arg)),
+                            low_byte,
+                            size: width.into(),
+                        }
+                    }
+                    LOW => IrExpression::Subpiece {
+                        arg: Box::new(IrExpression::from(*arg)),
+                        low_byte: (0 as u64).into(),
+                        size: width.into(),
+                    },
+                }
+            }
+            Extract {
+                low_bit,
+                high_bit,
+                arg,
+            } => IrExpression::Subpiece {
+                size: (high_bit - low_bit + 1).into(),
+                low_byte: low_bit.into(),
+                arg: Box::new(IrExpression::from(*arg)),
+            },
+            Concat { left, right } => IrExpression::BinOp {
+                op: IrBinOpType::Piece,
+                lhs: Box::new(IrExpression::from(*left)),
+                rhs: Box::new(IrExpression::from(*right)),
+            },
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy)]
@@ -222,10 +329,48 @@ pub enum BinOpType {
     SLE,
 }
 
+impl From<BinOpType> for IrBinOpType {
+    fn from(op: BinOpType) -> IrBinOpType {
+        use BinOpType::*;
+        use IrBinOpType::*;
+        match op {
+            PLUS => IntAdd,
+            MINUS => IntSub,
+            TIMES => IntMult,
+            DIVIDE => IntDiv,
+            SDIVIDE => IntSDiv,
+            MOD => IntRem,
+            SMOD => IntSRem,
+            LSHIFT => IntLeft,
+            RSHIFT => IntRight,
+            ARSHIFT => IntSRight,
+            AND => IntAnd,
+            OR => IntOr,
+            XOR => IntXOr,
+            EQ => IntEqual,
+            NEQ => IntNotEqual,
+            LT => IntLess,
+            LE => IntLessEqual,
+            SLT => IntSLess,
+            SLE => IntSLessEqual,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum UnOpType {
     NEG,
     NOT,
+}
+
+impl From<UnOpType> for IrUnOpType {
+    fn from(op: UnOpType) -> IrUnOpType {
+        use UnOpType::*;
+        match op {
+            NEG => IrUnOpType::Int2Comp,
+            NOT => IrUnOpType::IntNegate,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy)]
