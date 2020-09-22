@@ -38,6 +38,8 @@ pub enum BinOpType {
     IntNotEqual,
     IntLess,
     IntSLess,
+    IntLessEqual,
+    IntSLessEqual,
     IntAdd,
     IntSub,
     IntCarry,
@@ -74,7 +76,6 @@ pub enum CastOpType {
     Int2Float,
     Float2Float,
     Trunc,
-
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy)]
