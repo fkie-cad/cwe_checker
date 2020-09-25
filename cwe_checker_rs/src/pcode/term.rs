@@ -204,7 +204,6 @@ impl Blk {
     fn add_load_defs_for_implicit_ram_access(&mut self) {
         let mut refactored_defs = Vec::new();
         for def in self.defs.iter() {
-            
             let mut cleaned_def = def.clone();
             if let Some(input) = &def.term.rhs.input0 {
                 if input.address.is_some() {
@@ -673,8 +672,13 @@ mod tests {
 
     #[test]
     fn add_load_defs_for_implicit_ram_access() {
-        let mut blk: Blk = Blk { defs: Vec::new(), jmps: Vec::new()};
-        blk.defs.push(serde_json::from_str(r#"
+        let mut blk: Blk = Blk {
+            defs: Vec::new(),
+            jmps: Vec::new(),
+        };
+        blk.defs.push(
+            serde_json::from_str(
+                r#"
         {
             "tid": {
               "id": "instr_001053f8_0",
@@ -702,10 +706,34 @@ mod tests {
               }
             }
           }
-        "#).unwrap());
+        "#,
+            )
+            .unwrap(),
+        );
         blk.add_load_defs_for_implicit_ram_access();
-        assert_eq!(blk.defs[0].term.lhs.as_ref().unwrap().name.as_ref().unwrap(), "$load_temp0");
-        assert_eq!(blk.defs[1].term.rhs.input0.as_ref().unwrap().name.as_ref().unwrap(), "$load_temp0");
+        assert_eq!(
+            blk.defs[0]
+                .term
+                .lhs
+                .as_ref()
+                .unwrap()
+                .name
+                .as_ref()
+                .unwrap(),
+            "$load_temp0"
+        );
+        assert_eq!(
+            blk.defs[1]
+                .term
+                .rhs
+                .input0
+                .as_ref()
+                .unwrap()
+                .name
+                .as_ref()
+                .unwrap(),
+            "$load_temp0"
+        );
         assert_eq!(blk.defs.len(), 2);
     }
 }
