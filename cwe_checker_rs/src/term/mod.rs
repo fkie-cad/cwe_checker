@@ -1,8 +1,11 @@
 use crate::bil::*;
+use crate::intermediate_representation::Arg as IrArg;
 use crate::intermediate_representation::Blk as IrBlk;
 use crate::intermediate_representation::Def as IrDef;
 use crate::intermediate_representation::Expression as IrExpression;
 use crate::intermediate_representation::Jmp as IrJmp;
+use crate::intermediate_representation::Program as IrProgram;
+use crate::intermediate_representation::Project as IrProject;
 use crate::intermediate_representation::Sub as IrSub;
 use serde::{Deserialize, Serialize};
 
@@ -20,6 +23,14 @@ impl Tid {
         Tid {
             id: val.to_string(),
             address: "UNKNOWN".to_string(),
+        }
+    }
+
+    /// Add a suffix to the ID string and return the new `Tid`
+    pub fn with_id_suffix(self, suffix: &str) -> Self {
+        Tid {
+            id: self.id + suffix,
+            address: self.address,
         }
     }
 }
@@ -43,12 +54,14 @@ pub struct Def {
 }
 
 impl Def {
-    fn to_ir_defs(self) -> Vec<IrDef> {
+    fn into_ir_defs(self) -> Vec<IrDef> {
         match self.rhs {
             Expression::Load { address, .. } => {
                 let (defs, cleaned_address, _) = extract_loads_from_expression(*address, 0);
-                let mut ir_defs: Vec<IrDef> =
-                    defs.into_iter().map(|def| def.to_ir_assignment()).collect();
+                let mut ir_defs: Vec<IrDef> = defs
+                    .into_iter()
+                    .map(|def| def.into_ir_assignment())
+                    .collect();
                 ir_defs.push(IrDef::Load {
                     address: cleaned_address.into(),
                     var: self.lhs.into(),
@@ -61,8 +74,10 @@ impl Def {
                 let (mut more_defs, cleaned_value, _) =
                     extract_loads_from_expression(*value, counter);
                 defs.append(&mut more_defs);
-                let mut ir_defs: Vec<IrDef> =
-                    defs.into_iter().map(|def| def.to_ir_assignment()).collect();
+                let mut ir_defs: Vec<IrDef> = defs
+                    .into_iter()
+                    .map(|def| def.into_ir_assignment())
+                    .collect();
                 ir_defs.push(IrDef::Store {
                     address: cleaned_address.into(),
                     value: cleaned_value.into(),
@@ -93,8 +108,10 @@ impl Def {
                     extract_loads_from_expression(*value, counter);
                 defs.append(&mut more_defs);
                 defs.append(&mut even_more_defs);
-                let mut ir_defs: Vec<IrDef> =
-                    defs.into_iter().map(|def| def.to_ir_assignment()).collect();
+                let mut ir_defs: Vec<IrDef> = defs
+                    .into_iter()
+                    .map(|def| def.into_ir_assignment())
+                    .collect();
                 ir_defs.push(IrDef::Store {
                     address: cleaned_adress.into(),
                     value: IrExpression::Unknown {
@@ -104,11 +121,11 @@ impl Def {
                 });
                 ir_defs
             }
-            _ => vec![self.to_ir_assignment()],
+            _ => vec![self.into_ir_assignment()],
         }
     }
 
-    fn to_ir_assignment(self) -> IrDef {
+    fn into_ir_assignment(self) -> IrDef {
         IrDef::Assign {
             var: self.lhs.into(),
             value: self.rhs.into(),
@@ -184,7 +201,7 @@ impl From<Blk> for IrBlk {
     fn from(blk: Blk) -> IrBlk {
         let mut ir_def_terms = Vec::new();
         for def_term in blk.defs {
-            let ir_defs = def_term.term.to_ir_defs();
+            let ir_defs = def_term.term.into_ir_defs();
             assert!(!ir_defs.is_empty());
             if ir_defs.len() == 1 {
                 ir_def_terms.push(Term {
@@ -248,6 +265,28 @@ pub struct Program {
     pub entry_points: Vec<Tid>,
 }
 
+impl From<Program> for IrProgram {
+    fn from(program: Program) -> IrProgram {
+        let subs = program
+            .subs
+            .into_iter()
+            .map(|sub_term| Term {
+                tid: sub_term.tid,
+                term: sub_term.term.into(),
+            })
+            .collect();
+        IrProgram {
+            subs,
+            extern_symbols: program
+                .extern_symbols
+                .into_iter()
+                .map(|symbol| symbol.into())
+                .collect(),
+            entry_points: program.entry_points,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Project {
     pub program: Term<Program>,
@@ -294,6 +333,20 @@ impl Project {
     }
 }
 
+impl From<Project> for IrProject {
+    fn from(project: Project) -> IrProject {
+        let program = Term {
+            tid: project.program.tid,
+            term: project.program.term.into(),
+        };
+        IrProject {
+            program,
+            cpu_architecture: project.cpu_architecture,
+            stack_pointer_register: project.stack_pointer_register.into(),
+        }
+    }
+}
+
 impl Label {
     /// Replace let-bindings inside the expression for `Indirect` labels.
     fn replace_let_bindings(&mut self) {
@@ -330,6 +383,40 @@ impl ArgIntent {
         match self {
             Self::Output | Self::Both | Self::Unknown => true,
             Self::Input => false,
+        }
+    }
+}
+
+impl From<Arg> for IrArg {
+    fn from(arg: Arg) -> IrArg {
+        match arg.location {
+            Expression::Var(var) => IrArg::Register(var.into()),
+            Expression::Load {
+                address,
+                size: bitsize,
+                ..
+            } => {
+                let offset = match *address {
+                    Expression::BinOp {
+                        op: BinOpType::PLUS,
+                        lhs,
+                        rhs,
+                    } => {
+                        assert!(matches!(*lhs, Expression::Var(_)));
+                        if let Expression::Const(bitvec) = *rhs {
+                            bitvec.try_to_i64().unwrap()
+                        } else {
+                            panic!()
+                        }
+                    }
+                    _ => panic!(),
+                };
+                IrArg::Stack {
+                    offset,
+                    size: bitsize.into(),
+                }
+            }
+            _ => panic!(),
         }
     }
 }

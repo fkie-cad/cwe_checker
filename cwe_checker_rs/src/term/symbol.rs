@@ -1,5 +1,6 @@
-use super::Arg;
+use super::{Arg, ArgIntent};
 use crate::bil::*;
+use crate::intermediate_representation::ExternSymbol as IrExternSymbol;
 use crate::prelude::*;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
@@ -48,6 +49,35 @@ impl ExternSymbol {
             ));
         }
         Ok(&param_args[0].location)
+    }
+}
+
+impl From<ExternSymbol> for IrExternSymbol {
+    fn from(symbol: ExternSymbol) -> IrExternSymbol {
+        let mut parameters = Vec::new();
+        let mut return_values = Vec::new();
+        for arg in symbol.arguments.into_iter() {
+            if matches!(
+                arg.intent,
+                ArgIntent::Input | ArgIntent::Both | ArgIntent::Unknown
+            ) {
+                parameters.push(arg.clone().into());
+            }
+            if matches!(
+                arg.intent,
+                ArgIntent::Output | ArgIntent::Both | ArgIntent::Unknown
+            ) {
+                return_values.push(arg.into());
+            }
+        }
+        IrExternSymbol {
+            tid: symbol.tid,
+            name: symbol.name,
+            calling_convention: symbol.calling_convention,
+            parameters,
+            return_values,
+            no_return: false, // Last time I checked BAP had an attribute for non-returning functions, but did not actually set it.
+        }
     }
 }
 
