@@ -52,3 +52,33 @@ pub struct Sub {
     pub name: String,
     pub blocks: Vec<Term<Blk>>,
 }
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
+pub enum Arg {
+    Register(Variable),
+    Stack { offset: i64, size: ByteSize },
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
+pub struct ExternSymbol {
+    pub tid: Tid,
+    pub name: String,
+    pub calling_convention: Option<String>,
+    pub parameters: Vec<Arg>,
+    pub return_values: Vec<Arg>,
+    pub no_return: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
+pub struct Program {
+    pub subs: Vec<Term<Sub>>,
+    pub extern_symbols: Vec<ExternSymbol>,
+    pub entry_points: Vec<Tid>,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
+pub struct Project {
+    pub program: Term<Program>,
+    pub cpu_architecture: String,
+    pub stack_pointer_register: Variable,
+}

@@ -1,3 +1,4 @@
+use super::Def;
 use crate::intermediate_representation::BinOpType as IrBinOpType;
 use crate::intermediate_representation::ByteSize;
 use crate::intermediate_representation::CastOpType as IrCastOpType;
@@ -5,17 +6,19 @@ use crate::intermediate_representation::Expression as IrExpression;
 use crate::intermediate_representation::UnOpType as IrUnOpType;
 use crate::intermediate_representation::Variable as IrVariable;
 use crate::prelude::*;
-use crate::term::{Term, Tid};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Variable {
     pub name: Option<String>,
     pub value: Option<String>,
+    pub address: Option<String>,
     pub size: ByteSize,
     pub is_virtual: bool,
 }
 
 impl From<Variable> for IrVariable {
+    /// Translate a P-Code variable into a register variable of the internally used IR.
+    /// Panic if the variable does not represent a register.
     fn from(pcode_var: Variable) -> IrVariable {
         IrVariable {
             name: pcode_var.name.unwrap(),
@@ -26,12 +29,24 @@ impl From<Variable> for IrVariable {
 }
 
 impl From<Variable> for IrExpression {
+    /// Translate a P-Code variable into a `Var`or `Const` expression of the internally used IR.
+    /// Panics if the translation fails.
     fn from(pcode_var: Variable) -> IrExpression {
         match (&pcode_var.name, &pcode_var.value) {
             (Some(_name), None) => IrExpression::Var(pcode_var.into()),
-            (None, Some(hex_value)) => {
+            (None, Some(_hex_value)) => IrExpression::Const(pcode_var.parse_to_bitvector()),
+            _ => panic!("Conversion failed:\n{:?}", pcode_var),
+        }
+    }
+}
+
+impl Variable {
+    /// Parses a variable representing a concrete value or a concrete address to a bitvector containing the value or address.
+    pub fn parse_to_bitvector(&self) -> Bitvector {
+        match (&self.value, &self.address) {
+            (Some(hex_value), None) | (None, Some(hex_value)) => {
                 // TODO: Implement parsing for large hex values.
-                if u64::from(pcode_var.size) > 8 {
+                if u64::from(self.size) > 8 {
                     panic!(
                         "Parsing of immediates greater than 8 bytes not yet implemented: {}",
                         hex_value
@@ -39,25 +54,58 @@ impl From<Variable> for IrExpression {
                 }
                 let val: u64 = u64::from_str_radix(&hex_value, 16).unwrap();
                 let mut bitvector: Bitvector = Bitvector::from_u64(val);
-                bitvector.truncate(pcode_var.size).unwrap();
-                IrExpression::Const(bitvector)
+                bitvector.truncate(self.size).unwrap();
+                bitvector
             }
             _ => panic!(),
         }
     }
-}
 
-impl From<Variable> for ByteSize {
-    fn from(pcode_var: Variable) -> ByteSize {
-        match (&pcode_var.name, &pcode_var.value) {
+    /// Generate a virtual variable with the given name and size.
+    pub fn new_virtual(name: impl Into<String>, size: ByteSize) -> Variable {
+        Variable {
+            name: Some(name.into()),
+            value: None,
+            address: None,
+            size,
+            is_virtual: true,
+        }
+    }
+
+    /// Generate a variable representing a constant
+    pub fn new_const(value_string: impl Into<String>, size: ByteSize) -> Variable {
+        Variable {
+            name: None,
+            value: Some(value_string.into()),
+            address: None,
+            size,
+            is_virtual: false,
+        }
+    }
+
+    /// Create a LOAD instruction out of a variable representing a load from a constant address into a virtual register.
+    ///
+    /// Note that the address pointer size gets set to zero, since the function does not know the correct size for pointers.
+    pub fn to_load_def(&self, target_register_name: impl Into<String>) -> Def {
+        Def {
+            lhs: Some(Variable::new_virtual(target_register_name, self.size)),
+            rhs: Expression {
+                mnemonic: ExpressionType::LOAD,
+                input0: None,
+                input1: Some(Variable::new_const(
+                    self.address.as_ref().unwrap(),
+                    ByteSize::from(0 as u64), // We do not know the correct pointer size here.
+                )),
+                input2: None,
+            },
+        }
+    }
+
+    /// Translates a variable into the byte size that it represents. Panics on error.
+    pub fn parse_to_bytesize(self) -> ByteSize {
+        match (&self.name, &self.value) {
             (None, Some(hex_value)) => {
-                // TODO: Implement parsing for large hex values.
-                if u64::from(pcode_var.size) > 8 {
-                    panic!(
-                        "Parsing of immediates greater than 8 bytes not yet implemented: {}",
-                        hex_value
-                    );
-                }
+                assert!(u64::from(self.size) <= 8);
                 let val: u64 = u64::from_str_radix(&hex_value, 16).unwrap();
                 val.into()
             }
@@ -144,6 +192,8 @@ pub enum ExpressionType {
 }
 
 impl From<ExpressionType> for IrBinOpType {
+    /// Translates expression types.
+    /// Panics when given a type not representable by the target type.
     fn from(expr_type: ExpressionType) -> IrBinOpType {
         use ExpressionType::*;
         use IrBinOpType::*;
@@ -195,6 +245,8 @@ impl From<ExpressionType> for IrBinOpType {
 }
 
 impl From<ExpressionType> for IrUnOpType {
+    /// Translates expression types.
+    /// Panics when given a type not representable by the target type.
     fn from(expr_type: ExpressionType) -> IrUnOpType {
         use ExpressionType::*;
         match expr_type {
@@ -214,6 +266,8 @@ impl From<ExpressionType> for IrUnOpType {
 }
 
 impl From<ExpressionType> for IrCastOpType {
+    /// Translates expression types.
+    /// Panics when given a type not representable by the target type.
     fn from(expr_type: ExpressionType) -> IrCastOpType {
         use ExpressionType::*;
         match expr_type {
@@ -249,20 +303,20 @@ mod tests {
     fn expression_deserialization() {
         let _: Expression = serde_json::from_str(
             r#"
-        {
-            "mnemonic": "INT_SUB",
-            "input0": {
-              "name": "RSP",
-              "size": 8,
-              "is_virtual": false
-            },
-            "input1": {
-              "name": "00000008",
-              "size": 8,
-              "is_virtual": false
+            {
+                "mnemonic": "INT_SLESS",
+                "input0": {
+                "name": "EAX",
+                "size": 4,
+                "is_virtual": false
+                },
+                "input1": {
+                "value": "00000000",
+                "size": 4,
+                "is_virtual": false
+                }
             }
-        }
-        "#,
+            "#,
         )
         .unwrap();
     }

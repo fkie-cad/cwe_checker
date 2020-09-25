@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use crate::term::{Term, Tid};
 use derive_more::*;
 use std::convert::TryFrom;
 
@@ -58,5 +57,19 @@ impl From<ByteSize> for BitSize {
 impl From<ByteSize> for apint::BitWidth {
     fn from(bytesize: ByteSize) -> apint::BitWidth {
         apint::BitWidth::from((u64::from(bytesize) * 8) as usize)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn check_bit_to_byte_conversion() {
+        let bits: BitSize = 8;
+        let bytes: ByteSize = bits.into();
+        assert_eq!(u64::from(bytes), 1);
+        let bits: BitSize = bytes.into();
+        assert_eq!(bits, 8);
     }
 }

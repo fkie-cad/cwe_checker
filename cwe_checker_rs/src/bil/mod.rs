@@ -266,7 +266,7 @@ impl From<Expression> for IrExpression {
                     },
                     HIGH => {
                         assert!(width % 8 == 0);
-                        let low_byte = (arg.bitsize() - BitSize::from(width)).into();
+                        let low_byte = (arg.bitsize() - width).into();
                         IrExpression::Subpiece {
                             arg: Box::new(IrExpression::from(*arg)),
                             low_byte,
