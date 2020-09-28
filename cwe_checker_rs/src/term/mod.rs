@@ -54,6 +54,12 @@ pub struct Def {
 }
 
 impl Def {
+    /// Convert one `Def` into one or more `Def`s of the internal IR.
+    ///
+    /// `Load` expressions get transferred to their own `Def`,
+    /// since they are not representable as expressions in the internal IR.
+    /// `IfThenElse` expressions are translated to `Unknown` expressions in the process,
+    /// thus resulting in possible information loss.
     fn into_ir_defs(self) -> Vec<IrDef> {
         match self.rhs {
             Expression::Load { address, .. } => {
@@ -141,6 +147,8 @@ impl Def {
         }
     }
 
+    /// Translate a `Load` into its internal IR representation.
+    /// Panics if right hand side expression is not a `Load`.
     fn into_ir_load(self) -> IrDef {
         if let Expression::Load { address, .. } = self.rhs {
             IrDef::Load {
@@ -168,6 +176,7 @@ pub enum JmpKind {
 }
 
 impl From<Jmp> for IrJmp {
+    /// Translate jump types.
     fn from(jmp: Jmp) -> IrJmp {
         match jmp.kind {
             JmpKind::Goto(Label::Direct(tid)) => IrJmp::Branch(tid),
@@ -218,6 +227,7 @@ pub struct Blk {
 }
 
 impl From<Blk> for IrBlk {
+    /// Translates block types.
     fn from(blk: Blk) -> IrBlk {
         let mut ir_def_terms = Vec::new();
         for def_term in blk.defs {
@@ -278,6 +288,7 @@ pub struct Sub {
 }
 
 impl From<Sub> for IrSub {
+    /// Translate `Sub` types.
     fn from(sub: Sub) -> IrSub {
         let blocks = sub
             .blocks
@@ -302,6 +313,7 @@ pub struct Program {
 }
 
 impl From<Program> for IrProgram {
+    /// Translate program types.
     fn from(program: Program) -> IrProgram {
         let subs = program
             .subs
@@ -370,6 +382,7 @@ impl Project {
 }
 
 impl From<Project> for IrProject {
+    /// Translate project types.
     fn from(project: Project) -> IrProject {
         let program = Term {
             tid: project.program.tid,
@@ -424,6 +437,7 @@ impl ArgIntent {
 }
 
 impl From<Arg> for IrArg {
+    /// Translate extern symbol argument types.
     fn from(arg: Arg) -> IrArg {
         match arg.location {
             Expression::Var(var) => IrArg::Register(var.into()),
@@ -457,6 +471,11 @@ impl From<Arg> for IrArg {
     }
 }
 
+/// Substitute each `Load` subexpression with a temporary variable
+/// and a `Def` containing the `Load` into said variable.
+///
+/// The function is recursive and the counter is needed to keep track how many `Load` expressions
+/// have already been extracted (which is used to generate unique names for the temporary variables).
 fn extract_loads_from_expression(expr: Expression, counter: u64) -> (Vec<Def>, Expression, u64) {
     use Expression::*;
     match expr {
@@ -580,6 +599,8 @@ fn extract_loads_from_expression(expr: Expression, counter: u64) -> (Vec<Def>, E
     }
 }
 
+/// Substitutes each `Load` expression in the target or conditition fields of a jump
+/// with a temporary variable and a `Def` containing the `Load` into said variable.
 fn extract_loads_from_jump(mut jmp: Jmp) -> (Jmp, Vec<Def>) {
     let mut counter = 0;
     let mut defs = Vec::new();
