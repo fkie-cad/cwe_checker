@@ -203,6 +203,8 @@ impl Expression {
         }
     }
 
+    /// Compute the bitsize of the value that the expression computes.
+    /// Return zero for `Store` expressions.
     pub fn bitsize(&self) -> BitSize {
         use Expression::*;
         match self {
@@ -234,6 +236,9 @@ impl Expression {
 }
 
 impl From<Expression> for IrExpression {
+    /// Convert a BAP IR expression to an internal IR expression.
+    /// Panics on expressions that are not expressions in the internal IR.
+    /// Replaces `IfThenElse` expressions with `Unknown` expressions (thus losing some information).
     fn from(expr: Expression) -> IrExpression {
         use Expression::*;
         match expr {
@@ -373,6 +378,7 @@ pub enum BinOpType {
 }
 
 impl From<BinOpType> for IrBinOpType {
+    /// Translate binary operation types.
     fn from(op: BinOpType) -> IrBinOpType {
         use BinOpType::*;
         use IrBinOpType::*;
@@ -407,6 +413,7 @@ pub enum UnOpType {
 }
 
 impl From<UnOpType> for IrUnOpType {
+    /// Translate unary operation types.
     fn from(op: UnOpType) -> IrUnOpType {
         use UnOpType::*;
         match op {
