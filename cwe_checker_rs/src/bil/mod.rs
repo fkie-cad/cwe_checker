@@ -239,9 +239,15 @@ impl From<Expression> for IrExpression {
         match expr {
             Var(var) => IrExpression::Var(var.into()),
             Const(bitvector) => IrExpression::Const(bitvector),
-            Load { .. } | Store { .. } | Let { .. } | Unknown { .. } | IfThenElse { .. } => {
-                panic!()
-            }
+            Load { .. } | Store { .. } | Let { .. } => panic!(),
+            IfThenElse { true_exp, .. } => IrExpression::Unknown {
+                description: "BAP-IfThenElse-expression".into(),
+                size: true_exp.bitsize().into(),
+            },
+            Unknown { description, type_ } => IrExpression::Unknown {
+                description,
+                size: type_.bitsize().unwrap().into(),
+            },
             BinOp { op, lhs, rhs } => IrExpression::BinOp {
                 op: op.into(),
                 lhs: Box::new(IrExpression::from(*lhs)),
@@ -254,41 +260,78 @@ impl From<Expression> for IrExpression {
             Cast { kind, width, arg } => {
                 use CastType::*;
                 match kind {
-                    UNSIGNED => IrExpression::Cast {
-                        arg: Box::new(IrExpression::from(*arg)),
-                        op: IrCastOpType::IntZExt,
-                        size: width.into(),
-                    },
-                    SIGNED => IrExpression::Cast {
-                        arg: Box::new(IrExpression::from(*arg)),
-                        op: IrCastOpType::IntSExt,
-                        size: width.into(),
-                    },
-                    HIGH => {
+                    UNSIGNED => {
                         assert!(width % 8 == 0);
-                        let low_byte = (arg.bitsize() - width).into();
-                        IrExpression::Subpiece {
+                        IrExpression::Cast {
                             arg: Box::new(IrExpression::from(*arg)),
-                            low_byte,
+                            op: IrCastOpType::IntZExt,
                             size: width.into(),
                         }
                     }
-                    LOW => IrExpression::Subpiece {
-                        arg: Box::new(IrExpression::from(*arg)),
-                        low_byte: (0 as u64).into(),
-                        size: width.into(),
-                    },
+                    SIGNED => {
+                        assert!(width % 8 == 0);
+                        IrExpression::Cast {
+                            arg: Box::new(IrExpression::from(*arg)),
+                            op: IrCastOpType::IntSExt,
+                            size: width.into(),
+                        }
+                    }
+                    HIGH => {
+                        if width == 1 {
+                            IrExpression::BinOp {
+                                op: IrBinOpType::IntSLess,
+                                lhs: Box::new(IrExpression::Const(Bitvector::zero(
+                                    (arg.bitsize() as usize).into(),
+                                ))),
+                                rhs: Box::new(IrExpression::from(*arg)),
+                            }
+                        } else {
+                            assert!(width % 8 == 0);
+                            let low_byte = (arg.bitsize() - width).into();
+                            IrExpression::Subpiece {
+                                arg: Box::new(IrExpression::from(*arg)),
+                                low_byte,
+                                size: width.into(),
+                            }
+                        }
+                    }
+                    LOW => {
+                        if width == 1 {
+                            IrExpression::Subpiece {
+                                low_byte: ByteSize::new(0),
+                                size: ByteSize::new(1),
+                                arg: Box::new(IrExpression::BinOp {
+                                    op: IrBinOpType::IntAnd,
+                                    lhs: Box::new(IrExpression::Const(Bitvector::one(
+                                        (arg.bitsize() as usize).into(),
+                                    ))),
+                                    rhs: Box::new(IrExpression::from(*arg)),
+                                }),
+                            }
+                        } else {
+                            assert!(width % 8 == 0);
+                            IrExpression::Subpiece {
+                                arg: Box::new(IrExpression::from(*arg)),
+                                low_byte: (0 as u64).into(),
+                                size: width.into(),
+                            }
+                        }
+                    }
                 }
             }
             Extract {
                 low_bit,
                 high_bit,
                 arg,
-            } => IrExpression::Subpiece {
-                size: (high_bit - low_bit + 1).into(),
-                low_byte: low_bit.into(),
-                arg: Box::new(IrExpression::from(*arg)),
-            },
+            } => {
+                assert!(low_bit % 8 == 0);
+                assert!((high_bit + 1) % 8 == 0);
+                IrExpression::Subpiece {
+                    size: (high_bit - low_bit + 1).into(),
+                    low_byte: low_bit.into(),
+                    arg: Box::new(IrExpression::from(*arg)),
+                }
+            }
             Concat { left, right } => IrExpression::BinOp {
                 op: IrBinOpType::Piece,
                 lhs: Box::new(IrExpression::from(*left)),

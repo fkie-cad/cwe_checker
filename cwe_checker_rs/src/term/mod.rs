@@ -58,10 +58,8 @@ impl Def {
         match self.rhs {
             Expression::Load { address, .. } => {
                 let (defs, cleaned_address, _) = extract_loads_from_expression(*address, 0);
-                let mut ir_defs: Vec<IrDef> = defs
-                    .into_iter()
-                    .map(|def| def.into_ir_assignment())
-                    .collect();
+                let mut ir_defs: Vec<IrDef> =
+                    defs.into_iter().map(|def| def.into_ir_load()).collect();
                 ir_defs.push(IrDef::Load {
                     address: cleaned_address.into(),
                     var: self.lhs.into(),
@@ -74,10 +72,8 @@ impl Def {
                 let (mut more_defs, cleaned_value, _) =
                     extract_loads_from_expression(*value, counter);
                 defs.append(&mut more_defs);
-                let mut ir_defs: Vec<IrDef> = defs
-                    .into_iter()
-                    .map(|def| def.into_ir_assignment())
-                    .collect();
+                let mut ir_defs: Vec<IrDef> =
+                    defs.into_iter().map(|def| def.into_ir_load()).collect();
                 ir_defs.push(IrDef::Store {
                     address: cleaned_address.into(),
                     value: cleaned_value.into(),
@@ -89,46 +85,70 @@ impl Def {
                 true_exp,
                 false_exp,
             } => {
-                // We only match for conditional stores.
-                // Other usages of the `IfThenElse`-expression will result in panics.
-                let (address, value) = match (*true_exp, *false_exp) {
-                    (Expression::Store { address, value, .. }, Expression::Var(var))
-                    | (Expression::Var(var), Expression::Store { address, value, .. })
-                        if var == self.lhs =>
-                    {
-                        (address, value)
-                    }
-                    _ => panic!(),
-                };
-                let (mut defs, _cleaned_condition, counter) =
-                    extract_loads_from_expression(*condition, 0);
-                let (mut more_defs, cleaned_adress, counter) =
-                    extract_loads_from_expression(*address, counter);
-                let (mut even_more_defs, cleaned_value, _) =
-                    extract_loads_from_expression(*value, counter);
-                defs.append(&mut more_defs);
-                defs.append(&mut even_more_defs);
-                let mut ir_defs: Vec<IrDef> = defs
-                    .into_iter()
-                    .map(|def| def.into_ir_assignment())
-                    .collect();
-                ir_defs.push(IrDef::Store {
-                    address: cleaned_adress.into(),
-                    value: IrExpression::Unknown {
-                        description: "BAP conditional store".into(),
-                        size: cleaned_value.bitsize().into(),
+                let (defs, cleaned_if_then_else, _) = extract_loads_from_expression(
+                    Expression::IfThenElse {
+                        condition,
+                        true_exp,
+                        false_exp,
                     },
+                    0,
+                );
+                let mut ir_defs: Vec<IrDef> =
+                    defs.into_iter().map(|def| def.into_ir_load()).collect();
+                if let Expression::IfThenElse {
+                    condition: _,
+                    true_exp,
+                    false_exp,
+                } = cleaned_if_then_else
+                {
+                    match (*true_exp, *false_exp) {
+                        (Expression::Store { address, value, .. }, Expression::Var(var))
+                        | (Expression::Var(var), Expression::Store { address, value, .. })
+                            if var == self.lhs =>
+                        {
+                            // The IfThenElse-expression is a conditional store to memory
+                            ir_defs.push(IrDef::Store {
+                                address: IrExpression::from(*address),
+                                value: IrExpression::Unknown {
+                                    description: "BAP conditional store".into(),
+                                    size: value.bitsize().into(),
+                                },
+                            });
+                        }
+                        _ => ir_defs.push(IrDef::Assign {
+                            var: self.lhs.clone().into(),
+                            value: IrExpression::Unknown {
+                                description: "BAP IfThenElse expression".into(),
+                                size: self.lhs.bitsize().unwrap().into(),
+                            },
+                        }),
+                    }
+                    ir_defs
+                } else {
+                    panic!()
+                }
+            }
+            _ => {
+                let (defs, cleaned_rhs, _) = extract_loads_from_expression(self.rhs, 0);
+                let mut ir_defs: Vec<IrDef> =
+                    defs.into_iter().map(|def| def.into_ir_load()).collect();
+                ir_defs.push(IrDef::Assign {
+                    var: self.lhs.into(),
+                    value: cleaned_rhs.into(),
                 });
                 ir_defs
             }
-            _ => vec![self.into_ir_assignment()],
         }
     }
 
-    fn into_ir_assignment(self) -> IrDef {
-        IrDef::Assign {
-            var: self.lhs.into(),
-            value: self.rhs.into(),
+    fn into_ir_load(self) -> IrDef {
+        if let Expression::Load { address, .. } = self.rhs {
+            IrDef::Load {
+                address: IrExpression::from(*address),
+                var: self.lhs.into(),
+            }
+        } else {
+            panic!()
         }
     }
 }
@@ -223,9 +243,25 @@ impl From<Blk> for IrBlk {
         let ir_jmp_terms = blk
             .jmps
             .into_iter()
-            .map(|jmp_term| Term {
-                tid: jmp_term.tid,
-                term: jmp_term.term.into(),
+            .map(|jmp_term| {
+                let (jmp, defs) = extract_loads_from_jump(jmp_term.term);
+                let mut ir_defs = Vec::new();
+                for def in defs.into_iter() {
+                    ir_defs.append(&mut def.into_ir_defs());
+                }
+                for (counter, ir_def) in ir_defs.into_iter().enumerate() {
+                    ir_def_terms.push(Term {
+                        tid: Tid {
+                            id: format!("{}_{}", jmp_term.tid.id, counter),
+                            address: jmp_term.tid.address.clone(),
+                        },
+                        term: ir_def,
+                    });
+                }
+                Term {
+                    tid: jmp_term.tid,
+                    term: jmp.into(),
+                }
             })
             .collect();
         IrBlk {
@@ -450,7 +486,30 @@ fn extract_loads_from_expression(expr: Expression, counter: u64) -> (Vec<Def>, E
             (defs, Var(temp_var), counter)
         }
         Var(_) | Const(_) | Unknown { .. } => (Vec::new(), expr, counter),
-        Store { .. } | Let { .. } | IfThenElse { .. } => panic!(),
+        Store { .. } | Let { .. } => panic!(),
+        IfThenElse {
+            condition,
+            true_exp,
+            false_exp,
+        } => {
+            let (mut defs, cleaned_cond, counter) =
+                extract_loads_from_expression(*condition, counter);
+            let (mut defs_true, cleaned_true, counter) =
+                extract_loads_from_expression(*true_exp, counter);
+            let (mut defs_false, cleaned_false, counter) =
+                extract_loads_from_expression(*false_exp, counter);
+            defs.append(&mut defs_true);
+            defs.append(&mut defs_false);
+            (
+                defs,
+                IfThenElse {
+                    condition: Box::new(cleaned_cond),
+                    true_exp: Box::new(cleaned_true),
+                    false_exp: Box::new(cleaned_false),
+                },
+                counter,
+            )
+        }
         BinOp { op, lhs, rhs } => {
             let (mut defs, cleaned_lhs, counter) = extract_loads_from_expression(*lhs, counter);
             let (mut defs_rhs, cleaned_rhs, counter) = extract_loads_from_expression(*rhs, counter);
@@ -519,6 +578,36 @@ fn extract_loads_from_expression(expr: Expression, counter: u64) -> (Vec<Def>, E
             )
         }
     }
+}
+
+fn extract_loads_from_jump(mut jmp: Jmp) -> (Jmp, Vec<Def>) {
+    let mut counter = 0;
+    let mut defs = Vec::new();
+    if let Some(condition) = jmp.condition {
+        let (mut new_defs, cleaned_condition, new_counter) =
+            extract_loads_from_expression(condition, counter);
+        counter = new_counter;
+        defs.append(&mut new_defs);
+        jmp.condition = Some(cleaned_condition);
+    }
+    match jmp.kind {
+        JmpKind::Goto(Label::Indirect(ref mut target)) => {
+            let (mut new_defs, cleaned_target, _) =
+                extract_loads_from_expression(target.clone(), counter);
+            defs.append(&mut new_defs);
+            *target = cleaned_target;
+        }
+        JmpKind::Call(ref mut call) => {
+            if let Label::Indirect(ref mut target) = call.target {
+                let (mut new_defs, cleaned_target, _) =
+                    extract_loads_from_expression(target.clone(), counter);
+                defs.append(&mut new_defs);
+                *target = cleaned_target;
+            }
+        }
+        _ => (),
+    }
+    (jmp, defs)
 }
 
 #[cfg(test)]

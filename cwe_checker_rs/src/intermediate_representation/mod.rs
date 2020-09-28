@@ -60,6 +60,12 @@ impl From<ByteSize> for apint::BitWidth {
     }
 }
 
+impl ByteSize {
+    pub fn new(value: u64) -> ByteSize {
+        ByteSize(value)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
