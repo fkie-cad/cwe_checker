@@ -266,19 +266,33 @@ impl From<Expression> for IrExpression {
                 use CastType::*;
                 match kind {
                     UNSIGNED => {
-                        assert!(width % 8 == 0);
-                        IrExpression::Cast {
-                            arg: Box::new(IrExpression::from(*arg)),
-                            op: IrCastOpType::IntZExt,
-                            size: width.into(),
+                        if width % 8 == 0 {
+                            IrExpression::Cast {
+                                arg: Box::new(IrExpression::from(*arg)),
+                                op: IrCastOpType::IntZExt,
+                                size: width.into(),
+                            }
+                        } else {
+                            IrExpression::Unknown {
+                                description: serde_json::to_string(&Cast { kind, width, arg })
+                                    .unwrap(),
+                                size: width.into(),
+                            }
                         }
                     }
                     SIGNED => {
-                        assert!(width % 8 == 0);
-                        IrExpression::Cast {
-                            arg: Box::new(IrExpression::from(*arg)),
-                            op: IrCastOpType::IntSExt,
-                            size: width.into(),
+                        if width % 8 == 0 {
+                            IrExpression::Cast {
+                                arg: Box::new(IrExpression::from(*arg)),
+                                op: IrCastOpType::IntSExt,
+                                size: width.into(),
+                            }
+                        } else {
+                            IrExpression::Unknown {
+                                description: serde_json::to_string(&Cast { kind, width, arg })
+                                    .unwrap(),
+                                size: width.into(),
+                            }
                         }
                     }
                     HIGH => {
@@ -290,12 +304,17 @@ impl From<Expression> for IrExpression {
                                 ))),
                                 rhs: Box::new(IrExpression::from(*arg)),
                             }
-                        } else {
-                            assert!(width % 8 == 0);
+                        } else if width % 8 == 0 {
                             let low_byte = (arg.bitsize() - width).into();
                             IrExpression::Subpiece {
                                 arg: Box::new(IrExpression::from(*arg)),
                                 low_byte,
+                                size: width.into(),
+                            }
+                        } else {
+                            IrExpression::Unknown {
+                                description: serde_json::to_string(&Cast { kind, width, arg })
+                                    .unwrap(),
                                 size: width.into(),
                             }
                         }
@@ -313,11 +332,16 @@ impl From<Expression> for IrExpression {
                                     rhs: Box::new(IrExpression::from(*arg)),
                                 }),
                             }
-                        } else {
-                            assert!(width % 8 == 0);
+                        } else if width % 8 == 0 {
                             IrExpression::Subpiece {
                                 arg: Box::new(IrExpression::from(*arg)),
                                 low_byte: (0 as u64).into(),
+                                size: width.into(),
+                            }
+                        } else {
+                            IrExpression::Unknown {
+                                description: serde_json::to_string(&Cast { kind, width, arg })
+                                    .unwrap(),
                                 size: width.into(),
                             }
                         }
@@ -329,12 +353,22 @@ impl From<Expression> for IrExpression {
                 high_bit,
                 arg,
             } => {
-                assert!(low_bit % 8 == 0);
-                assert!((high_bit + 1) % 8 == 0);
-                IrExpression::Subpiece {
-                    size: (high_bit - low_bit + 1).into(),
-                    low_byte: low_bit.into(),
-                    arg: Box::new(IrExpression::from(*arg)),
+                if low_bit % 8 == 0 && (high_bit + 1) % 8 == 0 {
+                    IrExpression::Subpiece {
+                        size: (high_bit - low_bit + 1).into(),
+                        low_byte: low_bit.into(),
+                        arg: Box::new(IrExpression::from(*arg)),
+                    }
+                } else {
+                    IrExpression::Unknown {
+                        description: serde_json::to_string(&Extract {
+                            low_bit,
+                            high_bit,
+                            arg,
+                        })
+                        .unwrap(),
+                        size: (high_bit - low_bit + 1).into(),
+                    }
                 }
             }
             Concat { left, right } => IrExpression::BinOp {
