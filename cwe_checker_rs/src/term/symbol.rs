@@ -61,13 +61,17 @@ impl From<ExternSymbol> for IrExternSymbol {
                 arg.intent,
                 ArgIntent::Input | ArgIntent::Both | ArgIntent::Unknown
             ) {
-                parameters.push(arg.clone().into());
+                for ir_arg in arg.clone().into_ir_args() {
+                    parameters.push(ir_arg);
+                }
             }
             if matches!(
                 arg.intent,
                 ArgIntent::Output | ArgIntent::Both | ArgIntent::Unknown
             ) {
-                return_values.push(arg.into());
+                for ir_arg in arg.into_ir_args() {
+                    return_values.push(ir_arg);
+                }
             }
         }
         IrExternSymbol {

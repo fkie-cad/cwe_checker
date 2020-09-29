@@ -436,36 +436,45 @@ impl ArgIntent {
     }
 }
 
-impl From<Arg> for IrArg {
+impl Arg {
     /// Translate extern symbol argument types.
-    fn from(arg: Arg) -> IrArg {
-        match arg.location {
-            Expression::Var(var) => IrArg::Register(var.into()),
+    pub fn into_ir_args(self) -> Vec<IrArg> {
+        match self.location {
+            Expression::Var(var) => vec![IrArg::Register(var.into())],
+            Expression::Concat { left, right } => match (*left, *right) {
+                (Expression::Var(var_left), Expression::Var(var_right)) => vec![
+                    IrArg::Register(var_left.into()),
+                    IrArg::Register(var_right.into()),
+                ],
+                _ => panic!(),
+            },
             Expression::Load {
                 address,
                 size: bitsize,
                 ..
-            } => {
-                let offset = match *address {
-                    Expression::BinOp {
-                        op: BinOpType::PLUS,
-                        lhs,
-                        rhs,
-                    } => {
-                        assert!(matches!(*lhs, Expression::Var(_)));
-                        if let Expression::Const(bitvec) = *rhs {
-                            bitvec.try_to_i64().unwrap()
-                        } else {
-                            panic!()
-                        }
-                    }
-                    _ => panic!(),
-                };
-                IrArg::Stack {
-                    offset,
+            } => match *address {
+                Expression::Var(_) => vec![IrArg::Stack {
+                    offset: 0,
                     size: bitsize.into(),
+                }],
+                Expression::BinOp {
+                    op: BinOpType::PLUS,
+                    lhs,
+                    rhs,
+                } => {
+                    assert!(matches!(*lhs, Expression::Var(_)));
+                    let offset = if let Expression::Const(bitvec) = *rhs {
+                        bitvec.try_to_i64().unwrap()
+                    } else {
+                        panic!()
+                    };
+                    vec![IrArg::Stack {
+                        offset,
+                        size: bitsize.into(),
+                    }]
                 }
-            }
+                _ => panic!(),
+            },
             _ => panic!(),
         }
     }
@@ -505,7 +514,31 @@ fn extract_loads_from_expression(expr: Expression, counter: u64) -> (Vec<Def>, E
             (defs, Var(temp_var), counter)
         }
         Var(_) | Const(_) | Unknown { .. } => (Vec::new(), expr, counter),
-        Store { .. } | Let { .. } => panic!(),
+        Let { .. } => panic!(),
+        Store {
+            memory,
+            address,
+            value,
+            endian,
+            size,
+        } => {
+            let (mut defs, cleaned_address, counter) =
+                extract_loads_from_expression(*address, counter);
+            let (mut more_defs, cleaned_value, counter) =
+                extract_loads_from_expression(*value, counter);
+            defs.append(&mut more_defs);
+            (
+                defs,
+                Store {
+                    address: Box::new(cleaned_address),
+                    value: Box::new(cleaned_value),
+                    memory,
+                    endian,
+                    size,
+                },
+                counter,
+            )
+        }
         IfThenElse {
             condition,
             true_exp,
