@@ -7,8 +7,8 @@ use crate::intermediate_representation::Jmp as IrJmp;
 use crate::intermediate_representation::Program as IrProgram;
 use crate::intermediate_representation::Project as IrProject;
 use crate::intermediate_representation::Sub as IrSub;
-use serde::{Deserialize, Serialize};
 use crate::intermediate_representation::{Term, Tid};
+use serde::{Deserialize, Serialize};
 
 pub mod symbol;
 use symbol::ExternSymbol;
@@ -207,7 +207,10 @@ impl From<Blk> for IrBlk {
             } else {
                 for (counter, ir_def) in ir_defs.into_iter().enumerate() {
                     ir_def_terms.push(Term {
-                        tid: def_term.tid.clone().with_id_suffix(&format!("_{}", counter)),
+                        tid: def_term
+                            .tid
+                            .clone()
+                            .with_id_suffix(&format!("_{}", counter)),
                         term: ir_def,
                     });
                 }
@@ -224,7 +227,10 @@ impl From<Blk> for IrBlk {
                 }
                 for (counter, ir_def) in ir_defs.into_iter().enumerate() {
                     ir_def_terms.push(Term {
-                        tid: jmp_term.tid.clone().with_id_suffix(&format!("_{}", counter)),
+                        tid: jmp_term
+                            .tid
+                            .clone()
+                            .with_id_suffix(&format!("_{}", counter)),
                         term: ir_def,
                     });
                 }

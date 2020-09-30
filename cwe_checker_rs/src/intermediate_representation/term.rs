@@ -50,15 +50,12 @@ pub struct Term<T> {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub enum Def {
     /// A memory load into the register given by `var`.
-    /// 
+    ///
     /// The size of `var` also determines the number of bytes read from memory.
     /// The size of `address` is required to match the pointer size of the corresponding CPU architecture.
-    Load {
-        var: Variable,
-        address: Expression,
-    },
+    Load { var: Variable, address: Expression },
     /// A memory store operation.
-    /// 
+    ///
     /// The size of `value` determines the number of bytes written.
     /// The size of `address` is required to match the pointer size of the corresponding CPU architecture.
     Store {
@@ -66,18 +63,15 @@ pub enum Def {
         value: Expression,
     },
     /// A register assignment, assigning the result of the expression `value` to the register `var`.
-    Assign {
-        var: Variable,
-        value: Expression,
-    },
+    Assign { var: Variable, value: Expression },
 }
 
 /// A `Jmp` instruction affects the control flow of a program, i.e. it may change the instruction pointer.
 /// With the exception of `CallOther`, it has no other side effects.
-/// 
+///
 /// `Jmp` instructions carry some semantic information with it, like whether a jump is intra- or interprocedural.
 /// Note that this semantic information may not always be correct.
-/// 
+///
 /// The targets (and return targets) of jumps are, if known, either basic blocks (`Blk`) or subroutines (`Sub`)
 /// depending of the type of the jump.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
@@ -87,21 +81,15 @@ pub enum Jmp {
     /// An indirect intraprocedural jump to the address that the given expression evaluates to.
     BranchInd(Expression),
     /// A direct intraprocedural jump that is only taken if the condition evaluates to true (i.e. not zero).
-    CBranch {
-        target: Tid,
-        condition: Expression,
-    },
+    CBranch { target: Tid, condition: Expression },
     /// A direct interprocedural jump representing a subroutine call.
-    /// 
+    ///
     /// Note that this is syntactically equivalent to a `Jmp::Branch`.
     /// If the `return_` is `None`, then the called function does not return to its caller.
-    Call {
-        target: Tid,
-        return_: Option<Tid>,
-    },
+    Call { target: Tid, return_: Option<Tid> },
     /// An indirect interprocedural jump to the address the `target` expression evaluates to
     /// and representing a subroutine call.
-    /// 
+    ///
     /// Note that this is syntactically equivalent to a `Jmp::BranchInd`.
     /// If the `return_` is `None`, then the called function is believed to not return to its caller.
     CallInd {
@@ -109,17 +97,17 @@ pub enum Jmp {
         return_: Option<Tid>,
     },
     /// A indirect interprocedural jump indicating a return from a subroutine.
-    /// 
+    ///
     /// Note that this is syntactically equivalent to a `Jmp::BranchInd`.
     Return(Expression),
     /// This instruction is used for all side effects that are not representable by other instructions
     /// or not supported by the disassembler.
-    /// 
+    ///
     /// E.g. syscalls and other interrupts are mapped to `CallOther`.
     /// Assembly instructions that the disassembler does not support are also mapped to `CallOther`.
     /// One can use the `description` field to match for and handle known side effects (e.g. syscalls).
-    /// 
-    /// The `return_` field indicates the `Blk` term identifier 
+    ///
+    /// The `return_` field indicates the `Blk` term identifier
     /// where the disassembler assumes that execution will continue after handling of the side effect.
     CallOther {
         description: String,
@@ -128,10 +116,10 @@ pub enum Jmp {
 }
 
 /// A basic block is a sequence of `Def` instructions followed by up to two `Jmp` instructions.
-/// 
+///
 /// The `Def` instructions represent side-effectful operations that are executed in order when the block is entered.
 /// `Def` instructions do not affect the control flow of a program.
-/// 
+///
 /// The `Jmp` instructions represent control flow affecting operations.
 /// There can only be zero, one or two `Jmp`s:
 /// - Zero `Jmp`s indicate that the next execution to be executed could not be discerned.
@@ -139,7 +127,7 @@ pub enum Jmp {
 /// - If there is exactly one `Jmp`, it is required to be an unconditional jump.
 /// - For two jumps, the first one has to be a conditional jump,
 /// where the second unconditional jump is only taken if the condition of the first jump evaluates to false.
-/// 
+///
 /// Basic blocks are *single entry, single exit*, i.e. a basic block is only entered at the beginning
 /// and is only exited by the jump instructions at the end of the block.
 /// If a new control flow edge is discovered that would jump to the middle of a basic block,
@@ -151,7 +139,7 @@ pub struct Blk {
 }
 
 /// A `Sub` or subroutine represents a function with a given name and a list of basic blocks belonging to it.
-/// 
+///
 /// Subroutines are *single-entry*,
 /// i.e. calling a subroutine will execute the first block in the list of basic blocks.
 /// A subroutine may have multiple exits, which are identified by `Jmp::Return` instructions.
@@ -206,7 +194,7 @@ pub struct Program {
 }
 
 /// The `Project` struct is the main data structure representing a binary.
-/// 
+///
 /// It contains information about the disassembled binary
 /// and about the execution environment of the binary.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
