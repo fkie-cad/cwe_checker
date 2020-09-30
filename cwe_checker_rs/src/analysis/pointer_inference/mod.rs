@@ -20,6 +20,7 @@ use petgraph::graph::NodeIndex;
 use petgraph::visit::IntoNodeReferences;
 use petgraph::Direction;
 use std::collections::HashMap;
+use crate::prelude::*;
 
 mod context;
 mod object;

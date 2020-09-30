@@ -21,6 +21,6 @@ mod prelude {
     pub use serde::{Deserialize, Serialize};
 
     pub use crate::bil::{BitSize, Bitvector};
-    pub use crate::term::Tid;
+    pub use crate::intermediate_representation::{Term, Tid};
     pub use anyhow::{anyhow, Error};
 }

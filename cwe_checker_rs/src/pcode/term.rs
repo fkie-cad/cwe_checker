@@ -10,7 +10,6 @@ use crate::intermediate_representation::Program as IrProgram;
 use crate::intermediate_representation::Project as IrProject;
 use crate::intermediate_representation::Sub as IrSub;
 use crate::prelude::*;
-use crate::term::{Term, Tid};
 
 // TODO: Handle the case where an indirect tail call is represented by CALLIND plus RETURN
 
