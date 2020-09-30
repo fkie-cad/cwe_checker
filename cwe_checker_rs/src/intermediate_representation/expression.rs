@@ -4,17 +4,17 @@ use crate::prelude::*;
 
 /// An expression is a calculation rule
 /// on how to compute a certain value given some variables (register values) as input.
-/// 
+///
 /// The basic building blocks of expressions are the same as for Ghidra P-Code.
 /// However, expressions can be nested, unlike original P-Code.
-/// 
+///
 /// Computing the value of an expression is a side-effect-free operation.
-/// 
+///
 /// Expressions are typed in the sense that each expression has a `ByteSize`
 /// indicating the size of the result when evaluating the expression.
 /// Some expressions impose restrictions on the sizes of their inputs
 /// for the expression to be well-typed.
-/// 
+///
 /// All operations are defined the same as the corresponding P-Code operation.
 /// Further information about specific operations can be obtained by looking up the P-Code mnemonics in the
 /// [P-Code Reference Manual](https://ghidra.re/courses/languages/html/pcoderef.html).
@@ -33,10 +33,7 @@ pub enum Expression {
         rhs: Box<Expression>,
     },
     /// A unary operation
-    UnOp {
-        op: UnOpType,
-        arg: Box<Expression>,
-    },
+    UnOp { op: UnOpType, arg: Box<Expression> },
     /// A cast operation for type cast between integer and floating point types of different byte lengths.
     Cast {
         op: CastOpType,
@@ -46,10 +43,7 @@ pub enum Expression {
     /// An unknown value but with known size.
     /// This may be generated for e.g. unsupported assembly instructions.
     /// Note that computation of an unknown value is still required to be side-effect-free!
-    Unknown {
-        description: String,
-        size: ByteSize,
-    },
+    Unknown { description: String, size: ByteSize },
     /// Extracting a sub-bitvector from the argument expression.
     Subpiece {
         low_byte: ByteSize,

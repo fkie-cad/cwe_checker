@@ -2,7 +2,7 @@ use super::ByteSize;
 use crate::prelude::*;
 
 /// A variable represents a register with a known size and name.
-/// 
+///
 /// Variables can be temporary (or virtual).
 /// In this case they do not represent actual physical registers
 /// and are only used to store intermediate results necessary for representing more complex assembly instructions.

@@ -19,7 +19,7 @@ mod term;
 pub use term::*;
 
 /// An unsigned number of bytes.
-/// 
+///
 /// Used to represent sizes of values in registers or in memory.
 /// Can also be used for other byte-valued numbers, like offsets,
 /// as long as the number is guaranteed to be non-negative.
