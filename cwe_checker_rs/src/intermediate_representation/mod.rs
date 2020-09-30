@@ -1,3 +1,12 @@
+//! This module defines the intermediate representation used to represent a binary
+//! and all its contained executable code.
+//!
+//! The main data structure is the `Project` struct,
+//! which contains all information recovered about a binary during the disassembly step.
+//! To learn how individual instructions are encoded,
+//! you should first take a look at the `Expression` type and then at the `Def` and `Jmp` data types,
+//! which form the basis of the basic block `Blk` struct.
+
 use crate::prelude::*;
 use derive_more::*;
 use std::convert::TryFrom;
@@ -9,7 +18,11 @@ pub use expression::*;
 mod term;
 pub use term::*;
 
-// TODO: move ByteSize and BitSize into their own module
+/// An unsigned number of bytes.
+/// 
+/// Used to represent sizes of values in registers or in memory.
+/// Can also be used for other byte-valued numbers, like offsets,
+/// as long as the number is guaranteed to be non-negative.
 #[derive(
     Serialize,
     Deserialize,

@@ -8,44 +8,10 @@ use crate::intermediate_representation::Program as IrProgram;
 use crate::intermediate_representation::Project as IrProject;
 use crate::intermediate_representation::Sub as IrSub;
 use serde::{Deserialize, Serialize};
+use crate::intermediate_representation::{Term, Tid};
 
 pub mod symbol;
 use symbol::ExternSymbol;
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
-pub struct Tid {
-    id: String,
-    pub address: String,
-}
-
-impl Tid {
-    pub fn new<T: ToString>(val: T) -> Tid {
-        Tid {
-            id: val.to_string(),
-            address: "UNKNOWN".to_string(),
-        }
-    }
-
-    /// Add a suffix to the ID string and return the new `Tid`
-    pub fn with_id_suffix(self, suffix: &str) -> Self {
-        Tid {
-            id: self.id + suffix,
-            address: self.address,
-        }
-    }
-}
-
-impl std::fmt::Display for Tid {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(formatter, "{}", self.id)
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
-pub struct Term<T> {
-    pub tid: Tid,
-    pub term: T,
-}
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Def {
@@ -241,10 +207,7 @@ impl From<Blk> for IrBlk {
             } else {
                 for (counter, ir_def) in ir_defs.into_iter().enumerate() {
                     ir_def_terms.push(Term {
-                        tid: Tid {
-                            id: format!("{}_{}", def_term.tid.id, counter),
-                            address: def_term.tid.address.clone(),
-                        },
+                        tid: def_term.tid.clone().with_id_suffix(&format!("_{}", counter)),
                         term: ir_def,
                     });
                 }
@@ -261,10 +224,7 @@ impl From<Blk> for IrBlk {
                 }
                 for (counter, ir_def) in ir_defs.into_iter().enumerate() {
                     ir_def_terms.push(Term {
-                        tid: Tid {
-                            id: format!("{}_{}", jmp_term.tid.id, counter),
-                            address: jmp_term.tid.address.clone(),
-                        },
+                        tid: jmp_term.tid.clone().with_id_suffix(&format!("_{}", counter)),
                         term: ir_def,
                     });
                 }
