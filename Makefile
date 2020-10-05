@@ -10,7 +10,7 @@ all:
 	cd plugins/cwe_checker_type_inference && make all
 	cd plugins/cwe_checker_type_inference_print && make all
 	cd plugins/cwe_checker_pointer_inference_debug && make all
-	mkdir ${HOME}/.config/cwe_checker
+	mkdir -p ${HOME}/.config/cwe_checker
 	cp src/utils/registers.json ${HOME}/.config/cwe_checker/registers.json
 
 test:
