@@ -8,7 +8,7 @@ impl State {
         if let Some(data) = self.register.get(variable) {
             Ok(data.clone())
         } else {
-            Ok(Data::new_top(variable.bitsize()?))
+            Ok(Data::new_top(variable.size))
         }
     }
 
@@ -28,16 +28,11 @@ impl State {
     /// Set the value of a register.
     ///
     /// Returns an error if the variable is not a register.
-    pub fn set_register(&mut self, variable: &Variable, value: Data) -> Result<(), Error> {
-        if let variable::Type::Immediate(_bitsize) = variable.type_ {
-            if !value.is_top() {
-                self.register.insert(variable.clone(), value);
-            } else {
-                self.register.remove(variable);
-            }
-            Ok(())
+    pub fn set_register(&mut self, variable: &Variable, value: Data) {
+        if !value.is_top() {
+            self.register.insert(variable.clone(), value);
         } else {
-            Err(anyhow!("Variable is not a register type"))
+            self.register.remove(variable);
         }
     }
 
@@ -47,21 +42,13 @@ impl State {
         target: &Variable,
         expression: &Expression,
     ) -> Result<(), Error> {
-        if let Expression::Var(variable) = expression {
-            if target == variable {
-                // The assign does nothing. Occurs as "do nothing"-path in conditional stores.
-                // Needs special handling, since it is the only case where the target is allowed
-                // to denote memory instead of a register.
-                return Ok(());
-            }
-        }
         match self.eval(expression) {
             Ok(new_value) => {
-                self.set_register(target, new_value)?;
+                self.set_register(target, new_value);
                 Ok(())
             }
             Err(err) => {
-                self.set_register(target, Data::new_top(target.bitsize()?))?;
+                self.set_register(target, Data::new_top(target.size));
                 Err(err)
             }
         }
@@ -103,31 +90,38 @@ impl State {
         }
     }
 
-    /// Evaluate the given store expression on the given state and return the resulting state.
+    /// Evaluate the given store instruction on the given state and return the resulting state.
     ///
     /// The function panics if given anything else than a store expression.
-    pub fn handle_store_exp(&mut self, store_exp: &Expression) -> Result<(), Error> {
-        if let Expression::Store {
-            memory: _,
-            address,
-            value,
-            endian: _,
-            size,
-        } = store_exp
-        {
-            match self.eval(value) {
-                Ok(data) => {
-                    assert_eq!(data.bitsize(), *size);
-                    self.write_to_address(address, &data)
-                }
-                Err(err) => {
-                    // we still need to write to the target location before reporting the error
-                    self.write_to_address(address, &Data::new_top(*size))?;
-                    Err(err)
-                }
+    pub fn handle_store(&mut self, address: &Expression, value: &Expression) -> Result<(), Error> {
+        match self.eval(value) {
+            Ok(data) => self.write_to_address(address, &data),
+            Err(err) => {
+                // we still need to write to the target location before reporting the error
+                self.write_to_address(address, &Data::new_top(value.bytesize()))?;
+                Err(err)
             }
-        } else {
-            panic!("Expected store expression")
+        }
+    }
+
+    /// Evaluate the given load instruction and return the data read on success.
+    pub fn load_value(&self, address: &Expression, size: ByteSize) -> Result<Data, Error> {
+        Ok(self
+            .memory
+            .get_value(&self.adjust_pointer_for_read(&self.eval(address)?), size)?)
+    }
+
+    /// Handle a load instruction by assigning the value loaded from the address given by the `address` expression to `var`.
+    pub fn handle_load(&mut self, var: &Variable, address: &Expression) -> Result<(), Error> {
+        match self.load_value(address, var.size) {
+            Ok(data) => {
+                self.set_register(var, data);
+                Ok(())
+            }
+            Err(err) => {
+                self.set_register(var, Data::new_top(var.size));
+                Err(err)
+            }
         }
     }
 
@@ -151,7 +145,7 @@ impl State {
                                 new_targets.insert(id.clone(), offset.clone());
                             }
                         }
-                        BitvectorDomain::Top(_bitsize) => {
+                        BitvectorDomain::Top(_bytesize) => {
                             for caller_id in self.caller_stack_ids.iter() {
                                 new_targets.insert(caller_id.clone(), offset.clone());
                             }
@@ -175,130 +169,39 @@ impl State {
         match expression {
             Var(variable) => self.get_register(&variable),
             Const(bitvector) => Ok(bitvector.clone().into()),
-            // TODO: implement handling of endianness for loads and writes!
-            Load {
-                memory: _,
-                address,
-                endian: _,
-                size,
-            } => Ok(self
-                .memory
-                .get_value(&self.adjust_pointer_for_read(&self.eval(address)?), *size)?),
-            Store { .. } => {
-                // This does not return an error, but panics outright.
-                // If this would return an error, it would hide a side effect, which is not allowed to happen.
-                panic!("Store expression cannot be evaluated!")
-            }
             BinOp { op, lhs, rhs } => {
-                if *op == crate::bil::BinOpType::XOR && lhs == rhs {
+                if *op == BinOpType::IntXOr && lhs == rhs {
                     // the result of `x XOR x` is always zero.
-                    return Ok(Bitvector::zero(apint::BitWidth::new(
-                        self.eval(lhs)?.bitsize() as usize
-                    )?)
-                    .into());
+                    return Ok(Bitvector::zero(apint::BitWidth::from(lhs.bytesize())).into());
                 }
                 let (left, right) = (self.eval(lhs)?, self.eval(rhs)?);
                 Ok(left.bin_op(*op, &right))
             }
             UnOp { op, arg } => Ok(self.eval(arg)?.un_op(*op)),
-            Cast { kind, width, arg } => Ok(self.eval(arg)?.cast(*kind, *width)),
-            Let {
-                var: _,
-                bound_exp: _,
-                body_exp: _,
-            } => Err(anyhow!("Let binding expression handling not implemented")),
-            Unknown { description, type_ } => {
-                if let crate::bil::variable::Type::Immediate(bitsize) = type_ {
-                    Ok(Data::new_top(*bitsize))
-                } else {
-                    Err(anyhow!("Unknown Memory operation: {}", description))
-                }
-            }
-            IfThenElse {
-                condition,
-                true_exp,
-                false_exp,
-            } => match self.eval(condition)? {
-                x if x == Bitvector::from_bit(false).into() => self.eval(false_exp),
-                x if x == Bitvector::from_bit(true).into() => self.eval(true_exp),
-                _ => Ok(self.eval(true_exp)?.merge(&self.eval(false_exp)?)),
-            },
-            Extract {
-                low_bit,
-                high_bit,
+            Cast { op, size, arg } => Ok(self.eval(arg)?.cast(*op, *size)),
+            Unknown {
+                description: _,
+                size,
+            } => Ok(Data::new_top(*size)),
+            Subpiece {
+                low_byte,
+                size,
                 arg,
-            } => Ok(self.eval(arg)?.extract(*low_bit, *high_bit)),
-            Concat { left, right } => Ok(self.eval(left)?.concat(&self.eval(right)?)),
+            } => Ok(self.eval(arg)?.subpiece(*low_byte, *size)),
         }
     }
 
     /// Check if an expression contains a use-after-free
-    pub fn contains_access_of_dangling_memory(&self, expression: &Expression) -> bool {
-        use Expression::*;
-        match expression {
-            Var(_) | Const(_) | Unknown { .. } => false,
-            Load {
-                address: address_exp,
-                ..
-            } => {
-                if let Ok(pointer) = self.eval(address_exp) {
+    pub fn contains_access_of_dangling_memory(&self, def: &Def) -> bool {
+        match def {
+            Def::Load { address, .. } | Def::Store { address, .. } => {
+                if let Ok(pointer) = self.eval(address) {
                     self.memory.is_dangling_pointer(&pointer, true)
-                        || self.contains_access_of_dangling_memory(address_exp)
                 } else {
                     false
                 }
             }
-            Store {
-                memory: _,
-                address: address_exp,
-                value: value_exp,
-                ..
-            } => {
-                let address_check = if let Ok(pointer) = self.eval(address_exp) {
-                    self.memory.is_dangling_pointer(&pointer, true)
-                } else {
-                    false
-                };
-                address_check
-                    || self.contains_access_of_dangling_memory(address_exp)
-                    || self.contains_access_of_dangling_memory(value_exp)
-            }
-            BinOp { op: _, lhs, rhs } => {
-                self.contains_access_of_dangling_memory(lhs)
-                    || self.contains_access_of_dangling_memory(rhs)
-            }
-            UnOp { op: _, arg } => self.contains_access_of_dangling_memory(arg),
-            Cast {
-                kind: _,
-                width: _,
-                arg,
-            } => self.contains_access_of_dangling_memory(arg),
-            Let {
-                var: _,
-                bound_exp,
-                body_exp,
-            } => {
-                self.contains_access_of_dangling_memory(bound_exp)
-                    || self.contains_access_of_dangling_memory(body_exp)
-            }
-            IfThenElse {
-                condition,
-                true_exp,
-                false_exp,
-            } => {
-                self.contains_access_of_dangling_memory(condition)
-                    || self.contains_access_of_dangling_memory(true_exp)
-                    || self.contains_access_of_dangling_memory(false_exp)
-            }
-            Extract {
-                low_bit: _,
-                high_bit: _,
-                arg,
-            } => self.contains_access_of_dangling_memory(arg),
-            Concat { left, right } => {
-                self.contains_access_of_dangling_memory(left)
-                    || self.contains_access_of_dangling_memory(right)
-            }
+            _ => false,
         }
     }
 

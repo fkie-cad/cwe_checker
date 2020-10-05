@@ -358,6 +358,8 @@ impl From<Project> for IrProject {
             program,
             cpu_architecture: project.cpu_architecture,
             stack_pointer_register: project.stack_pointer_register.into(),
+            callee_saved_registers: project.callee_saved_registers,
+            parameter_registers: project.parameter_registers,
         }
     }
 }

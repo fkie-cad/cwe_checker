@@ -22,8 +22,8 @@ impl DerefMut for AbstractObject {
 
 impl AbstractObject {
     /// Create a new abstract object with given object type and address bitsize.
-    pub fn new(type_: ObjectType, address_bitsize: BitSize) -> AbstractObject {
-        AbstractObject(Arc::new(AbstractObjectInfo::new(type_, address_bitsize)))
+    pub fn new(type_: ObjectType, address_bytesize: ByteSize) -> AbstractObject {
+        AbstractObject(Arc::new(AbstractObjectInfo::new(type_, address_bytesize)))
     }
 
     /// Short-circuits the `AbstractObjectInfo::merge` function if `self==other`.
@@ -53,20 +53,19 @@ pub struct AbstractObjectInfo {
 
 impl AbstractObjectInfo {
     /// Create a new abstract object with known object type and address bitsize
-    pub fn new(type_: ObjectType, address_bitsize: BitSize) -> AbstractObjectInfo {
+    pub fn new(type_: ObjectType, address_bytesize: ByteSize) -> AbstractObjectInfo {
         AbstractObjectInfo {
             pointer_targets: BTreeSet::new(),
             is_unique: true,
             state: Some(ObjectState::Alive),
             type_: Some(type_),
-            memory: MemRegion::new(address_bitsize),
+            memory: MemRegion::new(address_bytesize),
         }
     }
 
     /// Read the value at the given offset of the given size (in bits, not bytes) inside the memory region.
-    pub fn get_value(&self, offset: Bitvector, bitsize: BitSize) -> Data {
-        assert_eq!(bitsize % 8, 0);
-        self.memory.get(offset, (bitsize / 8) as u64)
+    pub fn get_value(&self, offset: Bitvector, bytesize: ByteSize) -> Data {
+        self.memory.get(offset, bytesize)
     }
 
     /// Write a value at the given offset to the memory region.
@@ -83,12 +82,12 @@ impl AbstractObjectInfo {
             } else {
                 let merged_value = self
                     .memory
-                    .get(concrete_offset.clone(), (value.bitsize() / 8) as u64)
+                    .get(concrete_offset.clone(), value.bytesize())
                     .merge(&value);
                 self.memory.add(merged_value, concrete_offset.clone());
             };
         } else {
-            self.memory = MemRegion::new(self.memory.get_address_bitsize());
+            self.memory = MemRegion::new(self.memory.get_address_bytesize());
         }
         Ok(())
     }
@@ -101,11 +100,11 @@ impl AbstractObjectInfo {
         if let BitvectorDomain::Value(ref concrete_offset) = offset {
             let merged_value = self
                 .memory
-                .get(concrete_offset.clone(), (value.bitsize() / 8) as u64)
+                .get(concrete_offset.clone(), value.bytesize())
                 .merge(&value);
             self.memory.add(merged_value, concrete_offset.clone());
         } else {
-            self.memory = MemRegion::new(self.memory.get_address_bitsize());
+            self.memory = MemRegion::new(self.memory.get_address_bytesize());
         }
     }
 
@@ -164,7 +163,7 @@ impl AbstractObjectInfo {
     /// Represents the effect of unknown write instructions to the object
     /// which may include writing pointers to targets from the `additional_targets` set to the object.
     pub fn assume_arbitrary_writes(&mut self, additional_targets: &BTreeSet<AbstractIdentifier>) {
-        self.memory = MemRegion::new(self.memory.get_address_bitsize());
+        self.memory = MemRegion::new(self.memory.get_address_bytesize());
         self.pointer_targets
             .extend(additional_targets.iter().cloned());
     }
@@ -294,7 +293,7 @@ mod tests {
             is_unique: true,
             state: Some(ObjectState::Alive),
             type_: Some(ObjectType::Heap),
-            memory: MemRegion::new(64),
+            memory: MemRegion::new(ByteSize::new(8)),
         };
         AbstractObject(Arc::new(obj_info))
     }
@@ -310,7 +309,7 @@ mod tests {
     fn new_id(tid: &str, reg_name: &str) -> AbstractIdentifier {
         AbstractIdentifier::new(
             Tid::new(tid),
-            AbstractLocation::Register(reg_name.into(), 64),
+            AbstractLocation::Register(reg_name.into(), ByteSize::new(8)),
         )
     }
 
@@ -321,19 +320,22 @@ mod tests {
         let offset = bv(-15);
         object.set_value(three, &offset).unwrap();
         assert_eq!(
-            object.get_value(Bitvector::from_i64(-16), 64),
-            Data::Top(64)
+            object.get_value(Bitvector::from_i64(-16), ByteSize::new(8)),
+            Data::Top(ByteSize::new(8))
         );
-        assert_eq!(object.get_value(Bitvector::from_i64(-15), 64), new_data(3));
+        assert_eq!(
+            object.get_value(Bitvector::from_i64(-15), ByteSize::new(8)),
+            new_data(3)
+        );
         object.set_value(new_data(4), &bv(-12)).unwrap();
         assert_eq!(
-            object.get_value(Bitvector::from_i64(-15), 64),
-            Data::Top(64)
+            object.get_value(Bitvector::from_i64(-15), ByteSize::new(8)),
+            Data::Top(ByteSize::new(8))
         );
         object.merge_value(new_data(5), &bv(-12));
         assert_eq!(
-            object.get_value(Bitvector::from_i64(-12), 64),
-            Data::Value(BitvectorDomain::new_top(64))
+            object.get_value(Bitvector::from_i64(-12), ByteSize::new(8)),
+            Data::Value(BitvectorDomain::new_top(ByteSize::new(8)))
         );
 
         let mut other_object = new_abstract_object();
@@ -341,11 +343,11 @@ mod tests {
         other_object.set_value(new_data(0), &bv(0)).unwrap();
         let merged_object = object.merge(&other_object);
         assert_eq!(
-            merged_object.get_value(Bitvector::from_i64(-12), 64),
-            Data::Top(64)
+            merged_object.get_value(Bitvector::from_i64(-12), ByteSize::new(8)),
+            Data::Top(ByteSize::new(8))
         );
         assert_eq!(
-            merged_object.get_value(Bitvector::from_i64(0), 64),
+            merged_object.get_value(Bitvector::from_i64(0), ByteSize::new(8)),
             new_data(0)
         );
     }
@@ -370,7 +372,7 @@ mod tests {
         target_map.remove(&new_id("time_1", "RAX"));
         let modified_pointer = PointerDomain::with_targets(target_map);
         assert_eq!(
-            object.get_value(Bitvector::from_i64(-15), 64),
+            object.get_value(Bitvector::from_i64(-15), ByteSize::new(8)),
             modified_pointer.into()
         );
 
@@ -384,7 +386,7 @@ mod tests {
         target_map.insert(new_id("time_234", "RBX"), bv(50));
         let modified_pointer = PointerDomain::with_targets(target_map);
         assert_eq!(
-            object.get_value(Bitvector::from_i64(-15), 64),
+            object.get_value(Bitvector::from_i64(-15), ByteSize::new(8)),
             modified_pointer.into()
         );
     }

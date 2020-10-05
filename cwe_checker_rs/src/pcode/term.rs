@@ -375,10 +375,15 @@ impl From<Project> for IrProject {
             tid: project.program.tid,
             term: project.program.term.into(),
         };
+        let (params, callee_saved) = crate::utils::get_generic_parameter_and_callee_saved_register(
+            &project.cpu_architecture,
+        );
         IrProject {
             program,
             cpu_architecture: project.cpu_architecture,
             stack_pointer_register: project.stack_pointer_register.into(),
+            callee_saved_registers: callee_saved,
+            parameter_registers: params,
         }
     }
 }
@@ -657,11 +662,11 @@ mod tests {
               }
             },
             "stack_pointer_register": {
-                "name": "ESP",
-                "size": 32,
+                "name": "RSP",
+                "size": 8,
                 "is_virtual": false
             },
-            "cpu_architecture": "x86_32"
+            "cpu_architecture": "x86_64"
         }
         "#,
         )

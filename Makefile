@@ -5,11 +5,13 @@ all:
 	cp target/release/libcwe_checker_rs.so src/dllcwe_checker_rs.so
 	dune build
 	dune install
-	cd plugins/cwe_checker; make all; cd ../..
-	cd plugins/cwe_checker_emulation; make all; cd ../..
-	cd plugins/cwe_checker_type_inference; make all; cd ../..
-	cd plugins/cwe_checker_type_inference_print; make all; cd ../..
-	cd plugins/cwe_checker_pointer_inference_debug; make all; cd ../..
+	cd plugins/cwe_checker && make all
+	cd plugins/cwe_checker_emulation && make all
+	cd plugins/cwe_checker_type_inference && make all
+	cd plugins/cwe_checker_type_inference_print && make all
+	cd plugins/cwe_checker_pointer_inference_debug && make all
+	mkdir ${HOME}/.config/cwe_checker
+	cp src/utils/registers.json ${HOME}/.config/cwe_checker/registers.json
 
 test:
 	cargo test
@@ -43,6 +45,7 @@ uninstall:
 	cd plugins/cwe_checker_type_inference; make uninstall; cd ../..
 	cd plugins/cwe_checker_type_inference_print; make uninstall; cd ../..
 	cd plugins/cwe_checker_pointer_inference_debug; make uninstall; cd ../..
+	rm -f -r ${HOME}/.config/cwe_checker
 
 documentation:
 	dune build @doc

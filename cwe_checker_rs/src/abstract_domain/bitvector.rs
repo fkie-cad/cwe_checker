@@ -1,13 +1,14 @@
-use super::{AbstractDomain, HasBitSize, HasTop, RegisterDomain};
-use crate::bil::*;
+use super::{AbstractDomain, HasByteSize, HasTop, RegisterDomain};
+use crate::bil::BitSize;
+use crate::intermediate_representation::*;
 use crate::prelude::*;
 
 /// The `BitvectorDomain` is a simple abstract domain describing a bitvector of known length.
 ///
-/// As values it can only assume a known bitvector or *Top(bitsize)*.
+/// As values it can only assume a known bitvector or *Top(bytesize)*.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub enum BitvectorDomain {
-    Top(BitSize),
+    Top(ByteSize),
     Value(Bitvector),
 }
 
@@ -28,27 +29,27 @@ impl AbstractDomain for BitvectorDomain {
 }
 
 impl HasTop for BitvectorDomain {
-    /// Return a *Top* value with the same bitsize as `self`.
+    /// Return a *Top* value with the same bytesize as `self`.
     fn top(&self) -> BitvectorDomain {
-        BitvectorDomain::Top(self.bitsize())
+        BitvectorDomain::Top(self.bytesize())
     }
 }
 
-impl HasBitSize for BitvectorDomain {
-    /// Return the bitsize of `self`.
-    fn bitsize(&self) -> BitSize {
+impl HasByteSize for BitvectorDomain {
+    /// Return the bytesize of `self`.
+    fn bytesize(&self) -> ByteSize {
         use BitvectorDomain::*;
         match self {
-            Top(bitsize) => *bitsize,
-            Value(bitvec) => bitvec.width().to_usize() as u16,
+            Top(bytesize) => *bytesize,
+            Value(bitvec) => bitvec.width().into(),
         }
     }
 }
 
 impl RegisterDomain for BitvectorDomain {
     /// Get a *Top* element with the given bitsize.
-    fn new_top(bitsize: BitSize) -> BitvectorDomain {
-        BitvectorDomain::Top(bitsize)
+    fn new_top(bytesize: ByteSize) -> BitvectorDomain {
+        BitvectorDomain::Top(bytesize)
     }
 
     /// Evaluate the given binary operation.
@@ -57,27 +58,83 @@ impl RegisterDomain for BitvectorDomain {
     fn bin_op(&self, op: BinOpType, rhs: &Self) -> Self {
         use BinOpType::*;
         match op {
-            LSHIFT | RSHIFT | ARSHIFT => (),
-            _ => assert_eq!(self.bitsize(), rhs.bitsize()),
+            Piece | IntLeft | IntRight | IntSRight => (),
+            _ => assert_eq!(self.bytesize(), rhs.bytesize()),
         }
         match (self, rhs) {
             (BitvectorDomain::Value(lhs_bitvec), BitvectorDomain::Value(rhs_bitvec)) => match op {
-                PLUS => BitvectorDomain::Value(lhs_bitvec + rhs_bitvec),
-                MINUS => BitvectorDomain::Value(lhs_bitvec - rhs_bitvec),
-                TIMES => BitvectorDomain::Value(lhs_bitvec * rhs_bitvec),
-                DIVIDE => BitvectorDomain::Value(
+                Piece => {
+                    let new_bitwidth = BitSize::from(self.bytesize() + rhs.bytesize());
+                    let upper_bits = lhs_bitvec
+                        .clone()
+                        .into_zero_extend(new_bitwidth as usize)
+                        .unwrap()
+                        .into_checked_shl(BitSize::from(rhs.bytesize()) as usize)
+                        .unwrap();
+                    let lower_bits = rhs_bitvec
+                        .clone()
+                        .into_zero_extend(new_bitwidth as usize)
+                        .unwrap();
+                    BitvectorDomain::Value(upper_bits | &lower_bits)
+                }
+                IntAdd => BitvectorDomain::Value(lhs_bitvec + rhs_bitvec),
+                IntSub => BitvectorDomain::Value(lhs_bitvec - rhs_bitvec),
+                IntCarry => {
+                    let result = lhs_bitvec + rhs_bitvec;
+                    if result.checked_ult(lhs_bitvec).unwrap()
+                        || result.checked_ult(rhs_bitvec).unwrap()
+                    {
+                        Bitvector::from_u8(1).into()
+                    } else {
+                        Bitvector::from_u8(0).into()
+                    }
+                }
+                IntSCarry => {
+                    let result = apint::Int::from(lhs_bitvec + rhs_bitvec);
+                    let lhs_bitvec = apint::Int::from(lhs_bitvec.clone());
+                    let rhs_bitvec = apint::Int::from(rhs_bitvec.clone());
+                    if (result.is_negative()
+                        && lhs_bitvec.is_positive()
+                        && rhs_bitvec.is_positive())
+                        || (!result.is_negative()
+                            && lhs_bitvec.is_negative()
+                            && rhs_bitvec.is_negative())
+                    {
+                        Bitvector::from_u8(1).into()
+                    } else {
+                        Bitvector::from_u8(0).into()
+                    }
+                }
+                IntSBorrow => {
+                    let result = apint::Int::from(lhs_bitvec - rhs_bitvec);
+                    let lhs_bitvec = apint::Int::from(lhs_bitvec.clone());
+                    let rhs_bitvec = apint::Int::from(rhs_bitvec.clone());
+                    if (result.is_negative()
+                        && !lhs_bitvec.is_positive()
+                        && rhs_bitvec.is_negative())
+                        || (result.is_positive()
+                            && lhs_bitvec.is_negative()
+                            && rhs_bitvec.is_positive())
+                    {
+                        Bitvector::from_u8(1).into()
+                    } else {
+                        Bitvector::from_u8(0).into()
+                    }
+                }
+                IntMult => BitvectorDomain::Value(lhs_bitvec * rhs_bitvec),
+                IntDiv => BitvectorDomain::Value(
                     lhs_bitvec.clone().into_checked_udiv(rhs_bitvec).unwrap(),
                 ),
-                SDIVIDE => BitvectorDomain::Value(
+                IntSDiv => BitvectorDomain::Value(
                     lhs_bitvec.clone().into_checked_sdiv(rhs_bitvec).unwrap(),
                 ),
-                MOD => BitvectorDomain::Value(
+                IntRem => BitvectorDomain::Value(
                     lhs_bitvec.clone().into_checked_urem(rhs_bitvec).unwrap(),
                 ),
-                SMOD => BitvectorDomain::Value(
+                IntSRem => BitvectorDomain::Value(
                     lhs_bitvec.clone().into_checked_srem(rhs_bitvec).unwrap(),
                 ),
-                LSHIFT => {
+                IntLeft => {
                     let shift_amount = rhs_bitvec.try_to_u64().unwrap() as usize;
                     if shift_amount < lhs_bitvec.width().to_usize() {
                         BitvectorDomain::Value(
@@ -87,7 +144,7 @@ impl RegisterDomain for BitvectorDomain {
                         BitvectorDomain::Value(Bitvector::zero(lhs_bitvec.width()))
                     }
                 }
-                RSHIFT => {
+                IntRight => {
                     let shift_amount = rhs_bitvec.try_to_u64().unwrap() as usize;
                     if shift_amount < lhs_bitvec.width().to_usize() {
                         BitvectorDomain::Value(
@@ -97,7 +154,7 @@ impl RegisterDomain for BitvectorDomain {
                         BitvectorDomain::Value(Bitvector::zero(lhs_bitvec.width()))
                     }
                 }
-                ARSHIFT => {
+                IntSRight => {
                     let shift_amount = rhs_bitvec.try_to_u64().unwrap() as usize;
                     if shift_amount < lhs_bitvec.width().to_usize() {
                         BitvectorDomain::Value(
@@ -114,34 +171,48 @@ impl RegisterDomain for BitvectorDomain {
                         }
                     }
                 }
-                AND => BitvectorDomain::Value(lhs_bitvec & rhs_bitvec),
-                OR => BitvectorDomain::Value(lhs_bitvec | rhs_bitvec),
-                XOR => BitvectorDomain::Value(lhs_bitvec ^ rhs_bitvec),
-                EQ => {
+                IntAnd | BoolAnd => BitvectorDomain::Value(lhs_bitvec & rhs_bitvec),
+                IntOr | BoolOr => BitvectorDomain::Value(lhs_bitvec | rhs_bitvec),
+                IntXOr | BoolXOr => BitvectorDomain::Value(lhs_bitvec ^ rhs_bitvec),
+                IntEqual => {
                     assert_eq!(lhs_bitvec.width(), rhs_bitvec.width());
                     BitvectorDomain::Value(Bitvector::from(lhs_bitvec == rhs_bitvec))
                 }
-                NEQ => {
+                IntNotEqual => {
                     assert_eq!(lhs_bitvec.width(), rhs_bitvec.width());
                     BitvectorDomain::Value(Bitvector::from(lhs_bitvec != rhs_bitvec))
                 }
-                LT => BitvectorDomain::Value(Bitvector::from(
+                IntLess => BitvectorDomain::Value(Bitvector::from(
                     lhs_bitvec.checked_ult(rhs_bitvec).unwrap(),
                 )),
-                LE => BitvectorDomain::Value(Bitvector::from(
+                IntLessEqual => BitvectorDomain::Value(Bitvector::from(
                     lhs_bitvec.checked_ule(rhs_bitvec).unwrap(),
                 )),
-                SLT => BitvectorDomain::Value(Bitvector::from(
+                IntSLess => BitvectorDomain::Value(Bitvector::from(
                     lhs_bitvec.checked_slt(rhs_bitvec).unwrap(),
                 )),
-                SLE => BitvectorDomain::Value(Bitvector::from(
+                IntSLessEqual => BitvectorDomain::Value(Bitvector::from(
                     lhs_bitvec.checked_sle(rhs_bitvec).unwrap(),
                 )),
+                FloatEqual | FloatNotEqual | FloatLess | FloatLessEqual => {
+                    // TODO: Implement floating point comparison operators!
+                    BitvectorDomain::new_top(ByteSize::new(1))
+                }
+                FloatAdd | FloatSub | FloatMult | FloatDiv => {
+                    // TODO: Implement floating point arithmetic operators!
+                    BitvectorDomain::new_top(self.bytesize())
+                }
             },
             _ => match op {
-                PLUS | MINUS | TIMES | DIVIDE | SDIVIDE | MOD | SMOD | LSHIFT | RSHIFT
-                | ARSHIFT | AND | OR | XOR => BitvectorDomain::new_top(self.bitsize()),
-                EQ | NEQ | LT | LE | SLT | SLE => BitvectorDomain::new_top(1),
+                Piece => BitvectorDomain::new_top(self.bytesize() + rhs.bytesize()),
+                IntAdd | IntSub | IntMult | IntDiv | IntSDiv | IntRem | IntSRem | IntLeft
+                | IntRight | IntSRight | IntAnd | IntOr | IntXOr | FloatAdd | FloatSub
+                | FloatMult | FloatDiv => BitvectorDomain::new_top(self.bytesize()),
+                IntEqual | IntNotEqual | IntLess | IntLessEqual | IntSLess | IntSLessEqual
+                | IntCarry | IntSCarry | IntSBorrow | BoolAnd | BoolOr | BoolXOr | FloatEqual
+                | FloatNotEqual | FloatLess | FloatLessEqual => {
+                    BitvectorDomain::new_top(ByteSize::new(1))
+                }
             },
         }
     }
@@ -151,73 +222,63 @@ impl RegisterDomain for BitvectorDomain {
         use UnOpType::*;
         if let BitvectorDomain::Value(bitvec) = self {
             match op {
-                NEG => BitvectorDomain::Value(-bitvec),
-                NOT => BitvectorDomain::Value(bitvec.clone().into_bitnot()),
+                Int2Comp => BitvectorDomain::Value(-bitvec),
+                IntNegate => BitvectorDomain::Value(bitvec.clone().into_bitnot()),
+                BoolNegate => {
+                    if bitvec.is_zero() {
+                        BitvectorDomain::Value(Bitvector::from_u8(1))
+                    } else {
+                        BitvectorDomain::Value(Bitvector::from_u8(0))
+                    }
+                }
+                FloatNegate | FloatAbs | FloatSqrt | FloatCeil | FloatFloor | FloatRound
+                | FloatNaN => BitvectorDomain::new_top(self.bytesize()),
             }
         } else {
-            BitvectorDomain::new_top(self.bitsize())
+            match op {
+                BoolNegate => BitvectorDomain::new_top(ByteSize::new(1)),
+                _ => BitvectorDomain::new_top(self.bytesize()),
+            }
         }
     }
 
     /// Extract a sub-bitvector out of a bitvector
-    fn extract(&self, low_bit: BitSize, high_bit: BitSize) -> Self {
+    fn subpiece(&self, low_byte: ByteSize, size: ByteSize) -> Self {
         if let BitvectorDomain::Value(bitvec) = self {
             BitvectorDomain::Value(
                 bitvec
                     .clone()
-                    .into_checked_lshr(low_bit as usize)
+                    .into_checked_lshr(BitSize::from(low_byte) as usize)
                     .unwrap()
-                    .into_truncate((high_bit - low_bit + 1) as usize)
+                    .into_truncate(BitSize::from(size) as usize)
                     .unwrap(),
             )
         } else {
-            BitvectorDomain::new_top(high_bit - low_bit + 1)
+            BitvectorDomain::new_top(size)
         }
     }
 
     /// Perform a size-changing cast on a bitvector.
-    fn cast(&self, kind: CastType, width: BitSize) -> Self {
+    fn cast(&self, kind: CastOpType, width: ByteSize) -> Self {
         if let BitvectorDomain::Value(bitvec) = self {
-            use CastType::*;
+            use CastOpType::*;
             match kind {
-                UNSIGNED => {
-                    BitvectorDomain::Value(bitvec.clone().into_zero_extend(width as usize).unwrap())
-                }
-                SIGNED => {
-                    BitvectorDomain::Value(bitvec.clone().into_sign_extend(width as usize).unwrap())
-                }
-                HIGH => BitvectorDomain::Value(
+                IntZExt => BitvectorDomain::Value(
                     bitvec
                         .clone()
-                        .into_checked_lshr((self.bitsize() - width) as usize)
-                        .unwrap()
-                        .into_truncate(width as usize)
+                        .into_zero_extend(apint::BitWidth::from(width))
                         .unwrap(),
                 ),
-                LOW => {
-                    BitvectorDomain::Value(bitvec.clone().into_truncate(width as usize).unwrap())
-                }
+                IntSExt => BitvectorDomain::Value(
+                    bitvec
+                        .clone()
+                        .into_sign_extend(apint::BitWidth::from(width))
+                        .unwrap(),
+                ),
+                Int2Float | Float2Float | Trunc => BitvectorDomain::new_top(width),
             }
         } else {
             BitvectorDomain::new_top(width)
-        }
-    }
-
-    /// Concatenate two bitvectors.
-    fn concat(&self, other: &Self) -> Self {
-        match (self, other) {
-            (BitvectorDomain::Value(left_bitvec), BitvectorDomain::Value(right_bitvec)) => {
-                let new_bitwidth = (self.bitsize() + other.bitsize()) as usize;
-                let upper_bits = left_bitvec
-                    .clone()
-                    .into_zero_extend(new_bitwidth)
-                    .unwrap()
-                    .into_checked_shl(other.bitsize() as usize)
-                    .unwrap();
-                let lower_bits = right_bitvec.clone().into_zero_extend(new_bitwidth).unwrap();
-                BitvectorDomain::Value(upper_bits | &lower_bits)
-            }
-            _ => BitvectorDomain::new_top(self.bitsize() + other.bitsize()),
         }
     }
 }
@@ -226,7 +287,7 @@ impl std::ops::Add for BitvectorDomain {
     type Output = BitvectorDomain;
 
     fn add(self, rhs: Self) -> Self {
-        self.bin_op(crate::bil::BinOpType::PLUS, &rhs)
+        self.bin_op(BinOpType::IntAdd, &rhs)
     }
 }
 
@@ -234,7 +295,7 @@ impl std::ops::Sub for BitvectorDomain {
     type Output = BitvectorDomain;
 
     fn sub(self, rhs: Self) -> Self {
-        self.bin_op(crate::bil::BinOpType::MINUS, &rhs)
+        self.bin_op(BinOpType::IntSub, &rhs)
     }
 }
 
@@ -242,7 +303,7 @@ impl std::ops::Neg for BitvectorDomain {
     type Output = BitvectorDomain;
 
     fn neg(self) -> Self {
-        self.un_op(crate::bil::UnOpType::NEG)
+        self.un_op(UnOpType::Int2Comp)
     }
 }
 
@@ -286,55 +347,55 @@ mod tests {
 
     #[test]
     fn bitvector_domain_as_value_domain() {
-        use crate::bil::BinOpType::*;
-        use crate::bil::CastType::*;
-        use crate::bil::UnOpType::*;
+        use BinOpType::*;
+        use UnOpType::*;
         let eight = bv(8);
         let sixteen = bv(16);
 
-        assert_eq!(sixteen.bin_op(PLUS, &eight), bv(24));
-        assert_eq!(sixteen.bin_op(MINUS, &eight), bv(8));
-        assert_eq!(sixteen.bin_op(TIMES, &eight), bv(16 * 8));
-        assert_eq!(sixteen.bin_op(DIVIDE, &eight), bv(2));
-        assert_eq!(sixteen.bin_op(SDIVIDE, &eight), bv(2));
-        assert_eq!(sixteen.bin_op(MOD, &eight), bv(0));
-        assert_eq!(sixteen.bin_op(SMOD, &eight), bv(0));
-        assert_eq!(sixteen.bin_op(LSHIFT, &bv(2)), bv(64));
-        assert_eq!(sixteen.bin_op(RSHIFT, &bv(2)), bv(4));
-        assert_eq!(sixteen.bin_op(ARSHIFT, &bv(2)), bv(4));
-        assert_eq!(sixteen.bin_op(AND, &eight), bv(0));
-        assert_eq!(sixteen.bin_op(OR, &eight), bv(24));
-        assert_eq!(sixteen.bin_op(XOR, &eight), bv(24));
+        assert_eq!(sixteen.bin_op(IntAdd, &eight), bv(24));
+        assert_eq!(sixteen.bin_op(IntSub, &eight), bv(8));
+        assert_eq!(sixteen.bin_op(IntMult, &eight), bv(16 * 8));
+        assert_eq!(sixteen.bin_op(IntDiv, &eight), bv(2));
+        assert_eq!(sixteen.bin_op(IntSDiv, &eight), bv(2));
+        assert_eq!(sixteen.bin_op(IntRem, &eight), bv(0));
+        assert_eq!(sixteen.bin_op(IntSRem, &eight), bv(0));
+        assert_eq!(sixteen.bin_op(IntLeft, &bv(2)), bv(64));
+        assert_eq!(sixteen.bin_op(IntRight, &bv(2)), bv(4));
+        assert_eq!(sixteen.bin_op(IntSRight, &bv(2)), bv(4));
+        assert_eq!(sixteen.bin_op(IntAnd, &eight), bv(0));
+        assert_eq!(sixteen.bin_op(IntOr, &eight), bv(24));
+        assert_eq!(sixteen.bin_op(IntXOr, &eight), bv(24));
 
         assert_eq!(
-            sixteen.bin_op(EQ, &bv(16)),
+            sixteen.bin_op(IntEqual, &bv(16)),
             BitvectorDomain::Value(Bitvector::from_bit(true))
         );
         assert_eq!(
-            sixteen.bin_op(NEQ, &bv(16)),
+            sixteen.bin_op(IntNotEqual, &bv(16)),
             BitvectorDomain::Value(Bitvector::from_bit(false))
         );
 
-        assert_eq!(sixteen.un_op(NEG), bv(-16));
-        assert_eq!(bv(0).un_op(NOT), bv(-1));
+        assert_eq!(sixteen.un_op(Int2Comp), bv(-16));
+        assert_eq!(bv(0).un_op(IntNegate), bv(-1));
 
         assert_eq!(
-            sixteen.extract(0, 31),
+            sixteen.subpiece(ByteSize::new(0), ByteSize::new(4)),
             BitvectorDomain::Value(Bitvector::from_i32(16))
         );
         assert_eq!(
-            sixteen.extract(32, 63),
+            sixteen.subpiece(ByteSize::new(4), ByteSize::new(4)),
             BitvectorDomain::Value(Bitvector::from_i32(0))
         );
 
         assert_eq!(
             BitvectorDomain::Value(Bitvector::from_i32(2)),
-            BitvectorDomain::Value(Bitvector::from_i64(2 << 32)).cast(HIGH, 32)
+            BitvectorDomain::Value(Bitvector::from_i64(2 << 32))
+                .subpiece(ByteSize::new(4), ByteSize::new(4))
         );
 
         assert_eq!(
             BitvectorDomain::Value(Bitvector::from_i32(-1))
-                .concat(&BitvectorDomain::Value(Bitvector::from_i32(-1))),
+                .bin_op(Piece, &BitvectorDomain::Value(Bitvector::from_i32(-1))),
             bv(-1)
         );
     }
@@ -342,32 +403,35 @@ mod tests {
     #[test]
     fn bitvector_domain_as_abstract_domain() {
         assert_eq!(bv(17).merge(&bv(17)), bv(17));
-        assert_eq!(bv(17).merge(&bv(16)), BitvectorDomain::new_top(64));
+        assert_eq!(
+            bv(17).merge(&bv(16)),
+            BitvectorDomain::new_top(ByteSize::new(8))
+        );
         assert!(!bv(17).is_top());
-        assert!(BitvectorDomain::new_top(64).is_top());
+        assert!(BitvectorDomain::new_top(ByteSize::new(8)).is_top());
     }
 
     #[test]
     fn arshift() {
-        use crate::bil::BinOpType::ARSHIFT;
+        use BinOpType::IntSRight;
         let positive_x = BitvectorDomain::Value(Bitvector::from_i64(31));
         let negative_x = BitvectorDomain::Value(Bitvector::from_i64(-31));
         let shift_3 = BitvectorDomain::Value(Bitvector::from_u8(3));
         let shift_70 = BitvectorDomain::Value(Bitvector::from_u8(70));
         assert_eq!(
-            positive_x.bin_op(ARSHIFT, &shift_3),
+            positive_x.bin_op(IntSRight, &shift_3),
             BitvectorDomain::Value(Bitvector::from_i64(3))
         );
         assert_eq!(
-            positive_x.bin_op(ARSHIFT, &shift_70),
+            positive_x.bin_op(IntSRight, &shift_70),
             BitvectorDomain::Value(Bitvector::from_i64(0))
         );
         assert_eq!(
-            negative_x.bin_op(ARSHIFT, &shift_3),
+            negative_x.bin_op(IntSRight, &shift_3),
             BitvectorDomain::Value(Bitvector::from_i64(-4))
         );
         assert_eq!(
-            negative_x.bin_op(ARSHIFT, &shift_70),
+            negative_x.bin_op(IntSRight, &shift_70),
             BitvectorDomain::Value(Bitvector::from_i64(-1))
         );
     }

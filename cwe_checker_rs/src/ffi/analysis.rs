@@ -12,7 +12,7 @@ fn run_pointer_inference(program_jsonbuilder_val: ocaml::Value) -> (Vec<CweWarni
         serde_json::from_value(program_json).expect("Project deserialization failed");
 
     project.replace_let_bindings();
-    crate::analysis::pointer_inference::run(&project, false)
+    crate::analysis::pointer_inference::run(&project.into(), false)
 }
 
 caml!(rs_run_pointer_inference(program_jsonbuilder_val) {
@@ -31,7 +31,7 @@ fn run_pointer_inference_and_print_debug(program_jsonbuilder_val: ocaml::Value) 
         serde_json::from_value(program_json).expect("Project deserialization failed");
 
     project.replace_let_bindings();
-    crate::analysis::pointer_inference::run(&project, true); // Note: This discard all CweWarnings and log messages.
+    crate::analysis::pointer_inference::run(&project.into(), true); // Note: This discard all CweWarnings and log messages.
 }
 
 caml!(rs_run_pointer_inference_and_print_debug(program_jsonbuilder_val) {

@@ -181,6 +181,30 @@ pub struct ExternSymbol {
     pub no_return: bool,
 }
 
+impl ExternSymbol {
+    /// If the extern symbol has exactly one return value that is passed in a register,
+    /// return the register.
+    pub fn get_unique_return_register(&self) -> Result<&Variable, Error> {
+        if self.return_values.len() == 1 {
+            match self.return_values[0] {
+                Arg::Register(ref var) => Ok(var),
+                Arg::Stack { .. } => Err(anyhow!("Return value is passed on the stak")),
+            }
+        } else {
+            Err(anyhow!("Wrong number of return values"))
+        }
+    }
+
+    /// If the extern symbol has exactly one parameter, return the parameter.
+    pub fn get_unique_parameter(&self) -> Result<&Arg, Error> {
+        if self.parameters.len() == 1 {
+            Ok(&self.parameters[0])
+        } else {
+            Err(anyhow!("Wrong number of parameter values"))
+        }
+    }
+}
+
 /// The `Program` structure represents a disassembled binary.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Program {
@@ -205,4 +229,19 @@ pub struct Project {
     pub cpu_architecture: String,
     /// The stack pointer register for the given CPU architecture.
     pub stack_pointer_register: Variable,
+    /// The names of callee-saved registers for the standard calling convention
+    /// for the given CPU architecture.
+    /// Note that this field may be removed in the future.
+    pub callee_saved_registers: Vec<String>,
+    /// The names of parameter registers for the standard calling convention
+    /// for the given CPU architecture.
+    /// Note that this field may be removed in the future.
+    pub parameter_registers: Vec<String>,
+}
+
+impl Project {
+    /// Return the size (in bytes) for pointers of the given architecture.
+    pub fn get_pointer_bytesize(&self) -> ByteSize {
+        self.stack_pointer_register.size
+    }
 }

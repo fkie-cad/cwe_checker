@@ -52,6 +52,32 @@ pub enum Expression {
     },
 }
 
+impl Expression {
+    /// Return the size (in bytes) of the result value of the expression.
+    pub fn bytesize(&self) -> ByteSize {
+        use BinOpType::*;
+        use Expression::*;
+        match self {
+            Var(var) => var.size,
+            Const(bitvec) => bitvec.width().into(),
+            BinOp { op, lhs, rhs } => match op {
+                Piece => lhs.bytesize() + rhs.bytesize(),
+                IntEqual | IntNotEqual | IntLess | IntSLess | IntLessEqual | IntSLessEqual
+                | IntCarry | IntSCarry | IntSBorrow | BoolXOr | BoolOr | BoolAnd | FloatEqual
+                | FloatNotEqual | FloatLess | FloatLessEqual => ByteSize::new(1),
+                IntAdd | IntSub | IntAnd | IntOr | IntXOr | IntLeft | IntRight | IntSRight
+                | IntMult | IntDiv | IntRem | IntSDiv | IntSRem | FloatAdd | FloatSub
+                | FloatMult | FloatDiv => lhs.bytesize(),
+            },
+            UnOp { op, arg } => match op {
+                UnOpType::FloatNaN => ByteSize::new(1),
+                _ => arg.bytesize(),
+            },
+            Cast { size, .. } | Unknown { size, .. } | Subpiece { size, .. } => *size,
+        }
+    }
+}
+
 /// The type/mnemonic of a binary operation
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum BinOpType {

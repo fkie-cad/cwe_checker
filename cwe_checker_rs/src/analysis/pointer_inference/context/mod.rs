@@ -1,10 +1,8 @@
 use super::object::ObjectType;
 use crate::abstract_domain::*;
 use crate::analysis::graph::Graph;
-use crate::bil::Expression;
+use crate::intermediate_representation::*;
 use crate::prelude::*;
-use crate::term::symbol::ExternSymbol;
-use crate::term::*;
 use crate::utils::log::*;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
@@ -84,10 +82,10 @@ impl<'a> Context<'a> {
         return_term: &Term<Jmp>,
     ) {
         let expected_stack_pointer_offset = match self.project.cpu_architecture.as_str() {
-            "x86" | "x86_64" => Bitvector::from_u16(self.project.get_pointer_bitsize() / 8)
-                .into_zero_extend(self.project.get_pointer_bitsize() as usize)
+            "x86" | "x86_64" => Bitvector::from_u64(u64::from(self.project.get_pointer_bytesize()))
+                .into_truncate(apint::BitWidth::from(self.project.get_pointer_bytesize()))
                 .unwrap(),
-            _ => Bitvector::zero((self.project.get_pointer_bitsize() as usize).into()),
+            _ => Bitvector::zero(apint::BitWidth::from(self.project.get_pointer_bytesize())),
         };
         match state_before_return.get_register(&self.project.stack_pointer_register) {
             Ok(Data::Pointer(pointer)) => {
@@ -134,21 +132,18 @@ impl<'a> Context<'a> {
                     call.tid.clone(),
                     AbstractLocation::from_var(return_register).unwrap(),
                 );
-                let address_bitsize = self.project.stack_pointer_register.bitsize().unwrap();
+                let address_bytesize = self.project.get_pointer_bytesize();
                 state.memory.add_abstract_object(
                     object_id.clone(),
-                    Bitvector::zero((address_bitsize as usize).into()).into(),
+                    Bitvector::zero(apint::BitWidth::from(address_bytesize)).into(),
                     super::object::ObjectType::Heap,
-                    address_bitsize,
+                    address_bytesize,
                 );
                 let pointer = PointerDomain::new(
                     object_id,
-                    Bitvector::zero((address_bitsize as usize).into()).into(),
+                    Bitvector::zero(apint::BitWidth::from(address_bytesize)).into(),
                 );
-                self.log_debug(
-                    state.set_register(return_register, pointer.into()),
-                    Some(&call.tid),
-                );
+                state.set_register(return_register, pointer.into());
                 Some(state)
             }
             Err(err) => {
@@ -156,6 +151,27 @@ impl<'a> Context<'a> {
                 self.log_debug(Err(err), Some(&call.tid));
                 Some(state)
             }
+        }
+    }
+
+    /// Evaluate the value of a parameter of an extern symbol for the given state.
+    fn eval_parameter_arg(&self, state: &State, parameter: &Arg) -> Result<Data, Error> {
+        match parameter {
+            Arg::Register(var) => state.eval(&Expression::Var(var.clone())),
+            Arg::Stack { offset, size } => state.load_value(
+                &Expression::BinOp {
+                    op: BinOpType::IntAdd,
+                    lhs: Box::new(Expression::Var(self.project.stack_pointer_register.clone())),
+                    rhs: Box::new(Expression::Const(
+                        Bitvector::from_i64(*offset)
+                            .into_truncate(apint::BitWidth::from(
+                                self.project.get_pointer_bytesize(),
+                            ))
+                            .unwrap(),
+                    )),
+                },
+                *size,
+            ),
         }
     }
 
@@ -170,43 +186,46 @@ impl<'a> Context<'a> {
         extern_symbol: &ExternSymbol,
     ) -> Option<State> {
         match extern_symbol.get_unique_parameter() {
-            Ok(parameter_expression) => match state.eval(parameter_expression) {
-                Ok(memory_object_pointer) => {
-                    if let Data::Pointer(pointer) = memory_object_pointer {
-                        if let Err(possible_double_frees) =
-                            new_state.mark_mem_object_as_freed(&pointer)
-                        {
-                            let warning = CweWarning {
-                                name: "CWE415".to_string(),
-                                version: VERSION.to_string(),
-                                addresses: vec![call.tid.address.clone()],
-                                tids: vec![format!("{}", call.tid)],
-                                symbols: Vec::new(),
-                                other: vec![possible_double_frees
-                                    .into_iter()
-                                    .map(|(id, err)| format!("{}: {}", id, err))
-                                    .collect()],
-                                description: format!(
-                                    "(Double Free) Object may have been freed before at {}",
-                                    call.tid.address
-                                ),
-                            };
-                            self.cwe_collector.send(warning).unwrap();
+            Ok(parameter) => {
+                let parameter_value = self.eval_parameter_arg(state, parameter);
+                match parameter_value {
+                    Ok(memory_object_pointer) => {
+                        if let Data::Pointer(pointer) = memory_object_pointer {
+                            if let Err(possible_double_frees) =
+                                new_state.mark_mem_object_as_freed(&pointer)
+                            {
+                                let warning = CweWarning {
+                                    name: "CWE415".to_string(),
+                                    version: VERSION.to_string(),
+                                    addresses: vec![call.tid.address.clone()],
+                                    tids: vec![format!("{}", call.tid)],
+                                    symbols: Vec::new(),
+                                    other: vec![possible_double_frees
+                                        .into_iter()
+                                        .map(|(id, err)| format!("{}: {}", id, err))
+                                        .collect()],
+                                    description: format!(
+                                        "(Double Free) Object may have been freed before at {}",
+                                        call.tid.address
+                                    ),
+                                };
+                                self.cwe_collector.send(warning).unwrap();
+                            }
+                        } else {
+                            self.log_debug(
+                                Err(anyhow!("Free on a non-pointer value called.")),
+                                Some(&call.tid),
+                            );
                         }
-                    } else {
-                        self.log_debug(
-                            Err(anyhow!("Free on a non-pointer value called.")),
-                            Some(&call.tid),
-                        );
+                        new_state.remove_unreferenced_objects();
+                        Some(new_state)
                     }
-                    new_state.remove_unreferenced_objects();
-                    Some(new_state)
+                    Err(err) => {
+                        self.log_debug(Err(err), Some(&call.tid));
+                        Some(new_state)
+                    }
                 }
-                Err(err) => {
-                    self.log_debug(Err(err), Some(&call.tid));
-                    Some(new_state)
-                }
-            },
+            }
             Err(err) => {
                 // We do not know which memory object to free
                 self.log_debug(Err(err), Some(&call.tid));
@@ -222,12 +241,8 @@ impl<'a> Context<'a> {
         call: &Term<Jmp>,
         extern_symbol: &ExternSymbol,
     ) {
-        for argument in extern_symbol
-            .arguments
-            .iter()
-            .filter(|arg| arg.intent.is_input())
-        {
-            match state.eval(&argument.location) {
+        for parameter in extern_symbol.parameters.iter() {
+            match self.eval_parameter_arg(state, parameter) {
                 Ok(value) => {
                     if state.memory.is_dangling_pointer(&value, true) {
                         let warning = CweWarning {
@@ -247,8 +262,8 @@ impl<'a> Context<'a> {
                 }
                 Err(err) => self.log_debug(
                     Err(err.context(format!(
-                        "Function argument expression {:?} could not be evaluated",
-                        argument.location
+                        "Function parameter {:?} could not be evaluated",
+                        parameter
                     ))),
                     Some(&call.tid),
                 ),
@@ -266,11 +281,11 @@ impl<'a> Context<'a> {
         extern_symbol: &ExternSymbol,
     ) -> Option<State> {
         self.log_debug(
-            new_state.clear_stack_parameter(extern_symbol),
+            new_state.clear_stack_parameter(extern_symbol, &self.project.stack_pointer_register),
             Some(&call.tid),
         );
         let mut possible_referenced_ids = BTreeSet::new();
-        if extern_symbol.arguments.is_empty() {
+        if extern_symbol.parameters.is_empty() && extern_symbol.return_values.is_empty() {
             // We assume here that we do not know the parameters and approximate them by all possible parameter registers.
             // This approximation is wrong if the function is known but has neither parameters nor return values.
             // We cannot distinguish these two cases yet.
@@ -280,12 +295,8 @@ impl<'a> Context<'a> {
                 }
             }
         } else {
-            for parameter in extern_symbol
-                .arguments
-                .iter()
-                .filter(|arg| arg.intent.is_input())
-            {
-                if let Ok(data) = state.eval(&parameter.location) {
+            for parameter in extern_symbol.parameters.iter() {
+                if let Ok(data) = self.eval_parameter_arg(state, parameter) {
                     possible_referenced_ids.append(&mut data.referenced_ids());
                 }
             }
@@ -312,13 +323,13 @@ impl<'a> Context<'a> {
                 if *stack_id == state.stack_id {
                     stack_offset_domain.clone()
                 } else {
-                    BitvectorDomain::new_top(stack_pointer.bitsize())
+                    BitvectorDomain::new_top(stack_pointer.bytesize())
                 }
             } else {
-                BitvectorDomain::new_top(self.project.stack_pointer_register.bitsize().unwrap())
+                BitvectorDomain::new_top(self.project.stack_pointer_register.size)
             }
         } else {
-            BitvectorDomain::new_top(self.project.stack_pointer_register.bitsize().unwrap())
+            BitvectorDomain::new_top(self.project.stack_pointer_register.size)
         }
     }
 }

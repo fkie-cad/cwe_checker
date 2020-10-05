@@ -13,9 +13,8 @@
 
 use super::fixpoint::Context as GeneralFPContext;
 use super::graph::*;
-use crate::bil::Expression;
+use crate::intermediate_representation::*;
 use crate::prelude::*;
-use crate::term::*;
 use fnv::FnvHashMap;
 use petgraph::graph::{EdgeIndex, NodeIndex};
 use std::marker::PhantomData;
