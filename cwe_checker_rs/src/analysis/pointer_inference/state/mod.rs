@@ -1,9 +1,8 @@
 use super::object_list::AbstractObjectList;
 use super::Data;
 use crate::abstract_domain::*;
-use crate::bil::*;
+use crate::intermediate_representation::*;
 use crate::prelude::*;
-use crate::term::symbol::ExternSymbol;
 use std::collections::{BTreeMap, BTreeSet};
 
 mod access_handling;
@@ -50,16 +49,13 @@ impl State {
             stack_register.clone(),
             PointerDomain::new(
                 stack_id.clone(),
-                Bitvector::zero((stack_register.bitsize().unwrap() as usize).into()).into(),
+                Bitvector::zero(apint::BitWidth::from(stack_register.size)).into(),
             )
             .into(),
         );
         State {
             register,
-            memory: AbstractObjectList::from_stack_id(
-                stack_id.clone(),
-                stack_register.bitsize().unwrap(),
-            ),
+            memory: AbstractObjectList::from_stack_id(stack_id.clone(), stack_register.size),
             stack_id,
             caller_stack_ids: BTreeSet::new(),
             ids_known_to_caller: BTreeSet::new(),
@@ -89,18 +85,27 @@ impl State {
 
     /// Mark those parameter values of an extern function call, that are passed on the stack,
     /// as unknown data (since the function may modify them).
-    pub fn clear_stack_parameter(&mut self, extern_call: &ExternSymbol) -> Result<(), Error> {
+    pub fn clear_stack_parameter(
+        &mut self,
+        extern_call: &ExternSymbol,
+        stack_pointer_register: &Variable,
+    ) -> Result<(), Error> {
         let mut result_log = Ok(());
-        for arg in &extern_call.arguments {
-            match &arg.location {
-                Expression::Var(_) => {}
-                location_expression => {
-                    let arg_size = arg
-                        .var
-                        .bitsize()
-                        .expect("Encountered argument with unknown size");
-                    let data_top = Data::new_top(arg_size);
-                    if let Err(err) = self.write_to_address(location_expression, &data_top) {
+        for arg in &extern_call.parameters {
+            match arg {
+                Arg::Register(_) => (),
+                Arg::Stack { offset, size } => {
+                    let data_top = Data::new_top(*size);
+                    let location_expression = Expression::BinOp {
+                        lhs: Box::new(Expression::Var(stack_pointer_register.clone())),
+                        op: BinOpType::IntAdd,
+                        rhs: Box::new(Expression::Const(
+                            Bitvector::from_i64(*offset)
+                                .into_truncate(apint::BitWidth::from(stack_pointer_register.size))
+                                .unwrap(),
+                        )),
+                    };
+                    if let Err(err) = self.write_to_address(&location_expression, &data_top) {
                         result_log = Err(err);
                     }
                 }

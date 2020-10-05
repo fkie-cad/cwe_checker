@@ -1,7 +1,7 @@
 use super::{
-    AbstractDomain, AbstractIdentifier, HasBitSize, HasTop, PointerDomain, RegisterDomain,
+    AbstractDomain, AbstractIdentifier, HasByteSize, HasTop, PointerDomain, RegisterDomain,
 };
-use crate::bil::*;
+use crate::intermediate_representation::*;
 use crate::prelude::*;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Display;
@@ -10,7 +10,7 @@ use std::fmt::Display;
 /// Both non-pointer values and offsets of pointers are represented by the same abstract domain `T`.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub enum DataDomain<T: RegisterDomain> {
-    Top(BitSize),
+    Top(ByteSize),
     Pointer(PointerDomain<T>),
     Value(T),
 }
@@ -54,7 +54,7 @@ impl<T: RegisterDomain> DataDomain<T> {
                 })
                 .collect();
             if remaining_targets.is_empty() {
-                *self = Self::new_top(self.bitsize());
+                *self = Self::new_top(self.bytesize());
             } else {
                 *self = Self::Pointer(PointerDomain::with_targets(remaining_targets));
             }
@@ -62,14 +62,14 @@ impl<T: RegisterDomain> DataDomain<T> {
     }
 }
 
-impl<T: RegisterDomain> HasBitSize for DataDomain<T> {
+impl<T: RegisterDomain> HasByteSize for DataDomain<T> {
     // Return the bitsize of `self`.
-    fn bitsize(&self) -> BitSize {
+    fn bytesize(&self) -> ByteSize {
         use DataDomain::*;
         match self {
             Top(size) => *size,
-            Pointer(pointer) => pointer.bitsize(),
-            Value(bitvec) => bitvec.bitsize(),
+            Pointer(pointer) => pointer.bytesize(),
+            Value(bitvec) => bitvec.bytesize(),
         }
     }
 }
@@ -77,14 +77,14 @@ impl<T: RegisterDomain> HasBitSize for DataDomain<T> {
 impl<T: RegisterDomain> HasTop for DataDomain<T> {
     // Generate a new *Top* element with the same bitsize as `self`.
     fn top(&self) -> Self {
-        DataDomain::new_top(self.bitsize())
+        DataDomain::new_top(self.bytesize())
     }
 }
 
 impl<T: RegisterDomain> RegisterDomain for DataDomain<T> {
-    // Return a new *Top* element with the given bitsize
-    fn new_top(bitsize: BitSize) -> Self {
-        Self::Top(bitsize)
+    // Return a new *Top* element with the given bytesize
+    fn new_top(bytesize: ByteSize) -> Self {
+        Self::Top(bytesize)
     }
 
     /// Compute the (abstract) result of a binary operation
@@ -93,40 +93,58 @@ impl<T: RegisterDomain> RegisterDomain for DataDomain<T> {
         use DataDomain::*;
         match (self, op, rhs) {
             (Value(left), _, Value(right)) => Value(left.bin_op(op, right)),
-            (Pointer(pointer), PLUS, Value(value)) | (Value(value), PLUS, Pointer(pointer)) => {
+            (Pointer(pointer), IntAdd, Value(value)) | (Value(value), IntAdd, Pointer(pointer)) => {
                 Pointer(pointer.add_to_offset(value))
             }
-            (Pointer(pointer), MINUS, Value(value)) => Pointer(pointer.sub_from_offset(value)),
-            (Pointer(pointer_lhs), MINUS, Pointer(pointer_rhs)) => {
+            (Pointer(pointer), IntSub, Value(value)) => Pointer(pointer.sub_from_offset(value)),
+            (Pointer(pointer_lhs), IntSub, Pointer(pointer_rhs)) => {
                 if pointer_lhs.ids().len() == 1 && pointer_rhs.ids().len() == 1 {
                     let (id_lhs, offset_lhs) = pointer_lhs.targets().iter().next().unwrap();
                     let (id_rhs, offset_rhs) = pointer_rhs.targets().iter().next().unwrap();
                     if id_lhs == id_rhs {
-                        Self::Value(offset_lhs.bin_op(MINUS, offset_rhs))
+                        Self::Value(offset_lhs.bin_op(IntSub, offset_rhs))
                     } else {
-                        Self::Top(self.bitsize())
+                        Self::Top(self.bytesize())
                     }
                 } else {
                     // We cannot be sure that both pointers point to the same target
-                    Self::Top(self.bitsize())
+                    Self::Top(self.bytesize())
                 }
             }
-            (_, EQ, _) | (_, NEQ, _) | (_, LT, _) | (_, LE, _) | (_, SLT, _) | (_, SLE, _) => {
-                T::new_top(1).into()
-            }
-            (_, PLUS, _)
-            | (_, MINUS, _)
-            | (_, TIMES, _)
-            | (_, DIVIDE, _)
-            | (_, SDIVIDE, _)
-            | (_, MOD, _)
-            | (_, SMOD, _)
-            | (_, LSHIFT, _)
-            | (_, RSHIFT, _)
-            | (_, ARSHIFT, _)
-            | (_, AND, _)
-            | (_, OR, _)
-            | (_, XOR, _) => Self::new_top(self.bitsize()),
+            (_, IntEqual, _)
+            | (_, IntNotEqual, _)
+            | (_, IntLess, _)
+            | (_, IntLessEqual, _)
+            | (_, IntSLess, _)
+            | (_, IntSLessEqual, _)
+            | (_, IntCarry, _)
+            | (_, IntSCarry, _)
+            | (_, IntSBorrow, _)
+            | (_, BoolXOr, _)
+            | (_, BoolOr, _)
+            | (_, BoolAnd, _)
+            | (_, FloatEqual, _)
+            | (_, FloatNotEqual, _)
+            | (_, FloatLess, _)
+            | (_, FloatLessEqual, _) => T::new_top(ByteSize::new(1)).into(),
+            (_, IntAdd, _)
+            | (_, IntSub, _)
+            | (_, IntMult, _)
+            | (_, IntDiv, _)
+            | (_, IntSDiv, _)
+            | (_, IntRem, _)
+            | (_, IntSRem, _)
+            | (_, IntLeft, _)
+            | (_, IntRight, _)
+            | (_, IntSRight, _)
+            | (_, IntAnd, _)
+            | (_, IntOr, _)
+            | (_, IntXOr, _)
+            | (_, FloatAdd, _)
+            | (_, FloatSub, _)
+            | (_, FloatMult, _)
+            | (_, FloatDiv, _) => Self::new_top(self.bytesize()),
+            (_, Piece, _) => Self::new_top(self.bytesize() + rhs.bytesize()),
         }
     }
 
@@ -135,39 +153,26 @@ impl<T: RegisterDomain> RegisterDomain for DataDomain<T> {
         if let Self::Value(value) = self {
             Self::Value(value.un_op(op))
         } else {
-            Self::new_top(self.bitsize())
+            Self::new_top(self.bytesize())
         }
     }
 
     /// extract a sub-bitvector
-    fn extract(&self, low_bit: BitSize, high_bit: BitSize) -> Self {
+    fn subpiece(&self, low_byte: ByteSize, size: ByteSize) -> Self {
         if let Self::Value(value) = self {
-            Self::Value(value.extract(low_bit, high_bit))
+            Self::Value(value.subpiece(low_byte, size))
         } else {
-            Self::new_top(high_bit - low_bit + 1)
+            Self::new_top(size)
         }
     }
 
-    /// Extend or shrink a bitvector using the given cast type
-    fn cast(&self, kind: CastType, width: BitSize) -> Self {
-        if self.bitsize() == width {
-            // The cast is a no-op.
-            return self.clone();
-        }
+    /// Cast a bitvector using the given cast type
+    fn cast(&self, kind: CastOpType, width: ByteSize) -> Self {
         if let Self::Value(value) = self {
             Self::Value(value.cast(kind, width))
         } else {
-            // The result of extending or shrinking pointers is undefined.
+            // The result of casting pointers is undefined.
             Self::new_top(width)
-        }
-    }
-
-    /// Concatenate two bitvectors.
-    fn concat(&self, other: &Self) -> Self {
-        if let (Self::Value(upper_bits), Self::Value(lower_bits)) = (self, other) {
-            Self::Value(upper_bits.concat(lower_bits))
-        } else {
-            Self::new_top(self.bitsize() + other.bitsize())
         }
     }
 }
@@ -177,10 +182,10 @@ impl<T: RegisterDomain> AbstractDomain for DataDomain<T> {
     fn merge(&self, other: &Self) -> Self {
         use DataDomain::*;
         match (self, other) {
-            (Top(bitsize), _) | (_, Top(bitsize)) => Top(*bitsize),
+            (Top(bytesize), _) | (_, Top(bytesize)) => Top(*bytesize),
             (Pointer(pointer1), Pointer(pointer2)) => Pointer(pointer1.merge(pointer2)),
             (Value(val1), Value(val2)) => Value(val1.merge(val2)),
-            (Pointer(_), Value(_)) | (Value(_), Pointer(_)) => Top(self.bitsize()),
+            (Pointer(_), Value(_)) | (Value(_), Pointer(_)) => Top(self.bytesize()),
         }
     }
 
@@ -245,7 +250,7 @@ mod tests {
     fn new_id(name: &str) -> AbstractIdentifier {
         AbstractIdentifier::new(
             Tid::new("time0"),
-            AbstractLocation::Register(name.into(), 64),
+            AbstractLocation::Register(name.into(), ByteSize::new(8)),
         )
     }
 
@@ -267,10 +272,10 @@ mod tests {
         let pointer = new_pointer("Rax".into(), 0);
         let data = new_value(42);
         assert_eq!(pointer.merge(&pointer), pointer);
-        assert_eq!(pointer.merge(&data), Data::new_top(64));
+        assert_eq!(pointer.merge(&data), Data::new_top(ByteSize::new(8)));
         assert_eq!(
             data.merge(&new_value(41)),
-            Data::Value(BitvectorDomain::new_top(64))
+            Data::Value(BitvectorDomain::new_top(ByteSize::new(8)))
         );
 
         let other_pointer = new_pointer("Rbx".into(), 0);
@@ -282,27 +287,30 @@ mod tests {
 
     #[test]
     fn data_register_domain() {
-        use crate::bil::BinOpType::*;
+        use BinOpType::*;
         let data = new_value(42);
-        assert_eq!(data.bitsize(), 64);
+        assert_eq!(data.bytesize(), ByteSize::new(8));
 
         let three = new_value(3);
         let pointer = new_pointer("Rax".into(), 0);
-        assert_eq!(data.bin_op(PLUS, &three), new_value(45));
-        assert_eq!(pointer.bin_op(PLUS, &three), new_pointer("Rax".into(), 3));
-        assert_eq!(three.un_op(crate::bil::UnOpType::NEG), new_value(-3));
+        assert_eq!(data.bin_op(IntAdd, &three), new_value(45));
+        assert_eq!(pointer.bin_op(IntAdd, &three), new_pointer("Rax".into(), 3));
+        assert_eq!(three.un_op(UnOpType::Int2Comp), new_value(-3));
 
         assert_eq!(
-            three.extract(0, 31),
+            three.subpiece(ByteSize::new(0), ByteSize::new(4)),
             Data::Value(BitvectorDomain::Value(Bitvector::from_i32(3)))
         );
 
-        assert_eq!(data.cast(crate::bil::CastType::SIGNED, 128).bitsize(), 128);
+        assert_eq!(
+            data.cast(CastOpType::IntSExt, ByteSize::new(16)).bytesize(),
+            ByteSize::new(16)
+        );
 
         let one = Data::Value(BitvectorDomain::Value(Bitvector::from_i32(1)));
         let two = Data::Value(BitvectorDomain::Value(Bitvector::from_i32(2)));
         let concat = new_value((1 << 32) + 2);
-        assert_eq!(one.concat(&two), concat);
+        assert_eq!(one.bin_op(Piece, &two), concat);
     }
 
     #[test]

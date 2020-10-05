@@ -15,6 +15,7 @@ fnv = "1.0" # a faster hash function for small keys like integers
 anyhow = "1.0" # for easy error types
 crossbeam-channel = "0.4"
 derive_more = "0.99"
+directories = "3.0"
 
 [lib]
 name = "cwe_checker_rs"

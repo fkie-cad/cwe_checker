@@ -1,7 +1,7 @@
 //! This module defines traits describing general properties of abstract domains
 //! as well as several abstract domain types implementing these traits.
 
-use crate::bil::*;
+use crate::intermediate_representation::*;
 
 mod bitvector;
 pub use bitvector::*;
@@ -29,14 +29,14 @@ pub trait AbstractDomain: Sized + Eq + Clone {
     fn is_top(&self) -> bool;
 }
 
-/// A trait for types representing values with a fixed size (in bits).
+/// A trait for types representing values with a fixed size (in bytes).
 ///
-/// For abstract domains, the bitsize is a parameter of the domain itself,
-/// i.e. you cannot merge values of different bitsizes,
-/// since they lie in different posets (one for each bitsize).
-pub trait HasBitSize {
-    /// Return the size of the represented value in bits.
-    fn bitsize(&self) -> BitSize;
+/// For abstract domains, the bytesize is a parameter of the domain itself,
+/// i.e. you cannot merge values of different bytesizes,
+/// since they lie in different posets (one for each bytesize).
+pub trait HasByteSize {
+    /// Return the size of the represented value in bytes.
+    fn bytesize(&self) -> ByteSize;
 }
 
 /// An abstract domain implementing this trait has a global maximum, i.e. a *Top* element.
@@ -52,11 +52,11 @@ pub trait HasTop {
 /// A trait for abstract domains that can represent values loaded into CPU register.
 ///
 /// The domain implements all general operations used to manipulate register values.
-/// The domain is parametrized by its bitsize (which represents the size of the register).
-/// It has a *Top* element, which is only characterized by its bitsize.
-pub trait RegisterDomain: AbstractDomain + HasBitSize + HasTop {
-    /// Return a new top element with the given bitsize
-    fn new_top(bitsize: BitSize) -> Self;
+/// The domain is parametrized by its bytesize (which represents the size of the register).
+/// It has a *Top* element, which is only characterized by its bytesize.
+pub trait RegisterDomain: AbstractDomain + HasByteSize + HasTop {
+    /// Return a new top element with the given bytesize
+    fn new_top(bytesize: ByteSize) -> Self;
 
     /// Compute the (abstract) result of a binary operation
     fn bin_op(&self, op: BinOpType, rhs: &Self) -> Self;
@@ -64,12 +64,9 @@ pub trait RegisterDomain: AbstractDomain + HasBitSize + HasTop {
     /// Compute the (abstract) result of a unary operation
     fn un_op(&self, op: UnOpType) -> Self;
 
-    /// extract a sub-bitvector
-    fn extract(&self, low_bit: BitSize, high_bit: BitSize) -> Self;
+    /// Extract a sub-bitvector
+    fn subpiece(&self, low_byte: ByteSize, size: ByteSize) -> Self;
 
-    /// Extend a bitvector using the given cast type
-    fn cast(&self, kind: CastType, width: BitSize) -> Self;
-
-    /// Concatenate two bitvectors
-    fn concat(&self, other: &Self) -> Self;
+    /// Perform a typecast to extend a bitvector or to cast between integer and floating point types.
+    fn cast(&self, kind: CastOpType, width: ByteSize) -> Self;
 }

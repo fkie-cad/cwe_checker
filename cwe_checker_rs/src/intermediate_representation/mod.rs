@@ -73,6 +73,12 @@ impl From<ByteSize> for apint::BitWidth {
     }
 }
 
+impl From<apint::BitWidth> for ByteSize {
+    fn from(bitwidth: apint::BitWidth) -> ByteSize {
+        ByteSize::new(bitwidth.to_usize() as u64 / 8)
+    }
+}
+
 impl ByteSize {
     pub fn new(value: u64) -> ByteSize {
         ByteSize(value)

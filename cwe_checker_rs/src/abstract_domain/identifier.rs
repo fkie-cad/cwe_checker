@@ -1,4 +1,4 @@
-use crate::bil::variable::*;
+use crate::intermediate_representation::*;
 use crate::prelude::*;
 use derive_more::Deref;
 use std::sync::Arc;
@@ -57,7 +57,7 @@ impl std::fmt::Display for AbstractIdentifier {
 /// It is also impossible to accidently describe circular references.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
 pub enum AbstractLocation {
-    Register(String, BitSize),
+    Register(String, ByteSize),
     Pointer(String, AbstractMemoryLocation),
 }
 
@@ -81,7 +81,7 @@ impl AbstractLocation {
         }
         Ok(AbstractLocation::Register(
             variable.name.clone(),
-            variable.bitsize()?,
+            variable.size,
         ))
     }
 }

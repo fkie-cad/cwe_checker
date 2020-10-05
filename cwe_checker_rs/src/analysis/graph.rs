@@ -39,8 +39,8 @@
 //! The artificial *CallReturn* nodes enable enriching the information flowing through a return edge
 //! with information recovered from the corresponding callsite during a fixpoint computation.
 
+use crate::intermediate_representation::*;
 use crate::prelude::*;
-use crate::term::*;
 use petgraph::graph::{DiGraph, NodeIndex};
 use std::collections::{HashMap, HashSet};
 
@@ -166,47 +166,55 @@ impl<'a> GraphBuilder<'a> {
         jump: &'a Term<Jmp>,
         untaken_conditional: Option<&'a Term<Jmp>>,
     ) {
-        match &jump.term.kind {
-            JmpKind::Goto(Label::Direct(tid)) => {
+        match &jump.term {
+            Jmp::Branch(tid)
+            | Jmp::CBranch {
+                target: tid,
+                condition: _,
+            } => {
                 self.graph.add_edge(
                     source,
                     self.jump_targets[&tid].0,
                     Edge::Jump(jump, untaken_conditional),
                 );
             }
-            JmpKind::Goto(Label::Indirect(_)) => (), // TODO: add handling of indirect edges!
-            JmpKind::Call(ref call) => {
-                if let Label::Direct(ref target_tid) = call.target {
-                    if self.extern_subs.contains(target_tid) {
-                        if let Some(Label::Direct(ref return_tid)) = call.return_ {
-                            self.graph.add_edge(
-                                source,
-                                self.jump_targets[&return_tid].0,
-                                Edge::ExternCallStub(jump),
-                            );
-                        }
-                    } else {
-                        if let Some(target) = self.jump_targets.get(&target_tid) {
-                            self.graph.add_edge(source, target.0, Edge::Call(jump));
-                        }
-
-                        if let Some(Label::Direct(ref return_tid)) = call.return_ {
-                            let return_index = self.jump_targets[return_tid].0;
-                            self.return_addresses
-                                .entry(target_tid.clone())
-                                .and_modify(|vec| vec.push((source, return_index)))
-                                .or_insert_with(|| vec![(source, return_index)]);
-                        }
-                        // TODO: Non-returning calls and tail calls both have no return target in BAP.
-                        // Thus we need to distinguish them somehow to correctly handle tail calls.
+            Jmp::BranchInd(_) => (), // TODO: add handling of indirect edges!
+            Jmp::Call { target, return_ } => {
+                if self.extern_subs.contains(target) {
+                    if let Some(return_tid) = return_ {
+                        self.graph.add_edge(
+                            source,
+                            self.jump_targets[&return_tid].0,
+                            Edge::ExternCallStub(jump),
+                        );
+                    }
+                } else {
+                    if let Some(target_node) = self.jump_targets.get(&target) {
+                        self.graph.add_edge(source, target_node.0, Edge::Call(jump));
+                    } // TODO: Log message for the else-case?
+                    if let Some(ref return_tid) = return_ {
+                        let return_index = self.jump_targets[return_tid].0;
+                        self.return_addresses
+                            .entry(target.clone())
+                            .and_modify(|vec| vec.push((source, return_index)))
+                            .or_insert_with(|| vec![(source, return_index)]);
                     }
                 }
             }
-            JmpKind::Interrupt {
-                value: _,
-                return_addr: _,
-            } => (), // TODO: Add some handling for interrupts
-            JmpKind::Return(_) => {} // return edges are handled in a different function
+            Jmp::CallInd {
+                target: _,
+                return_: _,
+            } => {
+                // TODO: add handling of indirect calls!
+            }
+            Jmp::CallOther {
+                description: _,
+                return_: _,
+            } => {
+                // TODO: Decide how to represent CallOther edges.
+                // Right now they are dead ends in the control flow graph.
+            }
+            Jmp::Return(_) => {} // return edges are handled in a different function
         }
     }
 
@@ -244,7 +252,7 @@ impl<'a> GraphBuilder<'a> {
                 .term
                 .jmps
                 .iter()
-                .find(|jump| matches!(jump.term.kind, JmpKind::Call(_)))
+                .find(|jump| matches!(jump.term, Jmp::Call{..}))
                 .unwrap();
             let cr_combine_node = self.graph.add_node(Node::CallReturn {
                 call: call_block,
@@ -267,7 +275,7 @@ impl<'a> GraphBuilder<'a> {
                     .term
                     .jmps
                     .iter()
-                    .any(|jmp| matches!(jmp.term.kind, JmpKind::Return(_)))
+                    .any(|jmp| matches!(jmp.term, Jmp::Return(_)))
                 {
                     let return_from_node = self.jump_targets[&block.tid].1;
                     self.add_call_return_node_and_edges(sub, return_from_node);
@@ -326,29 +334,18 @@ mod tests {
     use super::*;
 
     fn mock_program() -> Term<Program> {
-        use Label::*;
-        let call = Call {
-            target: Direct(Tid::new("sub2")),
-            return_: Some(Direct(Tid::new("sub1_blk2"))),
-        };
         let call_term = Term {
             tid: Tid::new("call".to_string()),
-            term: Jmp {
-                condition: None,
-                kind: JmpKind::Call(call),
+            term: Jmp::Call {
+                target: Tid::new("sub2"),
+                return_: Some(Tid::new("sub1_blk2")),
             },
         };
         let return_term = Term {
             tid: Tid::new("return".to_string()),
-            term: Jmp {
-                condition: None,
-                kind: JmpKind::Return(Direct(Tid::new("sub1_blk2"))),
-            },
+            term: Jmp::Return(Expression::Const(Bitvector::zero(64.into()))), // The return term does not matter
         };
-        let jmp = Jmp {
-            condition: None,
-            kind: JmpKind::Goto(Direct(Tid::new("sub1_blk1"))),
-        };
+        let jmp = Jmp::Branch(Tid::new("sub1_blk1"));
         let jmp_term = Term {
             tid: Tid::new("jump"),
             term: jmp,

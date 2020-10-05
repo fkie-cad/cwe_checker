@@ -1,5 +1,4 @@
 use super::*;
-use crate::bil::variable::*;
 
 fn bv(value: i64) -> BitvectorDomain {
     BitvectorDomain::Value(Bitvector::from_i64(value))
@@ -8,59 +7,51 @@ fn bv(value: i64) -> BitvectorDomain {
 fn new_id(time: &str, reg_name: &str) -> AbstractIdentifier {
     AbstractIdentifier::new(
         Tid::new(time),
-        AbstractLocation::Register(reg_name.to_string(), 64),
+        AbstractLocation::Register(reg_name.to_string(), ByteSize::new(8)),
     )
 }
 
 fn mock_extern_symbol(name: &str) -> ExternSymbol {
-    use crate::bil;
-    let arg = Arg {
-        var: register("RAX"),
-        location: bil::Expression::Var(register("RAX")),
-        intent: ArgIntent::Both,
-    };
+    let arg = Arg::Register(register("RAX"));
     ExternSymbol {
         tid: Tid::new("extern_".to_string() + name),
-        address: "somewhere".into(),
         name: name.into(),
         calling_convention: None,
-        arguments: vec![arg],
+        parameters: vec![arg.clone()],
+        return_values: vec![arg],
+        no_return: false,
     }
 }
 
 fn register(name: &str) -> Variable {
     Variable {
         name: name.into(),
-        type_: crate::bil::variable::Type::Immediate(64),
+        size: ByteSize::new(8),
         is_temp: false,
     }
 }
 
 fn reg_add_term(name: &str, value: i64, tid_name: &str) -> Term<Def> {
     let add_expr = Expression::BinOp {
-        op: crate::bil::BinOpType::PLUS,
+        op: BinOpType::IntAdd,
         lhs: Box::new(Expression::Var(register(name))),
         rhs: Box::new(Expression::Const(Bitvector::from_i64(value))),
     };
     Term {
         tid: Tid::new(format!("{}", tid_name)),
-        term: Def {
-            lhs: register(name),
-            rhs: add_expr,
+        term: Def::Assign {
+            var: register(name),
+            value: add_expr,
         },
     }
 }
 
 fn call_term(target_name: &str) -> Term<Jmp> {
-    let call = Call {
-        target: Label::Direct(Tid::new(target_name)),
-        return_: None,
-    };
     Term {
         tid: Tid::new(format!("call_{}", target_name)),
-        term: Jmp {
-            condition: None,
-            kind: JmpKind::Call(call),
+        term: Jmp::Call {
+            target: Tid::new(target_name),
+            return_: None,
         },
     }
 }
@@ -68,10 +59,10 @@ fn call_term(target_name: &str) -> Term<Jmp> {
 fn return_term(target_name: &str) -> Term<Jmp> {
     Term {
         tid: Tid::new(format!("return")),
-        term: Jmp {
-            condition: None,
-            kind: JmpKind::Return(Label::Direct(Tid::new(target_name))),
-        },
+        term: Jmp::Return(Expression::Unknown {
+            description: target_name.into(),
+            size: ByteSize::new(8),
+        }),
     }
 }
 
@@ -102,7 +93,6 @@ fn mock_project() -> Project {
 fn context_problem_implementation() {
     use crate::analysis::interprocedural_fixpoint::Context as IpFpContext;
     use crate::analysis::pointer_inference::Data;
-    use crate::bil::*;
     use Expression::*;
 
     let project = mock_project();
@@ -113,10 +103,10 @@ fn context_problem_implementation() {
 
     let def = Term {
         tid: Tid::new("def"),
-        term: Def {
-            lhs: register("RSP"),
-            rhs: BinOp {
-                op: BinOpType::PLUS,
+        term: Def::Assign {
+            var: register("RSP"),
+            value: BinOp {
+                op: BinOpType::IntAdd,
                 lhs: Box::new(Var(register("RSP"))),
                 rhs: Box::new(Const(Bitvector::from_i64(-16))),
             },
@@ -124,15 +114,9 @@ fn context_problem_implementation() {
     };
     let store_term = Term {
         tid: Tid::new("store"),
-        term: Def {
-            lhs: register("memory"), // technically false, but not checked at the moment
-            rhs: Store {
-                address: Box::new(Var(register("RSP"))),
-                endian: Endianness::LittleEndian,
-                memory: Box::new(Var(register("memory"))), // This is technically false, but the field is ignored at the moment
-                value: Box::new(Const(Bitvector::from_i64(42))),
-                size: 64,
-            },
+        term: Def::Store {
+            address: Var(register("RSP")),
+            value: Const(Bitvector::from_i64(42)),
         },
     };
 
@@ -183,12 +167,8 @@ fn context_problem_implementation() {
         state.get_register(&register("RSP")).unwrap()
     );
 
-    state
-        .set_register(&register("callee_saved_reg"), Data::Value(bv(13)))
-        .unwrap();
-    state
-        .set_register(&register("other_reg"), Data::Value(bv(14)))
-        .unwrap();
+    state.set_register(&register("callee_saved_reg"), Data::Value(bv(13)));
+    state.set_register(&register("other_reg"), Data::Value(bv(14)));
 
     let malloc = call_term("extern_malloc");
     let mut state_after_malloc = context.update_call_stub(&state, &malloc).unwrap();
@@ -205,7 +185,7 @@ fn context_problem_implementation() {
         state
             .get_register(&register("RSP"))
             .unwrap()
-            .bin_op(BinOpType::PLUS, &Data::Value(bv(8)))
+            .bin_op(BinOpType::IntAdd, &Data::Value(bv(8)))
     );
     assert_eq!(
         state_after_malloc
@@ -218,15 +198,13 @@ fn context_problem_implementation() {
         .unwrap()
         .is_top());
 
-    state_after_malloc
-        .set_register(
-            &register("callee_saved_reg"),
-            Data::Pointer(PointerDomain::new(
-                new_id("call_extern_malloc", "RAX"),
-                bv(0),
-            )),
-        )
-        .unwrap();
+    state_after_malloc.set_register(
+        &register("callee_saved_reg"),
+        Data::Pointer(PointerDomain::new(
+            new_id("call_extern_malloc", "RAX"),
+            bv(0),
+        )),
+    );
     let free = call_term("extern_free");
     let state_after_free = context
         .update_call_stub(&state_after_malloc, &free)
@@ -254,7 +232,7 @@ fn context_problem_implementation() {
         state
             .get_register(&register("RSP"))
             .unwrap()
-            .bin_op(BinOpType::PLUS, &Data::Value(bv(8)))
+            .bin_op(BinOpType::IntAdd, &Data::Value(bv(8)))
     );
     assert_eq!(
         state_after_other_fn
@@ -290,7 +268,7 @@ fn update_return() {
         callsite_id.clone(),
         bv(0).into(),
         ObjectType::Stack,
-        64,
+        ByteSize::new(8),
     );
     state_before_return
         .caller_stack_ids
@@ -304,7 +282,7 @@ fn update_return() {
         other_callsite_id.clone(),
         bv(0).into(),
         ObjectType::Stack,
-        64,
+        ByteSize::new(8),
     );
     state_before_return
         .caller_stack_ids
@@ -312,15 +290,13 @@ fn update_return() {
     state_before_return
         .ids_known_to_caller
         .insert(other_callsite_id.clone());
-    state_before_return
-        .set_register(
-            &register("RAX"),
-            Data::Pointer(PointerDomain::new(
-                new_id("call_callee_other", "RSP"),
-                bv(-32),
-            )),
-        )
-        .unwrap();
+    state_before_return.set_register(
+        &register("RAX"),
+        Data::Pointer(PointerDomain::new(
+            new_id("call_callee_other", "RSP"),
+            bv(-32),
+        )),
+    );
 
     let state_before_call = State::new(&register("RSP"), Tid::new("original_caller_id"));
     let mut state_before_call = context
@@ -334,7 +310,7 @@ fn update_return() {
         caller_caller_id.clone(),
         bv(0).into(),
         ObjectType::Stack,
-        64,
+        ByteSize::new(8),
     );
     state_before_call
         .caller_stack_ids

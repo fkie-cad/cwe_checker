@@ -14,8 +14,7 @@
 use super::interprocedural_fixpoint::{Computation, NodeValue};
 use crate::abstract_domain::{BitvectorDomain, DataDomain};
 use crate::analysis::graph::{Graph, Node};
-use crate::prelude::*;
-use crate::term::*;
+use crate::intermediate_representation::*;
 use crate::utils::log::*;
 use petgraph::graph::NodeIndex;
 use petgraph::visit::IntoNodeReferences;

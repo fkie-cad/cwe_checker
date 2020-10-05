@@ -16,7 +16,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
     /// Update the state according to the effects of the given `Def` term.
     fn update_def(&self, state: &Self::Value, def: &Term<Def>) -> Option<Self::Value> {
         // first check for use-after-frees
-        if state.contains_access_of_dangling_memory(&def.term.rhs) {
+        if state.contains_access_of_dangling_memory(&def.term) {
             let warning = CweWarning {
                 name: "CWE416".to_string(),
                 version: VERSION.to_string(),
@@ -32,63 +32,27 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
             self.cwe_collector.send(warning).unwrap();
         }
 
-        match &def.term.rhs {
-            Expression::IfThenElse {
-                condition,
-                true_exp,
-                false_exp,
-            } => {
-                // IfThenElse needs special handling, because it may encode conditional store instructions.
-                let mut true_state = state.clone();
-                if let Expression::Store { .. } = **true_exp {
-                    self.log_debug(true_state.handle_store_exp(true_exp), Some(&def.tid));
-                } else {
-                    self.log_debug(
-                        true_state.handle_register_assign(&def.term.lhs, true_exp),
-                        Some(&def.tid),
-                    );
-                };
-                let mut false_state = state.clone();
-                if let Expression::Store { .. } = **false_exp {
-                    self.log_debug(false_state.handle_store_exp(false_exp), Some(&def.tid));
-                } else {
-                    self.log_debug(
-                        false_state.handle_register_assign(&def.term.lhs, false_exp),
-                        Some(&def.tid),
-                    );
-                };
-                match state.eval(condition) {
-                    Ok(Data::Value(cond)) if !cond.is_top() => {
-                        if cond == Bitvector::from_bit(true).into() {
-                            Some(true_state)
-                        } else if cond == Bitvector::from_bit(false).into() {
-                            Some(false_state)
-                        } else {
-                            panic!("IfThenElse with wrong condition bitsize encountered")
-                        }
-                    }
-                    Ok(_) => Some(true_state.merge(&false_state)),
-                    Err(err) => panic!("IfThenElse-Condition evaluation failed: {}", err),
-                }
-            }
-            Expression::Store { .. } => {
+        match &def.term {
+            Def::Store { address, value } => {
                 let mut state = state.clone();
-                self.log_debug(state.handle_store_exp(&def.term.rhs), Some(&def.tid));
+                self.log_debug(state.handle_store(address, value), Some(&def.tid));
                 Some(state)
             }
-            expression => {
+            Def::Assign { var, value } => {
                 let mut new_state = state.clone();
-                self.log_debug(
-                    new_state.handle_register_assign(&def.term.lhs, expression),
-                    Some(&def.tid),
-                );
+                self.log_debug(new_state.handle_register_assign(var, value), Some(&def.tid));
+                Some(new_state)
+            }
+            Def::Load { var, address } => {
+                let mut new_state = state.clone();
+                self.log_debug(new_state.handle_load(var, address), Some(&def.tid));
                 Some(new_state)
             }
         }
     }
 
     /// Update the state according to the effects of the given `Jmp` term.
-    /// Right now this only removes virtual registers from the state,
+    /// Right now the state is not changed,
     /// as specialization for conditional jumps is not implemented yet.
     fn update_jump(
         &self,
@@ -97,8 +61,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
         _untaken_conditional: Option<&Term<Jmp>>,
         _target: &Term<Blk>,
     ) -> Option<State> {
-        let mut new_value = value.clone();
-        new_value.remove_virtual_register();
+        let new_value = value.clone();
         Some(new_value)
     }
 
@@ -110,13 +73,11 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
         call_term: &Term<Jmp>,
         _target_node: &crate::analysis::graph::Node,
     ) -> Option<State> {
-        let call = if let JmpKind::Call(ref call) = call_term.term.kind {
-            call
-        } else {
-            panic!("Malformed control flow graph: Encountered call edge with a non-call jump term.")
-        };
-
-        if let Label::Direct(ref callee_tid) = call.target {
+        if let Jmp::Call {
+            target: ref callee_tid,
+            return_: _,
+        } = call_term.term
+        {
             let callee_stack_id = AbstractIdentifier::new(
                 callee_tid.clone(),
                 AbstractLocation::from_var(&self.project.stack_pointer_register).unwrap(),
@@ -126,7 +87,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
                 AbstractLocation::from_var(&self.project.stack_pointer_register).unwrap(),
             );
             let stack_offset_adjustment = self.get_current_stack_offset(state);
-            let address_bitsize = self.project.stack_pointer_register.bitsize().unwrap();
+            let address_bytesize = self.project.stack_pointer_register.size;
 
             let mut callee_state = state.clone();
             callee_state.remove_virtual_register();
@@ -140,25 +101,21 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
             // add a new memory object for the callee stack frame
             callee_state.memory.add_abstract_object(
                 callee_stack_id.clone(),
-                Bitvector::zero(apint::BitWidth::new(address_bitsize as usize).unwrap()).into(),
+                Bitvector::zero(apint::BitWidth::from(address_bytesize)).into(),
                 ObjectType::Stack,
-                address_bitsize,
+                address_bytesize,
             );
             // set the new stack_id
             callee_state.stack_id = callee_stack_id.clone();
             // Set the stack pointer register to the callee stack id.
             // At the beginning of a function this is the only known pointer to the new stack frame.
-            self.log_debug(
-                callee_state.set_register(
-                    &self.project.stack_pointer_register,
-                    PointerDomain::new(
-                        callee_stack_id.clone(),
-                        Bitvector::zero(apint::BitWidth::new(address_bitsize as usize).unwrap())
-                            .into(),
-                    )
-                    .into(),
-                ),
-                Some(&call_term.tid),
+            callee_state.set_register(
+                &self.project.stack_pointer_register,
+                PointerDomain::new(
+                    callee_stack_id.clone(),
+                    Bitvector::zero(apint::BitWidth::from(address_bytesize)).into(),
+                )
+                .into(),
             );
             // set the list of caller stack ids to only this caller id
             callee_state.caller_stack_ids = BTreeSet::new();
@@ -171,8 +128,10 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
             callee_state.ids_known_to_caller.remove(&callee_stack_id);
 
             Some(callee_state)
-        } else {
+        } else if let Jmp::CallInd { .. } = call_term.term {
             panic!("Indirect call edges not yet supported.")
+        } else {
+            panic!("Malformed control flow graph: Call edge was not a call.")
         }
     }
 
@@ -245,8 +204,9 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
     /// Update the state according to the effect of a call to an extern symbol.
     fn update_call_stub(&self, state: &State, call: &Term<Jmp>) -> Option<State> {
         let mut new_state = state.clone();
-        let call_target = match &call.term.kind {
-            JmpKind::Call(call_inner) => &call_inner.target,
+        let call_target = match &call.term {
+            Jmp::Call { target, .. } => target,
+            Jmp::CallInd { .. } => panic!("Indirect calls to extern symbols not yet supported."),
             _ => panic!("Malformed control flow graph encountered."),
         };
         // Clear non-callee-saved registers from the state.
@@ -258,45 +218,31 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
         let stack_pointer = state.get_register(stack_register).unwrap();
         match self.project.cpu_architecture.as_str() {
             "x86" | "x86_64" => {
-                let offset = Bitvector::from_u16(stack_register.bitsize().unwrap() / 8)
-                    .into_zero_extend(stack_register.bitsize().unwrap() as usize)
+                let offset = Bitvector::from_u64(stack_register.size.into())
+                    .into_truncate(apint::BitWidth::from(stack_register.size))
                     .unwrap();
-                self.log_debug(
-                    new_state.set_register(
-                        stack_register,
-                        stack_pointer.bin_op(crate::bil::BinOpType::PLUS, &offset.into()),
-                    ),
-                    Some(&call.tid),
+                new_state.set_register(
+                    stack_register,
+                    stack_pointer.bin_op(BinOpType::IntAdd, &offset.into()),
                 );
             }
-            _ => self.log_debug(
-                new_state.set_register(stack_register, stack_pointer),
-                Some(&call.tid),
-            ),
+            _ => new_state.set_register(stack_register, stack_pointer),
         }
+        if let Some(extern_symbol) = self.extern_symbol_map.get(call_target) {
+            // Check parameter for possible use-after-frees
+            self.check_parameter_register_for_dangling_pointer(state, call, extern_symbol);
 
-        match call_target {
-            Label::Direct(tid) => {
-                if let Some(extern_symbol) = self.extern_symbol_map.get(tid) {
-                    // Check parameter for possible use-after-frees
-                    self.check_parameter_register_for_dangling_pointer(state, call, extern_symbol);
-
-                    match extern_symbol.name.as_str() {
-                        "malloc" | "calloc" | "realloc" | "xmalloc" => self
-                            .add_new_object_in_call_return_register(new_state, call, extern_symbol),
-                        "free" => self.mark_parameter_object_as_freed(
-                            state,
-                            new_state,
-                            call,
-                            extern_symbol,
-                        ),
-                        _ => self.handle_generic_extern_call(state, new_state, call, extern_symbol),
-                    }
-                } else {
-                    panic!("Extern symbol not found.");
+            match extern_symbol.name.as_str() {
+                "malloc" | "calloc" | "realloc" | "xmalloc" => {
+                    self.add_new_object_in_call_return_register(new_state, call, extern_symbol)
                 }
+                "free" => {
+                    self.mark_parameter_object_as_freed(state, new_state, call, extern_symbol)
+                }
+                _ => self.handle_generic_extern_call(state, new_state, call, extern_symbol),
             }
-            Label::Indirect(_) => unimplemented!("Handling of indirect edges not yet implemented"), // Right now this case should not exist. Decide how to handle only after it can actually occur.
+        } else {
+            panic!("Extern symbol not found.");
         }
     }
 

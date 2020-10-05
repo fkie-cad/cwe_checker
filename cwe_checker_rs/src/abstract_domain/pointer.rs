@@ -1,5 +1,5 @@
-use super::{AbstractDomain, AbstractIdentifier, HasBitSize, RegisterDomain};
-use crate::bil::BinOpType;
+use super::{AbstractDomain, AbstractIdentifier, HasByteSize, RegisterDomain};
+use crate::intermediate_representation::{BinOpType, ByteSize};
 use crate::prelude::*;
 use std::collections::BTreeMap;
 use std::fmt::Display;
@@ -38,15 +38,15 @@ impl<T: RegisterDomain> AbstractDomain for PointerDomain<T> {
     }
 }
 
-impl<T: RegisterDomain> HasBitSize for PointerDomain<T> {
+impl<T: RegisterDomain> HasByteSize for PointerDomain<T> {
     /// Return the bitsize of the pointer.
     /// Should always equal the pointer size of the CPU architecture.
-    fn bitsize(&self) -> BitSize {
+    fn bytesize(&self) -> ByteSize {
         self.0
             .values()
             .next()
             .expect("Pointer without targets encountered")
-            .bitsize()
+            .bytesize()
     }
 }
 
@@ -84,7 +84,7 @@ impl<T: RegisterDomain> PointerDomain<T> {
         offset_adjustment: &T,
     ) {
         if let Some(old_offset) = self.0.get(&old_id) {
-            let new_offset = old_offset.bin_op(BinOpType::PLUS, offset_adjustment);
+            let new_offset = old_offset.bin_op(BinOpType::IntAdd, offset_adjustment);
             self.0.remove(old_id);
             self.0.insert(new_id.clone(), new_offset);
         }
@@ -94,7 +94,7 @@ impl<T: RegisterDomain> PointerDomain<T> {
     pub fn add_to_offset(&self, value: &T) -> PointerDomain<T> {
         let mut result = self.clone();
         for offset in result.0.values_mut() {
-            *offset = offset.bin_op(BinOpType::PLUS, value);
+            *offset = offset.bin_op(BinOpType::IntAdd, value);
         }
         result
     }
@@ -103,7 +103,7 @@ impl<T: RegisterDomain> PointerDomain<T> {
     pub fn sub_from_offset(&self, value: &T) -> PointerDomain<T> {
         let mut result = self.clone();
         for offset in result.0.values_mut() {
-            *offset = offset.bin_op(BinOpType::MINUS, value);
+            *offset = offset.bin_op(BinOpType::IntSub, value);
         }
         result
     }
@@ -149,7 +149,7 @@ mod tests {
     fn new_id(name: &str) -> AbstractIdentifier {
         AbstractIdentifier::new(
             Tid::new("time0"),
-            AbstractLocation::Register(name.into(), 64),
+            AbstractLocation::Register(name.into(), ByteSize::new(8)),
         )
     }
 

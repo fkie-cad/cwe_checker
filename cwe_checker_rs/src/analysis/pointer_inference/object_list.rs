@@ -22,15 +22,15 @@ impl AbstractObjectList {
     /// The offset into the stack object will be set to zero.
     pub fn from_stack_id(
         stack_id: AbstractIdentifier,
-        address_bitsize: BitSize,
+        address_bytesize: ByteSize,
     ) -> AbstractObjectList {
         let mut objects = BTreeMap::new();
-        let stack_object = AbstractObject::new(ObjectType::Stack, address_bitsize);
+        let stack_object = AbstractObject::new(ObjectType::Stack, address_bytesize);
         objects.insert(
             stack_id,
             (
                 stack_object,
-                Bitvector::zero((address_bitsize as usize).into()).into(),
+                Bitvector::zero(apint::BitWidth::from(address_bytesize)).into(),
             ),
         );
         AbstractObjectList { objects }
@@ -68,7 +68,7 @@ impl AbstractObjectList {
     /// If the address is not unique, merge the value of all possible addresses.
     ///
     /// Returns an error if the address is a `Data::Value`, i.e. not a pointer.
-    pub fn get_value(&self, address: &Data, size: BitSize) -> Result<Data, Error> {
+    pub fn get_value(&self, address: &Data, size: ByteSize) -> Result<Data, Error> {
         match address {
             Data::Value(value) => Err(anyhow!("Load from non-pointer value:\n{:?}", value)),
             Data::Top(_) => Ok(Data::new_top(size)),
@@ -158,9 +158,9 @@ impl AbstractObjectList {
         object_id: AbstractIdentifier,
         initial_offset: BitvectorDomain,
         type_: ObjectType,
-        address_bitsize: BitSize,
+        address_bytesize: ByteSize,
     ) {
-        let new_object = AbstractObject::new(type_, address_bitsize);
+        let new_object = AbstractObject::new(type_, address_bytesize);
         if let Some((object, offset)) = self.objects.get_mut(&object_id) {
             // If the identifier already exists, we have to assume that more than one object may be referenced by this identifier.
             object.is_unique = false;
@@ -333,13 +333,14 @@ mod tests {
     fn new_id(name: &str) -> AbstractIdentifier {
         AbstractIdentifier::new(
             Tid::new("time0"),
-            AbstractLocation::Register(name.into(), 64),
+            AbstractLocation::Register(name.into(), ByteSize::new(8)),
         )
     }
 
     #[test]
     fn abstract_object_list() {
-        let mut obj_list = AbstractObjectList::from_stack_id(new_id("RSP".into()), 64);
+        let mut obj_list =
+            AbstractObjectList::from_stack_id(new_id("RSP".into()), ByteSize::new(8));
         assert_eq!(obj_list.objects.len(), 1);
         assert_eq!(obj_list.objects.values().next().unwrap().1, bv(0));
 
@@ -349,12 +350,13 @@ mod tests {
             .unwrap();
         assert_eq!(
             obj_list
-                .get_value(&Data::Pointer(pointer.clone()), 64)
+                .get_value(&Data::Pointer(pointer.clone()), ByteSize::new(8))
                 .unwrap(),
             Data::Value(bv(42))
         );
 
-        let mut other_obj_list = AbstractObjectList::from_stack_id(new_id("RSP".into()), 64);
+        let mut other_obj_list =
+            AbstractObjectList::from_stack_id(new_id("RSP".into()), ByteSize::new(8));
         let second_pointer = PointerDomain::new(new_id("RSP".into()), bv(-8));
         other_obj_list
             .set_value(pointer.clone(), Data::Value(bv(42)))
@@ -364,12 +366,17 @@ mod tests {
             .unwrap();
         assert_eq!(
             other_obj_list
-                .get_value(&Data::Pointer(second_pointer.clone()), 64)
+                .get_value(&Data::Pointer(second_pointer.clone()), ByteSize::new(8))
                 .unwrap(),
             Data::Value(bv(35))
         );
 
-        other_obj_list.add_abstract_object(new_id("RAX".into()), bv(0), ObjectType::Heap, 64);
+        other_obj_list.add_abstract_object(
+            new_id("RAX".into()),
+            bv(0),
+            ObjectType::Heap,
+            ByteSize::new(8),
+        );
         let heap_pointer = PointerDomain::new(new_id("RAX".into()), bv(8));
         other_obj_list
             .set_value(heap_pointer.clone(), Data::Value(bv(3)))
@@ -378,19 +385,19 @@ mod tests {
         let mut merged = obj_list.merge(&other_obj_list);
         assert_eq!(
             merged
-                .get_value(&Data::Pointer(pointer.clone()), 64)
+                .get_value(&Data::Pointer(pointer.clone()), ByteSize::new(8))
                 .unwrap(),
             Data::Value(bv(42))
         );
         assert_eq!(
             merged
-                .get_value(&Data::Pointer(second_pointer.clone()), 64)
+                .get_value(&Data::Pointer(second_pointer.clone()), ByteSize::new(8))
                 .unwrap(),
-            Data::new_top(64)
+            Data::new_top(ByteSize::new(8))
         );
         assert_eq!(
             merged
-                .get_value(&Data::Pointer(heap_pointer.clone()), 64)
+                .get_value(&Data::Pointer(heap_pointer.clone()), ByteSize::new(8))
                 .unwrap(),
             Data::Value(bv(3))
         );
@@ -401,13 +408,13 @@ mod tests {
             .unwrap();
         assert_eq!(
             merged
-                .get_value(&Data::Pointer(pointer.clone()), 64)
+                .get_value(&Data::Pointer(pointer.clone()), ByteSize::new(8))
                 .unwrap(),
-            Data::Value(BitvectorDomain::new_top(64))
+            Data::Value(BitvectorDomain::new_top(ByteSize::new(8)))
         );
         assert_eq!(
             merged
-                .get_value(&Data::Pointer(heap_pointer.clone()), 64)
+                .get_value(&Data::Pointer(heap_pointer.clone()), ByteSize::new(8))
                 .unwrap(),
             Data::Value(bv(3))
         );
@@ -435,7 +442,7 @@ mod tests {
         other_obj_list.replace_abstract_id(&new_id("RAX".into()), &new_id("ID2".into()), &bv(0));
         assert_eq!(
             other_obj_list
-                .get_value(&Data::Pointer(pointer.clone()), 64)
+                .get_value(&Data::Pointer(pointer.clone()), ByteSize::new(8))
                 .unwrap(),
             Data::Pointer(modified_heap_pointer.clone())
         );
@@ -481,10 +488,16 @@ mod tests {
 
     #[test]
     fn append_unknown_objects_test() {
-        let mut obj_list = AbstractObjectList::from_stack_id(new_id("stack"), 64);
+        let mut obj_list = AbstractObjectList::from_stack_id(new_id("stack"), ByteSize::new(8));
 
-        let mut other_obj_list = AbstractObjectList::from_stack_id(new_id("stack"), 64);
-        other_obj_list.add_abstract_object(new_id("heap_obj"), bv(0).into(), ObjectType::Heap, 64);
+        let mut other_obj_list =
+            AbstractObjectList::from_stack_id(new_id("stack"), ByteSize::new(8));
+        other_obj_list.add_abstract_object(
+            new_id("heap_obj"),
+            bv(0).into(),
+            ObjectType::Heap,
+            ByteSize::new(8),
+        );
 
         obj_list.append_unknown_objects(&other_obj_list);
         assert_eq!(obj_list.objects.len(), 2);
