@@ -188,7 +188,7 @@ impl ExternSymbol {
         if self.return_values.len() == 1 {
             match self.return_values[0] {
                 Arg::Register(ref var) => Ok(var),
-                Arg::Stack { .. } => Err(anyhow!("Return value is passed on the stak")),
+                Arg::Stack { .. } => Err(anyhow!("Return value is passed on the stack")),
             }
         } else {
             Err(anyhow!("Wrong number of return values"))

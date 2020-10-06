@@ -34,9 +34,9 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
 
         match &def.term {
             Def::Store { address, value } => {
-                let mut state = state.clone();
-                self.log_debug(state.handle_store(address, value), Some(&def.tid));
-                Some(state)
+                let mut new_state = state.clone();
+                self.log_debug(new_state.handle_store(address, value), Some(&def.tid));
+                Some(new_state)
             }
             Def::Assign { var, value } => {
                 let mut new_state = state.clone();
