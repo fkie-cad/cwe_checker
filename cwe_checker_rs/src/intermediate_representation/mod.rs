@@ -76,7 +76,7 @@ impl From<ByteSize> for apint::BitWidth {
 impl From<apint::BitWidth> for ByteSize {
     /// Convert to `ByteSize`, while always rounding up to the nearest full byte.
     fn from(bitwidth: apint::BitWidth) -> ByteSize {
-        ByteSize::new( (bitwidth.to_usize() + 7) as u64 / 8 )
+        ByteSize::new((bitwidth.to_usize() + 7) as u64 / 8)
     }
 }
 
