@@ -16,6 +16,7 @@ use crate::prelude::*;
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Call {
     pub target: Label,
+    #[serde(rename="return")]
     pub return_: Option<Label>,
 }
 

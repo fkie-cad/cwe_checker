@@ -16,6 +16,7 @@ pub fn get_generic_parameter_and_callee_saved_register(
     let mut registers_json: serde_json::Value = serde_json::from_str(&file).unwrap();
     match cpu_architecture {
         "x86" | "x86_32" => registers_json = registers_json["elf"]["x86"]["cdecl"].clone(),
+        "ARM_32" => registers_json = registers_json["elf"]["armv7"].clone(),
         _ => registers_json = registers_json["elf"][cpu_architecture].clone(),
     }
     let mut callee_saved: Vec<String> =
