@@ -62,7 +62,21 @@ impl From<Jmp> for IrJmp {
                 target: unwrap_label_direct(jmp.goto.unwrap()),
                 condition: jmp.condition.unwrap().into(),
             },
-            BRANCHIND => IrJmp::BranchInd(unwrap_label_indirect(jmp.goto.unwrap()).into()),
+            BRANCHIND => {
+                let target = unwrap_label_indirect(jmp.goto.unwrap());
+                if let Some(address) = target.address {
+                    // Sometimes there are entries in jump tables that have no associated symbol,
+                    // i.e. jumping there means jumping to nowhere.
+                    // Usually the jump ends up jumping to address 0.
+                    IrJmp::CallOther {
+                        description: format!("Unresolved jump: Jump to value read from address {}", address),
+                        return_: None,
+                    }
+                } else {
+                    IrJmp::BranchInd(target.into())
+                }
+                
+            }
             CALL => {
                 let call = jmp.call.unwrap();
                 IrJmp::Call {
