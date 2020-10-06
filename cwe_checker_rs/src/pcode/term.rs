@@ -513,7 +513,7 @@ mod tests {
                     }
                     },
                     "return": {
-                    "direct": {
+                    "Direct": {
                         "id": "blk_00102016",
                         "address": "00102016"
                     }
