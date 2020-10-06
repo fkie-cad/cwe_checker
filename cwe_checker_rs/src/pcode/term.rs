@@ -16,7 +16,7 @@ use crate::prelude::*;
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Call {
     pub target: Label,
-    #[serde(rename="return")]
+    #[serde(rename = "return")]
     pub return_: Option<Label>,
 }
 
@@ -70,13 +70,15 @@ impl From<Jmp> for IrJmp {
                     // i.e. jumping there means jumping to nowhere.
                     // Usually the jump ends up jumping to address 0.
                     IrJmp::CallOther {
-                        description: format!("Unresolved jump: Jump to value read from address {}", address),
+                        description: format!(
+                            "Unresolved jump: Jump to value read from address {}",
+                            address
+                        ),
                         return_: None,
                     }
                 } else {
                     IrJmp::BranchInd(target.into())
                 }
-                
             }
             CALL => {
                 let call = jmp.call.unwrap();
