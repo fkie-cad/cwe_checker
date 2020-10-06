@@ -161,6 +161,9 @@ impl<T: RegisterDomain> RegisterDomain for DataDomain<T> {
     fn subpiece(&self, low_byte: ByteSize, size: ByteSize) -> Self {
         if let Self::Value(value) = self {
             Self::Value(value.subpiece(low_byte, size))
+        } else if low_byte == ByteSize::new(0) && size == self.bytesize() {
+            // The operation is a no-op
+            self.clone()
         } else {
             Self::new_top(size)
         }
