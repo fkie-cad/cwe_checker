@@ -243,7 +243,11 @@ impl From<Expression> for IrExpression {
         use Expression::*;
         match expr {
             Var(var) => IrExpression::Var(var.into()),
-            Const(bitvector) => IrExpression::Const(bitvector),
+            Const(bitvector) => {
+                // The internal IR expects everything to be byte-sized, so we have to extend the bitvector if necessary.
+                let size: ByteSize = bitvector.width().into();
+                IrExpression::Const(bitvector.into_zero_extend(apint::BitWidth::from(size)).unwrap())
+            },
             Load { .. } | Store { .. } | Let { .. } => panic!(),
             IfThenElse { true_exp, .. } => IrExpression::Unknown {
                 description: "BAP-IfThenElse-expression".into(),

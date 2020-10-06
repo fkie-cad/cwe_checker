@@ -176,23 +176,23 @@ impl RegisterDomain for BitvectorDomain {
                 IntXOr | BoolXOr => BitvectorDomain::Value(lhs_bitvec ^ rhs_bitvec),
                 IntEqual => {
                     assert_eq!(lhs_bitvec.width(), rhs_bitvec.width());
-                    BitvectorDomain::Value(Bitvector::from(lhs_bitvec == rhs_bitvec))
+                    BitvectorDomain::Value(Bitvector::from((lhs_bitvec == rhs_bitvec) as u8))
                 }
                 IntNotEqual => {
                     assert_eq!(lhs_bitvec.width(), rhs_bitvec.width());
-                    BitvectorDomain::Value(Bitvector::from(lhs_bitvec != rhs_bitvec))
+                    BitvectorDomain::Value(Bitvector::from((lhs_bitvec != rhs_bitvec) as u8))
                 }
                 IntLess => BitvectorDomain::Value(Bitvector::from(
-                    lhs_bitvec.checked_ult(rhs_bitvec).unwrap(),
+                    lhs_bitvec.checked_ult(rhs_bitvec).unwrap() as u8,
                 )),
                 IntLessEqual => BitvectorDomain::Value(Bitvector::from(
-                    lhs_bitvec.checked_ule(rhs_bitvec).unwrap(),
+                    lhs_bitvec.checked_ule(rhs_bitvec).unwrap() as u8,
                 )),
                 IntSLess => BitvectorDomain::Value(Bitvector::from(
-                    lhs_bitvec.checked_slt(rhs_bitvec).unwrap(),
+                    lhs_bitvec.checked_slt(rhs_bitvec).unwrap() as u8,
                 )),
                 IntSLessEqual => BitvectorDomain::Value(Bitvector::from(
-                    lhs_bitvec.checked_sle(rhs_bitvec).unwrap(),
+                    lhs_bitvec.checked_sle(rhs_bitvec).unwrap() as u8,
                 )),
                 FloatEqual | FloatNotEqual | FloatLess | FloatLessEqual => {
                     // TODO: Implement floating point comparison operators!
@@ -368,11 +368,11 @@ mod tests {
 
         assert_eq!(
             sixteen.bin_op(IntEqual, &bv(16)),
-            BitvectorDomain::Value(Bitvector::from_bit(true))
+            BitvectorDomain::Value(Bitvector::from_u8(true as u8))
         );
         assert_eq!(
             sixteen.bin_op(IntNotEqual, &bv(16)),
-            BitvectorDomain::Value(Bitvector::from_bit(false))
+            BitvectorDomain::Value(Bitvector::from_u8(false as u8))
         );
 
         assert_eq!(sixteen.un_op(Int2Comp), bv(-16));
