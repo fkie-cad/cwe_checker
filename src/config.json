@@ -190,5 +190,16 @@
       "fgets",
       "scanf"
     ]
+  },
+  "pointer_inference": {
+    "allocation_symbols": [
+      "malloc",
+      "calloc",
+      "realloc",
+      "xmalloc"
+    ],
+    "deallocation_symbols": [
+      "free"
+    ]
   }
 }

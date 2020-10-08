@@ -30,3 +30,14 @@ pub fn get_generic_parameter_and_callee_saved_register(
     params.append(&mut params_float);
     (params, callee_saved)
 }
+
+/// Get the contents of the main configuration file.
+pub fn read_config_file() -> serde_json::Value {
+    let project_dirs = directories::ProjectDirs::from("", "", "cwe_checker")
+        .expect("Could not discern location of configuration files.");
+    let config_dir = project_dirs.config_dir();
+    let config_path = config_dir.join("config.json");
+    let config_file =
+        std::fs::read_to_string(config_path).expect("Could not read register configuration file");
+    serde_json::from_str(&config_file).unwrap()
+}

@@ -12,6 +12,7 @@ all:
 	cd plugins/cwe_checker_pointer_inference_debug && make all
 	mkdir -p ${HOME}/.config/cwe_checker
 	cp src/utils/registers.json ${HOME}/.config/cwe_checker/registers.json
+	cp src/config.json ${HOME}/.config/cwe_checker/config.json
 
 test:
 	cargo test

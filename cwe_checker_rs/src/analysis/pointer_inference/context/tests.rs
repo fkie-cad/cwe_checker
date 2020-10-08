@@ -66,7 +66,7 @@ fn return_term(target_name: &str) -> Term<Jmp> {
     }
 }
 
-fn mock_project() -> Project {
+fn mock_project() -> (Project, Config) {
     let program = Program {
         subs: Vec::new(),
         extern_symbols: vec![
@@ -80,13 +80,19 @@ fn mock_project() -> Project {
         tid: Tid::new("program"),
         term: program,
     };
-    Project {
-        program: program_term,
-        cpu_architecture: "x86_64".to_string(),
-        stack_pointer_register: register("RSP"),
-        callee_saved_registers: vec!["callee_saved_reg".to_string()],
-        parameter_registers: vec!["RAX".to_string()],
-    }
+    (
+        Project {
+            program: program_term,
+            cpu_architecture: "x86_64".to_string(),
+            stack_pointer_register: register("RSP"),
+            callee_saved_registers: vec!["callee_saved_reg".to_string()],
+            parameter_registers: vec!["RAX".to_string()],
+        },
+        Config {
+            allocation_symbols: vec!["malloc".into()],
+            deallocation_symbols: vec!["free".into()],
+        },
+    )
 }
 
 #[test]
@@ -95,10 +101,10 @@ fn context_problem_implementation() {
     use crate::analysis::pointer_inference::Data;
     use Expression::*;
 
-    let project = mock_project();
+    let (project, config) = mock_project();
     let (cwe_sender, _cwe_receiver) = crossbeam_channel::unbounded();
     let (log_sender, _log_receiver) = crossbeam_channel::unbounded();
-    let context = Context::new(&project, cwe_sender, log_sender);
+    let context = Context::new(&project, config, cwe_sender, log_sender);
     let mut state = State::new(&register("RSP"), Tid::new("main"));
 
     let def = Term {
@@ -251,10 +257,10 @@ fn update_return() {
     use crate::analysis::interprocedural_fixpoint::Context as IpFpContext;
     use crate::analysis::pointer_inference::object::ObjectType;
     use crate::analysis::pointer_inference::Data;
-    let project = mock_project();
+    let (project, config) = mock_project();
     let (cwe_sender, _cwe_receiver) = crossbeam_channel::unbounded();
     let (log_sender, _log_receiver) = crossbeam_channel::unbounded();
-    let context = Context::new(&project, cwe_sender, log_sender);
+    let context = Context::new(&project, config, cwe_sender, log_sender);
     let state_before_return = State::new(&register("RSP"), Tid::new("callee"));
     let mut state_before_return = context
         .update_def(

@@ -10,11 +10,14 @@
 //! whether an error is due to an error in the memory management of the program under analysis
 //! or due to inexactness of the pointer inference analysis itself,
 //! we try to treat is as the more likely (but not necessarily true) case of the two.
+//!
+//! See the `Config` struct for configurable analysis parameters.
 
 use super::interprocedural_fixpoint::{Computation, NodeValue};
 use crate::abstract_domain::{BitvectorDomain, DataDomain};
 use crate::analysis::graph::{Graph, Node};
 use crate::intermediate_representation::*;
+use crate::prelude::*;
 use crate::utils::log::*;
 use petgraph::graph::NodeIndex;
 use petgraph::visit::IntoNodeReferences;
@@ -35,6 +38,19 @@ const VERSION: &str = "0.1";
 /// The abstract domain type for representing register values.
 type Data = DataDomain<BitvectorDomain>;
 
+/// Configurable parameters for the analysis.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
+pub struct Config {
+    /// Names of extern functions that are `malloc`-like,
+    /// i.e. the unique return value is a pointer to a newly allocated chunk of memory or a NULL pointer.
+    allocation_symbols: Vec<String>,
+    /// Names of extern functions that are `free`-like,
+    /// i.e. the memory chunk that the unique parameter of the function points to gets deallocated.
+    /// Note that the analysis currently does not detect mismatching allocation-deallocation pairs,
+    /// i.e. it cannot distinguish between memory allocated by `malloc` and memory allocated by `new`.
+    deallocation_symbols: Vec<String>,
+}
+
 /// A wrapper struct for the pointer inference computation object.
 pub struct PointerInference<'a> {
     computation: Computation<'a, Context<'a>>,
@@ -45,10 +61,11 @@ impl<'a> PointerInference<'a> {
     /// Generate a new pointer inference compuation for a project.
     pub fn new(
         project: &'a Project,
+        config: Config,
         cwe_sender: crossbeam_channel::Sender<CweWarning>,
         log_sender: crossbeam_channel::Sender<LogMessage>,
     ) -> PointerInference<'a> {
-        let context = Context::new(project, cwe_sender, log_sender.clone());
+        let context = Context::new(project, config, cwe_sender, log_sender.clone());
 
         let mut entry_sub_to_entry_blocks_map = HashMap::new();
         let subs: HashMap<Tid, &Term<Sub>> = project
@@ -247,7 +264,7 @@ impl<'a> PointerInference<'a> {
 
 /// Generate and execute the pointer inference analysis.
 /// Returns a vector of all found CWE warnings and a vector of all log messages generated during analysis.
-pub fn run(project: &Project, print_debug: bool) -> (Vec<CweWarning>, Vec<String>) {
+pub fn run(project: &Project, config: Config, print_debug: bool) -> (Vec<CweWarning>, Vec<String>) {
     let (cwe_sender, cwe_receiver) = crossbeam_channel::unbounded();
     let (log_sender, log_receiver) = crossbeam_channel::unbounded();
 
@@ -257,7 +274,7 @@ pub fn run(project: &Project, print_debug: bool) -> (Vec<CweWarning>, Vec<String
     {
         // Scope the computation object so that it is dropped before the warning collector thread is joined.
         // Else the warning collector thread will not terminate (the cwe_sender needs to be dropped for it to terminate).
-        let mut computation = PointerInference::new(project, cwe_sender, log_sender);
+        let mut computation = PointerInference::new(project, config, cwe_sender, log_sender);
 
         computation.compute();
         computation.count_blocks_with_state();
