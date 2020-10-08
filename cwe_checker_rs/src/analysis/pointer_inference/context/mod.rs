@@ -7,7 +7,7 @@ use crate::utils::log::*;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use super::state::State;
-use super::{Data, VERSION};
+use super::{Config, Data, VERSION};
 
 // contains trait implementations for the `Context` struct,
 // especially the implementation of the `interprocedural_fixpoint::Context` trait.
@@ -31,6 +31,10 @@ pub struct Context<'a> {
     pub cwe_collector: crossbeam_channel::Sender<CweWarning>,
     /// A channel where log messages should be sent to.
     pub log_collector: crossbeam_channel::Sender<LogMessage>,
+    /// Names of `malloc`-like extern functions.
+    pub allocation_symbols: Vec<String>,
+    /// Names of `free`-like extern functions.
+    pub deallocation_symbols: Vec<String>,
 }
 
 impl<'a> Context<'a> {
@@ -38,6 +42,7 @@ impl<'a> Context<'a> {
     /// Also needs two channels as input to know where CWE warnings and log messages should be sent to.
     pub fn new(
         project: &Project,
+        config: Config,
         cwe_collector: crossbeam_channel::Sender<CweWarning>,
         log_collector: crossbeam_channel::Sender<LogMessage>,
     ) -> Context {
@@ -60,6 +65,8 @@ impl<'a> Context<'a> {
             extern_symbol_map,
             cwe_collector,
             log_collector,
+            allocation_symbols: config.allocation_symbols,
+            deallocation_symbols: config.deallocation_symbols,
         }
     }
 

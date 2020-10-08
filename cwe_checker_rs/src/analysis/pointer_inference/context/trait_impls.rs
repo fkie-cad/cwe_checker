@@ -233,10 +233,10 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
             self.check_parameter_register_for_dangling_pointer(state, call, extern_symbol);
 
             match extern_symbol.name.as_str() {
-                "malloc" | "calloc" | "realloc" | "xmalloc" => {
+                malloc_like_fn if self.allocation_symbols.iter().any(|x| x == malloc_like_fn) => {
                     self.add_new_object_in_call_return_register(new_state, call, extern_symbol)
                 }
-                "free" => {
+                free_like_fn if self.deallocation_symbols.iter().any(|x| x == free_like_fn) => {
                     self.mark_parameter_object_as_freed(state, new_state, call, extern_symbol)
                 }
                 _ => self.handle_generic_extern_call(state, new_state, call, extern_symbol),
