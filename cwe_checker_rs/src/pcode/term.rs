@@ -18,6 +18,7 @@ pub struct Call {
     pub target: Label,
     #[serde(rename = "return")]
     pub return_: Option<Label>,
+    pub call_string: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
@@ -36,6 +37,7 @@ pub enum JmpType {
     BRANCHIND,
     CALL,
     CALLIND,
+    CALLOTHER,
     RETURN,
 }
 
@@ -91,6 +93,13 @@ impl From<Jmp> for IrJmp {
                 let call = jmp.call.unwrap();
                 IrJmp::CallInd {
                     target: unwrap_label_indirect(call.target).into(),
+                    return_: call.return_.map(unwrap_label_direct),
+                }
+            }
+            CALLOTHER => {
+                let call = jmp.call.unwrap();
+                IrJmp::CallOther {
+                    description: call.call_string.unwrap(),
                     return_: call.return_.map(unwrap_label_direct),
                 }
             }
