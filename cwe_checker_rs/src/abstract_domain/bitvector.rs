@@ -326,7 +326,7 @@ impl std::convert::TryFrom<&BitvectorDomain> for Bitvector {
 impl std::fmt::Display for BitvectorDomain {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Self::Top(bitsize) => write!(formatter, "Top:i{}", bitsize),
+            Self::Top(bytesize) => write!(formatter, "Top:i{}", BitSize::from(*bytesize)),
             Self::Value(bitvector) => write!(
                 formatter,
                 "0x{:016x}:i{:?}",
