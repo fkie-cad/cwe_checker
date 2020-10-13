@@ -247,7 +247,7 @@ public class PcodeExtractor extends GhidraScript {
      */
     protected void processPcode(ArrayList<Term<Blk>> blocks, Instruction instruction, int instructionIndex, long numberOfInstructionsInBlock) {
         PcodeOp[] ops = instruction.getPcode(true);
-        if(ops.length == 0) {
+        if(ops.length == 0 && !instruction.isInDelaySlot()) {
             addJumpToCurrentBlock(blocks.get(blocks.size()-1).getTerm(), instruction.getAddress().toString(), instruction.getFallThrough().toString(), null);
             return;
         }
@@ -383,7 +383,7 @@ public class PcodeExtractor extends GhidraScript {
     protected Boolean processJumpAtEndOfPcodeBlocks(ArrayList<Term<Blk>> blocks, Instruction instruction, PcodeOp pcodeOp, String mnemonic, ArrayList<Term<Def>> temporaryDefStorage, 
     int instructionIndex, long numberOfInstructionsInBlock, int numberOfPcodeOps, int pcodeIndex, Boolean intraInstructionJumpOccured, Term<Blk> currentBlock) {
         // Case 2: jump at the end of pcode group but not end of ghidra generated block.
-        if(instructionIndex < numberOfInstructionsInBlock - 1) {
+        if(instructionIndex < numberOfInstructionsInBlock - 1 && instruction.getDelaySlotDepth() == 0) {
             blocks.add(createBlkTerm(instruction.getFallThrough().toString(), null));
         }
         // Case 3: jmp at last pcode op at last instruction in ghidra generated block
