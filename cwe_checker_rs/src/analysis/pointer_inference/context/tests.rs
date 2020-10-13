@@ -140,7 +140,14 @@ fn context_problem_implementation() {
             jmps: Vec::new(),
         },
     };
-    let target_node = crate::analysis::graph::Node::BlkStart(&target_block);
+    let sub = Term {
+        tid: Tid::new("caller_sub"),
+        term: Sub {
+            name: "caller_sub".into(),
+            blocks: vec![target_block.clone()],
+        },
+    };
+    let target_node = crate::analysis::graph::Node::BlkStart(&target_block, &sub);
     let call = call_term("func");
     let mut callee_state = context.update_call(&state, &call, &target_node).unwrap();
     assert_eq!(callee_state.stack_id, new_id("func", "RSP"));

@@ -217,6 +217,19 @@ pub struct Program {
     pub entry_points: Vec<Tid>,
 }
 
+impl Program {
+    /// Find a block term by its term identifier.
+    /// WARNING: The function simply iterates through all blocks,
+    /// i.e. it is very inefficient for large projects!
+    pub fn find_block(&self, tid: &Tid) -> Option<&Term<Blk>> {
+        self.subs
+            .iter()
+            .map(|sub| sub.term.blocks.iter())
+            .flatten()
+            .find(|block| block.tid == *tid)
+    }
+}
+
 /// The `Project` struct is the main data structure representing a binary.
 ///
 /// It contains information about the disassembled binary

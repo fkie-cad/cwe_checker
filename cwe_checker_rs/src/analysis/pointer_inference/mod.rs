@@ -77,20 +77,22 @@ impl<'a> PointerInference<'a> {
             .collect();
         for sub_tid in project.program.term.entry_points.iter() {
             if let Some(sub) = subs.get(sub_tid) {
-                if let Some(entry_block) = sub.term.blocks.iter().next() {
+                if let Some(entry_block) = sub.term.blocks.get(0) {
                     entry_sub_to_entry_blocks_map.insert(sub_tid, entry_block.tid.clone());
                 }
             }
         }
-        let tid_to_graph_indices_map = super::graph::get_indices_of_block_nodes(
-            &context.graph,
-            entry_sub_to_entry_blocks_map.values(),
-        );
+        let mut tid_to_graph_indices_map = HashMap::new();
+        for node in context.graph.node_indices() {
+            if let super::graph::Node::BlkStart(block, sub) = context.graph[node] {
+                tid_to_graph_indices_map.insert((block.tid.clone(), sub.tid.clone()), node);
+            }
+        }
         let entry_sub_to_entry_node_map: HashMap<Tid, NodeIndex> = entry_sub_to_entry_blocks_map
             .into_iter()
             .filter_map(|(sub_tid, block_tid)| {
-                if let Some((start_node_index, _end_node_index)) =
-                    tid_to_graph_indices_map.get(&block_tid)
+                if let Some(start_node_index) =
+                    tid_to_graph_indices_map.get(&(block_tid, sub_tid.clone()))
                 {
                     Some((sub_tid.clone(), *start_node_index))
                 } else {
@@ -200,14 +202,14 @@ impl<'a> PointerInference<'a> {
         let graph = self.computation.get_graph();
         let mut new_entry_points = Vec::new();
         for (node_id, node) in graph.node_references() {
-            if let Node::BlkStart(block) = node {
-                if !(start_block_to_sub_map.get(&block.tid).is_none()
-                    || self.computation.get_node_value(node_id).is_some()
-                    || only_cfg_roots
-                        && graph
+            if let Node::BlkStart(block, sub) = node {
+                if start_block_to_sub_map.get(&block.tid) == Some(sub)
+                    && self.computation.get_node_value(node_id).is_none()
+                    && (!only_cfg_roots
+                        || graph
                             .neighbors_directed(node_id, Direction::Incoming)
                             .next()
-                            .is_some())
+                            .is_none())
                 {
                     new_entry_points.push(node_id);
                 }
@@ -239,7 +241,7 @@ impl<'a> PointerInference<'a> {
         let mut stateful_blocks: i64 = 0;
         let mut all_blocks: i64 = 0;
         for (node_id, node) in graph.node_references() {
-            if let Node::BlkStart(_block) = node {
+            if let Node::BlkStart(_block, _sub) = node {
                 all_blocks += 1;
                 if self.computation.get_node_value(node_id).is_some() {
                     stateful_blocks += 1;
