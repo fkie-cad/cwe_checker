@@ -77,8 +77,7 @@ public class PcodeExtractor extends GhidraScript {
         Project project = createProject();
         program = iterateFunctions(simpleBM, listing);
 
-        //String jsonPath = getScriptArgs()[0];
-        String jsonPath = "/home/melvin/p_code_extractor/tmp/a.out.json";
+        String jsonPath = getScriptArgs()[0];
         Serializer ser = new Serializer(project, jsonPath);
         ser.serializeProject();
         TimeUnit.SECONDS.sleep(3);
