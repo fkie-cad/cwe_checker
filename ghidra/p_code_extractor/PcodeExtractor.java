@@ -109,11 +109,6 @@ public class PcodeExtractor extends GhidraScript {
     protected Term<Program> iterateFunctions(SimpleBlockModel simpleBM, Listing listing) {
         FunctionIterator functions = funcMan.getFunctionsNoStubs(true);
         for (Function func : functions) {
-            if(func.getName().equals("testfunc")) {
-                for(Varnode node : func.getReturn().getVariableStorage().getVarnodes()) {
-                    println(String.format("RETURN PARAMETER: %s", context.getRegister(node).getName()));
-                }
-            }
             if (!func.isThunk()) {
                 Term<Sub> currentSub = createSubTerm(func);
                 currentSub.getTerm().setBlocks(iterateBlocks(currentSub, simpleBM, listing));
@@ -648,6 +643,15 @@ public class PcodeExtractor extends GhidraScript {
      * 
      * Checks whether the same symbol name is in the references of the current symbol.
      * If so, the current symbol is not internally called by other functions
+     * 
+     * e.g. some_function() -> system() -> system() -> external_system()
+     * 
+     * In this Example some_function() only calls the leftmost system() function 
+     * and if we have the one in the middle as parameter of notInReferences(),
+     * the leftmost will be in the references. As a consequence, the middle function
+     * of the chain is not taken into the external symbol list as it is not called 
+     * by some_function().
+     * 
      */
     protected Boolean notInReferences(Symbol sym) {
         for(Reference ref : sym.getReferences()) {
