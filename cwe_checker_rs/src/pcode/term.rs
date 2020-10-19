@@ -29,7 +29,6 @@ pub struct Jmp {
     pub condition: Option<Variable>,
 }
 
-// TODO: CALLOTHER is still missing!
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum JmpType {
     BRANCH,
