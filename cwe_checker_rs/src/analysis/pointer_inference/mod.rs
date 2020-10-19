@@ -35,6 +35,12 @@ use state::State;
 /// The version number of the analysis.
 const VERSION: &str = "0.1";
 
+pub static CWE_MODULE: crate::CweModule = crate::CweModule {
+    name: "Memory",
+    version: VERSION,
+    run: run_analysis,
+};
+
 /// The abstract domain type for representing register values.
 type Data = DataDomain<BitvectorDomain>;
 
@@ -103,14 +109,10 @@ impl<'a> PointerInference<'a> {
         let mut fixpoint_computation =
             super::interprocedural_fixpoint::Computation::new(context, None);
         log_sender
-            .send(LogMessage {
-                text: format!(
-                    "Pointer Inference: Adding {} entry points",
-                    entry_sub_to_entry_node_map.len()
-                ),
-                level: LogLevel::Debug,
-                location: None,
-            })
+            .send(LogMessage::new_debug(format!(
+                "Pointer Inference: Adding {} entry points",
+                entry_sub_to_entry_node_map.len()
+            )))
             .unwrap();
         for (sub_tid, start_node_index) in entry_sub_to_entry_node_map.into_iter() {
             fixpoint_computation.set_node_value(
@@ -255,18 +257,27 @@ impl<'a> PointerInference<'a> {
     }
 
     fn log_debug(&self, msg: impl Into<String>) {
-        let log_msg = LogMessage {
-            text: msg.into(),
-            level: LogLevel::Debug,
-            location: None,
-        };
+        let log_msg = LogMessage::new_debug(msg.into());
         self.log_collector.send(log_msg).unwrap();
     }
 }
 
+/// The main entry point for executing the pointer inference analysis.
+pub fn run_analysis(
+    project: &Project,
+    analysis_params: &serde_json::Value,
+) -> (Vec<LogMessage>, Vec<CweWarning>) {
+    let config: Config = serde_json::from_value(analysis_params.clone()).unwrap();
+    run(project, config, false)
+}
+
 /// Generate and execute the pointer inference analysis.
 /// Returns a vector of all found CWE warnings and a vector of all log messages generated during analysis.
-pub fn run(project: &Project, config: Config, print_debug: bool) -> (Vec<CweWarning>, Vec<String>) {
+pub fn run(
+    project: &Project,
+    config: Config,
+    print_debug: bool,
+) -> (Vec<LogMessage>, Vec<CweWarning>) {
     let (cwe_sender, cwe_receiver) = crossbeam_channel::unbounded();
     let (log_sender, log_receiver) = crossbeam_channel::unbounded();
 
@@ -297,8 +308,8 @@ pub fn run(project: &Project, config: Config, print_debug: bool) -> (Vec<CweWarn
     }
     // Return the CWE warnings
     (
-        warning_collector_thread.join().unwrap(),
         log_collector_thread.join().unwrap(),
+        warning_collector_thread.join().unwrap(),
     )
 }
 
@@ -320,7 +331,7 @@ fn collect_cwe_warnings(receiver: crossbeam_channel::Receiver<CweWarning>) -> Ve
 }
 
 /// Collect log messages from the receiver until the channel is closed. Then return them.
-fn collect_logs(receiver: crossbeam_channel::Receiver<LogMessage>) -> Vec<String> {
+fn collect_logs(receiver: crossbeam_channel::Receiver<LogMessage>) -> Vec<LogMessage> {
     let mut logs_with_address = HashMap::new();
     let mut general_logs = Vec::new();
     while let Ok(log_message) = receiver.recv() {
@@ -334,6 +345,5 @@ fn collect_logs(receiver: crossbeam_channel::Receiver<LogMessage>) -> Vec<String
         .values()
         .cloned()
         .chain(general_logs.into_iter())
-        .map(|msg| msg.to_string())
         .collect()
 }

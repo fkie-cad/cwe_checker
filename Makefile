@@ -1,6 +1,17 @@
+GHIDRA_PATH =
+
 .PHONY: all clean test uninstall docker
 all:
 	cargo build --release
+	mkdir -p ${HOME}/.config/cwe_checker
+	cp src/utils/registers.json ${HOME}/.config/cwe_checker/registers.json
+	cp src/config.json ${HOME}/.config/cwe_checker/config.json
+ifdef GHIDRA_PATH
+	cargo install --path caller --locked
+	echo "{ \"ghidra_path\": \"${GHIDRA_PATH}\" }" > ${HOME}/.config/cwe_checker/ghidra.json
+	mkdir -p ${HOME}/.local/share/cwe_checker
+	cp -r ghidra ${HOME}/.local/share/cwe_checker/ghidra
+else
 	cp target/release/libcwe_checker_rs.a src/libcwe_checker_rs.a
 	cp target/release/libcwe_checker_rs.so src/dllcwe_checker_rs.so
 	dune build
@@ -10,9 +21,7 @@ all:
 	cd plugins/cwe_checker_type_inference && make all
 	cd plugins/cwe_checker_type_inference_print && make all
 	cd plugins/cwe_checker_pointer_inference_debug && make all
-	mkdir -p ${HOME}/.config/cwe_checker
-	cp src/utils/registers.json ${HOME}/.config/cwe_checker/registers.json
-	cp src/config.json ${HOME}/.config/cwe_checker/config.json
+endif
 
 test:
 	cargo test
@@ -40,13 +49,15 @@ clean:
 	cd plugins/cwe_checker_pointer_inference_debug; make clean; cd ../..
 
 uninstall:
+	rm -f -r ${HOME}/.config/cwe_checker
+	rm -f -r ${HOME}/.local/share/cwe_checker
+	cargo uninstall cwe_checker; echo ""
 	dune uninstall
 	cd plugins/cwe_checker; make uninstall; cd ../..
 	cd plugins/cwe_checker_emulation; make uninstall; cd ../..
 	cd plugins/cwe_checker_type_inference; make uninstall; cd ../..
 	cd plugins/cwe_checker_type_inference_print; make uninstall; cd ../..
 	cd plugins/cwe_checker_pointer_inference_debug; make uninstall; cd ../..
-	rm -f -r ${HOME}/.config/cwe_checker
 
 documentation:
 	dune build @doc

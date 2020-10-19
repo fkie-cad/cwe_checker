@@ -191,7 +191,7 @@
       "scanf"
     ]
   },
-  "pointer_inference": {
+  "Memory": {
     "allocation_symbols": [
       "malloc",
       "calloc",

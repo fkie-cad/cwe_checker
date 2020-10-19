@@ -69,7 +69,7 @@ pub trait Context {
 ///
 /// # Usage
 ///
-/// ```
+/// ```ignore
 /// let mut computation = Computation::new(context, optional_default_node_value);
 ///
 /// // set starting node values with computation.set_node_value(..)

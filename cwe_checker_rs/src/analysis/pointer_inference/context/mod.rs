@@ -73,10 +73,10 @@ impl<'a> Context<'a> {
     /// If `result` is an `Err`, log the error message as a debug message through the `log_collector` channel.
     pub fn log_debug<'_lt>(&self, result: Result<(), Error>, location: Option<&'_lt Tid>) {
         if let Err(err) = result {
-            let log_message = LogMessage {
-                text: format!("Pointer Inference: {}", err),
-                level: LogLevel::Debug,
-                location: location.cloned(),
+            let mut log_message =
+                LogMessage::new_debug(format!("{}", err)).source("Pointer Inference");
+            if let Some(loc) = location {
+                log_message = log_message.location(loc.clone());
             };
             self.log_collector.send(log_message).unwrap();
         }
