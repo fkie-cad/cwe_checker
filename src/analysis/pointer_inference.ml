@@ -21,9 +21,9 @@ let run (project: Project.t) (tid_map: Bap.Std.word Bap.Std.Tid.Map.t) : unit =
         match message with
         | `String message_string ->
             begin match String.lsplit2 message_string ~on:':' with
-            | Some("Error", msg) -> Log_utils.error @@ String.strip msg
-            | Some("Debug", msg) -> Log_utils.debug @@ String.strip msg
-            | Some("Info", msg) -> Log_utils.info @@ String.strip msg
+            | Some("ERROR", msg) -> Log_utils.error @@ String.strip msg
+            | Some("DEBUG", msg) -> Log_utils.debug @@ String.strip msg
+            | Some("INFO", msg) -> Log_utils.info @@ String.strip msg
             | _ -> failwith "Malformed log-message."
             end
         | _ -> failwith "Log-message is not a string."

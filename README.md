@@ -22,11 +22,16 @@ The following arguments should convince you to give *cwe_checker* a try:
 -  *cwe_checker* can be integrated as a plugin into [FACT](https://github.com/fkie-cad/FACT_core)
 
 ## Installation ##
+
+### Using the docker image ###
+
 The simplest way is to pull the latest Docker image from [dockerhub](https://hub.docker.com/r/fkiecad/cwe_checker):
 -   `docker pull fkiecad/cwe_checker:latest` yields an image based on the current master branch.
 -   `docker pull fkiecad/cwe_checker:stable` yields an image based on the latest stable release version.
 
 If you want to build the docker image yourself, just run `docker build -t cwe_checker .`
+
+### Local installation with BAP as backend ###
 
 Another way is to get cwe_checker from the Ocaml package manager Opam. You can install cwe_checker via the package [cwe_checker](https://opam.ocaml.org/packages/cwe_checker/) (`opam install cwe_checker`). This gives you the latest stable release version of the  *cwe_checker*.
 
@@ -45,6 +50,15 @@ If you plan to develop *cwe_checker*, it is recommended to build it using the pr
 -   [Rust](https://www.rust-lang.org) >= 1.44.1
 
 Just run `make all` to compile and register the plugin with BAP. You can run the test suite via `make test`. Documentation can be built via `make documentation`.
+
+### Local installation with Ghidra as backend ###
+
+The Ghidra backend is still in early development, thus many checks are not yet available for it. To try it out, the following dependencies must be fulfilled:
+-   [Rust](https://www.rust-lang.org) >= 1.44.1
+-   Ghidra >= 9.1
+-   The Java library `gson`. Download it from https://search.maven.org/artifact/com.google.code.gson/gson/2.8.6/jar and move it to the Ghidra plugin folder located at `$HOME/.ghidra/.ghidra_9.X.X_PUBLIC/plugins` (with the version number depending on your version of Ghidra).
+
+Run `make all GHIDRA_PATH=path/to/ghidra_folder` (with the correct path to the local Ghidra installation inserted) to compile and install the *cwe_checker*.
 
 ## Usage ##
 

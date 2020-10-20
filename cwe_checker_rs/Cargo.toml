@@ -19,4 +19,4 @@ directories = "3.0"
 
 [lib]
 name = "cwe_checker_rs"
-crate-type = ["staticlib", "cdylib"]
+crate-type = ["staticlib", "cdylib", "lib"]

@@ -13,9 +13,13 @@ fn run_pointer_inference(program_jsonbuilder_val: ocaml::Value) -> (Vec<CweWarni
 
     project.replace_let_bindings();
     let config: crate::analysis::pointer_inference::Config =
-        serde_json::from_value(crate::utils::read_config_file()["pointer_inference"].clone())
+        serde_json::from_value(crate::utils::read_config_file("config.json")["Memory"].clone())
             .unwrap();
-    crate::analysis::pointer_inference::run(&project.into(), config, false)
+    let (logs, cwes) = crate::analysis::pointer_inference::run(&project.into(), config, false);
+    (
+        cwes,
+        logs.into_iter().map(|log| format! {"{}", log}).collect(),
+    )
 }
 
 caml!(rs_run_pointer_inference(program_jsonbuilder_val) {
@@ -35,7 +39,7 @@ fn run_pointer_inference_and_print_debug(program_jsonbuilder_val: ocaml::Value) 
 
     project.replace_let_bindings();
     let config: crate::analysis::pointer_inference::Config =
-        serde_json::from_value(crate::utils::read_config_file()["pointer_inference"].clone())
+        serde_json::from_value(crate::utils::read_config_file("config.json")["Memory"].clone())
             .unwrap();
     crate::analysis::pointer_inference::run(&project.into(), config, true); // Note: This discard all CweWarnings and log messages.
 }

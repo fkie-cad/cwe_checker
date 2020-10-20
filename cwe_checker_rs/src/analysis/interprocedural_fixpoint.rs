@@ -185,7 +185,10 @@ impl<'a, T: Context<'a>> GeneralFPContext for GeneralizedContext<'a, T> {
                 NodeValue::Value(_) => panic!("Unexpected interprocedural fixpoint graph state"),
                 NodeValue::CallReturnCombinator { call, return_ } => {
                     let return_from_block = match graph.node_weight(start_node) {
-                        Some(Node::CallReturn { call: _, return_ }) => return_,
+                        Some(Node::CallReturn {
+                            call: _,
+                            return_: (return_from_block, _),
+                        }) => return_from_block,
                         _ => panic!("Malformed Control flow graph"),
                     };
                     let return_from_jmp = &return_from_block.term.jmps[0];

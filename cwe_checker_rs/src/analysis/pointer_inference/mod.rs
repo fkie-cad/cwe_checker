@@ -35,6 +35,12 @@ use state::State;
 /// The version number of the analysis.
 const VERSION: &str = "0.1";
 
+pub static CWE_MODULE: crate::CweModule = crate::CweModule {
+    name: "Memory",
+    version: VERSION,
+    run: run_analysis,
+};
+
 /// The abstract domain type for representing register values.
 type Data = DataDomain<BitvectorDomain>;
 
@@ -77,20 +83,22 @@ impl<'a> PointerInference<'a> {
             .collect();
         for sub_tid in project.program.term.entry_points.iter() {
             if let Some(sub) = subs.get(sub_tid) {
-                if let Some(entry_block) = sub.term.blocks.iter().next() {
+                if let Some(entry_block) = sub.term.blocks.get(0) {
                     entry_sub_to_entry_blocks_map.insert(sub_tid, entry_block.tid.clone());
                 }
             }
         }
-        let tid_to_graph_indices_map = super::graph::get_indices_of_block_nodes(
-            &context.graph,
-            entry_sub_to_entry_blocks_map.values(),
-        );
+        let mut tid_to_graph_indices_map = HashMap::new();
+        for node in context.graph.node_indices() {
+            if let super::graph::Node::BlkStart(block, sub) = context.graph[node] {
+                tid_to_graph_indices_map.insert((block.tid.clone(), sub.tid.clone()), node);
+            }
+        }
         let entry_sub_to_entry_node_map: HashMap<Tid, NodeIndex> = entry_sub_to_entry_blocks_map
             .into_iter()
             .filter_map(|(sub_tid, block_tid)| {
-                if let Some((start_node_index, _end_node_index)) =
-                    tid_to_graph_indices_map.get(&block_tid)
+                if let Some(start_node_index) =
+                    tid_to_graph_indices_map.get(&(block_tid, sub_tid.clone()))
                 {
                     Some((sub_tid.clone(), *start_node_index))
                 } else {
@@ -101,14 +109,10 @@ impl<'a> PointerInference<'a> {
         let mut fixpoint_computation =
             super::interprocedural_fixpoint::Computation::new(context, None);
         log_sender
-            .send(LogMessage {
-                text: format!(
-                    "Pointer Inference: Adding {} entry points",
-                    entry_sub_to_entry_node_map.len()
-                ),
-                level: LogLevel::Debug,
-                location: None,
-            })
+            .send(LogMessage::new_debug(format!(
+                "Pointer Inference: Adding {} entry points",
+                entry_sub_to_entry_node_map.len()
+            )))
             .unwrap();
         for (sub_tid, start_node_index) in entry_sub_to_entry_node_map.into_iter() {
             fixpoint_computation.set_node_value(
@@ -200,14 +204,14 @@ impl<'a> PointerInference<'a> {
         let graph = self.computation.get_graph();
         let mut new_entry_points = Vec::new();
         for (node_id, node) in graph.node_references() {
-            if let Node::BlkStart(block) = node {
-                if !(start_block_to_sub_map.get(&block.tid).is_none()
-                    || self.computation.get_node_value(node_id).is_some()
-                    || only_cfg_roots
-                        && graph
+            if let Node::BlkStart(block, sub) = node {
+                if start_block_to_sub_map.get(&block.tid) == Some(sub)
+                    && self.computation.get_node_value(node_id).is_none()
+                    && (!only_cfg_roots
+                        || graph
                             .neighbors_directed(node_id, Direction::Incoming)
                             .next()
-                            .is_some())
+                            .is_none())
                 {
                     new_entry_points.push(node_id);
                 }
@@ -239,7 +243,7 @@ impl<'a> PointerInference<'a> {
         let mut stateful_blocks: i64 = 0;
         let mut all_blocks: i64 = 0;
         for (node_id, node) in graph.node_references() {
-            if let Node::BlkStart(_block) = node {
+            if let Node::BlkStart(_block, _sub) = node {
                 all_blocks += 1;
                 if self.computation.get_node_value(node_id).is_some() {
                     stateful_blocks += 1;
@@ -253,18 +257,27 @@ impl<'a> PointerInference<'a> {
     }
 
     fn log_debug(&self, msg: impl Into<String>) {
-        let log_msg = LogMessage {
-            text: msg.into(),
-            level: LogLevel::Debug,
-            location: None,
-        };
+        let log_msg = LogMessage::new_debug(msg.into());
         self.log_collector.send(log_msg).unwrap();
     }
 }
 
+/// The main entry point for executing the pointer inference analysis.
+pub fn run_analysis(
+    project: &Project,
+    analysis_params: &serde_json::Value,
+) -> (Vec<LogMessage>, Vec<CweWarning>) {
+    let config: Config = serde_json::from_value(analysis_params.clone()).unwrap();
+    run(project, config, false)
+}
+
 /// Generate and execute the pointer inference analysis.
 /// Returns a vector of all found CWE warnings and a vector of all log messages generated during analysis.
-pub fn run(project: &Project, config: Config, print_debug: bool) -> (Vec<CweWarning>, Vec<String>) {
+pub fn run(
+    project: &Project,
+    config: Config,
+    print_debug: bool,
+) -> (Vec<LogMessage>, Vec<CweWarning>) {
     let (cwe_sender, cwe_receiver) = crossbeam_channel::unbounded();
     let (log_sender, log_receiver) = crossbeam_channel::unbounded();
 
@@ -295,8 +308,8 @@ pub fn run(project: &Project, config: Config, print_debug: bool) -> (Vec<CweWarn
     }
     // Return the CWE warnings
     (
-        warning_collector_thread.join().unwrap(),
         log_collector_thread.join().unwrap(),
+        warning_collector_thread.join().unwrap(),
     )
 }
 
@@ -318,7 +331,7 @@ fn collect_cwe_warnings(receiver: crossbeam_channel::Receiver<CweWarning>) -> Ve
 }
 
 /// Collect log messages from the receiver until the channel is closed. Then return them.
-fn collect_logs(receiver: crossbeam_channel::Receiver<LogMessage>) -> Vec<String> {
+fn collect_logs(receiver: crossbeam_channel::Receiver<LogMessage>) -> Vec<LogMessage> {
     let mut logs_with_address = HashMap::new();
     let mut general_logs = Vec::new();
     while let Ok(log_message) = receiver.recv() {
@@ -332,6 +345,5 @@ fn collect_logs(receiver: crossbeam_channel::Receiver<LogMessage>) -> Vec<String
         .values()
         .cloned()
         .chain(general_logs.into_iter())
-        .map(|msg| msg.to_string())
         .collect()
 }
