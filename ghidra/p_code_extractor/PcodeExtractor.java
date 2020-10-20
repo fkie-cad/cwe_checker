@@ -1,4 +1,5 @@
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -10,6 +11,7 @@ import org.apache.commons.lang3.EnumUtils;
 
 import bil.*;
 import term.*;
+import internal.*;
 import symbol.ExternSymbol;
 import serializer.Serializer;
 import ghidra.app.script.GhidraScript;
@@ -574,6 +576,14 @@ public class PcodeExtractor extends GhidraScript {
         project.setProgram(program);
         project.setStackPointerRegister(stackPointerVar);
         project.setCpuArch(cpuArch);
+        try {
+            HashMap<String, RegisterConvention> conventions = new HashMap<String, RegisterConvention>();
+            ParseCspecContent.parseSpecs(ghidraProgram, conventions);
+            addParameterRegister(conventions);
+            project.setRegisterConvention(new ArrayList<RegisterConvention>(conventions.values()));
+        } catch (FileNotFoundException e) {
+            System.out.println(e);
+        }
 
         return project;
     }
@@ -1064,6 +1074,23 @@ public class PcodeExtractor extends GhidraScript {
             return matcher.group(1);
         }
         return "";
+    }
+
+    /**
+     * Adds parameter register to the RegisterCallingConvetion object
+     */
+    protected void addParameterRegister(HashMap<String, RegisterConvention> conventions) {
+        PrototypeModel[] models = ghidraProgram.getCompilerSpec().getCallingConventions();
+        for(PrototypeModel model : models) {
+            String cconv = model.getName();
+            System.out.println(cconv);
+            if(conventions.get(cconv) != null) {
+                ArrayList<String> parameters = conventions.get(cconv).getParameter();
+                for(VariableStorage storage : model.getPotentialInputRegisterStorage(ghidraProgram)) {
+                    parameters.add(storage.getRegister().getName());
+                }
+            }
+        }
     }
 
 }
