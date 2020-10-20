@@ -1083,7 +1083,6 @@ public class PcodeExtractor extends GhidraScript {
         PrototypeModel[] models = ghidraProgram.getCompilerSpec().getCallingConventions();
         for(PrototypeModel model : models) {
             String cconv = model.getName();
-            System.out.println(cconv);
             if(conventions.get(cconv) != null) {
                 ArrayList<String> parameters = conventions.get(cconv).getParameter();
                 for(VariableStorage storage : model.getPotentialInputRegisterStorage(ghidraProgram)) {
