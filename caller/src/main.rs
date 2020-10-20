@@ -179,9 +179,11 @@ fn get_project_from_ghidra(file_path: &Path) -> Project {
     // Find the correct paths for temporary files.
     let project_dirs = directories::ProjectDirs::from("", "", "cwe_checker")
         .expect("Could not determine path for temporary files");
-    let tmp_folder = project_dirs
-        .runtime_dir()
-        .expect("Could not determine path for temporary files");
+    let tmp_folder = if let Some(folder) = project_dirs.runtime_dir() {
+        folder
+    } else {
+        Path::new("/tmp/cwe_checker")
+    };
     if !tmp_folder.exists() {
         std::fs::create_dir(tmp_folder).expect("Unable to create temporary folder");
     }
