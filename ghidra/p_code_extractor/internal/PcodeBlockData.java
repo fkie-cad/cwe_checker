@@ -1,3 +1,6 @@
+
+package internal;
+
 import java.util.ArrayList;
 
 import ghidra.program.model.listing.Instruction;
