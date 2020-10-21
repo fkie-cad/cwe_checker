@@ -190,6 +190,7 @@ public class ParseCspecContent {
             XmlElement languageEnter = parser.peek();
             if(languageEnter.getAttribute("id").equals(languageId.getIdAsString())) {
                 cspecName = getCompilerName(parser);
+                break;
             } else {
                 discardSubTree(parser);
             }
@@ -274,7 +275,7 @@ public class ParseCspecContent {
         }
 
         // Using the hashmap this way will simplify the addition of parameter registers which are not parsed here
-        // as they are calling convetion specific
+        // as they are calling convention specific
         conventions.put(convention.getCconv(), convention);
     }
 
