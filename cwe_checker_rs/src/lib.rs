@@ -18,6 +18,7 @@ pub mod intermediate_representation;
 pub mod pcode;
 pub mod term;
 pub mod utils;
+pub mod checkers;
 
 mod prelude {
     pub use apint::Width;

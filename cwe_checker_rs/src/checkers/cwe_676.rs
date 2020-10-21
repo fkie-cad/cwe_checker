@@ -1,4 +1,8 @@
-use crate::intermediate_representation::Project;
+use crate::{
+    intermediate_representation::{ Project, Sub, Term, Program }, 
+    utils::log::{ CweWarning, LogMessage }
+};
+use serde::{ Serialize, Deserialize };
 
 const VERSION: &str = "0.1";
 
@@ -10,7 +14,7 @@ pub static CWE_MODULE: crate::CweModule = crate::CweModule {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Config {
-    dangerous_function_symbols: Vec<String>,
+    symbols: Vec<String>,
 }
 
 
@@ -29,8 +33,10 @@ pub fn print_calls() {
 }
 
 
-pub fn resolve_symbols(subfunctions: Vec<Term<Sub>>, symbols: Vec<String>) -> Vec<Term<Sub>> {
-    subfunctions.retain(|&sub| symbols.iter().any(|&dangerous| sub.term.name == dangerous))
+pub fn resolve_symbols(subfunctions: &Vec<Term<Sub>>, symbols: &Vec<String>) -> Vec<Term<Sub>> {
+    let mut filtered_subs = subfunctions.clone();
+    filtered_subs.retain(|symbol| symbols.iter().any(|dangerous_function| *symbol.term.name == *dangerous_function));
+    filtered_subs
 }
 
 
@@ -39,16 +45,9 @@ pub fn check_cwe(
     cwe_params: &serde_json::Value,
 ) -> (Vec<LogMessage>, Vec<CweWarning>) {
     let config: Config = serde_json::from_value(cwe_params.clone()).unwrap();
-    run(project, config, false)
-}
+    let prog: &Term<Program> = &project.program;
+    let subfunctions: &Vec<Term<Sub>> = &prog.term.subs;
+    let dangerous_functions = resolve_symbols(subfunctions, &config.symbols);
 
-pub fn run(
-    project: &Project,
-    config: Config,
-    print_debug: bool,
-) -> (Vec<LogMessage>, Vec<CweWarning>) {
-    let prog: Term<Program> = project.program;
-    let subfunctions: Vec<Term<Sub>> = prog.subs;
-    let dangerous_functions: Vec<Term<Sub>> = resolve_symbols(subfunctions, config.dangerous_function_symbols);
-
+    (vec![], vec![])
 }
