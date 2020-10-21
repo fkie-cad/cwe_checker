@@ -1,6 +1,10 @@
 package term;
 
 import bil.Variable;
+import internal.RegisterConvention;
+
+import java.util.ArrayList;
+
 import com.google.gson.annotations.SerializedName;
 
 public class Project {
@@ -10,14 +14,17 @@ public class Project {
     private Variable stackPointerRegister;
     @SerializedName("cpu_architecture")
     private String cpuArch;
+    @SerializedName("register_calling_convention")
+    private ArrayList<RegisterConvention> conventions;
 
     public Project() {
     }
 
-    public Project(Term<Program> program, String cpuArch, Variable stackPointerRegister) {
+    public Project(Term<Program> program, String cpuArch, Variable stackPointerRegister, ArrayList<RegisterConvention> conventions) {
         this.setProgram(program);
         this.setCpuArch(cpuArch);
         this.setStackPointerRegister(stackPointerRegister);
+        this.setRegisterConvention(conventions);
     }
 
     public Term<Program> getProgram() {
@@ -42,5 +49,13 @@ public class Project {
 
     public void setCpuArch(String cpuArch) {
         this.cpuArch = cpuArch;
+    }
+
+    public ArrayList<RegisterConvention> getRegisterConvention() {
+        return conventions;
+    }
+
+    public void setRegisterConvention(ArrayList<RegisterConvention> conventions) {
+        this.conventions = conventions;
     }
 }

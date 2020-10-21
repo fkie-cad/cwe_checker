@@ -1,4 +1,6 @@
+import java.io.FileNotFoundException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -10,6 +12,7 @@ import org.apache.commons.lang3.EnumUtils;
 
 import bil.*;
 import term.*;
+import internal.*;
 import symbol.ExternSymbol;
 import serializer.Serializer;
 import ghidra.app.script.GhidraScript;
@@ -20,6 +23,7 @@ import ghidra.program.model.block.CodeBlockIterator;
 import ghidra.program.model.block.CodeBlockReferenceIterator;
 import ghidra.program.model.block.SimpleBlockModel;
 import ghidra.program.model.lang.CompilerSpec;
+import ghidra.program.model.lang.PrototypeModel;
 import ghidra.program.model.lang.Register;
 import ghidra.program.model.listing.Function;
 import ghidra.program.model.listing.FunctionIterator;
@@ -28,6 +32,7 @@ import ghidra.program.model.listing.Instruction;
 import ghidra.program.model.listing.InstructionIterator;
 import ghidra.program.model.listing.Listing;
 import ghidra.program.model.listing.Parameter;
+import ghidra.program.model.listing.VariableStorage;
 import ghidra.program.model.pcode.PcodeOp;
 import ghidra.program.model.pcode.Varnode;
 import ghidra.program.model.symbol.Symbol;
@@ -574,6 +579,14 @@ public class PcodeExtractor extends GhidraScript {
         project.setProgram(program);
         project.setStackPointerRegister(stackPointerVar);
         project.setCpuArch(cpuArch);
+        try {
+            HashMap<String, RegisterConvention> conventions = new HashMap<String, RegisterConvention>();
+            ParseCspecContent.parseSpecs(ghidraProgram, conventions);
+            addParameterRegister(conventions);
+            project.setRegisterConvention(new ArrayList<RegisterConvention>(conventions.values()));
+        } catch (FileNotFoundException e) {
+            System.out.println(e);
+        }
 
         return project;
     }
@@ -1064,6 +1077,22 @@ public class PcodeExtractor extends GhidraScript {
             return matcher.group(1);
         }
         return "";
+    }
+
+    /**
+     * Adds parameter register to the RegisterCallingConvention object
+     */
+    protected void addParameterRegister(HashMap<String, RegisterConvention> conventions) {
+        PrototypeModel[] models = ghidraProgram.getCompilerSpec().getCallingConventions();
+        for(PrototypeModel model : models) {
+            String cconv = model.getName();
+            if(conventions.get(cconv) != null) {
+                ArrayList<String> parameters = conventions.get(cconv).getParameter();
+                for(VariableStorage storage : model.getPotentialInputRegisterStorage(ghidraProgram)) {
+                    parameters.add(storage.getRegister().getName());
+                }
+            }
+        }
     }
 
 }
