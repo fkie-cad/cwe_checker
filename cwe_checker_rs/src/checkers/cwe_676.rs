@@ -1,5 +1,7 @@
+/// The CWE 676 checks for potentially dangerous function calls, such as strcpy, memcpy, scanf etc.
+
 use crate::{
-    intermediate_representation::{ Program, Project, Sub, Term, Tid, Jmp }, 
+    intermediate_representation::{ Program, Project, Sub, Term, Tid, Jmp, ExternSymbol }, 
     utils::log::{ CweWarning, LogMessage }};
 use serde::{ Serialize, Deserialize };
 
@@ -17,14 +19,15 @@ pub struct Config {
 }
 
 
-pub fn get_call_to_target<'a>(caller: &'a Term<Sub>, target: &'a Term<Sub>) -> Vec<Option<(&'a str, &'a Tid, &'a str)>> {
+/// For each block of a subroutine check if the jump is a direct call and if the target TID of that call is equal to a dangerous symbol TID
+pub fn get_call_to_target<'a>(caller: &'a Term<Sub>, target: &'a ExternSymbol) -> Vec<Option<(&'a str, &'a Tid, &'a str)>> {
     let mut calls: Vec<Option<(&'a str, &'a Tid, &'a str)>> = Vec::new();
     for blk in caller.term.blocks.iter() {
         for jmp in blk.term.jmps.iter() {
             match &jmp.term {
                 Jmp::Call{ target: dst, .. } => {
                     if *dst == target.tid {
-                        calls.push(Some((caller.term.name.as_str(), &blk.tid, target.term.name.as_str())));
+                        calls.push(Some((caller.term.name.as_str(), &blk.tid, target.name.as_str())));
                     }
                 }
                 _ => ()
@@ -36,7 +39,8 @@ pub fn get_call_to_target<'a>(caller: &'a Term<Sub>, target: &'a Term<Sub>) -> V
 }
 
 
-pub fn get_calls_to_symbols<'a>(subfunctions: &'a Vec<Term<Sub>>, dangerous_symbols: &'a Vec<&'a Term<Sub>>) -> Vec<Option<(&'a str, &'a Tid, &'a str)>> {
+/// For each subroutine and each found dangerous symbol, check for calls to the corresponding symbol
+pub fn get_calls_to_symbols<'a>(subfunctions: &'a Vec<Term<Sub>>, dangerous_symbols: &'a Vec<&'a ExternSymbol>) -> Vec<Option<(&'a str, &'a Tid, &'a str)>> {
     let mut calls: Vec<Option<(&str, &Tid, &str)>> = Vec::new();
     for sub in subfunctions.iter() {
         for symbol in dangerous_symbols.iter() {
@@ -48,6 +52,7 @@ pub fn get_calls_to_symbols<'a>(subfunctions: &'a Vec<Term<Sub>>, dangerous_symb
 }
 
 
+/// Generate cwe warnings for potentially dangerous function calls
 pub fn generate_cwe_warnings<'a>(dangerous_calls: Vec<Option<(&'a str, &'a Tid, &'a str)>>) -> Vec<CweWarning> {
     let mut cwe_warnings: Vec<CweWarning> = Vec::new();
     for call in dangerous_calls.iter() {
@@ -79,10 +84,11 @@ pub fn generate_cwe_warnings<'a>(dangerous_calls: Vec<Option<(&'a str, &'a Tid, 
 }
 
 
-pub fn resolve_symbols<'a>(subfunctions: &'a Vec<Term<Sub>>, symbols: &'a Vec<String>) -> Vec<&'a Term<Sub>> {
-    subfunctions
+/// Filter external symbols by dangerous symbols
+pub fn resolve_symbols<'a>(external_symbols: &'a Vec<ExternSymbol>, symbols: &'a Vec<String>) -> Vec<&'a ExternSymbol> {
+    external_symbols
         .iter()
-        .filter(|symbol| symbols.iter().any(|dangerous_function| *symbol.term.name == *dangerous_function))
+        .filter(|symbol| symbols.iter().any(|dangerous_function| *symbol.name == *dangerous_function))
         .collect()
 }
 
@@ -94,8 +100,9 @@ pub fn check_cwe(
     let config: Config = serde_json::from_value(cwe_params.clone()).unwrap();
     let prog: &Term<Program> = &project.program;
     let subfunctions: &Vec<Term<Sub>> = &prog.term.subs;
-    let dangerous_functions = resolve_symbols(subfunctions, &config.symbols);
-    let dangerous_calls = get_calls_to_symbols(subfunctions, &dangerous_functions);
+    let external_symbols: &Vec<ExternSymbol> = &prog.term.extern_symbols;
+    let dangerous_symbols = resolve_symbols(external_symbols, &config.symbols);
+    let dangerous_calls = get_calls_to_symbols(subfunctions, &dangerous_symbols);
 
     (vec![], generate_cwe_warnings(dangerous_calls))
 }
