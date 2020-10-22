@@ -1,3 +1,4 @@
+import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -22,6 +23,7 @@ import ghidra.program.model.block.CodeBlockIterator;
 import ghidra.program.model.block.CodeBlockReferenceIterator;
 import ghidra.program.model.block.SimpleBlockModel;
 import ghidra.program.model.lang.CompilerSpec;
+import ghidra.program.model.lang.PrototypeModel;
 import ghidra.program.model.lang.Register;
 import ghidra.program.model.listing.Function;
 import ghidra.program.model.listing.FunctionIterator;
@@ -30,6 +32,7 @@ import ghidra.program.model.listing.Instruction;
 import ghidra.program.model.listing.InstructionIterator;
 import ghidra.program.model.listing.Listing;
 import ghidra.program.model.listing.Parameter;
+import ghidra.program.model.listing.VariableStorage;
 import ghidra.program.model.pcode.PcodeOp;
 import ghidra.program.model.pcode.Varnode;
 import ghidra.program.model.symbol.Symbol;
@@ -1077,7 +1080,7 @@ public class PcodeExtractor extends GhidraScript {
     }
 
     /**
-     * Adds parameter register to the RegisterCallingConvetion object
+     * Adds parameter register to the RegisterCallingConvention object
      */
     protected void addParameterRegister(HashMap<String, RegisterConvention> conventions) {
         PrototypeModel[] models = ghidraProgram.getCompilerSpec().getCallingConventions();
