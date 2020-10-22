@@ -4,7 +4,6 @@ GHIDRA_PATH =
 all:
 	cargo build --release
 	mkdir -p ${HOME}/.config/cwe_checker
-	cp src/utils/registers.json ${HOME}/.config/cwe_checker/registers.json
 	cp src/config.json ${HOME}/.config/cwe_checker/config.json
 ifdef GHIDRA_PATH
 	cargo install --path caller --locked

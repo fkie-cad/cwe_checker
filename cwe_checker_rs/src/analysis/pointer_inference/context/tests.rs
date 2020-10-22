@@ -12,7 +12,7 @@ fn new_id(time: &str, reg_name: &str) -> AbstractIdentifier {
 }
 
 fn mock_extern_symbol(name: &str) -> ExternSymbol {
-    let arg = Arg::Register(register("RAX"));
+    let arg = Arg::Register(register("RDX"));
     ExternSymbol {
         tid: Tid::new("extern_".to_string() + name),
         name: name.into(),
@@ -80,13 +80,18 @@ fn mock_project() -> (Project, Config) {
         tid: Tid::new("program"),
         term: program,
     };
+    let cconv = CallingConvention {
+        name: "default".to_string(),
+        parameter_register: vec!["RDX".to_string()],
+        return_register: vec!["RDX".to_string()],
+        callee_saved_register: vec!["callee_saved_reg".to_string()],
+    };
     (
         Project {
             program: program_term,
             cpu_architecture: "x86_64".to_string(),
             stack_pointer_register: register("RSP"),
-            callee_saved_registers: vec!["callee_saved_reg".to_string()],
-            parameter_registers: vec!["RAX".to_string()],
+            calling_conventions: vec![cconv],
         },
         Config {
             allocation_symbols: vec!["malloc".into()],
@@ -186,9 +191,9 @@ fn context_problem_implementation() {
     let malloc = call_term("extern_malloc");
     let mut state_after_malloc = context.update_call_stub(&state, &malloc).unwrap();
     assert_eq!(
-        state_after_malloc.get_register(&register("RAX")).unwrap(),
+        state_after_malloc.get_register(&register("RDX")).unwrap(),
         Data::Pointer(PointerDomain::new(
-            new_id("call_extern_malloc", "RAX"),
+            new_id("call_extern_malloc", "RDX"),
             bv(0)
         ))
     );
@@ -214,7 +219,7 @@ fn context_problem_implementation() {
     state_after_malloc.set_register(
         &register("callee_saved_reg"),
         Data::Pointer(PointerDomain::new(
-            new_id("call_extern_malloc", "RAX"),
+            new_id("call_extern_malloc", "RDX"),
             bv(0),
         )),
     );
@@ -223,7 +228,7 @@ fn context_problem_implementation() {
         .update_call_stub(&state_after_malloc, &free)
         .unwrap();
     assert!(state_after_free
-        .get_register(&register("RAX"))
+        .get_register(&register("RDX"))
         .unwrap()
         .is_top());
     assert_eq!(state_after_free.memory.get_num_objects(), 2);
@@ -232,7 +237,7 @@ fn context_problem_implementation() {
             .get_register(&register("callee_saved_reg"))
             .unwrap(),
         Data::Pointer(PointerDomain::new(
-            new_id("call_extern_malloc", "RAX"),
+            new_id("call_extern_malloc", "RDX"),
             bv(0)
         ))
     );
@@ -304,7 +309,7 @@ fn update_return() {
         .ids_known_to_caller
         .insert(other_callsite_id.clone());
     state_before_return.set_register(
-        &register("RAX"),
+        &register("RDX"),
         Data::Pointer(PointerDomain::new(
             new_id("call_callee_other", "RSP"),
             bv(-32),

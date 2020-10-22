@@ -1,6 +1,7 @@
 use crate::bil::*;
 use crate::intermediate_representation::Arg as IrArg;
 use crate::intermediate_representation::Blk as IrBlk;
+use crate::intermediate_representation::CallingConvention as IrCallingConvention;
 use crate::intermediate_representation::Def as IrDef;
 use crate::intermediate_representation::Expression as IrExpression;
 use crate::intermediate_representation::Jmp as IrJmp;
@@ -308,6 +309,7 @@ pub struct Project {
     pub stack_pointer_register: Variable,
     pub callee_saved_registers: Vec<String>,
     pub parameter_registers: Vec<String>,
+    pub return_registers: Vec<String>,
 }
 
 impl Project {
@@ -354,12 +356,17 @@ impl From<Project> for IrProject {
             tid: project.program.tid,
             term: project.program.term.into(),
         };
+        let default_cconv = IrCallingConvention {
+            name: "default".to_string(),
+            parameter_register: project.parameter_registers,
+            return_register: project.return_registers,
+            callee_saved_register: project.callee_saved_registers,
+        };
         IrProject {
             program,
             cpu_architecture: project.cpu_architecture,
             stack_pointer_register: project.stack_pointer_register.into(),
-            callee_saved_registers: project.callee_saved_registers,
-            parameter_registers: project.parameter_registers,
+            calling_conventions: vec![default_cconv],
         }
     }
 }
