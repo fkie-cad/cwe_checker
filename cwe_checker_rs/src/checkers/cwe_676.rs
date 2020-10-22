@@ -17,13 +17,14 @@ pub struct Config {
 }
 
 
-pub fn get_call_to_target<'a>(caller: &'a Term<Sub>, target: &'a Term<Sub>) -> Option<(&'a str, &'a Tid, &'a str)> {
+pub fn get_call_to_target<'a>(caller: &'a Term<Sub>, target: &'a Term<Sub>) -> Vec<Option<(&'a str, &'a Tid, &'a str)>> {
+    let mut calls: Vec<Option<(&'a str, &'a Tid, &'a str)>> = Vec::new();
     for blk in caller.term.blocks.iter() {
         for jmp in blk.term.jmps.iter() {
             match &jmp.term {
                 Jmp::Call{ target: dst, .. } => {
                     if *dst == target.tid {
-                        return Some((caller.term.name.as_str(), &blk.tid, target.term.name.as_str()))
+                        calls.push(Some((caller.term.name.as_str(), &blk.tid, target.term.name.as_str())));
                     }
                 }
                 _ => ()
@@ -31,7 +32,7 @@ pub fn get_call_to_target<'a>(caller: &'a Term<Sub>, target: &'a Term<Sub>) -> O
         }
     }
 
-    None
+    calls
 }
 
 
@@ -39,7 +40,7 @@ pub fn get_calls_to_symbols<'a>(subfunctions: &'a Vec<Term<Sub>>, dangerous_symb
     let mut calls: Vec<Option<(&str, &Tid, &str)>> = Vec::new();
     for sub in subfunctions.iter() {
         for symbol in dangerous_symbols.iter() {
-            calls.push(get_call_to_target(sub, symbol))
+            calls.append(&mut get_call_to_target(sub, symbol))
         }
     }
 
