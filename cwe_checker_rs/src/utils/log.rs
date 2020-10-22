@@ -12,6 +12,44 @@ pub struct CweWarning {
     pub description: String,
 }
 
+impl CweWarning {
+    pub fn new(
+        name: String, 
+        version: String,
+        description: String,
+    ) -> CweWarning {
+        CweWarning {
+            name: name,
+            version: version,
+            addresses: Vec::new(),
+            tids: Vec::new(),
+            symbols: Vec::new(),
+            other: Vec::new(),
+            description: description,
+        }
+    }
+
+    pub fn addresses(mut self, addresses: Vec<String>) -> CweWarning {
+        self.addresses = addresses;
+        self
+    } 
+
+    pub fn tids(mut self, tids: Vec<String>) -> CweWarning {
+        self.tids = tids;
+        self
+    } 
+
+    pub fn symbols(mut self, symbols: Vec<String>) -> CweWarning {
+        self.symbols = symbols;
+        self
+    } 
+
+    pub fn other(mut self, other: Vec<Vec<String>>) -> CweWarning {
+        self.other = other;
+        self
+    } 
+}
+
 impl std::fmt::Display for CweWarning {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
