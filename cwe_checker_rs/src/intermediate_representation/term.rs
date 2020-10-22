@@ -203,6 +203,19 @@ impl ExternSymbol {
             Err(anyhow!("Wrong number of parameter values"))
         }
     }
+
+    /// Get the calling convention corresponding to the extern symbol.
+    pub fn get_calling_convention<'a>(&self, project: &'a Project) -> &'a CallingConvention {
+        let cconv_name = match self.calling_convention {
+            Some(ref name) => name,
+            None => "default",
+        };
+        project
+            .calling_conventions
+            .iter()
+            .find(|cconv| cconv.name == cconv_name)
+            .unwrap()
+    }
 }
 
 /// The `Program` structure represents a disassembled binary.
@@ -230,6 +243,21 @@ impl Program {
     }
 }
 
+/// Calling convention related data
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
+pub struct CallingConvention {
+    /// The name of the calling convention
+    #[serde(rename = "calling_convention")]
+    pub name: String,
+    /// A list of possible parameter register
+    pub parameter_register: Vec<String>,
+    /// A list of possible return register
+    pub return_register: Vec<String>,
+    /// A list of callee-saved register,
+    /// i.e. the values of these registers should be the same after the call as they were before the call.
+    pub callee_saved_register: Vec<String>,
+}
+
 /// The `Project` struct is the main data structure representing a binary.
 ///
 /// It contains information about the disassembled binary
@@ -242,14 +270,8 @@ pub struct Project {
     pub cpu_architecture: String,
     /// The stack pointer register for the given CPU architecture.
     pub stack_pointer_register: Variable,
-    /// The names of callee-saved registers for the standard calling convention
-    /// for the given CPU architecture.
-    /// Note that this field may be removed in the future.
-    pub callee_saved_registers: Vec<String>,
-    /// The names of parameter registers for the standard calling convention
-    /// for the given CPU architecture.
-    /// Note that this field may be removed in the future.
-    pub parameter_registers: Vec<String>,
+    /// The known calling conventions that may be used for calls to extern functions.
+    pub calling_conventions: Vec<CallingConvention>,
 }
 
 impl Project {

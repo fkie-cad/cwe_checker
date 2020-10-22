@@ -190,7 +190,6 @@ public class ParseCspecContent {
             XmlElement languageEnter = parser.peek();
             if(languageEnter.getAttribute("id").equals(languageId.getIdAsString())) {
                 cspecName = getCompilerName(parser);
-                break;
             } else {
                 discardSubTree(parser);
             }

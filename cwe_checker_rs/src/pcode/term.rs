@@ -2,6 +2,7 @@ use super::{Expression, ExpressionType, Variable};
 use crate::intermediate_representation::Arg as IrArg;
 use crate::intermediate_representation::Blk as IrBlk;
 use crate::intermediate_representation::ByteSize;
+use crate::intermediate_representation::CallingConvention as IrCallingConvention;
 use crate::intermediate_representation::Def as IrDef;
 use crate::intermediate_representation::Expression as IrExpression;
 use crate::intermediate_representation::ExternSymbol as IrExternSymbol;
@@ -387,10 +388,32 @@ impl From<Program> for IrProgram {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
+pub struct CallingConvention {
+    #[serde(rename = "calling_convention")]
+    pub name: String,
+    parameter_register: Vec<String>,
+    return_register: Vec<String>,
+    unaffected_register: Vec<String>,
+    killed_by_call_register: Vec<String>,
+}
+
+impl From<CallingConvention> for IrCallingConvention {
+    fn from(cconv: CallingConvention) -> IrCallingConvention {
+        IrCallingConvention {
+            name: cconv.name,
+            parameter_register: cconv.parameter_register,
+            return_register: cconv.return_register,
+            callee_saved_register: cconv.unaffected_register,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Project {
     pub program: Term<Program>,
     pub cpu_architecture: String,
     pub stack_pointer_register: Variable,
+    pub register_calling_convention: Vec<CallingConvention>,
 }
 
 impl From<Project> for IrProject {
@@ -400,15 +423,15 @@ impl From<Project> for IrProject {
             tid: project.program.tid,
             term: project.program.term.into(),
         };
-        let (params, callee_saved) = crate::utils::get_generic_parameter_and_callee_saved_register(
-            &project.cpu_architecture,
-        );
         IrProject {
             program,
             cpu_architecture: project.cpu_architecture,
             stack_pointer_register: project.stack_pointer_register.into(),
-            callee_saved_registers: callee_saved,
-            parameter_registers: params,
+            calling_conventions: project
+                .register_calling_convention
+                .into_iter()
+                .map(|cconv| cconv.into())
+                .collect(),
         }
     }
 }
@@ -691,7 +714,16 @@ mod tests {
                 "size": 8,
                 "is_virtual": false
             },
-            "cpu_architecture": "x86_64"
+            "cpu_architecture": "x86_64",
+            "register_calling_convention": [
+                {
+                    "calling_convention": "default",
+                    "parameter_register": [],
+                    "return_register": [],
+                    "unaffected_register": [],
+                    "killed_by_call_register": []
+                }
+            ]
         }
         "#,
         )
