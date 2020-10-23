@@ -308,5 +308,6 @@ let of_project (project: Project.t) (extern_symbols: extern_symbol List.t) (entr
     ("cpu_architecture", build_string (Arch.to_string (Project.arch project)));
     ("stack_pointer_register", of_var (Symbol_utils.stack_register project));
     ("callee_saved_registers", build_array (List.map (Cconv.get_register_list project "callee_saved") ~f:(fun reg_name -> build_string reg_name) ));
-    ("parameter_registers", build_array (List.map (Cconv.get_register_list project "params") ~f:(fun reg_name -> build_string reg_name) ))
+    ("parameter_registers", build_array (List.map (Cconv.get_register_list project "params") ~f:(fun reg_name -> build_string reg_name) ));
+    ("return_registers", build_array (List.map (Cconv.get_register_list project "return") ~f:(fun reg_name -> build_string reg_name) ))
   ]

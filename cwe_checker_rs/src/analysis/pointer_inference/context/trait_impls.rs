@@ -209,26 +209,27 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
             Jmp::CallInd { .. } => panic!("Indirect calls to extern symbols not yet supported."),
             _ => panic!("Malformed control flow graph encountered."),
         };
-        // Clear non-callee-saved registers from the state.
-        new_state.clear_non_callee_saved_register(&self.project.callee_saved_registers[..]);
-        // On x86, remove the return address from the stack (other architectures pass the return address in a register, not on the stack).
-        // Note that in some calling conventions the callee also clears function parameters from the stack.
-        // We do not detect and handle these cases yet.
-        let stack_register = &self.project.stack_pointer_register;
-        let stack_pointer = state.get_register(stack_register).unwrap();
-        match self.project.cpu_architecture.as_str() {
-            "x86" | "x86_64" => {
-                let offset = Bitvector::from_u64(stack_register.size.into())
-                    .into_truncate(apint::BitWidth::from(stack_register.size))
-                    .unwrap();
-                new_state.set_register(
-                    stack_register,
-                    stack_pointer.bin_op(BinOpType::IntAdd, &offset.into()),
-                );
-            }
-            _ => new_state.set_register(stack_register, stack_pointer),
-        }
         if let Some(extern_symbol) = self.extern_symbol_map.get(call_target) {
+            // Clear non-callee-saved registers from the state.
+            let cconv = extern_symbol.get_calling_convention(&self.project);
+            new_state.clear_non_callee_saved_register(&cconv.callee_saved_register[..]);
+            // On x86, remove the return address from the stack (other architectures pass the return address in a register, not on the stack).
+            // Note that in some calling conventions the callee also clears function parameters from the stack.
+            // We do not detect and handle these cases yet.
+            let stack_register = &self.project.stack_pointer_register;
+            let stack_pointer = state.get_register(stack_register).unwrap();
+            match self.project.cpu_architecture.as_str() {
+                "x86" | "x86_64" => {
+                    let offset = Bitvector::from_u64(stack_register.size.into())
+                        .into_truncate(apint::BitWidth::from(stack_register.size))
+                        .unwrap();
+                    new_state.set_register(
+                        stack_register,
+                        stack_pointer.bin_op(BinOpType::IntAdd, &offset.into()),
+                    );
+                }
+                _ => new_state.set_register(stack_register, stack_pointer),
+            }
             // Check parameter for possible use-after-frees
             self.check_parameter_register_for_dangling_pointer(state, call, extern_symbol);
 
