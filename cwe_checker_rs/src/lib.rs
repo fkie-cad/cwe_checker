@@ -13,12 +13,12 @@ use crate::utils::log::{CweWarning, LogMessage};
 pub mod abstract_domain;
 pub mod analysis;
 pub mod bil;
+pub mod checkers;
 pub mod ffi;
 pub mod intermediate_representation;
 pub mod pcode;
 pub mod term;
 pub mod utils;
-pub mod checkers;
 
 mod prelude {
     pub use apint::Width;
@@ -52,5 +52,6 @@ impl std::fmt::Display for CweModule {
 pub fn get_modules() -> Vec<&'static CweModule> {
     vec![
         &crate::checkers::cwe_676::CWE_MODULE,
-        &crate::analysis::pointer_inference::CWE_MODULE]
+        &crate::analysis::pointer_inference::CWE_MODULE,
+    ]
 }
