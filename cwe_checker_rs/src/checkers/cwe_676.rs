@@ -50,17 +50,14 @@ pub fn get_call_to_target<'a, 'b>(
     let mut calls: Vec<(&'a str, &'a Tid, &'a str)> = Vec::new();
     for blk in caller.term.blocks.iter() {
         for jmp in blk.term.jmps.iter() {
-            match &jmp.term {
-                Jmp::Call { target: dst, .. } => {
-                    if targets.contains_key(dst) {
-                        calls.push((
-                            caller.term.name.as_str(),
-                            &jmp.tid,
-                            targets.get(dst).clone().unwrap(),
-                        ));
-                    }
+            if let Jmp::Call { target: dst, .. } = &jmp.term {
+                if targets.contains_key(dst) {
+                    calls.push((
+                        caller.term.name.as_str(),
+                        &jmp.tid,
+                        targets.get(dst).clone().unwrap(),
+                    ));
                 }
-                _ => (),
             }
         }
     }
@@ -70,8 +67,8 @@ pub fn get_call_to_target<'a, 'b>(
 
 /// For each subroutine and each found dangerous symbol, check for calls to the corresponding symbol
 pub fn get_calls_to_symbols<'a>(
-    subfunctions: &'a Vec<Term<Sub>>,
-    dangerous_symbols: &'a Vec<&'a ExternSymbol>,
+    subfunctions: &'a [Term<Sub>],
+    dangerous_symbols: &'a [&'a ExternSymbol],
 ) -> Vec<(&'a str, &'a Tid, &'a str)> {
     let mut calls: Vec<(&str, &Tid, &str)> = Vec::new();
     let mut symbol_map: HashMap<&Tid, &str> = HashMap::with_capacity(dangerous_symbols.len());
@@ -117,8 +114,8 @@ pub fn generate_cwe_warnings<'a>(
 
 /// Filter external symbols by dangerous symbols
 pub fn resolve_symbols<'a>(
-    external_symbols: &'a Vec<ExternSymbol>,
-    symbols: &'a Vec<String>,
+    external_symbols: &'a [ExternSymbol],
+    symbols: &'a [String],
 ) -> Vec<&'a ExternSymbol> {
     external_symbols
         .iter()
