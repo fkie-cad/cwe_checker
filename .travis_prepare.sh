@@ -6,3 +6,4 @@ cd ../unit/
 ./specify_test_files_for_compilation.sh
 cd ../..
 docker build -t cwe-checker .
+docker build -t cwe-checker-ghidra -f ghidra.Dockerfile .
