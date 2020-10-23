@@ -16,13 +16,13 @@ impl CweWarning {
     /// Creates a new CweWarning by only setting name, version and description
     pub fn new(name: String, version: String, description: String) -> CweWarning {
         CweWarning {
-            name: name,
-            version: version,
+            name,
+            version,
             addresses: Vec::new(),
             tids: Vec::new(),
             symbols: Vec::new(),
             other: Vec::new(),
-            description: description,
+            description,
         }
     }
 
