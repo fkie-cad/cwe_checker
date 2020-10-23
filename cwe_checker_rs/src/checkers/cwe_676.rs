@@ -23,8 +23,11 @@ This module implements a check for CWE-676: Use of Potentially Dangerous Functio
 use std::collections::HashMap;
 
 use crate::{
-    intermediate_representation::{ExternSymbol, Jmp, Program, Project, Sub, Term, Tid},
-    utils::log::{CweWarning, LogMessage},
+    intermediate_representation::{ExternSymbol, Program, Project, Sub, Term, Tid},
+    utils::{
+        log::{CweWarning, LogMessage},
+        symbol_utils::get_calls_to_symbols,
+    },
 };
 use serde::{Deserialize, Serialize};
 
@@ -42,31 +45,8 @@ pub struct Config {
     symbols: Vec<String>,
 }
 
-/// For each block of a subroutine check if the jump is a direct call and if the target TID of that call is equal to a dangerous symbol TID
-pub fn get_call_to_target<'a, 'b>(
-    caller: &'a Term<Sub>,
-    targets: &'b HashMap<&'a Tid, &'a str>,
-) -> Vec<(&'a str, &'a Tid, &'a str)> {
-    let mut calls: Vec<(&'a str, &'a Tid, &'a str)> = Vec::new();
-    for blk in caller.term.blocks.iter() {
-        for jmp in blk.term.jmps.iter() {
-            if let Jmp::Call { target: dst, .. } = &jmp.term {
-                if targets.contains_key(dst) {
-                    calls.push((
-                        caller.term.name.as_str(),
-                        &jmp.tid,
-                        targets.get(dst).clone().unwrap(),
-                    ));
-                }
-            }
-        }
-    }
-
-    calls
-}
-
 /// For each subroutine and each found dangerous symbol, check for calls to the corresponding symbol
-pub fn get_calls_to_symbols<'a>(
+pub fn get_calls<'a>(
     subfunctions: &'a [Term<Sub>],
     dangerous_symbols: &'a [&'a ExternSymbol],
 ) -> Vec<(&'a str, &'a Tid, &'a str)> {
@@ -76,7 +56,7 @@ pub fn get_calls_to_symbols<'a>(
         symbol_map.insert(&symbol.tid, &symbol.name.as_str());
     }
     for sub in subfunctions.iter() {
-        calls.append(&mut get_call_to_target(sub, &symbol_map));
+        calls.append(&mut get_calls_to_symbols(sub, &symbol_map));
     }
 
     calls
@@ -87,8 +67,8 @@ pub fn generate_cwe_warnings<'a>(
     dangerous_calls: Vec<(&'a str, &'a Tid, &'a str)>,
 ) -> Vec<CweWarning> {
     let mut cwe_warnings: Vec<CweWarning> = Vec::new();
-    for (sub_name, blk_tid, target_name) in dangerous_calls.iter() {
-        let address: &String = &blk_tid.address;
+    for (sub_name, jmp_tid, target_name) in dangerous_calls.iter() {
+        let address: &String = &jmp_tid.address;
         let description: String = format!(
             "(Use of Potentially Dangerous Function) {} ({}) -> {}",
             sub_name, address, target_name
@@ -99,7 +79,7 @@ pub fn generate_cwe_warnings<'a>(
             description,
         )
         .addresses(vec![address.clone()])
-        .tids(vec![format!("{}", blk_tid)])
+        .tids(vec![format!("{}", jmp_tid)])
         .symbols(vec![String::from(*sub_name)])
         .other(vec![vec![
             String::from("dangerous_function"),
@@ -136,7 +116,7 @@ pub fn check_cwe(
     let subfunctions: &Vec<Term<Sub>> = &prog.term.subs;
     let external_symbols: &Vec<ExternSymbol> = &prog.term.extern_symbols;
     let dangerous_symbols = resolve_symbols(external_symbols, &config.symbols);
-    let dangerous_calls = get_calls_to_symbols(subfunctions, &dangerous_symbols);
+    let dangerous_calls = get_calls(subfunctions, &dangerous_symbols);
 
     (vec![], generate_cwe_warnings(dangerous_calls))
 }

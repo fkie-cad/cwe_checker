@@ -1,4 +1,5 @@
 pub mod log;
+pub mod symbol_utils;
 
 /// Get the names of parameter registers and callee saved registers
 /// of the standard calling convention for the given architecture.
