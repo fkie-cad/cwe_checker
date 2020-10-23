@@ -13,11 +13,8 @@ pub struct CweWarning {
 }
 
 impl CweWarning {
-    pub fn new(
-        name: String, 
-        version: String,
-        description: String,
-    ) -> CweWarning {
+    /// Creates a new CweWarning by only setting name, version and description
+    pub fn new(name: String, version: String, description: String) -> CweWarning {
         CweWarning {
             name: name,
             version: version,
@@ -29,25 +26,29 @@ impl CweWarning {
         }
     }
 
+    /// Sets the address field of the CweWarning
     pub fn addresses(mut self, addresses: Vec<String>) -> CweWarning {
         self.addresses = addresses;
         self
-    } 
+    }
 
+    /// Sets the Tids field of the CweWarning
     pub fn tids(mut self, tids: Vec<String>) -> CweWarning {
         self.tids = tids;
         self
-    } 
+    }
 
+    /// Sets the symbols field of the CweWarning
     pub fn symbols(mut self, symbols: Vec<String>) -> CweWarning {
         self.symbols = symbols;
         self
-    } 
+    }
 
+    /// Sets the other field of the CweWarning
     pub fn other(mut self, other: Vec<Vec<String>>) -> CweWarning {
         self.other = other;
         self
-    } 
+    }
 }
 
 impl std::fmt::Display for CweWarning {

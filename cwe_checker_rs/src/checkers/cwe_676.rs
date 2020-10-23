@@ -1,4 +1,6 @@
-/// The CWE 676 checks for potentially dangerous function calls, such as strcpy, memcpy, scanf etc.
+//! The CWE 676 checks for potentially dangerous function calls, such as strcpy, memcpy, scanf etc.
+use std::collections::HashMap;
+
 use crate::{
     intermediate_representation::{ExternSymbol, Jmp, Program, Project, Sub, Term, Tid},
     utils::log::{CweWarning, LogMessage},
@@ -13,27 +15,28 @@ pub static CWE_MODULE: crate::CweModule = crate::CweModule {
     run: check_cwe,
 };
 
+/// struct containing dangerous symbols from config.json
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Config {
     symbols: Vec<String>,
 }
 
 /// For each block of a subroutine check if the jump is a direct call and if the target TID of that call is equal to a dangerous symbol TID
-pub fn get_call_to_target<'a>(
+pub fn get_call_to_target<'a, 'b>(
     caller: &'a Term<Sub>,
-    target: &'a ExternSymbol,
-) -> Vec<Option<(&'a str, &'a Tid, &'a str)>> {
-    let mut calls: Vec<Option<(&'a str, &'a Tid, &'a str)>> = Vec::new();
+    targets: &'b HashMap<&'a Tid, &'a str>,
+) -> Vec<(&'a str, &'a Tid, &'a str)> {
+    let mut calls: Vec<(&'a str, &'a Tid, &'a str)> = Vec::new();
     for blk in caller.term.blocks.iter() {
         for jmp in blk.term.jmps.iter() {
             match &jmp.term {
                 Jmp::Call { target: dst, .. } => {
-                    if *dst == target.tid {
-                        calls.push(Some((
+                    if targets.contains_key(dst) {
+                        calls.push((
                             caller.term.name.as_str(),
-                            &blk.tid,
-                            target.name.as_str(),
-                        )));
+                            &jmp.tid,
+                            targets.get(dst).clone().unwrap(),
+                        ));
                     }
                 }
                 _ => (),
@@ -48,12 +51,14 @@ pub fn get_call_to_target<'a>(
 pub fn get_calls_to_symbols<'a>(
     subfunctions: &'a Vec<Term<Sub>>,
     dangerous_symbols: &'a Vec<&'a ExternSymbol>,
-) -> Vec<Option<(&'a str, &'a Tid, &'a str)>> {
-    let mut calls: Vec<Option<(&str, &Tid, &str)>> = Vec::new();
+) -> Vec<(&'a str, &'a Tid, &'a str)> {
+    let mut calls: Vec<(&str, &Tid, &str)> = Vec::new();
+    let mut symbol_map: HashMap<&Tid, &str> = HashMap::with_capacity(dangerous_symbols.len());
+    for symbol in dangerous_symbols.iter() {
+        symbol_map.insert(&symbol.tid, &symbol.name.as_str());
+    }
     for sub in subfunctions.iter() {
-        for symbol in dangerous_symbols.iter() {
-            calls.append(&mut get_call_to_target(sub, symbol))
-        }
+        calls.append(&mut get_call_to_target(sub, &symbol_map));
     }
 
     calls
@@ -61,34 +66,29 @@ pub fn get_calls_to_symbols<'a>(
 
 /// Generate cwe warnings for potentially dangerous function calls
 pub fn generate_cwe_warnings<'a>(
-    dangerous_calls: Vec<Option<(&'a str, &'a Tid, &'a str)>>,
+    dangerous_calls: Vec<(&'a str, &'a Tid, &'a str)>,
 ) -> Vec<CweWarning> {
     let mut cwe_warnings: Vec<CweWarning> = Vec::new();
-    for call in dangerous_calls.iter() {
-        match *call {
-            Some((sub_name, blk_tid, target_name)) => {
-                let address: &String = &blk_tid.address;
-                let description: String = format!(
-                    "(Use of Potentially Dangerous Function) {} ({}) -> {}",
-                    sub_name, address, target_name
-                );
-                let cwe_warning = CweWarning::new(
-                    String::from(CWE_MODULE.name),
-                    String::from(CWE_MODULE.version),
-                    description,
-                )
-                .addresses(vec![address.clone()])
-                .tids(vec![format!("{}", blk_tid)])
-                .symbols(vec![String::from(sub_name)])
-                .other(vec![vec![
-                    String::from("dangerous_function"),
-                    String::from(target_name),
-                ]]);
+    for (sub_name, blk_tid, target_name) in dangerous_calls.iter() {
+        let address: &String = &blk_tid.address;
+        let description: String = format!(
+            "(Use of Potentially Dangerous Function) {} ({}) -> {}",
+            sub_name, address, target_name
+        );
+        let cwe_warning = CweWarning::new(
+            String::from(CWE_MODULE.name),
+            String::from(CWE_MODULE.version),
+            description,
+        )
+        .addresses(vec![address.clone()])
+        .tids(vec![format!("{}", blk_tid)])
+        .symbols(vec![String::from(*sub_name)])
+        .other(vec![vec![
+            String::from("dangerous_function"),
+            String::from(*target_name),
+        ]]);
 
-                cwe_warnings.push(cwe_warning);
-            }
-            _ => (),
-        }
+        cwe_warnings.push(cwe_warning);
     }
 
     cwe_warnings
