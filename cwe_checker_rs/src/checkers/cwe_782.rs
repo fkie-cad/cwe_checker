@@ -41,7 +41,7 @@ pub fn handle_sub(sub: &Term<Sub>, symbol: &HashMap<&Tid, &str>) -> Vec<CweWarni
     vec![]
 }
 
-pub fn generate_cwe_warning(calls: &Vec<(&str, &Tid, &str)>) -> Vec<CweWarning> {
+pub fn generate_cwe_warning(calls: &[(&str, &Tid, &str)]) -> Vec<CweWarning> {
     let mut cwe_warnings: Vec<CweWarning> = Vec::new();
     for (sub_name, jmp_tid, _) in calls.iter() {
         let address: &String = &jmp_tid.address;
