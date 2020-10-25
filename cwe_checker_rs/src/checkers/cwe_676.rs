@@ -1,24 +1,23 @@
 /**
 This module implements a check for CWE-676: Use of Potentially Dangerous Function.
 
-    Potentially dangerous functions like memcpy can lead to security issues like buffer
-    overflows.
+Potentially dangerous functions like memcpy can lead to security issues like buffer overflows.
+    
+See <https://cwe.mitre.org/data/definitions/676.html> for a detailed description.
+    
+How the check works:
 
-    See <https://cwe.mitre.org/data/definitions/676.html> for a detailed description.
+* Calls to dangerous functions are flagged. The list of functions that are considered
+dangerous can be configured in config.json. The default list is taken from
+<https://github.com/01org/safestringlib/wiki/SDL-List-of-Banned-Functions>.
 
-    1 How the check works
+False Positives
 
-    Calls to dangerous functions are flagged. The list of functions that are considered
-    dangerous can be configured in config.json. The default list is taken from
-    <https://github.com/01org/safestringlib/wiki/SDL-List-of-Banned-Functions>.
+* None known
 
-    1 False Positives
+False Negatives
 
-    None known
-
-    1 False Negatives
-
-    None known
+* None known
 */
 use std::collections::HashMap;
 
