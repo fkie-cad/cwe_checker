@@ -1,17 +1,16 @@
 /**
 This module implements a check for CWE-782: Exposed IOCTL with Insufficient Access Control.
-
 See <https://cwe.mitre.org/data/definitions/782.html> for a detailed description.
 
 How the check works:
 
 * Calls to ioctl() get flagged as CWE hits.
 
-False Positives
+False Positives:
 
 * We cannot check whether the call contains sufficient access control.
 
-False Negatives
+False Negatives:
 
 * There are other ways to expose I/O control without access control.
 */
