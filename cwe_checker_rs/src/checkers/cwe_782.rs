@@ -1,7 +1,7 @@
 /**
 This module implements a check for CWE-782: Exposed IOCTL with Insufficient Access Control.
 
-    See https://cwe.mitre.org/data/definitions/782.html for a detailed description.
+    See <https://cwe.mitre.org/data/definitions/782.html> for a detailed description.
 
     1 How the check works
 
