@@ -1,4 +1,4 @@
-/**
+/*!
 This module implements a check for CWE-676: Use of Potentially Dangerous Function.
 Potentially dangerous functions like memcpy can lead to security issues like buffer overflows.
 
