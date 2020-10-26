@@ -77,7 +77,7 @@ impl From<ExternSymbol> for IrExternSymbol {
         IrExternSymbol {
             tid: symbol.tid,
             name: symbol.name,
-            calling_convention: symbol.calling_convention,
+            calling_convention: None, // We do not parse more than one calling convention from BAP at the moment. So we assume everything uses the standard one.
             parameters,
             return_values,
             no_return: false, // Last time I checked BAP had an attribute for non-returning functions, but did not actually set it.
