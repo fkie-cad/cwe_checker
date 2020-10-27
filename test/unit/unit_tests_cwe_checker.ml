@@ -121,6 +121,6 @@ let () =
     let () = try
         Sys.chdir (Sys.getenv "PWD" ^ "/test/unit")
       with _ -> (* In the docker image the environment variable PWD is not set *)
-        Sys.chdir "/home/bap/cwe_checker/test/unit"
+        Sys.chdir "/home/cwe/cwe_checker/test/unit"
     in
     exit (Sys.command "make all")
