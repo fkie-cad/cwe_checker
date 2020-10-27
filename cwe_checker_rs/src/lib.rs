@@ -13,6 +13,7 @@ use crate::utils::log::{CweWarning, LogMessage};
 pub mod abstract_domain;
 pub mod analysis;
 pub mod bil;
+pub mod checkers;
 pub mod ffi;
 pub mod intermediate_representation;
 pub mod pcode;
@@ -49,5 +50,9 @@ impl std::fmt::Display for CweModule {
 
 /// Get a list of all known analysis modules.
 pub fn get_modules() -> Vec<&'static CweModule> {
-    vec![&crate::analysis::pointer_inference::CWE_MODULE]
+    vec![
+        &crate::checkers::cwe_782::CWE_MODULE,
+        &crate::checkers::cwe_676::CWE_MODULE,
+        &crate::analysis::pointer_inference::CWE_MODULE,
+    ]
 }

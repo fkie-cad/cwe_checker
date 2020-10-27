@@ -1,4 +1,5 @@
 pub mod log;
+pub mod symbol_utils;
 
 /// Get the contents of a configuration file.
 pub fn read_config_file(filename: &str) -> serde_json::Value {
