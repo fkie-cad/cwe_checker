@@ -32,6 +32,7 @@ pub static CWE_MODULE: crate::CweModule = crate::CweModule {
     run: check_cwe,
 };
 
+/// check whether the ioctl symbol is called by any subroutine. If so, generate the cwe warning.
 pub fn handle_sub(sub: &Term<Sub>, symbol: &HashMap<&Tid, &str>) -> Vec<CweWarning> {
     let calls: Vec<(&str, &Tid, &str)> = get_calls_to_symbols(sub, &symbol);
     if !calls.is_empty() {
@@ -40,6 +41,7 @@ pub fn handle_sub(sub: &Term<Sub>, symbol: &HashMap<&Tid, &str>) -> Vec<CweWarni
     vec![]
 }
 
+/// generate the cwe warning for CWE 782
 pub fn generate_cwe_warning(calls: &[(&str, &Tid, &str)]) -> Vec<CweWarning> {
     let mut cwe_warnings: Vec<CweWarning> = Vec::new();
     for (sub_name, jmp_tid, _) in calls.iter() {

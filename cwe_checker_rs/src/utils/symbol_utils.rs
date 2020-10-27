@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::intermediate_representation::{Jmp, Program, Sub, Term, Tid};
 
+/// Find the extern symbol object for a symbol name and return the symbol tid and name.
 pub fn find_symbol<'a>(prog: &'a Term<Program>, name: &str) -> Option<(&'a Tid, &'a str)> {
     let mut symbol: Option<(&'a Tid, &'a str)> = None;
     prog.term.extern_symbols.iter().for_each(|sym| {
@@ -13,6 +14,8 @@ pub fn find_symbol<'a>(prog: &'a Term<Program>, name: &str) -> Option<(&'a Tid, 
     symbol
 }
 
+/// generate a vector of (caller name, callsite tid, callee name)
+/// for a number of given symbols if available.
 pub fn get_calls_to_symbols<'a, 'b>(
     sub: &'a Term<Sub>,
     symbols: &'b HashMap<&'a Tid, &'a str>,
