@@ -23,14 +23,14 @@
 //! # Interprocedural control flow graph
 //!
 //! The function [`get_program_cfg`](fn.get_program_cfg.html) builds an interprocedural control flow graph out of a program term as follows:
-//! * Each basic block is converted into two nodes, *BlkStart* and *BlkEnd*,
+//! * [Each basic block](../../../../../doc/images/node_edge.png) is converted into two nodes, *BlkStart* and *BlkEnd*,
 //! and a *block* edge from *BlkStart* to *BlkEnd*.
 //! * Jumps and calls inside the program are converted to *Jump* or *Call* edges from the *BlkEnd* node of their source
 //! to the *BlkStart* node of their target (which is the first block of the target function in case of calls).
-//! * Calls to library functions outside the program are converted to *ExternCallStub* edges
+//! * [Calls to library functions](../../../../../doc/images/extern_calls.png) outside the program are converted to *ExternCallStub* edges
 //! from the *BlkEnd* node of the callsite to the *BlkStart* node of the basic block the call returns to
 //! (if the call returns at all).
-//! * For each in-program call and corresponding return jump one node and three edges are generated:
+//! * For each [in-program call](../../../../../doc/images/internal_function_call.png) and corresponding return jump one node and three edges are generated:
 //!   * An artificial node *CallReturn*
 //!   * A *CRCallStub* edge from the *BlkEnd* node of the callsite to *CallReturn*
 //!   * A *CRReturnStub* edge from the *BlkEnd* node of the returning from block to *CallReturn*
