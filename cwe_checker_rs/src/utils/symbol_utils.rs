@@ -14,8 +14,10 @@ pub fn find_symbol<'a>(prog: &'a Term<Program>, name: &str) -> Option<(&'a Tid, 
     symbol
 }
 
-/// generate a vector of (caller name, callsite tid, callee name)
-/// for a number of given symbols if available.
+/// Match direct calls' target tids in the program's subroutines with
+/// with the tids of the external symbols given to the function.
+/// When a match was found, add a triple of (caller name, callsite tid, callee name)
+/// to a vector. Lastly, return the vector with all callsites of all given external symbols.
 pub fn get_calls_to_symbols<'a, 'b>(
     sub: &'a Term<Sub>,
     symbols: &'b HashMap<&'a Tid, &'a str>,
