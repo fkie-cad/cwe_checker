@@ -197,12 +197,13 @@ fn get_project_from_ghidra(file_path: &Path) -> Project {
             .unwrap()
             .as_millis()
     );
+    let filename = file_path
+        .file_name()
+        .expect("Invalid file name")
+        .to_string_lossy();
     let output_filename = format!(
         "{}_{}.json",
-        file_path
-            .file_name()
-            .expect("Invalid file name")
-            .to_string_lossy(),
+        filename,
         timestamp_suffix
     );
     let output_path = tmp_folder.join(output_filename);
@@ -210,7 +211,11 @@ fn get_project_from_ghidra(file_path: &Path) -> Project {
     // Execute Ghidra
     let output = Command::new(&headless_path)
         .arg(&tmp_folder) // The folder where temporary files should be stored
-        .arg(format!("PcodeExtractor_{}", timestamp_suffix)) // The name of the temporary Ghidra Project.
+        .arg(format!(
+            "PcodeExtractor_{}_{}",
+            filename,
+            timestamp_suffix
+        )) // The name of the temporary Ghidra Project.
         .arg("-import") // Import a file into the Ghidra project
         .arg(file_path) // File import path
         .arg("-postScript") // Execute a script after standard analysis by Ghidra finished
