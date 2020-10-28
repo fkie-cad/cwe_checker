@@ -228,7 +228,6 @@ mod tests {
         let mut error_log = Vec::new();
         let mut tests = all_test_cases("cwe_676", "CWE676");
 
-        mark_skipped(&mut tests, "aarch64", "clang"); // TODO: Check reason for failure!
         mark_architecture_skipped(&mut tests, "mips64"); // TODO: Check reason for failure!
         mark_architecture_skipped(&mut tests, "mips64el"); // TODO: Check reason for failure!
         mark_skipped(&mut tests, "mips", "gcc"); // TODO: Check reason for failure!
@@ -238,9 +237,17 @@ mod tests {
         mark_compiler_skipped(&mut tests, "mingw32-gcc"); // TODO: Check reason for failure!
 
         for test_case in tests {
-            if let Err(error) = test_case.run_test("[CWE676]", 1) {
-                error_log.push((test_case.get_filepath(), error));
+            if test_case.architecture == "aarch64" && test_case.compiler == "clang" {
+                // For some reason clang adds an extra `memcpy` here, which is also in the list of dangerous functions.
+                if let Err(error) = test_case.run_test("[CWE676]", 2) {
+                    error_log.push((test_case.get_filepath(), error));
+                }
+            } else {
+                if let Err(error) = test_case.run_test("[CWE676]", 1) {
+                    error_log.push((test_case.get_filepath(), error));
+                }
             }
+            
         }
         if !error_log.is_empty() {
             print_errors(error_log);
