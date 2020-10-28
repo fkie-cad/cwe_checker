@@ -216,7 +216,7 @@ public class ParseCspecContent {
         while(parser.peek().isStart()) {
             XmlElement langProperty = parser.peek();
             if(langProperty.getName().equals("compiler")) {
-                if(langProperty.getAttribute("name").equals(compilerSpecId.getIdAsString())) {
+                if(langProperty.getAttribute("id").equals(compilerSpecId.getIdAsString())) {
                     parser.start();
                     cspec = langProperty.getAttribute("spec");
                     parser.end();
