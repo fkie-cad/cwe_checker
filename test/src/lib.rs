@@ -185,7 +185,8 @@ mod tests {
         mark_compiler_skipped(&mut tests, "mingw32-gcc"); // TODO: Check reason for failure!
 
         for test_case in tests {
-            if let Err(error) = test_case.run_test("[CWE415]", 2) {
+            let num_expected_occurences = 2;
+            if let Err(error) = test_case.run_test("[CWE415]", num_expected_occurences) {
                 error_log.push((test_case.get_filepath(), error));
             }
         }
@@ -212,7 +213,8 @@ mod tests {
         mark_compiler_skipped(&mut tests, "mingw32-gcc"); // TODO: Check reason for failure!
 
         for test_case in tests {
-            if let Err(error) = test_case.run_test("[CWE416]", 1) {
+            let num_expected_occurences = 1;
+            if let Err(error) = test_case.run_test("[CWE416]", num_expected_occurences) {
                 error_log.push((test_case.get_filepath(), error));
             }
         }
@@ -239,11 +241,13 @@ mod tests {
         for test_case in tests {
             if test_case.architecture == "aarch64" && test_case.compiler == "clang" {
                 // For some reason clang adds an extra `memcpy` here, which is also in the list of dangerous functions.
-                if let Err(error) = test_case.run_test("[CWE676]", 2) {
+                let num_expected_occurences = 2;
+                if let Err(error) = test_case.run_test("[CWE676]", num_expected_occurences) {
                     error_log.push((test_case.get_filepath(), error));
                 }
             } else {
-                if let Err(error) = test_case.run_test("[CWE676]", 1) {
+                let num_expected_occurences = 1;
+                if let Err(error) = test_case.run_test("[CWE676]", num_expected_occurences) {
                     error_log.push((test_case.get_filepath(), error));
                 }
             }
@@ -261,7 +265,8 @@ mod tests {
         let mut error_log = Vec::new();
         let tests = new_test_cases("cwe_782", &["x64"], COMPILERS, "CWE782");
         for test_case in tests {
-            if let Err(error) = test_case.run_test("[CWE782]", 1) {
+            let num_expected_occurences = 1;
+            if let Err(error) = test_case.run_test("[CWE782]", num_expected_occurences) {
                 error_log.push((test_case.get_filepath(), error));
             }
         }
