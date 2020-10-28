@@ -24,10 +24,15 @@ endif
 
 test:
 	cargo test
+ifeq (,$(wildcard ${HOME}/.config/cwe_checker/ghidra.json))
 	cd test/unit/ && ./specify_test_files_for_compilation.sh
 	dune runtest
 	cd test/artificial_samples; scons; cd ../..
 	pytest -v --ignore=_build
+else
+	cd test/artificial_samples; scons; cd ../..
+	cargo test --no-fail-fast -p acceptance_tests_ghidra -- --show-output --ignored
+endif
 
 codestyle-check:
 	cargo fmt -- --check
