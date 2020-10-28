@@ -251,7 +251,6 @@ mod tests {
                     error_log.push((test_case.get_filepath(), error));
                 }
             }
-            
         }
         if !error_log.is_empty() {
             print_errors(error_log);
