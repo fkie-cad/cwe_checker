@@ -76,11 +76,9 @@ impl CweTestCase {
         } else {
             println!("{} \t {}", filepath, "[FAILED]".red());
             match output.status.code() {
-                Some(_code) => {
-                    return Err(String::from_utf8(output.stdout).unwrap()
-                        + &String::from_utf8(output.stderr).unwrap());
-                }
-                None => return Err(format!("Execution failed for file {}", filepath)),
+                Some(_code) => Err(String::from_utf8(output.stdout).unwrap()
+                    + &String::from_utf8(output.stderr).unwrap()),
+                None => Err(format!("Execution failed for file {}", filepath)),
             }
         }
     }
