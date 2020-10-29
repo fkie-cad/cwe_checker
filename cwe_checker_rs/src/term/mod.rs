@@ -362,12 +362,14 @@ impl From<Project> for IrProject {
             return_register: project.return_registers,
             callee_saved_register: project.callee_saved_registers,
         };
-        IrProject {
+        let mut ir_project = IrProject {
             program,
             cpu_architecture: project.cpu_architecture,
             stack_pointer_register: project.stack_pointer_register.into(),
             calling_conventions: vec![default_cconv],
-        }
+        };
+        ir_project.normalize();
+        ir_project
     }
 }
 

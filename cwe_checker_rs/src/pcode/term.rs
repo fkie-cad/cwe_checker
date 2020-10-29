@@ -412,7 +412,7 @@ impl From<Project> for IrProject {
             tid: project.program.tid,
             term: project.program.term.into(),
         };
-        IrProject {
+        let mut ir_project = IrProject {
             program,
             cpu_architecture: project.cpu_architecture,
             stack_pointer_register: project.stack_pointer_register.into(),
@@ -421,7 +421,9 @@ impl From<Project> for IrProject {
                 .into_iter()
                 .map(|cconv| cconv.into())
                 .collect(),
-        }
+        };
+        ir_project.normalize();
+        ir_project
     }
 }
 

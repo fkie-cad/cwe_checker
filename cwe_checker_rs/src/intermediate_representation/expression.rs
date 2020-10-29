@@ -76,6 +76,62 @@ impl Expression {
             Cast { size, .. } | Unknown { size, .. } | Subpiece { size, .. } => *size,
         }
     }
+
+    /// Substitute some trivial expressions with their result.
+    /// E.g. substitute `a XOR a` with zero or substitute `a OR a` with `a`.
+    pub fn substitute_trivial_operations(&mut self) {
+        use Expression::*;
+        match self {
+            Var(_) | Const(_) | Unknown { .. } => (),
+            Subpiece {
+                low_byte,
+                size,
+                arg,
+            } => {
+                arg.substitute_trivial_operations();
+                if *low_byte == ByteSize::new(0) && *size == arg.bytesize() {
+                    *self = (**arg).clone();
+                }
+            }
+            Cast { op, size, arg } => {
+                arg.substitute_trivial_operations();
+                if (*op == CastOpType::IntSExt || *op == CastOpType::IntZExt)
+                    && *size == arg.bytesize()
+                {
+                    *self = (**arg).clone();
+                }
+            }
+            UnOp { op: _, arg } => arg.substitute_trivial_operations(),
+            BinOp { op, lhs, rhs } => {
+                lhs.substitute_trivial_operations();
+                rhs.substitute_trivial_operations();
+                if lhs == rhs {
+                    match op {
+                        BinOpType::BoolAnd
+                        | BinOpType::BoolOr
+                        | BinOpType::IntAnd
+                        | BinOpType::IntOr => {
+                            // This is an identity operation
+                            *self = (**lhs).clone();
+                        }
+                        BinOpType::BoolXOr | BinOpType::IntXOr => {
+                            // `a xor a` always equals zero.
+                            *self = Expression::Const(Bitvector::zero(lhs.bytesize().into()));
+                        }
+                        BinOpType::IntEqual
+                        | BinOpType::IntLessEqual
+                        | BinOpType::IntSLessEqual => {
+                            *self = Expression::Const(Bitvector::one(ByteSize::new(1).into()));
+                        }
+                        BinOpType::IntNotEqual | BinOpType::IntLess | BinOpType::IntSLess => {
+                            *self = Expression::Const(Bitvector::zero(ByteSize::new(1).into()));
+                        }
+                        _ => (),
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// The type/mnemonic of a binary operation
@@ -140,4 +196,31 @@ pub enum UnOpType {
     FloatFloor,
     FloatRound,
     FloatNaN,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn trivial_expression_substitution() {
+        let mut expr = Expression::BinOp {
+            op: BinOpType::IntXOr,
+            lhs: Box::new(Expression::Var(Variable {
+                name: "RAX".into(),
+                size: ByteSize::new(8),
+                is_temp: false,
+            })),
+            rhs: Box::new(Expression::Var(Variable {
+                name: "RAX".into(),
+                size: ByteSize::new(8),
+                is_temp: false,
+            })),
+        };
+        expr.substitute_trivial_operations();
+        assert_eq!(
+            expr,
+            Expression::Const(Bitvector::zero(ByteSize::new(8).into()))
+        );
+    }
 }
