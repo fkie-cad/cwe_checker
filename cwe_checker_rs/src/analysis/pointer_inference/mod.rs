@@ -30,7 +30,7 @@ mod object_list;
 mod state;
 
 use context::Context;
-use state::State;
+pub use state::State;
 
 /// The version number of the analysis.
 const VERSION: &str = "0.1";
