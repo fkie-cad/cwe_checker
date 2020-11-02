@@ -235,8 +235,7 @@ mod tests {
         mark_skipped(&mut tests, "mipsel", "gcc"); // The parameter is loaded from global memory (which is not supported yet)
         mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
         mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.
-        
-        
+
         for test_case in tests {
             let num_expected_occurences = 1;
             if let Err(error) = test_case.run_test("[CWE560]", num_expected_occurences) {

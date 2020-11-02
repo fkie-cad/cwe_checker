@@ -74,19 +74,12 @@ fn get_umask_permission_arg(
 
 /// Determine whether the given jump is a call to umask.
 fn is_call_to_umask(jmp: &Term<Jmp>, umask_tid: &Tid) -> bool {
-    match &jmp.term {
-        Jmp::Call { target, .. } if target == umask_tid => true,
-        _ => false,
-    }
+    matches!(&jmp.term, Jmp::Call { target, .. } if target == umask_tid)
 }
 
 /// Is the given argument value considered to be a chmod-style argument?
 fn is_chmod_style_arg(arg: u64) -> bool {
-    if arg > UPPER_BOUND_CORRECT_UMASK_ARG_VALUE && arg <= UPPER_BOUND_CORRECT_CHMOD_ARG_VALUE {
-        true
-    } else {
-        false
-    }
+    arg > UPPER_BOUND_CORRECT_UMASK_ARG_VALUE && arg <= UPPER_BOUND_CORRECT_CHMOD_ARG_VALUE
 }
 
 /// Generate the CWE warning for a detected instance of the CWE.
@@ -137,11 +130,14 @@ pub fn check_cwe(
                             }
                         }
                         Err(err) => {
-                            let log = LogMessage::new_info(format!("Could not determine umask argument: {}", err))
-                                .location(jmp.tid.clone())
-                                .source(CWE_MODULE.name);
-                                log_messages.push(log);
-                        },
+                            let log = LogMessage::new_info(format!(
+                                "Could not determine umask argument: {}",
+                                err
+                            ))
+                            .location(jmp.tid.clone())
+                            .source(CWE_MODULE.name);
+                            log_messages.push(log);
+                        }
                     }
                 }
             }
