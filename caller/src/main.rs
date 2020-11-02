@@ -41,6 +41,11 @@ struct CmdlineArgs {
     #[structopt(long)]
     module_versions: bool,
 
+    /// Output for debugging purposes.
+    /// The current behavior of this flag is unstable and subject to change.
+    #[structopt(long, hidden = true)]
+    debug: bool,
+
     /// Use BAP as backend (instead of Ghidra). Requires BAP and the cwe_checker-BAP-plugin to be installed.
     #[structopt(long, hidden = true)]
     bap: bool,
@@ -131,6 +136,18 @@ fn run_with_ghidra(args: CmdlineArgs) {
     }
 
     let project = get_project_from_ghidra(&Path::new(&args.binary.unwrap()));
+
+    // Print debug and then return.
+    // Right now there is only one debug printing function.
+    // When more debug printing modes exist, this behaviour will change!
+    if args.debug {
+        cwe_checker_rs::analysis::pointer_inference::run(
+            &project,
+            serde_json::from_value(config["Memory"].clone()).unwrap(),
+            true,
+        );
+        return;
+    }
 
     // Execute the modules and collect their logs and CWE-warnings.
     let mut all_logs = Vec::new();

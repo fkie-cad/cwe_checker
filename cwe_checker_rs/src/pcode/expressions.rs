@@ -124,8 +124,13 @@ pub struct Expression {
 
 impl From<Expression> for IrExpression {
     /// Translates a P-Code expression into an expression of the internally used IR if possible.
-    /// Panics if translation is not possible,
-    /// e.g. for `LOAD`, `STORE` and and expressions that need the size of the output variable to be defined.
+    /// Panics if translation is not possible.
+    ///
+    /// Cases where translation is not possible:
+    /// - `LOAD` and `STORE`, since these are not expressions (they have side effects).
+    /// - Expressions which store the size of their output in the output variable (to which we do not have access here).
+    /// These include `SUBPIECE`, `INT_ZEXT`, `INT_SEXT`, `INT2FLOAT`, `FLOAT2FLOAT` and `TRUNC`.
+    /// Translation of these expressions is handled explicitly during translation of `Def`.
     fn from(expr: Expression) -> IrExpression {
         use ExpressionType::*;
         match expr.mnemonic {
