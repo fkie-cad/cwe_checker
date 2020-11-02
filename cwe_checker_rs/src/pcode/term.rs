@@ -125,10 +125,6 @@ impl From<Def> for IrDef {
     fn from(def: Def) -> IrDef {
         use super::ExpressionType::*;
         match def.rhs.mnemonic {
-            COPY => IrDef::Assign {
-                var: def.lhs.unwrap().into(),
-                value: def.rhs.input0.unwrap().into(),
-            },
             LOAD => IrDef::Load {
                 var: def.lhs.unwrap().into(),
                 address: def.rhs.input1.unwrap().into(),
@@ -137,32 +133,11 @@ impl From<Def> for IrDef {
                 address: def.rhs.input1.unwrap().into(),
                 value: def.rhs.input2.unwrap().into(),
             },
-            PIECE | INT_EQUAL | INT_NOTEQUAL | INT_LESS | INT_SLESS | INT_LESSEQUAL
-            | INT_SLESSEQUAL | INT_ADD | INT_SUB | INT_CARRY | INT_SCARRY | INT_SBORROW
-            | INT_XOR | INT_AND | INT_OR | INT_LEFT | INT_RIGHT | INT_SRIGHT | INT_MULT
-            | INT_DIV | INT_REM | INT_SDIV | INT_SREM | BOOL_XOR | BOOL_AND | BOOL_OR
-            | FLOAT_EQUAL | FLOAT_NOTEQUAL | FLOAT_LESS | FLOAT_LESSEQUAL | FLOAT_ADD
-            | FLOAT_SUB | FLOAT_MULT | FLOAT_DIV => IrDef::Assign {
-                var: def.lhs.unwrap().into(),
-                value: IrExpression::BinOp {
-                    op: def.rhs.mnemonic.into(),
-                    lhs: Box::new(def.rhs.input0.unwrap().into()),
-                    rhs: Box::new(def.rhs.input1.unwrap().into()),
-                },
-            },
             SUBPIECE => IrDef::Assign {
                 var: def.lhs.clone().unwrap().into(),
                 value: IrExpression::Subpiece {
                     low_byte: def.rhs.input1.unwrap().parse_to_bytesize(),
                     size: def.lhs.unwrap().size,
-                    arg: Box::new(def.rhs.input0.unwrap().into()),
-                },
-            },
-            INT_NEGATE | INT_2COMP | BOOL_NEGATE | FLOAT_NEGATE | FLOAT_ABS | FLOAT_SQRT
-            | FLOAT_CEIL | FLOAT_FLOOR | FLOAT_ROUND | FLOAT_NAN => IrDef::Assign {
-                var: def.lhs.unwrap().into(),
-                value: IrExpression::UnOp {
-                    op: def.rhs.mnemonic.into(),
                     arg: Box::new(def.rhs.input0.unwrap().into()),
                 },
             },
@@ -174,6 +149,20 @@ impl From<Def> for IrDef {
                     arg: Box::new(def.rhs.input0.unwrap().into()),
                 },
             },
+            _ => {
+                let target_var = def.lhs.unwrap();
+                if target_var.address.is_some() {
+                    IrDef::Store {
+                        address: IrExpression::Const(target_var.parse_to_bitvector()),
+                        value: def.rhs.into(),
+                    }
+                } else {
+                    IrDef::Assign {
+                        var: target_var.into(),
+                        value: def.rhs.into(),
+                    }
+                }
+            }
         }
     }
 }
@@ -423,7 +412,7 @@ impl From<Project> for IrProject {
             tid: project.program.tid,
             term: project.program.term.into(),
         };
-        IrProject {
+        let mut ir_project = IrProject {
             program,
             cpu_architecture: project.cpu_architecture,
             stack_pointer_register: project.stack_pointer_register.into(),
@@ -432,7 +421,9 @@ impl From<Project> for IrProject {
                 .into_iter()
                 .map(|cconv| cconv.into())
                 .collect(),
-        }
+        };
+        ir_project.normalize();
+        ir_project
     }
 }
 
@@ -491,6 +482,32 @@ mod tests {
         }
       }
       "#,
+        )
+        .unwrap();
+        let _: IrDef = def.into();
+        let def: Def = serde_json::from_str(
+            r#"
+            {
+                "lhs": {
+                    "address": "004053e8",
+                    "size": 4,
+                    "is_virtual": false
+                },
+                "rhs": {
+                    "mnemonic": "INT_XOR",
+                    "input0": {
+                        "name": "$load_temp0",
+                        "size": 4,
+                        "is_virtual": true
+                    },
+                    "input1": {
+                        "name": "$U4780",
+                        "size": 4,
+                        "is_virtual": true
+                    }
+                }
+            }
+            "#,
         )
         .unwrap();
         let _: IrDef = def.into();

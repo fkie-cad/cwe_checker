@@ -122,6 +122,40 @@ pub struct Expression {
     pub input2: Option<Variable>,
 }
 
+impl From<Expression> for IrExpression {
+    /// Translates a P-Code expression into an expression of the internally used IR if possible.
+    /// Panics if translation is not possible.
+    ///
+    /// Cases where translation is not possible:
+    /// - `LOAD` and `STORE`, since these are not expressions (they have side effects).
+    /// - Expressions which store the size of their output in the output variable (to which we do not have access here).
+    /// These include `SUBPIECE`, `INT_ZEXT`, `INT_SEXT`, `INT2FLOAT`, `FLOAT2FLOAT` and `TRUNC`.
+    /// Translation of these expressions is handled explicitly during translation of `Def`.
+    fn from(expr: Expression) -> IrExpression {
+        use ExpressionType::*;
+        match expr.mnemonic {
+            COPY => expr.input0.unwrap().into(),
+            LOAD | STORE | SUBPIECE => panic!(),
+            PIECE | INT_EQUAL | INT_NOTEQUAL | INT_LESS | INT_SLESS | INT_LESSEQUAL
+            | INT_SLESSEQUAL | INT_ADD | INT_SUB | INT_CARRY | INT_SCARRY | INT_SBORROW
+            | INT_XOR | INT_AND | INT_OR | INT_LEFT | INT_RIGHT | INT_SRIGHT | INT_MULT
+            | INT_DIV | INT_REM | INT_SDIV | INT_SREM | BOOL_XOR | BOOL_AND | BOOL_OR
+            | FLOAT_EQUAL | FLOAT_NOTEQUAL | FLOAT_LESS | FLOAT_LESSEQUAL | FLOAT_ADD
+            | FLOAT_SUB | FLOAT_MULT | FLOAT_DIV => IrExpression::BinOp {
+                op: expr.mnemonic.into(),
+                lhs: Box::new(expr.input0.unwrap().into()),
+                rhs: Box::new(expr.input1.unwrap().into()),
+            },
+            INT_NEGATE | INT_2COMP | BOOL_NEGATE | FLOAT_NEG | FLOAT_ABS | FLOAT_SQRT
+            | FLOAT_CEIL | FLOAT_FLOOR | FLOAT_ROUND | FLOAT_NAN => IrExpression::UnOp {
+                op: expr.mnemonic.into(),
+                arg: Box::new(expr.input0.unwrap().into()),
+            },
+            INT_ZEXT | INT_SEXT | INT2FLOAT | FLOAT2FLOAT | TRUNC => panic!(),
+        }
+    }
+}
+
 #[allow(non_camel_case_types)]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum ExpressionType {
@@ -176,7 +210,7 @@ pub enum ExpressionType {
     INT_2COMP,
     BOOL_NEGATE,
 
-    FLOAT_NEGATE,
+    FLOAT_NEG,
     FLOAT_ABS,
     FLOAT_SQRT,
     FLOAT_CEIL,
@@ -253,7 +287,7 @@ impl From<ExpressionType> for IrUnOpType {
             INT_NEGATE => IrUnOpType::IntNegate,
             INT_2COMP => IrUnOpType::Int2Comp,
             BOOL_NEGATE => IrUnOpType::BoolNegate,
-            FLOAT_NEGATE => IrUnOpType::FloatNegate,
+            FLOAT_NEG => IrUnOpType::FloatNegate,
             FLOAT_ABS => IrUnOpType::FloatAbs,
             FLOAT_SQRT => IrUnOpType::FloatSqrt,
             FLOAT_CEIL => IrUnOpType::FloatCeil,

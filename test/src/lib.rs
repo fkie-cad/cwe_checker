@@ -178,9 +178,8 @@ mod tests {
         mark_architecture_skipped(&mut tests, "mips64el"); // TODO: Check reason for failure!
         mark_architecture_skipped(&mut tests, "mips"); // TODO: Check reason for failure!
         mark_architecture_skipped(&mut tests, "mipsel"); // TODO: Check reason for failure!
-        mark_architecture_skipped(&mut tests, "ppc64"); // TODO: Check reason for failure!
-        mark_architecture_skipped(&mut tests, "ppc64le"); // TODO: Check reason for failure!
-        mark_architecture_skipped(&mut tests, "ppc"); // TODO: Check reason for failure!
+        mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
+        mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.
         mark_skipped(&mut tests, "x86", "gcc"); // TODO: Check reason for failure!
         mark_compiler_skipped(&mut tests, "mingw32-gcc"); // TODO: Check reason for failure!
 
@@ -206,9 +205,8 @@ mod tests {
         mark_architecture_skipped(&mut tests, "mips64el"); // TODO: Check reason for failure!
         mark_architecture_skipped(&mut tests, "mips"); // TODO: Check reason for failure!
         mark_architecture_skipped(&mut tests, "mipsel"); // TODO: Check reason for failure!
-        mark_architecture_skipped(&mut tests, "ppc64"); // TODO: Check reason for failure!
-        mark_architecture_skipped(&mut tests, "ppc64le"); // TODO: Check reason for failure!
-        mark_architecture_skipped(&mut tests, "ppc"); // TODO: Check reason for failure!
+        mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
+        mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.
         mark_architecture_skipped(&mut tests, "x86"); // TODO: Check reason for failure!
         mark_compiler_skipped(&mut tests, "mingw32-gcc"); // TODO: Check reason for failure!
 
@@ -234,8 +232,8 @@ mod tests {
         mark_architecture_skipped(&mut tests, "mips64el"); // TODO: Check reason for failure!
         mark_skipped(&mut tests, "mips", "gcc"); // TODO: Check reason for failure!
         mark_skipped(&mut tests, "mipsel", "gcc"); // TODO: Check reason for failure!
-        mark_architecture_skipped(&mut tests, "ppc64"); // TODO: Check reason for failure!
-        mark_architecture_skipped(&mut tests, "ppc64le"); // TODO: Check reason for failure!
+        mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
+        mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.
         mark_compiler_skipped(&mut tests, "mingw32-gcc"); // TODO: Check reason for failure!
 
         for test_case in tests {

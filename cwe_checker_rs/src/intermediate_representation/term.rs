@@ -280,3 +280,43 @@ impl Project {
         self.stack_pointer_register.size
     }
 }
+
+impl Project {
+    /// For all expressions contained in the project,
+    /// replace trivially computable subexpressions like `a XOR a` with their result.
+    fn substitute_trivial_expressions(&mut self) {
+        for sub in self.program.term.subs.iter_mut() {
+            for block in sub.term.blocks.iter_mut() {
+                for def in block.term.defs.iter_mut() {
+                    match &mut def.term {
+                        Def::Assign { value: expr, .. } | Def::Load { address: expr, .. } => {
+                            expr.substitute_trivial_operations()
+                        }
+                        Def::Store { address, value } => {
+                            address.substitute_trivial_operations();
+                            value.substitute_trivial_operations();
+                        }
+                    }
+                }
+                for jmp in block.term.jmps.iter_mut() {
+                    match &mut jmp.term {
+                        Jmp::Branch(_) | Jmp::Call { .. } | Jmp::CallOther { .. } => (),
+                        Jmp::BranchInd(expr)
+                        | Jmp::CBranch {
+                            condition: expr, ..
+                        }
+                        | Jmp::CallInd { target: expr, .. }
+                        | Jmp::Return(expr) => expr.substitute_trivial_operations(),
+                    }
+                }
+            }
+        }
+    }
+
+    /// Run some normalization passes over the project.
+    ///
+    /// Right now this only replaces trivial expressions like `a XOR a` with their result.
+    pub fn normalize(&mut self) {
+        self.substitute_trivial_expressions();
+    }
+}

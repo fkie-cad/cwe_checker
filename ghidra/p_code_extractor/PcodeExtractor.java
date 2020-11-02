@@ -897,8 +897,6 @@ public class PcodeExtractor extends GhidraScript {
         if (pcodeOp.getMnemonic().equals("STORE")) {
             return new Term<Def>(defTid, new Def(createExpression(pcodeOp), pcodeIndex));
             // cast copy instructions that have address outputs into store instructions
-        } else if (pcodeOp.getMnemonic().equals("COPY") && pcodeOp.getOutput().isAddress()) {
-            return new Term<Def>(defTid, new Def(new Expression("STORE", null, createVariable(pcodeOp.getOutput()), createVariable(pcodeOp.getInput(0))), pcodeIndex));
         }
         return new Term<Def>(defTid, new Def(createVariable(pcodeOp.getOutput()), createExpression(pcodeOp), pcodeIndex));
     }
