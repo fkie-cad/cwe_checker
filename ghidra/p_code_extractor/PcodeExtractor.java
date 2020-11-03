@@ -274,7 +274,6 @@ public class PcodeExtractor extends GhidraScript {
      * Checks whether the assembly instruction is a nop instruction and adds a jump to the block.
      * Checks whether a jump occured within a ghidra generated pcode block and fixes the control flow
      * by adding missing jumps between artificially generated blocks.
-<<<<<<< HEAD
      * Checks whether an instruction is in a delay slot and, if so, ignores it 
      * as Ghidra already includes the instruction before the jump
      */
@@ -284,12 +283,6 @@ public class PcodeExtractor extends GhidraScript {
             return;
         }
         if(PcodeBlockData.ops.length == 0) {
-=======
-     */
-    protected void analysePcodeBlockOfAssemblyInstruction() {
-        PcodeBlockData.ops = PcodeBlockData.instruction.getPcode(true);
-        if(PcodeBlockData.ops.length == 0 && !PcodeBlockData.instruction.isInDelaySlot()) {
->>>>>>> 6313165ceb1f1759220fde1329e02558e0b519bc
             addJumpToCurrentBlock(PcodeBlockData.blocks.get(PcodeBlockData.blocks.size()-1).getTerm(), PcodeBlockData.instruction.getAddress().toString(), PcodeBlockData.instruction.getFallThrough().toString(), null);
             if(PcodeBlockData.instructionIndex < PcodeBlockData.numberOfInstructionsInBlock - 1) {
                 PcodeBlockData.blocks.add(createBlkTerm(PcodeBlockData.instruction.getFallThrough().toString(), null));
