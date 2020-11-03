@@ -14,15 +14,19 @@ pub struct CweWarning {
 
 impl CweWarning {
     /// Creates a new CweWarning by only setting name, version and description
-    pub fn new(name: String, version: String, description: String) -> CweWarning {
+    pub fn new(
+        name: impl ToString,
+        version: impl ToString,
+        description: impl ToString,
+    ) -> CweWarning {
         CweWarning {
-            name,
-            version,
+            name: name.to_string(),
+            version: version.to_string(),
             addresses: Vec::new(),
             tids: Vec::new(),
             symbols: Vec::new(),
             other: Vec::new(),
-            description,
+            description: description.to_string(),
         }
     }
 

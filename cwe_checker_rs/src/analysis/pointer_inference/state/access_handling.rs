@@ -191,6 +191,29 @@ impl State {
         }
     }
 
+    /// Evaluate the value of a parameter of an extern symbol for the given state.
+    pub fn eval_parameter_arg(
+        &self,
+        parameter: &Arg,
+        stack_pointer: &Variable,
+    ) -> Result<Data, Error> {
+        match parameter {
+            Arg::Register(var) => self.eval(&Expression::Var(var.clone())),
+            Arg::Stack { offset, size } => self.load_value(
+                &Expression::BinOp {
+                    op: BinOpType::IntAdd,
+                    lhs: Box::new(Expression::Var(stack_pointer.clone())),
+                    rhs: Box::new(Expression::Const(
+                        Bitvector::from_i64(*offset)
+                            .into_truncate(apint::BitWidth::from(stack_pointer.size))
+                            .unwrap(),
+                    )),
+                },
+                *size,
+            ),
+        }
+    }
+
     /// Check if an expression contains a use-after-free
     pub fn contains_access_of_dangling_memory(&self, def: &Def) -> bool {
         match def {
