@@ -56,6 +56,7 @@ public class PcodeExtractor extends GhidraScript {
 
     Term<Program> program = null;
     FunctionManager funcMan;
+    HashMap<String, Integer> functionEntryPoints;
     ghidra.program.model.listing.Program ghidraProgram;
     VarnodeContext context;
     String cpuArch;
@@ -79,6 +80,8 @@ public class PcodeExtractor extends GhidraScript {
         cpuArch = getCpuArchitecture();
 
         program = createProgramTerm();
+        functionEntryPoints = new HashMap<String, Integer>();
+        setFunctionEntryPoints();
         Project project = createProject();
         program = iterateFunctions(simpleBM, listing);
 
@@ -87,6 +90,24 @@ public class PcodeExtractor extends GhidraScript {
         ser.serializeProject();
         TimeUnit.SECONDS.sleep(3);
 
+    }
+
+
+    /**
+     * Adds all entry points of internal and external function to a global hash map
+     * This will later speed up the cast of indirect Calls.
+     */
+    protected void setFunctionEntryPoints() {
+        // Add external symbols and internal function addresses to hash map
+        int funcCounter = 0;
+        for(ExternSymbol sym : program.getTerm().getExternSymbols()){
+            functionEntryPoints.put(sym.getAddress(), funcCounter);
+            funcCounter++;
+        }
+        for(Function func : funcMan.getFunctionsNoStubs(true)) {
+            functionEntryPoints.put(func.getEntryPoint().toString(), funcCounter);
+            funcCounter++;
+        }
     }
 
 
@@ -998,13 +1019,11 @@ public class PcodeExtractor extends GhidraScript {
      * Resolves the target id for an indirect jump
      */
     protected Tid getTargetTid(Varnode target) {
-        if (!target.isRegister() && !target.isUnique()) {
-            Reference[] referenced = ghidraProgram.getReferenceManager().getReferencesFrom(target.getAddress());
-            if(referenced.length != 0) {
-                for (ExternSymbol symbol : program.getTerm().getExternSymbols()) {
-                    if (symbol.getAddress().equals(referenced[0].getToAddress().toString())) {
-                        return symbol.getTid();
-                    }
+        Address[] flowDestinations = PcodeBlockData.instruction.getFlows();
+        if(flowDestinations.length == 1) {
+            for(Address flow : flowDestinations) {
+                if(functionEntryPoints.containsKey(flow.toString())){
+                    return new Tid(String.format("sub_%s", flow.toString()), flow.toString());
                 }
             }
         }
