@@ -104,7 +104,6 @@ public class PcodeExtractor extends GhidraScript {
             functionEntryPoints.put(sym.getAddress(), funcCounter);
             funcCounter++;
         }
-        funcCounter++;
         for(Function func : funcMan.getFunctionsNoStubs(true)) {
             functionEntryPoints.put(func.getEntryPoint().toString(), funcCounter);
             funcCounter++;
@@ -1021,9 +1020,11 @@ public class PcodeExtractor extends GhidraScript {
      */
     protected Tid getTargetTid(Varnode target) {
         Address[] flowDestinations = PcodeBlockData.instruction.getFlows();
-        for(Address flow : flowDestinations) {
-            if(functionEntryPoints.containsKey(flow.toString())){
-                return new Tid(String.format("sub_%s", flow.toString()), flow.toString());
+        if(flowDestinations.length == 1) {
+            for(Address flow : flowDestinations) {
+                if(functionEntryPoints.containsKey(flow.toString())){
+                    return new Tid(String.format("sub_%s", flow.toString()), flow.toString());
+                }
             }
         }
         return null;
