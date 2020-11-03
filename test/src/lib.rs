@@ -224,6 +224,32 @@ mod tests {
 
     #[test]
     #[ignore]
+    fn cwe_560() {
+        let mut error_log = Vec::new();
+        let mut tests = linux_test_cases("cwe_560", "CWE560");
+
+        mark_skipped(&mut tests, "arm", "gcc"); // The parameter is loaded from global memory (which is not supported yet)
+        mark_architecture_skipped(&mut tests, "mips64"); // TODO: Check reason for failure!
+        mark_architecture_skipped(&mut tests, "mips64el"); // TODO: Check reason for failure!
+        mark_skipped(&mut tests, "mips", "gcc"); // The parameter is loaded from global memory (which is not supported yet)
+        mark_skipped(&mut tests, "mipsel", "gcc"); // The parameter is loaded from global memory (which is not supported yet)
+        mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
+        mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.
+
+        for test_case in tests {
+            let num_expected_occurences = 1;
+            if let Err(error) = test_case.run_test("[CWE560]", num_expected_occurences) {
+                error_log.push((test_case.get_filepath(), error));
+            }
+        }
+        if !error_log.is_empty() {
+            print_errors(error_log);
+            panic!();
+        }
+    }
+
+    #[test]
+    #[ignore]
     fn cwe_676() {
         let mut error_log = Vec::new();
         let mut tests = all_test_cases("cwe_676", "CWE676");
