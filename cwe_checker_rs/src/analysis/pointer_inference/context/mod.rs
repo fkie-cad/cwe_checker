@@ -161,27 +161,6 @@ impl<'a> Context<'a> {
         }
     }
 
-    /// Evaluate the value of a parameter of an extern symbol for the given state.
-    fn eval_parameter_arg(&self, state: &State, parameter: &Arg) -> Result<Data, Error> {
-        match parameter {
-            Arg::Register(var) => state.eval(&Expression::Var(var.clone())),
-            Arg::Stack { offset, size } => state.load_value(
-                &Expression::BinOp {
-                    op: BinOpType::IntAdd,
-                    lhs: Box::new(Expression::Var(self.project.stack_pointer_register.clone())),
-                    rhs: Box::new(Expression::Const(
-                        Bitvector::from_i64(*offset)
-                            .into_truncate(apint::BitWidth::from(
-                                self.project.get_pointer_bytesize(),
-                            ))
-                            .unwrap(),
-                    )),
-                },
-                *size,
-            ),
-        }
-    }
-
     /// Mark the object that the parameter of a call is pointing to as freed.
     /// If the object may have been already freed, generate a CWE warning.
     /// This models the behaviour of `free` and similar functions.
