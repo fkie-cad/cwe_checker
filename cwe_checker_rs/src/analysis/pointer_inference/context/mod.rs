@@ -194,7 +194,8 @@ impl<'a> Context<'a> {
     ) -> Option<State> {
         match extern_symbol.get_unique_parameter() {
             Ok(parameter) => {
-                let parameter_value = self.eval_parameter_arg(state, parameter);
+                let parameter_value =
+                    state.eval_parameter_arg(parameter, &self.project.stack_pointer_register);
                 match parameter_value {
                     Ok(memory_object_pointer) => {
                         if let Data::Pointer(pointer) = memory_object_pointer {
@@ -249,7 +250,7 @@ impl<'a> Context<'a> {
         extern_symbol: &ExternSymbol,
     ) {
         for parameter in extern_symbol.parameters.iter() {
-            match self.eval_parameter_arg(state, parameter) {
+            match state.eval_parameter_arg(parameter, &self.project.stack_pointer_register) {
                 Ok(value) => {
                     if state.memory.is_dangling_pointer(&value, true) {
                         let warning = CweWarning {
@@ -304,7 +305,9 @@ impl<'a> Context<'a> {
             }
         } else {
             for parameter in extern_symbol.parameters.iter() {
-                if let Ok(data) = self.eval_parameter_arg(state, parameter) {
+                if let Ok(data) =
+                    state.eval_parameter_arg(parameter, &self.project.stack_pointer_register)
+                {
                     possible_referenced_ids.append(&mut data.referenced_ids());
                 }
             }
