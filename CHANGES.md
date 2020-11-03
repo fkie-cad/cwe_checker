@@ -8,6 +8,9 @@ dev
 -   Added deprecation warnings to the emulation based checks (PR #66)
 -   Added a new (still experimental) engine for data-flow analysis written in Rust (PR #70)
 -   Added new, data-flow based checks for CWEs 415 and 416 (PR #70)
+-   Several code improvements to for the CWE 415 and 416 checks (PRs #76, #77. #78, #84)
+-   Report more accurate incident locations for CWE 476 (PR #80)
+-   Enable Ghidra as an alternative Backend to BAP (still experimental) (PRs #86, #87)
 
 0.3 (2019-12)
 ====
