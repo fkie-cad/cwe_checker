@@ -1,0 +1,141 @@
+//! This module implements a check for CWE-467: Use of sizeof() on a Pointer Type.
+//!
+//! Functions like malloc and memmove take a size parameter of some data size as
+//! input. If accidentially the size of a pointer to the data instead of the size of
+//! the data itself gets passed to the function, this can have severe consequences.
+//!
+//! See <https://cwe.mitre.org/data/definitions/467.html> for a detailed description.
+//!
+//! ## How the check works
+//!
+//! We check whether a parameter in a call to a function listed in the symbols for CWE467 (configurable in in config.json)
+//! is an immediate value that equals the size of a pointer (e.g. 4 bytes on x86).
+//!
+//! ## False Positives
+//!
+//! - The size value might be correct and not a bug.
+//!
+//! ## False Negatives
+//!
+//! - If the incorrect size value is generated before the basic block that contains
+//! the call, the check will not be able to find it.
+
+use crate::abstract_domain::{BitvectorDomain, DataDomain};
+use crate::analysis::pointer_inference::State;
+use crate::intermediate_representation::*;
+use crate::prelude::*;
+use crate::utils::log::{CweWarning, LogMessage};
+use crate::CweModule;
+use std::collections::HashMap;
+
+pub static CWE_MODULE: CweModule = CweModule {
+    name: "CWE467",
+    version: "0.2",
+    run: check_cwe,
+};
+
+/// Function symbols read from *config.json*.
+/// All parameters of these functions will be checked on whether they are pointer sized.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
+pub struct Config {
+    symbols: Vec<String>,
+}
+
+/// Get a map from TIDs to the corresponding extern symbol struct.
+/// Only symbols contained in `symbols_to_check` are contained in the map.
+fn get_symbol_map<'a>(project: &'a Project, symbols_to_check: &Vec<String>) -> HashMap<Tid, &'a ExternSymbol> {
+    let mut tid_map = HashMap::new();
+    for symbol_name in symbols_to_check {
+        if let Some((tid, symbol)) = project.program.term.extern_symbols.iter().find_map(|symbol| {
+            if symbol.name == *symbol_name {
+                Some((symbol.tid.clone(), symbol))
+            } else {
+                None
+            }
+        }) {
+            tid_map.insert(tid, symbol);
+        }
+    }
+    tid_map
+}
+
+/// Compute the program state at the end of the given basic block
+/// assuming nothing is known about the state at the start of the block.
+fn compute_block_end_state(project: &Project, block: &Term<Blk>) -> State {
+    let stack_register = &project.stack_pointer_register;
+    let mut state = State::new(stack_register, block.tid.clone());
+
+    for def in block.term.defs.iter() {
+        match &def.term {
+            Def::Store { address, value } => {
+                let _ = state.handle_store(address, value);
+            }
+            Def::Assign { var, value } => {
+                let _ = state.handle_register_assign(var, value);
+            }
+            Def::Load { var, address } => {
+                let _ = state.handle_load(var, address);
+            }
+        }
+    }
+    state
+}
+
+/// Check whether a parameter value of the call to `symbol` has value `sizeof(void*)`.
+fn check_for_pointer_sized_arg(project: &Project, block: &Term<Blk>, symbol: &ExternSymbol) -> bool {
+    let pointer_size = project.stack_pointer_register.size;
+    let state = compute_block_end_state(project, block);
+    for parameter in symbol.parameters.iter() {
+        if let Ok(DataDomain::Value(BitvectorDomain::Value(param_value))) = state.eval_parameter_arg(parameter, &project.stack_pointer_register) {
+            if Ok(u64::from(pointer_size)) == param_value.try_to_u64() {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Generate the CWE warning for a detected instance of the CWE.
+fn generate_cwe_warning(jmp: &Term<Jmp>, extern_symbol: &ExternSymbol) -> CweWarning {
+    CweWarning::new(CWE_MODULE.name, CWE_MODULE.version,
+        format!("(Use of sizeof on a Pointer Type) sizeof on pointer at {} ({}).", jmp.tid.address, extern_symbol.name))
+        .tids(vec![format!("{}", jmp.tid)])
+        .addresses(vec![jmp.tid.address.clone()])
+}
+
+/// Check whether a symbol contained in `symbol_map` is called at the end of the given basic block.
+fn block_calls_symbol<'a>(block: &'a Term<Blk>, symbol_map: &HashMap<Tid, &'a ExternSymbol>) -> Option<(&'a Term<Jmp>, &'a ExternSymbol)> {
+    for jump in block.term.jmps.iter() {
+        if let Jmp::Call{target, ..} = &jump.term {
+            if let Some(symbol) = symbol_map.get(target) {
+                return Some((jump, symbol));
+            }
+        }
+    }
+    None
+}
+
+/// Execute the CWE check.
+///
+/// For each call to an extern symbol from the symbol list configured in the configuration file
+/// we check whether a parameter has value `sizeof(void*)`,
+/// which may indicate an instance of CWE 467.
+pub fn check_cwe(
+    project: &Project,
+    cwe_params: &serde_json::Value,
+) -> (Vec<LogMessage>, Vec<CweWarning>) {
+    let config: Config = serde_json::from_value(cwe_params.clone()).unwrap();
+    let mut cwe_warnings = Vec::new();
+
+    let symbol_map = get_symbol_map(project, &config.symbols);
+    for sub in project.program.term.subs.iter() {
+        for block in sub.term.blocks.iter() {
+            if let Some((jmp, symbol)) = block_calls_symbol(block, &symbol_map) {
+                if check_for_pointer_sized_arg(project, block, symbol) {
+                    cwe_warnings.push(generate_cwe_warning(jmp, symbol))
+                }
+            }
+        }
+    }
+    (Vec::new(), cwe_warnings)
+}
