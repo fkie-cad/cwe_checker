@@ -1104,7 +1104,7 @@ public class PcodeExtractor extends GhidraScript {
      * Removes stack prefix from stack parameter. e.g. Stack[0x4] => 0x4
      */
     protected String removeStackPrefix(String param) {
-        Matcher matcher = Pattern.compile("^Stack\\[([a-zA-Z0-9])\\]$").matcher(param);
+        Matcher matcher = Pattern.compile("^Stack\\[([a-zA-Z0-9]*)\\]$").matcher(param);
         if(matcher.find()) {
             return matcher.group(1);
         }
