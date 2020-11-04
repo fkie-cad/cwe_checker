@@ -174,13 +174,21 @@ mod tests {
         let mut error_log = Vec::new();
         let mut tests = all_test_cases("cwe_415", "Memory");
 
-        mark_architecture_skipped(&mut tests, "mips64"); // TODO: Check reason for failure!
-        mark_architecture_skipped(&mut tests, "mips64el"); // TODO: Check reason for failure!
-        mark_architecture_skipped(&mut tests, "mips"); // TODO: Check reason for failure!
-        mark_architecture_skipped(&mut tests, "mipsel"); // TODO: Check reason for failure!
+        // Ghidra does not recognize all extern function calls in the disassembly step for MIPS.
+        // Needs own control flow graph analysis to be fixed.
+        mark_architecture_skipped(&mut tests, "mips64");
+        mark_architecture_skipped(&mut tests, "mips64el");
+        mark_architecture_skipped(&mut tests, "mips");
+        mark_architecture_skipped(&mut tests, "mipsel");
+
         mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
         mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.
-        mark_skipped(&mut tests, "x86", "gcc"); // TODO: Check reason for failure!
+
+        // The analysis looses track of the stack pointer offset in the main() function
+        // because of a "INT_AND ESP 0xfffffff0" instruction.
+        // We would need knowledge about alignment guarantees for the stack pointer at the start of main() to fix this.
+        mark_skipped(&mut tests, "x86", "gcc");
+
         mark_compiler_skipped(&mut tests, "mingw32-gcc"); // TODO: Check reason for failure!
 
         for test_case in tests {
@@ -201,13 +209,21 @@ mod tests {
         let mut error_log = Vec::new();
         let mut tests = all_test_cases("cwe_416", "Memory");
 
-        mark_architecture_skipped(&mut tests, "mips64"); // TODO: Check reason for failure!
-        mark_architecture_skipped(&mut tests, "mips64el"); // TODO: Check reason for failure!
-        mark_architecture_skipped(&mut tests, "mips"); // TODO: Check reason for failure!
-        mark_architecture_skipped(&mut tests, "mipsel"); // TODO: Check reason for failure!
+        // Ghidra does not recognize all extern function calls in the disassembly step for MIPS.
+        // Needs own control flow graph analysis to be fixed.
+        mark_architecture_skipped(&mut tests, "mips64");
+        mark_architecture_skipped(&mut tests, "mips64el");
+        mark_architecture_skipped(&mut tests, "mips");
+        mark_architecture_skipped(&mut tests, "mipsel");
+
         mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
         mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.
-        mark_architecture_skipped(&mut tests, "x86"); // TODO: Check reason for failure!
+
+        // The analysis looses track of the stack pointer offset in the main() function
+        // because of a "INT_AND ESP 0xfffffff0" instruction.
+        // We would need knowledge about alignment guarantees for the stack pointer at the start of main() to fix this.
+        mark_architecture_skipped(&mut tests, "x86");
+        
         mark_compiler_skipped(&mut tests, "mingw32-gcc"); // TODO: Check reason for failure!
 
         for test_case in tests {
@@ -229,8 +245,6 @@ mod tests {
         let mut tests = linux_test_cases("cwe_560", "CWE560");
 
         mark_skipped(&mut tests, "arm", "gcc"); // The parameter is loaded from global memory (which is not supported yet)
-        mark_architecture_skipped(&mut tests, "mips64"); // TODO: Check reason for failure!
-        mark_architecture_skipped(&mut tests, "mips64el"); // TODO: Check reason for failure!
         mark_skipped(&mut tests, "mips", "gcc"); // The parameter is loaded from global memory (which is not supported yet)
         mark_skipped(&mut tests, "mipsel", "gcc"); // The parameter is loaded from global memory (which is not supported yet)
         mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
@@ -254,10 +268,6 @@ mod tests {
         let mut error_log = Vec::new();
         let mut tests = all_test_cases("cwe_676", "CWE676");
 
-        mark_architecture_skipped(&mut tests, "mips64"); // TODO: Check reason for failure!
-        mark_architecture_skipped(&mut tests, "mips64el"); // TODO: Check reason for failure!
-        mark_skipped(&mut tests, "mips", "gcc"); // TODO: Check reason for failure!
-        mark_skipped(&mut tests, "mipsel", "gcc"); // TODO: Check reason for failure!
         mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
         mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.
         mark_compiler_skipped(&mut tests, "mingw32-gcc"); // TODO: Check reason for failure!
