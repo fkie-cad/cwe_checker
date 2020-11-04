@@ -43,16 +43,25 @@ pub struct Config {
 
 /// Get a map from TIDs to the corresponding extern symbol struct.
 /// Only symbols contained in `symbols_to_check` are contained in the map.
-fn get_symbol_map<'a>(project: &'a Project, symbols_to_check: &Vec<String>) -> HashMap<Tid, &'a ExternSymbol> {
+fn get_symbol_map<'a>(
+    project: &'a Project,
+    symbols_to_check: &[String],
+) -> HashMap<Tid, &'a ExternSymbol> {
     let mut tid_map = HashMap::new();
     for symbol_name in symbols_to_check {
-        if let Some((tid, symbol)) = project.program.term.extern_symbols.iter().find_map(|symbol| {
-            if symbol.name == *symbol_name {
-                Some((symbol.tid.clone(), symbol))
-            } else {
-                None
-            }
-        }) {
+        if let Some((tid, symbol)) = project
+            .program
+            .term
+            .extern_symbols
+            .iter()
+            .find_map(|symbol| {
+                if symbol.name == *symbol_name {
+                    Some((symbol.tid.clone(), symbol))
+                } else {
+                    None
+                }
+            })
+        {
             tid_map.insert(tid, symbol);
         }
     }
@@ -82,11 +91,17 @@ fn compute_block_end_state(project: &Project, block: &Term<Blk>) -> State {
 }
 
 /// Check whether a parameter value of the call to `symbol` has value `sizeof(void*)`.
-fn check_for_pointer_sized_arg(project: &Project, block: &Term<Blk>, symbol: &ExternSymbol) -> bool {
+fn check_for_pointer_sized_arg(
+    project: &Project,
+    block: &Term<Blk>,
+    symbol: &ExternSymbol,
+) -> bool {
     let pointer_size = project.stack_pointer_register.size;
     let state = compute_block_end_state(project, block);
     for parameter in symbol.parameters.iter() {
-        if let Ok(DataDomain::Value(BitvectorDomain::Value(param_value))) = state.eval_parameter_arg(parameter, &project.stack_pointer_register) {
+        if let Ok(DataDomain::Value(BitvectorDomain::Value(param_value))) =
+            state.eval_parameter_arg(parameter, &project.stack_pointer_register)
+        {
             if Ok(u64::from(pointer_size)) == param_value.try_to_u64() {
                 return true;
             }
@@ -97,16 +112,25 @@ fn check_for_pointer_sized_arg(project: &Project, block: &Term<Blk>, symbol: &Ex
 
 /// Generate the CWE warning for a detected instance of the CWE.
 fn generate_cwe_warning(jmp: &Term<Jmp>, extern_symbol: &ExternSymbol) -> CweWarning {
-    CweWarning::new(CWE_MODULE.name, CWE_MODULE.version,
-        format!("(Use of sizeof on a Pointer Type) sizeof on pointer at {} ({}).", jmp.tid.address, extern_symbol.name))
-        .tids(vec![format!("{}", jmp.tid)])
-        .addresses(vec![jmp.tid.address.clone()])
+    CweWarning::new(
+        CWE_MODULE.name,
+        CWE_MODULE.version,
+        format!(
+            "(Use of sizeof on a Pointer Type) sizeof on pointer at {} ({}).",
+            jmp.tid.address, extern_symbol.name
+        ),
+    )
+    .tids(vec![format!("{}", jmp.tid)])
+    .addresses(vec![jmp.tid.address.clone()])
 }
 
 /// Check whether a symbol contained in `symbol_map` is called at the end of the given basic block.
-fn block_calls_symbol<'a>(block: &'a Term<Blk>, symbol_map: &HashMap<Tid, &'a ExternSymbol>) -> Option<(&'a Term<Jmp>, &'a ExternSymbol)> {
+fn block_calls_symbol<'a>(
+    block: &'a Term<Blk>,
+    symbol_map: &HashMap<Tid, &'a ExternSymbol>,
+) -> Option<(&'a Term<Jmp>, &'a ExternSymbol)> {
     for jump in block.term.jmps.iter() {
-        if let Jmp::Call{target, ..} = &jump.term {
+        if let Jmp::Call { target, .. } = &jump.term {
             if let Some(symbol) = symbol_map.get(target) {
                 return Some((jump, symbol));
             }
