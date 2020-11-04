@@ -76,6 +76,7 @@ impl From<ExternSymbol> for IrExternSymbol {
         }
         IrExternSymbol {
             tid: symbol.tid,
+            addresses: vec![symbol.address],
             name: symbol.name,
             calling_convention: None, // We do not parse more than one calling convention from BAP at the moment. So we assume everything uses the standard one.
             parameters,

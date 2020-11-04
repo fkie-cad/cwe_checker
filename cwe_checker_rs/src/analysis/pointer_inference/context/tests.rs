@@ -15,6 +15,7 @@ fn mock_extern_symbol(name: &str) -> ExternSymbol {
     let arg = Arg::Register(register("RDX"));
     ExternSymbol {
         tid: Tid::new("extern_".to_string() + name),
+        addresses: vec![],
         name: name.into(),
         calling_convention: None,
         parameters: vec![arg.clone()],
