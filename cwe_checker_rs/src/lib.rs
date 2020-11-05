@@ -51,6 +51,7 @@ impl std::fmt::Display for CweModule {
 /// Get a list of all known analysis modules.
 pub fn get_modules() -> Vec<&'static CweModule> {
     vec![
+        &crate::checkers::cwe_332::CWE_MODULE,
         &crate::checkers::cwe_426::CWE_MODULE,
         &crate::checkers::cwe_467::CWE_MODULE,
         &crate::checkers::cwe_560::CWE_MODULE,

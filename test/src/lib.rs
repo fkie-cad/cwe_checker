@@ -170,6 +170,29 @@ mod tests {
 
     #[test]
     #[ignore]
+    fn cwe_332() {
+        let mut error_log = Vec::new();
+        let mut tests = all_test_cases("cwe_332", "CWE332");
+
+        mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
+        mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.
+
+        mark_compiler_skipped(&mut tests, "mingw32-gcc"); // TODO: Check reason for failure!
+
+        for test_case in tests {
+            let num_expected_occurences = 1;
+            if let Err(error) = test_case.run_test("[CWE332]", num_expected_occurences) {
+                error_log.push((test_case.get_filepath(), error));
+            }
+        }
+        if !error_log.is_empty() {
+            print_errors(error_log);
+            panic!();
+        }
+    }
+
+    #[test]
+    #[ignore]
     fn cwe_415() {
         let mut error_log = Vec::new();
         let mut tests = all_test_cases("cwe_415", "Memory");
@@ -242,7 +265,7 @@ mod tests {
     #[ignore]
     fn cwe_426() {
         let mut error_log = Vec::new();
-        let mut tests = linux_test_cases("cwe_426", "CWE426");
+        let mut tests = all_test_cases("cwe_426", "CWE426");
 
         // Ghidra does not recognize all extern function calls in the disassembly step for MIPS.
         // Needs own control flow graph analysis to be fixed.
@@ -253,6 +276,8 @@ mod tests {
 
         mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
         mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.
+
+        mark_compiler_skipped(&mut tests, "mingw32-gcc"); // TODO: Check reason for failure!
 
         for test_case in tests {
             let num_expected_occurences = 1;
@@ -270,7 +295,7 @@ mod tests {
     #[ignore]
     fn cwe_467() {
         let mut error_log = Vec::new();
-        let mut tests = linux_test_cases("cwe_467", "CWE467");
+        let mut tests = all_test_cases("cwe_467", "CWE467");
 
         // Only one instance is found.
         // Other instance cannot be found, since the constant is not defined in the basic block of the call instruction.
@@ -291,6 +316,8 @@ mod tests {
         // This is a bug in the handling of sub-registers.
         // Register `ECX` is read, but the analysis doesn't know that `ECX` is a sub-register of `RCX`.
         mark_skipped(&mut tests, "x64", "clang");
+
+        mark_compiler_skipped(&mut tests, "mingw32-gcc"); // TODO: Check reason for failure!
 
         for test_case in tests {
             let num_expected_occurences = 2;
