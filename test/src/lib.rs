@@ -170,6 +170,36 @@ mod tests {
 
     #[test]
     #[ignore]
+    fn cwe_190() {
+        let mut error_log = Vec::new();
+        let mut tests = all_test_cases("cwe_190", "CWE190");
+
+        // Ghidra does not recognize all extern function calls in the disassembly step for MIPS.
+        // Needs own control flow graph analysis to be fixed.
+        mark_skipped(&mut tests, "mips64", "clang");
+        mark_skipped(&mut tests, "mips64el", "clang");
+        mark_skipped(&mut tests, "mips", "gcc");
+        mark_skipped(&mut tests, "mipsel", "gcc");
+
+        mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
+        mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.
+
+        mark_compiler_skipped(&mut tests, "mingw32-gcc"); // TODO: Check reason for failure!
+
+        for test_case in tests {
+            let num_expected_occurences = 3;
+            if let Err(error) = test_case.run_test("[CWE190]", num_expected_occurences) {
+                error_log.push((test_case.get_filepath(), error));
+            }
+        }
+        if !error_log.is_empty() {
+            print_errors(error_log);
+            panic!();
+        }
+    }
+
+    #[test]
+    #[ignore]
     fn cwe_332() {
         let mut error_log = Vec::new();
         let mut tests = all_test_cases("cwe_332", "CWE332");
