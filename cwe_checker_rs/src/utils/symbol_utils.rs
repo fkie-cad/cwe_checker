@@ -73,15 +73,15 @@ pub fn get_callsites<'a>(
     sub: &'a Term<Sub>,
     symbol_map: &HashMap<Tid, &'a ExternSymbol>,
 ) -> Vec<(&'a Term<Blk>, &'a Term<Jmp>, &'a ExternSymbol)> {
-    let mut call_pairs = Vec::new();
+    let mut callsites = Vec::new();
     for blk in sub.term.blocks.iter() {
         for jmp in blk.term.jmps.iter() {
             if let Jmp::Call { target: dst, .. } = &jmp.term {
                 if let Some(symbol) = symbol_map.get(dst) {
-                    call_pairs.push((blk, jmp, *symbol));
+                    callsites.push((blk, jmp, *symbol));
                 }
             }
         }
     }
-    call_pairs
+    callsites
 }

@@ -25,8 +25,8 @@ use crate::analysis::pointer_inference::State;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
 use crate::utils::log::{CweWarning, LogMessage};
+use crate::utils::symbol_utils::{get_callsites, get_symbol_map};
 use crate::CweModule;
-use std::collections::HashMap;
 
 pub static CWE_MODULE: CweModule = CweModule {
     name: "CWE467",
@@ -39,33 +39,6 @@ pub static CWE_MODULE: CweModule = CweModule {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Config {
     symbols: Vec<String>,
-}
-
-/// Get a map from TIDs to the corresponding extern symbol struct.
-/// Only symbols contained in `symbols_to_check` are contained in the map.
-fn get_symbol_map<'a>(
-    project: &'a Project,
-    symbols_to_check: &[String],
-) -> HashMap<Tid, &'a ExternSymbol> {
-    let mut tid_map = HashMap::new();
-    for symbol_name in symbols_to_check {
-        if let Some((tid, symbol)) = project
-            .program
-            .term
-            .extern_symbols
-            .iter()
-            .find_map(|symbol| {
-                if symbol.name == *symbol_name {
-                    Some((symbol.tid.clone(), symbol))
-                } else {
-                    None
-                }
-            })
-        {
-            tid_map.insert(tid, symbol);
-        }
-    }
-    tid_map
 }
 
 /// Compute the program state at the end of the given basic block
@@ -124,21 +97,6 @@ fn generate_cwe_warning(jmp: &Term<Jmp>, extern_symbol: &ExternSymbol) -> CweWar
     .addresses(vec![jmp.tid.address.clone()])
 }
 
-/// Check whether a symbol contained in `symbol_map` is called at the end of the given basic block.
-fn block_calls_symbol<'a>(
-    block: &'a Term<Blk>,
-    symbol_map: &HashMap<Tid, &'a ExternSymbol>,
-) -> Option<(&'a Term<Jmp>, &'a ExternSymbol)> {
-    for jump in block.term.jmps.iter() {
-        if let Jmp::Call { target, .. } = &jump.term {
-            if let Some(symbol) = symbol_map.get(target) {
-                return Some((jump, symbol));
-            }
-        }
-    }
-    None
-}
-
 /// Execute the CWE check.
 ///
 /// For each call to an extern symbol from the symbol list configured in the configuration file
@@ -153,11 +111,9 @@ pub fn check_cwe(
 
     let symbol_map = get_symbol_map(project, &config.symbols);
     for sub in project.program.term.subs.iter() {
-        for block in sub.term.blocks.iter() {
-            if let Some((jmp, symbol)) = block_calls_symbol(block, &symbol_map) {
-                if check_for_pointer_sized_arg(project, block, symbol) {
-                    cwe_warnings.push(generate_cwe_warning(jmp, symbol))
-                }
+        for (block, jmp, symbol) in get_callsites(sub, &symbol_map) {
+            if check_for_pointer_sized_arg(project, block, symbol) {
+                cwe_warnings.push(generate_cwe_warning(jmp, symbol))
             }
         }
     }
