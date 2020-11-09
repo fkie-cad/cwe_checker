@@ -658,7 +658,9 @@ mod tests {
                   "id": "sub_08048410",
                   "address": "08048410"
                 },
-                "address": "08048410",
+                "addresses": [
+                    "08048410"
+                ],
                 "name": "atoi",
                 "calling_convention": "__cdecl",
                 "arguments": [
