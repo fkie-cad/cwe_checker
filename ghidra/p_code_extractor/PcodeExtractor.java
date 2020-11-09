@@ -663,18 +663,37 @@ public class PcodeExtractor extends GhidraScript {
     protected void createExternalSymbolMap(SymbolTable symTab) {
         HashMap<String, ArrayList<Function>> symbolMap = new HashMap<String, ArrayList<Function>>();
         funcMan.getExternalFunctions().forEach(func -> {
-            Address[] thunks = func.getFunctionThunkAddresses();
-            if(thunks != null) {
-                for(Address thunkAddr : thunks) {
-                    addToSymbolMap(symbolMap, getFunctionAt(thunkAddr));
+            ArrayList<Function> thunkFuncs = new ArrayList<Function>();
+            getThunkFunctions(func, thunkFuncs);
+            if(thunkFuncs.size() > 0) {
+                for(Function thunk : thunkFuncs) {
+                    addToSymbolMap(symbolMap, thunk);
                 }
-            }
-            else {
+            } else {
                 addToSymbolMap(symbolMap, func);
             }
         });
 
         createExternalSymbols(symbolMap);
+    }
+
+
+    /**
+     * 
+     * @param func: Function for which thunk functions are to be found
+     * @param thunkFuncs: List of found thunk functions
+     * 
+     * Recursively find thunk functions in symbol chain
+     */
+    protected void getThunkFunctions(Function func, ArrayList<Function> thunkFuncs) {
+        Address[] thunks = func.getFunctionThunkAddresses();
+        if(thunks != null) {
+            for(Address thunkAddr : thunks) {
+                Function thunkFunction = getFunctionAt(thunkAddr);
+                thunkFuncs.add(funcMan.getFunctionAt(thunkAddr));
+                getThunkFunctions(thunkFunction, thunkFuncs);
+            }
+        }
     }
 
 
@@ -1038,7 +1057,7 @@ public class PcodeExtractor extends GhidraScript {
                 return functionEntryPoints.get(flow.toString());
             }
             Function external = funcMan.getFunctionAt(flow);
-            if(external.isExternal()){
+            if(external != null && external.isExternal()){
                 Address funcPointer = parseFunctionPointerAddress();
                 if(funcPointer != null && externalSymbolMap.containsKey(external.getName())) {
                     ExternSymbol symbol = externalSymbolMap.get(external.getName());
