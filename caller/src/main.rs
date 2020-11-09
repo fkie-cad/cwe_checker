@@ -135,7 +135,9 @@ fn run_with_ghidra(args: CmdlineArgs) {
         filter_modules_for_partial_run(&mut modules, partial_module_list);
     }
 
-    let project = get_project_from_ghidra(&Path::new(&args.binary.unwrap()));
+    let mut project = get_project_from_ghidra(&Path::new(&args.binary.unwrap()));
+    // Normalize the project and gather log messages generated from it.
+    let mut all_logs = project.normalize();
 
     // Print debug and then return.
     // Right now there is only one debug printing function.
@@ -150,7 +152,6 @@ fn run_with_ghidra(args: CmdlineArgs) {
     }
 
     // Execute the modules and collect their logs and CWE-warnings.
-    let mut all_logs = Vec::new();
     let mut all_cwes = Vec::new();
     for module in modules {
         let (mut logs, mut cwes) = (module.run)(&project, &config[&module.name]);
