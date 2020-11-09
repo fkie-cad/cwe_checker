@@ -678,6 +678,13 @@ public class PcodeExtractor extends GhidraScript {
     }
 
 
+    /**
+     * 
+     * @param symbolMap: Maps symbol names to multiple function declarations
+     * @param func: Function to be added to symbol map
+     * 
+     * Either adds a function to a given symbol name or creates a new entry in the symbol map
+     */
     protected void addToSymbolMap(HashMap<String, ArrayList<Function>> symbolMap, Function func) {
         if(symbolMap.containsKey(func.getName())) {
             symbolMap.get(func.getName()).add(func);
@@ -736,23 +743,6 @@ public class PcodeExtractor extends GhidraScript {
             externalSymbolMap.put(functions.getKey(), extSym);
         }
 
-    }
-
-
-    /**
-     * @param def:     Defined symbol
-     * @return: true if referencing function is thunk, else false
-     * 
-     * Checks if current external symbol is referenced by a Thunk Function.
-     * If so, the Thunk Function is the internally called function.
-     */
-    protected Boolean isThunkFunctionRef(Symbol def) {
-        Reference[] refs = def.getReferences();
-        if(refs.length == 0) {
-            return false;
-        }
-        Address refAddr = def.getReferences()[0].getFromAddress();
-        return funcMan.getFunctionContaining(refAddr) != null && funcMan.getFunctionContaining(refAddr).isThunk();
     }
 
 
@@ -1064,6 +1054,12 @@ public class PcodeExtractor extends GhidraScript {
     }
 
 
+    /**
+     * 
+     * @return Address of function pointer
+     * 
+     * Parses the function pointer address out of an indirect call instruction
+     */
     protected Address parseFunctionPointerAddress() {
         for(PcodeOp op : PcodeBlockData.ops) {
             if(op.getOpcode() == PcodeOp.CALLIND && op.getInput(0).isAddress()) {
