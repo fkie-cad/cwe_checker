@@ -71,7 +71,7 @@ fn expression_contains_multiplication(expr: &Expression) -> bool {
 }
 
 /// Check whether the given block contains a multiplication expression.
-/// Expression computing the address of a `Load` or `Store` instruction are ignored
+/// Expressions computing the address of a `Load` or `Store` instruction are ignored
 /// since the addresses themselves cannot be inputs to the call at the end of the block.
 fn block_contains_multiplication(block: &Term<Blk>) -> bool {
     block.term.defs.iter().any(|def| match &def.term {
