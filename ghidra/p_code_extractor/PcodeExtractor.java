@@ -114,12 +114,12 @@ public class PcodeExtractor extends GhidraScript {
         // Add internal function addresses
         for(Function func : funcMan.getFunctionsNoStubs(true)) {
             String address = func.getEntryPoint().toString();
-            functionEntryPoints.put(func.getEntryPoint().toString(), new Tid(String.format("sub_%s", address), address));
+            functionEntryPoints.put(address, new Tid(String.format("sub_%s", address), address));
         }
         // Add external addresses
         for(Function ext : funcMan.getExternalFunctions()) {
             String address = ext.getEntryPoint().toString();
-            functionEntryPoints.put(ext.getEntryPoint().toString(), new Tid(String.format("sub_%s", address), address));
+            functionEntryPoints.put(address, new Tid(String.format("sub_%s", address), address));
         }
     }
 
@@ -1068,7 +1068,7 @@ public class PcodeExtractor extends GhidraScript {
                 if(flow.isExternalAddress()) {
                     return handleCallToFunctionPointer(flow, external);
                 } else {
-                    return externalSymbolMap.get(external.getName()).getTid();
+                    return functionEntryPoints.get(flow.toString());
                 }
             }
         }
