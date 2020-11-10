@@ -105,14 +105,21 @@ public class PcodeExtractor extends GhidraScript {
      * This will later speed up the cast of indirect Calls.
      */
     protected void setFunctionEntryPoints() {
+        // Add thunk addresses for external functions
         for(ExternSymbol sym : externalSymbolMap.values()){
             for(String address : sym.getAddresses()) {
                 functionEntryPoints.put(address, sym.getTid());
             }
         }
+        // Add internal function addresses
         for(Function func : funcMan.getFunctionsNoStubs(true)) {
             String address = func.getEntryPoint().toString();
             functionEntryPoints.put(func.getEntryPoint().toString(), new Tid(String.format("sub_%s", address), address));
+        }
+        // Add external addresses
+        for(Function ext : funcMan.getExternalFunctions()) {
+            String address = ext.getEntryPoint().toString();
+            functionEntryPoints.put(ext.getEntryPoint().toString(), new Tid(String.format("sub_%s", address), address));
         }
     }
 
@@ -742,7 +749,7 @@ public class PcodeExtractor extends GhidraScript {
 
 
     /**
-     * @param symbol: External symbol
+     * @param symbolMap: External symbol map
      * 
      * Creates external symbol map with an unique TID, a calling convention and argument objects.
      */
@@ -757,7 +764,9 @@ public class PcodeExtractor extends GhidraScript {
                     extSym.setArguments(createArguments(func));
                     extSym.setCallingConvention(funcMan.getDefaultCallingConvention().toString());
                 }
-                extSym.getAddresses().add(func.getEntryPoint().toString());
+                if(!func.isExternal()) {
+                    extSym.getAddresses().add(func.getEntryPoint().toString());
+                }
             }
             externalSymbolMap.put(functions.getKey(), extSym);
         }
@@ -1054,17 +1063,20 @@ public class PcodeExtractor extends GhidraScript {
         if(flowDestinations.length == 1) {
             Address flow = flowDestinations[0];
             if(functionEntryPoints.containsKey(flow.toString())){
-                return functionEntryPoints.get(flow.toString());
-            }
-            Function external = funcMan.getFunctionAt(flow);
-            if(external != null && external.isExternal()){
-                Address funcPointer = parseFunctionPointerAddress();
-                if(funcPointer != null && externalSymbolMap.containsKey(external.getName())) {
-                    ExternSymbol symbol = externalSymbolMap.get(external.getName());
-                    // Add function pointer address to entry points to avoid duplicates 
-                    functionEntryPoints.put(flow.toString(), symbol.getTid());
-                    symbol.getAddresses().add(funcPointer.toString());
-                    return symbol.getTid();
+                // In case a jump to an external address occured, check for fuction pointer
+                if(flow.isExternalAddress()) {
+                    Address funcPointer = parseFunctionPointerAddress(funcMan.getFunctionAt(flow));
+                    Function external = funcMan.getFunctionAt(flow);
+                    if(funcPointer != null && externalSymbolMap.containsKey(external.getName())) {
+                        // Check whether the external symbol's TID is an external address
+                        // If so, replace it with the function pointer address
+                        ExternSymbol symbol = externalSymbolMap.get(external.getName());
+                        Tid targetTid = new Tid(String.format("sub_%s", funcPointer.toString()), funcPointer.toString());
+                        symbol.setTid(targetTid);
+                        symbol.getAddresses().add(funcPointer.toString());
+
+                        return targetTid;
+                    }
                 }
             }
         }
