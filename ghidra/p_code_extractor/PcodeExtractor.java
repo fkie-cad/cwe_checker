@@ -1087,7 +1087,7 @@ public class PcodeExtractor extends GhidraScript {
      * The function pointer address is always added to the address list of the external symbol.
      */
     protected Tid handleCallToFunctionPointer(Address flow, Function external) {
-        Address funcPointer = parseFunctionPointerAddress(funcMan.getFunctionAt(flow));
+        Address funcPointer = parseFunctionPointerAddress();
         Tid targetTid = null;
         if(funcPointer != null && externalSymbolMap.containsKey(external.getName())) {
             ExternSymbol symbol = externalSymbolMap.get(external.getName());
