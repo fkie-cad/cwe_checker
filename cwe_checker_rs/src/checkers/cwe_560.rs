@@ -27,6 +27,7 @@ use crate::analysis::pointer_inference::State;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
 use crate::utils::log::{CweWarning, LogMessage};
+use crate::utils::symbol_utils::{get_callsites, get_symbol_map};
 use crate::CweModule;
 
 pub static CWE_MODULE: CweModule = CweModule {
@@ -72,11 +73,6 @@ fn get_umask_permission_arg(
     }
 }
 
-/// Determine whether the given jump is a call to umask.
-fn is_call_to_umask(jmp: &Term<Jmp>, umask_tid: &Tid) -> bool {
-    matches!(&jmp.term, Jmp::Call { target, .. } if target == umask_tid)
-}
-
 /// Is the given argument value considered to be a chmod-style argument?
 fn is_chmod_style_arg(arg: u64) -> bool {
     arg > UPPER_BOUND_CORRECT_UMASK_ARG_VALUE && arg <= UPPER_BOUND_CORRECT_CHMOD_ARG_VALUE
@@ -107,37 +103,24 @@ pub fn check_cwe(
 ) -> (Vec<LogMessage>, Vec<CweWarning>) {
     let mut cwes = Vec::new();
     let mut log_messages = Vec::new();
-    if let Some(umask_symbol) = project
-        .program
-        .term
-        .extern_symbols
-        .iter()
-        .find(|symbol| symbol.name == "umask")
-    {
-        let umask_tid = &umask_symbol.tid;
+    let umask_symbol_map = get_symbol_map(project, &["umask".to_string()]);
+    if !umask_symbol_map.is_empty() {
         for sub in project.program.term.subs.iter() {
-            for block in sub.term.blocks.iter() {
-                if let Some(jmp) = block
-                    .term
-                    .jmps
-                    .iter()
-                    .find(|jmp| is_call_to_umask(jmp, umask_tid))
-                {
-                    match get_umask_permission_arg(block, umask_symbol, project) {
-                        Ok(permission_const) => {
-                            if is_chmod_style_arg(permission_const) {
-                                cwes.push(generate_cwe_warning(sub, jmp, permission_const));
-                            }
+            for (block, jmp, umask_symbol) in get_callsites(sub, &umask_symbol_map) {
+                match get_umask_permission_arg(block, umask_symbol, project) {
+                    Ok(permission_const) => {
+                        if is_chmod_style_arg(permission_const) {
+                            cwes.push(generate_cwe_warning(sub, jmp, permission_const));
                         }
-                        Err(err) => {
-                            let log = LogMessage::new_info(format!(
-                                "Could not determine umask argument: {}",
-                                err
-                            ))
-                            .location(jmp.tid.clone())
-                            .source(CWE_MODULE.name);
-                            log_messages.push(log);
-                        }
+                    }
+                    Err(err) => {
+                        let log = LogMessage::new_info(format!(
+                            "Could not determine umask argument: {}",
+                            err
+                        ))
+                        .location(jmp.tid.clone())
+                        .source(CWE_MODULE.name);
+                        log_messages.push(log);
                     }
                 }
             }
