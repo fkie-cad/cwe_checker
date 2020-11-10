@@ -1064,24 +1064,43 @@ public class PcodeExtractor extends GhidraScript {
             Address flow = flowDestinations[0];
             if(functionEntryPoints.containsKey(flow.toString())){
                 // In case a jump to an external address occured, check for fuction pointer
+                Function external = funcMan.getFunctionAt(flow);
                 if(flow.isExternalAddress()) {
-                    Address funcPointer = parseFunctionPointerAddress(funcMan.getFunctionAt(flow));
-                    Function external = funcMan.getFunctionAt(flow);
-                    if(funcPointer != null && externalSymbolMap.containsKey(external.getName())) {
-                        // Check whether the external symbol's TID is an external address
-                        // If so, replace it with the function pointer address
-                        ExternSymbol symbol = externalSymbolMap.get(external.getName());
-                        Tid targetTid = new Tid(String.format("sub_%s", funcPointer.toString()), funcPointer.toString());
-                        symbol.setTid(targetTid);
-                        symbol.getAddresses().add(funcPointer.toString());
-
-                        return targetTid;
-                    }
+                    return handleCallToFunctionPointer(flow, external);
+                } else {
+                    return externalSymbolMap.get(external.getName()).getTid();
                 }
             }
         }
 
         return null;
+    }
+
+
+    /**
+     * 
+     * @param flow: Flow address of indirect call
+     * @return: target tid of external symbol
+     * 
+     * Tries to parse the function pointer address and if the external symbol TID
+     * is an external address overwrite the TID with the function pointer address.
+     * The function pointer address is always added to the address list of the external symbol.
+     */
+    protected Tid handleCallToFunctionPointer(Address flow, Function external) {
+        Address funcPointer = parseFunctionPointerAddress(funcMan.getFunctionAt(flow));
+        Tid targetTid = null;
+        if(funcPointer != null && externalSymbolMap.containsKey(external.getName())) {
+            ExternSymbol symbol = externalSymbolMap.get(external.getName());
+            if(symbol.getTid().getId().startsWith("sub_EXTERNAL")) {
+                targetTid = new Tid(String.format("sub_%s", funcPointer.toString()), funcPointer.toString());
+                symbol.setTid(targetTid);
+            } else {
+                targetTid = symbol.getTid();
+            }
+            symbol.getAddresses().add(funcPointer.toString());
+        }
+
+        return targetTid;
     }
 
 
