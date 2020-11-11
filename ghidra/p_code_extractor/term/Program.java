@@ -22,9 +22,8 @@ public class Program {
         this.setSubs(subs);
     }
 
-    public Program(ArrayList<Term<Sub>> subs, ArrayList<ExternSymbol> externSymbols, ArrayList<Tid> entryPoints) {
+    public Program(ArrayList<Term<Sub>> subs, ArrayList<Tid> entryPoints) {
         this.setSubs(subs);
-        this.setExternSymbols(externSymbols);
         this.setEntryPoints(entryPoints);
     }
 

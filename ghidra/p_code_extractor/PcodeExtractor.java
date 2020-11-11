@@ -1,6 +1,7 @@
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -56,7 +57,9 @@ public class PcodeExtractor extends GhidraScript {
 
     Term<Program> program = null;
     FunctionManager funcMan;
-    HashMap<String, Integer> functionEntryPoints;
+    SymbolTable symTab;
+    HashMap<String, Tid> functionEntryPoints;
+    HashMap<String, ExternSymbol> externalSymbolMap;
     ghidra.program.model.listing.Program ghidraProgram;
     VarnodeContext context;
     String cpuArch;
@@ -79,11 +82,15 @@ public class PcodeExtractor extends GhidraScript {
         context = new VarnodeContext(ghidraProgram, ghidraProgram.getProgramContext(), ghidraProgram.getProgramContext());
         cpuArch = getCpuArchitecture();
 
+        symTab = ghidraProgram.getSymbolTable();
+        externalSymbolMap = new HashMap<String, ExternSymbol>();
+        createExternalSymbolMap(symTab);
         program = createProgramTerm();
-        functionEntryPoints = new HashMap<String, Integer>();
+        functionEntryPoints = new HashMap<String, Tid>();
         setFunctionEntryPoints();
         Project project = createProject();
         program = iterateFunctions(simpleBM, listing);
+        program.getTerm().setExternSymbols(new ArrayList<ExternSymbol>(externalSymbolMap.values()));
 
         String jsonPath = getScriptArgs()[0];
         Serializer ser = new Serializer(project, jsonPath);
@@ -98,15 +105,21 @@ public class PcodeExtractor extends GhidraScript {
      * This will later speed up the cast of indirect Calls.
      */
     protected void setFunctionEntryPoints() {
-        // Add external symbols and internal function addresses to hash map
-        int funcCounter = 0;
-        for(ExternSymbol sym : program.getTerm().getExternSymbols()){
-            functionEntryPoints.put(sym.getAddress(), funcCounter);
-            funcCounter++;
+        // Add thunk addresses for external functions
+        for(ExternSymbol sym : externalSymbolMap.values()){
+            for(String address : sym.getAddresses()) {
+                functionEntryPoints.put(address, sym.getTid());
+            }
         }
+        // Add internal function addresses
         for(Function func : funcMan.getFunctionsNoStubs(true)) {
-            functionEntryPoints.put(func.getEntryPoint().toString(), funcCounter);
-            funcCounter++;
+            String address = func.getEntryPoint().toString();
+            functionEntryPoints.put(address, new Tid(String.format("sub_%s", address), address));
+        }
+        // Add external addresses
+        for(Function ext : funcMan.getExternalFunctions()) {
+            String address = ext.getEntryPoint().toString();
+            functionEntryPoints.put(address, new Tid(String.format("sub_%s", address), address));
         }
     }
 
@@ -625,8 +638,7 @@ public class PcodeExtractor extends GhidraScript {
      */
     protected Term<Program> createProgramTerm() {
         Tid progTid = new Tid(String.format("prog_%s", ghidraProgram.getMinAddress().toString()), ghidraProgram.getMinAddress().toString());
-        SymbolTable symTab = ghidraProgram.getSymbolTable();
-        return new Term<Program>(progTid, new Program(new ArrayList<Term<Sub>>(), addExternalSymbols(symTab), addEntryPoints(symTab)));
+        return new Term<Program>(progTid, new Program(new ArrayList<Term<Sub>>(), addEntryPoints(symTab)));
     }
 
 
@@ -652,32 +664,65 @@ public class PcodeExtractor extends GhidraScript {
     /**
      * 
      * @param symTab: symbol table
-     * @return: list of external symbols
      * 
-     * Creates a list of external symbols to add to the program term
+     * Creates a map of external symbols to add to the program term
      */
-    protected ArrayList<ExternSymbol> addExternalSymbols(SymbolTable symTab) {
-        ArrayList<ExternSymbol> extSym = new ArrayList<ExternSymbol>();
-        ArrayList<Symbol> externalSymbols = new ArrayList<Symbol>();
-        ArrayList<Symbol> definedSymbols = new ArrayList<Symbol>();
-        symTab.getExternalSymbols().forEachRemaining(externalSymbols::add);
-        symTab.getDefinedSymbols().forEachRemaining(definedSymbols::add);
-        for(Symbol def : definedSymbols) {
-            for(Symbol ext : externalSymbols) {
-                if(def.getName().equals(ext.getName()) && !def.getAddress().toString().startsWith("EXTERNAL:") && def.getSymbolType() == SymbolType.FUNCTION && notInReferences(def)) {
-                    extSym.add(createExternSymbol(def));
-                    break;
+    protected void createExternalSymbolMap(SymbolTable symTab) {
+        HashMap<String, ArrayList<Function>> symbolMap = new HashMap<String, ArrayList<Function>>();
+        funcMan.getExternalFunctions().forEach(func -> {
+            ArrayList<Function> thunkFuncs = new ArrayList<Function>();
+            getThunkFunctions(func, thunkFuncs);
+            if(thunkFuncs.size() > 0) {
+                for(Function thunk : thunkFuncs) {
+                    addToSymbolMap(symbolMap, thunk);
                 }
+            } else {
+                addToSymbolMap(symbolMap, func);
             }
-        }
+        });
 
-        return extSym;
+        createExternalSymbols(symbolMap);
     }
 
 
     /**
      * 
-     * @param sym: external symbol
+     * @param func: Function for which thunk functions are to be found
+     * @param thunkFuncs: List of found thunk functions
+     * 
+     * Recursively find thunk functions in symbol chain
+     */
+    protected void getThunkFunctions(Function func, ArrayList<Function> thunkFuncs) {
+        Address[] thunks = func.getFunctionThunkAddresses();
+        if(thunks != null) {
+            for(Address thunkAddr : thunks) {
+                Function thunkFunction = getFunctionAt(thunkAddr);
+                thunkFuncs.add(funcMan.getFunctionAt(thunkAddr));
+                getThunkFunctions(thunkFunction, thunkFuncs);
+            }
+        }
+    }
+
+
+    /**
+     * 
+     * @param symbolMap: Maps symbol names to multiple function declarations
+     * @param func: Function to be added to symbol map
+     * 
+     * Either adds a function to a given symbol name or creates a new entry in the symbol map
+     */
+    protected void addToSymbolMap(HashMap<String, ArrayList<Function>> symbolMap, Function func) {
+        if(symbolMap.containsKey(func.getName())) {
+            symbolMap.get(func.getName()).add(func);
+        } else {
+            symbolMap.put(func.getName(), new ArrayList<Function>(){{add(func);}});
+        }
+    }
+
+
+    /**
+     * 
+     * @param func: function to get arguments
      * @return: if same symbol name in references
      * 
      * Checks whether the same symbol name is in the references of the current symbol.
@@ -692,12 +737,10 @@ public class PcodeExtractor extends GhidraScript {
      * by some_function().
      * 
      */
-    protected Boolean notInReferences(Symbol sym) {
-        for(Reference ref : sym.getReferences()) {
-            if(funcMan.getFunctionContaining(ref.getFromAddress()) != null) {
-                if(funcMan.getFunctionContaining(ref.getFromAddress()).getName().equals(sym.getName())) {
-                    return false;
-                }
+    protected Boolean notInReferences(Function func) {
+        for(Function calling : func.getCallingFunctions(getMonitor())) {
+            if(calling.getName().equals(func.getName())) {
+                return false;
             }
         }
 
@@ -706,34 +749,28 @@ public class PcodeExtractor extends GhidraScript {
 
 
     /**
-     * @param symbol:  External symbol
-     * @return: new ExternSymbol
+     * @param symbolMap: External symbol map
      * 
-     * Creates an external symbol with an unique TID, a calling convention and argument objects.
+     * Creates external symbol map with an unique TID, a calling convention and argument objects.
      */
-    protected ExternSymbol createExternSymbol(Symbol symbol) {
-        Tid tid = new Tid(String.format("sub_%s", symbol.getAddress().toString()), symbol.getAddress().toString());
-        ArrayList<Arg> args = createArguments(symbol);
-        Boolean noReturn = funcMan.getFunctionAt(symbol.getAddress()).hasNoReturn();
-        return new ExternSymbol(tid, symbol.getAddress().toString(), symbol.getName(), funcMan.getDefaultCallingConvention().getName(), args, noReturn);
-
-    }
-
-
-    /**
-     * @param def:     Defined symbol
-     * @return: true if referencing function is thunk, else false
-     * 
-     * Checks if current external symbol is referenced by a Thunk Function.
-     * If so, the Thunk Function is the internally called function.
-     */
-    protected Boolean isThunkFunctionRef(Symbol def) {
-        Reference[] refs = def.getReferences();
-        if(refs.length == 0) {
-            return false;
+    protected void createExternalSymbols(HashMap<String, ArrayList<Function>> symbolMap) {
+        for(Map.Entry<String, ArrayList<Function>> functions : symbolMap.entrySet()) {
+            ExternSymbol extSym = new ExternSymbol();
+            extSym.setName(functions.getKey());
+            for(Function func : functions.getValue()) {
+                if(notInReferences(func)) {
+                    extSym.setTid(new Tid(String.format("sub_%s", func.getEntryPoint().toString()), func.getEntryPoint().toString()));
+                    extSym.setNoReturn(func.hasNoReturn());
+                    extSym.setArguments(createArguments(func));
+                    extSym.setCallingConvention(funcMan.getDefaultCallingConvention().toString());
+                }
+                if(!func.isExternal()) {
+                    extSym.getAddresses().add(func.getEntryPoint().toString());
+                }
+            }
+            externalSymbolMap.put(functions.getKey(), extSym);
         }
-        Address refAddr = def.getReferences()[0].getFromAddress();
-        return funcMan.getFunctionContaining(refAddr) != null && funcMan.getFunctionContaining(refAddr).isThunk();
+
     }
 
 
@@ -743,14 +780,13 @@ public class PcodeExtractor extends GhidraScript {
 
 
     /**
-     * @param symbol:  Symbol used to get corresponding function
+     * @param func: function to get arguments
      * @return: new Arg ArrayList
      * 
      * Creates Arguments for the ExternSymbol object.
      */
-    protected ArrayList<Arg> createArguments(Symbol symbol) {
+    protected ArrayList<Arg> createArguments(Function func) {
         ArrayList<Arg> args = new ArrayList<Arg>();
-        Function func = funcMan.getFunctionAt(symbol.getAddress());
         Parameter[] params = func.getParameters();
         for (Parameter param : params) {
             args.add(specifyArg(param));
@@ -819,8 +855,7 @@ public class PcodeExtractor extends GhidraScript {
      * Creates a Sub Term with an unique TID consisting of the prefix sub and its entry address.
      */
     protected Term<Sub> createSubTerm(Function func) {
-        Tid subTid = new Tid(String.format("sub_%s", func.getEntryPoint().toString()), func.getEntryPoint().toString());
-        return new Term<Sub>(subTid, new Sub(func.getName(), func.getBody()));
+        return new Term<Sub>(functionEntryPoints.get(func.getEntryPoint().toString()), new Sub(func.getName(), func.getBody()));
     }
 
 
@@ -1008,7 +1043,7 @@ public class PcodeExtractor extends GhidraScript {
      * Either returns an address to the memory if not resolved or an address to a symbol
      */
     protected Label handleLabelsForIndirectCalls(PcodeOp pcodeOp) {
-        Tid subTid = getTargetTid(pcodeOp.getInput(0));
+        Tid subTid = getTargetTid();
         if (subTid != null) {
             return new Label(subTid);
         }
@@ -1023,13 +1058,62 @@ public class PcodeExtractor extends GhidraScript {
      * 
      * Resolves the target id for an indirect jump
      */
-    protected Tid getTargetTid(Varnode target) {
+    protected Tid getTargetTid() {
         Address[] flowDestinations = PcodeBlockData.instruction.getFlows();
         if(flowDestinations.length == 1) {
-            for(Address flow : flowDestinations) {
-                if(functionEntryPoints.containsKey(flow.toString())){
-                    return new Tid(String.format("sub_%s", flow.toString()), flow.toString());
+            Address flow = flowDestinations[0];
+            if(functionEntryPoints.containsKey(flow.toString())){
+                // In case a jump to an external address occured, check for fuction pointer
+                Function external = funcMan.getFunctionAt(flow);
+                if(flow.isExternalAddress()) {
+                    return handleCallToFunctionPointer(flow, external);
+                } else {
+                    return functionEntryPoints.get(flow.toString());
                 }
+            }
+        }
+
+        return null;
+    }
+
+
+    /**
+     * 
+     * @param flow: Flow address of indirect call
+     * @return: target tid of external symbol
+     * 
+     * Tries to parse the function pointer address and if the external symbol TID
+     * is an external address overwrite the TID with the function pointer address.
+     * The function pointer address is always added to the address list of the external symbol.
+     */
+    protected Tid handleCallToFunctionPointer(Address flow, Function external) {
+        Address funcPointer = parseFunctionPointerAddress();
+        Tid targetTid = null;
+        if(funcPointer != null && externalSymbolMap.containsKey(external.getName())) {
+            ExternSymbol symbol = externalSymbolMap.get(external.getName());
+            if(symbol.getTid().getId().startsWith("sub_EXTERNAL")) {
+                targetTid = new Tid(String.format("sub_%s", funcPointer.toString()), funcPointer.toString());
+                symbol.setTid(targetTid);
+            } else {
+                targetTid = symbol.getTid();
+            }
+            symbol.getAddresses().add(funcPointer.toString());
+        }
+
+        return targetTid;
+    }
+
+
+    /**
+     * 
+     * @return Address of function pointer
+     * 
+     * Parses the function pointer address out of an indirect call instruction
+     */
+    protected Address parseFunctionPointerAddress() {
+        for(PcodeOp op : PcodeBlockData.ops) {
+            if(op.getOpcode() == PcodeOp.CALLIND && op.getInput(0).isAddress()) {
+                return op.getInput(0).getAddress();
             }
         }
         return null;

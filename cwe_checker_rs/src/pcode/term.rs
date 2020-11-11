@@ -294,7 +294,7 @@ impl From<Sub> for IrSub {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct ExternSymbol {
     pub tid: Tid,
-    pub address: String,
+    pub addresses: Vec<String>,
     pub name: String,
     pub calling_convention: Option<String>,
     pub arguments: Vec<Arg>,
@@ -337,6 +337,7 @@ impl From<ExternSymbol> for IrExternSymbol {
         }
         IrExternSymbol {
             tid: symbol.tid,
+            addresses: symbol.addresses,
             name: symbol.name,
             calling_convention: symbol.calling_convention,
             parameters,
@@ -655,7 +656,9 @@ mod tests {
                   "id": "sub_08048410",
                   "address": "08048410"
                 },
-                "address": "08048410",
+                "addresses": [
+                    "08048410"
+                ],
                 "name": "atoi",
                 "calling_convention": "__cdecl",
                 "arguments": [

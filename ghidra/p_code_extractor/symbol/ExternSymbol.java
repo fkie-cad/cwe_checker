@@ -11,8 +11,8 @@ public class ExternSymbol {
 
     @SerializedName("tid")
     private Tid tid;
-    @SerializedName("address")
-    private String address;
+    @SerializedName("addresses")
+    private ArrayList<String> addresses;
     @SerializedName("name")
     private String name;
     @SerializedName("calling_convention")
@@ -23,11 +23,12 @@ public class ExternSymbol {
     private Boolean noReturn;
 
     public ExternSymbol() {
+        this.setAddresses(new ArrayList<String>());
     }
 
-    public ExternSymbol(Tid tid, String address, String name, String callingConvention, ArrayList<Arg> arguments, Boolean noReturn) {
+    public ExternSymbol(Tid tid, ArrayList<String> addresses, String name, String callingConvention, ArrayList<Arg> arguments, Boolean noReturn) {
         this.setTid(tid);
-        this.setAddress(address);
+        this.setAddresses(addresses);
         this.setName(name);
         this.setCallingConvention(callingConvention);
         this.setArguments(arguments);
@@ -42,12 +43,12 @@ public class ExternSymbol {
         this.tid = tid;
     }
 
-    public String getAddress() {
-        return address;
+    public ArrayList<String> getAddresses() {
+        return addresses;
     }
 
-    public void setAddress(String address) {
-        this.address = address;
+    public void setAddresses(ArrayList<String> addresses) {
+        this.addresses = addresses;
     }
 
     public String getName() {

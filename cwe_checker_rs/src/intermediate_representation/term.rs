@@ -217,6 +217,8 @@ pub enum Arg {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct ExternSymbol {
     pub tid: Tid,
+    /// Addresses of possibly multiple locations of the same extern symbol
+    pub addresses: Vec<String>,
     /// The name of the extern symbol
     pub name: String,
     /// The calling convention used for the extern symbol if known
