@@ -36,10 +36,7 @@ import ghidra.program.model.listing.Parameter;
 import ghidra.program.model.listing.VariableStorage;
 import ghidra.program.model.pcode.PcodeOp;
 import ghidra.program.model.pcode.Varnode;
-import ghidra.program.model.symbol.Symbol;
 import ghidra.program.model.symbol.SymbolTable;
-import ghidra.program.model.symbol.SymbolType;
-import ghidra.program.model.symbol.Reference;
 import ghidra.program.util.VarnodeContext;
 import ghidra.util.exception.CancelledException;
 
@@ -105,21 +102,17 @@ public class PcodeExtractor extends GhidraScript {
      * This will later speed up the cast of indirect Calls.
      */
     protected void setFunctionEntryPoints() {
-        // Add thunk addresses for external functions
-        for(ExternSymbol sym : externalSymbolMap.values()){
-            for(String address : sym.getAddresses()) {
-                functionEntryPoints.put(address, sym.getTid());
-            }
-        }
         // Add internal function addresses
         for(Function func : funcMan.getFunctionsNoStubs(true)) {
             String address = func.getEntryPoint().toString();
             functionEntryPoints.put(address, new Tid(String.format("sub_%s", address), address));
         }
-        // Add external addresses
-        for(Function ext : funcMan.getExternalFunctions()) {
-            String address = ext.getEntryPoint().toString();
-            functionEntryPoints.put(address, new Tid(String.format("sub_%s", address), address));
+
+        // Add thunk addresses for external functions
+        for(ExternSymbol sym : externalSymbolMap.values()){
+            for(String address : sym.getAddresses()) {
+                functionEntryPoints.put(address, sym.getTid());
+            }
         }
     }
 
@@ -1013,14 +1006,14 @@ public class PcodeExtractor extends GhidraScript {
         Label jumpLabel;
         if (fallThrough == null) {
             switch(mnemonic) {
+                case "CALL":
                 case "CALLIND": 
-                    jumpLabel = handleLabelsForIndirectCalls(pcodeOp);
+                    jumpLabel = handleLabelsForCalls(pcodeOp);
                     break;
                 case "BRANCHIND":
                 case "RETURN":
                     jumpLabel = new Label((Variable) createVariable(pcodeOp.getInput(0)));
                     break;
-                case "CALL":
                 case "CALLOTHER":
                     jumpLabel = new Label((Tid) new Tid(String.format("sub_%s", pcodeOp.getInput(0).getAddress().toString()), pcodeOp.getInput(0).getAddress().toString()));
                     break;
@@ -1042,10 +1035,13 @@ public class PcodeExtractor extends GhidraScript {
      * 
      * Either returns an address to the memory if not resolved or an address to a symbol
      */
-    protected Label handleLabelsForIndirectCalls(PcodeOp pcodeOp) {
-        Tid subTid = getTargetTid();
+    protected Label handleLabelsForCalls(PcodeOp pcodeOp) {
+        Tid subTid = getTargetTid(pcodeOp);
         if (subTid != null) {
             return new Label(subTid);
+        }
+        if(pcodeOp.getOpcode() == PcodeOp.CALL) {
+            return new Label(new Tid(String.format("sub_%s", pcodeOp.getInput(0).getAddress().toString()), pcodeOp.getInput(0).getAddress().toString()));
         }
         return new Label((Variable) createVariable(pcodeOp.getInput(0)));
     }
@@ -1058,18 +1054,38 @@ public class PcodeExtractor extends GhidraScript {
      * 
      * Resolves the target id for an indirect jump
      */
-    protected Tid getTargetTid() {
+    protected Tid getTargetTid(PcodeOp pcodeOp) {
+        // First check whether the parsed address from the pcodeOp operation
+        // is in the entry points map and if so, return the corresponding Tid.
+        // This is a cheap operation
+        String targetAddress = parseCallTargetAddress(pcodeOp);
+        if(functionEntryPoints.containsKey(targetAddress)) {
+            return functionEntryPoints.get(targetAddress);
+        }
+        // If no such target exists in the entry points map, follow the flows
+        // from the instruction
         Address[] flowDestinations = PcodeBlockData.instruction.getFlows();
+        // Check whether there is only one flow, so the result is unambiguous
         if(flowDestinations.length == 1) {
             Address flow = flowDestinations[0];
-            if(functionEntryPoints.containsKey(flow.toString())){
-                // In case a jump to an external address occured, check for fuction pointer
-                Function external = funcMan.getFunctionAt(flow);
-                if(flow.isExternalAddress()) {
-                    return handleCallToFunctionPointer(flow, external);
-                } else {
-                    return functionEntryPoints.get(flow.toString());
-                }
+            // Check if the flow target is in the entry points map
+            // This has to be done in case the parsed target address points 
+            // to a location in a jump table
+            if(functionEntryPoints.containsKey(flow.toString())) {
+                return functionEntryPoints.get(flow.toString());
+            }
+            // In some cases indirect calls do not follow addresses directly but contents of registers
+            if(targetAddress == null) {
+                return null;
+            }
+            // If the flow points to an external address, the earlier parsed address
+            // from the pcodeOp is most likely a function pointer which will be added
+            // to the entry points map for later calls.
+            // Also, since the function pointer address is not already in the entry points map
+            // the sub TID of the corresponding external symbol will be swapped with the function
+            // pointer address.
+            if(flow.isExternalAddress()) {
+                return updateExternalSymbolLocations(flow, targetAddress);
             }
         }
 
@@ -1079,42 +1095,35 @@ public class PcodeExtractor extends GhidraScript {
 
     /**
      * 
-     * @param flow: Flow address of indirect call
-     * @return: target tid of external symbol
+     * @param flow: flow from instruction to target
+     * @param targetAddress: address of target
      * 
-     * Tries to parse the function pointer address and if the external symbol TID
-     * is an external address overwrite the TID with the function pointer address.
-     * The function pointer address is always added to the address list of the external symbol.
+     * Adds function pointer address to external symbol and updates the TID.
      */
-    protected Tid handleCallToFunctionPointer(Address flow, Function external) {
-        Address funcPointer = parseFunctionPointerAddress();
-        Tid targetTid = null;
-        if(funcPointer != null && externalSymbolMap.containsKey(external.getName())) {
-            ExternSymbol symbol = externalSymbolMap.get(external.getName());
-            if(symbol.getTid().getId().startsWith("sub_EXTERNAL")) {
-                targetTid = new Tid(String.format("sub_%s", funcPointer.toString()), funcPointer.toString());
-                symbol.setTid(targetTid);
-            } else {
-                targetTid = symbol.getTid();
-            }
-            symbol.getAddresses().add(funcPointer.toString());
+    protected Tid updateExternalSymbolLocations(Address flow, String targetAddress) {
+        Function external = funcMan.getFunctionAt(flow);
+        ExternSymbol symbol = externalSymbolMap.get(external.getName());
+        symbol.getAddresses().add(targetAddress);
+        if(symbol.getTid().getId().startsWith("sub_EXTERNAL")) {
+            Tid targetTid = new Tid(String.format("sub_%s", targetAddress), targetAddress);
+            functionEntryPoints.put(targetAddress, targetTid);
+            symbol.setTid(targetTid);
+            return targetTid;
         }
-
-        return targetTid;
+        return symbol.getTid();
     }
 
 
     /**
      * 
-     * @return Address of function pointer
+     * @param op: call pcode operation
+     * @return: Address of function pointer
      * 
-     * Parses the function pointer address out of an indirect call instruction
+     * Parses the function pointer address out of an call instruction
      */
-    protected Address parseFunctionPointerAddress() {
-        for(PcodeOp op : PcodeBlockData.ops) {
-            if(op.getOpcode() == PcodeOp.CALLIND && op.getInput(0).isAddress()) {
-                return op.getInput(0).getAddress();
-            }
+    protected String parseCallTargetAddress(PcodeOp op) {
+        if(op.getInput(0).isAddress()) {
+            return op.getInput(0).getAddress().toString();
         }
         return null;
     }
