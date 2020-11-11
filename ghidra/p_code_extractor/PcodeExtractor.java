@@ -36,10 +36,7 @@ import ghidra.program.model.listing.Parameter;
 import ghidra.program.model.listing.VariableStorage;
 import ghidra.program.model.pcode.PcodeOp;
 import ghidra.program.model.pcode.Varnode;
-import ghidra.program.model.symbol.Symbol;
 import ghidra.program.model.symbol.SymbolTable;
-import ghidra.program.model.symbol.SymbolType;
-import ghidra.program.model.symbol.Reference;
 import ghidra.program.util.VarnodeContext;
 import ghidra.util.exception.CancelledException;
 
@@ -1071,23 +1068,24 @@ public class PcodeExtractor extends GhidraScript {
         // Check whether there is only one flow, so the result is unambiguous
         if(flowDestinations.length == 1) {
             Address flow = flowDestinations[0];
-            // If the flow points to an external address, the earlier parsed address
-            // from the pcodeOp is most likely a function pointer which will be added
-            // to the entry points map for later calls.
-            // Also, since the function pointer address is not already in the entry points map,
-            // the sub TID of the corresponding external symbol will be swapped with the function
-            // pointer address.
-            if(flow.isExternalAddress()) {
-                Tid targetTid = new Tid(String.format("sub_%s", targetAddress), targetAddress);
-                updateExternalSymbolLocations(flow, targetTid, targetAddress);
-                functionEntryPoints.put(targetAddress, targetTid);
-                return targetTid;
-            }
             // Check if the flow target is in the entry points map
             // This has to be done in case the parsed target address points 
             // to a location in a jump table
             if(functionEntryPoints.containsKey(flow.toString())) {
                 return functionEntryPoints.get(flow.toString());
+            }
+            // In some cases indirect calls do not follow addresses directly but contents of registers
+            if(targetAddress == null) {
+                return null;
+            }
+            // If the flow points to an external address, the earlier parsed address
+            // from the pcodeOp is most likely a function pointer which will be added
+            // to the entry points map for later calls.
+            // Also, since the function pointer address is not already in the entry points map
+            // the sub TID of the corresponding external symbol will be swapped with the function
+            // pointer address.
+            if(flow.isExternalAddress()) {
+                return updateExternalSymbolLocations(flow, targetAddress);
             }
         }
 
@@ -1095,11 +1093,24 @@ public class PcodeExtractor extends GhidraScript {
     }
 
 
-    protected void updateExternalSymbolLocations(Address flow, Tid targetTid, String targetAddress) {
+    /**
+     * 
+     * @param flow: flow from instruction to target
+     * @param targetAddress: address of target
+     * 
+     * Adds function pointer address to external symbol and updates the TID.
+     */
+    protected Tid updateExternalSymbolLocations(Address flow, String targetAddress) {
         Function external = funcMan.getFunctionAt(flow);
         ExternSymbol symbol = externalSymbolMap.get(external.getName());
         symbol.getAddresses().add(targetAddress);
-        symbol.setTid(targetTid);
+        if(symbol.getTid().getId().startsWith("sub_EXTERNAL")) {
+            Tid targetTid = new Tid(String.format("sub_%s", targetAddress), targetAddress);
+            functionEntryPoints.put(targetAddress, targetTid);
+            symbol.setTid(targetTid);
+            return targetTid;
+        }
+        return symbol.getTid();
     }
 
 
