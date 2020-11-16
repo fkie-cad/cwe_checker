@@ -16,7 +16,7 @@ use crate::prelude::*;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Call {
-    pub target: Label,
+    pub target: Option<Label>,
     #[serde(rename = "return")]
     pub return_: Option<Label>,
     pub call_string: Option<String>,
@@ -85,14 +85,14 @@ impl From<Jmp> for IrJmp {
             CALL => {
                 let call = jmp.call.unwrap();
                 IrJmp::Call {
-                    target: unwrap_label_direct(call.target),
+                    target: unwrap_label_direct(call.target.unwrap()),
                     return_: call.return_.map(unwrap_label_direct),
                 }
             }
             CALLIND => {
                 let call = jmp.call.unwrap();
                 IrJmp::CallInd {
-                    target: unwrap_label_indirect(call.target).into(),
+                    target: unwrap_label_indirect(call.target.unwrap()).into(),
                     return_: call.return_.map(unwrap_label_direct),
                 }
             }
