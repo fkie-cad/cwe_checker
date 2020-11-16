@@ -883,14 +883,14 @@ public class PcodeExtractor extends GhidraScript {
     protected Term<Jmp> createJmpTerm(int pCodeCount, PcodeOp pcodeOp, String mnemonic) {
         Address instrAddr = PcodeBlockData.instruction.getAddress();
         Tid jmpTid = new Tid(String.format("instr_%s_%s", instrAddr.toString(), pCodeCount), instrAddr.toString());
-        if (pcodeOp.getOpcode == PcodeOp.CBRANCH) {
-            return new Term<Jmp>(jmpTid, new Jmp(ExecutionType.JmpType.GOTO, mnemonic, createLabel(mnemonic, pcodeOp, null), createVariable(pcodeOp.getInput(1)), pCodeCount));
+        if (pcodeOp.getOpcode() == PcodeOp.CBRANCH) {
+            return new Term<Jmp>(jmpTid, new Jmp(ExecutionType.JmpType.GOTO, mnemonic, createLabel(pcodeOp, null), createVariable(pcodeOp.getInput(1)), pCodeCount));
         }
-        if (pcodeOp.getOpcode == PcodeOp.BRANCH || pcodeOp.getOpcode == PcodeOp.BRANCHIND) {
-            return new Term<Jmp>(jmpTid, new Jmp(ExecutionType.JmpType.GOTO, mnemonic, createLabel(mnemonic, pcodeOp, null), pCodeCount));
+        if (pcodeOp.getOpcode() == PcodeOp.BRANCH || pcodeOp.getOpcode() == PcodeOp.BRANCHIND) {
+            return new Term<Jmp>(jmpTid, new Jmp(ExecutionType.JmpType.GOTO, mnemonic, createLabel(pcodeOp, null), pCodeCount));
         }
-        if (pcodeOp.getOpcode == PcodeOp.RETURN) {
-            return new Term<Jmp>(jmpTid, new Jmp(ExecutionType.JmpType.RETURN, mnemonic, createLabel(mnemonic, pcodeOp, null), pCodeCount));
+        if (pcodeOp.getOpcode() == PcodeOp.RETURN) {
+            return new Term<Jmp>(jmpTid, new Jmp(ExecutionType.JmpType.RETURN, mnemonic, createLabel(pcodeOp, null), pCodeCount));
         }
         if (pcodeOp.getOpcode() == PcodeOp.UNIMPLEMENTED) {
             mnemonic = "CALLOTHER";
