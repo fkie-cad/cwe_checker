@@ -149,22 +149,23 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
         // When indirect calls are handled, the callsite alone is not a unique identifier anymore.
         // This may lead to confusion if both caller and callee have the same ID in their respective caller_stack_id sets.
 
-        let (state_before_call, state_before_return) = match (state_before_call, state_before_return) {
-            (Some(state_call), Some(state_return)) => (state_call, state_return),
-            (Some(state_call), None) => {
-                if self.is_indirect_call_with_top_target(state_call, call_term) {
-                    // We know nothing about the call target.
-                    return self.handle_call_to_generic_unknown_function(&state_call);
-                } else {
-                    // We know at least something about the call target.
-                    // Since we don't have a return value,
-                    // we assume that the called function may not return at all.
-                    return None;
+        let (state_before_call, state_before_return) =
+            match (state_before_call, state_before_return) {
+                (Some(state_call), Some(state_return)) => (state_call, state_return),
+                (Some(state_call), None) => {
+                    if self.is_indirect_call_with_top_target(state_call, call_term) {
+                        // We know nothing about the call target.
+                        return self.handle_call_to_generic_unknown_function(&state_call);
+                    } else {
+                        // We know at least something about the call target.
+                        // Since we don't have a return value,
+                        // we assume that the called function may not return at all.
+                        return None;
+                    }
                 }
-            },
-            (None, Some(_state_return)) => return None, // we only return to functions with a value before the call to prevent returning to dead code
-            (None, None) => return None,
-        };
+                (None, Some(_state_return)) => return None, // we only return to functions with a value before the call to prevent returning to dead code
+                (None, None) => return None,
+            };
 
         let original_caller_stack_id = &state_before_call.stack_id;
         let caller_stack_id = AbstractIdentifier::new(
@@ -225,7 +226,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
                 } else {
                     return None;
                 }
-            },
+            }
             _ => panic!("Malformed control flow graph encountered."),
         };
         let mut new_state = state.clone();

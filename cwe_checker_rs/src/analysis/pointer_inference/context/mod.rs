@@ -277,11 +277,15 @@ impl<'a> Context<'a> {
     /// On other architectures the stack register retains the value it had before the call.
     /// Note that in some calling conventions the callee also clears function parameters from the stack.
     /// We do not detect and handle these cases yet.
-    fn adjust_stack_register_on_extern_call(&self, state_before_call: &State, new_state: &mut State) {
+    fn adjust_stack_register_on_extern_call(
+        &self,
+        state_before_call: &State,
+        new_state: &mut State,
+    ) {
         let stack_register = &self.project.stack_pointer_register;
         let stack_pointer = state_before_call.get_register(stack_register).unwrap();
         match self.project.cpu_architecture.as_str() {
-            "x86" | "x86_64" => { // TODO: Check whether the strings are also correct for Ghidra as backend!
+            "x86" | "x86_64" => {
                 let offset = Bitvector::from_u64(stack_register.size.into())
                     .into_truncate(apint::BitWidth::from(stack_register.size))
                     .unwrap();
@@ -344,10 +348,7 @@ impl<'a> Context<'a> {
     /// and that it may access (and write to) all parameter registers of this calling convention.
     /// We also assume that the function does not use any parameters saved on the stack,
     /// which may greatly reduce correctness of the analysis for the x86_32 architecture.
-    fn handle_call_to_generic_unknown_function(
-        &self,
-        state_before_call: &State
-    ) -> Option<State> {
+    fn handle_call_to_generic_unknown_function(&self, state_before_call: &State) -> Option<State> {
         if let Some(calling_conv) = self
             .project
             .calling_conventions
