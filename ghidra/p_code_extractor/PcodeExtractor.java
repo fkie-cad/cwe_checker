@@ -319,7 +319,7 @@ public class PcodeExtractor extends GhidraScript {
         for(int pcodeIndex = 0; pcodeIndex < numberOfPcodeOps; pcodeIndex++) {
             PcodeOp pcodeOp = PcodeBlockData.ops[pcodeIndex];
             String mnemonic = pcodeOp.getMnemonic();
-            if (this.jumps.contains(mnemonic)) {
+            if (this.jumps.contains(mnemonic) || pcodeOp.getOpcode() == PcodeOp.UNIMPLEMENTED) {
                 intraInstructionJumpOccured = processJump(pcodeOp, mnemonic, numberOfPcodeOps, pcodeIndex, intraInstructionJumpOccured);
             } else {
                 PcodeBlockData.temporaryDefStorage.add(createDefTerm(pcodeIndex, pcodeOp));
@@ -591,7 +591,7 @@ public class PcodeExtractor extends GhidraScript {
      */
     protected void redirectCallReturn(Term<Blk> currentBlock, PcodeOp pcodeOp) {
         Tid jmpTid = new Tid(String.format("instr_%s_%s_r", PcodeBlockData.instruction.getAddress().toString(), 0), PcodeBlockData.instruction.getAddress().toString());
-        Term<Jmp> ret = new Term<Jmp>(jmpTid, new Jmp(ExecutionType.JmpType.RETURN, pcodeOp.getMnemonic(), createLabel(pcodeOp.getMnemonic(), pcodeOp, null), 0));
+        Term<Jmp> ret = new Term<Jmp>(jmpTid, new Jmp(ExecutionType.JmpType.RETURN, pcodeOp.getMnemonic(), createLabel(pcodeOp, null), 0));
         currentBlock.getTerm().addJmp(ret);
     } 
 
@@ -883,12 +883,17 @@ public class PcodeExtractor extends GhidraScript {
     protected Term<Jmp> createJmpTerm(int pCodeCount, PcodeOp pcodeOp, String mnemonic) {
         Address instrAddr = PcodeBlockData.instruction.getAddress();
         Tid jmpTid = new Tid(String.format("instr_%s_%s", instrAddr.toString(), pCodeCount), instrAddr.toString());
-        if (mnemonic.equals("CBRANCH")) {
+        if (pcodeOp.getOpcode == PcodeOp.CBRANCH) {
             return new Term<Jmp>(jmpTid, new Jmp(ExecutionType.JmpType.GOTO, mnemonic, createLabel(mnemonic, pcodeOp, null), createVariable(pcodeOp.getInput(1)), pCodeCount));
-        } else if (mnemonic.equals("BRANCH") || mnemonic.equals("BRANCHIND")) {
+        }
+        if (pcodeOp.getOpcode == PcodeOp.BRANCH || pcodeOp.getOpcode == PcodeOp.BRANCHIND) {
             return new Term<Jmp>(jmpTid, new Jmp(ExecutionType.JmpType.GOTO, mnemonic, createLabel(mnemonic, pcodeOp, null), pCodeCount));
-        } else if (mnemonic.equals("RETURN")) {
+        }
+        if (pcodeOp.getOpcode == PcodeOp.RETURN) {
             return new Term<Jmp>(jmpTid, new Jmp(ExecutionType.JmpType.RETURN, mnemonic, createLabel(mnemonic, pcodeOp, null), pCodeCount));
+        }
+        if (pcodeOp.getOpcode() == PcodeOp.UNIMPLEMENTED) {
+            mnemonic = "CALLOTHER";
         }
 
         Term<Jmp> call = new Term<Jmp>(jmpTid, new Jmp(ExecutionType.JmpType.CALL, mnemonic, createCall(mnemonic, pcodeOp), pCodeCount));
@@ -994,7 +999,6 @@ public class PcodeExtractor extends GhidraScript {
 
 
     /**
-     * @param mnemonic:    Pcode instruction mnemonic
      * @param pcodeOp:     Pcode instruction
      * @param fallThrough: fallThrough address of branch/call
      * @return: new Label
@@ -1002,20 +1006,21 @@ public class PcodeExtractor extends GhidraScript {
      * Create a Label based on the branch instruction. For indirect branches and calls, it consists of a Variable, for calls of a sub TID
      * and for branches of a blk TID.
      */
-    protected Label createLabel(String mnemonic, PcodeOp pcodeOp, Address fallThrough) {
+    protected Label createLabel(PcodeOp pcodeOp, Address fallThrough) {
         Label jumpLabel;
         if (fallThrough == null) {
-            switch(mnemonic) {
-                case "CALL":
-                case "CALLIND": 
+            switch(pcodeOp.getOpcode()) {
+                case PcodeOp.CALL:
+                case PcodeOp.CALLIND: 
                     jumpLabel = handleLabelsForCalls(pcodeOp);
                     break;
-                case "BRANCHIND":
-                case "RETURN":
+                case PcodeOp.BRANCHIND:
+                case PcodeOp.RETURN:
                     jumpLabel = new Label((Variable) createVariable(pcodeOp.getInput(0)));
                     break;
-                case "CALLOTHER":
-                    jumpLabel = new Label((Tid) new Tid(String.format("sub_%s", pcodeOp.getInput(0).getAddress().toString()), pcodeOp.getInput(0).getAddress().toString()));
+                case PcodeOp.CALLOTHER:
+                case PcodeOp.UNIMPLEMENTED:
+                    jumpLabel = null;
                     break;
                 default:
                     jumpLabel = new Label((Tid) new Tid(String.format("blk_%s", pcodeOp.getInput(0).getAddress().toString()), pcodeOp.getInput(0).getAddress().toString()));
@@ -1138,11 +1143,16 @@ public class PcodeExtractor extends GhidraScript {
      * Creates a Call object, using a target and return Label.
      */
     protected Call createCall(String mnemonic, PcodeOp pcodeOp) {
-        if(mnemonic.equals("CALLOTHER")) {
-            String callString = ghidraProgram.getLanguage().getUserDefinedOpName((int) pcodeOp.getInput(0).getOffset());
-            return new Call(createLabel(mnemonic, pcodeOp, null), createLabel(mnemonic, pcodeOp, PcodeBlockData.instruction.getFallThrough()), callString);
+        String callString = null;
+        if(pcodeOp.getOpcode() == PcodeOp.CALLOTHER) {
+            callString = ghidraProgram.getLanguage().getUserDefinedOpName((int) pcodeOp.getInput(0).getOffset());
+            return new Call(null, createLabel(pcodeOp, PcodeBlockData.instruction.getFallThrough()), callString);
         }
-        return new Call(createLabel(mnemonic, pcodeOp, null), createLabel(mnemonic, pcodeOp, PcodeBlockData.instruction.getFallThrough()));
+        if(pcodeOp.getOpcode() == PcodeOp.UNIMPLEMENTED) {
+            callString = "unimplemented";
+            return new Call(null, createLabel(pcodeOp, PcodeBlockData.instruction.getFallThrough()), callString);
+        }
+        return new Call(createLabel(pcodeOp, null), createLabel(pcodeOp, PcodeBlockData.instruction.getFallThrough()));
     }
 
 
