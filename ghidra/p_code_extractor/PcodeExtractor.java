@@ -103,11 +103,7 @@ public class PcodeExtractor extends GhidraScript {
      */
     protected void setFunctionEntryPoints() {
         // Add internal function addresses
-<<<<<<< HEAD
         for(Function func : funcMan.getFunctions(true)) {
-=======
-        for(Function func : funcMan.getFunctionsNoStubs(true)) {
->>>>>>> 02b9ec8aab97b54455e9716c4bb971da2204c38a
             String address = func.getEntryPoint().toString();
             functionEntryPoints.put(address, new Tid(String.format("sub_%s", address), address));
         }
