@@ -103,7 +103,7 @@ public class PcodeExtractor extends GhidraScript {
      */
     protected void setFunctionEntryPoints() {
         // Add internal function addresses
-        for(Function func : funcMan.getFunctionsNoStubs(true)) {
+        for(Function func : funcMan.getFunctions(true)) {
             String address = func.getEntryPoint().toString();
             functionEntryPoints.put(address, new Tid(String.format("sub_%s", address), address));
         }
@@ -139,9 +139,9 @@ public class PcodeExtractor extends GhidraScript {
      * Iterates over functions to create sub terms and calls the block iterator to add all block terms to each subroutine.
      */
     protected Term<Program> iterateFunctions(SimpleBlockModel simpleBM, Listing listing) {
-        FunctionIterator functions = funcMan.getFunctionsNoStubs(true);
+        FunctionIterator functions = funcMan.getFunctions(true);
         for (Function func : functions) {
-            if (!func.isThunk()) {
+            if (!externalSymbolMap.containsKey(func.getName())){
                 Term<Sub> currentSub = createSubTerm(func);
                 currentSub.getTerm().setBlocks(iterateBlocks(currentSub, simpleBM, listing));
                 program.getTerm().addSub(currentSub);
