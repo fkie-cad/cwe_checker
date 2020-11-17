@@ -30,6 +30,8 @@
 //! * Calls to library functions ([`image`](../../../../../doc/images/extern_calls.png)) outside the program are converted to *ExternCallStub* edges
 //! from the *BlkEnd* node of the callsite to the *BlkStart* node of the basic block the call returns to
 //! (if the call returns at all).
+//! * Right now indirect calls are handled as if they were extern calls, i.e. an *ExternCallStub* edge is added.
+//! This behaviour will change in the future, when better indirect call handling is implemented.
 //! * For each in-program call ([`image`](../../../../../doc/images/internal_function_call.png)) and corresponding return jump one node and three edges are generated:
 //!   * An artificial node *CallReturn*
 //!   * A *CRCallStub* edge from the *BlkEnd* node of the callsite to *CallReturn*
@@ -251,11 +253,22 @@ impl<'a> GraphBuilder<'a> {
                     }
                 }
             }
-            Jmp::CallInd {
-                target: _,
-                return_: _,
-            } => {
-                // TODO: add handling of indirect calls!
+            Jmp::CallInd { target: _, return_ } => {
+                // Right now we only add an artificial extern call stub for indirect calls.
+                // TODO: Handle cases where the call target may be known.
+                if let Some(return_tid) = return_ {
+                    let return_to_node = if let Some((return_to_node, _)) = self
+                        .jump_targets
+                        .get(&(return_tid.clone(), sub_term.tid.clone()))
+                    {
+                        *return_to_node
+                    } else {
+                        let return_block = self.program.term.find_block(return_tid).unwrap();
+                        self.add_block(return_block, sub_term).0
+                    };
+                    self.graph
+                        .add_edge(source, return_to_node, Edge::ExternCallStub(jump));
+                }
             }
             Jmp::CallOther {
                 description: _,

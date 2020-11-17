@@ -172,7 +172,7 @@ fn context_problem_implementation() {
         .unwrap();
     let return_state = context
         .update_return(
-            &callee_state,
+            Some(&callee_state),
             Some(&state),
             &call,
             &return_term("return_target"),
@@ -340,7 +340,7 @@ fn update_return() {
 
     let state = context
         .update_return(
-            &state_before_return,
+            Some(&state_before_return),
             Some(&state_before_call),
             &call_term("callee"),
             &return_term("return_target"),

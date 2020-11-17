@@ -258,6 +258,46 @@ impl<'a> Context<'a> {
         }
     }
 
+    /// Check whether the jump is an indirect call whose target evaluates to a *Top* value in the given state.
+    fn is_indirect_call_with_top_target(&self, state: &State, call: &Term<Jmp>) -> bool {
+        match &call.term {
+            Jmp::CallInd { target, .. }
+                if state.eval(target).map_or(false, |value| value.is_top()) =>
+            {
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// Adjust the stack register after a call to an extern function.
+    ///
+    /// On x86, this removes the return address from the stack
+    /// (other architectures pass the return address in a register, not on the stack).
+    /// On other architectures the stack register retains the value it had before the call.
+    /// Note that in some calling conventions the callee also clears function parameters from the stack.
+    /// We do not detect and handle these cases yet.
+    fn adjust_stack_register_on_extern_call(
+        &self,
+        state_before_call: &State,
+        new_state: &mut State,
+    ) {
+        let stack_register = &self.project.stack_pointer_register;
+        let stack_pointer = state_before_call.get_register(stack_register).unwrap();
+        match self.project.cpu_architecture.as_str() {
+            "x86" | "x86_64" => {
+                let offset = Bitvector::from_u64(stack_register.size.into())
+                    .into_truncate(apint::BitWidth::from(stack_register.size))
+                    .unwrap();
+                new_state.set_register(
+                    stack_register,
+                    stack_pointer.bin_op(BinOpType::IntAdd, &offset.into()),
+                );
+            }
+            _ => new_state.set_register(stack_register, stack_pointer),
+        }
+    }
+
     /// Handle an extern symbol call, whose concrete effect on the state is unknown.
     /// Basically, we assume that the call may write to all memory objects and register that is has access to.
     fn handle_generic_extern_call(
@@ -300,6 +340,46 @@ impl<'a> Context<'a> {
                 .assume_arbitrary_writes_to_object(id, &possible_referenced_ids);
         }
         Some(new_state)
+    }
+
+    /// Handle a generic call whose target function is unknown.
+    ///
+    /// This function just assumes that the target of the call uses a reasonable standard calling convention
+    /// and that it may access (and write to) all parameter registers of this calling convention.
+    /// We also assume that the function does not use any parameters saved on the stack,
+    /// which may greatly reduce correctness of the analysis for the x86_32 architecture.
+    fn handle_call_to_generic_unknown_function(&self, state_before_call: &State) -> Option<State> {
+        if let Some(calling_conv) = self
+            .project
+            .calling_conventions
+            .iter()
+            .find(|cconv| cconv.name == "__stdcall")
+        {
+            let mut new_state = state_before_call.clone();
+            new_state.clear_non_callee_saved_register(&calling_conv.callee_saved_register[..]);
+            // Adjust stack register value (for x86 architecture).
+            self.adjust_stack_register_on_extern_call(state_before_call, &mut new_state);
+
+            let mut possible_referenced_ids = BTreeSet::new();
+            for parameter_register_name in calling_conv.parameter_register.iter() {
+                if let Some(register_value) =
+                    state_before_call.get_register_by_name(parameter_register_name)
+                {
+                    possible_referenced_ids.append(&mut register_value.referenced_ids());
+                }
+            }
+            possible_referenced_ids =
+                state_before_call.add_recursively_referenced_ids_to_id_set(possible_referenced_ids);
+            // Delete content of all referenced objects, as the function may write to them.
+            for id in possible_referenced_ids.iter() {
+                new_state
+                    .memory
+                    .assume_arbitrary_writes_to_object(id, &possible_referenced_ids);
+            }
+            Some(new_state)
+        } else {
+            None // We don't try to handle cases where we cannot guess a reasonable standard calling convention.
+        }
     }
 
     /// Get the offset of the current stack pointer to the base of the current stack frame.

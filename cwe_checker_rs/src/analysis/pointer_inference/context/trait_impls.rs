@@ -139,7 +139,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
     /// The `state_before_call` is used to reconstruct caller-specific information like the caller stack frame.
     fn update_return(
         &self,
-        state_before_return: &State,
+        state_before_return: Option<&State>,
         state_before_call: Option<&State>,
         call_term: &Term<Jmp>,
         return_term: &Term<Jmp>,
@@ -149,11 +149,24 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
         // When indirect calls are handled, the callsite alone is not a unique identifier anymore.
         // This may lead to confusion if both caller and callee have the same ID in their respective caller_stack_id sets.
 
-        // we only return to functions with a value before the call to prevent returning to dead code
-        let state_before_call = match state_before_call {
-            Some(value) => value,
-            None => return None,
-        };
+        let (state_before_call, state_before_return) =
+            match (state_before_call, state_before_return) {
+                (Some(state_call), Some(state_return)) => (state_call, state_return),
+                (Some(state_call), None) => {
+                    if self.is_indirect_call_with_top_target(state_call, call_term) {
+                        // We know nothing about the call target.
+                        return self.handle_call_to_generic_unknown_function(&state_call);
+                    } else {
+                        // We know at least something about the call target.
+                        // Since we don't have a return value,
+                        // we assume that the called function may not return at all.
+                        return None;
+                    }
+                }
+                (None, Some(_state_return)) => return None, // we only return to functions with a value before the call to prevent returning to dead code
+                (None, None) => return None,
+            };
+
         let original_caller_stack_id = &state_before_call.stack_id;
         let caller_stack_id = AbstractIdentifier::new(
             call_term.tid.clone(),
@@ -201,35 +214,28 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
         Some(state_after_return)
     }
 
-    /// Update the state according to the effect of a call to an extern symbol.
+    /// Update the state according to the effect of a call to an extern symbol
+    /// or an indirect call where nothing is known about the call target.
     fn update_call_stub(&self, state: &State, call: &Term<Jmp>) -> Option<State> {
-        let mut new_state = state.clone();
         let call_target = match &call.term {
             Jmp::Call { target, .. } => target,
-            Jmp::CallInd { .. } => panic!("Indirect calls to extern symbols not yet supported."),
+            Jmp::CallInd { .. } => {
+                if self.is_indirect_call_with_top_target(state, call) {
+                    // We know nothing about the call target.
+                    return self.handle_call_to_generic_unknown_function(&state);
+                } else {
+                    return None;
+                }
+            }
             _ => panic!("Malformed control flow graph encountered."),
         };
+        let mut new_state = state.clone();
         if let Some(extern_symbol) = self.extern_symbol_map.get(call_target) {
             // Clear non-callee-saved registers from the state.
             let cconv = extern_symbol.get_calling_convention(&self.project);
             new_state.clear_non_callee_saved_register(&cconv.callee_saved_register[..]);
-            // On x86, remove the return address from the stack (other architectures pass the return address in a register, not on the stack).
-            // Note that in some calling conventions the callee also clears function parameters from the stack.
-            // We do not detect and handle these cases yet.
-            let stack_register = &self.project.stack_pointer_register;
-            let stack_pointer = state.get_register(stack_register).unwrap();
-            match self.project.cpu_architecture.as_str() {
-                "x86" | "x86_64" => {
-                    let offset = Bitvector::from_u64(stack_register.size.into())
-                        .into_truncate(apint::BitWidth::from(stack_register.size))
-                        .unwrap();
-                    new_state.set_register(
-                        stack_register,
-                        stack_pointer.bin_op(BinOpType::IntAdd, &offset.into()),
-                    );
-                }
-                _ => new_state.set_register(stack_register, stack_pointer),
-            }
+            // Adjust stack register value (for x86 architecture).
+            self.adjust_stack_register_on_extern_call(state, &mut new_state);
             // Check parameter for possible use-after-frees
             self.check_parameter_register_for_dangling_pointer(state, call, extern_symbol);
 
