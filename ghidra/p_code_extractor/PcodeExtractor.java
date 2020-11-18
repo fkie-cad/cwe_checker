@@ -322,7 +322,7 @@ public class PcodeExtractor extends GhidraScript {
             PcodeBlockData.pcodeOp = op;
             String mnemonic = PcodeBlockData.pcodeOp.getMnemonic();
             if (this.jumps.contains(mnemonic) || PcodeBlockData.pcodeOp.getOpcode() == PcodeOp.UNIMPLEMENTED) {
-                intraInstructionJumpOccured = processJump(mnemonic, numberOfPcodeOps, intraInstructionJumpOccured);
+                intraInstructionJumpOccured = processJump(mnemonic, numberOfPcodeOps);
             } else {
                 PcodeBlockData.temporaryDefStorage.add(createDefTerm());
             }
@@ -368,21 +368,21 @@ public class PcodeExtractor extends GhidraScript {
      *
      * @param mnemonic: pcode mnemonic
      * @param numberOfPcodeOps: number of pcode instruction in pcode block
-     * @param intraInstructionJumpOccured: indicator whether a jump occured inside a pcode block
      * @return: indicator whether a jump occured inside a pcode block
      * 
      * Processes jump pcode instruction by checking where it occurs.
      * Distinguishes between jumps inside a pcode block and jumps at the end of a pcode block
      */
-    protected Boolean processJump(String mnemonic, int numberOfPcodeOps, Boolean intraInstructionJumpOccured) {
+    protected Boolean processJump(String mnemonic, int numberOfPcodeOps) {
 
         Term<Blk> currentBlock = PcodeBlockData.blocks.get(PcodeBlockData.blocks.size() - 1);
 
         if(PcodeBlockData.pcodeIndex < numberOfPcodeOps - 1) {
-            return processJumpInPcodeBlock(mnemonic, numberOfPcodeOps, intraInstructionJumpOccured, currentBlock);
+            return processJumpInPcodeBlock(mnemonic, numberOfPcodeOps, currentBlock);
         }
 
-        return processJumpAtEndOfPcodeBlocks(mnemonic, numberOfPcodeOps, intraInstructionJumpOccured, currentBlock);
+        processJumpAtEndOfPcodeBlocks(mnemonic, numberOfPcodeOps, currentBlock);
+        return false;
     }
 
 
@@ -390,16 +390,13 @@ public class PcodeExtractor extends GhidraScript {
      * 
      * @param mnemonic: pcode mnemonic
      * @param numberOfPcodeOps: number of pcode instruction in pcode block
-     * @param intraInstructionJumpOccured: indicator whether a jump occured inside a pcode block
      * @param currentBlock: current block term
      * @return: indicator whether a jump occured inside a pcode block
      * 
      * Process jumps at the end of pcode blocks
      * If it is a return block, the call return address is changed to the current block
      */
-    protected Boolean processJumpAtEndOfPcodeBlocks(String mnemonic, int numberOfPcodeOps, Boolean intraInstructionJumpOccured, Term<Blk> currentBlock) {
-        // Even if an intra instruction jump occured, the indicator is set to false as the block ends on a jump. That way there is no missing jump added.
-        intraInstructionJumpOccured = false;
+    protected void processJumpAtEndOfPcodeBlocks(String mnemonic, int numberOfPcodeOps, Term<Blk> currentBlock) {
         // Case 1: jump at the end of pcode group but not end of ghidra generated block. Create a block for the next assembly instruction.
         if(PcodeBlockData.instructionIndex < PcodeBlockData.numberOfInstructionsInBlock - 1 && PcodeBlockData.instruction.getDelaySlotDepth() == 0) {
             PcodeBlockData.blocks.add(createBlkTerm(PcodeBlockData.instruction.getFallThrough().toString(), null));
@@ -408,13 +405,10 @@ public class PcodeExtractor extends GhidraScript {
         // If Case 1 is true, the 'currentBlk' will be the second to last block as the new block is for the next instruction
         if(PcodeBlockData.pcodeOp.getOpcode() == PcodeOp.RETURN && currentBlock.getTid().getId().endsWith("_r")) {
             redirectCallReturn(currentBlock);
-            return intraInstructionJumpOccured;
         }
         currentBlock.getTerm().addMultipleDefs(PcodeBlockData.temporaryDefStorage);
         currentBlock.getTerm().addMultipleJumps(createJmpTerm(false));
         PcodeBlockData.temporaryDefStorage.clear();
-
-        return intraInstructionJumpOccured;
     }
 
 
@@ -422,13 +416,13 @@ public class PcodeExtractor extends GhidraScript {
      * 
      * @param mnemonic: pcode mnemonic
      * @param numberOfPcodeOps: number of pcode instruction in pcode block
-     * @param intraInstructionJumpOccured: indicator whether a jump occured inside a pcode block
      * @param currentBlock: current block term
      * @return: indicator whether a jump occured inside a pcode block
      * 
      * Processes a jump inside a pcode block and distinguishes between intra jumps and call return pairs.
      */
-    protected Boolean processJumpInPcodeBlock(String mnemonic, int numberOfPcodeOps, Boolean intraInstructionJumpOccured, Term<Blk> currentBlock) {
+    protected Boolean processJumpInPcodeBlock(String mnemonic, int numberOfPcodeOps, Term<Blk> currentBlock) {
+        Boolean intraInstructionJumpOccured = false;
         if(!isCall()) {
             intraInstructionJumpOccured = true;
             handleIntraInstructionJump(currentBlock.getTerm());
