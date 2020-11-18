@@ -521,7 +521,11 @@ public class PcodeExtractor extends GhidraScript {
         // If an assembly instruction's pcode block is split into multiple blocks, the blocks' TIDs have to be distinguished by pcode index as they share the same instruction address
         if(PcodeBlockData.temporaryDefStorage.size() > 0) {
             int nextBlockStartIndex = PcodeBlockData.temporaryDefStorage.get(0).getTerm().getPcodeIndex();
-            newBlock = createBlkTerm(PcodeBlockData.instruction.getAddress().toString(), String.valueOf(nextBlockStartIndex));
+            if(nextBlockStartIndex == 0) {
+                newBlock = createBlkTerm(PcodeBlockData.instruction.getAddress().toString(), null);
+            } else {
+                newBlock = createBlkTerm(PcodeBlockData.instruction.getAddress().toString(), String.valueOf(nextBlockStartIndex));
+            }
         } else {
             newBlock = createBlkTerm(PcodeBlockData.instruction.getAddress().toString(), null);
         }
