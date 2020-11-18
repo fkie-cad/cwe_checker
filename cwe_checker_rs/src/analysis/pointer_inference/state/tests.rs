@@ -276,6 +276,7 @@ fn clear_parameters_on_the_stack_on_extern_calls() {
     };
     let extern_symbol = ExternSymbol {
         tid: Tid::new("symbol"),
+        addresses: vec![],
         name: "my_extern_symbol".into(),
         calling_convention: None,
         parameters: vec![stack_param],
