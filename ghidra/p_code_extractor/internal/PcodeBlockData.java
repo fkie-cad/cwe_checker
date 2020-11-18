@@ -40,6 +40,14 @@ public final class PcodeBlockData {
      */
     public static int instructionIndex;
     /**
+     * contains the current processed pcodeOp of the current assembly instruction.
+     */
+    public static PcodeOp pcodeOp;
+    /**
+     * Contains the index of the current pcodeOp of the current assembly instruction.
+     */
+    public static int pcodeIndex;
+    /**
      * Contains the number of assembly instructions in the current Ghidra block
      */
     public static long numberOfInstructionsInBlock;
