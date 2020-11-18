@@ -14,6 +14,7 @@ import org.apache.commons.lang3.EnumUtils;
 import bil.*;
 import term.*;
 import internal.*;
+import internal.PcodeBlockData;
 import symbol.ExternSymbol;
 import serializer.Serializer;
 import ghidra.app.script.GhidraScript;
