@@ -48,5 +48,9 @@ public class Blk {
         this.defs.addAll(defs);
     }
 
+    public void addMultipleJumps(ArrayList<Term<Jmp>> jmps) {
+        this.jmps.addAll(jmps);
+    }
+
 
 }

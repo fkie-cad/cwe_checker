@@ -14,6 +14,7 @@ import org.apache.commons.lang3.EnumUtils;
 import bil.*;
 import term.*;
 import internal.*;
+import internal.PcodeBlockData;
 import symbol.ExternSymbol;
 import serializer.Serializer;
 import ghidra.app.script.GhidraScript;
@@ -193,7 +194,7 @@ public class PcodeExtractor extends GhidraScript {
             String destinationAddress = getGotoAddressForDestination(currentBlock);
             if(destinationAddress != null) {
                 String instrAddress = lastBlockTerm.getTerm().getDefs().get(lastBlockTerm.getTerm().getDefs().size()-1).getTid().getAddress();
-                addJumpToCurrentBlock(lastBlockTerm.getTerm(), instrAddress, destinationAddress, null);
+                addBranchToCurrentBlock(lastBlockTerm.getTerm(), instrAddress, destinationAddress);
             }
         }
     }
@@ -289,7 +290,7 @@ public class PcodeExtractor extends GhidraScript {
             return;
         }
         if(PcodeBlockData.ops.length == 0) {
-            addJumpToCurrentBlock(PcodeBlockData.blocks.get(PcodeBlockData.blocks.size()-1).getTerm(), PcodeBlockData.instruction.getAddress().toString(), PcodeBlockData.instruction.getFallThrough().toString(), null);
+            addBranchToCurrentBlock(PcodeBlockData.blocks.get(PcodeBlockData.blocks.size()-1).getTerm(), PcodeBlockData.instruction.getAddress().toString(), PcodeBlockData.instruction.getFallThrough().toString());
             if(PcodeBlockData.instructionIndex < PcodeBlockData.numberOfInstructionsInBlock - 1) {
                 PcodeBlockData.blocks.add(createBlkTerm(PcodeBlockData.instruction.getFallThrough().toString(), null));
             }
@@ -316,14 +317,16 @@ public class PcodeExtractor extends GhidraScript {
     protected Boolean iteratePcode() {
         int numberOfPcodeOps = PcodeBlockData.ops.length;
         Boolean intraInstructionJumpOccured = false;
-        for(int pcodeIndex = 0; pcodeIndex < numberOfPcodeOps; pcodeIndex++) {
-            PcodeOp pcodeOp = PcodeBlockData.ops[pcodeIndex];
-            String mnemonic = pcodeOp.getMnemonic();
-            if (this.jumps.contains(mnemonic) || pcodeOp.getOpcode() == PcodeOp.UNIMPLEMENTED) {
-                intraInstructionJumpOccured = processJump(pcodeOp, mnemonic, numberOfPcodeOps, pcodeIndex, intraInstructionJumpOccured);
+        PcodeBlockData.pcodeIndex = 0;
+        for(PcodeOp op : PcodeBlockData.ops) {
+            PcodeBlockData.pcodeOp = op;
+            String mnemonic = PcodeBlockData.pcodeOp.getMnemonic();
+            if (this.jumps.contains(mnemonic) || PcodeBlockData.pcodeOp.getOpcode() == PcodeOp.UNIMPLEMENTED) {
+                intraInstructionJumpOccured = processJump(mnemonic, numberOfPcodeOps);
             } else {
-                PcodeBlockData.temporaryDefStorage.add(createDefTerm(pcodeIndex, pcodeOp));
+                PcodeBlockData.temporaryDefStorage.add(createDefTerm());
             }
+            PcodeBlockData.pcodeIndex++;
         }
 
         return intraInstructionJumpOccured;
@@ -355,7 +358,7 @@ public class PcodeExtractor extends GhidraScript {
      */
     protected void addMissingJumpAfterInstructionSplit(Term<Blk> lastBlock) {
         lastBlock.getTerm().addMultipleDefs(PcodeBlockData.temporaryDefStorage);
-        addJumpToCurrentBlock(lastBlock.getTerm(), PcodeBlockData.instruction.getAddress().toString(), PcodeBlockData.instruction.getFallThrough().toString(), null);
+        addBranchToCurrentBlock(lastBlock.getTerm(), PcodeBlockData.instruction.getAddress().toString(), PcodeBlockData.instruction.getFallThrough().toString());
         PcodeBlockData.blocks.add(createBlkTerm(PcodeBlockData.instruction.getFallThrough().toString(), null));
         PcodeBlockData.temporaryDefStorage.clear();
     }
@@ -363,59 +366,68 @@ public class PcodeExtractor extends GhidraScript {
 
     /**
      *
-     * @param pcodeOp: pcode instruction
      * @param mnemonic: pcode mnemonic
      * @param numberOfPcodeOps: number of pcode instruction in pcode block
-     * @param pcodeIndex: index of current pcode instruction
-     * @param intraInstructionJumpOccured: indicator whether a jump occured inside a pcode block
      * @return: indicator whether a jump occured inside a pcode block
      * 
      * Processes jump pcode instruction by checking where it occurs.
      * Distinguishes between jumps inside a pcode block and jumps at the end of a pcode block
      */
-    protected Boolean processJump(PcodeOp pcodeOp, String mnemonic, int numberOfPcodeOps, int pcodeIndex, Boolean intraInstructionJumpOccured) {
+    protected Boolean processJump(String mnemonic, int numberOfPcodeOps) {
 
-        int currentBlockCount = PcodeBlockData.blocks.size();
-        Term<Blk> currentBlock = PcodeBlockData.blocks.get(currentBlockCount - 1);
+        Term<Blk> currentBlock = PcodeBlockData.blocks.get(PcodeBlockData.blocks.size() - 1);
 
-        if(pcodeIndex < numberOfPcodeOps - 1) {
-            intraInstructionJumpOccured = processJumpInPcodeBlock(pcodeOp, mnemonic, numberOfPcodeOps, pcodeIndex, intraInstructionJumpOccured, currentBlock);
-            PcodeBlockData.temporaryDefStorage.clear();
-        } else {
-            intraInstructionJumpOccured = processJumpAtEndOfPcodeBlocks(pcodeOp, mnemonic, numberOfPcodeOps, pcodeIndex, intraInstructionJumpOccured, currentBlock);
+        if(PcodeBlockData.pcodeIndex < numberOfPcodeOps - 1) {
+            return processJumpInPcodeBlock(mnemonic, numberOfPcodeOps, currentBlock);
         }
 
-        return intraInstructionJumpOccured;
+        processJumpAtEndOfPcodeBlocks(mnemonic, numberOfPcodeOps, currentBlock);
+        return false;
     }
 
 
     /**
      * 
-     * @param pcodeOp: pcode instruction
      * @param mnemonic: pcode mnemonic
      * @param numberOfPcodeOps: number of pcode instruction in pcode block
-     * @param pcodeIndex: index of current pcode instruction
-     * @param intraInstructionJumpOccured: indicator whether a jump occured inside a pcode block
      * @param currentBlock: current block term
-     * @return: indicator whether a jump occured inside a pcode block
      * 
      * Process jumps at the end of pcode blocks
      * If it is a return block, the call return address is changed to the current block
      */
-    protected Boolean processJumpAtEndOfPcodeBlocks(PcodeOp pcodeOp, String mnemonic, int numberOfPcodeOps, int pcodeIndex, Boolean intraInstructionJumpOccured, Term<Blk> currentBlock) {
-        intraInstructionJumpOccured = false;
-        // Case 2: jump at the end of pcode group but not end of ghidra generated block.
+    protected void processJumpAtEndOfPcodeBlocks(String mnemonic, int numberOfPcodeOps, Term<Blk> currentBlock) {
+        // Case 1: jump at the end of pcode group but not end of ghidra generated block. Create a block for the next assembly instruction.
         if(PcodeBlockData.instructionIndex < PcodeBlockData.numberOfInstructionsInBlock - 1 && PcodeBlockData.instruction.getDelaySlotDepth() == 0) {
             PcodeBlockData.blocks.add(createBlkTerm(PcodeBlockData.instruction.getFallThrough().toString(), null));
         }
-        // Case 3: jmp at last pcode op at last instruction in ghidra generated block
-        // If Case 2 is true, the 'currentBlk' will be the second to last block as the new block is for the next instruction
-        if(pcodeOp.getOpcode() == PcodeOp.RETURN && currentBlock.getTid().getId().endsWith("_r")) {
-            redirectCallReturn(currentBlock, pcodeOp);
-            return intraInstructionJumpOccured;
+        // Case 2: jmp at last pcode op at last instruction in ghidra generated block
+        // If Case 1 is true, the 'currentBlk' will be the second to last block as the new block is for the next instruction
+        if(PcodeBlockData.pcodeOp.getOpcode() == PcodeOp.RETURN && currentBlock.getTid().getId().endsWith("_r")) {
+            redirectCallReturn(currentBlock);
         }
         currentBlock.getTerm().addMultipleDefs(PcodeBlockData.temporaryDefStorage);
-        currentBlock.getTerm().addJmp(createJmpTerm(pcodeIndex, pcodeOp, mnemonic));
+        currentBlock.getTerm().addMultipleJumps(createJmpTerm(false));
+        PcodeBlockData.temporaryDefStorage.clear();
+    }
+
+
+    /**
+     * 
+     * @param mnemonic: pcode mnemonic
+     * @param numberOfPcodeOps: number of pcode instruction in pcode block
+     * @param currentBlock: current block term
+     * @return: indicator whether a jump occured inside a pcode block
+     * 
+     * Processes a jump inside a pcode block and distinguishes between intra jumps and call return pairs.
+     */
+    protected Boolean processJumpInPcodeBlock(String mnemonic, int numberOfPcodeOps, Term<Blk> currentBlock) {
+        Boolean intraInstructionJumpOccured = false;
+        if(!isCall()) {
+            intraInstructionJumpOccured = true;
+            handleIntraInstructionJump(currentBlock.getTerm());
+        } else {
+            handleCallReturnPair(currentBlock);
+        }
         PcodeBlockData.temporaryDefStorage.clear();
 
         return intraInstructionJumpOccured;
@@ -424,97 +436,94 @@ public class PcodeExtractor extends GhidraScript {
 
     /**
      * 
-     * @param pcodeOp: pcode instruction
-     * @param mnemonic: pcode mnemonic
-     * @param numberOfPcodeOps: number of pcode instruction in pcode block
-     * @param pcodeIndex: index of current pcode instruction
-     * @param intraInstructionJumpOccured: indicator whether a jump occured inside a pcode block
      * @param currentBlock: current block term
-     * @return: indicator whether a jump occured inside a pcode block
      * 
-     * Processes a jump inside a pcode block and distinguishes between intra jumps and call return pairs.
+     * Adds an artificial jump from the previous instructions to the current instruction if an intra jump occurs.
+     * This is done to isolate the current defs and jumps in an exclusive block.
+     * The Jump is not added if the instruction is the first of the subroutine or if no defs and jumps have been added yet.
+     * This might be the case when the current instruction is only preceded by a nop instruction.
+     * 
+     * In case an artificial jump has to be added, a new block has to be created for the instruction with the intra jump so that
+     * the previous jump has a valid target TID.
+     * 
+     * e.g. This example shows one basic block generated by Ghidra which split into 4 basic blocks for proper analysis. 
+     * It also includes the case where a jump from the previous assembly instruction had to be added.
+     * Each individual assembly instruction is denoted with the [In] keyword and blocks are separated by dashed lines.
+     * Keep in mind that the target rows for the branches are only placeholders for the actual target TIDs.
+     * 
+     * 1. [In]  ...                                         ...
+     * 2.       RDI = COPY RDX                              RDI = COPY RDX
+     * 3.                                                   BRANCH [row 5.]
+     * 4.                                                   ---------------
+     * 5. [In]  $U2360:1 = INT_EQUAL RCX, 0:8               $U2360:1 = INT_EQUAL RCX, 0:8
+     * 6.       CBRANCH *[ram]0x1006e1:8, $U2360            CBRANCH *[ram]0x1006e1:8, $U2360
+     * 7.                                                   BRANCH [row 9.]
+     * 8.                                                   ---------------
+     * 9.       RCX = INT_SUB RCX, 1:8                      RCX = INT_SUB RCX, 1:8
+     * 10.      ...                                 ---->   ...
+     * 11.      $U2380:1 = BOOL_NEGATE ZF                   $U2380:1 = BOOL_NEGATE ZF
+     * 11.      CBRANCH *[ram]0x1006df:8, $U2380            CBRANCH *[ram]0x1006df:8, $U2380
+     * 12.                                                  BRANCH [row 14.]
+     * 13.                                                  ---------------
+     * 14. [In] RAX = COPY RCX                              RAX = COPY RCX
+     * 15.      ...                                         ...
      */
-    protected Boolean processJumpInPcodeBlock(PcodeOp pcodeOp, String mnemonic, int numberOfPcodeOps, int pcodeIndex, Boolean intraInstructionJumpOccured, Term<Blk> currentBlock) {
-        if(!isCall(pcodeOp)) {
-            intraInstructionJumpOccured = true;
-            handleIntraInstructionJump(currentBlock.getTerm(), pcodeOp, pcodeIndex);
-        } else {
-            handleCallReturnPair(currentBlock, pcodeOp, pcodeIndex);
-        }
-
-        return intraInstructionJumpOccured;
-    }
-
-
-    /**
-     * 
-     * @param currentBlock: current block term
-     * @param pcodeOp: pcode instruction
-     * @param pcodeIndex: index of current pcode instruction
-     * 
-     * Adds an artificial jump to the previous block if an intra jump occurs and creates a new block.
-     */
-    protected void handleIntraInstructionJump(Blk currentBlock, PcodeOp pcodeOp, int pcodeIndex) {
+    protected void handleIntraInstructionJump(Blk currentBlock) {
         if(PcodeBlockData.instructionIndex > 0 && !(currentBlock.getDefs().size() == 0 && currentBlock.getJmps().size() == 0)) {
-            jumpFromPreviousInstructionToNewBlock(currentBlock, pcodeOp, pcodeIndex);
+            addBranchToCurrentBlock(currentBlock, PcodeBlockData.instruction.getFallFrom().toString(), PcodeBlockData.instruction.getAddress().toString());
+            createNewBlockForIntraInstructionJump();
         } else {
             currentBlock.addMultipleDefs(PcodeBlockData.temporaryDefStorage);
-            currentBlock.addJmp(createJmpTerm(pcodeIndex, pcodeOp, pcodeOp.getMnemonic()));
+            currentBlock.addMultipleJumps(createJmpTerm(true));
         }
-        PcodeBlockData.blocks.add(createBlkTerm(PcodeBlockData.instruction.getAddress().toString(), String.valueOf(pcodeIndex + 1)));
+        // Create block for the pcode instructions after the intra jump !Not for the next assembly instruction!
+        // Check whether the number of jumps is equal to 2, i.e. a pair of CBRANCH, BRANCH was created. If so, increase the pcodeIndex by 1
+        // so that the next intr block has the correct index.
+        if(PcodeBlockData.blocks.get(PcodeBlockData.blocks.size() - 1).getTerm().getJmps().size() == 2) {
+            PcodeBlockData.pcodeIndex +=1;
+        }
+        PcodeBlockData.blocks.add(createBlkTerm(PcodeBlockData.instruction.getAddress().toString(), String.valueOf(PcodeBlockData.pcodeIndex + 1)));
         
     }
 
 
     /**
      * 
-     * @param currentBlock: current block term
-     * @param pcodeOp: pcode instruction
-     * @param pcodeIndex: index of current pcode instruction
-     * 
-     * Adds a jump from the previous instruction to a new intra block
-     */
-    protected void jumpFromPreviousInstructionToNewBlock(Blk currentBlock, PcodeOp pcodeOp, int pcodeIndex) {
-        addJumpToCurrentBlock(currentBlock, PcodeBlockData.instruction.getFallFrom().toString(), PcodeBlockData.instruction.getAddress().toString(), null);
-        createNewBlockForIntraInstructionJump(pcodeIndex, pcodeOp);
-    }
-
-
-    /**
-     * 
-     * @param pcodeOp: pcode instruction
      * @return: boolean whether current pcode instruction is a call
      * 
      * checks whether the current pcode instruction is a call
      */
-    protected Boolean isCall(PcodeOp pcodeOp){
-        return (pcodeOp.getOpcode() == PcodeOp.CALL || pcodeOp.getOpcode() == PcodeOp.CALLIND);
+    protected Boolean isCall(){
+        switch(PcodeBlockData.pcodeOp.getOpcode()) {
+            case PcodeOp.CALL:
+            case PcodeOp.CALLIND:
+            case PcodeOp.CALLOTHER:
+                return true;
+            default:
+                return false;
+        }
     }
 
 
     /**
      * 
-     * @param pcodeIndex: index of current pcode instruction
-     * @param pcodeOp: pcode instruction
-     * 
      * Creates a new block for the pcode instructions of the current assembly instruction and the intra jump
      */
-    protected void createNewBlockForIntraInstructionJump(int pcodeIndex, PcodeOp pcodeOp){
-        int nextBlockStartIndex;
+    protected void createNewBlockForIntraInstructionJump(){
         Term<Blk> newBlock;
         // If an assembly instruction's pcode block is split into multiple blocks, the blocks' TIDs have to be distinguished by pcode index as they share the same instruction address
         if(PcodeBlockData.temporaryDefStorage.size() > 0) {
-            nextBlockStartIndex = PcodeBlockData.temporaryDefStorage.get(0).getTerm().getPcodeIndex();
-            if(nextBlockStartIndex > 0) {
-                newBlock = createBlkTerm(PcodeBlockData.instruction.getAddress().toString(), String.valueOf(nextBlockStartIndex));
-            } else {
+            int nextBlockStartIndex = PcodeBlockData.temporaryDefStorage.get(0).getTerm().getPcodeIndex();
+            if(nextBlockStartIndex == 0) {
                 newBlock = createBlkTerm(PcodeBlockData.instruction.getAddress().toString(), null);
+            } else {
+                newBlock = createBlkTerm(PcodeBlockData.instruction.getAddress().toString(), String.valueOf(nextBlockStartIndex));
             }
         } else {
             newBlock = createBlkTerm(PcodeBlockData.instruction.getAddress().toString(), null);
         }
         newBlock.getTerm().addMultipleDefs(PcodeBlockData.temporaryDefStorage);
-        newBlock.getTerm().addJmp(createJmpTerm(pcodeIndex, pcodeOp, pcodeOp.getMnemonic()));
+        newBlock.getTerm().addMultipleJumps(createJmpTerm(true));
         PcodeBlockData.blocks.add(newBlock);
     }
 
@@ -524,24 +533,17 @@ public class PcodeExtractor extends GhidraScript {
      * @param currentBlock: current block term
      * @param jmpAddress: address of jump instruction
      * @param gotoAddress: address of where to jump
-     * @param suffix: suffix for TID
      * 
-     * Adds a jump to the current block.
+     * Adds a branch to the current block.
+     * The jump index for the instruction will be the pcode index +1
      */
-    protected void addJumpToCurrentBlock(Blk currentBlock, String jmpAddress, String gotoAddress, String suffix) {
-        int artificialJmpIndex;
-        if(currentBlock.getDefs().size() == 0) {
-            artificialJmpIndex = 1;
-        } else {
+    protected void addBranchToCurrentBlock(Blk currentBlock, String jumpSiteAddress, String gotoAddress) {
+        int artificialJmpIndex = 1;
+        if(currentBlock.getDefs().size() > 0) {
             artificialJmpIndex = currentBlock.getDefs().get(currentBlock.getDefs().size() - 1).getTerm().getPcodeIndex() + 1;
         }
-        Tid jmpTid = new Tid(String.format("instr_%s_%s", jmpAddress, artificialJmpIndex), jmpAddress);
-        Tid gotoTid;
-        if(suffix != null) {
-            gotoTid = new Tid(String.format("blk_%s_%s", gotoAddress, suffix), gotoAddress);
-        } else {
-            gotoTid = new Tid(String.format("blk_%s", gotoAddress), gotoAddress);
-        }
+        Tid jmpTid = new Tid(String.format("instr_%s_%s", jumpSiteAddress, artificialJmpIndex), jumpSiteAddress);
+        Tid gotoTid = new Tid(String.format("blk_%s", gotoAddress), gotoAddress);
         currentBlock.addJmp(new Term<Jmp>(jmpTid, new Jmp(ExecutionType.JmpType.GOTO, "BRANCH", new Label((Tid) gotoTid), artificialJmpIndex)));
     }
 
@@ -567,14 +569,12 @@ public class PcodeExtractor extends GhidraScript {
     /**
      * 
      * @param currentBlock: current block term
-     * @param pcodeOp: pcode instruction
-     * @param pcodeIndex: index of current pcode instruction
      * 
      * Handles call return pairs by creating a return block and redirecting the call's return to the return block
      */
-    protected void handleCallReturnPair(Term<Blk> currentBlock, PcodeOp pcodeOp, int pcodeIndex) {
+    protected void handleCallReturnPair(Term<Blk> currentBlock) {
         currentBlock.getTerm().addMultipleDefs(PcodeBlockData.temporaryDefStorage);
-        Term<Jmp> jump = createJmpTerm(pcodeIndex, pcodeOp, pcodeOp.getMnemonic());
+        Term<Jmp> jump = createJmpTerm(false).get(0);
         Term<Blk> returnBlock = createBlkTerm(PcodeBlockData.instruction.getAddress().toString(), "r");
         jump.getTerm().getCall().setReturn_(new Label(new Tid(returnBlock.getTid().getId(), returnBlock.getTid().getAddress())));
         currentBlock.getTerm().addJmp(jump);
@@ -585,13 +585,12 @@ public class PcodeExtractor extends GhidraScript {
     /**
      * 
      * @param currentBlock: current block term
-     * @param pcodeOp: pcode instruction
      * 
      * Redirects the call's return address to the artificially created return block
      */
-    protected void redirectCallReturn(Term<Blk> currentBlock, PcodeOp pcodeOp) {
+    protected void redirectCallReturn(Term<Blk> currentBlock) {
         Tid jmpTid = new Tid(String.format("instr_%s_%s_r", PcodeBlockData.instruction.getAddress().toString(), 0), PcodeBlockData.instruction.getAddress().toString());
-        Term<Jmp> ret = new Term<Jmp>(jmpTid, new Jmp(ExecutionType.JmpType.RETURN, pcodeOp.getMnemonic(), createLabel(pcodeOp, null), 0));
+        Term<Jmp> ret = new Term<Jmp>(jmpTid, new Jmp(ExecutionType.JmpType.RETURN, PcodeBlockData.pcodeOp.getMnemonic(), createLabel(null), 0));
         currentBlock.getTerm().addJmp(ret);
     } 
 
@@ -872,70 +871,104 @@ public class PcodeExtractor extends GhidraScript {
 
     /**
      * 
-     * @param pCodeCount: Pcode index in current block
-     * @param pcodeOp:    Pcode instruction
-     * @param mnemonic:   Pcode instruction mnemonic
+     * @param intraJump: Indicator if jump occured inside pcode block
      * @return: new Jmp Term
      * 
      * Creates a Jmp Term with an unique TID consisting of the prefix jmp, its instruction address and the index of the pcode in the block.
      * Depending on the instruction, it either has a goto label, a goto label and a condition or a call object.
      */
-    protected Term<Jmp> createJmpTerm(int pCodeCount, PcodeOp pcodeOp, String mnemonic) {
-        Address instrAddr = PcodeBlockData.instruction.getAddress();
-        Tid jmpTid = new Tid(String.format("instr_%s_%s", instrAddr.toString(), pCodeCount), instrAddr.toString());
-        if (pcodeOp.getOpcode() == PcodeOp.CBRANCH) {
-            return new Term<Jmp>(jmpTid, new Jmp(ExecutionType.JmpType.GOTO, mnemonic, createLabel(pcodeOp, null), createVariable(pcodeOp.getInput(1)), pCodeCount));
-        }
-        if (pcodeOp.getOpcode() == PcodeOp.BRANCH || pcodeOp.getOpcode() == PcodeOp.BRANCHIND) {
-            return new Term<Jmp>(jmpTid, new Jmp(ExecutionType.JmpType.GOTO, mnemonic, createLabel(pcodeOp, null), pCodeCount));
-        }
-        if (pcodeOp.getOpcode() == PcodeOp.RETURN) {
-            return new Term<Jmp>(jmpTid, new Jmp(ExecutionType.JmpType.RETURN, mnemonic, createLabel(pcodeOp, null), pCodeCount));
-        }
-        if (pcodeOp.getOpcode() == PcodeOp.UNIMPLEMENTED) {
-            mnemonic = "CALLOTHER";
+    protected ArrayList<Term<Jmp>> createJmpTerm(Boolean intraJump) {
+        String instrAddr = PcodeBlockData.instruction.getAddress().toString();
+        Tid jmpTid = new Tid(String.format("instr_%s_%s", instrAddr, PcodeBlockData.pcodeIndex), instrAddr);
+        ArrayList<Term<Jmp>> jumps = new ArrayList<Term<Jmp>>();
+        int opcode = PcodeBlockData.pcodeOp.getOpcode();
+        String mnemonic = PcodeBlockData.pcodeOp.getMnemonic();
+
+        switch(opcode) {
+            case PcodeOp.CALL:
+            case PcodeOp.CALLIND:
+            case PcodeOp.CALLOTHER:
+                Call call = createCall();
+                jumps.add(new Term<Jmp>(jmpTid, new Jmp(ExecutionType.JmpType.CALL, resolveCallMenmonic(call, mnemonic), call, PcodeBlockData.pcodeIndex)));
+                break;
+            case PcodeOp.UNIMPLEMENTED:
+                jumps.add(new Term<Jmp>(jmpTid, new Jmp(ExecutionType.JmpType.CALL, "CALLOTHER", createCall(), PcodeBlockData.pcodeIndex)));
+                break;
+            case PcodeOp.CBRANCH:
+                return handleConditionalBranches(jmpTid, intraJump);
+            case PcodeOp.BRANCH:
+            case PcodeOp.BRANCHIND:
+                jumps.add(new Term<Jmp>(jmpTid, new Jmp(ExecutionType.JmpType.GOTO, mnemonic, createLabel(null), PcodeBlockData.pcodeIndex)));
+                break;
+            case PcodeOp.RETURN:
+                jumps.add(new Term<Jmp>(jmpTid, new Jmp(ExecutionType.JmpType.RETURN, mnemonic, createLabel(null), PcodeBlockData.pcodeIndex)));
+                break;
         }
 
-        Term<Jmp> call = new Term<Jmp>(jmpTid, new Jmp(ExecutionType.JmpType.CALL, mnemonic, createCall(mnemonic, pcodeOp), pCodeCount));
-        call = checkIfCallindResolved(call);
+        return jumps;
+    }
 
-        return call;
+
+    /**
+     * 
+     * @param conditionalTid: jump site TID for CBRANCH
+     * @param intraJump: indicator if jump is an intra instruction jump
+     * @return: a pair of CBRANCH BRANCH jmp terms
+     * 
+     * Creates jmp terms for for a cbranch and an artificial fallthrough branch.
+     * It checks whether the CBRANCH occured inside a pcode block. If so, the target TID for
+     * the fall through BRANCH is set to the artificially generated block at the same address with
+     * the start pcode index of the next block.
+     */
+    protected ArrayList<Term<Jmp>> handleConditionalBranches(Tid conditionalTid, Boolean intraJump) {
+        ArrayList<Term<Jmp>> branches = new ArrayList<Term<Jmp>>();
+        String branchSiteAddress = new String(conditionalTid.getAddress());
+        Tid branchTid = new Tid(String.format("instr_%s_%s", branchSiteAddress, PcodeBlockData.pcodeIndex + 1), branchSiteAddress);
+        Tid targetTid = new Tid();
+
+        if(intraJump) {
+            targetTid = new Tid(String.format("blk_%s_%s", branchSiteAddress, PcodeBlockData.pcodeIndex + 2), branchSiteAddress);
+        } else {
+            targetTid = new Tid(String.format("blk_%s", PcodeBlockData.instruction.getFallThrough().toString()), PcodeBlockData.instruction.getFallThrough().toString());
+        }
+
+        branches.add(new Term<Jmp>(conditionalTid, new Jmp(ExecutionType.JmpType.GOTO, PcodeBlockData.pcodeOp.getMnemonic(), createLabel(null), createVariable(PcodeBlockData.pcodeOp.getInput(1)), PcodeBlockData.pcodeIndex)));
+        branches.add(new Term<Jmp>(branchTid, new Jmp(ExecutionType.JmpType.GOTO, "BRANCH", new Label(targetTid), PcodeBlockData.pcodeIndex + 1)));
+
+        return branches;
     }
 
 
     /**
      * 
      * @param call: indirect call
+     * @param mnemonic: call mnemonic
      * @return: direkt call or indirekt call
      * 
      * Checks whether the indirect call could have been resolved and casts it into a direct call
      */
-    protected Term<Jmp> checkIfCallindResolved(Term<Jmp> call) {
-        if (call.getTerm().getMnemonic().equals("CALLIND")) {
-            if (call.getTerm().getCall().getTarget().getIndirect() == null) {
-                call.getTerm().setMnemonic("CALL");
-            }
+    protected String resolveCallMenmonic(Call call, String mnemonic) {
+        if (mnemonic.equals("CALLIND") && call.getTarget().getIndirect() == null) {
+            return "CALL";
         }
 
-        return call;
+        return mnemonic;
     }
 
 
     /**
-     * @param pCodeCount: Pcode index in current block
-     * @param pcodeOp:    Pcode instruction
      * @return: new Def Term
      * 
      * Creates a Def Term with an unique TID consisting of the prefix def, its instruction address and the index of the pcode in the block.
      */
-    protected Term<Def> createDefTerm(int pcodeIndex, PcodeOp pcodeOp) {
+    protected Term<Def> createDefTerm() {
         Address instrAddr = PcodeBlockData.instruction.getAddress();
-        Tid defTid = new Tid(String.format("instr_%s_%s", instrAddr.toString(), pcodeIndex), instrAddr.toString());
-        if (pcodeOp.getMnemonic().equals("STORE")) {
-            return new Term<Def>(defTid, new Def(createExpression(pcodeOp), pcodeIndex));
+        Tid defTid = new Tid(String.format("instr_%s_%s", instrAddr.toString(), PcodeBlockData.pcodeIndex), instrAddr.toString());
+        if (PcodeBlockData.pcodeOp.getMnemonic().equals("STORE")) {
+            return new Term<Def>(defTid, new Def(createExpression(), PcodeBlockData.pcodeIndex));
             // cast copy instructions that have address outputs into store instructions
         }
-        return new Term<Def>(defTid, new Def(createVariable(pcodeOp.getOutput()), createExpression(pcodeOp), pcodeIndex));
+        return new Term<Def>(defTid, new Def(createVariable(PcodeBlockData.pcodeOp.getOutput()), createExpression(), PcodeBlockData.pcodeIndex));
     }
 
 
@@ -973,16 +1006,15 @@ public class PcodeExtractor extends GhidraScript {
 
 
     /**
-     * @param pcodeOp: Pcode instruction
      * @return: new Epxression
      * 
      * Create an Expression using the input varnodes of the pcode instruction.
      */
-    protected Expression createExpression(PcodeOp pcodeOp) {
-        String mnemonic = pcodeOp.getMnemonic();
+    protected Expression createExpression() {
+        String mnemonic = PcodeBlockData.pcodeOp.getMnemonic();
         List<Variable> in = new ArrayList<Variable>();
 
-        for (Varnode input : pcodeOp.getInputs()) {
+        for (Varnode input : PcodeBlockData.pcodeOp.getInputs()) {
             in.add(createVariable(input));
         }
 
@@ -990,40 +1022,39 @@ public class PcodeExtractor extends GhidraScript {
 
         if (inputLen == 1) {
             return new Expression(mnemonic, in.get(0));
-        } else if (inputLen == 2) {
-            return new Expression(mnemonic, in.get(0), in.get(1));
-        } else {
-            return new Expression(mnemonic, in.get(0), in.get(1), in.get(2));
         }
+        if (inputLen == 2) {
+            return new Expression(mnemonic, in.get(0), in.get(1));
+        }
+        return new Expression(mnemonic, in.get(0), in.get(1), in.get(2));
     }
 
 
     /**
-     * @param pcodeOp:     Pcode instruction
      * @param fallThrough: fallThrough address of branch/call
      * @return: new Label
      * 
      * Create a Label based on the branch instruction. For indirect branches and calls, it consists of a Variable, for calls of a sub TID
      * and for branches of a blk TID.
      */
-    protected Label createLabel(PcodeOp pcodeOp, Address fallThrough) {
+    protected Label createLabel(Address fallThrough) {
         Label jumpLabel;
         if (fallThrough == null) {
-            switch(pcodeOp.getOpcode()) {
+            switch(PcodeBlockData.pcodeOp.getOpcode()) {
                 case PcodeOp.CALL:
                 case PcodeOp.CALLIND: 
-                    jumpLabel = handleLabelsForCalls(pcodeOp);
+                    jumpLabel = handleLabelsForCalls(PcodeBlockData.pcodeOp);
                     break;
                 case PcodeOp.BRANCHIND:
                 case PcodeOp.RETURN:
-                    jumpLabel = new Label((Variable) createVariable(pcodeOp.getInput(0)));
+                    jumpLabel = new Label((Variable) createVariable(PcodeBlockData.pcodeOp.getInput(0)));
                     break;
                 case PcodeOp.CALLOTHER:
                 case PcodeOp.UNIMPLEMENTED:
                     jumpLabel = null;
                     break;
                 default:
-                    jumpLabel = new Label((Tid) new Tid(String.format("blk_%s", pcodeOp.getInput(0).getAddress().toString()), pcodeOp.getInput(0).getAddress().toString()));
+                    jumpLabel = new Label((Tid) new Tid(String.format("blk_%s", PcodeBlockData.pcodeOp.getInput(0).getAddress().toString()), PcodeBlockData.pcodeOp.getInput(0).getAddress().toString()));
                     break;
             }
             return jumpLabel;
@@ -1136,23 +1167,25 @@ public class PcodeExtractor extends GhidraScript {
 
     /**
      * 
-     * @param mnemonic: Pcode instruction mnemonic
-     * @param pcodeOp:  Pcode instruction
      * @return: new Call
      * 
      * Creates a Call object, using a target and return Label.
      */
-    protected Call createCall(String mnemonic, PcodeOp pcodeOp) {
+    protected Call createCall() {
         String callString = null;
-        if(pcodeOp.getOpcode() == PcodeOp.CALLOTHER) {
-            callString = ghidraProgram.getLanguage().getUserDefinedOpName((int) pcodeOp.getInput(0).getOffset());
-            return new Call(null, createLabel(pcodeOp, PcodeBlockData.instruction.getFallThrough()), callString);
+        Call call;
+        if(PcodeBlockData.pcodeOp.getOpcode() == PcodeOp.CALLOTHER) {
+            callString = ghidraProgram.getLanguage().getUserDefinedOpName((int) PcodeBlockData.pcodeOp.getInput(0).getOffset());
+            call = new Call(null, createLabel(PcodeBlockData.instruction.getFallThrough()), callString);
         }
-        if(pcodeOp.getOpcode() == PcodeOp.UNIMPLEMENTED) {
+        else if(PcodeBlockData.pcodeOp.getOpcode() == PcodeOp.UNIMPLEMENTED) {
             callString = "unimplemented";
-            return new Call(null, createLabel(pcodeOp, PcodeBlockData.instruction.getFallThrough()), callString);
+            call = new Call(null, createLabel(PcodeBlockData.instruction.getFallThrough()), callString);
+        } else {
+            call = new Call(createLabel(null), createLabel(PcodeBlockData.instruction.getFallThrough()));
         }
-        return new Call(createLabel(pcodeOp, null), createLabel(pcodeOp, PcodeBlockData.instruction.getFallThrough()));
+
+        return call;    
     }
 
 
