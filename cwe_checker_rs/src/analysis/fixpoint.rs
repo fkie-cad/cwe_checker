@@ -217,6 +217,11 @@ impl<T: Context> Computation<T> {
     pub fn get_context(&self) -> &T {
         &self.fp_context
     }
+
+    /// Returns `True` if the computation has stabilized, i.e. the internal worklist is empty.
+    pub fn has_stabilized(&self) -> bool {
+        self.worklist.is_empty()
+    }
 }
 
 #[cfg(test)]

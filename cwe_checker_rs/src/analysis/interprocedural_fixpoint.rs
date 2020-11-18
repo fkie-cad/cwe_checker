@@ -81,7 +81,7 @@ pub trait Context<'a> {
     /// This way one can recover caller-specific information on return from a function.
     fn update_return(
         &self,
-        value: &Self::Value,
+        value: Option<&Self::Value>,
         value_before_call: Option<&Self::Value>,
         call_term: &Term<Jmp>,
         return_term: &Term<Jmp>,
@@ -192,18 +192,14 @@ impl<'a, T: Context<'a>> GeneralFPContext for GeneralizedContext<'a, T> {
                         _ => panic!("Malformed Control flow graph"),
                     };
                     let return_from_jmp = &return_from_block.term.jmps[0];
-                    if let Some(return_value) = return_ {
-                        match self.context.update_return(
-                            return_value,
-                            call.as_ref(),
-                            call_term,
-                            return_from_jmp,
-                        ) {
-                            Some(val) => Some(NodeValue::Value(val)),
-                            None => None,
-                        }
-                    } else {
-                        None
+                    match self.context.update_return(
+                        return_.as_ref(),
+                        call.as_ref(),
+                        call_term,
+                        return_from_jmp,
+                    ) {
+                        Some(val) => Some(NodeValue::Value(val)),
+                        None => None,
                     }
                 }
             },
@@ -281,6 +277,11 @@ impl<'a, T: Context<'a>> Computation<'a, T> {
     /// Get a reference to the underlying context object
     pub fn get_context(&self) -> &T {
         &self.generalized_computation.get_context().context
+    }
+
+    /// Returns `True` if the computation has stabilized, i.e. the internal worklist is empty.
+    pub fn has_stabilized(&self) -> bool {
+        self.generalized_computation.has_stabilized()
     }
 }
 
