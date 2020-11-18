@@ -391,7 +391,6 @@ public class PcodeExtractor extends GhidraScript {
      * @param mnemonic: pcode mnemonic
      * @param numberOfPcodeOps: number of pcode instruction in pcode block
      * @param currentBlock: current block term
-     * @return: indicator whether a jump occured inside a pcode block
      * 
      * Process jumps at the end of pcode blocks
      * If it is a return block, the call return address is changed to the current block
