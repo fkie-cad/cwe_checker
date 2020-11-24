@@ -315,6 +315,14 @@ impl From<ExpressionType> for IrCastOpType {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
+pub struct RegisterProperties {
+    pub register: String,
+    pub base_register: String,
+    pub lsb: ByteSize,
+    pub size: ByteSize,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -349,6 +357,21 @@ mod tests {
                 "size": 4,
                 "is_virtual": false
                 }
+            }
+            "#,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn register_properties_deserialization() {
+        let _: RegisterProperties = serde_json::from_str(
+            r#"
+            {
+                "register": "AH",
+                "base_register": "EAX",
+                "lsb": 2,
+                "size": 1
             }
             "#,
         )
