@@ -1,4 +1,4 @@
-use super::{Expression, ExpressionType, Variable, RegisterProperties};
+use super::{Expression, ExpressionType, RegisterProperties, Variable};
 use crate::intermediate_representation::Arg as IrArg;
 use crate::intermediate_representation::Blk as IrBlk;
 use crate::intermediate_representation::ByteSize;
