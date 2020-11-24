@@ -5,9 +5,11 @@ import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import bil.RegisterProperties;
 import bil.Variable;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressIterator;
+import ghidra.program.model.lang.Language;
 import ghidra.program.model.lang.Register;
 import ghidra.program.model.listing.Function;
 import ghidra.program.model.listing.FunctionManager;
@@ -220,5 +222,29 @@ public final class HelperFunctions {
         String langId = ghidraProgram.getCompilerSpec().getLanguage().getLanguageID().getIdAsString();
         String[] arch = langId.split(":");
         return arch[0] + "_" + arch[2];
+    }
+
+
+    /**
+     * Returns a list of register properties including the register name itself,
+     * the name of the base register, the lsb of the register in the base register
+     * and the size of the register.
+     * 
+     * @return list of register properties
+     */
+    public static ArrayList<RegisterProperties> getRegisterList() {
+        ArrayList<RegisterProperties> regProps = new ArrayList<RegisterProperties>();
+        Language language = ghidraProgram.getLanguage();
+        int archSizeInBytes = (int)(language.getLanguageDescription().getSize() / 8);
+        for(Register reg : language.getRegisters()) {
+            regProps.add(
+                new RegisterProperties(reg.getName(), 
+                                       reg.getBaseRegister().getName(), 
+                                       (int)(reg.getLeastSignificatBitInBaseRegister() / archSizeInBytes),
+                                       context.getRegisterVarnode(reg).getSize())
+            );
+        }
+
+        return regProps;
     }
 }

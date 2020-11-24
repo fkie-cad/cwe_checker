@@ -24,7 +24,6 @@ import ghidra.program.model.lang.PrototypeModel;
 import ghidra.program.model.lang.Register;
 import ghidra.program.model.listing.Function;
 import ghidra.program.model.listing.FunctionIterator;
-import ghidra.program.model.listing.FunctionManager;
 import ghidra.program.model.listing.Instruction;
 import ghidra.program.model.listing.InstructionIterator;
 import ghidra.program.model.listing.Listing;
@@ -250,6 +249,7 @@ public class PcodeExtractor extends GhidraScript {
         } catch (FileNotFoundException e) {
             System.out.println(e);
         }
+        project.setRegisterProperties(HelperFunctions.getRegisterList());
 
         return project;
     }

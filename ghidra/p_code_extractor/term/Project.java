@@ -1,5 +1,6 @@
 package term;
 
+import bil.RegisterProperties;
 import bil.Variable;
 import internal.RegisterConvention;
 
@@ -12,6 +13,8 @@ public class Project {
     private Term<Program> program;
     @SerializedName("stack_pointer_register")
     private Variable stackPointerRegister;
+    @SerializedName("register_properties")
+    private ArrayList<RegisterProperties> registerProperties;
     @SerializedName("cpu_architecture")
     private String cpuArch;
     @SerializedName("register_calling_convention")
@@ -57,5 +60,13 @@ public class Project {
 
     public void setRegisterConvention(ArrayList<RegisterConvention> conventions) {
         this.conventions = conventions;
+    }
+
+    public ArrayList<RegisterProperties> getRegisterProperties() {
+        return registerProperties;
+    }
+
+    public void setRegisterProperties(ArrayList<RegisterProperties> registerProperties) {
+        this.registerProperties = registerProperties;
     }
 }
