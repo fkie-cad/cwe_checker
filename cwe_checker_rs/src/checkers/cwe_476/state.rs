@@ -49,7 +49,7 @@ impl AbstractDomain for State {
             if let Some(taint) = self.register_taint.get(var) {
                 register_taint.insert(var.clone(), taint.merge(other_taint));
             } else {
-                register_taint.insert(var.clone(), other_taint.clone());
+                register_taint.insert(var.clone(), *other_taint);
             }
         }
 
@@ -162,11 +162,10 @@ impl State {
         let mut taint = Taint::Top(size);
         if let Data::Pointer(pointer) = address {
             for (mem_id, offset) in pointer.targets().iter() {
-                match (self.memory_taint.get(mem_id), offset) {
-                    (Some(mem_region), BitvectorDomain::Value(position)) => {
-                        taint = taint.merge(&mem_region.get(position.clone(), size));
-                    }
-                    _ => (),
+                if let (Some(mem_region), BitvectorDomain::Value(position)) =
+                    (self.memory_taint.get(mem_id), offset)
+                {
+                    taint = taint.merge(&mem_region.get(position.clone(), size));
                 }
             }
         }
@@ -184,10 +183,10 @@ impl State {
                 for (mem_id, offset) in pointer.targets().iter() {
                     if let BitvectorDomain::Value(position) = offset {
                         if let Some(mem_region) = self.memory_taint.get_mut(mem_id) {
-                            mem_region.add(taint.clone(), position.clone());
+                            mem_region.add(taint, position.clone());
                         } else {
                             let mut mem_region = MemRegion::new(address.bytesize());
-                            mem_region.add(taint.clone(), position.clone());
+                            mem_region.add(taint, position.clone());
                             self.memory_taint.insert(mem_id.clone(), mem_region);
                         }
                     }
@@ -200,7 +199,7 @@ impl State {
                             mem_region.add(old_taint.merge(&taint), position.clone());
                         } else {
                             let mut mem_region = MemRegion::new(address.bytesize());
-                            mem_region.add(taint.clone(), position.clone());
+                            mem_region.add(taint, position.clone());
                             self.memory_taint.insert(mem_id.clone(), mem_region);
                         }
                     }
@@ -233,10 +232,9 @@ impl State {
                     .parameter_register
                     .iter()
                     .any(|param| *param == register.name)
+                    && !taint.is_top()
                 {
-                    if !taint.is_top() {
-                        return true;
-                    }
+                    return true;
                 }
             }
             false
@@ -257,7 +255,7 @@ impl State {
                     .iter()
                     .any(|callee_saved_reg| register.name == *callee_saved_reg)
                 {
-                    Some((register.clone(), taint.clone()))
+                    Some((register.clone(), *taint))
                 } else {
                     None
                 }

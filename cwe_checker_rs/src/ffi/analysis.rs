@@ -18,7 +18,7 @@ fn run_pointer_inference(program_jsonbuilder_val: ocaml::Value) -> (Vec<CweWarni
         serde_json::from_value(crate::utils::read_config_file("config.json")["Memory"].clone())
             .unwrap();
     let pi_analysis = crate::analysis::pointer_inference::run(&project, config, false);
-    let (mut logs, cwes) = pi_analysis.collected_logs.clone();
+    let (mut logs, cwes) = pi_analysis.collected_logs;
     all_logs.append(&mut logs);
     (
         cwes,

@@ -79,7 +79,7 @@ impl RegisterDomain for Taint {
 
     /// The result of a unary operation is tainted if the input was tainted.
     fn un_op(&self, _op: UnOpType) -> Self {
-        self.clone()
+        *self
     }
 
     /// A subpiece of a tainted value is again tainted.

@@ -71,7 +71,7 @@ impl<'a> Context<'a> {
         for (node_id, node) in graph.node_references() {
             match node {
                 Node::BlkStart(block, sub) => {
-                    if let Some(def) = block.term.defs.iter().next() {
+                    if let Some(def) = block.term.defs.get(0) {
                         block_start_node_map.insert((def.tid.clone(), sub.tid.clone()), node_id);
                     }
                 }
@@ -116,7 +116,7 @@ impl<'a> Context<'a> {
                         None
                     }
                 })
-                .unwrap_or("Unknown".to_string()),
+                .unwrap_or_else(|| "Unknown".to_string()),
             _ => "Unknown".to_string(),
         };
         self.taint_source = Some(taint_source);
@@ -132,18 +132,16 @@ impl<'a> Context<'a> {
     ) -> Option<PointerInferenceState> {
         if let Some(pi_state) = state.get_pointer_inference_state() {
             Some(pi_state.clone())
-        } else {
-            if let Some(node_id) = self
-                .block_start_node_map
-                .get(&(tid.clone(), self.current_sub.unwrap().tid.clone()))
-            {
-                match self.pointer_inference_results.get_node_value(*node_id) {
-                    Some(NodeValue::Value(val)) => Some(val.clone()),
-                    _ => None,
-                }
-            } else {
-                None
+        } else if let Some(node_id) = self
+            .block_start_node_map
+            .get(&(tid.clone(), self.current_sub.unwrap().tid.clone()))
+        {
+            match self.pointer_inference_results.get_node_value(*node_id) {
+                Some(NodeValue::Value(val)) => Some(val.clone()),
+                _ => None,
             }
+        } else {
+            None
         }
     }
 
@@ -221,7 +219,7 @@ impl<'a> Context<'a> {
         if let Some(calling_conv) = self.project.get_standard_calling_convention() {
             new_state.remove_non_callee_saved_taint(calling_conv);
         }
-        return Some(new_state);
+        Some(new_state)
     }
 }
 
@@ -285,7 +283,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
                     new_state.remove_non_callee_saved_taint(
                         extern_symbol.get_calling_convention(self.project),
                     );
-                    return Some(new_state);
+                    Some(new_state)
                 } else {
                     panic!("Extern symbol not found.");
                 }
@@ -312,36 +310,32 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
                 if state.eval(address).is_tainted() {
                     self.generate_cwe_warning(&def.tid);
                     return None;
-                } else {
-                    if let Some(pi_state) =
-                        self.get_current_pointer_inference_state(state, &def.tid)
-                    {
-                        if let Ok(address_data) = pi_state.eval(address) {
-                            let taint = state.load_taint_from_memory(&address_data, var.size);
-                            new_state.set_register_taint(var, taint);
-                        }
-                    } else {
-                        new_state.set_register_taint(var, Taint::Top(var.size));
+                } else if let Some(pi_state) =
+                    self.get_current_pointer_inference_state(state, &def.tid)
+                {
+                    if let Ok(address_data) = pi_state.eval(address) {
+                        let taint = state.load_taint_from_memory(&address_data, var.size);
+                        new_state.set_register_taint(var, taint);
                     }
+                } else {
+                    new_state.set_register_taint(var, Taint::Top(var.size));
                 }
             }
             Def::Store { address, value } => {
                 if state.eval(address).is_tainted() {
                     self.generate_cwe_warning(&def.tid);
                     return None;
-                } else {
-                    if let Some(pi_state) =
-                        self.get_current_pointer_inference_state(state, &def.tid)
-                    {
-                        if let Ok(address_data) = pi_state.eval(address) {
-                            let taint = state.eval(value);
-                            new_state.save_taint_to_memory(&address_data, taint);
-                        }
-                    } else {
-                        // We lost all knowledge about memory pointers.
-                        // We delete all memory taint to reduce false positives.
-                        new_state.remove_all_memory_taints();
+                } else if let Some(pi_state) =
+                    self.get_current_pointer_inference_state(state, &def.tid)
+                {
+                    if let Ok(address_data) = pi_state.eval(address) {
+                        let taint = state.eval(value);
+                        new_state.save_taint_to_memory(&address_data, taint);
                     }
+                } else {
+                    // We lost all knowledge about memory pointers.
+                    // We delete all memory taint to reduce false positives.
+                    new_state.remove_all_memory_taints();
                 }
             }
         }
