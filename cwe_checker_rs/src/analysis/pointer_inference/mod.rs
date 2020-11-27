@@ -38,11 +38,11 @@ const VERSION: &str = "0.1";
 pub static CWE_MODULE: crate::CweModule = crate::CweModule {
     name: "Memory",
     version: VERSION,
-    run: run_analysis,
+    run: extract_pi_analysis_results,
 };
 
 /// The abstract domain type for representing register values.
-type Data = DataDomain<BitvectorDomain>;
+pub type Data = DataDomain<BitvectorDomain>;
 
 /// Configurable parameters for the analysis.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
@@ -60,7 +60,8 @@ pub struct Config {
 /// A wrapper struct for the pointer inference computation object.
 pub struct PointerInference<'a> {
     computation: Computation<'a, Context<'a>>,
-    log_collector: crossbeam_channel::Sender<LogMessage>,
+    log_collector: crossbeam_channel::Sender<LogThreadMsg>,
+    pub collected_logs: (Vec<LogMessage>, Vec<CweWarning>),
 }
 
 impl<'a> PointerInference<'a> {
@@ -68,10 +69,9 @@ impl<'a> PointerInference<'a> {
     pub fn new(
         project: &'a Project,
         config: Config,
-        cwe_sender: crossbeam_channel::Sender<CweWarning>,
-        log_sender: crossbeam_channel::Sender<LogMessage>,
+        log_sender: crossbeam_channel::Sender<LogThreadMsg>,
     ) -> PointerInference<'a> {
-        let context = Context::new(project, config, cwe_sender, log_sender.clone());
+        let context = Context::new(project, config, log_sender.clone());
 
         let mut entry_sub_to_entry_blocks_map = HashMap::new();
         let subs: HashMap<Tid, &Term<Sub>> = project
@@ -108,12 +108,10 @@ impl<'a> PointerInference<'a> {
             .collect();
         let mut fixpoint_computation =
             super::interprocedural_fixpoint::Computation::new(context, None);
-        log_sender
-            .send(LogMessage::new_debug(format!(
-                "Pointer Inference: Adding {} entry points",
-                entry_sub_to_entry_node_map.len()
-            )))
-            .unwrap();
+        let _ = log_sender.send(LogThreadMsg::Log(LogMessage::new_debug(format!(
+            "Pointer Inference: Adding {} entry points",
+            entry_sub_to_entry_node_map.len()
+        ))));
         for (sub_tid, start_node_index) in entry_sub_to_entry_node_map.into_iter() {
             fixpoint_computation.set_node_value(
                 start_node_index,
@@ -126,6 +124,7 @@ impl<'a> PointerInference<'a> {
         PointerInference {
             computation: fixpoint_computation,
             log_collector: log_sender,
+            collected_logs: (Vec::new(), Vec::new()),
         }
     }
 
@@ -173,6 +172,14 @@ impl<'a> PointerInference<'a> {
 
     pub fn get_graph(&self) -> &Graph {
         self.computation.get_graph()
+    }
+
+    pub fn get_context(&self) -> &Context {
+        self.computation.get_context()
+    }
+
+    pub fn get_node_value(&self, node_id: NodeIndex) -> Option<&NodeValue<State>> {
+        self.computation.get_node_value(node_id)
     }
 
     /// Add speculative entry points to the fixpoint algorithm state.
@@ -258,92 +265,107 @@ impl<'a> PointerInference<'a> {
 
     fn log_debug(&self, msg: impl Into<String>) {
         let log_msg = LogMessage::new_debug(msg.into());
-        self.log_collector.send(log_msg).unwrap();
+        let _ = self.log_collector.send(LogThreadMsg::Log(log_msg));
     }
-}
 
-/// The main entry point for executing the pointer inference analysis.
-pub fn run_analysis(
-    project: &Project,
-    analysis_params: &serde_json::Value,
-) -> (Vec<LogMessage>, Vec<CweWarning>) {
-    let config: Config = serde_json::from_value(analysis_params.clone()).unwrap();
-    run(project, config, false)
-}
-
-/// Generate and execute the pointer inference analysis.
-/// Returns a vector of all found CWE warnings and a vector of all log messages generated during analysis.
-pub fn run(
-    project: &Project,
-    config: Config,
-    print_debug: bool,
-) -> (Vec<LogMessage>, Vec<CweWarning>) {
-    let (cwe_sender, cwe_receiver) = crossbeam_channel::unbounded();
-    let (log_sender, log_receiver) = crossbeam_channel::unbounded();
-
-    let warning_collector_thread = std::thread::spawn(move || collect_cwe_warnings(cwe_receiver));
-    let log_collector_thread = std::thread::spawn(move || collect_logs(log_receiver));
-
-    {
-        // Scope the computation object so that it is dropped before the warning collector thread is joined.
-        // Else the warning collector thread will not terminate (the cwe_sender needs to be dropped for it to terminate).
-        let mut computation = PointerInference::new(project, config, cwe_sender, log_sender);
-
-        computation.compute();
-        computation.count_blocks_with_state();
-
+    /// Compute the results of the pointer inference fixpoint algorithm.
+    /// Successively adds more functions as possible entry points
+    /// to increase code coverage.
+    pub fn compute_with_speculative_entry_points(&mut self, project: &Project) {
+        self.compute();
+        self.count_blocks_with_state();
         // Now compute again with speculative entry points added
-        computation.add_speculative_entry_points(project, true);
-        computation.compute();
-        computation.count_blocks_with_state();
-
+        self.add_speculative_entry_points(project, true);
+        self.compute();
+        self.count_blocks_with_state();
         // Now compute again with all missed functions as additional entry points
-        computation.add_speculative_entry_points(project, false);
-        computation.compute();
-        computation.count_blocks_with_state();
-
-        if print_debug {
-            computation.print_compact_json();
-        }
+        self.add_speculative_entry_points(project, false);
+        self.compute();
+        self.count_blocks_with_state();
     }
-    // Return the CWE warnings
-    (
-        log_collector_thread.join().unwrap(),
-        warning_collector_thread.join().unwrap(),
-    )
 }
 
-/// Collect CWE warnings from the receiver until the channel is closed. Then return them.
-fn collect_cwe_warnings(receiver: crossbeam_channel::Receiver<CweWarning>) -> Vec<CweWarning> {
-    let mut collected_warnings = HashMap::new();
-    while let Ok(warning) = receiver.recv() {
-        match &warning.addresses[..] {
-            [] => unimplemented!(),
-            [address, ..] => {
-                collected_warnings.insert(address.clone(), warning);
-            }
-        }
-    }
-    collected_warnings
-        .drain()
-        .map(|(_key, value)| value)
-        .collect()
+/// The entry point for the memory analysis check.
+/// Does not actually compute anything
+/// but just extracts the results of the already computed pointer inference analysis.
+pub fn extract_pi_analysis_results(
+    analysis_results: &AnalysisResults,
+    _analysis_params: &serde_json::Value,
+) -> (Vec<LogMessage>, Vec<CweWarning>) {
+    let pi_anaylsis = analysis_results.pointer_inference.unwrap();
+    pi_anaylsis.collected_logs.clone()
 }
 
-/// Collect log messages from the receiver until the channel is closed. Then return them.
-fn collect_logs(receiver: crossbeam_channel::Receiver<LogMessage>) -> Vec<LogMessage> {
+/// Compute the pointer inference analysis and return its results.
+///
+/// If `print_debug` is set to `true` print debug information to *stdout*.
+/// Note that the format of the debug information is currently unstable and subject to change.
+pub fn run(project: &Project, config: Config, print_debug: bool) -> PointerInference {
+    let logging_thread = LogThread::spawn(collect_all_logs);
+
+    let mut computation = PointerInference::new(project, config, logging_thread.get_msg_sender());
+
+    computation.compute_with_speculative_entry_points(project);
+
+    if print_debug {
+        computation.print_compact_json();
+    }
+
+    // save the logs and CWE warnings
+    computation.collected_logs = logging_thread.collect();
+    computation
+}
+
+/// The function responsible for collecting logs and CWE warnings.
+/// For warnings with the same origin address only the last one is kept.
+/// This prevents duplicates but may suppress some log messages
+/// in the rare case that several different log messages with the same origin address are generated.
+fn collect_all_logs(
+    receiver: crossbeam_channel::Receiver<LogThreadMsg>,
+) -> (Vec<LogMessage>, Vec<CweWarning>) {
     let mut logs_with_address = HashMap::new();
     let mut general_logs = Vec::new();
-    while let Ok(log_message) = receiver.recv() {
-        if let Some(ref tid) = log_message.location {
-            logs_with_address.insert(tid.address.clone(), log_message);
-        } else {
-            general_logs.push(log_message);
+    let mut collected_cwes = HashMap::new();
+
+    while let Ok(log_thread_msg) = receiver.recv() {
+        match log_thread_msg {
+            LogThreadMsg::Log(log_message) => {
+                if let Some(ref tid) = log_message.location {
+                    logs_with_address.insert(tid.address.clone(), log_message);
+                } else {
+                    general_logs.push(log_message);
+                }
+            }
+            LogThreadMsg::Cwe(cwe_warning) => match &cwe_warning.addresses[..] {
+                [] => panic!("Unexpected CWE warning without origin address"),
+                [address, ..] => {
+                    collected_cwes.insert(address.clone(), cwe_warning);
+                }
+            },
+            LogThreadMsg::Terminate => break,
         }
     }
-    logs_with_address
+    let logs = logs_with_address
         .values()
         .cloned()
         .chain(general_logs.into_iter())
-        .collect()
+        .collect();
+    let cwes = collected_cwes.drain().map(|(_key, value)| value).collect();
+    (logs, cwes)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    impl<'a> PointerInference<'a> {
+        pub fn mock(project: &'a Project) -> PointerInference<'a> {
+            let config = Config {
+                allocation_symbols: vec!["malloc".to_string()],
+                deallocation_symbols: vec!["free".to_string()],
+            };
+            let (log_sender, _) = crossbeam_channel::unbounded();
+            PointerInference::new(project, config, log_sender)
+        }
+    }
 }

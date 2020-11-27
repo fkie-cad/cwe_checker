@@ -331,6 +331,13 @@ impl Project {
     pub fn get_pointer_bytesize(&self) -> ByteSize {
         self.stack_pointer_register.size
     }
+
+    /// Try to guess a standard calling convention from the list of calling conventions in the project.
+    pub fn get_standard_calling_convention(&self) -> Option<&CallingConvention> {
+        self.calling_conventions
+            .iter()
+            .find(|cconv| cconv.name == "__stdcall")
+    }
 }
 
 impl Project {
@@ -436,6 +443,54 @@ impl Project {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    impl Blk {
+        pub fn mock() -> Term<Blk> {
+            Term {
+                tid: Tid::new("block"),
+                term: Blk {
+                    defs: Vec::new(),
+                    jmps: Vec::new(),
+                },
+            }
+        }
+    }
+
+    impl Sub {
+        pub fn mock(name: impl ToString) -> Term<Sub> {
+            Term {
+                tid: Tid::new(name.to_string()),
+                term: Sub {
+                    name: name.to_string(),
+                    blocks: Vec::new(),
+                },
+            }
+        }
+    }
+
+    impl Program {
+        pub fn mock_empty() -> Program {
+            Program {
+                subs: Vec::new(),
+                extern_symbols: Vec::new(),
+                entry_points: Vec::new(),
+            }
+        }
+    }
+
+    impl Project {
+        pub fn mock_empty() -> Project {
+            Project {
+                program: Term {
+                    tid: Tid::new("program_tid"),
+                    term: Program::mock_empty(),
+                },
+                cpu_architecture: "x86_64".to_string(),
+                stack_pointer_register: Variable::mock("RSP", 8u64),
+                calling_conventions: Vec::new(),
+            }
+        }
+    }
 
     #[test]
     fn retarget_nonexisting_jumps() {

@@ -29,7 +29,7 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
                     def.tid.address
                 ),
             };
-            self.cwe_collector.send(warning).unwrap();
+            let _ = self.log_collector.send(LogThreadMsg::Cwe(warning));
         }
 
         match &def.term {

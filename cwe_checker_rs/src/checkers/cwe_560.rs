@@ -98,9 +98,10 @@ fn generate_cwe_warning(sub: &Term<Sub>, jmp: &Term<Jmp>, permission_const: u64)
 ///
 /// Only the basic block right before the umask call is evaluated when trying to determine the parameter value of umask.
 pub fn check_cwe(
-    project: &Project,
+    analysis_results: &AnalysisResults,
     _cwe_params: &serde_json::Value,
 ) -> (Vec<LogMessage>, Vec<CweWarning>) {
+    let project = analysis_results.project;
     let mut cwes = Vec::new();
     let mut log_messages = Vec::new();
     let umask_symbol_map = get_symbol_map(project, &["umask".to_string()]);

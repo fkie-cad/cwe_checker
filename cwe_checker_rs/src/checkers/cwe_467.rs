@@ -103,9 +103,10 @@ fn generate_cwe_warning(jmp: &Term<Jmp>, extern_symbol: &ExternSymbol) -> CweWar
 /// we check whether a parameter has value `sizeof(void*)`,
 /// which may indicate an instance of CWE 467.
 pub fn check_cwe(
-    project: &Project,
+    analysis_results: &AnalysisResults,
     cwe_params: &serde_json::Value,
 ) -> (Vec<LogMessage>, Vec<CweWarning>) {
+    let project = analysis_results.project;
     let config: Config = serde_json::from_value(cwe_params.clone()).unwrap();
     let mut cwe_warnings = Vec::new();
 
