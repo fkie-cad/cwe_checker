@@ -316,7 +316,7 @@ pub fn run(project: &Project, config: Config, print_debug: bool) -> PointerInfer
     computation
 }
 
-/// The function responsible for collecting logs and CWE warnings.
+/// This function is responsible for collecting logs and CWE warnings.
 /// For warnings with the same origin address only the last one is kept.
 /// This prevents duplicates but may suppress some log messages
 /// in the rare case that several different log messages with the same origin address are generated.
