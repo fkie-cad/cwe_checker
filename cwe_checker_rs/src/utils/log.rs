@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use std::thread::JoinHandle;
 
 /// A CWE warning message.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord, Default)]
@@ -178,5 +179,96 @@ pub fn print_all_messages(
         std::fs::write(file_path, output).unwrap();
     } else {
         print!("{}", output);
+    }
+}
+
+/// The message types a logging thread can receive.
+/// See the [`LogThread`] type for more information.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
+pub enum LogThreadMsg {
+    /// A normal log message.
+    Log(LogMessage),
+    /// A CWE warning
+    Cwe(CweWarning),
+    /// If the log collector thread receives this signal,
+    /// it should stop receiving new messages
+    /// and instead terminate and return the collected messages prior to receiving the termination signal.
+    Terminate,
+}
+
+/// A type for managing threads for collecting log messages.
+///
+/// With [`LogThread::spawn()`] one can create a new log thread
+/// whose handle is contained in the returned `LogThread` struct.
+/// By calling the [`collect()`](LogThread::collect()) method
+/// one can tell the log thread to shut down
+/// and return the logs collected to this point.
+/// If the `LogThread` object gets dropped before calling `collect()`,
+/// the corresponding logging thread will be stopped
+/// and all collected logs will be discarded.
+///
+/// If one deliberately wants to discard all logging messages,
+/// one can simply create a sender to a disconnected channel
+/// via [`LogThread::create_disconnected_sender()`].
+pub struct LogThread {
+    msg_sender: crossbeam_channel::Sender<LogThreadMsg>,
+    thread_handle: Option<JoinHandle<(Vec<LogMessage>, Vec<CweWarning>)>>,
+}
+
+impl Drop for LogThread {
+    /// If the logging thread still exists,
+    /// send it the `Terminate` signal.
+    /// Then wait until the logging thread stopped.
+    fn drop(&mut self) {
+        // Make sure the logging thread gets terminated when dropping this.
+        let _ = self.msg_sender.send(LogThreadMsg::Terminate);
+        if let Some(handle) = self.thread_handle.take() {
+            let _ = handle.join();
+        }
+    }
+}
+
+impl LogThread {
+    /// Create a new `LogThread` object with a handle to a freshly spawned logging collector thread.
+    ///
+    /// The parameter is the function containing the actual log collection logic.
+    /// I.e. the function should receive messages through the given receiver until the channel disconnects
+    /// or until it receives a [`LogThread::Terminate`] message.
+    /// After that it should return the logs collected up to that point.
+    pub fn spawn<F>(collector_func: F) -> LogThread
+    where
+        F: FnOnce(crossbeam_channel::Receiver<LogThreadMsg>) -> (Vec<LogMessage>, Vec<CweWarning>)
+            + Send
+            + 'static,
+    {
+        let (sender, receiver) = crossbeam_channel::unbounded();
+        let thread_handle = std::thread::spawn(move || collector_func(receiver));
+        LogThread {
+            msg_sender: sender,
+            thread_handle: Some(thread_handle),
+        }
+    }
+
+    /// Just create a disconnected sender to a (non-existing) logging thread.
+    /// Can be used like a sender to a channel that deliberately discards all messages sent to it.
+    pub fn create_disconnected_sender() -> crossbeam_channel::Sender<LogThreadMsg> {
+        let (sender, _) = crossbeam_channel::unbounded();
+        sender
+    }
+
+    /// Get a sender that can be used to send messages to the logging thread corresponding to this `LogThread` instance.
+    pub fn get_msg_sender(&self) -> crossbeam_channel::Sender<LogThreadMsg> {
+        self.msg_sender.clone()
+    }
+
+    /// Stop the logging thread by sending it the `Terminate` signal
+    /// and then return all logs collected until that point.
+    pub fn collect(mut self) -> (Vec<LogMessage>, Vec<CweWarning>) {
+        let _ = self.msg_sender.send(LogThreadMsg::Terminate);
+        if let Some(handle) = self.thread_handle.take() {
+            handle.join().unwrap()
+        } else {
+            (Vec::new(), Vec::new())
+        }
     }
 }

@@ -203,17 +203,7 @@ impl RegisterDomain for BitvectorDomain {
                     BitvectorDomain::new_top(self.bytesize())
                 }
             },
-            _ => match op {
-                Piece => BitvectorDomain::new_top(self.bytesize() + rhs.bytesize()),
-                IntAdd | IntSub | IntMult | IntDiv | IntSDiv | IntRem | IntSRem | IntLeft
-                | IntRight | IntSRight | IntAnd | IntOr | IntXOr | FloatAdd | FloatSub
-                | FloatMult | FloatDiv => BitvectorDomain::new_top(self.bytesize()),
-                IntEqual | IntNotEqual | IntLess | IntLessEqual | IntSLess | IntSLessEqual
-                | IntCarry | IntSCarry | IntSBorrow | BoolAnd | BoolOr | BoolXOr | FloatEqual
-                | FloatNotEqual | FloatLess | FloatLessEqual => {
-                    BitvectorDomain::new_top(ByteSize::new(1))
-                }
-            },
+            _ => BitvectorDomain::new_top(self.bin_op_bytesize(op, rhs)),
         }
     }
 

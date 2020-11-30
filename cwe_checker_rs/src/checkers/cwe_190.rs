@@ -100,9 +100,10 @@ fn generate_cwe_warning(callsite: &Tid, called_symbol: &ExternSymbol) -> CweWarn
 /// For each call to one of the symbols configured in config.json
 /// we check whether the block containing the call also contains a multiplication instruction.
 pub fn check_cwe(
-    project: &Project,
+    analysis_results: &AnalysisResults,
     cwe_params: &serde_json::Value,
 ) -> (Vec<LogMessage>, Vec<CweWarning>) {
+    let project = analysis_results.project;
     let config: Config = serde_json::from_value(cwe_params.clone()).unwrap();
     let mut cwe_warnings = Vec::new();
     let symbol_map = get_symbol_map(project, &config.symbols);

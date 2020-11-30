@@ -18,10 +18,11 @@ False Negatives
 
 * None known
 */
+use crate::prelude::*;
 use std::collections::HashMap;
 
 use crate::{
-    intermediate_representation::{ExternSymbol, Program, Project, Sub, Term, Tid},
+    intermediate_representation::{ExternSymbol, Program, Sub, Term, Tid},
     utils::{
         log::{CweWarning, LogMessage},
         symbol_utils::get_calls_to_symbols,
@@ -106,9 +107,10 @@ pub fn resolve_symbols<'a>(
 }
 
 pub fn check_cwe(
-    project: &Project,
+    analysis_results: &AnalysisResults,
     cwe_params: &serde_json::Value,
 ) -> (Vec<LogMessage>, Vec<CweWarning>) {
+    let project = analysis_results.project;
     let config: Config = serde_json::from_value(cwe_params.clone()).unwrap();
     let prog: &Term<Program> = &project.program;
     let subfunctions: &Vec<Term<Sub>> = &prog.term.subs;
