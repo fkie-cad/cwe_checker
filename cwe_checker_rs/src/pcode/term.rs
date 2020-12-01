@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use super::{Expression, ExpressionType, RegisterProperties, Variable};
 use crate::intermediate_representation::Arg as IrArg;
 use crate::intermediate_representation::Blk as IrBlk;
@@ -410,10 +412,43 @@ pub struct Project {
 impl From<Project> for IrProject {
     /// Convert a project parsed from Ghidra to the internally used IR.
     fn from(project: Project) -> IrProject {
-        let program = Term {
+        let mut program: Term<IrProgram> = Term {
             tid: project.program.tid,
             term: project.program.term.into(),
         };
+        // a register map of all registers belonging to the architecture of the currently analysed binary
+        let register_map: HashMap<&String, &RegisterProperties> = project.register_properties
+            .iter()
+            .map(|p| (&p.register, p))
+            .collect();
+        // iterates over definitions and checks whether sub registers are used
+        // if so, they are swapped with subpieces of base registers
+        for sub in program.term.subs.iter_mut() {
+            for blk in sub.term.blocks.iter_mut() {
+                let mut def_iter = blk.term.defs.iter_mut().peekable();
+                while let Some(def) = def_iter.next() {
+                    let peeked_def = def_iter.peek();
+                    match &mut def.term {
+                        IrDef::Assign{var, value} => value.process_sub_registers_if_necessary(Some(var), &register_map, peeked_def),
+                        IrDef::Load{ var,  address} => address.process_sub_registers_if_necessary(Some(var), &register_map, peeked_def),
+                        IrDef::Store{ address,  value} => {
+                            address.process_sub_registers_if_necessary(None, &register_map, peeked_def);
+                            value.process_sub_registers_if_necessary(None, &register_map, peeked_def);
+                        }
+                    }
+                }
+                let mut jmp_iter = blk.term.jmps.iter_mut();
+                while let Some(jmp) = jmp_iter.next() {
+                    match &mut jmp.term {
+                        IrJmp::BranchInd(dest) => dest.process_sub_registers_if_necessary(None, &register_map, None),
+                        IrJmp::CBranch{condition, ..} => condition.process_sub_registers_if_necessary(None, &register_map, None),
+                        IrJmp::CallInd{target, ..} => target.process_sub_registers_if_necessary(None, &register_map, None),
+                        IrJmp::Return(dest) => dest.process_sub_registers_if_necessary(None, &register_map, None),
+                        _ => ()
+                    }
+                }
+            }
+        }
         IrProject {
             program,
             cpu_architecture: project.cpu_architecture,
