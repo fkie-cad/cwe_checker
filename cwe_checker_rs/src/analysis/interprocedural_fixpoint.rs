@@ -283,6 +283,11 @@ impl<'a, T: Context<'a>> Computation<'a, T> {
     pub fn has_stabilized(&self) -> bool {
         self.generalized_computation.has_stabilized()
     }
+
+    /// Return a list of all nodes which are marked as not-stabilized
+    pub fn get_worklist(&self) -> Vec<NodeIndex> {
+        self.generalized_computation.get_worklist()
+    }
 }
 
 /// Helper function to merge to values wrapped in `Option<..>`.
