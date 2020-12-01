@@ -69,4 +69,19 @@ pub trait RegisterDomain: AbstractDomain + HasByteSize + HasTop {
 
     /// Perform a typecast to extend a bitvector or to cast between integer and floating point types.
     fn cast(&self, kind: CastOpType, width: ByteSize) -> Self;
+
+    /// Return the bytesize of the result of the given binary operation.
+    /// Has a generic implementation that should not be overwritten!
+    fn bin_op_bytesize(&self, op: BinOpType, rhs: &Self) -> ByteSize {
+        use BinOpType::*;
+        match op {
+            Piece => self.bytesize() + rhs.bytesize(),
+            IntAdd | IntSub | IntMult | IntDiv | IntSDiv | IntRem | IntSRem | IntLeft
+            | IntRight | IntSRight | IntAnd | IntOr | IntXOr | FloatAdd | FloatSub | FloatMult
+            | FloatDiv => self.bytesize(),
+            IntEqual | IntNotEqual | IntLess | IntLessEqual | IntSLess | IntSLessEqual
+            | IntCarry | IntSCarry | IntSBorrow | BoolAnd | BoolOr | BoolXOr | FloatEqual
+            | FloatNotEqual | FloatLess | FloatLessEqual => ByteSize::new(1),
+        }
+    }
 }

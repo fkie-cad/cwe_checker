@@ -1,6 +1,7 @@
 use cwe_checker_rs::intermediate_representation::Project;
 use cwe_checker_rs::utils::log::print_all_messages;
 use cwe_checker_rs::utils::{get_ghidra_plugin_path, read_config_file};
+use cwe_checker_rs::AnalysisResults;
 use std::collections::HashSet;
 use std::path::Path;
 use std::process::Command;
@@ -138,6 +139,17 @@ fn run_with_ghidra(args: CmdlineArgs) {
     let mut project = get_project_from_ghidra(&Path::new(&args.binary.unwrap()));
     // Normalize the project and gather log messages generated from it.
     let mut all_logs = project.normalize();
+    let mut analysis_results = AnalysisResults::new(&project);
+
+    let pointer_inference_results = if modules
+        .iter()
+        .any(|module| module.name == "CWE476" || module.name == "Memory")
+    {
+        Some(analysis_results.compute_pointer_inference(&config["Memory"]))
+    } else {
+        None
+    };
+    analysis_results = analysis_results.set_pointer_inference(pointer_inference_results.as_ref());
 
     // Print debug and then return.
     // Right now there is only one debug printing function.
@@ -154,7 +166,7 @@ fn run_with_ghidra(args: CmdlineArgs) {
     // Execute the modules and collect their logs and CWE-warnings.
     let mut all_cwes = Vec::new();
     for module in modules {
-        let (mut logs, mut cwes) = (module.run)(&project, &config[&module.name]);
+        let (mut logs, mut cwes) = (module.run)(&analysis_results, &config[&module.name]);
         all_logs.append(&mut logs);
         all_cwes.append(&mut cwes);
     }

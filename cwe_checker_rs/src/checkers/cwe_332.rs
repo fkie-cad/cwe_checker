@@ -20,7 +20,6 @@
 //!
 //! - It is not checked whether the seeding function gets called before the random number generator function.
 
-use crate::intermediate_representation::*;
 use crate::prelude::*;
 use crate::utils::log::{CweWarning, LogMessage};
 use crate::utils::symbol_utils::find_symbol;
@@ -56,9 +55,10 @@ fn generate_cwe_warning(secure_initializer_func: &str, rand_func: &str) -> CweWa
 
 /// Run the CWE check. See the module-level description for more information.
 pub fn check_cwe(
-    project: &Project,
+    analysis_results: &AnalysisResults,
     cwe_params: &serde_json::Value,
 ) -> (Vec<LogMessage>, Vec<CweWarning>) {
+    let project = analysis_results.project;
     let config: Config = serde_json::from_value(cwe_params.clone()).unwrap();
     let mut cwe_warnings = Vec::new();
 

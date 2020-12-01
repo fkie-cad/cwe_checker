@@ -114,6 +114,12 @@ impl<T: AbstractDomain + HasByteSize + RegisterDomain + std::fmt::Debug> MemRegi
     pub fn add(&mut self, value: T, position: Bitvector) {
         assert_eq!(ByteSize::from(position.width()), self.address_bytesize);
         let position = Int::from(position).try_to_i64().unwrap();
+        self.insert_at_byte_index(value, position);
+    }
+
+    /// Insert a value into the memory region at the given position.
+    /// The position is the index (in bytes) in the memory region.
+    pub fn insert_at_byte_index(&mut self, value: T, position: i64) {
         let size_in_bytes = u64::from(value.bytesize()) as i64;
         assert!(size_in_bytes > 0);
 

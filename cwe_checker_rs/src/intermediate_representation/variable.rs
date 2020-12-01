@@ -15,3 +15,18 @@ pub struct Variable {
     pub size: ByteSize,
     pub is_temp: bool,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    impl Variable {
+        pub fn mock(name: impl ToString, size_in_bytes: impl Into<ByteSize>) -> Variable {
+            Variable {
+                name: name.to_string(),
+                size: size_in_bytes.into(),
+                is_temp: false,
+            }
+        }
+    }
+}

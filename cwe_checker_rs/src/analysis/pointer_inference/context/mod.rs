@@ -23,14 +23,12 @@ pub struct Context<'a> {
     pub project: &'a Project,
     /// Maps the TIDs of functions that shall be treated as extern symbols to the `ExternSymbol` object representing it.
     pub extern_symbol_map: BTreeMap<Tid, &'a ExternSymbol>,
-    /// A channel where found CWE warnings should be sent to.
+    /// A channel where found CWE warnings and log messages should be sent to.
     /// The receiver may filter or modify the warnings before presenting them to the user.
     /// For example, the same CWE warning will be found several times
     /// if the fixpoint computation does not instantly stabilize at the corresponding code point.
     /// These duplicates need to be filtered out.
-    pub cwe_collector: crossbeam_channel::Sender<CweWarning>,
-    /// A channel where log messages should be sent to.
-    pub log_collector: crossbeam_channel::Sender<LogMessage>,
+    pub log_collector: crossbeam_channel::Sender<LogThreadMsg>,
     /// Names of `malloc`-like extern functions.
     pub allocation_symbols: Vec<String>,
     /// Names of `free`-like extern functions.
@@ -43,8 +41,7 @@ impl<'a> Context<'a> {
     pub fn new(
         project: &Project,
         config: Config,
-        cwe_collector: crossbeam_channel::Sender<CweWarning>,
-        log_collector: crossbeam_channel::Sender<LogMessage>,
+        log_collector: crossbeam_channel::Sender<LogThreadMsg>,
     ) -> Context {
         let mut extern_symbol_map = BTreeMap::new();
         for symbol in project.program.term.extern_symbols.iter() {
@@ -63,7 +60,6 @@ impl<'a> Context<'a> {
             graph,
             project,
             extern_symbol_map,
-            cwe_collector,
             log_collector,
             allocation_symbols: config.allocation_symbols,
             deallocation_symbols: config.deallocation_symbols,
@@ -78,7 +74,7 @@ impl<'a> Context<'a> {
             if let Some(loc) = location {
                 log_message = log_message.location(loc.clone());
             };
-            self.log_collector.send(log_message).unwrap();
+            let _ = self.log_collector.send(LogThreadMsg::Log(log_message));
         }
     }
 
@@ -196,7 +192,7 @@ impl<'a> Context<'a> {
                                         call.tid.address
                                     ),
                                 };
-                                self.cwe_collector.send(warning).unwrap();
+                                let _ = self.log_collector.send(LogThreadMsg::Cwe(warning));
                             }
                         } else {
                             self.log_debug(
@@ -244,7 +240,7 @@ impl<'a> Context<'a> {
                                 extern_symbol.name, call.tid.address
                             ),
                         };
-                        self.cwe_collector.send(warning).unwrap();
+                        let _ = self.log_collector.send(LogThreadMsg::Cwe(warning));
                     }
                 }
                 Err(err) => self.log_debug(
@@ -349,12 +345,7 @@ impl<'a> Context<'a> {
     /// We also assume that the function does not use any parameters saved on the stack,
     /// which may greatly reduce correctness of the analysis for the x86_32 architecture.
     fn handle_call_to_generic_unknown_function(&self, state_before_call: &State) -> Option<State> {
-        if let Some(calling_conv) = self
-            .project
-            .calling_conventions
-            .iter()
-            .find(|cconv| cconv.name == "__stdcall")
-        {
+        if let Some(calling_conv) = self.project.get_standard_calling_convention() {
             let mut new_state = state_before_call.clone();
             new_state.clear_non_callee_saved_register(&calling_conv.callee_saved_register[..]);
             // Adjust stack register value (for x86 architecture).

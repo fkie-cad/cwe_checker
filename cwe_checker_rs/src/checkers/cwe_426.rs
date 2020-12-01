@@ -70,9 +70,10 @@ fn generate_cwe_warning(sub: &Term<Sub>) -> CweWarning {
 /// We check whether a function calls both `system(..)` and a privilege changing function.
 /// For each such function a CWE warning is generated.
 pub fn check_cwe(
-    project: &Project,
+    analysis_results: &AnalysisResults,
     cwe_params: &serde_json::Value,
 ) -> (Vec<LogMessage>, Vec<CweWarning>) {
+    let project = analysis_results.project;
     let config: Config = serde_json::from_value(cwe_params.clone()).unwrap();
     let mut cwe_warnings = Vec::new();
     let mut privilege_changing_symbols = HashMap::new();
