@@ -1,4 +1,4 @@
-use super::{Expression, ExpressionType, Variable};
+use super::{Expression, ExpressionType, RegisterProperties, Variable};
 use crate::intermediate_representation::Arg as IrArg;
 use crate::intermediate_representation::Blk as IrBlk;
 use crate::intermediate_representation::ByteSize;
@@ -403,6 +403,7 @@ pub struct Project {
     pub program: Term<Program>,
     pub cpu_architecture: String,
     pub stack_pointer_register: Variable,
+    pub register_properties: Vec<RegisterProperties>,
     pub register_calling_convention: Vec<CallingConvention>,
 }
 
@@ -733,6 +734,14 @@ mod tests {
                 "is_virtual": false
             },
             "cpu_architecture": "x86_64",
+            "register_properties": [
+                {
+                    "register": "AH",
+                    "base_register": "EAX",
+                    "lsb": 2,
+                    "size": 1
+                }
+            ],
             "register_calling_convention": [
                 {
                     "calling_convention": "default",
