@@ -13,7 +13,7 @@ let get_call_to_target _cg callee target =
            | Goto _ | Ret _ | Int (_,_) -> None
            | Call dst -> match Call.target dst with
              | Direct tid when tid = (Term.tid target) ->
-               Some (Term.name callee, Term.tid blk, Term.name target)
+               Some (Term.name callee, Term.tid j, Term.name target)
              | _ -> None))
 
 let get_calls_to_symbols cg subfunctions symbols =
