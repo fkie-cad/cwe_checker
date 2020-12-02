@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use super::{ByteSize, Def};
 use super::Variable;
+use super::{ByteSize, Def};
 use crate::{pcode::RegisterProperties, prelude::*};
 
 /// An expression is a calculation rule
@@ -137,10 +137,10 @@ impl Expression {
 
     /// This function
     pub fn process_sub_registers_if_necessary(
-        &mut self, 
-        output: Option<&mut Variable>, 
+        &mut self,
+        output: Option<&mut Variable>,
         register_map: &HashMap<&String, &RegisterProperties>,
-        peeked: Option<&&mut Term<Def>>
+        peeked: Option<&&mut Term<Def>>,
     ) {
         let mut output_base_size: Option<ByteSize> = None;
         let mut peek_is_zero_extension: bool = false;
@@ -148,8 +148,8 @@ impl Expression {
         let mut output_sub_register: Option<&RegisterProperties> = None;
 
         if let Some(output_value) = output {
-            if let Some(register) = register_map.get(&output_value.name){
-                if output_value.name != *register.base_register {
+            if let Some(register) = register_map.get(&output_value.name) {
+                if *register.register != *register.base_register {
                     output_sub_register = Some(register);
                     output_base_register = register_map.get(&register.base_register);
                     output_value.name = String::from(register.base_register.clone());
@@ -158,12 +158,12 @@ impl Expression {
 
                     if let Some(peek) = peeked {
                         match &peek.term {
-                            Def::Assign{var, value} => {
+                            Def::Assign { var, value } => {
                                 if output_value.name == var.name {
-                                    peek_is_zero_extension = Expression::check_for_zero_extension(value);
+                                    peek_is_zero_extension = value.check_for_zero_extension();
                                 }
                             }
-                            _ => ()
+                            _ => (),
                         }
                     }
                 }
@@ -172,37 +172,40 @@ impl Expression {
         self.check_for_sub_register(register_map);
         // based on the zero extension and base register output, either piece the subpieces together,
         // zero extend the expression or do nothing (e.g. if output is a virtual register, no further actions should be taken)
-        self.piece_zero_extend_or_none(&peek_is_zero_extension, &output_base_register, &output_base_size, &output_sub_register);
-
+        self.piece_zero_extend_or_none(
+            &peek_is_zero_extension,
+            &output_base_register,
+            &output_base_size,
+            &output_sub_register,
+        );
     }
-
 
     /// This function recursively iterates into the expression and checks whether a sub register was used.
     /// If so, the sub register is turned into a SUBPIECE of the corresponding base register.
     /// Finally, it returns a sub register if the corresponding base register is overwritten by the expression.
-    fn check_for_sub_register(
-        &mut self,
-        register_map: &HashMap<&String, &RegisterProperties>,
-    ) {
+    fn check_for_sub_register(&mut self, register_map: &HashMap<&String, &RegisterProperties>) {
         match self {
-            Expression::BinOp{lhs, rhs, ..} => {
+            Expression::BinOp { lhs, rhs, .. } => {
                 lhs.check_for_sub_register(register_map);
                 rhs.check_for_sub_register(register_map);
-            },
-            Expression::UnOp{arg, ..} | 
-            Expression::Cast{arg, ..} |
-            Expression::Subpiece{arg, ..} => arg.check_for_sub_register(register_map),
+            }
+            Expression::UnOp { arg, .. }
+            | Expression::Cast { arg, .. }
+            | Expression::Subpiece { arg, .. } => arg.check_for_sub_register(register_map),
             Expression::Var(variable) => {
-                if let Some(register) = register_map.get(&variable.name){
+                if let Some(register) = register_map.get(&variable.name) {
                     if variable.name != *register.base_register {
-                        self.create_subpiece_from_sub_register(register.base_register.clone(), register.size, register.lsb, register_map);
+                        self.create_subpiece_from_sub_register(
+                            register.base_register.clone(),
+                            register.size,
+                            register.lsb,
+                            register_map,
+                        );
                     }
                 }
             }
-            _ => ()
-
+            _ => (),
         }
-
     }
 
     /// This function creates a SUBPIECE expression
@@ -212,20 +215,16 @@ impl Expression {
         base: String,
         size: ByteSize,
         lsb: ByteSize,
-        register_map: &HashMap<&String, &RegisterProperties>
+        register_map: &HashMap<&String, &RegisterProperties>,
     ) {
         *self = Expression::Subpiece {
             low_byte: lsb.clone(),
             size: size.clone(),
-            arg: Box::new(
-                Expression::Var (
-                    Variable {
-                        name: base.clone(),
-                        size: register_map.get(&base).unwrap().size.clone(),
-                        is_temp: false,
-                    }
-                )
-            )
+            arg: Box::new(Expression::Var(Variable {
+                name: base.clone(),
+                size: register_map.get(&base).unwrap().size.clone(),
+                is_temp: false,
+            })),
         };
     }
 
@@ -235,83 +234,71 @@ impl Expression {
     /// 2. piece expression: if no zero extension is done the a sub register is overwritten
     /// or does nothing in case there is no overwritten sub register.
     fn piece_zero_extend_or_none(
-        &mut self, 
-        zero_extend: &bool, 
+        &mut self,
+        zero_extend: &bool,
         output_base_register: &Option<&&RegisterProperties>,
         output_size: &Option<ByteSize>,
-        sub_register: &Option<&RegisterProperties>
+        sub_register: &Option<&RegisterProperties>,
     ) {
         if *zero_extend {
             *self = Expression::Cast {
                 op: CastOpType::IntZExt,
                 size: output_size.unwrap().clone(),
-                arg: Box::new(
-                    self.clone()
-                ),
+                arg: Box::new(self.clone()),
             }
-        } 
-        if output_base_register.is_some() {
-            self.piece_two_expressions_together(output_base_register, sub_register);
+        } else if output_base_register.is_some() {
+            self.piece_two_expressions_together(
+                *output_base_register.unwrap(),
+                sub_register.unwrap(),
+            );
         }
     }
 
     fn piece_two_expressions_together(
         &mut self,
-        output_base_register: &Option<&&RegisterProperties>,
-        sub_register: &Option<&RegisterProperties>
+        output_base_register: &RegisterProperties,
+        sub_register: &RegisterProperties,
     ) {
-        let base_size: ByteSize = output_base_register.as_ref().unwrap().size;
-        let base_name: &String = &output_base_register.as_ref().unwrap().register;
-        let sub_size: ByteSize = sub_register.as_ref().unwrap().size;
-        let sub_lsb: ByteSize = sub_register.as_ref().unwrap().lsb;
+        let base_size: ByteSize = output_base_register.size;
+        let base_name: &String = &output_base_register.register;
+        let sub_size: ByteSize = sub_register.size;
+        let sub_lsb: ByteSize = sub_register.lsb;
 
-        let base_subpiece = Box::new(
-            Expression::Var(
-                Variable {
-                    name: base_name.clone(),
-                    size: base_size.clone(),
-                    is_temp: false,
-                }
-            )
-        );
+        let base_subpiece = Box::new(Expression::Var(Variable {
+            name: base_name.clone(),
+            size: base_size.clone(),
+            is_temp: false,
+        }));
 
         // Build PIECE as PIECE(lhs:PIECE(lhs:higher subpiece, rhs:sub register), rhs:lower subpiece)
-        if sub_register.as_ref().unwrap().lsb > ByteSize::new(0) {
+        if sub_register.lsb > ByteSize::new(0) {
             *self = Expression::BinOp {
                 op: BinOpType::Piece,
-                lhs: Box::new(
-                    Expression::BinOp {
-                        op: BinOpType::Piece,
-                        lhs: Box::new(
-                            Expression::Subpiece {
-                                low_byte: sub_lsb + sub_size,
-                                size: base_size - (sub_lsb + sub_size),
-                                arg: base_subpiece.clone(),
-                            }
-                        ),
-                        rhs: Box::new(self.clone()),
-                    }
-                ),
-                rhs: Box::new(
-                    Expression::Subpiece {
-                        low_byte: ByteSize::new(0),
-                        size: sub_lsb.clone(),
+                lhs: Box::new(Expression::BinOp {
+                    op: BinOpType::Piece,
+                    lhs: Box::new(Expression::Subpiece {
+                        low_byte: sub_lsb + sub_size,
+                        size: base_size - (sub_lsb + sub_size),
                         arg: base_subpiece.clone(),
-                    }
-                ),
+                    }),
+                    rhs: Box::new(self.clone()),
+                }),
+                rhs: Box::new(Expression::Subpiece {
+                    low_byte: ByteSize::new(0),
+                    size: sub_lsb.clone(),
+                    arg: base_subpiece.clone(),
+                }),
             }
         }
-        // Build PIECE as PIECE(lhs: high subpiece, rhs: sub register) 
+        // Build PIECE as PIECE(lhs: high subpiece, rhs: sub register)
         else {
             *self = Expression::BinOp {
                 op: BinOpType::Piece,
-                lhs: Box::new(
-                    Expression::Subpiece {
-                        low_byte: sub_size.clone(),
-                        size: base_size - sub_size,
-                        arg: base_subpiece.clone(),
-                    }
-                ),
+                lhs: Box::new(Expression::Subpiece {
+                    low_byte: sub_size.clone(),
+                    size: base_size - sub_size,
+                    arg: base_subpiece.clone(),
+                }),
                 rhs: Box::new(self.clone()),
             }
         }
@@ -319,22 +306,16 @@ impl Expression {
 
     /// This function checks whether the following instruction
     /// is a zero extension of the currently overwritten sub register
-    fn check_for_zero_extension(
-        expression: &Expression
-    ) -> bool {
-        match expression {
-            Expression::Cast{op, arg, ..} => {
-                match op {
-                    CastOpType::IntZExt => {
-                        match **arg {
-                            Expression::Var(_) => true,
-                            _ => false
-                        }
-                    },
-                    _ => false
-                }
-            }
-            _ => false
+    fn check_for_zero_extension(&self) -> bool {
+        match self {
+            Expression::Cast { op, arg, .. } => match op {
+                CastOpType::IntZExt => match **arg {
+                    Expression::Var(_) => true,
+                    _ => false,
+                },
+                _ => false,
+            },
+            _ => false,
         }
     }
 }
@@ -404,28 +385,4 @@ pub enum UnOpType {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn trivial_expression_substitution() {
-        let mut expr = Expression::BinOp {
-            op: BinOpType::IntXOr,
-            lhs: Box::new(Expression::Var(Variable {
-                name: "RAX".into(),
-                size: ByteSize::new(8),
-                is_temp: false,
-            })),
-            rhs: Box::new(Expression::Var(Variable {
-                name: "RAX".into(),
-                size: ByteSize::new(8),
-                is_temp: false,
-            })),
-        };
-        expr.substitute_trivial_operations();
-        assert_eq!(
-            expr,
-            Expression::Const(Bitvector::zero(ByteSize::new(8).into()))
-        );
-    }
-}
+mod tests;

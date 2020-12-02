@@ -417,7 +417,8 @@ impl From<Project> for IrProject {
             term: project.program.term.into(),
         };
         // a register map of all registers belonging to the architecture of the currently analysed binary
-        let register_map: HashMap<&String, &RegisterProperties> = project.register_properties
+        let register_map: HashMap<&String, &RegisterProperties> = project
+            .register_properties
             .iter()
             .map(|p| (&p.register, p))
             .collect();
@@ -429,22 +430,46 @@ impl From<Project> for IrProject {
                 while let Some(def) = def_iter.next() {
                     let peeked_def = def_iter.peek();
                     match &mut def.term {
-                        IrDef::Assign{var, value} => value.process_sub_registers_if_necessary(Some(var), &register_map, peeked_def),
-                        IrDef::Load{ var,  address} => address.process_sub_registers_if_necessary(Some(var), &register_map, peeked_def),
-                        IrDef::Store{ address,  value} => {
-                            address.process_sub_registers_if_necessary(None, &register_map, peeked_def);
-                            value.process_sub_registers_if_necessary(None, &register_map, peeked_def);
+                        IrDef::Assign { var, value } => value.process_sub_registers_if_necessary(
+                            Some(var),
+                            &register_map,
+                            peeked_def,
+                        ),
+                        IrDef::Load { var, address } => address.process_sub_registers_if_necessary(
+                            Some(var),
+                            &register_map,
+                            peeked_def,
+                        ),
+                        IrDef::Store { address, value } => {
+                            address.process_sub_registers_if_necessary(
+                                None,
+                                &register_map,
+                                peeked_def,
+                            );
+                            value.process_sub_registers_if_necessary(
+                                None,
+                                &register_map,
+                                peeked_def,
+                            );
                         }
                     }
                 }
                 let mut jmp_iter = blk.term.jmps.iter_mut();
                 while let Some(jmp) = jmp_iter.next() {
                     match &mut jmp.term {
-                        IrJmp::BranchInd(dest) => dest.process_sub_registers_if_necessary(None, &register_map, None),
-                        IrJmp::CBranch{condition, ..} => condition.process_sub_registers_if_necessary(None, &register_map, None),
-                        IrJmp::CallInd{target, ..} => target.process_sub_registers_if_necessary(None, &register_map, None),
-                        IrJmp::Return(dest) => dest.process_sub_registers_if_necessary(None, &register_map, None),
-                        _ => ()
+                        IrJmp::BranchInd(dest) => {
+                            dest.process_sub_registers_if_necessary(None, &register_map, None)
+                        }
+                        IrJmp::CBranch { condition, .. } => {
+                            condition.process_sub_registers_if_necessary(None, &register_map, None)
+                        }
+                        IrJmp::CallInd { target, .. } => {
+                            target.process_sub_registers_if_necessary(None, &register_map, None)
+                        }
+                        IrJmp::Return(dest) => {
+                            dest.process_sub_registers_if_necessary(None, &register_map, None)
+                        }
+                        _ => (),
                     }
                 }
             }
