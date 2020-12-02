@@ -5,7 +5,7 @@ use crate::analysis::pointer_inference::Data;
 use crate::analysis::pointer_inference::State as PointerInferenceState;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 use super::Taint;
 
@@ -222,11 +222,25 @@ impl State {
         }
     }
 
+    pub fn check_mem_ids_for_taint(&self, ids: &BTreeSet<AbstractIdentifier>) -> bool {
+        for id in ids {
+            if let Some(mem_object) = self.memory_taint.get(&id) {
+                for elem in mem_object.values() {
+                    if elem.is_tainted() {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
     /// Check whether a generic function call may contain tainted values in its parameters.
     /// Since we don't know the actual calling convention of the call,
     /// we approximate the parameters with all parameter registers of the standard calling convention of the project.
-    pub fn check_generic_function_params_for_taint(&self, project: &Project) -> bool {
+    pub fn check_generic_function_params_for_taint(&self, project: &Project, pi_state_option: Option<&PointerInferenceState>) -> bool {
         if let Some(calling_conv) = project.get_standard_calling_convention() {
+            // Check parameter register for taint
             for (register, taint) in &self.register_taint {
                 if calling_conv
                     .parameter_register
@@ -237,6 +251,23 @@ impl State {
                     return true;
                 }
             }
+            // Check whether some parameter memory object may contain taint
+            if let Some(pi_state) = pi_state_option {
+                let mut possible_referenced_ids = BTreeSet::new();
+                for parameter_register_name in calling_conv.parameter_register.iter() {
+                    if let Some(register_value) =
+                        pi_state.get_register_by_name(parameter_register_name)
+                    {
+                        possible_referenced_ids.append(&mut register_value.referenced_ids());
+                    }
+                }
+                possible_referenced_ids = pi_state
+                    .add_recursively_referenced_ids_to_id_set(possible_referenced_ids);
+                if self.check_mem_ids_for_taint(&possible_referenced_ids) {
+                    return true;
+                }
+            }
+
             false
         } else {
             // No standard calling convention found. Assume all registers may be parameters.

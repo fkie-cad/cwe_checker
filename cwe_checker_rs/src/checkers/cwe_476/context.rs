@@ -12,7 +12,7 @@ use crate::prelude::*;
 use crate::utils::log::CweWarning;
 use petgraph::graph::NodeIndex;
 use petgraph::visit::IntoNodeReferences;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 
 /// The context object for the Null-Pointer-Dereference check.
@@ -204,6 +204,71 @@ impl<'a> Context<'a> {
                 }
             }
         }
+    }
+
+    pub fn check_params_recursively_for_taint(
+        &self,
+        state: &State,
+        extern_symbol: &ExternSymbol,
+        node_id: NodeIndex,
+    ) -> bool {
+        // First check for taint directly in parameter registers (we don't need a pointer inference state for that)
+        for parameter in extern_symbol.parameters.iter() {
+            if let Arg::Register(var) = parameter {
+                if state.eval(&Expression::Var(var.clone())).is_tainted() {
+                    return true;
+                }
+            }
+        }
+        if let Some(NodeValue::Value(pi_state)) =
+            self.pointer_inference_results.get_node_value(node_id)
+        {
+            let mut mem_objects_to_check = BTreeSet::new();
+            // Check stack parameters and collect referenced memory object that need to be checked for taint.
+            for parameter in extern_symbol.parameters.iter() {
+                match parameter {
+                    Arg::Register(var) => {
+                        if let Ok(data) = pi_state.eval(&Expression::Var(var.clone())) {
+                            mem_objects_to_check.append(&mut data.referenced_ids());
+                        }
+                    }
+                    Arg::Stack { offset, size } => {
+                        if let Ok(stack_address) = pi_state.eval(&Expression::BinOp {
+                            op: BinOpType::IntAdd,
+                            lhs: Box::new(Expression::Var(
+                                self.project.stack_pointer_register.clone(),
+                            )),
+                            rhs: Box::new(Expression::Const(
+                                Bitvector::from_i64(*offset)
+                                    .into_truncate(apint::BitWidth::from(
+                                        self.project.stack_pointer_register.size,
+                                    ))
+                                    .unwrap(),
+                            )),
+                        }) {
+                            if state
+                                .load_taint_from_memory(&stack_address, *size)
+                                .is_tainted()
+                            {
+                                return true;
+                            }
+                        }
+                        if let Ok(stack_param) = pi_state
+                            .eval_parameter_arg(parameter, &self.project.stack_pointer_register)
+                        {
+                            mem_objects_to_check.append(&mut stack_param.referenced_ids());
+                        }
+                    }
+                }
+            }
+            // Complete set of memory objects to check 
+            mem_objects_to_check = pi_state.add_recursively_referenced_ids_to_id_set(mem_objects_to_check);
+
+            if state.check_mem_ids_for_taint(&mem_objects_to_check) {
+                return true;
+            }
+        }
+        false
     }
 
     /// If a possible  parameter register of the call contains taint,
