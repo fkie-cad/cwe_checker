@@ -206,7 +206,7 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub fn check_params_recursively_for_taint(
+    pub fn check_parameters_recursively_for_taint(
         &self,
         state: &State,
         extern_symbol: &ExternSymbol,
@@ -276,7 +276,8 @@ impl<'a> Context<'a> {
     /// Else remove all taint contained in non-callee-saved registers.
     fn handle_generic_call(&self, state: &State, call_tid: &Tid) -> Option<State> {
         // TODO: We do not yet check recursively for taint contained in objects pointed to by parameters.
-        if state.check_generic_function_params_for_taint(self.project) {
+        let pi_state_option = self.get_current_pointer_inference_state(state, call_tid);
+        if state.check_generic_function_params_for_taint(self.project, pi_state_option.as_ref()) {
             self.generate_cwe_warning(call_tid);
             return None;
         }
@@ -314,7 +315,8 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
     /// Generate a CWE warning if taint may be contained in the function parameters.
     /// Always returns `None` so that the analysis stays intraprocedural.
     fn update_call(&self, state: &State, call: &Term<Jmp>, _target: &Node) -> Option<Self::Value> {
-        if state.check_generic_function_params_for_taint(self.project) {
+        let pi_state_option = self.get_current_pointer_inference_state(state, &call.tid);
+        if state.check_generic_function_params_for_taint(self.project, pi_state_option.as_ref()) {
             self.generate_cwe_warning(&call.tid);
         }
         // TODO: We do not yet check recursively for taint contained in objects pointed to by parameters.
@@ -335,14 +337,9 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
                         .jmp_to_blk_end_node_map
                         .get(&(call.tid.clone(), self.current_sub.unwrap().tid.clone()))
                         .unwrap();
-                    for parameter in extern_symbol.parameters.iter() {
-                        if !self
-                            .check_parameter_arg_for_taint(parameter, state, *blk_end_node_id)
-                            .is_top()
-                        {
-                            self.generate_cwe_warning(&call.tid);
-                            return None;
-                        }
+                    if self.check_parameters_recursively_for_taint(state, extern_symbol, *blk_end_node_id) {
+                        self.generate_cwe_warning(&call.tid);
+                        return None;
                     }
                     let mut new_state = state.clone();
                     new_state.remove_non_callee_saved_taint(
@@ -454,8 +451,9 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
     ) -> Option<State> {
         if let Some(state) = state_before_return {
             // If taint is returned, generate a CWE warning
-            if !state.is_empty() {
-                self.generate_cwe_warning(&return_term.tid)
+            let pi_state_option = self.get_current_pointer_inference_state(state, &return_term.tid);
+            if state.check_return_values_for_taint(self.project, pi_state_option.as_ref()) {
+                self.generate_cwe_warning(&return_term.tid);
             }
             // Do not return early in case `state_before_call` is also set (possible for recursive functions).
         }
@@ -495,6 +493,7 @@ mod tests {
 
     #[test]
     fn check_parameter_arg_for_taint() {
+        todo!(); // TODO: Change test to new parameter checking function!
         let project = Project::mock_empty();
         let pi_results = PointerInferenceComputation::mock(&project);
         let context = Context::mock(&project, &pi_results);

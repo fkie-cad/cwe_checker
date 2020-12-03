@@ -235,43 +235,60 @@ impl State {
         false
     }
 
+    /// Check whether a register in the given register list contains taint
+    /// or (recursively) references a memory object containing taint.
+    /// Return `true` if taint was found and `false` if no taint was found.
+    fn check_register_list_recursively_for_taint(&self, register_list: &[String], pi_state_option: Option<&PointerInferenceState>) -> bool {
+        // Check whether a register contains taint
+        for (register, taint) in &self.register_taint {
+            if register_list
+                .iter()
+                .any(|reg_name| *reg_name == register.name)
+                && !taint.is_top()
+            {
+                return true;
+            }
+        }
+        // Check whether some memory object (recursively) referenced by a register may contain taint
+        if let Some(pi_state) = pi_state_option {
+            let mut possible_referenced_ids = BTreeSet::new();
+            for register_name in register_list {
+                if let Some(register_value) =
+                    pi_state.get_register_by_name(register_name)
+                {
+                    possible_referenced_ids.append(&mut register_value.referenced_ids());
+                }
+            }
+            possible_referenced_ids = pi_state
+                .add_recursively_referenced_ids_to_id_set(possible_referenced_ids);
+            if self.check_mem_ids_for_taint(&possible_referenced_ids) {
+                return true;
+            }
+        }
+        false
+    }
+
     /// Check whether a generic function call may contain tainted values in its parameters.
     /// Since we don't know the actual calling convention of the call,
     /// we approximate the parameters with all parameter registers of the standard calling convention of the project.
     pub fn check_generic_function_params_for_taint(&self, project: &Project, pi_state_option: Option<&PointerInferenceState>) -> bool {
         if let Some(calling_conv) = project.get_standard_calling_convention() {
-            // Check parameter register for taint
-            for (register, taint) in &self.register_taint {
-                if calling_conv
-                    .parameter_register
-                    .iter()
-                    .any(|param| *param == register.name)
-                    && !taint.is_top()
-                {
-                    return true;
-                }
-            }
-            // Check whether some parameter memory object may contain taint
-            if let Some(pi_state) = pi_state_option {
-                let mut possible_referenced_ids = BTreeSet::new();
-                for parameter_register_name in calling_conv.parameter_register.iter() {
-                    if let Some(register_value) =
-                        pi_state.get_register_by_name(parameter_register_name)
-                    {
-                        possible_referenced_ids.append(&mut register_value.referenced_ids());
-                    }
-                }
-                possible_referenced_ids = pi_state
-                    .add_recursively_referenced_ids_to_id_set(possible_referenced_ids);
-                if self.check_mem_ids_for_taint(&possible_referenced_ids) {
-                    return true;
-                }
-            }
-
-            false
+            self.check_register_list_recursively_for_taint(&calling_conv.parameter_register[..], pi_state_option)
         } else {
-            // No standard calling convention found. Assume all registers may be parameters.
-            self.register_taint.values().any(|taint| !taint.is_top())
+            // No standard calling convention found. Assume everything may be parameters or referenced by parameters.
+            !self.is_empty()
+        }
+    }
+
+    /// Check whether the return registers may contain tainted values or point to objects containing tainted values.
+    /// Since we don't know the actual return registers,
+    /// we approximate them by all return registers of the standard calling convention of the project.
+    pub fn check_return_values_for_taint(&self, project: &Project, pi_state_option: Option<&PointerInferenceState>) -> bool {
+        if let Some(calling_conv) = project.get_standard_calling_convention() {
+            self.check_register_list_recursively_for_taint(&calling_conv.return_register[..], pi_state_option)
+        } else {
+            // No standard calling convention found. Assume everything may be return values or referenced by return values.
+            !self.is_empty()
         }
     }
 
