@@ -91,7 +91,7 @@ pub struct Computation<T: Context> {
     priority_to_node_list: Vec<NodeIndex>,
     /// The worklist contains the priority numbers (not the node indices!) of nodes marked as not yet stabilized.
     worklist: BTreeSet<usize>,
-    /// The (optional) default value assigned to nodes without an explizit value.
+    /// The (optional) default value assigned to nodes without an explicit value.
     default_value: Option<T::NodeValue>,
     /// The internal map containing all known node values.
     node_values: FnvHashMap<NodeIndex, T::NodeValue>,
