@@ -37,7 +37,7 @@
 use fnv::FnvHashMap;
 use petgraph::graph::{DiGraph, EdgeIndex, NodeIndex};
 use petgraph::visit::EdgeRef;
-use std::collections::{BTreeMap, BinaryHeap};
+use std::collections::{BTreeMap, BTreeSet};
 
 /// The context of a fixpoint computation.
 ///
@@ -83,13 +83,17 @@ pub trait Context {
 /// };
 /// ```
 pub struct Computation<T: Context> {
+    /// The context object needed for the fixpoint computation
     fp_context: T,
     /// maps a node index to its priority (higher priority nodes get stabilized first)
     node_priority_list: Vec<usize>,
     /// maps a priority to the corresponding node index
     priority_to_node_list: Vec<NodeIndex>,
-    worklist: BinaryHeap<usize>,
+    /// The worklist contains the priority numbers (not the node indices!) of nodes marked as not yet stabilized.
+    worklist: BTreeSet<usize>,
+    /// The (optional) default value assigned to nodes without an explicit value.
     default_value: Option<T::NodeValue>,
+    /// The internal map containing all known node values.
     node_values: FnvHashMap<NodeIndex, T::NodeValue>,
 }
 
@@ -109,11 +113,11 @@ impl<T: Context> Computation<T> {
             node_to_index.insert(node_index, i);
         }
         let node_priority_list: Vec<usize> = node_to_index.values().copied().collect();
-        let mut worklist = BinaryHeap::new();
+        let mut worklist = BTreeSet::new();
         // If a default value exists, all nodes are added to the worklist. If not, the worklist is empty
         if default_value.is_some() {
             for i in 0..sorted_nodes.len() {
-                worklist.push(i);
+                worklist.insert(i);
             }
         }
         Computation {
@@ -138,7 +142,7 @@ impl<T: Context> Computation<T> {
     /// Set the value of a node and mark the node as not yet stabilized.
     pub fn set_node_value(&mut self, node: NodeIndex, value: T::NodeValue) {
         self.node_values.insert(node, value);
-        self.worklist.push(self.node_priority_list[node.index()]);
+        self.worklist.insert(self.node_priority_list[node.index()]);
     }
 
     /// Merge the value at a node with some new value.
@@ -185,19 +189,26 @@ impl<T: Context> Computation<T> {
     /// If a node does not stabilize after max_steps visits, the end result will not be a fixpoint but only an intermediate result of a fixpoint computation.
     pub fn compute_with_max_steps(&mut self, max_steps: u64) {
         let mut steps = vec![0; self.fp_context.get_graph().node_count()];
-        while let Some(priority) = self.worklist.pop() {
+        let mut non_stabilized_nodes = BTreeSet::new();
+        while let Some(priority) = self.worklist.iter().next_back().cloned() {
+            let priority = self.worklist.take(&priority).unwrap();
             let node = self.priority_to_node_list[priority];
             if steps[node.index()] < max_steps {
                 steps[node.index()] += 1;
                 self.update_node(node);
+            } else {
+                non_stabilized_nodes.insert(priority);
             }
         }
+        // After the algorithm finished, the new worklist is the list of non-stabilized nodes
+        self.worklist = non_stabilized_nodes;
     }
 
     /// Compute the fixpoint of the fixpoint problem.
     /// If the fixpoint algorithm does not converge to a fixpoint, this function will not terminate.
     pub fn compute(&mut self) {
-        while let Some(priority) = self.worklist.pop() {
+        while let Some(priority) = self.worklist.iter().next_back().cloned() {
+            let priority = self.worklist.take(&priority).unwrap();
             let node = self.priority_to_node_list[priority];
             self.update_node(node);
         }
@@ -221,6 +232,14 @@ impl<T: Context> Computation<T> {
     /// Returns `True` if the computation has stabilized, i.e. the internal worklist is empty.
     pub fn has_stabilized(&self) -> bool {
         self.worklist.is_empty()
+    }
+
+    /// Return a list of all nodes which are marked as not-stabilized
+    pub fn get_worklist(&self) -> Vec<NodeIndex> {
+        self.worklist
+            .iter()
+            .map(|priority| self.priority_to_node_list[*priority])
+            .collect()
     }
 }
 

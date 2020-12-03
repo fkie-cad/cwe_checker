@@ -478,6 +478,17 @@ mod tests {
         }
     }
 
+    impl CallingConvention {
+        pub fn mock() -> CallingConvention {
+            CallingConvention {
+                name: "__stdcall".to_string(),
+                parameter_register: vec!["RDI".into()],
+                callee_saved_register: vec!["RBP".into()],
+                return_register: vec!["RAX".into()],
+            }
+        }
+    }
+
     impl Project {
         pub fn mock_empty() -> Project {
             Project {
