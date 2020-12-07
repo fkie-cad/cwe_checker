@@ -150,10 +150,8 @@ impl State {
     /// Remove all objects that cannot longer be reached by any known pointer.
     /// This does not remove objects, where some caller may still know a pointer to the object.
     ///
-    /// Right now it uses the conservative overapproximation of all possible pointer targets contained in a memory object,
-    /// which will sometimes prevent memory objects from being removed
-    /// even if no actual pointer to it can be reconstructed from the state.
-    /// This may change in the future if memory consumption is too high (TODO: measure that).
+    /// The function uses an underapproximation of all possible pointer targets contained in a memory object.
+    /// This keeps the number of tracked objects reasonably small.
     pub fn remove_unreferenced_objects(&mut self) {
         // get all referenced IDs
         let mut referenced_ids = BTreeSet::new();
@@ -163,13 +161,37 @@ impl State {
         referenced_ids.insert(self.stack_id.clone());
         referenced_ids.append(&mut self.caller_stack_ids.clone());
         referenced_ids.append(&mut self.ids_known_to_caller.clone());
-        referenced_ids = self.add_recursively_referenced_ids_to_id_set(referenced_ids);
+        referenced_ids = self.add_directly_reachable_ids_to_id_set(referenced_ids);
         // remove unreferenced objects
         self.memory.remove_unused_objects(&referenced_ids);
     }
 
     /// Search (recursively) through all memory objects referenced by the given IDs
-    /// and all IDs contained in them to the set of IDs.
+    /// and add all IDs reachable through concrete pointers contained in them to the set of IDs.
+    ///
+    /// This uses an underapproximation of the referenced IDs of a memory object,
+    /// i.e. IDs may be missing if the analysis lost track of the corresponding pointer.
+    pub fn add_directly_reachable_ids_to_id_set(
+        &self,
+        mut ids: BTreeSet<AbstractIdentifier>,
+    ) -> BTreeSet<AbstractIdentifier> {
+        let mut unsearched_ids = ids.clone();
+        while let Some(id) = unsearched_ids.iter().next() {
+            let id = id.clone();
+            unsearched_ids.remove(&id);
+            let memory_ids = self.memory.get_referenced_ids_underapproximation(&id);
+            for mem_id in memory_ids {
+                if ids.get(&mem_id).is_none() {
+                    ids.insert(mem_id.clone());
+                    unsearched_ids.insert(mem_id.clone());
+                }
+            }
+        }
+        ids
+    }
+
+    /// Search (recursively) through all memory objects referenced by the given IDs
+    /// and add all IDs contained in them to the set of IDs.
     ///
     /// This uses an overapproximation of the referenced IDs of a memory object,
     /// i.e. for a memory object it may add IDs as possible references
@@ -182,9 +204,9 @@ impl State {
         while let Some(id) = unsearched_ids.iter().next() {
             let id = id.clone();
             unsearched_ids.remove(&id);
-            let memory_ids = self.memory.get_referenced_ids(&id);
+            let memory_ids = self.memory.get_referenced_ids_overapproximation(&id);
             for mem_id in memory_ids {
-                if ids.get(mem_id).is_none() {
+                if ids.get(&mem_id).is_none() {
                     ids.insert(mem_id.clone());
                     unsearched_ids.insert(mem_id.clone());
                 }
@@ -263,6 +285,45 @@ impl State {
     /// thus we can simply copy their object-state from the moment of the call.
     pub fn readd_caller_objects(&mut self, caller_state: &State) {
         self.memory.append_unknown_objects(&caller_state.memory);
+    }
+
+    /// Restore the content of callee-saved registers from the caller state.
+    ///
+    /// This function does not check what the callee state currently contains in these registers.
+    /// If the callee does not adhere to the given calling convention, this may introduce analysis errors!
+    /// It will also mask cases,
+    /// where a callee-saved register was incorrectly modified (e.g. because of a bug in the callee).
+    pub fn restore_callee_saved_register(
+        &mut self,
+        caller_state: &State,
+        cconv: &CallingConvention,
+    ) {
+        for (register, value) in caller_state.register.iter() {
+            if cconv
+                .callee_saved_register
+                .iter()
+                .any(|reg_name| *reg_name == register.name)
+            {
+                self.set_register(register, value.clone());
+            }
+        }
+    }
+
+    /// Remove all knowledge about the contents of callee-saved registers from the state.
+    pub fn remove_callee_saved_register(&mut self, cconv: &CallingConvention) {
+        let mut register_to_remove = Vec::new();
+        for register in self.register.keys() {
+            if cconv
+                .callee_saved_register
+                .iter()
+                .any(|reg_name| *reg_name == register.name)
+            {
+                register_to_remove.push(register.clone());
+            }
+        }
+        for register in register_to_remove {
+            self.register.remove(&register);
+        }
     }
 }
 

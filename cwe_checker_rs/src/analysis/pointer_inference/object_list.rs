@@ -171,10 +171,28 @@ impl AbstractObjectList {
         }
     }
 
-    /// Return all IDs that get referenced by the memory object pointed to by the given ID.
-    pub fn get_referenced_ids(&self, id: &AbstractIdentifier) -> &BTreeSet<AbstractIdentifier> {
+    /// Return all IDs that may be referenced by the memory object pointed to by the given ID.
+    /// The returned set is an overapproximation of the actual referenced IDs.
+    pub fn get_referenced_ids_overapproximation(
+        &self,
+        id: &AbstractIdentifier,
+    ) -> BTreeSet<AbstractIdentifier> {
         if let Some((object, _offset)) = self.objects.get(id) {
-            object.get_referenced_ids()
+            object.get_referenced_ids_overapproximation().clone()
+        } else {
+            BTreeSet::new()
+        }
+    }
+
+    /// Return all IDs that get referenced by the memory object pointed to by the given ID.
+    /// The returned set is an underapproximation of the actual referenced IDs,
+    /// since only still tracked pointers inside the memory object are used to compute it.
+    pub fn get_referenced_ids_underapproximation(
+        &self,
+        id: &AbstractIdentifier,
+    ) -> BTreeSet<AbstractIdentifier> {
+        if let Some((object, _offset)) = self.objects.get(id) {
+            object.get_referenced_ids_underapproximation()
         } else {
             panic!("Abstract ID not associated to an object")
         }
@@ -240,11 +258,9 @@ impl AbstractObjectList {
         object_id: &AbstractIdentifier,
         new_possible_reference_targets: &BTreeSet<AbstractIdentifier>,
     ) {
-        self.objects
-            .get_mut(object_id)
-            .unwrap()
-            .0
-            .assume_arbitrary_writes(new_possible_reference_targets);
+        if let Some((object, _)) = self.objects.get_mut(object_id) {
+            object.assume_arbitrary_writes(new_possible_reference_targets);
+        }
     }
 
     /// Get the number of objects that are currently tracked.
@@ -425,13 +441,13 @@ mod tests {
             .unwrap();
         assert_eq!(
             other_obj_list
-                .get_referenced_ids(&new_id("RSP".into()))
+                .get_referenced_ids_overapproximation(&new_id("RSP".into()))
                 .len(),
             1
         );
         assert_eq!(
             *other_obj_list
-                .get_referenced_ids(&new_id("RSP".into()))
+                .get_referenced_ids_overapproximation(&new_id("RSP".into()))
                 .iter()
                 .next()
                 .unwrap(),
