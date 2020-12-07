@@ -416,12 +416,12 @@ impl From<Project> for IrProject {
             tid: project.program.tid,
             term: project.program.term.into(),
         };
-        // a register map of all registers belonging to the architecture of the currently analysed binary
         let register_map: HashMap<&String, &RegisterProperties> = project
             .register_properties
             .iter()
             .map(|p| (&p.register, p))
             .collect();
+        let mut zero_extend_tids: HashMap<String, Tid> = HashMap::new();
         // iterates over definitions and checks whether sub registers are used
         // if so, they are swapped with subpieces of base registers
         for sub in program.term.subs.iter_mut() {
@@ -430,16 +430,32 @@ impl From<Project> for IrProject {
                 while let Some(def) = def_iter.next() {
                     let peeked_def = def_iter.peek();
                     match &mut def.term {
-                        IrDef::Assign { var, value } => value.process_sub_registers_if_necessary(
-                            Some(var),
-                            &register_map,
-                            peeked_def,
-                        ),
-                        IrDef::Load { var, address } => address.process_sub_registers_if_necessary(
-                            Some(var),
-                            &register_map,
-                            peeked_def,
-                        ),
+                        IrDef::Assign { var, value } => {
+                            let zero_tid: Option<Tid> = value.process_sub_registers_if_necessary(
+                                Some(var),
+                                &register_map,
+                                peeked_def,
+                            );
+                            match zero_tid {
+                                Some(tid) => {
+                                    zero_extend_tids.insert(format!("{}", tid), tid);
+                                }
+                                _ => (),
+                            }
+                        }
+                        IrDef::Load { var, address } => {
+                            let zero_tid: Option<Tid> = address.process_sub_registers_if_necessary(
+                                Some(var),
+                                &register_map,
+                                peeked_def,
+                            );
+                            match zero_tid {
+                                Some(tid) => {
+                                    zero_extend_tids.insert(format!("{}", tid), tid);
+                                }
+                                _ => (),
+                            }
+                        }
                         IrDef::Store { address, value } => {
                             address.process_sub_registers_if_necessary(
                                 None,
@@ -458,20 +474,27 @@ impl From<Project> for IrProject {
                 while let Some(jmp) = jmp_iter.next() {
                     match &mut jmp.term {
                         IrJmp::BranchInd(dest) => {
-                            dest.process_sub_registers_if_necessary(None, &register_map, None)
+                            dest.process_sub_registers_if_necessary(None, &register_map, None);
                         }
                         IrJmp::CBranch { condition, .. } => {
-                            condition.process_sub_registers_if_necessary(None, &register_map, None)
+                            condition.process_sub_registers_if_necessary(None, &register_map, None);
                         }
                         IrJmp::CallInd { target, .. } => {
-                            target.process_sub_registers_if_necessary(None, &register_map, None)
+                            target.process_sub_registers_if_necessary(None, &register_map, None);
                         }
                         IrJmp::Return(dest) => {
-                            dest.process_sub_registers_if_necessary(None, &register_map, None)
+                            dest.process_sub_registers_if_necessary(None, &register_map, None);
                         }
                         _ => (),
                     }
                 }
+                blk.term.defs.retain(|def| {
+                    let def_tid = format!("{}", def.tid);
+                    if zero_extend_tids.contains_key(&def_tid) {
+                        return false;
+                    }
+                    true
+                });
             }
         }
         IrProject {
@@ -514,374 +537,4 @@ impl Project {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn def_deserialization() {
-        let def: Def = serde_json::from_str(
-            r#"
-      {
-        "lhs": {
-          "name": "CF",
-          "size": 1,
-          "is_virtual": false
-        },
-        "rhs": {
-          "mnemonic": "INT_CARRY",
-          "input0": {
-            "name": "RDX",
-            "size": 8,
-            "is_virtual": false
-          },
-          "input1": {
-            "name": "RDI",
-            "size": 8,
-            "is_virtual": false
-          }
-        }
-      }
-      "#,
-        )
-        .unwrap();
-        let _: IrDef = def.into();
-        let def: Def = serde_json::from_str(
-            r#"
-            {
-                "lhs": {
-                    "address": "004053e8",
-                    "size": 4,
-                    "is_virtual": false
-                },
-                "rhs": {
-                    "mnemonic": "INT_XOR",
-                    "input0": {
-                        "name": "$load_temp0",
-                        "size": 4,
-                        "is_virtual": true
-                    },
-                    "input1": {
-                        "name": "$U4780",
-                        "size": 4,
-                        "is_virtual": true
-                    }
-                }
-            }
-            "#,
-        )
-        .unwrap();
-        let _: IrDef = def.into();
-    }
-
-    #[test]
-    fn label_deserialization() {
-        let _: Label = serde_json::from_str(
-            r#"
-        {
-            "Direct": {
-              "id": "blk_00103901",
-              "address": "00103901"
-            }
-        }
-        "#,
-        )
-        .unwrap();
-        let _: Label = serde_json::from_str(
-            r#"
-        {
-            "Indirect": {
-                "name": "00109ef0",
-                "size": 8,
-                "is_virtual": false
-            }
-        }
-        "#,
-        )
-        .unwrap();
-    }
-
-    #[test]
-    fn jmp_deserialization() {
-        let jmp_term: Term<Jmp> = serde_json::from_str(
-            r#"
-            {
-                "tid": {
-                "id": "instr_00102014_2",
-                "address": "00102014"
-                },
-                "term": {
-                "type_": "CALL",
-                "mnemonic": "CALLIND",
-                "call": {
-                    "target": {
-                    "Indirect": {
-                        "name": "RAX",
-                        "size": 8,
-                        "is_virtual": false
-                    }
-                    },
-                    "return": {
-                    "Direct": {
-                        "id": "blk_00102016",
-                        "address": "00102016"
-                    }
-                    }
-                }
-                }
-            }
-            "#,
-        )
-        .unwrap();
-        let _: IrJmp = jmp_term.term.into();
-    }
-
-    #[test]
-    fn blk_deserialization() {
-        let block_term: Term<Blk> = serde_json::from_str(
-            r#"
-            {
-            "tid": {
-                "id": "blk_00101000",
-                "address": "00101000"
-            },
-            "term": {
-                "defs": [],
-                "jmps": []
-            }
-            }
-            "#,
-        )
-        .unwrap();
-        let _: IrBlk = block_term.term.into();
-    }
-
-    #[test]
-    fn arg_deserialization() {
-        let _: Arg = serde_json::from_str(
-            r#"
-            {
-            "var": {
-                "name": "RDI",
-                "size": 8,
-                "is_virtual": false
-            },
-            "intent": "INPUT"
-            }
-            "#,
-        )
-        .unwrap();
-        let _: Arg = serde_json::from_str(
-            r#"
-            {
-                "location": {
-                "mnemonic": "LOAD",
-                "input0": {
-                    "address": "0x4",
-                    "size": 4,
-                    "is_virtual": false
-                }
-                },
-                "intent": "INPUT"
-            }
-        "#,
-        )
-        .unwrap();
-    }
-
-    #[test]
-    fn sub_deserialization() {
-        let sub_term: Term<Sub> = serde_json::from_str(
-            r#"
-            {
-            "tid": {
-                "id": "sub_00101000",
-                "address": "00101000"
-            },
-            "term": {
-                "name": "sub_name",
-                "blocks": []
-            }
-            }
-            "#,
-        )
-        .unwrap();
-        let _: IrSub = sub_term.term.into();
-    }
-
-    #[test]
-    fn extern_symbol_deserialization() {
-        let symbol: ExternSymbol = serde_json::from_str(
-            r#"
-            {
-                "tid": {
-                  "id": "sub_08048410",
-                  "address": "08048410"
-                },
-                "addresses": [
-                    "08048410"
-                ],
-                "name": "atoi",
-                "calling_convention": "__cdecl",
-                "arguments": [
-                  {
-                    "location": {
-                      "mnemonic": "LOAD",
-                      "input0": {
-                        "address": "0x4",
-                        "size": 4,
-                        "is_virtual": false
-                      }
-                    },
-                    "intent": "INPUT"
-                  },
-                  {
-                    "var": {
-                      "name": "EAX",
-                      "size": 4,
-                      "is_virtual": false
-                    },
-                    "intent": "OUTPUT"
-                  }
-                ],
-                "no_return": false
-            }
-            "#,
-        )
-        .unwrap();
-        let _: IrExternSymbol = symbol.into();
-    }
-
-    #[test]
-    fn program_deserialization() {
-        let program_term: Term<Program> = serde_json::from_str(
-            r#"
-            {
-            "tid": {
-                "id": "prog_00101000",
-                "address": "00101000"
-            },
-            "term": {
-                "subs": [],
-                "extern_symbols": [],
-                "entry_points":[]
-            }
-            }
-            "#,
-        )
-        .unwrap();
-        let _: IrProgram = program_term.term.into();
-    }
-
-    #[test]
-    fn project_deserialization() {
-        let project: Project = serde_json::from_str(
-            r#"
-        {
-            "program": {
-              "tid": {
-                "id": "prog_08048000",
-                "address": "08048000"
-              },
-              "term": {
-                "subs": [],
-                "extern_symbols": [],
-                "entry_points":[]
-              }
-            },
-            "stack_pointer_register": {
-                "name": "RSP",
-                "size": 8,
-                "is_virtual": false
-            },
-            "cpu_architecture": "x86_64",
-            "register_properties": [
-                {
-                    "register": "AH",
-                    "base_register": "EAX",
-                    "lsb": 2,
-                    "size": 1
-                }
-            ],
-            "register_calling_convention": [
-                {
-                    "calling_convention": "default",
-                    "parameter_register": [],
-                    "return_register": [],
-                    "unaffected_register": [],
-                    "killed_by_call_register": []
-                }
-            ]
-        }
-        "#,
-        )
-        .unwrap();
-        let _: IrProject = project.into();
-    }
-
-    #[test]
-    fn add_load_defs_for_implicit_ram_access() {
-        let mut blk: Blk = Blk {
-            defs: Vec::new(),
-            jmps: Vec::new(),
-        };
-        blk.defs.push(
-            serde_json::from_str(
-                r#"
-        {
-            "tid": {
-              "id": "instr_001053f8_0",
-              "address": "001053f8"
-            },
-            "term": {
-              "lhs": {
-                "name": "EDI",
-                "value": null,
-                "address": null,
-                "size": 4,
-                "is_virtual": false
-              },
-              "rhs": {
-                "mnemonic": "COPY",
-                "input0": {
-                  "name": null,
-                  "value": null,
-                  "address": "0010a018",
-                  "size": 4,
-                  "is_virtual": false
-                },
-                "input1": null,
-                "input2": null
-              }
-            }
-          }
-        "#,
-            )
-            .unwrap(),
-        );
-        blk.add_load_defs_for_implicit_ram_access();
-        assert_eq!(
-            blk.defs[0]
-                .term
-                .lhs
-                .as_ref()
-                .unwrap()
-                .name
-                .as_ref()
-                .unwrap(),
-            "$load_temp0"
-        );
-        assert_eq!(
-            blk.defs[1]
-                .term
-                .rhs
-                .input0
-                .as_ref()
-                .unwrap()
-                .name
-                .as_ref()
-                .unwrap(),
-            "$load_temp0"
-        );
-        assert_eq!(blk.defs.len(), 2);
-    }
-}
+mod tests;

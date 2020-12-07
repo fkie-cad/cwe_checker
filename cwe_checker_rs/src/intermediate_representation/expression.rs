@@ -135,17 +135,21 @@ impl Expression {
         }
     }
 
-    /// This function
+    /// This function checks whether there is an output variable to the definition and
+    /// whether the next definition is a zero extension in case there is a output variable.
+    /// Lastly it calls the function to iterate recursively into the current expression and
+    /// pieces it together if necessary.
     pub fn process_sub_registers_if_necessary(
         &mut self,
         output: Option<&mut Variable>,
         register_map: &HashMap<&String, &RegisterProperties>,
         peeked: Option<&&mut Term<Def>>,
-    ) {
+    ) -> Option<Tid> {
         let mut output_base_size: Option<ByteSize> = None;
         let mut peek_is_zero_extension: bool = false;
         let mut output_base_register: Option<&&RegisterProperties> = None;
         let mut output_sub_register: Option<&RegisterProperties> = None;
+        let mut zero_extend_tid: Option<Tid> = None;
 
         if let Some(output_value) = output {
             if let Some(register) = register_map.get(&output_value.name) {
@@ -160,7 +164,11 @@ impl Expression {
                         match &peek.term {
                             Def::Assign { var, value } => {
                                 if output_value.name == var.name {
-                                    peek_is_zero_extension = value.check_for_zero_extension();
+                                    if value.check_for_zero_extension() {
+                                        peek_is_zero_extension = true;
+                                        // set the def tid to be deleted from the program
+                                        zero_extend_tid = Some(peek.tid.clone());
+                                    }
                                 }
                             }
                             _ => (),
@@ -178,11 +186,12 @@ impl Expression {
             &output_base_size,
             &output_sub_register,
         );
+
+        zero_extend_tid
     }
 
     /// This function recursively iterates into the expression and checks whether a sub register was used.
     /// If so, the sub register is turned into a SUBPIECE of the corresponding base register.
-    /// Finally, it returns a sub register if the corresponding base register is overwritten by the expression.
     fn check_for_sub_register(&mut self, register_map: &HashMap<&String, &RegisterProperties>) {
         match self {
             Expression::BinOp { lhs, rhs, .. } => {
