@@ -484,8 +484,7 @@ mod tests {
                 name: "__stdcall".to_string(), // so that the mock is useable as standard calling convention in tests
                 parameter_register: vec!["RDI".to_string()],
                 return_register: vec!["RAX".to_string()],
-                callee_saved_register: vec!["RBP".to_string()]
-
+                callee_saved_register: vec!["RBP".to_string()],
             }
         }
     }
