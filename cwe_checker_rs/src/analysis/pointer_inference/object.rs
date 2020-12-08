@@ -159,6 +159,11 @@ impl AbstractObjectInfo {
         self.state
     }
 
+    /// Get the type of the memory object.
+    pub fn get_object_type(&self) -> Option<ObjectType> {
+        self.type_
+    }
+
     /// Invalidates all memory and adds the `additional_targets` to the pointer targets.
     /// Represents the effect of unknown write instructions to the object
     /// which may include writing pointers to targets from the `additional_targets` set to the object.

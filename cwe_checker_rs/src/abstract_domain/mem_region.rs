@@ -144,6 +144,15 @@ impl<T: AbstractDomain + HasByteSize + RegisterDomain + std::fmt::Debug> MemRegi
         T::new_top(size_in_bytes)
     }
 
+    /// Get the value at the given position regardless of the value size.
+    /// Return `None` if there is no value at that position in the memory region.
+    pub fn get_unsized(&self, position: Bitvector) -> Option<T> {
+        assert_eq!(ByteSize::from(position.width()), self.address_bytesize);
+        let position = Int::from(position).try_to_i64().unwrap();
+
+        self.values.get(&position).cloned()
+    }
+
     /// Remove all elements intersecting the provided interval.
     pub fn remove(&mut self, position: Bitvector, size_in_bytes: Bitvector) {
         assert_eq!(ByteSize::from(position.width()), self.address_bytesize);

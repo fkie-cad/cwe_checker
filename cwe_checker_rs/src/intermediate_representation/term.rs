@@ -478,6 +478,38 @@ mod tests {
         }
     }
 
+    impl CallingConvention {
+        pub fn mock() -> CallingConvention {
+            CallingConvention {
+                name: "__stdcall".to_string(), // so that the mock is useable as standard calling convention in tests
+                parameter_register: vec!["RDI".to_string()],
+                return_register: vec!["RAX".to_string()],
+                callee_saved_register: vec!["RBP".to_string()]
+
+            }
+        }
+    }
+
+    impl Arg {
+        pub fn mock_register(name: impl ToString) -> Arg {
+            Arg::Register(Variable::mock(name.to_string(), ByteSize::new(8)))
+        }
+    }
+
+    impl ExternSymbol {
+        pub fn mock() -> ExternSymbol {
+            ExternSymbol {
+                tid: Tid::new("mock_symbol"),
+                addresses: vec!["UNKNOWN".to_string()],
+                name: "mock_symbol".to_string(),
+                calling_convention: Some("__stdcall".to_string()),
+                parameters: vec![Arg::mock_register("RDI")],
+                return_values: vec![Arg::mock_register("RAX")],
+                no_return: false,
+            }
+        }
+    }
+
     impl Project {
         pub fn mock_empty() -> Project {
             Project {
