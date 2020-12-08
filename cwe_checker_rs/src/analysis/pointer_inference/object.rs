@@ -109,8 +109,20 @@ impl AbstractObjectInfo {
     }
 
     /// Get all abstract IDs that the object may contain pointers to.
-    pub fn get_referenced_ids(&self) -> &BTreeSet<AbstractIdentifier> {
+    /// This yields an overapproximation of possible pointer targets.
+    pub fn get_referenced_ids_overapproximation(&self) -> &BTreeSet<AbstractIdentifier> {
         &self.pointer_targets
+    }
+
+    /// Get all abstract IDs for which the object contains pointers to.
+    /// This yields an underapproximation of pointer targets,
+    /// since the object may contain pointers that could not be tracked by the analysis.
+    pub fn get_referenced_ids_underapproximation(&self) -> BTreeSet<AbstractIdentifier> {
+        let mut referenced_ids = BTreeSet::new();
+        for data in self.memory.values() {
+            referenced_ids.append(&mut data.referenced_ids())
+        }
+        referenced_ids
     }
 
     /// For pointer values replace an abstract identifier with another one and add the offset_adjustment to the pointer offsets.
@@ -367,7 +379,7 @@ mod tests {
         target_map.insert(new_id("time_1", "RBX"), bv(40));
         let pointer = PointerDomain::with_targets(target_map.clone());
         object.set_value(pointer.into(), &bv(-15)).unwrap();
-        assert_eq!(object.get_referenced_ids().len(), 3);
+        assert_eq!(object.get_referenced_ids_overapproximation().len(), 3);
 
         object.replace_abstract_id(
             &new_id("time_1", "RAX"),
@@ -406,14 +418,14 @@ mod tests {
         target_map.insert(new_id("time_1", "RBX"), bv(40));
         let pointer = PointerDomain::with_targets(target_map.clone());
         object.set_value(pointer.into(), &bv(-15)).unwrap();
-        assert_eq!(object.get_referenced_ids().len(), 3);
+        assert_eq!(object.get_referenced_ids_overapproximation().len(), 3);
 
         let ids_to_remove = vec![new_id("time_1", "RAX"), new_id("time_23", "RBX")]
             .into_iter()
             .collect();
         object.remove_ids(&ids_to_remove);
         assert_eq!(
-            object.get_referenced_ids(),
+            object.get_referenced_ids_overapproximation(),
             &vec![new_id("time_234", "RAX"), new_id("time_1", "RBX")]
                 .into_iter()
                 .collect()

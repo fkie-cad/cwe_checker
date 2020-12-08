@@ -282,6 +282,98 @@ impl<'a> PointerInference<'a> {
         self.add_speculative_entry_points(project, false);
         self.compute();
         self.count_blocks_with_state();
+
+        if !self.computation.has_stabilized() {
+            let worklist_size = self.computation.get_worklist().len();
+            let _ = self.log_debug(format!(
+                "Pointer Inference: Fixpoint did not stabilize. Remaining worklist size: {}",
+                worklist_size
+            ));
+        }
+    }
+
+    /// Print information on dead ends in the control flow graph for debugging purposes.
+    /// Ignore returns where there is no known caller stack id.
+    #[allow(dead_code)]
+    fn print_cfg_dead_ends(&self) {
+        let graph = self.computation.get_graph();
+        for (node_id, node) in graph.node_references() {
+            if let Some(node_value) = self.computation.get_node_value(node_id) {
+                if !graph
+                    .neighbors(node_id)
+                    .any(|neighbor| self.computation.get_node_value(neighbor).is_some())
+                {
+                    match node {
+                        Node::BlkEnd(block, _sub) => {
+                            let state = node_value.unwrap_value();
+                            if block.term.jmps.is_empty() {
+                                println!("Dead end without jumps after block {}", block.tid);
+                            }
+                            for jmp in block.term.jmps.iter() {
+                                match &jmp.term {
+                                    Jmp::BranchInd(target_expr) => {
+                                        if let Ok(address) = state.eval(&target_expr) {
+                                            println!(
+                                                "{}: Indirect jump to {}",
+                                                jmp.tid,
+                                                address.to_json_compact()
+                                            );
+                                        } else {
+                                            println!(
+                                                "{}: Indirect jump. Could not compute address",
+                                                jmp.tid
+                                            );
+                                        }
+                                    }
+                                    Jmp::CallInd { target, return_ } => {
+                                        if let Ok(address) = state.eval(&target) {
+                                            println!(
+                                                "{}: Indirect call to {}. HasReturn: {}",
+                                                jmp.tid,
+                                                address.to_json_compact(),
+                                                return_.is_some()
+                                            );
+                                        } else {
+                                            println!(
+                                                "{}: Indirect call. Could not compute address",
+                                                jmp.tid
+                                            );
+                                        }
+                                    }
+                                    Jmp::Return(_) => {
+                                        if !state.caller_stack_ids.is_empty() {
+                                            println!(
+                                                "{}: Return dead end despite known caller ids",
+                                                jmp.tid
+                                            )
+                                        }
+                                    }
+                                    _ => println!(
+                                        "{}: Unexpected Jmp dead end: {:?}",
+                                        jmp.tid, jmp.term
+                                    ),
+                                }
+                            }
+                        }
+                        Node::BlkStart(block, _sub) => {
+                            println!("{}: ERROR: Block start without successor state!", block.tid)
+                        }
+                        Node::CallReturn { call, return_ } => {
+                            let (call_state, return_state) = match node_value {
+                                NodeValue::CallReturnCombinator { call, return_ } => {
+                                    (call.is_some(), return_.is_some())
+                                }
+                                _ => panic!(),
+                            };
+                            println!(
+                                "CallReturn. Caller: ({}, {}), Return: ({}, {})",
+                                call.0.tid, call_state, return_.0.tid, return_state
+                            );
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

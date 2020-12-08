@@ -329,3 +329,80 @@ fn merge_callee_stack_to_caller_stack() {
     );
     assert_eq!(state.memory.get_all_object_ids().len(), 1);
 }
+
+#[test]
+fn remove_and_restore_callee_saved_register() {
+    let mut state = State::new(&register("RSP"), Tid::new("func_tid"));
+    let value: Data = Bitvector::from_u64(42).into();
+    let cconv = CallingConvention::mock();
+    state.set_register(&register("RBP"), value.clone());
+    state.set_register(&register("RAX"), value.clone());
+
+    let mut callee_state = state.clone();
+    callee_state.remove_callee_saved_register(&cconv);
+    assert_eq!(
+        callee_state.get_register(&register("RBP")).unwrap(),
+        Data::new_top(ByteSize::new(8))
+    );
+    assert_eq!(
+        callee_state.get_register(&register("RAX")).unwrap(),
+        value.clone()
+    );
+
+    let other_value: Data = Bitvector::from_u64(13).into();
+    callee_state.set_register(&register("RAX"), other_value.clone());
+    callee_state.restore_callee_saved_register(&state, &cconv);
+    assert_eq!(callee_state.get_register(&register("RBP")).unwrap(), value);
+    assert_eq!(
+        callee_state.get_register(&register("RAX")).unwrap(),
+        other_value
+    );
+}
+
+#[test]
+fn reachable_ids_under_and_overapproximation() {
+    let mut state = State::new(&register("RSP"), Tid::new("func_tid"));
+    let stack_id = new_id("func_tid", "RSP");
+    let heap_id = new_id("heap_obj", "RAX");
+    let stack_address: Data =
+        PointerDomain::new(stack_id.clone(), Bitvector::from_i64(-8).into()).into();
+    let heap_address: Data =
+        PointerDomain::new(heap_id.clone(), Bitvector::from_i64(0).into()).into();
+    // Add the heap object to the state, so that it can be recursively searched.
+    state.memory.add_abstract_object(
+        heap_id.clone(),
+        Bitvector::from_i64(0).into(),
+        crate::analysis::pointer_inference::object::ObjectType::Heap,
+        ByteSize::new(8),
+    );
+
+    state.store_value(&stack_address, &heap_address).unwrap();
+    let reachable_ids: BTreeSet<AbstractIdentifier> = vec![stack_id.clone()].into_iter().collect();
+    assert_eq!(
+        state.add_directly_reachable_ids_to_id_set(reachable_ids.clone()),
+        vec![stack_id.clone(), heap_id.clone()]
+            .into_iter()
+            .collect()
+    );
+    assert_eq!(
+        state.add_recursively_referenced_ids_to_id_set(reachable_ids.clone()),
+        vec![stack_id.clone(), heap_id.clone()]
+            .into_iter()
+            .collect()
+    );
+
+    let _ = state.store_value(
+        &PointerDomain::new(stack_id.clone(), BitvectorDomain::new_top(ByteSize::new(8))).into(),
+        &Data::Value(Bitvector::from_i64(42).into()),
+    );
+    assert_eq!(
+        state.add_directly_reachable_ids_to_id_set(reachable_ids.clone()),
+        vec![stack_id.clone()].into_iter().collect()
+    );
+    assert_eq!(
+        state.add_recursively_referenced_ids_to_id_set(reachable_ids.clone()),
+        vec![stack_id.clone(), heap_id.clone()]
+            .into_iter()
+            .collect()
+    );
+}

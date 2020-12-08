@@ -90,7 +90,15 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
             let address_bytesize = self.project.stack_pointer_register.size;
 
             let mut callee_state = state.clone();
+            // Remove virtual register since they do no longer exist in the callee
             callee_state.remove_virtual_register();
+            // Remove callee-saved register, since the callee should not use their values anyway.
+            // This should prevent recursive references to all stack frames in the call tree
+            // since the source for it, the stack frame base pointer, is callee-saved.
+            if let Some(cconv) = self.project.get_standard_calling_convention() {
+                // Note that this may lead to analysis errors if the function uses another calling convention.
+                callee_state.remove_callee_saved_register(cconv);
+            }
             // Replace the caller stack ID with one determined by the call instruction.
             // This has to be done *before* adding the new callee stack id to avoid confusing caller and callee stack ids in case of recursive calls.
             callee_state.replace_abstract_id(
@@ -207,6 +215,15 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
         state_after_return.ids_known_to_caller = state_before_call.ids_known_to_caller.clone();
 
         state_after_return.readd_caller_objects(state_before_call);
+
+        if let Some(cconv) = self.project.get_standard_calling_convention() {
+            // Restore information about callee-saved register from the caller state.
+            // TODO: Implement some kind of check to ensure that the callee adheres to the given calling convention!
+            // The current workaround should be reasonably exact for programs written in C,
+            // but may introduce a lot of errors
+            // if the compiler often uses other calling conventions for internal function calls.
+            state_after_return.restore_callee_saved_register(state_before_call, cconv);
+        }
 
         // remove non-referenced objects from the state
         state_after_return.remove_unreferenced_objects();
