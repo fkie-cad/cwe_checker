@@ -198,9 +198,29 @@ impl Expression {
                 lhs.check_for_sub_register(register_map);
                 rhs.check_for_sub_register(register_map);
             }
-            Expression::UnOp { arg, .. }
-            | Expression::Cast { arg, .. }
-            | Expression::Subpiece { arg, .. } => arg.check_for_sub_register(register_map),
+            Expression::UnOp { arg, .. } | Expression::Cast { arg, .. } => {
+                arg.check_for_sub_register(register_map)
+            }
+            Expression::Subpiece { arg, .. } => {
+                let truncated = &mut **arg;
+                // Check whether the truncated data source is a sub register and if so,
+                // change it to its corresponding base register.
+                match truncated {
+                    Expression::Var(variable) => {
+                        if let Some(register) = register_map.get(&variable.name) {
+                            if variable.name != *register.base_register {
+                                variable.name = register.base_register.clone();
+                                variable.size = register_map
+                                    .get(&register.base_register)
+                                    .unwrap()
+                                    .size
+                                    .clone()
+                            }
+                        }
+                    }
+                    _ => arg.check_for_sub_register(register_map),
+                }
+            }
             Expression::Var(variable) => {
                 if let Some(register) = register_map.get(&variable.name) {
                     if variable.name != *register.base_register {

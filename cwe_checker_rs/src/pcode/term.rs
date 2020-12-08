@@ -488,6 +488,8 @@ impl From<Project> for IrProject {
                         _ => (),
                     }
                 }
+                // Remove all tagged zero extension instruction that came after a sub register instruction
+                // since it has been wrapped around the former instruction.
                 blk.term.defs.retain(|def| {
                     let def_tid = format!("{}", def.tid);
                     if zero_extend_tids.contains_key(&def_tid) {

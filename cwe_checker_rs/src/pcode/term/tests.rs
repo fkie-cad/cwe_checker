@@ -9,6 +9,8 @@ struct Setup {
     def_1_t: Term<Def>,
     def_2_t: Term<Def>,
     def_3_t: Term<Def>,
+    def_4_t: Term<Def>,
+    def_5_t: Term<Def>,
     jmp_t: Term<Jmp>,
 }
 
@@ -47,6 +49,12 @@ impl Setup {
                             "base_register": "RAX",
                             "lsb": 0,
                             "size": 1
+                        },
+                        {
+                            "register": "AX",
+                            "base_register": "RAX",
+                            "lsb": 0,
+                            "size": 2
                         },
                         {
                             "register": "EAX",
@@ -243,6 +251,82 @@ impl Setup {
                       "is_virtual": false
                     },
                     "input1": null,
+                    "input2": null
+                  }
+                }
+              }
+            "#,
+            )
+            .unwrap(),
+            def_4_t: serde_json::from_str(
+                r#"
+            {
+                "tid": {
+                  "id": "instr_001053f8_4",
+                  "address": "001053f8"
+                },
+                "term": {
+                  "lhs": {
+                    "name": "EAX",
+                    "value": null,
+                    "address": null,
+                    "size": 4,
+                    "is_virtual": false
+                  },
+                  "rhs": {
+                    "mnemonic": "PIECE",
+                    "input0": {
+                      "name": null,
+                      "value": "00000000",
+                      "address": null,
+                      "size": 2,
+                      "is_virtual": false
+                    },
+                    "input1": {
+                      "name": "AX",
+                      "value": null,
+                      "address": null,
+                      "size": 2,
+                      "is_virtual": false
+                    },
+                    "input2": null
+                  }
+                }
+              }
+            "#,
+            )
+            .unwrap(),
+            def_5_t: serde_json::from_str(
+                r#"
+            {
+                "tid": {
+                  "id": "instr_001053f8_5",
+                  "address": "001053f8"
+                },
+                "term": {
+                  "lhs": {
+                    "name": "AX",
+                    "value": null,
+                    "address": null,
+                    "size": 2,
+                    "is_virtual": false
+                  },
+                  "rhs": {
+                    "mnemonic": "SUBPIECE",
+                    "input0": {
+                      "name": "EDI",
+                      "value": null,
+                      "address": null,
+                      "size": 4,
+                      "is_virtual": false
+                    },
+                    "input1": {
+                      "name": null,
+                      "value": "00000001",
+                      "address": null,
+                      "size": 4,
+                      "is_virtual": false
+                    },
                     "input2": null
                   }
                 }
@@ -568,6 +652,8 @@ fn from_project_to_ir_project() {
     blk.term.defs.push(setup.def_1_t);
     blk.term.defs.push(setup.def_2_t);
     blk.term.defs.push(setup.def_3_t);
+    blk.term.defs.push(setup.def_4_t);
+    blk.term.defs.push(setup.def_5_t);
     blk.term.jmps.push(setup.jmp_t);
 
     let mut sub = setup.sub_t;
@@ -641,7 +727,7 @@ fn from_project_to_ir_project() {
 
     // From: EAX = COPY EDI && RAX = INT_ZEXT EAX
     // To: RAX = INT_ZEXT SUBPIECE(RDI, 0, 4)
-    let expected_def_2 = IrDef::Assign {
+    let expected_def_3 = IrDef::Assign {
         var: ir_rax_var.clone(),
         value: IrExpression::Cast {
             op: CastOpType::IntZExt,
@@ -649,6 +735,50 @@ fn from_project_to_ir_project() {
             arg: Box::new(IrExpression::Subpiece {
                 low_byte: ByteSize::new(0),
                 size: ByteSize::new(4),
+                arg: Box::new(IrExpression::Var(ir_rdi_var.clone())),
+            }),
+        },
+    };
+
+    // From: EAX = PIECE(0:2, AX)
+    // To: RAX = PIECE(SUBPIECE(RAX, 4, 4), PIECE(0:2, SUBPIECE(RAX, 0, 2)))
+    let expected_def_4 = IrDef::Assign {
+        var: ir_rax_var.clone(),
+        value: IrExpression::BinOp {
+            op: BinOpType::Piece,
+            lhs: Box::new(IrExpression::Subpiece {
+                low_byte: ByteSize::new(4),
+                size: ByteSize::new(4),
+                arg: Box::new(IrExpression::Var(ir_rax_var.clone())),
+            }),
+            rhs: Box::new(IrExpression::BinOp {
+                op: BinOpType::Piece,
+                lhs: Box::new(IrExpression::Const(Bitvector::zero(
+                    ByteSize::new(2).into(),
+                ))),
+                rhs: Box::new(IrExpression::Subpiece {
+                    low_byte: ByteSize::new(0),
+                    size: ByteSize::new(2),
+                    arg: Box::new(IrExpression::Var(ir_rax_var.clone())),
+                }),
+            }),
+        },
+    };
+
+    // From: AX = SUBPIECE(EDI, 1, 2)
+    // To: RAX = PIECE(SUBPIECE(RAX, 2, 6), SUBPIECE(RDI, 1, 2))
+    let expected_def_5 = IrDef::Assign {
+        var: ir_rax_var.clone(),
+        value: IrExpression::BinOp {
+            op: BinOpType::Piece,
+            lhs: Box::new(IrExpression::Subpiece {
+                low_byte: ByteSize::new(2),
+                size: ByteSize::new(6),
+                arg: Box::new(IrExpression::Var(ir_rax_var.clone())),
+            }),
+            rhs: Box::new(IrExpression::Subpiece {
+                low_byte: ByteSize::new(1),
+                size: ByteSize::new(2),
                 arg: Box::new(IrExpression::Var(ir_rdi_var.clone())),
             }),
         },
@@ -668,8 +798,8 @@ fn from_project_to_ir_project() {
         return_: Some(target_tid.clone()),
     };
 
-    // Checks whether the zero extension was correctly removed; leaving only 3 definitions behind.
-    assert_eq!(ir_program.subs[0].term.blocks[0].term.defs.len(), 3);
+    // Checks whether the zero extension was correctly removed; leaving only 5 definitions behind.
+    assert_eq!(ir_program.subs[0].term.blocks[0].term.defs.len(), 5);
 
     // Checks if the other definitions and the jump were correctly casted.
     assert_eq!(
@@ -682,7 +812,15 @@ fn from_project_to_ir_project() {
     );
     assert_eq!(
         ir_program.subs[0].term.blocks[0].term.defs[2].term,
-        expected_def_2
+        expected_def_3
+    );
+    assert_eq!(
+        ir_program.subs[0].term.blocks[0].term.defs[3].term,
+        expected_def_4
+    );
+    assert_eq!(
+        ir_program.subs[0].term.blocks[0].term.defs[4].term,
+        expected_def_5
     );
     assert_eq!(
         ir_program.subs[0].term.blocks[0].term.jmps[0].term,
