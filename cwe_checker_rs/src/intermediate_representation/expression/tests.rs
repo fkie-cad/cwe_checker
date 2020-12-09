@@ -119,36 +119,6 @@ fn trivial_expression_substitution() {
 }
 
 #[test]
-fn zero_extension_check() {
-    let setup = Setup::new();
-
-    let zero_extend_expr = Expression::Cast {
-        op: CastOpType::IntZExt,
-        size: ByteSize::new(8),
-        arg: Box::new(setup.eax_variable.clone()),
-    };
-    // An expression that is a zero extension but does not directly contain a variable
-    let zero_extend_but_no_var_expr = Expression::Cast {
-        op: CastOpType::IntZExt,
-        size: ByteSize::new(8),
-        arg: Box::new(setup.int_sub_expr.clone()),
-    };
-
-    let non_zero_extend_expr = Expression::Cast {
-        op: CastOpType::IntSExt,
-        size: ByteSize::new(8),
-        arg: Box::new(setup.eax_variable.clone()),
-    };
-
-    assert_eq!(zero_extend_expr.check_for_zero_extension(), true);
-    assert_eq!(
-        zero_extend_but_no_var_expr.check_for_zero_extension(),
-        false
-    );
-    assert_eq!(non_zero_extend_expr.check_for_zero_extension(), false);
-}
-
-#[test]
 fn subpiece_creation() {
     let setup = Setup::new();
     let lsb = ByteSize::new(0);
@@ -236,7 +206,7 @@ fn piecing_expressions_together() {
 #[test]
 fn piecing_extending_or_none() {
     let setup = Setup::new();
-    let mut zero_extend: bool = true;
+    let zero_extend: Option<Tid> = Some(Tid::new("zero_tid"));
     let output_size: Option<ByteSize> = Some(ByteSize::new(8));
     let mut expr = setup.int_sub_expr.clone();
     let expected_expr_with_zero_extend = Expression::Cast {
@@ -246,17 +216,16 @@ fn piecing_extending_or_none() {
     };
     // Test assumes that the next instruction is a zero extension of the current output
     expr.piece_zero_extend_or_none(
-        &zero_extend,
-        &Some(&&setup.rax_register),
-        &output_size,
-        &Some(&setup.eax_register),
+        zero_extend,
+        Some(&&setup.rax_register),
+        output_size,
+        Some(&setup.eax_register),
     );
     assert_eq!(expr, expected_expr_with_zero_extend);
 
-    zero_extend = false;
     expr = setup.int_sub_expr.clone();
     // Test assumes there is no output (i.e. virtual register output)
-    expr.piece_zero_extend_or_none(&zero_extend, &None, &None, &None);
+    expr.piece_zero_extend_or_none(None, None, None, None);
     assert_eq!(expr, setup.int_sub_expr);
 
     expr = setup.int_sub_subpiece_expr.clone();
@@ -272,10 +241,10 @@ fn piecing_extending_or_none() {
     };
     // Test assume output is a base register and the input needs to be pieced together
     expr.piece_zero_extend_or_none(
-        &zero_extend,
-        &Some(&&setup.rax_register),
-        &output_size,
-        &Some(&setup.eax_register),
+        None,
+        Some(&&setup.rax_register),
+        output_size,
+        Some(&setup.eax_register),
     );
     assert_eq!(expr, expected_expr_with_piecing);
 }
@@ -307,7 +276,7 @@ fn processing_sub_registers() {
     // Test Case: Subregister output
     let out_sub = Variable {
         name: setup.eax_name.clone(),
-        size: ByteSize::new(8),
+        size: ByteSize::new(4),
         is_temp: false,
     };
     // Test Case: Baseregister output
@@ -360,7 +329,7 @@ fn processing_sub_registers() {
         arg: Box::new(setup.int_sub_subpiece_expr.clone()),
     };
 
-    expr.process_sub_registers_if_necessary(output, &register_map, peeked);
+    expr.cast_sub_registers_to_base_register_subpieces(output, &register_map, peeked);
     assert_eq!(expr, expected_expr);
 
     // 2. Test: peeked is not a zero extend and output is a sub register
@@ -379,7 +348,7 @@ fn processing_sub_registers() {
     };
     let mut sub_reg_output = out_sub.clone();
     output = Some(&mut sub_reg_output);
-    expr.process_sub_registers_if_necessary(output, &register_map, peeked);
+    expr.cast_sub_registers_to_base_register_subpieces(output, &register_map, peeked);
     assert_eq!(expr, expected_expr);
 
     // 3. Test: peek is neglectable and output is a base register
@@ -387,7 +356,7 @@ fn processing_sub_registers() {
     peeked = Some(&def_term_pointer);
     expr = setup.int_sub_expr.clone();
     output = Some(&mut out_base);
-    expr.process_sub_registers_if_necessary(output, &register_map, peeked);
+    expr.cast_sub_registers_to_base_register_subpieces(output, &register_map, peeked);
     assert_eq!(expr, setup.int_sub_subpiece_expr);
 
     // 4. Test: peek is neglectable and output is a virtual register
@@ -395,6 +364,6 @@ fn processing_sub_registers() {
     peeked = Some(&def_term_pointer);
     expr = setup.int_sub_expr.clone();
     output = Some(&mut out_virtual);
-    expr.process_sub_registers_if_necessary(output, &register_map, peeked);
+    expr.cast_sub_registers_to_base_register_subpieces(output, &register_map, peeked);
     assert_eq!(expr, setup.int_sub_subpiece_expr);
 }

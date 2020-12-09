@@ -1,4 +1,4 @@
-use super::{ByteSize, Expression, Variable};
+use super::{ByteSize, CastOpType, Expression, Variable};
 use crate::prelude::*;
 use crate::utils::log::LogMessage;
 use std::collections::HashSet;
@@ -66,6 +66,33 @@ pub enum Def {
     },
     /// A register assignment, assigning the result of the expression `value` to the register `var`.
     Assign { var: Variable, value: Expression },
+}
+
+impl Term<Def> {
+    /// This function checks whether the following instruction
+    /// is a zero extension of the currently overwritten sub register and
+    /// if so, returns its TID
+    pub fn check_for_zero_extension(&self, output_name: String) -> Option<Tid> {
+        match &self.term {
+            Def::Assign { var, value } => {
+                if output_name == var.name {
+                    match value {
+                        Expression::Cast { op, arg, .. } => match op {
+                            CastOpType::IntZExt => match **arg {
+                                Expression::Var(_) => Some(self.tid.clone()),
+                                _ => None,
+                            },
+                            _ => None,
+                        },
+                        _ => None,
+                    }
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
 }
 
 /// A `Jmp` instruction affects the control flow of a program, i.e. it may change the instruction pointer.
@@ -442,6 +469,8 @@ impl Project {
 
 #[cfg(test)]
 mod tests {
+    use crate::intermediate_representation::BinOpType;
+
     use super::*;
 
     impl Blk {
@@ -518,5 +547,88 @@ mod tests {
             )
             .is_err());
         assert_eq!(jmp_term.term, Jmp::Branch(Tid::new("dummy_blk")));
+    }
+
+    #[test]
+    fn zero_extension_check() {
+        let eax_variable = Expression::Var(Variable {
+            name: String::from("EAX"),
+            size: ByteSize::new(4),
+            is_temp: false,
+        });
+        let int_sub_expr = Expression::BinOp {
+            op: BinOpType::IntSub,
+            lhs: Box::new(Expression::Var(Variable {
+                name: String::from("EAX"),
+                size: ByteSize::new(4),
+                is_temp: false,
+            })),
+            rhs: Box::new(Expression::Var(Variable {
+                name: String::from("ECX"),
+                size: ByteSize::new(4),
+                is_temp: false,
+            })),
+        };
+
+        let zero_extend_def = Term {
+            tid: Tid::new("zero_tid"),
+            term: Def::Assign {
+                var: Variable {
+                    name: String::from("EAX"),
+                    size: ByteSize::new(4),
+                    is_temp: false,
+                },
+                value: Expression::Cast {
+                    op: CastOpType::IntZExt,
+                    size: ByteSize::new(8),
+                    arg: Box::new(eax_variable.clone()),
+                },
+            },
+        };
+        // An expression that is a zero extension but does not directly contain a variable
+        let zero_extend_but_no_var_def = Term {
+            tid: Tid::new("zero_tid"),
+            term: Def::Assign {
+                var: Variable {
+                    name: String::from("EAX"),
+                    size: ByteSize::new(4),
+                    is_temp: false,
+                },
+                value: Expression::Cast {
+                    op: CastOpType::IntZExt,
+                    size: ByteSize::new(8),
+                    arg: Box::new(int_sub_expr.clone()),
+                },
+            },
+        };
+
+        let non_zero_extend_def = Term {
+            tid: Tid::new("zero_tid"),
+            term: Def::Assign {
+                var: Variable {
+                    name: String::from("EAX"),
+                    size: ByteSize::new(4),
+                    is_temp: false,
+                },
+                value: Expression::Cast {
+                    op: CastOpType::IntSExt,
+                    size: ByteSize::new(8),
+                    arg: Box::new(eax_variable.clone()),
+                },
+            },
+        };
+
+        assert_eq!(
+            zero_extend_def.check_for_zero_extension(String::from("EAX")),
+            Some(Tid::new("zero_tid"))
+        );
+        assert_eq!(
+            zero_extend_but_no_var_def.check_for_zero_extension(String::from("EAX")),
+            None
+        );
+        assert_eq!(
+            non_zero_extend_def.check_for_zero_extension(String::from("EAX")),
+            None
+        );
     }
 }

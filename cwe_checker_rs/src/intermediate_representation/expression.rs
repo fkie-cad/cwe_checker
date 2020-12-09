@@ -135,18 +135,32 @@ impl Expression {
         }
     }
 
-    /// This function checks whether there is an output variable to the definition and
-    /// whether the next definition is a zero extension in case there is a output variable.
-    /// Lastly it calls the function to iterate recursively into the current expression and
-    /// pieces it together if necessary.
-    pub fn process_sub_registers_if_necessary(
+    /// This function checks for sub registers in pcode instruction and casts them into
+    /// SUBPIECE expressions with the base register as argument. It also checks whether
+    /// the given Term<Def> has a output sub register and if so, casts it into its
+    /// corresponding base register.
+    /// Lastly, it checks whether the following pcode instruction is a zero extension of
+    /// the currently overwritten sub register. If so, the zero extension is wrapped around
+    /// the current instruction and the TID of the zero extension instruction is returned
+    /// for later removal.
+    /// If there is no zero extension but an output register, the multiple SUBPIECEs are put
+    /// together to the size of the corresponding output base register using the PIECE instruction.
+    /// A few examples:
+    /// 1. From: EAX = COPY EDX;
+    ///    To:   RAX = COPY PIECE(SUBPIECE(RAX, 4, 4), SUBPIECE(RDX, 0, 4));
+    ///
+    /// 2. From:  AH = AH INT_XOR AH;
+    ///    To:   RAX = PIECE(PIECE(SUBPIECE(RAX, 2, 6), (SUBPIECE(RAX, 1, 1) INT_XOR SUBPIECE(RAX, 1, 1)), SUBPIECE(RAX, 0, 1));
+    ///
+    /// 3. FROM EAX = COPY EDX && RAX = INT_ZEXT EAX;
+    ///    To:  RAX = INT_ZEXT SUBPIECE(RDX, 0, 4);
+    pub fn cast_sub_registers_to_base_register_subpieces(
         &mut self,
         output: Option<&mut Variable>,
         register_map: &HashMap<&String, &RegisterProperties>,
         peeked: Option<&&mut Term<Def>>,
     ) -> Option<Tid> {
         let mut output_base_size: Option<ByteSize> = None;
-        let mut peek_is_zero_extension: bool = false;
         let mut output_base_register: Option<&&RegisterProperties> = None;
         let mut output_sub_register: Option<&RegisterProperties> = None;
         let mut zero_extend_tid: Option<Tid> = None;
@@ -156,23 +170,12 @@ impl Expression {
                 if *register.register != *register.base_register {
                     output_sub_register = Some(register);
                     output_base_register = register_map.get(&register.base_register);
-                    output_value.name = String::from(register.base_register.clone());
-                    output_value.size = output_base_register.unwrap().size.clone();
-                    output_base_size = Some(output_value.size.clone());
+                    output_value.name = register.base_register.clone();
+                    output_value.size = output_base_register.unwrap().size;
+                    output_base_size = Some(output_value.size);
 
                     if let Some(peek) = peeked {
-                        match &peek.term {
-                            Def::Assign { var, value } => {
-                                if output_value.name == var.name {
-                                    if value.check_for_zero_extension() {
-                                        peek_is_zero_extension = true;
-                                        // set the def tid to be deleted from the program
-                                        zero_extend_tid = Some(peek.tid.clone());
-                                    }
-                                }
-                            }
-                            _ => (),
-                        }
+                        zero_extend_tid = peek.check_for_zero_extension(output_value.name.clone());
                     }
                 }
             }
@@ -181,10 +184,10 @@ impl Expression {
         // based on the zero extension and base register output, either piece the subpieces together,
         // zero extend the expression or do nothing (e.g. if output is a virtual register, no further actions should be taken)
         self.piece_zero_extend_or_none(
-            &peek_is_zero_extension,
-            &output_base_register,
-            &output_base_size,
-            &output_sub_register,
+            zero_extend_tid.clone(),
+            output_base_register,
+            output_base_size,
+            output_sub_register,
         );
 
         zero_extend_tid
@@ -202,7 +205,7 @@ impl Expression {
                 arg.check_for_sub_register(register_map)
             }
             Expression::Subpiece { arg, .. } => {
-                let truncated = &mut **arg;
+                let truncated: &mut Expression = arg;
                 // Check whether the truncated data source is a sub register and if so,
                 // change it to its corresponding base register.
                 match truncated {
@@ -214,7 +217,6 @@ impl Expression {
                                     .get(&register.base_register)
                                     .unwrap()
                                     .size
-                                    .clone()
                             }
                         }
                     }
@@ -247,11 +249,11 @@ impl Expression {
         register_map: &HashMap<&String, &RegisterProperties>,
     ) {
         *self = Expression::Subpiece {
-            low_byte: lsb.clone(),
-            size: size.clone(),
+            low_byte: lsb,
+            size,
             arg: Box::new(Expression::Var(Variable {
                 name: base.clone(),
-                size: register_map.get(&base).unwrap().size.clone(),
+                size: register_map.get(&base).unwrap().size,
                 is_temp: false,
             })),
         };
@@ -264,15 +266,15 @@ impl Expression {
     /// or does nothing in case there is no overwritten sub register.
     fn piece_zero_extend_or_none(
         &mut self,
-        zero_extend: &bool,
-        output_base_register: &Option<&&RegisterProperties>,
-        output_size: &Option<ByteSize>,
-        sub_register: &Option<&RegisterProperties>,
+        zero_extend: Option<Tid>,
+        output_base_register: Option<&&RegisterProperties>,
+        output_size: Option<ByteSize>,
+        sub_register: Option<&RegisterProperties>,
     ) {
-        if *zero_extend {
+        if zero_extend.is_some() {
             *self = Expression::Cast {
                 op: CastOpType::IntZExt,
-                size: output_size.unwrap().clone(),
+                size: output_size.unwrap(),
                 arg: Box::new(self.clone()),
             }
         } else if output_base_register.is_some() {
@@ -283,6 +285,9 @@ impl Expression {
         }
     }
 
+    /// This function puts multiple SUBPIECE into PIECE of the size of the
+    /// base register. Depending on the position of the LSB of the sub register,
+    /// also nested PIECE instruction are possible.
     fn piece_two_expressions_together(
         &mut self,
         output_base_register: &RegisterProperties,
@@ -295,7 +300,7 @@ impl Expression {
 
         let base_subpiece = Box::new(Expression::Var(Variable {
             name: base_name.clone(),
-            size: base_size.clone(),
+            size: base_size,
             is_temp: false,
         }));
 
@@ -314,8 +319,8 @@ impl Expression {
                 }),
                 rhs: Box::new(Expression::Subpiece {
                     low_byte: ByteSize::new(0),
-                    size: sub_lsb.clone(),
-                    arg: base_subpiece.clone(),
+                    size: sub_lsb,
+                    arg: base_subpiece,
                 }),
             }
         }
@@ -324,27 +329,12 @@ impl Expression {
             *self = Expression::BinOp {
                 op: BinOpType::Piece,
                 lhs: Box::new(Expression::Subpiece {
-                    low_byte: sub_size.clone(),
+                    low_byte: sub_size,
                     size: base_size - sub_size,
-                    arg: base_subpiece.clone(),
+                    arg: base_subpiece,
                 }),
                 rhs: Box::new(self.clone()),
             }
-        }
-    }
-
-    /// This function checks whether the following instruction
-    /// is a zero extension of the currently overwritten sub register
-    fn check_for_zero_extension(&self) -> bool {
-        match self {
-            Expression::Cast { op, arg, .. } => match op {
-                CastOpType::IntZExt => match **arg {
-                    Expression::Var(_) => true,
-                    _ => false,
-                },
-                _ => false,
-            },
-            _ => false,
         }
     }
 }

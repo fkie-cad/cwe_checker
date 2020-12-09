@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use super::{Expression, ExpressionType, RegisterProperties, Variable};
 use crate::intermediate_representation::Arg as IrArg;
@@ -421,7 +421,7 @@ impl From<Project> for IrProject {
             .iter()
             .map(|p| (&p.register, p))
             .collect();
-        let mut zero_extend_tids: HashMap<String, Tid> = HashMap::new();
+        let mut zero_extend_tids: HashSet<Tid> = HashSet::new();
         // iterates over definitions and checks whether sub registers are used
         // if so, they are swapped with subpieces of base registers
         for sub in program.term.subs.iter_mut() {
@@ -431,38 +431,34 @@ impl From<Project> for IrProject {
                     let peeked_def = def_iter.peek();
                     match &mut def.term {
                         IrDef::Assign { var, value } => {
-                            let zero_tid: Option<Tid> = value.process_sub_registers_if_necessary(
-                                Some(var),
-                                &register_map,
-                                peeked_def,
-                            );
-                            match zero_tid {
-                                Some(tid) => {
-                                    zero_extend_tids.insert(format!("{}", tid), tid);
-                                }
-                                _ => (),
+                            if let Some(zero_tid) = value
+                                .cast_sub_registers_to_base_register_subpieces(
+                                    Some(var),
+                                    &register_map,
+                                    peeked_def,
+                                )
+                            {
+                                zero_extend_tids.insert(zero_tid);
                             }
                         }
                         IrDef::Load { var, address } => {
-                            let zero_tid: Option<Tid> = address.process_sub_registers_if_necessary(
-                                Some(var),
-                                &register_map,
-                                peeked_def,
-                            );
-                            match zero_tid {
-                                Some(tid) => {
-                                    zero_extend_tids.insert(format!("{}", tid), tid);
-                                }
-                                _ => (),
+                            if let Some(zero_tid) = address
+                                .cast_sub_registers_to_base_register_subpieces(
+                                    Some(var),
+                                    &register_map,
+                                    peeked_def,
+                                )
+                            {
+                                zero_extend_tids.insert(zero_tid);
                             }
                         }
                         IrDef::Store { address, value } => {
-                            address.process_sub_registers_if_necessary(
+                            address.cast_sub_registers_to_base_register_subpieces(
                                 None,
                                 &register_map,
                                 peeked_def,
                             );
-                            value.process_sub_registers_if_necessary(
+                            value.cast_sub_registers_to_base_register_subpieces(
                                 None,
                                 &register_map,
                                 peeked_def,
@@ -470,20 +466,35 @@ impl From<Project> for IrProject {
                         }
                     }
                 }
-                let mut jmp_iter = blk.term.jmps.iter_mut();
-                while let Some(jmp) = jmp_iter.next() {
+                for jmp in blk.term.jmps.iter_mut() {
                     match &mut jmp.term {
                         IrJmp::BranchInd(dest) => {
-                            dest.process_sub_registers_if_necessary(None, &register_map, None);
+                            dest.cast_sub_registers_to_base_register_subpieces(
+                                None,
+                                &register_map,
+                                None,
+                            );
                         }
                         IrJmp::CBranch { condition, .. } => {
-                            condition.process_sub_registers_if_necessary(None, &register_map, None);
+                            condition.cast_sub_registers_to_base_register_subpieces(
+                                None,
+                                &register_map,
+                                None,
+                            );
                         }
                         IrJmp::CallInd { target, .. } => {
-                            target.process_sub_registers_if_necessary(None, &register_map, None);
+                            target.cast_sub_registers_to_base_register_subpieces(
+                                None,
+                                &register_map,
+                                None,
+                            );
                         }
                         IrJmp::Return(dest) => {
-                            dest.process_sub_registers_if_necessary(None, &register_map, None);
+                            dest.cast_sub_registers_to_base_register_subpieces(
+                                None,
+                                &register_map,
+                                None,
+                            );
                         }
                         _ => (),
                     }
@@ -491,8 +502,7 @@ impl From<Project> for IrProject {
                 // Remove all tagged zero extension instruction that came after a sub register instruction
                 // since it has been wrapped around the former instruction.
                 blk.term.defs.retain(|def| {
-                    let def_tid = format!("{}", def.tid);
-                    if zero_extend_tids.contains_key(&def_tid) {
+                    if zero_extend_tids.contains(&def.tid) {
                         return false;
                     }
                     true
