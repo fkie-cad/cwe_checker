@@ -175,7 +175,10 @@ impl Expression {
                     output_base_size = Some(output_value.size);
 
                     if let Some(peek) = peeked {
-                        zero_extend_tid = peek.check_for_zero_extension(output_value.name.clone());
+                        zero_extend_tid = peek.check_for_zero_extension(
+                            output_value.name.clone(),
+                            output_sub_register.unwrap().register.clone(),
+                        );
                     }
                 }
             }
@@ -213,10 +216,8 @@ impl Expression {
                         if let Some(register) = register_map.get(&variable.name) {
                             if variable.name != *register.base_register {
                                 variable.name = register.base_register.clone();
-                                variable.size = register_map
-                                    .get(&register.base_register)
-                                    .unwrap()
-                                    .size
+                                variable.size =
+                                    register_map.get(&register.base_register).unwrap().size
                             }
                         }
                     }

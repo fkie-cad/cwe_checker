@@ -69,27 +69,30 @@ pub enum Def {
 }
 
 impl Term<Def> {
-    /// This function checks whether the following instruction
-    /// is a zero extension of the currently overwritten sub register and
-    /// if so, returns its TID
-    pub fn check_for_zero_extension(&self, output_name: String) -> Option<Tid> {
+    /// This function checks whether the instruction
+    /// is a zero extension of the overwritten sub register of the previous instruction.
+    /// If so, returns its TID
+    pub fn check_for_zero_extension(
+        &self,
+        output_name: String,
+        output_sub_register: String,
+    ) -> Option<Tid> {
         match &self.term {
-            Def::Assign { var, value } => {
-                if output_name == var.name {
-                    match value {
-                        Expression::Cast { op, arg, .. } => match op {
-                            CastOpType::IntZExt => match **arg {
-                                Expression::Var(_) => Some(self.tid.clone()),
-                                _ => None,
-                            },
+            Def::Assign { var, value } if output_name == var.name => match value {
+                Expression::Cast { op, arg, .. } => {
+                    let argument: &Expression = arg;
+                    match op {
+                        CastOpType::IntZExt => match argument {
+                            Expression::Var(var) if var.name == output_sub_register => {
+                                Some(self.tid.clone())
+                            }
                             _ => None,
                         },
                         _ => None,
                     }
-                } else {
-                    None
                 }
-            }
+                _ => None,
+            },
             _ => None,
         }
     }
@@ -574,8 +577,8 @@ mod tests {
             tid: Tid::new("zero_tid"),
             term: Def::Assign {
                 var: Variable {
-                    name: String::from("EAX"),
-                    size: ByteSize::new(4),
+                    name: String::from("RAX"),
+                    size: ByteSize::new(8),
                     is_temp: false,
                 },
                 value: Expression::Cast {
@@ -590,8 +593,8 @@ mod tests {
             tid: Tid::new("zero_tid"),
             term: Def::Assign {
                 var: Variable {
-                    name: String::from("EAX"),
-                    size: ByteSize::new(4),
+                    name: String::from("RAX"),
+                    size: ByteSize::new(8),
                     is_temp: false,
                 },
                 value: Expression::Cast {
@@ -606,8 +609,8 @@ mod tests {
             tid: Tid::new("zero_tid"),
             term: Def::Assign {
                 var: Variable {
-                    name: String::from("EAX"),
-                    size: ByteSize::new(4),
+                    name: String::from("RAX"),
+                    size: ByteSize::new(8),
                     is_temp: false,
                 },
                 value: Expression::Cast {
@@ -619,15 +622,16 @@ mod tests {
         };
 
         assert_eq!(
-            zero_extend_def.check_for_zero_extension(String::from("EAX")),
+            zero_extend_def.check_for_zero_extension(String::from("RAX"), String::from("EAX")),
             Some(Tid::new("zero_tid"))
         );
         assert_eq!(
-            zero_extend_but_no_var_def.check_for_zero_extension(String::from("EAX")),
+            zero_extend_but_no_var_def
+                .check_for_zero_extension(String::from("RAX"), String::from("EAX")),
             None
         );
         assert_eq!(
-            non_zero_extend_def.check_for_zero_extension(String::from("EAX")),
+            non_zero_extend_def.check_for_zero_extension(String::from("RAX"), String::from("EAX")),
             None
         );
     }
