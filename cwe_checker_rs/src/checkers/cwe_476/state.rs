@@ -235,7 +235,7 @@ impl State {
     }
 
     /// If the given address points to the stack,
-    /// return true if and only if the value at that tsack position is tainted.
+    /// return true if and only if the value at that stack position is tainted.
     /// If the given address points to a non-stack memory object,
     /// return true if the memory object contains any tainted value (at any position).
     pub fn check_if_address_points_to_taint(
