@@ -143,7 +143,7 @@ fn run_with_ghidra(args: CmdlineArgs) {
 
     let pointer_inference_results = if modules
         .iter()
-        .any(|module| module.name == "CWE476" || module.name == "Memory")
+        .any(|module| module.name == "CWE476" || module.name == "Memory" || module.name == "CWE367")
     {
         Some(analysis_results.compute_pointer_inference(&config["Memory"]))
     } else {
