@@ -291,6 +291,18 @@ impl AbstractObjectList {
             object.remove_ids(ids_to_remove);
         }
     }
+
+    // Return the object type of a memory object.
+    // Returns an error if no object with the given ID is contained in the object list.
+    pub fn get_object_type(
+        &self,
+        object_id: &AbstractIdentifier,
+    ) -> Result<Option<ObjectType>, ()> {
+        match self.objects.get(object_id) {
+            Some((object, _)) => Ok(object.get_object_type()),
+            None => Err(()),
+        }
+    }
 }
 
 impl AbstractDomain for AbstractObjectList {

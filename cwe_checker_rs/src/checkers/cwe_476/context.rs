@@ -168,50 +168,78 @@ impl<'a> Context<'a> {
         let _ = self.cwe_collector.send(cwe_warning);
     }
 
-    /// Check whether the given function parameter contains taint
-    /// when evaluating it on the given state.
-    ///
-    /// The `node_id` is used to find the correct pointer inference state.
-    pub fn check_parameter_arg_for_taint(
+    /// Check parameters of an extern symbol for taint.
+    /// For pointers as parameters we also check
+    /// whether the pointer points directly to taint if it points to some stack address.
+    /// or whether the pointed to object contains any taint at all if it is not a stack object.
+    pub fn check_parameters_for_taint(
         &self,
-        parameter: &Arg,
         state: &State,
+        extern_symbol: &ExternSymbol,
         node_id: NodeIndex,
-    ) -> Taint {
-        match parameter {
-            Arg::Register(var) => state.eval(&Expression::Var(var.clone())),
-            Arg::Stack { offset, size } => {
-                if let Some(NodeValue::Value(pi_state)) =
-                    self.pointer_inference_results.get_node_value(node_id)
-                {
-                    if let Ok(stack_address) = pi_state.eval(&Expression::BinOp {
-                        op: BinOpType::IntAdd,
-                        lhs: Box::new(Expression::Var(self.project.stack_pointer_register.clone())),
-                        rhs: Box::new(Expression::Const(
-                            Bitvector::from_i64(*offset)
-                                .into_truncate(apint::BitWidth::from(
-                                    self.project.stack_pointer_register.size,
-                                ))
-                                .unwrap(),
-                        )),
-                    }) {
-                        state.load_taint_from_memory(&stack_address, *size)
-                    } else {
-                        Taint::Top(*size)
-                    }
-                } else {
-                    Taint::Top(*size)
+    ) -> bool {
+        // First check for taint directly in parameter registers (we don't need a pointer inference state for that)
+        for parameter in extern_symbol.parameters.iter() {
+            if let Arg::Register(var) = parameter {
+                if state.eval(&Expression::Var(var.clone())).is_tainted() {
+                    return true;
                 }
             }
         }
+        if let Some(NodeValue::Value(pi_state)) =
+            self.pointer_inference_results.get_node_value(node_id)
+        {
+            // Check stack parameters and collect referenced memory object that need to be checked for taint.
+            for parameter in extern_symbol.parameters.iter() {
+                match parameter {
+                    Arg::Register(var) => {
+                        if let Ok(data) = pi_state.eval(&Expression::Var(var.clone())) {
+                            if state.check_if_address_points_to_taint(data, pi_state) {
+                                return true;
+                            }
+                        }
+                    }
+                    Arg::Stack { offset, size } => {
+                        if let Ok(stack_address) = pi_state.eval(&Expression::BinOp {
+                            op: BinOpType::IntAdd,
+                            lhs: Box::new(Expression::Var(
+                                self.project.stack_pointer_register.clone(),
+                            )),
+                            rhs: Box::new(Expression::Const(
+                                Bitvector::from_i64(*offset)
+                                    .into_truncate(apint::BitWidth::from(
+                                        self.project.stack_pointer_register.size,
+                                    ))
+                                    .unwrap(),
+                            )),
+                        }) {
+                            if state
+                                .load_taint_from_memory(&stack_address, *size)
+                                .is_tainted()
+                            {
+                                return true;
+                            }
+                        }
+                        if let Ok(stack_param) = pi_state
+                            .eval_parameter_arg(parameter, &self.project.stack_pointer_register)
+                        {
+                            if state.check_if_address_points_to_taint(stack_param, pi_state) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        false
     }
 
     /// If a possible  parameter register of the call contains taint,
     /// generate a CWE warning and return `None`.
     /// Else remove all taint contained in non-callee-saved registers.
     fn handle_generic_call(&self, state: &State, call_tid: &Tid) -> Option<State> {
-        // TODO: We do not yet check recursively for taint contained in objects pointed to by parameters.
-        if state.check_generic_function_params_for_taint(self.project) {
+        let pi_state_option = self.get_current_pointer_inference_state(state, call_tid);
+        if state.check_generic_function_params_for_taint(self.project, pi_state_option.as_ref()) {
             self.generate_cwe_warning(call_tid);
             return None;
         }
@@ -249,17 +277,16 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
     /// Generate a CWE warning if taint may be contained in the function parameters.
     /// Always returns `None` so that the analysis stays intraprocedural.
     fn update_call(&self, state: &State, call: &Term<Jmp>, _target: &Node) -> Option<Self::Value> {
-        if state.check_generic_function_params_for_taint(self.project) {
+        let pi_state_option = self.get_current_pointer_inference_state(state, &call.tid);
+        if state.check_generic_function_params_for_taint(self.project, pi_state_option.as_ref()) {
             self.generate_cwe_warning(&call.tid);
         }
-        // TODO: We do not yet check recursively for taint contained in objects pointed to by parameters.
         None
     }
 
     /// If taint may be contained in the function parameters, generate a CWE warning and return None.
     /// Else remove taint from non-callee-saved registers.
     fn update_call_stub(&self, state: &State, call: &Term<Jmp>) -> Option<Self::Value> {
-        // TODO: We do not yet check recursively for taint contained in objects pointed to by parameters.
         if state.is_empty() {
             return None;
         }
@@ -270,14 +297,9 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
                         .jmp_to_blk_end_node_map
                         .get(&(call.tid.clone(), self.current_sub.unwrap().tid.clone()))
                         .unwrap();
-                    for parameter in extern_symbol.parameters.iter() {
-                        if !self
-                            .check_parameter_arg_for_taint(parameter, state, *blk_end_node_id)
-                            .is_top()
-                        {
-                            self.generate_cwe_warning(&call.tid);
-                            return None;
-                        }
+                    if self.check_parameters_for_taint(state, extern_symbol, *blk_end_node_id) {
+                        self.generate_cwe_warning(&call.tid);
+                        return None;
                     }
                     let mut new_state = state.clone();
                     new_state.remove_non_callee_saved_taint(
@@ -389,8 +411,9 @@ impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> 
     ) -> Option<State> {
         if let Some(state) = state_before_return {
             // If taint is returned, generate a CWE warning
-            if !state.is_empty() {
-                self.generate_cwe_warning(&return_term.tid)
+            let pi_state_option = self.get_current_pointer_inference_state(state, &return_term.tid);
+            if state.check_return_values_for_taint(self.project, pi_state_option.as_ref()) {
+                self.generate_cwe_warning(&return_term.tid);
             }
             // Do not return early in case `state_before_call` is also set (possible for recursive functions).
         }
@@ -433,15 +456,21 @@ mod tests {
         let project = Project::mock_empty();
         let pi_results = PointerInferenceComputation::mock(&project);
         let context = Context::mock(&project, &pi_results);
-        let (state, _pi_state) = State::mock_with_pi_state();
+        let (mut state, _pi_state) = State::mock_with_pi_state();
 
-        let arg = Arg::Register(Variable::mock("RAX", 8u64));
-        let param_taint = context.check_parameter_arg_for_taint(&arg, &state, NodeIndex::new(0));
-        assert!(param_taint.is_tainted());
+        assert_eq!(
+            context.check_parameters_for_taint(&state, &ExternSymbol::mock(), NodeIndex::new(0)),
+            false
+        );
 
-        let arg = Arg::Register(Variable::mock("RBX", 8u64));
-        let param_taint = context.check_parameter_arg_for_taint(&arg, &state, NodeIndex::new(0));
-        assert!(!param_taint.is_tainted());
+        state.set_register_taint(
+            &Variable::mock("RDI", ByteSize::new(8)),
+            Taint::Tainted(ByteSize::new(8)),
+        );
+        assert_eq!(
+            context.check_parameters_for_taint(&state, &ExternSymbol::mock(), NodeIndex::new(0)),
+            true
+        );
     }
 
     #[test]

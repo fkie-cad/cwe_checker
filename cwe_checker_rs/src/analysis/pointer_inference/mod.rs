@@ -25,7 +25,7 @@ use petgraph::Direction;
 use std::collections::HashMap;
 
 mod context;
-mod object;
+pub mod object;
 mod object_list;
 mod state;
 

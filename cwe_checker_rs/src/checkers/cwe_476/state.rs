@@ -222,25 +222,114 @@ impl State {
         }
     }
 
-    /// Check whether a generic function call may contain tainted values in its parameters.
-    /// Since we don't know the actual calling convention of the call,
-    /// we approximate the parameters with all parameter registers of the standard calling convention of the project.
-    pub fn check_generic_function_params_for_taint(&self, project: &Project) -> bool {
-        if let Some(calling_conv) = project.get_standard_calling_convention() {
-            for (register, taint) in &self.register_taint {
-                if calling_conv
-                    .parameter_register
-                    .iter()
-                    .any(|param| *param == register.name)
-                    && !taint.is_top()
-                {
+    /// Return true if the memory object with the given ID contains a tainted value.
+    pub fn check_mem_id_for_taint(&self, id: &AbstractIdentifier) -> bool {
+        if let Some(mem_object) = self.memory_taint.get(&id) {
+            for elem in mem_object.values() {
+                if elem.is_tainted() {
                     return true;
                 }
             }
-            false
+        }
+        false
+    }
+
+    /// If the given address points to the stack,
+    /// return true if and only if the value at that stack position is tainted.
+    /// If the given address points to a non-stack memory object,
+    /// return true if the memory object contains any tainted value (at any position).
+    pub fn check_if_address_points_to_taint(
+        &self,
+        address: Data,
+        pi_state: &PointerInferenceState,
+    ) -> bool {
+        use crate::analysis::pointer_inference::object::ObjectType;
+        if let Data::Pointer(pointer) = address {
+            for (target, offset) in pointer.targets() {
+                if let Ok(Some(ObjectType::Stack)) = pi_state.memory.get_object_type(target) {
+                    // Only check if the value at the address is tainted
+                    if let (Some(mem_object), BitvectorDomain::Value(target_offset)) =
+                        (self.memory_taint.get(target), offset)
+                    {
+                        if let Some(taint) = mem_object.get_unsized(target_offset.clone()) {
+                            if taint.is_tainted() {
+                                return true;
+                            }
+                        }
+                    }
+                } else {
+                    // Check whether the memory object contains any taint.
+                    if self.check_mem_id_for_taint(target) {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Check whether a register in the given register list contains taint.
+    /// Return `true` if taint was found and `false` if no taint was found.
+    fn check_register_list_for_taint(
+        &self,
+        register_list: &[String],
+        pi_state_option: Option<&PointerInferenceState>,
+    ) -> bool {
+        // Check whether a register contains taint
+        for (register, taint) in &self.register_taint {
+            if register_list
+                .iter()
+                .any(|reg_name| *reg_name == register.name)
+                && !taint.is_top()
+            {
+                return true;
+            }
+        }
+        // Check whether some memory object referenced by a register may contain taint
+        if let Some(pi_state) = pi_state_option {
+            for register_name in register_list {
+                if let Some(register_value) = pi_state.get_register_by_name(register_name) {
+                    if self.check_if_address_points_to_taint(register_value, pi_state) {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Check whether a generic function call may contain tainted values in its parameters.
+    /// Since we don't know the actual calling convention of the call,
+    /// we approximate the parameters with all parameter registers of the standard calling convention of the project.
+    pub fn check_generic_function_params_for_taint(
+        &self,
+        project: &Project,
+        pi_state_option: Option<&PointerInferenceState>,
+    ) -> bool {
+        if let Some(calling_conv) = project.get_standard_calling_convention() {
+            self.check_register_list_for_taint(
+                &calling_conv.parameter_register[..],
+                pi_state_option,
+            )
         } else {
-            // No standard calling convention found. Assume all registers may be parameters.
-            self.register_taint.values().any(|taint| !taint.is_top())
+            // No standard calling convention found. Assume everything may be parameters or referenced by parameters.
+            !self.is_empty()
+        }
+    }
+
+    /// Check whether the return registers may contain tainted values or point to objects containing tainted values.
+    /// Since we don't know the actual return registers,
+    /// we approximate them by all return registers of the standard calling convention of the project.
+    pub fn check_return_values_for_taint(
+        &self,
+        project: &Project,
+        pi_state_option: Option<&PointerInferenceState>,
+    ) -> bool {
+        if let Some(calling_conv) = project.get_standard_calling_convention() {
+            self.check_register_list_for_taint(&calling_conv.return_register[..], pi_state_option)
+        } else {
+            // No standard calling convention found. Assume everything may be return values or referenced by return values.
+            !self.is_empty()
         }
     }
 
