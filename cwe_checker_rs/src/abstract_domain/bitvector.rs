@@ -265,6 +265,11 @@ impl RegisterDomain for BitvectorDomain {
                         .into_sign_extend(apint::BitWidth::from(width))
                         .unwrap(),
                 ),
+                PopCount => BitvectorDomain::Value(
+                    Bitvector::from_u64(bitvec.count_ones() as u64)
+                        .into_truncate(apint::BitWidth::from(width))
+                        .unwrap(),
+                ),
                 Int2Float | Float2Float | Trunc => BitvectorDomain::new_top(width),
             }
         } else {
@@ -338,6 +343,7 @@ mod tests {
     #[test]
     fn bitvector_domain_as_value_domain() {
         use BinOpType::*;
+        use CastOpType::*;
         use UnOpType::*;
         let eight = bv(8);
         let sixteen = bv(16);
@@ -388,6 +394,11 @@ mod tests {
                 .bin_op(Piece, &BitvectorDomain::Value(Bitvector::from_i32(-1))),
             bv(-1)
         );
+
+        assert_eq!(
+            BitvectorDomain::Value(Bitvector::from_i32(-1)).cast(PopCount, ByteSize::new(8)),
+            bv(32)
+        )
     }
 
     #[test]

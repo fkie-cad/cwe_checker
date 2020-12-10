@@ -141,7 +141,7 @@ impl From<Def> for IrDef {
                     arg: Box::new(def.rhs.input0.unwrap().into()),
                 },
             },
-            INT_ZEXT | INT_SEXT | INT2FLOAT | FLOAT2FLOAT | TRUNC => IrDef::Assign {
+            INT_ZEXT | INT_SEXT | INT2FLOAT | FLOAT2FLOAT | TRUNC | POPCOUNT => IrDef::Assign {
                 var: def.lhs.clone().unwrap().into(),
                 value: IrExpression::Cast {
                     op: def.rhs.mnemonic.into(),

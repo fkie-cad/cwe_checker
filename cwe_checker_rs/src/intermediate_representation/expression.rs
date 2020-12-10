@@ -181,6 +181,7 @@ pub enum CastOpType {
     Int2Float,
     Float2Float,
     Trunc,
+    PopCount,
 }
 
 /// The type/mnemonic of an unary operation

@@ -53,10 +53,9 @@ Just run `make all` to compile and register the plugin with BAP. You can run the
 
 ### Local installation with Ghidra as backend ###
 
-The Ghidra backend is still in early development, thus many checks are not yet available for it. To try it out, the following dependencies must be fulfilled:
+The Ghidra backend is still in early development, thus some checks are not yet available for it. To try it out, the following dependencies must be fulfilled:
 -   [Rust](https://www.rust-lang.org) >= 1.44.1
--   Ghidra >= 9.1
--   The Java library `gson`. Download it from https://search.maven.org/artifact/com.google.code.gson/gson/2.8.6/jar and move it to the Ghidra plugin folder located at `$HOME/.ghidra/.ghidra_9.X.X_PUBLIC/plugins` (with the version number depending on your version of Ghidra).
+-   [Ghidra](https://ghidra-sre.org/) >= 9.2. If you want to use an earlier version of Ghidra, you need to manually add the Java library `gson` to Ghidra: Download it from https://search.maven.org/artifact/com.google.code.gson/gson/2.8.6/jar and move it to the Ghidra plugin folder located at `$HOME/.ghidra/.ghidra_9.X.X_PUBLIC/plugins` (with the version number depending on your version of Ghidra).
 
 Run `make all GHIDRA_PATH=path/to/ghidra_folder` (with the correct path to the local Ghidra installation inserted) to compile and install the *cwe_checker*.
 
