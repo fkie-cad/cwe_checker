@@ -143,7 +143,7 @@ fn subpiece_creation() {
 fn piecing_expressions_together() {
     let setup = Setup::new();
     // Simple test:
-    // Input:           RAX = INT_SUB SUBPIECE(RAX, 0, 4), SUBPIECE(RCX, 0, 4)
+    // Input:           EAX = INT_SUB SUBPIECE(RAX, 0, 4), SUBPIECE(RCX, 0, 4)
     // Expected Output: RAX = PIECE(SUBPIECE(RAX, 4, 4), INT_SUB SUBPIECE(RAX, 0, 4), SUBPIECE(RCX, 0, 4))
     let mut expr = setup.int_sub_subpiece_expr.clone();
 
@@ -158,7 +158,7 @@ fn piecing_expressions_together() {
     };
 
     // More complex test:
-    // Input:           RAX = INT_SUB SUBPIECE(RAX, 1, 1), 0:1;
+    // Input:           EAX = INT_SUB SUBPIECE(RAX, 1, 1), 0:1;
     // Expected Output: RAX = PIECE[ PIECE(SUBPIECE(RAX, 2, 6), INT_SUB SUBPIECE(RAX, 1, 1)), SUBPIECE(RAX, 0, 1) ]
     let mut higher_byte_exp = Expression::BinOp {
         op: BinOpType::IntSub,
@@ -259,7 +259,7 @@ fn sub_register_check() {
     register_map.insert(&setup.ecx_name, &setup.ecx_register);
     register_map.insert(&setup.rcx_name, &setup.rcx_register);
 
-    expr.check_for_sub_register(&register_map);
+    expr.replace_input_sub_register(&register_map);
     assert_eq!(expr, setup.int_sub_subpiece_expr);
 }
 

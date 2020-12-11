@@ -183,7 +183,7 @@ impl Expression {
                 }
             }
         }
-        self.check_for_sub_register(register_map);
+        self.replace_input_sub_register(register_map);
         // based on the zero extension and base register output, either piece the subpieces together,
         // zero extend the expression or do nothing (e.g. if output is a virtual register, no further actions should be taken)
         self.piece_zero_extend_or_none(
@@ -198,14 +198,14 @@ impl Expression {
 
     /// This function recursively iterates into the expression and checks whether a sub register was used.
     /// If so, the sub register is turned into a SUBPIECE of the corresponding base register.
-    fn check_for_sub_register(&mut self, register_map: &HashMap<&String, &RegisterProperties>) {
+    fn replace_input_sub_register(&mut self, register_map: &HashMap<&String, &RegisterProperties>) {
         match self {
             Expression::BinOp { lhs, rhs, .. } => {
-                lhs.check_for_sub_register(register_map);
-                rhs.check_for_sub_register(register_map);
+                lhs.replace_input_sub_register(register_map);
+                rhs.replace_input_sub_register(register_map);
             }
             Expression::UnOp { arg, .. } | Expression::Cast { arg, .. } => {
-                arg.check_for_sub_register(register_map)
+                arg.replace_input_sub_register(register_map)
             }
             Expression::Subpiece { arg, .. } => {
                 let truncated: &mut Expression = arg;
@@ -221,7 +221,7 @@ impl Expression {
                             }
                         }
                     }
-                    _ => arg.check_for_sub_register(register_map),
+                    _ => arg.replace_input_sub_register(register_map),
                 }
             }
             Expression::Var(variable) => {
