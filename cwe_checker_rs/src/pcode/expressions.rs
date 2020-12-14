@@ -129,7 +129,7 @@ impl From<Expression> for IrExpression {
     /// Cases where translation is not possible:
     /// - `LOAD` and `STORE`, since these are not expressions (they have side effects).
     /// - Expressions which store the size of their output in the output variable (to which we do not have access here).
-    /// These include `SUBPIECE`, `INT_ZEXT`, `INT_SEXT`, `INT2FLOAT`, `FLOAT2FLOAT` and `TRUNC`.
+    /// These include `SUBPIECE`, `INT_ZEXT`, `INT_SEXT`, `INT2FLOAT`, `FLOAT2FLOAT`, `TRUNC` and `POPCOUNT`.
     /// Translation of these expressions is handled explicitly during translation of `Def`.
     fn from(expr: Expression) -> IrExpression {
         use ExpressionType::*;
@@ -151,7 +151,7 @@ impl From<Expression> for IrExpression {
                 op: expr.mnemonic.into(),
                 arg: Box::new(expr.input0.unwrap().into()),
             },
-            INT_ZEXT | INT_SEXT | INT2FLOAT | FLOAT2FLOAT | TRUNC => panic!(),
+            INT_ZEXT | INT_SEXT | INT2FLOAT | FLOAT2FLOAT | TRUNC | POPCOUNT => panic!(),
         }
     }
 }
@@ -164,6 +164,7 @@ pub enum ExpressionType {
     STORE,
     PIECE,
     SUBPIECE,
+    POPCOUNT,
 
     INT_EQUAL,
     INT_NOTEQUAL,
@@ -310,6 +311,7 @@ impl From<ExpressionType> for IrCastOpType {
             INT2FLOAT => IrCastOpType::Int2Float,
             FLOAT2FLOAT => IrCastOpType::Float2Float,
             TRUNC => IrCastOpType::Trunc,
+            POPCOUNT => IrCastOpType::PopCount,
             _ => panic!(),
         }
     }
