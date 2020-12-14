@@ -93,7 +93,7 @@ fn generate_cwe_warning(callsite: &Tid, called_symbol: &ExternSymbol) -> CweWarn
         ))
         .tids(vec![format!("{}", callsite)])
         .addresses(vec![callsite.address.clone()])
-        .symbols(vec!(called_symbol.name.clone()))
+        .symbols(vec![called_symbol.name.clone()])
 }
 
 /// Run the CWE check.
