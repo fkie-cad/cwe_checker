@@ -39,7 +39,7 @@ pub static CWE_MODULE: CweModule = CweModule {
 
 /// The configuration struct contains pairs of the form `(source_symbol, sink_symbol)`.
 /// The `source_symbol` corresponds to a check-call and the `sink_symbol` corresponds to a use-call.
-/// An execution path from a source call to a sink call correspond to a possible Time-of-check Time-of-use Race Condition.
+/// An execution path from a source call to a sink call corresponds to a possible Time-of-check Time-of-use Race Condition.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 struct Config {
     pairs: Vec<(String, String)>,
