@@ -1,4 +1,27 @@
 {
+  "CWE78": {
+    "system_call_symbols": [
+      "system",
+      "execl"
+    ],
+    "string_minpulation_symbols": [
+      "strcat",
+      "strncat",
+      "sprintf",
+      "snprintf",
+      "memcpy"
+    ],
+    "user_input_symbols": [
+      "scanf",
+      "__isoc99_scanf"
+    ],
+    "check_character_symbols": [
+      "strchr",
+      "strrchr",
+      "regexp",
+      "regexec"
+    ]
+  },
   "CWE190": {
     "symbols": [
       "xmalloc",

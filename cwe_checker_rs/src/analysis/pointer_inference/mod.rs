@@ -358,6 +358,9 @@ impl<'a> PointerInference<'a> {
                         Node::BlkStart(block, _sub) => {
                             println!("{}: ERROR: Block start without successor state!", block.tid)
                         }
+                        Node::CallSource { source, .. } => {
+                            println!("{}: ERROR: Call source without target!", source.0.tid)
+                        }
                         Node::CallReturn { call, return_ } => {
                             let (call_state, return_state) = match node_value {
                                 NodeValue::CallReturnCombinator { call, return_ } => {
