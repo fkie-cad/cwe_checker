@@ -22,14 +22,14 @@
 //! - If the check-call and the use-call happen in different functions it will not
 //!   be found by the check.
 
-use crate::analysis::graph::{Edge, Graph, Node};
+use crate::analysis::graph::{Edge, Node};
 use crate::intermediate_representation::Jmp;
 use crate::prelude::*;
+use crate::utils::graph_utils::is_sink_call_reachable_from_source_call;
 use crate::utils::log::{CweWarning, LogMessage};
 use crate::CweModule;
-use petgraph::graph::NodeIndex;
 use petgraph::visit::EdgeRef;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 pub static CWE_MODULE: CweModule = CweModule {
     name: "CWE367",
@@ -43,55 +43,6 @@ pub static CWE_MODULE: CweModule = CweModule {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 struct Config {
     pairs: Vec<(String, String)>,
-}
-
-/// Check whether a call to the `sink_symbol` is reachable from the `source_node`
-/// through a path of intraprocedural edges in the control flow graph.
-///
-/// A simple depth-first-search on the graph is used to find such a path.
-fn is_reachable(
-    graph: &Graph,
-    source_node: NodeIndex,
-    source_symbol: &Tid,
-    sink_symbol: &Tid,
-) -> Option<(Tid, Tid)> {
-    let mut visited_nodes = HashSet::new();
-    visited_nodes.insert(source_node);
-    let mut worklist = vec![source_node];
-
-    while let Some(node) = worklist.pop() {
-        for edge in graph.edges(node) {
-            if let Edge::ExternCallStub(jmp) = edge.weight() {
-                if let Jmp::Call { target, .. } = &jmp.term {
-                    if target == sink_symbol {
-                        // We found a CWE hit
-                        let source_tid = graph[source_node].get_block().tid.clone();
-                        return Some((source_tid, jmp.tid.clone()));
-                    } else if target == source_symbol {
-                        // Do not search past another source call,
-                        // since subsequent sink calls probably belong to the new source.
-                        continue;
-                    }
-                }
-            }
-            // Add the target node to the worklist if it was not already visited
-            // and as long as the edge does not leave the function.
-            match edge.weight() {
-                Edge::Block
-                | Edge::CRCallStub
-                | Edge::CRCombine(_)
-                | Edge::Jump(_, _)
-                | Edge::ExternCallStub(_) => {
-                    if visited_nodes.get(&edge.target()).is_none() {
-                        visited_nodes.insert(edge.target());
-                        worklist.push(edge.target())
-                    }
-                }
-                Edge::Call(_) | Edge::CRReturnStub => (), // These edges would leave the function control flow graph.
-            }
-        }
-    }
-    None
 }
 
 /// Generate a CWE warning for a found CWE hit.
@@ -141,9 +92,13 @@ pub fn check_cwe(
                 if let Edge::ExternCallStub(jmp) = edge.weight() {
                     if let Jmp::Call { target, .. } = &jmp.term {
                         if target == source_tid {
-                            if let Some((source_callsite, sink_callsite)) =
-                                is_reachable(graph, edge.target(), target, sink_tid)
-                            {
+                            if let Some(sink_callsite) = is_sink_call_reachable_from_source_call(
+                                graph,
+                                edge.target(),
+                                target,
+                                sink_tid,
+                            ) {
+                                let source_callsite = graph[edge.target()].get_block().tid.clone();
                                 let sub_name = match graph[edge.target()] {
                                     Node::BlkStart(_blk, sub) => sub.term.name.as_str(),
                                     _ => panic!("Malformed control flow graph."),
