@@ -52,10 +52,11 @@ pub type Graph<'a> = DiGraph<Node<'a>, Edge<'a>>;
 /// The node type of an interprocedural control flow graph
 ///
 /// Each node carries a pointer to its associated block with it.
-/// For `CallReturn`nodes the associated nodes are both the `CallSource`node (containing the call instruction)
+/// For `CallReturn`nodes the associated blocks are both the `CallSource`block (containing the call instruction)
 /// and the returning-from block (containing the return instruction).
 ///
-/// For `CallSource`nodes the associated node is the callsite block (source)
+/// For `CallSource`nodes the associated block is the callsite block (source)
+/// and the target block of the call.
 ///
 /// Basic blocks are allowed to be contained in more than one `Sub`.
 /// In the control flow graph such basic blocks occur once per subroutine they are contained in.
@@ -283,11 +284,6 @@ impl<'a> GraphBuilder<'a> {
                                 .entry(target.clone())
                                 .and_modify(|vec| vec.push((cs_node, return_node)))
                                 .or_insert_with(|| vec![(cs_node, return_node)]);
-                        } else {
-                            self.return_addresses
-                                .entry(target.clone())
-                                .and_modify(|vec| vec.push((source, return_node)))
-                                .or_insert_with(|| vec![(source, return_node)]);
                         }
                     }
                 }
@@ -349,7 +345,6 @@ impl<'a> GraphBuilder<'a> {
         }
         for (call_node, return_to_node) in self.return_addresses[&return_from_sub.tid].iter() {
             let (call_block, caller_sub) = match self.graph[*call_node] {
-                Node::BlkEnd(block, sub) => (block, sub),
                 Node::CallSource { source, .. } => source,
                 _ => panic!(),
             };
