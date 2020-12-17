@@ -166,7 +166,7 @@ public final class HelperFunctions {
      */
     public static Boolean notInReferences(Function func) {
         for(Function calling : func.getCallingFunctions(monitor)) {
-            if(calling.getName().equals(func.getName())) {
+            if(calling.getName().equals(func.getName()) && calling.isThunk()) {
                 return false;
             }
         }

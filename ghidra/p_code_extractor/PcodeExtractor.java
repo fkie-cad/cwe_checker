@@ -75,7 +75,14 @@ public class PcodeExtractor extends GhidraScript {
     protected Term<Program> iterateFunctions(SimpleBlockModel simpleBM, Listing listing, Term<Program> program) {
         FunctionIterator functions = HelperFunctions.funcMan.getFunctions(true);
         for (Function func : functions) {
-            if (!ExternSymbolCreator.externalSymbolMap.containsKey(func.getName())){
+            if(ExternSymbolCreator.externalSymbolMap.containsKey(func.getName())) {
+                ArrayList<String> addresses = ExternSymbolCreator.externalSymbolMap.get(func.getName()).getAddresses();
+                if(!addresses.stream().anyMatch(addr -> addr.equals(func.getEntryPoint().toString()))) {
+                    Term<Sub> currentSub = TermCreator.createSubTerm(func);
+                    currentSub.getTerm().setBlocks(iterateBlocks(currentSub, simpleBM, listing));
+                    program.getTerm().addSub(currentSub);
+                }
+            } else {
                 Term<Sub> currentSub = TermCreator.createSubTerm(func);
                 currentSub.getTerm().setBlocks(iterateBlocks(currentSub, simpleBM, listing));
                 program.getTerm().addSub(currentSub);
