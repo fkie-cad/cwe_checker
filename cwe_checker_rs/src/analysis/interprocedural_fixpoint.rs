@@ -148,7 +148,7 @@ impl<'a, T: Context<'a>> GeneralFPContext for GeneralizedContext<'a, T> {
         }
     }
 
-    /// Edge transition function.
+    /// Forward edge transition function.
     /// Applies the transition functions from the interprocedural context object
     /// corresponding to the type of the provided edge.
     fn update_edge(
@@ -169,6 +169,7 @@ impl<'a, T: Context<'a>> GeneralFPContext for GeneralizedContext<'a, T> {
                 });
                 end_val.map(NodeValue::Value)
             }
+            Edge::CallCombine(_) => Some(Self::NodeValue::Value(node_value.unwrap_value().clone())),
             Edge::Call(call) => self
                 .context
                 .update_call(node_value.unwrap_value(), call, &graph[end_node])
@@ -181,7 +182,7 @@ impl<'a, T: Context<'a>> GeneralFPContext for GeneralizedContext<'a, T> {
                 call: None,
                 return_: Some(node_value.unwrap_value().clone()),
             }),
-            Edge::CRCombine(call_term) => match node_value {
+            Edge::ReturnCombine(call_term) => match node_value {
                 NodeValue::Value(_) => panic!("Unexpected interprocedural fixpoint graph state"),
                 NodeValue::CallReturnCombinator { call, return_ } => {
                     let return_from_block = match graph.node_weight(start_node) {
