@@ -42,7 +42,8 @@ pub fn is_sink_call_reachable_from_source_call(
             match edge.weight() {
                 Edge::Block
                 | Edge::CRCallStub
-                | Edge::CRCombine(_)
+                | Edge::CallCombine(_)
+                | Edge::ReturnCombine(_)
                 | Edge::Jump(_, _)
                 | Edge::ExternCallStub(_) => {
                     if visited_nodes.get(&edge.target()).is_none() {
