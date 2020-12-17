@@ -32,11 +32,12 @@
 //! (if the call returns at all).
 //! * Right now indirect calls are handled as if they were extern calls, i.e. an *ExternCallStub* edge is added.
 //! This behaviour will change in the future, when better indirect call handling is implemented.
-//! * For each in-program call ([`image`](../../../../../doc/images/internal_function_call.png)) and corresponding return jump one node and three edges are generated:
-//!   * An artificial node *CallReturn*
+//! * For each in-program call ([`image`](../../../../../doc/images/internal_function_call.png)) and corresponding return jump two nodes and four edges are generated:
+//!   * An artificial node *CallReturn* and node *CallSource*
 //!   * A *CRCallStub* edge from the *BlkEnd* node of the callsite to *CallReturn*
 //!   * A *CRReturnStub* edge from the *BlkEnd* node of the returning from block to *CallReturn*
-//!   * A *CRCombine* edge from *CallReturn* to the *BlkStart* node of the returned to block.
+//!   * A *ReturnCombine* edge from *CallReturn* to the *BlkStart* node of the returned to block.
+//!   * A *CallCombine* edge from the *BlkEnd* node to the *CallSource* node.
 //!
 //! The artificial *CallReturn* nodes enable enriching the information flowing through a return edge
 //! with information recovered from the corresponding callsite during a fixpoint computation.
@@ -52,8 +53,11 @@ pub type Graph<'a> = DiGraph<Node<'a>, Edge<'a>>;
 /// The node type of an interprocedural control flow graph
 ///
 /// Each node carries a pointer to its associated block with it.
-/// For `CallReturn`nodes the associated blocks are both the callsite block (containing the call instruction)
+/// For `CallReturn`nodes the associated blocks are both the `CallSource`block (containing the call instruction)
 /// and the returning-from block (containing the return instruction).
+///
+/// For `CallSource`nodes the associated block is the callsite block (source)
+/// and the target block of the call.
 ///
 /// Basic blocks are allowed to be contained in more than one `Sub`.
 /// In the control flow graph such basic blocks occur once per subroutine they are contained in.
@@ -67,6 +71,10 @@ pub enum Node<'a> {
         call: (&'a Term<Blk>, &'a Term<Sub>),
         return_: (&'a Term<Blk>, &'a Term<Sub>),
     },
+    CallSource {
+        source: (&'a Term<Blk>, &'a Term<Sub>),
+        target: (&'a Term<Blk>, &'a Term<Sub>),
+    },
 }
 
 impl<'a> Node<'a> {
@@ -76,7 +84,9 @@ impl<'a> Node<'a> {
         use Node::*;
         match self {
             BlkStart(blk, _sub) | BlkEnd(blk, _sub) => blk,
-            CallReturn { .. } => panic!("get_block() is undefined for CallReturn nodes"),
+            CallSource { .. } | CallReturn { .. } => {
+                panic!("get_block() is undefined for CallReturn and CallSource nodes")
+            }
         }
     }
 }
@@ -94,6 +104,11 @@ impl<'a> std::fmt::Display for Node<'a> {
                 formatter,
                 "CallReturn @ {} (sub {}) (caller @ {} (sub {}))",
                 return_.0.tid, return_.1.tid, call.0.tid, call.1.tid
+            ),
+            Self::CallSource { source, target } => write!(
+                formatter,
+                "CallSource @ {} (sub {}) (caller @ {} (sub {}))",
+                target.0.tid, target.1.tid, source.0.tid, source.1.tid
             ),
         }
     }
@@ -115,7 +130,8 @@ pub enum Edge<'a> {
     ExternCallStub(&'a Term<Jmp>),
     CRCallStub,
     CRReturnStub,
-    CRCombine(&'a Term<Jmp>),
+    CallCombine(&'a Term<Jmp>),
+    ReturnCombine(&'a Term<Jmp>),
 }
 
 /// A builder struct for building graphs
@@ -176,7 +192,7 @@ impl<'a> GraphBuilder<'a> {
     }
 
     /// add all subs to the call targets so that call instructions can be linked to the starting block of the corresponding sub.
-    fn add_subs_to_jump_targets(&mut self) {
+    fn add_subs_to_call_targets(&mut self) {
         for sub in self.program.term.subs.iter() {
             if !sub.term.blocks.is_empty() {
                 let start_block = &sub.term.blocks[0];
@@ -194,8 +210,8 @@ impl<'a> GraphBuilder<'a> {
         jump: &'a Term<Jmp>,
         untaken_conditional: Option<&'a Term<Jmp>>,
     ) {
-        let sub_term = match self.graph[source] {
-            Node::BlkEnd(_source_block, sub_term) => sub_term,
+        let (source_block, sub_term) = match self.graph[source] {
+            Node::BlkEnd(source_block, sub_term) => (source_block, sub_term),
             _ => panic!(),
         };
         match &jump.term {
@@ -242,14 +258,34 @@ impl<'a> GraphBuilder<'a> {
                             .add_edge(source, return_to_node, Edge::ExternCallStub(jump));
                     }
                 } else {
+                    let mut call_source_node: Option<NodeIndex> = None;
                     if let Some((target_node, _)) = self.call_targets.get(&target) {
-                        self.graph.add_edge(source, *target_node, Edge::Call(jump));
+                        let (target_block, target_sub) = match self.graph[*target_node] {
+                            Node::BlkStart(target_block, target_sub) => (target_block, target_sub),
+                            _ => panic!(),
+                        };
+                        call_source_node = Some(self.graph.add_node(Node::CallSource {
+                            source: (source_block, sub_term),
+                            target: (target_block, target_sub),
+                        }));
+                        self.graph.add_edge(
+                            source,
+                            *call_source_node.as_ref().unwrap(),
+                            Edge::CallCombine(jump),
+                        );
+                        self.graph.add_edge(
+                            *call_source_node.as_ref().unwrap(),
+                            *target_node,
+                            Edge::Call(jump),
+                        );
                     } // TODO: Log message for the else-case?
                     if let Some(return_node) = return_to_node_option {
-                        self.return_addresses
-                            .entry(target.clone())
-                            .and_modify(|vec| vec.push((source, return_node)))
-                            .or_insert_with(|| vec![(source, return_node)]);
+                        if let Some(cs_node) = call_source_node {
+                            self.return_addresses
+                                .entry(target.clone())
+                                .and_modify(|vec| vec.push((cs_node, return_node)))
+                                .or_insert_with(|| vec![(cs_node, return_node)]);
+                        }
                     }
                 }
             }
@@ -310,7 +346,7 @@ impl<'a> GraphBuilder<'a> {
         }
         for (call_node, return_to_node) in self.return_addresses[&return_from_sub.tid].iter() {
             let (call_block, caller_sub) = match self.graph[*call_node] {
-                Node::BlkEnd(block, sub) => (block, sub),
+                Node::CallSource { source, .. } => source,
                 _ => panic!(),
             };
             let return_from_block = self.graph[return_source].get_block();
@@ -320,16 +356,19 @@ impl<'a> GraphBuilder<'a> {
                 .iter()
                 .find(|jump| matches!(jump.term, Jmp::Call{..}))
                 .unwrap();
-            let cr_combine_node = self.graph.add_node(Node::CallReturn {
+            let return_combine_node = self.graph.add_node(Node::CallReturn {
                 call: (call_block, caller_sub),
                 return_: (return_from_block, return_from_sub),
             });
             self.graph
-                .add_edge(*call_node, cr_combine_node, Edge::CRCallStub);
+                .add_edge(*call_node, return_combine_node, Edge::CRCallStub);
             self.graph
-                .add_edge(return_source, cr_combine_node, Edge::CRReturnStub);
-            self.graph
-                .add_edge(cr_combine_node, *return_to_node, Edge::CRCombine(call_term));
+                .add_edge(return_source, return_combine_node, Edge::CRReturnStub);
+            self.graph.add_edge(
+                return_combine_node,
+                *return_to_node,
+                Edge::ReturnCombine(call_term),
+            );
         }
     }
 
@@ -367,7 +406,7 @@ impl<'a> GraphBuilder<'a> {
     /// Build the interprocedural control flow graph.
     pub fn build(mut self) -> Graph<'a> {
         self.add_program_blocks();
-        self.add_subs_to_jump_targets();
+        self.add_subs_to_call_targets();
         self.add_jump_and_call_edges();
         self.add_return_edges();
         self.graph
@@ -471,7 +510,7 @@ mod tests {
         let program = mock_program();
         let graph = get_program_cfg(&program, HashSet::new());
         println!("{}", serde_json::to_string_pretty(&graph).unwrap());
-        assert_eq!(graph.node_count(), 14);
-        assert_eq!(graph.edge_count(), 18);
+        assert_eq!(graph.node_count(), 16);
+        assert_eq!(graph.edge_count(), 20);
     }
 }
