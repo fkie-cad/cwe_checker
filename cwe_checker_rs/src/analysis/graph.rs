@@ -32,11 +32,12 @@
 //! (if the call returns at all).
 //! * Right now indirect calls are handled as if they were extern calls, i.e. an *ExternCallStub* edge is added.
 //! This behaviour will change in the future, when better indirect call handling is implemented.
-//! * For each in-program call ([`image`](../../../../../doc/images/internal_function_call.png)) and corresponding return jump one node and three edges are generated:
-//!   * An artificial node *CallReturn*
+//! * For each in-program call ([`image`](../../../../../doc/images/internal_function_call.png)) and corresponding return jump two nodes and four edges are generated:
+//!   * An artificial node *CallReturn* and node *CallSource*
 //!   * A *CRCallStub* edge from the *BlkEnd* node of the callsite to *CallReturn*
 //!   * A *CRReturnStub* edge from the *BlkEnd* node of the returning from block to *CallReturn*
-//!   * A *CRCombine* edge from *CallReturn* to the *BlkStart* node of the returned to block.
+//!   * A *ReturnCombine* edge from *CallReturn* to the *BlkStart* node of the returned to block.
+//!   * A *CallCombine* edge from the *BlkEnd* node to the *CallSource* node.
 //!
 //! The artificial *CallReturn* nodes enable enriching the information flowing through a return edge
 //! with information recovered from the corresponding callsite during a fixpoint computation.
