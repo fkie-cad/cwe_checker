@@ -200,6 +200,24 @@ mod tests {
 
     #[test]
     #[ignore]
+    fn cwe_215() {
+        let mut error_log = Vec::new();
+        let tests = linux_test_cases("cwe_476", "CWE215"); // We use the test binaries of another check here.
+
+        for test_case in tests {
+            let num_expected_occurences = 1;
+            if let Err(error) = test_case.run_test("[CWE215]", num_expected_occurences) {
+                error_log.push((test_case.get_filepath(), error));
+            }
+        }
+        if !error_log.is_empty() {
+            print_errors(error_log);
+            panic!();
+        }
+    }
+
+    #[test]
+    #[ignore]
     fn cwe_243() {
         let mut error_log = Vec::new();
         let mut tests = linux_test_cases("cwe_243", "CWE243");
