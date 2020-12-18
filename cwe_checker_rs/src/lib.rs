@@ -55,6 +55,7 @@ impl std::fmt::Display for CweModule {
 pub fn get_modules() -> Vec<&'static CweModule> {
     vec![
         &crate::checkers::cwe_190::CWE_MODULE,
+        &crate::checkers::cwe_243::CWE_MODULE,
         &crate::checkers::cwe_332::CWE_MODULE,
         &crate::checkers::cwe_367::CWE_MODULE,
         &crate::checkers::cwe_426::CWE_MODULE,
