@@ -60,7 +60,7 @@ fn blk_calls_tid(blk: &Term<Blk>, tid: &Tid) -> Option<Tid> {
     None
 }
 
-/// Check whther the given `sub` calls both the `chdir_tid`
+/// Check whether the given `sub` calls both the `chdir_tid`
 /// and at least one of the `priviledge_dropping_tids`.
 /// If yes, return true.
 fn sub_calls_chdir_and_priviledge_dropping_func(
