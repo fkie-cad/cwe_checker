@@ -218,6 +218,27 @@ mod tests {
 
     #[test]
     #[ignore]
+    fn cwe_243() {
+        let mut error_log = Vec::new();
+        let mut tests = linux_test_cases("cwe_243", "CWE243");
+
+        mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
+        mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.
+
+        for test_case in tests {
+            let num_expected_occurences = 1;
+            if let Err(error) = test_case.run_test("[CWE243]", num_expected_occurences) {
+                error_log.push((test_case.get_filepath(), error));
+            }
+        }
+        if !error_log.is_empty() {
+            print_errors(error_log);
+            panic!();
+        }
+    }
+
+    #[test]
+    #[ignore]
     fn cwe_332() {
         let mut error_log = Vec::new();
         let mut tests = all_test_cases("cwe_332", "CWE332");

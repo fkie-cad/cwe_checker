@@ -1,5 +1,6 @@
 /*!
 This module implements a check for CWE-782: Exposed IOCTL with Insufficient Access Control.
+
 See <https://cwe.mitre.org/data/definitions/782.html> for a detailed description.
 
 How the check works:

@@ -37,6 +37,12 @@
         "chroot",
         "setuid"
       ]
+    ],
+    "priviledge_dropping_functions": [
+      "setresuid",
+      "seteuid",
+      "setreuid",
+      "setuid"
     ]
   },
   "CWE248": {
