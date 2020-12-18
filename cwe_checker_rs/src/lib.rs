@@ -55,6 +55,7 @@ impl std::fmt::Display for CweModule {
 pub fn get_modules() -> Vec<&'static CweModule> {
     vec![
         &crate::checkers::cwe_190::CWE_MODULE,
+        &crate::checkers::cwe_215::CWE_MODULE,
         &crate::checkers::cwe_332::CWE_MODULE,
         &crate::checkers::cwe_367::CWE_MODULE,
         &crate::checkers::cwe_426::CWE_MODULE,
@@ -71,6 +72,8 @@ pub fn get_modules() -> Vec<&'static CweModule> {
 /// that may be needed as input for other analyses and CWE checks.
 #[derive(Clone, Copy)]
 pub struct AnalysisResults<'a> {
+    /// The content of the binary file
+    pub binary: &'a [u8],
     /// A pointer to the project struct
     pub project: &'a Project,
     /// The result of the pointer inference analysis if already computed.
@@ -79,8 +82,9 @@ pub struct AnalysisResults<'a> {
 
 impl<'a> AnalysisResults<'a> {
     /// Create a new `AnalysisResults` struct with only the project itself known.
-    pub fn new(project: &'a Project) -> AnalysisResults<'a> {
+    pub fn new(binary: &'a [u8], project: &'a Project) -> AnalysisResults<'a> {
         AnalysisResults {
+            binary,
             project,
             pointer_inference: None,
         }

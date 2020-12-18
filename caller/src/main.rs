@@ -3,7 +3,7 @@ use cwe_checker_rs::utils::log::print_all_messages;
 use cwe_checker_rs::utils::{get_ghidra_plugin_path, read_config_file};
 use cwe_checker_rs::AnalysisResults;
 use std::collections::HashSet;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use structopt::StructOpt;
 
@@ -136,10 +136,17 @@ fn run_with_ghidra(args: CmdlineArgs) {
         filter_modules_for_partial_run(&mut modules, partial_module_list);
     }
 
-    let mut project = get_project_from_ghidra(&Path::new(&args.binary.unwrap()));
+    let binary_file_path = PathBuf::from(args.binary.unwrap());
+    let binary: Vec<u8> = std::fs::read(&binary_file_path).unwrap_or_else(|_| {
+        panic!(
+            "Error: Could not read from file path {}",
+            binary_file_path.display()
+        )
+    });
+    let mut project = get_project_from_ghidra(&binary_file_path);
     // Normalize the project and gather log messages generated from it.
     let mut all_logs = project.normalize();
-    let mut analysis_results = AnalysisResults::new(&project);
+    let mut analysis_results = AnalysisResults::new(&binary, &project);
 
     let pointer_inference_results = if modules
         .iter()
