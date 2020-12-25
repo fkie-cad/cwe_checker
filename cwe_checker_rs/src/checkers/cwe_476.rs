@@ -37,9 +37,9 @@
 //! the return values.
 
 use crate::analysis::graph::{Edge, Node};
-use crate::analysis::interprocedural_fixpoint::Computation;
-use crate::analysis::interprocedural_fixpoint::Context as _;
-use crate::analysis::interprocedural_fixpoint::NodeValue;
+use crate::analysis::forward_interprocedural_fixpoint::Computation;
+use crate::analysis::forward_interprocedural_fixpoint::Context as _;
+use crate::analysis::interprocedural_fixpoint_generic::NodeValue;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
 use crate::utils::log::{CweWarning, LogMessage};

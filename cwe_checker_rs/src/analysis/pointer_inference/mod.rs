@@ -13,7 +13,8 @@
 //!
 //! See the `Config` struct for configurable analysis parameters.
 
-use super::interprocedural_fixpoint::{Computation, NodeValue};
+use super::forward_interprocedural_fixpoint::Computation;
+use super::interprocedural_fixpoint_generic::NodeValue;
 use crate::abstract_domain::{BitvectorDomain, DataDomain};
 use crate::analysis::graph::{Graph, Node};
 use crate::intermediate_representation::*;
@@ -107,7 +108,7 @@ impl<'a> PointerInference<'a> {
             })
             .collect();
         let mut fixpoint_computation =
-            super::interprocedural_fixpoint::Computation::new(context, None);
+            super::forward_interprocedural_fixpoint::Computation::new(context, None);
         let _ = log_sender.send(LogThreadMsg::Log(LogMessage::new_debug(format!(
             "Pointer Inference: Adding {} entry points",
             entry_sub_to_entry_node_map.len()
@@ -115,7 +116,7 @@ impl<'a> PointerInference<'a> {
         for (sub_tid, start_node_index) in entry_sub_to_entry_node_map.into_iter() {
             fixpoint_computation.set_node_value(
                 start_node_index,
-                super::interprocedural_fixpoint::NodeValue::Value(State::new(
+                super::interprocedural_fixpoint_generic::NodeValue::Value(State::new(
                     &project.stack_pointer_register,
                     sub_tid,
                 )),
@@ -235,7 +236,7 @@ impl<'a> PointerInference<'a> {
                 .clone();
             self.computation.set_node_value(
                 entry,
-                super::interprocedural_fixpoint::NodeValue::Value(State::new(
+                super::interprocedural_fixpoint_generic::NodeValue::Value(State::new(
                     &project.stack_pointer_register,
                     sub_tid,
                 )),
@@ -363,8 +364,8 @@ impl<'a> PointerInference<'a> {
                         }
                         Node::CallReturn { call, return_ } => {
                             let (call_state, return_state) = match node_value {
-                                NodeValue::CallReturnCombinator { call, return_ } => {
-                                    (call.is_some(), return_.is_some())
+                                NodeValue::CallFlowCombinator { call_stub, interprocedural_flow } => {
+                                    (call_stub.is_some(), interprocedural_flow.is_some())
                                 }
                                 _ => panic!(),
                             };
