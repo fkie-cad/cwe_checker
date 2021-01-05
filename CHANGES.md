@@ -1,4 +1,4 @@
-dev
+0.4 (2021-01)
 ====
 
 -   Added a lot more test cases to acceptance tests (PR #46)
@@ -11,6 +11,10 @@ dev
 -   Several code improvements to for the CWE 415 and 416 checks (PRs #76, #77. #78, #84)
 -   Report more accurate incident locations for CWE 476 (PR #80)
 -   Enable Ghidra as an alternative Backend to BAP (still experimental) (PRs #86, #87)
+-   Added acceptance tests for the Ghidra backend (PRs #91, #99)
+-   Bugfixes for the Ghidra backend (PRs #98, #101, #104, #106, #110, #114, #120)
+-   Ported the CWE checks to Rust for the Ghidra backend (PRs #88, #95, #100, #102, #111, #117, #119, #121)
+-   Added support for Ghidra 9.2 (PR #116)
 
 0.3 (2019-12)
 ====
