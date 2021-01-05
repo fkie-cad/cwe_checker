@@ -19,7 +19,7 @@ let call_handling_test () =
 
   let state = State.set_register state rax_register mock_taint in
   let _state = flag_unchecked_return_values state ~cwe_hits:mock_hits ~project in
-  check "flag_RAX_return" (false = Taint.is_empty !mock_hits);
+  check "flag_RAX_return" (Bool.(=) false (Taint.is_empty !mock_hits));
   let state = State.empty in
   let state = State.set_register state rbx_register mock_taint in
   mock_hits := Taint.empty;
@@ -30,7 +30,7 @@ let call_handling_test () =
   mock_hits := Taint.empty;
   let state = State.set_register state rbx_register mock_taint in
   let _state = flag_register_taints state ~cwe_hits:mock_hits in
-  check "flag_all_registers" (false = Taint.is_empty !mock_hits);
+  check "flag_all_registers" (Bool.(=) false (Taint.is_empty !mock_hits));
 
   let state = State.empty in
   mock_hits := Taint.empty;
@@ -38,7 +38,7 @@ let call_handling_test () =
   let state = State.set_register state rdx_register mock_taint in
   let state = State.set_register state rbx_register other_mock_taint in
   let state = flag_parameter_register state ~cwe_hits:mock_hits ~project in
-  check "flag_RDX_parameter" (false = Taint.is_empty !mock_hits && Option.is_none (State.find_register state rdx_register));
+  check "flag_RDX_parameter" (Bool.(=) false (Taint.is_empty !mock_hits) && Option.is_none (State.find_register state rdx_register));
   check "dont_flag_RBX_parameter" (Option.is_some (State.find_register state rbx_register));
 
   let state = State.empty in

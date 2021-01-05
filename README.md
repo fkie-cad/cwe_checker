@@ -36,10 +36,10 @@ If you want to build the docker image yourself, just run `docker build -t cwe_ch
 Another way is to get cwe_checker from the Ocaml package manager Opam. You can install cwe_checker via the package [cwe_checker](https://opam.ocaml.org/packages/cwe_checker/) (`opam install cwe_checker`). This gives you the latest stable release version of the  *cwe_checker*.
 
 If you plan to develop *cwe_checker*, it is recommended to build it using the provided `Makefile`. In this case you must ensure that all dependencies are fulfilled:
--   Ocaml 4.07.1
+-   Ocaml 4.08.0
 -   Opam 2.0.2
 -   dune >= 2.0
--   BAP (and its dependencies). Development on the master branch depends on the master branch of BAP which can be added with `opam repo add bap-testing git+https://github.com/BinaryAnalysisPlatform/opam-repository#testing` to the sources of the Opam package manager. The stable release of the *cwe_checker* depends on BAP 1.6.
+-   BAP 2.2.0 (and its dependencies).
 -   yojson >= 1.6.0
 -   ppx_deriving_yojson >= 3.5.1
 -   alcotest >= 0.8.3 (for tests)

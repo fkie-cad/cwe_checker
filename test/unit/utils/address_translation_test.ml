@@ -13,8 +13,8 @@ let test_translate_tid_to_assembler_address_string () =
   let tid_1 = Tid.create () in
   let tid_2 = Tid.create () in
   let tid_map = Map.add_exn tid_map ~key:tid_1 ~data:(Addr.of_bool true) in
-  let () = check "TID not correctly mapped to address" (translate_tid_to_assembler_address_string tid_1 tid_map = "1:1u") in
-  let () = check "TID not correctly mapped to address" (translate_tid_to_assembler_address_string tid_2 tid_map = "UNKNOWN") in
+  let () = check "TID not correctly mapped to address" (String.(=) (translate_tid_to_assembler_address_string tid_1 tid_map) "1:1u") in
+  let () = check "TID not correctly mapped to address" (String.(=) (translate_tid_to_assembler_address_string tid_2 tid_map) "UNKNOWN") in
   ()
 
 
@@ -35,8 +35,8 @@ let test_generate_tid_map () =
   let program = Term.append sub_t program s in
   let tid_map = generate_tid_map program in
 
-  let () = check "address not in vicinity" (translate_tid_to_assembler_address_string (Term.tid s) tid_map = "UNKNOWN") in
-  let () = check "address not in vicinity" (translate_tid_to_assembler_address_string (Term.tid d_1) tid_map = "1:1u") in
+  let () = check "address not in vicinity" (String.(=) (translate_tid_to_assembler_address_string (Term.tid s) tid_map) "UNKNOWN") in
+  let () = check "address not in vicinity" (String.(=) (translate_tid_to_assembler_address_string (Term.tid d_1) tid_map) "1:1u") in
   ()
 
 

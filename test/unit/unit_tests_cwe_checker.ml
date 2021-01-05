@@ -108,7 +108,7 @@ let generate_bap_params params =
 let () =
   (* Check whether this file is run as an executable (via dune runtest) or
      as a bap plugin *)
-  if Sys.argv.(0) = "bap" then
+  if String.(=) Sys.argv.(0) "bap" then
     let cmdline_params = generate_bap_params cmdline_params in
     let () = Config.when_ready (fun ({get=(!!)}) ->
       let params: String.t String.Map.t = List.fold cmdline_params ~init:String.Map.empty ~f:(fun param_map (name, bap_param) ->

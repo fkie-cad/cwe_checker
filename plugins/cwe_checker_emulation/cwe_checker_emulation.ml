@@ -85,7 +85,7 @@ let rec run = function
     Machine.current () >>= fun pid ->
     Machine.fork ()    >>= fun () ->
     Machine.current () >>= fun cid ->
-    if pid = cid
+    if Poly.(=) pid cid
     then run xs
     else
       exec x >>= fun () ->
@@ -95,7 +95,7 @@ let rec run = function
 (** Checks if a certain Primus.Observation.Provider is equal
     to a string like 'incident'. *)
 let has_name name p =
-  Primus.Observation.Provider.name p = name
+  Poly.(=) (Primus.Observation.Provider.name p) name
 
 (** Register a monitor. *)
 let monitor_provider name ps =
