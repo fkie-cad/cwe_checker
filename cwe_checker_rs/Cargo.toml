@@ -1,6 +1,6 @@
 [package]
 name = "cwe_checker_rs"
-version = "0.4.0-dev"
+version = "0.4.0"
 authors = ["Nils-Edvin Enkelmann <nils-edvin.enkelmann@fkie.fraunhofer.de>"]
 edition = "2018"
 
