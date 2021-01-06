@@ -1,10 +1,10 @@
-use std::marker::PhantomData;
 use super::fixpoint::Context as GeneralFPContext;
 use super::graph::*;
-use crate::intermediate_representation::*;
 use super::interprocedural_fixpoint_generic::*;
+use crate::intermediate_representation::*;
 use fnv::FnvHashMap;
 use petgraph::graph::{EdgeIndex, NodeIndex};
+use std::marker::PhantomData;
 
 /// The context for an backward interprocedural fixpoint computation.
 ///
@@ -43,41 +43,29 @@ pub trait Context<'a> {
     /// Transition function for in-program calls.
     fn update_callsite(
         &self,
-        value_after_call: &Self::Value,
+        value_after_call: Option<&Self::Value>,
+        fallthrough_value: Option<&Self::Value>,
         call: &Term<Jmp>,
-        callsite: &Node,
+        return_: &Term<Jmp>,
     ) -> Option<Self::Value>;
 
-    /// Transition function for return instructions.
-    /// Has access to the value at the callsite corresponding to the return edge.
-    /// This way one can recover caller-specific information on return from a function.
-    fn update_return_site(
-        &self,
-        value: Option<&Self::Value>,
-        value_before_call: Option<&Self::Value>,
-        call_term: &Term<Jmp>,
-        return_term: &Term<Jmp>,
-    ) -> Option<Self::Value>;
+    /// Transition function for call stub split.
+    /// Has access to the value at the ReturnCombine node and
+    /// decides which data is transferred along the Call Stub Edge.
+    fn split_call_stub(&self, combined_value: &Self::Value) -> Option<Self::Value>;
 
     /// Transition function for return stub split.
     /// Has access to the value at the ReturnCombine node and
     /// decides which data is transferred along the Return Stub Edge.
-    fn split_call_stub(
-        &self,
-        combined_value: &Self::Value,
-    ) -> Option<Self::Value>;
-
-    /// Transition function for return stub split.
-    /// Has access to the value at the ReturnCombine node and
-    /// decides which data is transferred along the Return Stub Edge.
-    fn split_return_stub(
-        &self,
-        combined_value: &Self::Value,
-    ) -> Option<Self::Value>;
+    fn split_return_stub(&self, combined_value: &Self::Value) -> Option<Self::Value>;
 
     /// Transition function for calls to functions not contained in the binary.
     /// The corresponding edge goes from the callsite to the returned-to block.
-    fn update_call_stub(&self, value_after_call: &Self::Value, call: &Term<Jmp>) -> Option<Self::Value>;
+    fn update_call_stub(
+        &self,
+        value_after_call: &Self::Value,
+        call: &Term<Jmp>,
+    ) -> Option<Self::Value>;
 
     /// This function is used to refine the value using the information on which branch was taken on a conditional jump.
     fn specialize_conditional(
@@ -114,7 +102,9 @@ impl<'a, T: Context<'a>> GeneralFPContext for GeneralizedContext<'a, T> {
                 },
             ) => CallFlowCombinator {
                 call_stub: merge_option(call1, call2, |v1, v2| self.context.merge(v1, v2)),
-                interprocedural_flow: merge_option(target1, target2, |v1, v2| self.context.merge(v1, v2)),
+                interprocedural_flow: merge_option(target1, target2, |v1, v2| {
+                    self.context.merge(v1, v2)
+                }),
             },
             _ => panic!("Malformed CFG in fixpoint computation"),
         }
@@ -136,39 +126,62 @@ impl<'a, T: Context<'a>> GeneralFPContext for GeneralizedContext<'a, T> {
             Edge::Block => {
                 let block_term = graph.node_weight(start_node).unwrap().get_block();
                 let value = node_value.unwrap_value();
-                let defs= &block_term.term.defs;
+                let defs = &block_term.term.defs;
                 let end_val = defs.iter().rev().try_fold(value.clone(), |accum, def| {
                     self.context.update_def(&accum, def)
                 });
                 end_val.map(NodeValue::Value)
             }
-            Edge::ReturnCombine(_) => Some(Self::NodeValue::Value(node_value.unwrap_value().clone())),
+            Edge::ReturnCombine(_) => {
+                Some(Self::NodeValue::Value(node_value.unwrap_value().clone()))
+            }
             // The Call Edge value is added to the CallSourceCombinator.
-            // The end node will be the callsite node and the node_value parameter is the value at the 
+            // The end node will be the callsite node and the node_value parameter is the value at the
             // called subroutine's BlkStart node
-            Edge::Call(call) => Some(NodeValue::CallFlowCombinator {
+            Edge::Call(_) => Some(NodeValue::CallFlowCombinator {
                 call_stub: None,
-                interprocedural_flow: self.context.update_callsite(node_value.unwrap_value(), call, &graph[end_node]),
+                interprocedural_flow: Some(node_value.unwrap_value().clone()),
             }),
             // The CallStub Edge value is added to the CallSourceCombinator
-            // The user has the ability to split the node value at the BlkStart return node 
+            // The user has the ability to split the node value at the BlkStart return to node
             // to only send specific data along the CallStub Edge to the callsite
             Edge::CRCallStub => Some(NodeValue::CallFlowCombinator {
                 call_stub: self.context.split_call_stub(node_value.unwrap_value()),
                 interprocedural_flow: None,
             }),
-            // The user has the ability to split the node value at the BlkStart return node 
+            // The user has the ability to split the node value at the BlkStart return node
             // to only send specific data along the ReturnStub Edge to the last BlkEnd node called subroutine
             Edge::CRReturnStub => self
                 .context
                 .split_return_stub(node_value.unwrap_value())
                 .map(NodeValue::Value),
-            
-            Edge::CallCombine(call_term) => match node_value {
+
+            // The CallCombine Edge merges the values coming in from the CallStub Edge and Call Edge
+            // It also gives the user access to the call and return term.
+            Edge::CallCombine(return_term) => match node_value {
                 NodeValue::Value(_) => panic!("Unexpected interprocedural fixpoint graph state"),
-                NodeValue::CallFlowCombinator {call_stub, interprocedural_flow} => {
-                    let target_block = match graph.node_weight(start_mode)
-                },
+                NodeValue::CallFlowCombinator {
+                    call_stub,
+                    interprocedural_flow,
+                } => {
+                    let call_block = match graph.node_weight(start_node) {
+                        Some(Node::CallSource {
+                            source: (call_block, ..),
+                            target: _,
+                        }) => call_block,
+                        _ => panic!("Malformed Control flow graph"),
+                    };
+                    let call_term = &call_block.term.jmps[0];
+                    match self.context.update_callsite(
+                        interprocedural_flow.as_ref(),
+                        call_stub.as_ref(),
+                        call_term,
+                        return_term,
+                    ) {
+                        Some(val) => Some(NodeValue::Value(val)),
+                        None => None,
+                    }
+                }
             },
             Edge::ExternCallStub(call) => self
                 .context
@@ -272,3 +285,7 @@ impl<'a, T: Context<'a>> Computation<'a, T> {
         self.generalized_computation.get_worklist()
     }
 }
+
+pub mod mock_context;
+#[cfg(test)]
+pub mod tests;

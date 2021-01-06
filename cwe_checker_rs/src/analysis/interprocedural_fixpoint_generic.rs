@@ -6,7 +6,11 @@ use crate::prelude::*;
 #[derive(PartialEq, Eq, Serialize, Deserialize)]
 pub enum NodeValue<T: PartialEq + Eq> {
     Value(T),
-    CallFlowCombinator { call_stub: Option<T>, interprocedural_flow: Option<T> },
+    // TODO: more doc strings
+    CallFlowCombinator {
+        call_stub: Option<T>,
+        interprocedural_flow: Option<T>,
+    },
 }
 
 impl<T: PartialEq + Eq> NodeValue<T> {

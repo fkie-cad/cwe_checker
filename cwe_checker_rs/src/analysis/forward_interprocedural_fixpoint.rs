@@ -12,8 +12,8 @@
 //! The `Computation` object provides the necessary methods for the actual fixpoint computation.
 
 use super::fixpoint::Context as GeneralFPContext;
-use super::interprocedural_fixpoint_generic::*;
 use super::graph::*;
+use super::interprocedural_fixpoint_generic::*;
 use crate::intermediate_representation::*;
 use fnv::FnvHashMap;
 use petgraph::graph::{EdgeIndex, NodeIndex};
@@ -127,7 +127,9 @@ impl<'a, T: Context<'a>> GeneralFPContext for GeneralizedContext<'a, T> {
                 },
             ) => CallFlowCombinator {
                 call_stub: merge_option(call1, call2, |v1, v2| self.context.merge(v1, v2)),
-                interprocedural_flow: merge_option(return1, return2, |v1, v2| self.context.merge(v1, v2)),
+                interprocedural_flow: merge_option(return1, return2, |v1, v2| {
+                    self.context.merge(v1, v2)
+                }),
             },
             _ => panic!("Malformed CFG in fixpoint computation"),
         }
@@ -169,7 +171,10 @@ impl<'a, T: Context<'a>> GeneralFPContext for GeneralizedContext<'a, T> {
             }),
             Edge::ReturnCombine(call_term) => match node_value {
                 NodeValue::Value(_) => panic!("Unexpected interprocedural fixpoint graph state"),
-                NodeValue::CallFlowCombinator { call_stub, interprocedural_flow } => {
+                NodeValue::CallFlowCombinator {
+                    call_stub,
+                    interprocedural_flow,
+                } => {
                     let return_from_block = match graph.node_weight(start_node) {
                         Some(Node::CallReturn {
                             call: _,

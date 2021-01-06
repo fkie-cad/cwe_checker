@@ -364,9 +364,10 @@ impl<'a> PointerInference<'a> {
                         }
                         Node::CallReturn { call, return_ } => {
                             let (call_state, return_state) = match node_value {
-                                NodeValue::CallFlowCombinator { call_stub, interprocedural_flow } => {
-                                    (call_stub.is_some(), interprocedural_flow.is_some())
-                                }
+                                NodeValue::CallFlowCombinator {
+                                    call_stub,
+                                    interprocedural_flow,
+                                } => (call_stub.is_some(), interprocedural_flow.is_some()),
                                 _ => panic!(),
                             };
                             println!(

@@ -36,9 +36,9 @@
 //! - For functions with more than one return value we do not distinguish between
 //! the return values.
 
-use crate::analysis::graph::{Edge, Node};
 use crate::analysis::forward_interprocedural_fixpoint::Computation;
 use crate::analysis::forward_interprocedural_fixpoint::Context as _;
+use crate::analysis::graph::{Edge, Node};
 use crate::analysis::interprocedural_fixpoint_generic::NodeValue;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
