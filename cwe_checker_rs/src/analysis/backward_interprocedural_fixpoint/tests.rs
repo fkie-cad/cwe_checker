@@ -2,7 +2,10 @@ use petgraph::graph::NodeIndex;
 
 use crate::{bil::Bitvector, intermediate_representation::*};
 
-use super::{create_computation, mock_context::Context, mock_context::StartEnd, NodeValue};
+use super::{create_computation, mock_context, NodeValue};
+
+use mock_context::Context;
+use mock_context::StartEnd;
 
 fn mock_program() -> Term<Program> {
     let var = Variable {

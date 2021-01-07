@@ -17,8 +17,6 @@ use crate::intermediate_representation::*;
 use petgraph::graph::EdgeIndex;
 use std::marker::PhantomData;
 
-pub mod mock_context;
-
 /// The context for an backward interprocedural fixpoint computation.
 ///
 /// Basically, a `Context` object needs to contain a reference to the actual graph,
@@ -54,6 +52,8 @@ pub trait Context<'a> {
     ) -> Option<Self::Value>;
 
     /// Transition function for in-program calls.
+    /// The target value is comming in via the call edge from the called subroutine and
+    /// the return_value is comming in via the call stub edge from the return node of the subroutine
     fn update_callsite(
         &self,
         target_value: Option<&Self::Value>,
@@ -244,3 +244,6 @@ pub fn create_computation<'a, T: Context<'a>>(
 
 #[cfg(test)]
 pub mod tests;
+
+#[cfg(test)]
+pub mod mock_context;

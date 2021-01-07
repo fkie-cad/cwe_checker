@@ -3,6 +3,7 @@ use crate::analysis::graph::Graph;
 use petgraph::graph::NodeIndex;
 use std::collections::{HashMap, HashSet};
 
+/// Identifier for BlkStart and BlkEnd nodes
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub enum StartEnd {
     Start,
