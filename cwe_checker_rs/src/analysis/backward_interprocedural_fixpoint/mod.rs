@@ -52,8 +52,8 @@ pub trait Context<'a> {
     ) -> Option<Self::Value>;
 
     /// Transition function for in-program calls.
-    /// The target value is comming in via the call edge from the called subroutine and
-    /// the return_value is comming in via the call stub edge from the return node of the subroutine
+    /// The target value is coming in via the call edge from the BlkStart node of the called subroutine and
+    /// the return_value is coming in via the call stub edge from the returned-to node of the caller
     fn update_callsite(
         &self,
         target_value: Option<&Self::Value>,

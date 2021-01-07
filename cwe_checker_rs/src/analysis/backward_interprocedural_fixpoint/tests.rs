@@ -1,5 +1,3 @@
-use petgraph::graph::NodeIndex;
-
 use crate::{bil::Bitvector, intermediate_representation::*};
 
 use super::{create_computation, mock_context, NodeValue};
@@ -148,7 +146,13 @@ fn backward_fixpoint() {
 
     let mock_con = Context::new(&project);
     let mut computation = create_computation(mock_con.clone(), None);
-    computation.set_node_value(NodeIndex::new(0), NodeValue::Value(0));
+    computation.set_node_value(
+        *mock_con
+            .tid_to_node_index
+            .get(&(Tid::new("sub1"), Tid::new("sub1_blk1"), StartEnd::Start))
+            .unwrap(),
+        NodeValue::Value(0),
+    );
     computation.compute_with_max_steps(100);
 
     // The fixpoint values of all 12 BlockStart/BlockEnd nodes are compared with their expected value
