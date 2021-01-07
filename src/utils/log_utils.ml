@@ -70,12 +70,12 @@ let get_cwe_warnings () = !cwe_warning_store
 let emit_json target_path out_path =
   let cwe_warning_result = {
       CweCheckerResult.binary = target_path;
-      CweCheckerResult.time = Unix.time ();
+      CweCheckerResult.time = Caml_unix.time ();
       CweCheckerResult.warnings = !cwe_warning_store;
       CweCheckerResult.check_path = !check_path_store
     } in
   let output = Yojson.Safe.pretty_to_string (CweCheckerResult.to_yojson cwe_warning_result) in
-  if out_path = "" then
+  if  String.(=) out_path "" then
     print_endline output
   else
     Out_channel.write_all out_path ~data:output
@@ -86,7 +86,7 @@ let emit_native out_path =
   let output_warnings = List.map !cwe_warning_store ~f:(fun (cwe_warning:CweWarning.t) ->
                             sprintf "[%s] (%s) \n %s" cwe_warning.name cwe_warning.version cwe_warning.description) in
   let output_lines = output_warnings @ output_check_path in
-  if out_path = "" then
+  if String.(=) out_path "" then
     List.iter output_lines ~f:print_endline
   else
     Out_channel.write_lines out_path output_lines

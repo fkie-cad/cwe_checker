@@ -51,7 +51,7 @@ let get_fp_of_arch arch =
   | _ -> failwith  "Unknown architecture."
 
 let vars_contain_fp vars fp_pointer =
-  let regs = Set.filter vars ~f:(fun var -> Var.to_string var = fp_pointer) in
+  let regs = Set.filter vars ~f:(fun var -> String.(=) (Var.to_string var) fp_pointer) in
   Set.length regs > 0
 
 let is_interesting_load_store def fp_pointer =
@@ -61,7 +61,7 @@ let is_interesting_load_store def fp_pointer =
   contains_mem && contains_fp
 
 (*TODO: implement real filtering*)
-let filter_mem_address i min_fp_offset = Set.filter i ~f:(fun elem -> (Word.of_int  ~width:32 min_fp_offset) < elem)
+let filter_mem_address i min_fp_offset = Set.filter i ~f:(fun elem -> Word.(<) (Word.of_int ~width:32 min_fp_offset) elem)
 
 let log_cwe_warning sub i d tid_map =
    let word = Word.to_string i in
@@ -95,7 +95,7 @@ let check_subfunction _prog proj tid_map sub =
           else
             begin
               let filter_mem_addresses = filter_mem_address ints min_fp_offset in
-              Set.iter filter_mem_addresses ~f:(fun i -> if not (Array.exists !stores ~f:(fun elem -> elem = i)) then
+              Set.iter filter_mem_addresses ~f:(fun i -> if not (Array.exists !stores ~f:(fun elem -> Word.(=) elem i)) then
                 log_cwe_warning sub i d tid_map)
             end
         end)

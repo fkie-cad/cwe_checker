@@ -73,7 +73,7 @@ let execute_cwe_module (cwe : cwe_module) (json : Yojson.Basic.t) (project : Pro
   let parameters = match cwe.has_parameters with
     | false -> []
     | true -> Json_utils.get_parameter_list_from_json json cwe.name in
-  if cwe.requires_pairs = true then
+  if cwe.requires_pairs then
     let symbol_pairs = Json_utils.get_symbol_lists_from_json json cwe.name in
     cwe.cwe_func program project tid_address_map symbol_pairs parameters
   else
@@ -93,7 +93,7 @@ let partial_run (json : Yojson.Basic.t) (project : Project.t) (program : program
   let () = check_valid_module_list modules in
   Log_utils.info (sprintf "[cwe_checker] Just running the following analyses: %s." (String.concat (List.map ~f:(fun x -> x ^ " ") modules)));
   List.iter modules ~f:(fun cwe ->
-    let cwe_mod = match List.find known_modules ~f:(fun x -> x.name = cwe) with
+    let cwe_mod = match List.find known_modules ~f:(fun x -> String.(=) x.name cwe) with
       | Some(module_) -> module_
       | None -> failwith "[cwe_checker] Unknown CWE module" in
     execute_cwe_module cwe_mod json project program tid_address_map
@@ -102,7 +102,7 @@ let partial_run (json : Yojson.Basic.t) (project : Project.t) (program : program
 
 let full_run (json : Yojson.Basic.t) (project : Project.t) (program : program term) (tid_address_map : word Tid.Map.t) : unit =
   List.iter known_modules ~f:(fun cwe ->
-    if cwe.name <> "Memory" then (* TODO: Remove this when the memory check is more stable *)
+    if String.(<>) cwe.name "Memory" then (* TODO: Remove this when the memory check is more stable *)
       execute_cwe_module cwe json project program tid_address_map)
 
 
@@ -114,7 +114,7 @@ let build_output_path (path : string) : string =
         let path = match String.is_suffix path ~suffix:"/" with
           | true -> path
           | false -> path ^ "/" in
-        let path = path ^ "out-" ^ string_of_float (Unix.time ()) in
+        let path = path ^ "out-" ^ string_of_float (Caml_unix.time ()) in
         Log_utils.info (sprintf "Created: %s" path);
         path
   with
@@ -141,16 +141,16 @@ let main (flags : Bool.t String.Map.t) (params : String.t String.Map.t) (project
       if no_logging then Log_utils.turn_off_logging ();
 
       let config =
-        if config = "" then
+        if String.(=) config "" then
           (* try the standard installation path for the config file instead *)
           match Sys.getenv_opt "OPAM_SWITCH_PREFIX" with
           | Some(prefix) -> prefix ^ "/etc/cwe_checker/config.json"
           | None -> ""
         else
           config in
-      if config = "" then
+      if String.(=) config "" then
         Log_utils.error "[cwe_checker] No configuration file provided! Aborting..."
-      else if Sys.file_exists config <> true then
+      else if Bool.(=) (Sys.file_exists config) false then
         Log_utils.error "[cwe_checker] Configuration file not found. Aborting..."
       else
         begin
@@ -160,7 +160,7 @@ let main (flags : Bool.t String.Map.t) (params : String.t String.Map.t) (project
           let () = match Symbol_utils.check_if_symbols_resolved project prog tid_address_map with
           | false -> Log_utils.error "BAP is not able to resolve external symbols."
           | true -> () in
-          if partial_update = "" then
+          if String.(=) partial_update "" then
             full_run json project prog tid_address_map
           else
             partial_run json project prog tid_address_map (String.split partial_update ~on: ',');
@@ -171,7 +171,7 @@ let main (flags : Bool.t String.Map.t) (params : String.t String.Map.t) (project
               Check_path.check_path prog tid_address_map check_path_sources check_path_sinks
             end;
           let file_output =
-            if file_output <> "" then
+            if String.(<>) file_output "" then
               build_output_path file_output
             else
               file_output in

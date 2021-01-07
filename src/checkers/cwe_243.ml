@@ -40,7 +40,7 @@ let rec check dests (symbols : symbol list) =
       | [] -> true
       | first_symbol :: symbol_rest -> begin
           match first_symbol.address with
-          | Some address -> if address = hd then check tl symbol_rest else check tl symbols
+          | Some address -> if Tid.(=) address hd then check tl symbol_rest else check tl symbols
           | _ -> false
         end
   end
@@ -72,8 +72,8 @@ If all of them fail then we supose that the program handles chroot on
 let check_subfunction prog tid_map sub pathes =
   if sub_calls_symbol prog sub "chroot" then
     begin
-      let path_checks = List.map pathes ~f:(fun path -> check_path prog tid_map sub path) in
-      if not (List.exists path_checks ~f:(fun x -> x = true)) then
+      let path_checks: Bool.t List.t = List.map pathes ~f:(fun path -> check_path prog tid_map sub path) in
+      if not (List.exists path_checks ~f:(fun x -> x)) then
         let address = (Address_translation.translate_tid_to_assembler_address_string (Term.tid sub) tid_map) in
         let tid = Address_translation.tid_to_string @@ Term.tid sub in
         let symbol = Term.name sub in

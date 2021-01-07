@@ -108,8 +108,8 @@ let rec mark_error mem_region ~pos ~size =
     else if pos + size <= hd.pos then
       (error_elem ~pos ~size) :: mem_region
     else
-      let start_pos = min pos hd.pos in
-      let end_pos_plus_one = max (pos + size) (hd.pos + hd.size) in
+      let start_pos = Word.min pos hd.pos in
+      let end_pos_plus_one = Word.max (pos + size) (hd.pos + hd.size) in
       mark_error tl ~pos:start_pos ~size:(end_pos_plus_one - start_pos)
 
 
@@ -133,8 +133,8 @@ let rec merge mem_region1 mem_region2 ~data_merge =
         end
       | _ -> { hd1 with data = Error(()) } :: merge tl1 tl2 ~data_merge
     else
-      let start_pos = min hd1.pos hd2.pos in
-      let end_pos_plus_one = max (hd1.pos + hd1.size) (hd2.pos + hd2.size) in
+      let start_pos = Word.min hd1.pos hd2.pos in
+      let end_pos_plus_one = Word.max (hd1.pos + hd1.size) (hd2.pos + hd2.size) in
       let mem_region = merge tl1 tl2 ~data_merge in
       mark_error mem_region ~pos:start_pos ~size:(end_pos_plus_one - start_pos)
 
