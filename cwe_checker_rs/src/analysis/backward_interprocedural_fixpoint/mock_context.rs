@@ -19,9 +19,8 @@ pub struct Context<'a> {
 
 impl<'a> Context<'a> {
     pub fn new(project: &'a Project) -> Self {
-        let mut graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
+        let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new(), true);
         let mut tid_to_node_index: HashMap<(Tid, Tid, StartEnd), NodeIndex> = HashMap::new();
-        graph.reverse();
         for node in graph.node_indices() {
             let node_value = graph.node_weight(node).unwrap();
             match node_value {

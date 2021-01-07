@@ -55,7 +55,7 @@ impl<'a> Context<'a> {
             .map(|symb| symb.tid.clone())
             .collect();
         let graph =
-            crate::analysis::graph::get_program_cfg(&project.program, extern_symbol_tid_set);
+            crate::analysis::graph::get_program_cfg(&project.program, extern_symbol_tid_set, false);
         Context {
             graph,
             project,
