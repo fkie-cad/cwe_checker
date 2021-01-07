@@ -14,7 +14,7 @@
 -   Added acceptance tests for the Ghidra backend (PRs #91, #99)
 -   Bugfixes for the Ghidra backend (PRs #98, #101, #104, #106, #110, #114, #120)
 -   Ported the CWE checks to Rust for the Ghidra backend (PRs #88, #95, #100, #102, #111, #117, #119, #121)
--   Added support for Ghidra 9.2 (PR #116)
+-   Added support for Ghidra 9.2 (PR #116) and BAP 2.2 (PR #122)
 
 0.3 (2019-12)
 ====
