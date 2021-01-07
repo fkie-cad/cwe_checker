@@ -1,12 +1,20 @@
 use crate::prelude::*;
 
-/// NodeValue that can either be a simple value or a
-/// combination of two values representing a fall through
-/// and interprocedural flow value
+/// NodeValue that can either be a single abstract value or a
+/// composition of the abstract value computed following an interprocedural
+/// call in the graph and of the abstract value when the call is not taken.
+/// The CallFlowCombinator then allows for a merge of the values computed
+/// over both paths.
+///
+/// The call_stub value will either be transferred from the callsite to the return site
+/// in a forward analysis or the other way around in a backward analysis.
+///
+/// The interprocedural_flow value will either be transferred from the end of the called subroutine
+/// to the return site in case of a forward analysis or from the beginning of the called subroutine
+/// to the callsite in a backward analysis.
 #[derive(PartialEq, Eq, Serialize, Deserialize)]
 pub enum NodeValue<T: PartialEq + Eq> {
     Value(T),
-    // TODO: more doc strings
     CallFlowCombinator {
         call_stub: Option<T>,
         interprocedural_flow: Option<T>,

@@ -1,19 +1,54 @@
-use std::collections::HashSet;
-
 use super::*;
 use crate::analysis::graph::Graph;
+use petgraph::graph::NodeIndex;
+use std::collections::{HashMap, HashSet};
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub enum StartEnd {
+    Start,
+    End,
+}
 
 /// A simple mock context, only containing the program cfg
 #[derive(Clone)]
 pub struct Context<'a> {
     pub graph: Graph<'a>,
+    pub tid_to_node_index: HashMap<(Tid, Tid, StartEnd), NodeIndex>,
 }
 
 impl<'a> Context<'a> {
     pub fn new(project: &'a Project) -> Self {
         let mut graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
+        let mut tid_to_node_index: HashMap<(Tid, Tid, StartEnd), NodeIndex> = HashMap::new();
         graph.reverse();
-        Context { graph }
+        for node in graph.node_indices() {
+            let node_value = graph.node_weight(node).unwrap();
+            match node_value {
+                Node::BlkStart {
+                    0: block,
+                    1: subroutine,
+                } => {
+                    tid_to_node_index.insert(
+                        (subroutine.tid.clone(), block.tid.clone(), StartEnd::Start),
+                        node,
+                    );
+                }
+                Node::BlkEnd {
+                    0: block,
+                    1: subroutine,
+                } => {
+                    tid_to_node_index.insert(
+                        (subroutine.tid.clone(), block.tid.clone(), StartEnd::End),
+                        node,
+                    );
+                }
+                _ => (),
+            }
+        }
+        Context {
+            graph,
+            tid_to_node_index,
+        }
     }
 }
 
@@ -31,7 +66,7 @@ impl<'a> crate::analysis::backward_interprocedural_fixpoint::Context<'a> for Con
 
     /// Increase the Def count when parsing one
     fn update_def(&self, val: &u64, _def: &Term<Def>) -> Option<u64> {
-        let updated_value = val.clone() + 1;
+        let updated_value = *val + 1;
         Some(updated_value)
     }
 
@@ -43,39 +78,39 @@ impl<'a> crate::analysis::backward_interprocedural_fixpoint::Context<'a> for Con
         _untaken_conditional: Option<&Term<Jmp>>,
         _jumpsite: &Term<Blk>,
     ) -> Option<u64> {
-        Some(value_after_jump.clone())
+        Some(*value_after_jump)
     }
 
     /// Merge two values at the callsite if both exist
     /// If there is only one, simply copy it
     fn update_callsite(
         &self,
-        value_after_call: Option<&u64>,
-        fallthrough_value: Option<&u64>,
+        target_value: Option<&u64>,
+        return_value: Option<&u64>,
         _call: &Term<Jmp>,
         _return_: &Term<Jmp>,
     ) -> Option<u64> {
-        match (value_after_call, fallthrough_value) {
+        match (target_value, return_value) {
             (Some(call), Some(fall)) => Some(self.merge(call, fall)),
-            (Some(call), _) => Some(call.clone()),
-            (_, Some(fall)) => Some(fall.clone()),
+            (Some(call), _) => Some(*call),
+            (_, Some(fall)) => Some(*fall),
             _ => panic!("No values to merge at callsite!"),
         }
     }
 
     /// Simply copy the value
     fn split_call_stub(&self, combined_value: &u64) -> Option<u64> {
-        Some(combined_value.clone())
+        Some(*combined_value)
     }
 
     /// Simply copy the value
     fn split_return_stub(&self, combined_value: &u64) -> Option<u64> {
-        Some(combined_value.clone())
+        Some(*combined_value)
     }
 
     /// Simply copy the value
     fn update_call_stub(&self, value_after_call: &u64, _call: &Term<Jmp>) -> Option<u64> {
-        Some(value_after_call.clone())
+        Some(*value_after_call)
     }
 
     /// Simply copy the value
@@ -85,6 +120,6 @@ impl<'a> crate::analysis::backward_interprocedural_fixpoint::Context<'a> for Con
         _condition: &Expression,
         _is_true: bool,
     ) -> Option<u64> {
-        Some(value_after_jump.clone())
+        Some(*value_after_jump)
     }
 }

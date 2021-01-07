@@ -1,17 +1,8 @@
 use petgraph::graph::NodeIndex;
 
-use crate::{
-    analysis::{self, interprocedural_fixpoint_generic::NodeValue},
-    bil::Bitvector,
-    intermediate_representation::{
-        Blk, ByteSize, Def, Expression, Jmp, Program, Project, Sub, Term, Tid, UnOpType, Variable,
-    },
-};
+use crate::{bil::Bitvector, intermediate_representation::*};
 
-use analysis::backward_interprocedural_fixpoint::Computation;
-use mock_context::Context;
-
-use super::mock_context;
+use super::{create_computation, mock_context::Context, mock_context::StartEnd, NodeValue};
 
 fn mock_program() -> Term<Program> {
     let var = Variable {
@@ -153,91 +144,151 @@ fn backward_fixpoint() {
     };
 
     let mock_con = Context::new(&project);
-    let mut computation = Computation::new(mock_con, None);
+    let mut computation = create_computation(mock_con.clone(), None);
     computation.set_node_value(NodeIndex::new(0), NodeValue::Value(0));
     computation.compute_with_max_steps(100);
 
     // The fixpoint values of all 12 BlockStart/BlockEnd nodes are compared with their expected value
     assert_eq!(
         *computation
-            .get_node_value(NodeIndex::new(0))
+            .get_node_value(
+                *mock_con
+                    .tid_to_node_index
+                    .get(&(Tid::new("sub1"), Tid::new("sub1_blk1"), StartEnd::Start))
+                    .unwrap()
+            )
             .unwrap()
             .unwrap_value(),
         0 as u64
     );
     assert_eq!(
         *computation
-            .get_node_value(NodeIndex::new(1))
+            .get_node_value(
+                *mock_con
+                    .tid_to_node_index
+                    .get(&(Tid::new("sub1"), Tid::new("sub1_blk1"), StartEnd::End))
+                    .unwrap()
+            )
             .unwrap()
             .unwrap_value(),
         1 as u64
     );
     assert_eq!(
         *computation
-            .get_node_value(NodeIndex::new(2))
+            .get_node_value(
+                *mock_con
+                    .tid_to_node_index
+                    .get(&(Tid::new("sub1"), Tid::new("sub1_blk2"), StartEnd::Start))
+                    .unwrap()
+            )
             .unwrap()
             .unwrap_value(),
         1 as u64
     );
     assert_eq!(
         *computation
-            .get_node_value(NodeIndex::new(3))
+            .get_node_value(
+                *mock_con
+                    .tid_to_node_index
+                    .get(&(Tid::new("sub1"), Tid::new("sub1_blk2"), StartEnd::End))
+                    .unwrap()
+            )
             .unwrap()
             .unwrap_value(),
         0 as u64
     );
     assert_eq!(
         *computation
-            .get_node_value(NodeIndex::new(4))
+            .get_node_value(
+                *mock_con
+                    .tid_to_node_index
+                    .get(&(Tid::new("sub2"), Tid::new("sub2_blk1"), StartEnd::Start))
+                    .unwrap()
+            )
             .unwrap()
             .unwrap_value(),
         4 as u64
     );
     assert_eq!(
         *computation
-            .get_node_value(NodeIndex::new(5))
+            .get_node_value(
+                *mock_con
+                    .tid_to_node_index
+                    .get(&(Tid::new("sub2"), Tid::new("sub2_blk1"), StartEnd::End))
+                    .unwrap()
+            )
             .unwrap()
             .unwrap_value(),
         2 as u64
     );
     assert_eq!(
         *computation
-            .get_node_value(NodeIndex::new(6))
+            .get_node_value(
+                *mock_con
+                    .tid_to_node_index
+                    .get(&(Tid::new("sub2"), Tid::new("sub2_blk2"), StartEnd::Start))
+                    .unwrap()
+            )
             .unwrap()
             .unwrap_value(),
         2 as u64
     );
     assert_eq!(
         *computation
-            .get_node_value(NodeIndex::new(7))
+            .get_node_value(
+                *mock_con
+                    .tid_to_node_index
+                    .get(&(Tid::new("sub2"), Tid::new("sub2_blk2"), StartEnd::End))
+                    .unwrap()
+            )
             .unwrap()
             .unwrap_value(),
         1 as u64
     );
     assert_eq!(
         *computation
-            .get_node_value(NodeIndex::new(8))
+            .get_node_value(
+                *mock_con
+                    .tid_to_node_index
+                    .get(&(Tid::new("sub2"), Tid::new("sub1_blk1"), StartEnd::Start))
+                    .unwrap()
+            )
             .unwrap()
             .unwrap_value(),
         5 as u64
     );
     assert_eq!(
         *computation
-            .get_node_value(NodeIndex::new(9))
+            .get_node_value(
+                *mock_con
+                    .tid_to_node_index
+                    .get(&(Tid::new("sub2"), Tid::new("sub1_blk1"), StartEnd::End))
+                    .unwrap()
+            )
             .unwrap()
             .unwrap_value(),
         4 as u64
     );
     assert_eq!(
         *computation
-            .get_node_value(NodeIndex::new(10))
+            .get_node_value(
+                *mock_con
+                    .tid_to_node_index
+                    .get(&(Tid::new("sub2"), Tid::new("sub1_blk2"), StartEnd::Start))
+                    .unwrap()
+            )
             .unwrap()
             .unwrap_value(),
         6 as u64
     );
     assert_eq!(
         *computation
-            .get_node_value(NodeIndex::new(11))
+            .get_node_value(
+                *mock_con
+                    .tid_to_node_index
+                    .get(&(Tid::new("sub2"), Tid::new("sub1_blk2"), StartEnd::End))
+                    .unwrap()
+            )
             .unwrap()
             .unwrap_value(),
         5 as u64

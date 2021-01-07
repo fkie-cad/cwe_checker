@@ -36,7 +36,7 @@
 //! - For functions with more than one return value we do not distinguish between
 //! the return values.
 
-use crate::analysis::forward_interprocedural_fixpoint::Computation;
+use crate::analysis::forward_interprocedural_fixpoint::create_computation;
 use crate::analysis::forward_interprocedural_fixpoint::Context as _;
 use crate::analysis::graph::{Edge, Node};
 use crate::analysis::interprocedural_fixpoint_generic::NodeValue;
@@ -102,7 +102,7 @@ pub fn check_cwe(
                             Some(NodeValue::Value(val)) => Some(val.clone()),
                             _ => None,
                         };
-                    let mut computation = Computation::new(context, None);
+                    let mut computation = create_computation(context, None);
                     computation.set_node_value(
                         node,
                         NodeValue::Value(State::new(

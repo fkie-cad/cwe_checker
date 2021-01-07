@@ -13,7 +13,8 @@
 //!
 //! See the `Config` struct for configurable analysis parameters.
 
-use super::forward_interprocedural_fixpoint::Computation;
+use super::fixpoint::Computation;
+use super::forward_interprocedural_fixpoint::GeneralizedContext;
 use super::interprocedural_fixpoint_generic::NodeValue;
 use crate::abstract_domain::{BitvectorDomain, DataDomain};
 use crate::analysis::graph::{Graph, Node};
@@ -60,7 +61,7 @@ pub struct Config {
 
 /// A wrapper struct for the pointer inference computation object.
 pub struct PointerInference<'a> {
-    computation: Computation<'a, Context<'a>>,
+    computation: Computation<GeneralizedContext<'a, Context<'a>>>,
     log_collector: crossbeam_channel::Sender<LogThreadMsg>,
     pub collected_logs: (Vec<LogMessage>, Vec<CweWarning>),
 }
@@ -108,7 +109,7 @@ impl<'a> PointerInference<'a> {
             })
             .collect();
         let mut fixpoint_computation =
-            super::forward_interprocedural_fixpoint::Computation::new(context, None);
+            super::forward_interprocedural_fixpoint::create_computation(context, None);
         let _ = log_sender.send(LogThreadMsg::Log(LogMessage::new_debug(format!(
             "Pointer Inference: Adding {} entry points",
             entry_sub_to_entry_node_map.len()
@@ -176,7 +177,7 @@ impl<'a> PointerInference<'a> {
     }
 
     pub fn get_context(&self) -> &Context {
-        self.computation.get_context()
+        self.computation.get_context().get_context()
     }
 
     pub fn get_node_value(&self, node_id: NodeIndex) -> Option<&NodeValue<State>> {
