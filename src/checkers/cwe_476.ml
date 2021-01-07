@@ -137,7 +137,7 @@ let rec contains_taint (exp: Exp.t) (state: State.t) ~(cwe_hits: Taint.t ref) ~(
   | Bil.Load(_mem, addr, _endian, _size)->
     begin
       let access_taint = contains_taint addr state ~cwe_hits ~stack in
-      let () = if Taint.is_empty access_taint = false then append_to_hits cwe_hits access_taint in
+      let () = if Bool.(=) (Taint.is_empty access_taint) false then append_to_hits cwe_hits access_taint in
       match StackInfo.get_address stack addr with
       | Some(stack_offset) -> Option.value (State.find_stack state ~pos:stack_offset) ~default:Taint.empty
       | None -> Taint.empty
@@ -146,14 +146,14 @@ let rec contains_taint (exp: Exp.t) (state: State.t) ~(cwe_hits: Taint.t ref) ~(
     begin
       let access_taint = contains_taint addr state ~cwe_hits ~stack in
       let value_taint = contains_taint val_expression state ~cwe_hits ~stack in
-      let () = if Taint.is_empty access_taint = false then append_to_hits cwe_hits access_taint in
+      let () = if Bool.(=) (Taint.is_empty access_taint) false then append_to_hits cwe_hits access_taint in
       match StackInfo.get_address stack addr with
       | Some(_) -> Taint.empty
       | None ->
-          let () = if stack.strict_mem_policy && (Taint.is_empty value_taint = false) then append_to_hits cwe_hits value_taint in
+          let () = if stack.strict_mem_policy && (Bool.(=) (Taint.is_empty value_taint) false) then append_to_hits cwe_hits value_taint in
           Taint.empty
     end
-  | Bil.BinOp(Bil.XOR, Bil.Var(var1), Bil.Var(var2)) when var1 = var2 -> Taint.empty (* standard assembly shortcut for setting a register to NULL *)
+  | Bil.BinOp(Bil.XOR, Bil.Var(var1), Bil.Var(var2)) when Var.(=) var1 var2 -> Taint.empty (* standard assembly shortcut for setting a register to NULL *)
   | Bil.BinOp(_, exp1, exp2) -> Taint.union (contains_taint exp1 state ~cwe_hits ~stack) (contains_taint exp2 state ~cwe_hits ~stack)
   | Bil.UnOp(_, exp) -> contains_taint exp state ~cwe_hits ~stack
   | Bil.Var(var) -> Option.value (State.find_register state var) ~default:Taint.empty
@@ -192,7 +192,7 @@ let checks_value (exp: Exp.t) (state: State.t) ~(cwe_hits: Taint.t ref) ~(stack:
   match exp with
   | Bil.Ite(if_, _then_, _else_) -> begin
       let (taint_to_remove, state) = parse_taint_of_exp if_ state ~cwe_hits ~stack in
-      if Taint.is_empty taint_to_remove = false then
+      if Bool.(=) (Taint.is_empty taint_to_remove) false then
         State.remove_taint state taint_to_remove
       else
         state
@@ -417,12 +417,12 @@ let update_block_analysis
 let print_hit (tid: Tid.t) ~(sub: Sub.t) ~(malloc_like_functions: String.t List.t) ~(tid_map: Word.t Tid.Map.t) : unit =
   let block = Option.value_exn (Term.find blk_t sub tid) in
   let jmps = Term.enum jmp_t block in
-  let _ = Seq.find_exn jmps ~f:(fun jmp ->
+  let _: Jmp.t = Seq.find_exn jmps ~f:(fun jmp ->
     match Jmp.kind jmp with
     | Call(call) -> begin
         match Call.target call with
         | Direct(call_tid) -> Option.is_some (List.find malloc_like_functions ~f:(fun fn_name ->
-          if fn_name = (Tid.name call_tid) then
+          if String.(=) fn_name (Tid.name call_tid) then
             begin
               let address = Address_translation.translate_tid_to_assembler_address_string (Term.tid jmp) tid_map in
               let tids = [Address_translation.tid_to_string (Term.tid jmp)] in
@@ -480,7 +480,7 @@ let check_cwe (_prog: Program.t) (project: Project.t) (tid_map: Word.t Tid.Map.t
           let block = Graphs.Ir.Node.label node in
           update_block_analysis block state ~cwe_hits ~malloc_like_functions ~extern_functions ~sub_tid:(Term.tid subfn) ~project ~strict_call_policy ~strict_mem_policy
         ) in
-      let _ = Graphlib.Std.Graphlib.fixpoint (module Graphs.Ir) cfg ~steps:max_steps ~rev:false ~init:init ~equal:equal ~merge:merge ~f:f in
+      let _: ('n, 'd) Graphlib.Std.Solution.t = Graphlib.Std.Graphlib.fixpoint (module Graphs.Ir) cfg ~steps:max_steps ~rev:false ~init:init ~equal:equal ~merge:merge ~f:f in
       Tid.Set.iter (!cwe_hits) ~f:(fun hit -> print_hit hit ~sub:subfn ~malloc_like_functions ~tid_map)
   )
 

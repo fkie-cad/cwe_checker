@@ -12,7 +12,7 @@ let get_calls_to_symbol symbol_name callsites program =
           Seq.filter callsites ~f:(fun callsite -> match Jmp.kind callsite with
             | Goto _ | Ret _ | Int (_,_) -> false
             | Call destination -> match Call.target destination with
-              | Direct addr -> addr = symbol
+              | Direct addr -> Tid.(=) addr symbol
               | _ -> false)
         end
       | None -> Seq.empty
@@ -21,7 +21,7 @@ let get_blk_tid_of_tid sub tid =
  let blk = Seq.find (Term.enum blk_t sub) ~f:(
       fun b ->
       match Term.last jmp_t b with
-      | Some last_term -> tid = (Term.tid last_term)
+      | Some last_term -> Tid.(=) tid (Term.tid last_term)
       | None -> false) in
  match blk with
  | Some b -> Term.tid b

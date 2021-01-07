@@ -21,7 +21,7 @@ let extract_direct_call_symbol block =
 (* check whether block contains a direct call to a symbol with name symbol_name *)
 let contains_symbol block symbol_name =
   match extract_direct_call_symbol block with
-    | Some(symb) -> symb = symbol_name
+    | Some(symb) -> String.(=) symb symbol_name
     | None -> false
 
   (* Checks whether a subfunction contains a catch block. *)
@@ -31,11 +31,11 @@ let contains_symbol block symbol_name =
 
 (* Find all calls to subfunctions that are reachable from this subfunction. The calls are returned
     as a list, except for calls to "@__cxa_throw", which are logged as possibly uncaught exceptions. *)
-let find_calls_and_throws subfunction ~tid_map =
+let find_calls_and_throws (subfunction: Sub.t) ~tid_map : Tid.t List.t =
   let blocks = Term.enum blk_t subfunction in
   Seq.fold blocks ~init:[] ~f:(fun call_list block ->
     if contains_symbol block "@__cxa_throw" then
-      let () = print_uncatched_exception  (Term.tid block) ~tid_map:tid_map in
+      let () = print_uncatched_exception (Term.tid block) ~tid_map:tid_map in
       call_list
     else
       match Symbol_utils.extract_direct_call_tid_from_block block with
@@ -52,7 +52,7 @@ let rec find_uncaught_exceptions subfunction already_checked_functions program ~
   else
     let subfunction_calls = find_calls_and_throws subfunction ~tid_map:tid_map in
     List.fold subfunction_calls ~init:already_checked_functions ~f:(fun already_checked subfunc ->
-      match List.exists ~f:(fun a -> a = subfunc) already_checked with
+      match List.exists ~f:(fun a -> Tid.(=) a subfunc) already_checked with
         | true -> already_checked
         | false ->  find_uncaught_exceptions ~tid_map:tid_map (Core_kernel.Option.value_exn (Term.find sub_t program subfunc)) (subfunc :: already_checked) program)
 
@@ -61,5 +61,5 @@ let rec find_uncaught_exceptions subfunction already_checked_functions program ~
     way. We should check whether this produces a lot of false negatives. *)
 let check_cwe program _project tid_map _symbol_pairs _ =
   let entry_points = Symbol_utils.get_program_entry_points program in
-  let _ = List.fold entry_points ~init:[] ~f:(fun already_checked_functions sub -> find_uncaught_exceptions ~tid_map:tid_map sub already_checked_functions program) in
+  let _: Tid.t List.t = List.fold entry_points ~init:[] ~f:(fun already_checked_functions sub -> find_uncaught_exceptions ~tid_map:tid_map sub already_checked_functions program) in
   ()

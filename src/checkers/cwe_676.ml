@@ -12,7 +12,7 @@ let get_call_to_target _cg callee target =
            match Jmp.kind j with
            | Goto _ | Ret _ | Int (_,_) -> None
            | Call dst -> match Call.target dst with
-             | Direct tid when tid = (Term.tid target) ->
+             | Direct tid when Tid.(=) tid (Term.tid target) ->
                Some (Term.name callee, Term.tid j, Term.name target)
              | _ -> None))
 
@@ -48,7 +48,7 @@ let print_calls calls ~tid_map =
 
 let resolve_symbols prog symbols =
   Term.enum sub_t prog |>
-    Seq.filter ~f:(fun s -> List.exists ~f:(fun x -> x = Sub.name s) symbols)
+    Seq.filter ~f:(fun s -> List.exists ~f:(fun x -> String.(=) x (Sub.name s)) symbols)
 
 
 let check_cwe prog _proj tid_map symbol_names _ =

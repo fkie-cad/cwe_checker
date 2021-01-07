@@ -14,7 +14,7 @@ type proof =
 
 (** Taken from https://stackoverflow.com/questions/8373460/substring-check-in-ocaml *)
 let contains_substring search target =
-    String.substr_index ~pattern:search target <> None
+    Option.is_some (String.substr_index ~pattern:search target)
 
 let format_path get_source get_destination path tid_map =
   let e_count = List.length (Seq.to_list (Path.edges path)) in
@@ -78,7 +78,7 @@ let block_has_callsite blk t =
         match Jmp.kind j with
         | Goto _ | Ret _ | Int (_,_) -> false 
         | Call destination -> begin match Call.target destination with
-                              | Direct tid -> tid = t
+                              | Direct tid -> Tid.(=) tid t
                               | _ -> false
                               end)
 
@@ -90,11 +90,11 @@ let collect_callsites program t =
 
 let sub_has_tid sub tid =
   Term.enum blk_t sub
-  |> Seq.exists ~f:(fun blk -> Term.tid blk = tid || Blk.elts blk
+  |> Seq.exists ~f:(fun blk -> Tid.(=) (Term.tid blk) tid || Blk.elts blk
                                |> Seq.exists ~f:(fun e -> match e with
-                                                          | `Def d -> Term.tid d = tid
-                                                          | `Jmp j -> Term.tid j = tid
-                                                          | `Phi p -> Term.tid p = tid ))
+                                                          | `Def d -> Tid.(=) (Term.tid d) tid
+                                                          | `Jmp j -> Tid.(=) (Term.tid j) tid
+                                                          | `Phi p -> Tid.(=) (Term.tid p) tid ))
 
 let find_sub_tid_of_term_tid program tid =
   match tid with

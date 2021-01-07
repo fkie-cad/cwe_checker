@@ -37,7 +37,7 @@ let call_finder_run = ref false
 (** Parse a line from the dyn-syms output table of objdump. Return the name of a symbol if the symbol is an extern function name. *)
 let parse_dyn_sym_line (line : string) : string option =
   let columns = String.split_on_chars ~on:[ ' ' ; '\t' ; '\n' ; '\r' ] line
-                |> List.filter ~f:(fun x -> x <> "") in
+                |> List.filter ~f:(fun x -> String.(<>) x "") in
   (* Check whether the symbol is a function --> DF and if it is referenced in the file, but defined outside it --> *UND* *)
   match ((Stdlib.List.mem "DF" columns) && (Stdlib.List.mem "*UND*" columns)) with
   | true -> List.last columns
@@ -103,7 +103,7 @@ let add_as_extern_symbol (project : Project.t) (program : program term) (symbol 
 
 let find_symbol (program : program term) (name : string) : tid option =
   Term.enum sub_t program |>
-  Seq.find_map ~f:(fun s -> Option.some_if (Sub.name s = name) (Term.tid s))
+  Seq.find_map ~f:(fun s -> Option.some_if (String.(=) (Sub.name s) name) (Term.tid s))
 
 
 let build_symbols (symbol_names : string list) (prog : program term) : symbol list =
@@ -127,7 +127,7 @@ let get_symbol_of_string (prog : program term) (name : string) : symbol option =
 let get_symbol (tid : tid) (symbols : symbol list) : symbol option =
   List.find symbols ~f:(
     fun symbol -> match symbol.address with
-      | Some address -> tid = address
+      | Some address -> Tid.(=) tid address
       | None -> false)
 
 
@@ -139,7 +139,7 @@ let get_symbol_name_from_jmp (jmp : Jmp.t) (symbols : symbol list) : string =
         | Direct addr ->
           begin
             let symbol = List.find symbols ~f:(fun symbol -> match symbol.address with
-                | Some address -> addr = address
+                | Some address -> Tid.(=) addr address
                 | _ -> assert(false)) in match symbol with
             | Some s -> s.name
             | _ -> assert(false)
@@ -168,7 +168,7 @@ let sub_calls_symbol (prog : program term) (sub : sub term) (symbol_name : strin
     Seq.exists callsites ~f:(fun callsite -> match Jmp.kind callsite with
             | Goto _ | Ret _ | Int (_,_) -> false
             | Call destination -> match Call.target destination with
-              | Direct addr -> addr = s
+              | Direct addr -> Tid.(=) addr s
               | _ -> false)
   end
   | _ -> false
@@ -181,7 +181,7 @@ let calls_callsite_symbol (jmp : Jmp.t) (symbol : symbol) : bool =
       match Call.target dst with
       | Direct tid -> begin
             match symbol.address with
-            | Some symbol_tid -> tid = symbol_tid
+            | Some symbol_tid -> Tid.(=) tid symbol_tid
             | None -> false
           end
       | _ -> false
@@ -241,7 +241,7 @@ let filter_calls_to_symbols (calls : (tid * tid) list) (symbols : symbol list) :
   List.filter calls ~f:(
     fun (_, dst) -> List.exists symbols ~f:(
         fun symbol -> match symbol.address with
-          | Some address -> address = dst
+          | Some address -> Tid.(=) address dst
           | None -> false))
 |> List.map ~f:(fun call -> transform_call_to_concrete_call call symbols)
 
@@ -250,7 +250,7 @@ let is_interesting_callsite (jmp : Jmp.t) (relevant_calls : concrete_call list):
   match Jmp.kind jmp with
           | Goto _ | Ret _ | Int (_,_) -> false
           | Call dst -> match Call.target dst with
-            | Direct tid -> List.exists relevant_calls ~f:(fun c -> c.symbol_address = tid)
+            | Direct tid -> List.exists relevant_calls ~f:(fun c -> Tid.(=) c.symbol_address tid)
             | _ -> false
 
 
@@ -273,7 +273,7 @@ let get_symbol_call_count_of_sub (symbol_name : string) (sub : Sub.t) (prog : Pr
                     match Jmp.kind callsite with
                     | Goto _ | Ret _ | Int (_,_) -> false
                     | Call destination -> match Call.target destination with
-                      | Direct addr -> addr = s
+                      | Direct addr -> Tid.(=) addr s
                       | _ -> false)
                 |> List.length
               end
@@ -297,9 +297,9 @@ let extract_direct_call_tid_from_block (block : blk term) : tid option =
 let get_program_entry_points (program : program term) : sub term List.t =
   let subfunctions = Term.enum sub_t program in
   let entry_points = Seq.filter subfunctions ~f:(fun subfn -> Term.has_attr subfn Sub.entry_point) in
-  match Seq.find subfunctions ~f:(fun subfn -> "main" = Sub.name subfn) with
+  match Seq.find subfunctions ~f:(fun subfn -> String.(=) "main" (Sub.name subfn)) with
   | Some(main_fn) ->
-      if Seq.exists entry_points ~f:(fun elem -> elem = main_fn) then
+      if Seq.exists entry_points ~f:(fun elem -> Sub.(=) elem main_fn) then
         Seq.to_list entry_points
       else
         main_fn :: (Seq.to_list entry_points)

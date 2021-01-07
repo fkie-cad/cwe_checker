@@ -26,7 +26,7 @@ let test_callee_saved () =
       let register = Var.create "EBX" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
       let () = check "callee_saved_register" (is_callee_saved register project) in
       let register = Var.create "EAX" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
-      let () = check "caller_saved_register" (is_callee_saved register project = false) in
+      let () = check "caller_saved_register" (Bool.(=) (is_callee_saved register project) false) in
       ()
   end
   | "" -> begin
@@ -37,14 +37,14 @@ let test_callee_saved () =
             let register = Var.create "RDI" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
             let () = check "callee_saved_register" (is_callee_saved register project) in
             let register = Var.create "R8" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
-            let () = check "caller_saved_register" (is_callee_saved register project = false) in
+            let () = check "caller_saved_register" (Bool.(=) (is_callee_saved register project) false) in
             ()
         end
         | "elf" -> begin
             let register = Var.create "RBX" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
             let () = check "callee_saved_register" (is_callee_saved register project) in
             let register = Var.create "RDI" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
-            let () = check "caller_saved_register" (is_callee_saved register project = false) in
+            let () = check "caller_saved_register" (Bool.(=) (is_callee_saved register project) false) in
             ()
         end
         | _ -> failwith "Not a valid binary format"
@@ -53,7 +53,7 @@ let test_callee_saved () =
         let register = Var.create "S0" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
         let () = check "callee_saved_register" (is_callee_saved register project) in
         let register = Var.create "A0" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
-        let () = check "callee_saved_register" (is_callee_saved register project = false) in
+        let () = check "callee_saved_register" (Bool.(=) (is_callee_saved register project) false) in
         ()
     end
     | "armv4" | "armv5" | "armv6" | "armv7" | "armv4eb" | "armv5eb"
@@ -62,28 +62,28 @@ let test_callee_saved () =
         let register = Var.create "R4" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
         let () = check "callee_saved_register" (is_callee_saved register project) in
         let register = Var.create "R0" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
-        let () = check "callee_saved_register" (is_callee_saved register project = false) in
+        let () = check "callee_saved_register" (Bool.(=) (is_callee_saved register project) false) in
         ()
     end
     | "aarch64" -> begin
         let register = Var.create "X18" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
         let () = check "callee_saved_register" (is_callee_saved register project) in
         let register = Var.create "X0" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
-        let () = check "callee_saved_register" (is_callee_saved register project = false) in
+        let () = check "callee_saved_register" (Bool.(=) (is_callee_saved register project) false) in
         ()
     end
     | "powerpc" -> begin
         let register = Var.create "R14" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
         let () = check "callee_saved_register" (is_callee_saved register project) in
         let register = Var.create "R4" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
-        let () = check "callee_saved_register" (is_callee_saved register project = false) in
+        let () = check "callee_saved_register" (Bool.(=) (is_callee_saved register project) false) in
         ()
     end
     | "powerpc64" | "powerpc64le" -> begin
         let register = Var.create "R14" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
         let () = check "callee_saved_register" (is_callee_saved register project) in
         let register = Var.create "R10" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
-        let () = check "callee_saved_register" (is_callee_saved register project = false) in
+        let () = check "callee_saved_register" (Bool.(=) (is_callee_saved register project) false) in
         ()
     end
     | _ -> failwith "Not a supported architecture"
@@ -100,9 +100,9 @@ let test_parameter_register () =
   match cconv with
   | "cdecl" | "stdcall" | "ms" -> begin
       let register = Var.create "EBX" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
-      let () = check "parameter_register" (is_parameter_register register project = false) in
+      let () = check "parameter_register" (Bool.(=) (is_parameter_register register project) false) in
       let register = Var.create "EAX" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
-      let () = check "parameter_register" (is_parameter_register register project = false) in
+      let () = check "parameter_register" (Bool.(=) (is_parameter_register register project) false) in
       ()
     end
   | "fastcall" -> begin
@@ -120,14 +120,14 @@ let test_parameter_register () =
             let register = Var.create "R8" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
             let () = check "parameter_register" (is_parameter_register register project) in
             let register = Var.create "RDI" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
-            let () = check "parameter_register" (is_parameter_register register project = false) in
+            let () = check "parameter_register" (Bool.(=) (is_parameter_register register project) false) in
             ()
         end
         | "elf" -> begin
             let register = Var.create "RDI" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
             let () = check "parameter_register" (is_parameter_register register project) in
             let register = Var.create "RBP" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
-            let () = check "parameter_register" (is_parameter_register register project = false) in
+            let () = check "parameter_register" (Bool.(=) (is_parameter_register register project) false) in
             ()
         end
         | _ -> failwith "Not a valid binary format"
@@ -136,14 +136,14 @@ let test_parameter_register () =
         let register = Var.create "A3" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
         let () = check "parameter_register" (is_parameter_register register project) in
         let register = Var.create "V0" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
-        let () = check "parameter_register" (is_parameter_register register project = false) in
+        let () = check "parameter_register" (Bool.(=) (is_parameter_register register project) false) in
         ()
     end
     | "aarch64" -> begin
         let register = Var.create "X2" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
         let () = check "parameter_register" (is_parameter_register register project) in
         let register = Var.create "X23" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
-        let () = check "parameter_register" (is_parameter_register register project = false) in
+        let () = check "parameter_register" (Bool.(=) (is_parameter_register register project) false) in
         ()
     end
     | "armv4" | "armv5" | "armv6" | "armv7" | "armv4eb" | "armv5eb"
@@ -152,21 +152,21 @@ let test_parameter_register () =
         let register = Var.create "R3" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
         let () = check "parameter_register" (is_parameter_register register project) in
         let register = Var.create "LR" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
-        let () = check "parameter_register" (is_parameter_register register project = false) in
+        let () = check "parameter_register" (Bool.(=) (is_parameter_register register project) false) in
         ()
     end
     | "powerpc" -> begin
         let register = Var.create "R3" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
         let () = check "parameter_register" (is_parameter_register register project) in
         let register = Var.create "F1" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
-        let () = check "parameter_register" (is_parameter_register register project = false) in
+        let () = check "parameter_register" (Bool.(=) (is_parameter_register register project) false) in
         ()
     end
     | "powerpc64" | "powerpc64le" -> begin
         let register = Var.create "R3" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
         let () = check "parameter_register" (is_parameter_register register project) in
         let register = Var.create "R31" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
-        let () = check "parameter_register" (is_parameter_register register project = false) in
+        let () = check "parameter_register" (Bool.(=) (is_parameter_register register project) false) in
         ()
     end
     | _ -> failwith "Not a supported architecture"
@@ -185,7 +185,7 @@ let test_return_register () =
       let register = Var.create "EDX" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
       let () = check "return_register" (is_return_register register project) in
       let register = Var.create "EBP" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
-      let () = check "no_return_register" (is_return_register register project = false) in
+      let () = check "no_return_register" (Bool.(=) (is_return_register register project) false) in
       ()
   end
   | "" -> begin
@@ -196,14 +196,14 @@ let test_return_register () =
             let register = Var.create "RAX" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
             let () = check "return_register" (is_return_register register project) in
             let register = Var.create "RDX" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
-            let () = check "no_return_register" (is_return_register register project = false) in
+            let () = check "no_return_register" (Bool.(=) (is_return_register register project) false) in
             ()
         end
         | "elf" -> begin
             let register = Var.create "RDX" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
             let () = check "return_register" (is_return_register register project) in
             let register = Var.create "R12" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
-            let () = check "no_return_register" (is_return_register register project = false) in
+            let () = check "no_return_register" (Bool.(=) (is_return_register register project) false) in
             ()
         end
         | _ -> failwith "Not a valid binary format"
@@ -212,14 +212,14 @@ let test_return_register () =
         let register = Var.create "V0" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
         let () = check "return_register" (is_return_register register project) in
         let register = Var.create "A0" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
-        let () = check "no_return_register" (is_return_register register project = false) in
+        let () = check "no_return_register" (Bool.(=) (is_return_register register project) false) in
         ()
     end
     | "aarch64" -> begin
         let register = Var.create "X1" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
         let () = check "return_register" (is_return_register register project) in
         let register = Var.create "X30" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
-        let () = check "no_return_register" (is_return_register register project = false) in
+        let () = check "no_return_register" (Bool.(=) (is_return_register register project) false) in
         ()
     end
     | "armv4" | "armv5" | "armv6" | "armv7" | "armv4eb" | "armv5eb"
@@ -228,21 +228,21 @@ let test_return_register () =
         let register = Var.create "R3" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
         let () = check "return_register" (is_return_register register project) in
         let register = Var.create "R4" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
-        let () = check "no_return_register" (is_return_register register project = false) in
+        let () = check "no_return_register" (Bool.(=) (is_return_register register project) false) in
         ()
     end
     | "powerpc" -> begin
         let register = Var.create "R3" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
         let () = check "return_register" (is_return_register register project) in
         let register = Var.create "R10" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
-        let () = check "no_return_register" (is_return_register register project = false) in
+        let () = check "no_return_register" (Bool.(=) (is_return_register register project) false) in
         ()
     end
     | "powerpc64" | "powerpc64le" -> begin
         let register = Var.create "R3" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
         let () = check "return_register" (is_return_register register project) in
         let register = Var.create "R25" (Bil.Imm (Symbol_utils.arch_pointer_size_in_bytes project * 8)) in
-        let () = check "no_return_register" (is_return_register register project = false) in
+        let () = check "no_return_register" (Bool.(=) (is_return_register register project) false) in
         ()
     end
     | _ -> failwith "Not a supported architecture"
@@ -252,7 +252,7 @@ let test_return_register () =
 
 let test_extract_bin_format () =
   let project = Option.value_exn !example_project in
-  let () = check "bin_format" (extract_bin_format project = (Option.value_exn !example_bin_format)) in
+  let () = check "bin_format" (Poly.(=) (extract_bin_format project) (Option.value_exn !example_bin_format)) in
   ()
 
 

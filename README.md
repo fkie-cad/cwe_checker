@@ -11,7 +11,7 @@
 ## What is cwe_checker? ##
 *cwe_checker* is a suite of tools to detect common bug classes such as use of dangerous functions and simple integer overflows. These bug classes are formally known as [Common Weakness Enumerations](https://cwe.mitre.org/) (CWEs). Its main goal is to aid analysts to quickly find vulnerable code paths.
 
-Its main focus are ELF binaries that are commonly found on Linux and Unix operating systems. *cwe_checker* is built on top of [BAP](https://github.com/BinaryAnalysisPlatform/bap) (Binary Analysis Platform). By using BAP, we are not restricted to one low level instruction set architectures like Intel x86. BAP lifts several of them to one common intermediate representation (IR). cwe_checker implements its analyses on this IR. At time of writing, BAP 2.1 supports Intel x86/x64, ARM, MIPS, and PPC amongst others. Hence, this makes *cwe_checker* a valuable tool for firmware analysis.
+Its main focus are ELF binaries that are commonly found on Linux and Unix operating systems. *cwe_checker* is built on top of [BAP](https://github.com/BinaryAnalysisPlatform/bap) (Binary Analysis Platform). By using BAP, we are not restricted to one low level instruction set architectures like Intel x86. BAP lifts several of them to one common intermediate representation (IR). cwe_checker implements its analyses on this IR. At time of writing, BAP 2.2 supports Intel x86/x64, ARM, MIPS, and PPC amongst others. Hence, this makes *cwe_checker* a valuable tool for firmware analysis.
 
 The following arguments should convince you to give *cwe_checker* a try:
 -  it is very easy to set up, just build the Docker container!
@@ -33,13 +33,11 @@ If you want to build the docker image yourself, just run `docker build -t cwe_ch
 
 ### Local installation with BAP as backend ###
 
-Another way is to get cwe_checker from the Ocaml package manager Opam. You can install cwe_checker via the package [cwe_checker](https://opam.ocaml.org/packages/cwe_checker/) (`opam install cwe_checker`). This gives you the latest stable release version of the  *cwe_checker*.
-
 If you plan to develop *cwe_checker*, it is recommended to build it using the provided `Makefile`. In this case you must ensure that all dependencies are fulfilled:
--   Ocaml 4.07.1
+-   Ocaml 4.08.0
 -   Opam 2.0.2
 -   dune >= 2.0
--   BAP (and its dependencies). Development on the master branch depends on the master branch of BAP which can be added with `opam repo add bap-testing git+https://github.com/BinaryAnalysisPlatform/opam-repository#testing` to the sources of the Opam package manager. The stable release of the *cwe_checker* depends on BAP 1.6.
+-   BAP 2.2.0 (and its dependencies).
 -   yojson >= 1.6.0
 -   ppx_deriving_yojson >= 3.5.1
 -   alcotest >= 0.8.3 (for tests)

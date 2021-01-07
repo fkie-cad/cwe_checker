@@ -13,7 +13,7 @@ let test_check_if_symbols_resolved () =
   let project = Option.value_exn !example_project in
   let program = Project.program project in
   let tid_address_map = Address_translation.generate_tid_map program in
-  let () = check "no_symbols" (check_if_symbols_resolved project program tid_address_map = false) in
+  let () = check "no_symbols" (Bool.(=) (check_if_symbols_resolved project program tid_address_map) false) in
   ()
 
 
