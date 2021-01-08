@@ -343,7 +343,7 @@ impl From<Expression> for IrExpression {
                         } else if width % 8 == 0 {
                             IrExpression::Subpiece {
                                 arg: Box::new(IrExpression::from(*arg)),
-                                low_byte: (0 as u64).into(),
+                                low_byte: (0u64).into(),
                                 size: width.into(),
                             }
                         } else {

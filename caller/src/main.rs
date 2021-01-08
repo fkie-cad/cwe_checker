@@ -198,7 +198,7 @@ fn filter_modules_for_partial_run(
         .filter_map(|module_name| {
             if let Some(module) = modules.iter().find(|module| module.name == module_name) {
                 Some(*module)
-            } else if module_name == "" {
+            } else if module_name.is_empty() {
                 None
             } else {
                 panic!("Error: {} is not a valid module name.", module_name)
