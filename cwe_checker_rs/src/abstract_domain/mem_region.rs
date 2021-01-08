@@ -65,12 +65,12 @@ impl<T: AbstractDomain + HasByteSize + HasTop + std::fmt::Debug> MemRegion<T> {
 
 /// The internal data of a memory region. See the description of `MemRegion` for more.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
-pub struct MemRegionData<T: AbstractDomain + HasByteSize + std::fmt::Debug> {
+pub struct MemRegionData<T: AbstractDomain + HasByteSize + HasTop + std::fmt::Debug> {
     address_bytesize: ByteSize,
     values: BTreeMap<i64, T>,
 }
 
-impl<T: AbstractDomain + HasByteSize + std::fmt::Debug> MemRegionData<T> {
+impl<T: AbstractDomain + HasByteSize + HasTop + std::fmt::Debug> MemRegionData<T> {
     /// create a new, empty MemRegion
     pub fn new(address_bytesize: ByteSize) -> MemRegionData<T> {
         MemRegionData {
