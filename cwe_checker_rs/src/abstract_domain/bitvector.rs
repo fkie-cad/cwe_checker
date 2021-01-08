@@ -44,14 +44,14 @@ impl HasByteSize for BitvectorDomain {
             Value(bitvec) => bitvec.width().into(),
         }
     }
-}
 
-impl RegisterDomain for BitvectorDomain {
     /// Get a *Top* element with the given bitsize.
     fn new_top(bytesize: ByteSize) -> BitvectorDomain {
         BitvectorDomain::Top(bytesize)
     }
+}
 
+impl RegisterDomain for BitvectorDomain {
     /// Evaluate the given binary operation.
     ///
     /// For non-shift operations, this function will panic if the operands have different bitsizes.
