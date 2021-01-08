@@ -37,6 +37,10 @@ pub trait AbstractDomain: Sized + Eq + Clone {
 pub trait HasByteSize {
     /// Return the size of the represented value in bytes.
     fn bytesize(&self) -> ByteSize;
+
+    /// Return a new top element with the given bytesize.
+    /// The function is expected to panic if the type in question does not also implement the `HasTop` trait.
+    fn new_top(bytesize: ByteSize) -> Self;
 }
 
 /// An abstract domain implementing this trait has a global maximum, i.e. a *Top* element.
@@ -55,9 +59,6 @@ pub trait HasTop {
 /// The domain is parametrized by its bytesize (which represents the size of the register).
 /// It has a *Top* element, which is only characterized by its bytesize.
 pub trait RegisterDomain: AbstractDomain + HasByteSize + HasTop {
-    /// Return a new top element with the given bytesize
-    fn new_top(bytesize: ByteSize) -> Self;
-
     /// Compute the (abstract) result of a binary operation
     fn bin_op(&self, op: BinOpType, rhs: &Self) -> Self;
 

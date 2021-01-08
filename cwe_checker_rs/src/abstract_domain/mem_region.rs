@@ -1,4 +1,4 @@
-use super::{AbstractDomain, HasByteSize, HasTop, RegisterDomain};
+use super::{AbstractDomain, HasByteSize, HasTop};
 use crate::bil::Bitvector;
 use crate::intermediate_representation::ByteSize;
 use apint::{Int, Width};
@@ -10,7 +10,8 @@ use std::sync::Arc;
 
 /// A memory region is an abstract domain representing a continuous region of memory, e.g. the stack frame of a function.
 ///
-/// This implementation can only save values of one `RegisterDomain` type
+/// This implementation can only save values of one abstract domain type,
+/// which must implement the `HasByteSize` and `HasTop` domains,
 /// and it can only track values with a known offset, i.e. it cannot handle arrays of any kind.
 /// Offsets are internally saved as signed integers, which allows negative offsets,
 /// e.g. for downward growing stack frames.
@@ -21,19 +22,17 @@ use std::sync::Arc;
 /// To allow cheap cloning of a `MemRegion`, the actual data is wrapped inside an `Arc`.
 #[derive(Serialize, Deserialize, Debug, Hash, Clone, PartialEq, Eq, Deref)]
 #[deref(forward)]
-pub struct MemRegion<T: AbstractDomain + HasByteSize + RegisterDomain + std::fmt::Debug>(
+pub struct MemRegion<T: AbstractDomain + HasByteSize + HasTop + std::fmt::Debug>(
     Arc<MemRegionData<T>>,
 );
 
-impl<T: AbstractDomain + HasByteSize + RegisterDomain + std::fmt::Debug> DerefMut for MemRegion<T> {
+impl<T: AbstractDomain + HasByteSize + HasTop + std::fmt::Debug> DerefMut for MemRegion<T> {
     fn deref_mut(&mut self) -> &mut MemRegionData<T> {
         Arc::make_mut(&mut self.0)
     }
 }
 
-impl<T: AbstractDomain + HasByteSize + RegisterDomain + std::fmt::Debug> AbstractDomain
-    for MemRegion<T>
-{
+impl<T: AbstractDomain + HasByteSize + HasTop + std::fmt::Debug> AbstractDomain for MemRegion<T> {
     /// Short-circuting the `MemRegionData::merge` function if `self==other`,
     /// to prevent unneccessary cloning.
     fn merge(&self, other: &Self) -> Self {
@@ -50,14 +49,14 @@ impl<T: AbstractDomain + HasByteSize + RegisterDomain + std::fmt::Debug> Abstrac
     }
 }
 
-impl<T: AbstractDomain + HasByteSize + RegisterDomain + std::fmt::Debug> HasTop for MemRegion<T> {
+impl<T: AbstractDomain + HasByteSize + HasTop + std::fmt::Debug> HasTop for MemRegion<T> {
     /// Return a new, empty memory region with the same address bytesize as `self`, representing the *Top* element of the abstract domain.
     fn top(&self) -> Self {
         Self::new(self.get_address_bytesize())
     }
 }
 
-impl<T: AbstractDomain + HasByteSize + RegisterDomain + std::fmt::Debug> MemRegion<T> {
+impl<T: AbstractDomain + HasByteSize + HasTop + std::fmt::Debug> MemRegion<T> {
     // Create a new, empty memory region.
     pub fn new(address_bytesize: ByteSize) -> Self {
         MemRegion(Arc::new(MemRegionData::new(address_bytesize)))
@@ -66,12 +65,12 @@ impl<T: AbstractDomain + HasByteSize + RegisterDomain + std::fmt::Debug> MemRegi
 
 /// The internal data of a memory region. See the description of `MemRegion` for more.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
-pub struct MemRegionData<T: AbstractDomain + HasByteSize + RegisterDomain + std::fmt::Debug> {
+pub struct MemRegionData<T: AbstractDomain + HasByteSize + HasTop + std::fmt::Debug> {
     address_bytesize: ByteSize,
     values: BTreeMap<i64, T>,
 }
 
-impl<T: AbstractDomain + HasByteSize + RegisterDomain + std::fmt::Debug> MemRegionData<T> {
+impl<T: AbstractDomain + HasByteSize + HasTop + std::fmt::Debug> MemRegionData<T> {
     /// create a new, empty MemRegion
     pub fn new(address_bytesize: ByteSize) -> MemRegionData<T> {
         MemRegionData {
@@ -233,6 +232,7 @@ impl<T: AbstractDomain + HasByteSize + RegisterDomain + std::fmt::Debug> MemRegi
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::abstract_domain::RegisterDomain;
     use crate::bil::Bitvector;
     use crate::intermediate_representation::*;
 
@@ -258,6 +258,10 @@ mod tests {
         fn bytesize(&self) -> ByteSize {
             self.1
         }
+
+        fn new_top(bytesize: ByteSize) -> MockDomain {
+            MockDomain(0, bytesize)
+        }
     }
 
     impl HasTop for MockDomain {
@@ -267,10 +271,6 @@ mod tests {
     }
 
     impl RegisterDomain for MockDomain {
-        fn new_top(bytesize: ByteSize) -> MockDomain {
-            MockDomain(0, bytesize)
-        }
-
         fn bin_op(&self, _op: BinOpType, _rhs: &Self) -> Self {
             Self::new_top(self.1)
         }

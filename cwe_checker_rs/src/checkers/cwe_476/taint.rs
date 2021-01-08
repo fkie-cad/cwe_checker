@@ -52,6 +52,11 @@ impl HasByteSize for Taint {
             Self::Tainted(size) | Self::Top(size) => *size,
         }
     }
+
+    /// Get a new `Top`-value with the given bytesize.
+    fn new_top(bytesize: ByteSize) -> Self {
+        Self::Top(bytesize)
+    }
 }
 
 impl HasTop for Taint {
@@ -62,11 +67,6 @@ impl HasTop for Taint {
 }
 
 impl RegisterDomain for Taint {
-    /// Get a new `Top`-value with the given bytesize.
-    fn new_top(bytesize: ByteSize) -> Self {
-        Self::Top(bytesize)
-    }
-
     /// The result of a binary operation is tainted if at least one input value was tainted.
     fn bin_op(&self, op: BinOpType, rhs: &Self) -> Self {
         match (self, rhs) {

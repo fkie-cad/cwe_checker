@@ -48,6 +48,11 @@ impl<T: RegisterDomain> HasByteSize for PointerDomain<T> {
             .expect("Pointer without targets encountered")
             .bytesize()
     }
+
+    /// PointerDomain has no explicit `Top` element, thus calling this function will panic.
+    fn new_top(_bytesize: ByteSize) -> Self {
+        panic!()
+    }
 }
 
 impl<T: RegisterDomain> PointerDomain<T> {
