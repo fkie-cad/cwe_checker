@@ -417,16 +417,9 @@ impl<'a> GraphBuilder<'a> {
 pub fn get_program_cfg(
     program: &Term<Program>,
     extern_subs: HashSet<Tid>,
-    backward: bool,
 ) -> Graph {
     let builder = GraphBuilder::new(program, extern_subs);
-    if backward {
-        let mut graph = builder.build();
-        graph.reverse();
-        graph
-    } else {
-        builder.build()
-    }
+    builder.build()
 }
 
 #[cfg(test)]
@@ -518,7 +511,7 @@ mod tests {
     #[test]
     fn create_program_cfg() {
         let program = mock_program();
-        let graph = get_program_cfg(&program, HashSet::new(), false);
+        let graph = get_program_cfg(&program, HashSet::new());
         println!("{}", serde_json::to_string_pretty(&graph).unwrap());
         assert_eq!(graph.node_count(), 16);
         assert_eq!(graph.edge_count(), 20);

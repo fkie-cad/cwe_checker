@@ -31,6 +31,7 @@ pub trait Context<'a> {
     type Value: PartialEq + Eq + Clone;
 
     /// Get a reference to the graph that the fixpoint is computed on.
+    /// The return value is expected to be the reversed CFG.
     fn get_graph(&self) -> &Graph<'a>;
 
     /// Merge two node values.
