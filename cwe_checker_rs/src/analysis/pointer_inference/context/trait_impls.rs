@@ -1,6 +1,6 @@
 use super::*;
 
-impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> {
+impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
     type Value = State;
 
     /// Get the underlying graph on which the analysis operates.

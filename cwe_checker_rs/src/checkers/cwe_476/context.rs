@@ -2,9 +2,9 @@ use super::State;
 use super::Taint;
 use super::CWE_MODULE;
 use crate::abstract_domain::AbstractDomain;
+use crate::analysis::forward_interprocedural_fixpoint::Context as _;
 use crate::analysis::graph::{Graph, Node};
-use crate::analysis::interprocedural_fixpoint::Context as _;
-use crate::analysis::interprocedural_fixpoint::NodeValue;
+use crate::analysis::interprocedural_fixpoint_generic::NodeValue;
 use crate::analysis::pointer_inference::PointerInference as PointerInferenceComputation;
 use crate::analysis::pointer_inference::State as PointerInferenceState;
 use crate::intermediate_representation::*;
@@ -251,7 +251,7 @@ impl<'a> Context<'a> {
     }
 }
 
-impl<'a> crate::analysis::interprocedural_fixpoint::Context<'a> for Context<'a> {
+impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
     type Value = State;
 
     /// Get the underlying graph of the fixpoint computation

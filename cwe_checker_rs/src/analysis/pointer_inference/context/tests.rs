@@ -103,7 +103,7 @@ fn mock_project() -> (Project, Config) {
 
 #[test]
 fn context_problem_implementation() {
-    use crate::analysis::interprocedural_fixpoint::Context as IpFpContext;
+    use crate::analysis::forward_interprocedural_fixpoint::Context as IpFpContext;
     use crate::analysis::pointer_inference::Data;
     use Expression::*;
 
@@ -266,7 +266,7 @@ fn context_problem_implementation() {
 
 #[test]
 fn update_return() {
-    use crate::analysis::interprocedural_fixpoint::Context as IpFpContext;
+    use crate::analysis::forward_interprocedural_fixpoint::Context as IpFpContext;
     use crate::analysis::pointer_inference::object::ObjectType;
     use crate::analysis::pointer_inference::Data;
     let (project, config) = mock_project();
