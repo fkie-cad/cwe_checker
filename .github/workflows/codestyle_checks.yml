@@ -1,6 +1,6 @@
 name: codestyle-checks
 
-on: [push, pull_request]
+on: [push]
 
 env:
   CARGO_TERM_COLOR: always
