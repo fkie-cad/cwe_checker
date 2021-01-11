@@ -14,12 +14,9 @@ jobs:
       - uses: actions/checkout@v2
       - name: Install cross compilers
         run: ./test/artificial_samples/install_cross_compilers.sh
-      - name: Install Scons and curl
-        run: |
-          sudo apt-get install python-pip curl -y
-          pip install scons
       - name: Compile artificial samples
         run: |
+          pip install scons
           cd test/artificial_samples
           scons
       - uses: actions/setup-java@v1
