@@ -16,9 +16,10 @@ jobs:
         run: ./test/artificial_samples/install_cross_compilers.sh
       - uses: actions/setup-python@v2
         with:
-          python-version: '3.6'
+          python-version: '2.7'
       - name: Compile artificial samples
         run: |
+          pip install --upgrade pip
           pip install scons
           cd test/artificial_samples
           scons
