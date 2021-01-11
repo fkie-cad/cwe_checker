@@ -1,0 +1,46 @@
+name: Acceptance tests
+
+on: push
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs: 
+ 
+  acceptance-tests:
+    runs-on: ubuntu-18.04
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install cross compilers
+        run: ./test/artificial_samples/install_cross_compilers.sh
+      - name: Install Scons and curl
+        run: |
+          sudo apt-get install python-pip curl -y
+          pip install scons
+      - name: Compile artificial samples
+        run: |
+          cd test/artificial_samples
+          scons
+      - uses: actions/setup-java@v1
+        with:
+          java-version: "11.0.x"
+          java-package: jdk
+          architecture: x64
+      - name: Install Ghidra
+        run: |
+          curl -fSL https://www.ghidra-sre.org/ghidra_9.2.1_PUBLIC_20201215.zip -o ghidra.zip
+          unzip -q ghidra.zip
+          mv ghidra_9.2.1_PUBLIC /opt/ghidra
+          rm ghidra.zip
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Install cwe_checker
+        run: make all GHIDRA_PATH=/opt/ghidra
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --no-fail-fast -p acceptance_tests_ghidra -- --show-output --ignored --test-threads 1
