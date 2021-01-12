@@ -12,17 +12,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-      - name: Install cross compilers
-        run: ./test/artificial_samples/install_cross_compilers.sh
-      - uses: actions/setup-python@v2
-        with:
-          python-version: '2.7'
-      - name: Compile artificial samples
+      - name: Build and run docker image for cross compiling
         run: |
-          pip install --upgrade pip
-          pip install scons
           cd test/artificial_samples
-          scons
+          docker build -t cross_compiling .
+          docker run --rm -v $(pwd)/build:/home/cwe/artificial_samples/build cross_compiling sudo /home/cwe/.local/bin/scons
       - uses: actions/setup-java@v1
         with:
           java-version: "11.0.x"
