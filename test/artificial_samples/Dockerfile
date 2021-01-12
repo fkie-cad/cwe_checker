@@ -4,7 +4,7 @@ RUN apt-get -y update \
     && apt-get install -y sudo \
     && useradd -m cwe \
     && echo "cwe:cwe" | chpasswd \
-    && adduser bap sudo \
+    && adduser cwe sudo \
     && sed -i.bkp -e 's/%sudo\s\+ALL=(ALL\(:ALL\)\?)\s\+ALL/%sudo ALL=NOPASSWD:ALL/g' /etc/sudoers
     
 USER cwe
