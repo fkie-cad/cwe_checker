@@ -34,6 +34,11 @@ else
 	cargo test --no-fail-fast -p acceptance_tests_ghidra -- --show-output --ignored
 endif
 
+compile_test_files:
+	cd test/artificial_samples \
+	&& docker build -t cross_compiling . \
+	&& docker run --rm -v $(pwd)/build:/home/cwe/artificial_samples/build cross_compiling sudo /home/cwe/.local/bin/scons
+
 codestyle-check:
 	cargo fmt -- --check
 	cargo clippy -- -D clippy::all

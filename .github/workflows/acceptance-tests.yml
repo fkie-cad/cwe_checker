@@ -1,0 +1,41 @@
+name: Acceptance tests
+
+on: [pull_request]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs: 
+ 
+  acceptance-tests:
+    runs-on: ubuntu-18.04
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build and run docker image for cross compiling
+        run: |
+          cd test/artificial_samples
+          docker build -t cross_compiling .
+          docker run --rm -v $(pwd)/build:/home/cwe/artificial_samples/build cross_compiling sudo /home/cwe/.local/bin/scons
+      - uses: actions/setup-java@v1
+        with:
+          java-version: "11.0.x"
+          java-package: jdk
+          architecture: x64
+      - name: Install Ghidra
+        run: |
+          curl -fSL https://www.ghidra-sre.org/ghidra_9.2.1_PUBLIC_20201215.zip -o ghidra.zip
+          unzip -q ghidra.zip
+          mv ghidra_9.2.1_PUBLIC /opt/ghidra
+          rm ghidra.zip
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Install cwe_checker
+        run: make all GHIDRA_PATH=/opt/ghidra
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --no-fail-fast -p acceptance_tests_ghidra -- --show-output --ignored --test-threads 1
