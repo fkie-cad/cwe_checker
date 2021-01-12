@@ -5,7 +5,6 @@ use crate::prelude::*;
 use derive_more::Deref;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
-use std::iter::FromIterator;
 use std::ops::DerefMut;
 use std::sync::Arc;
 
@@ -271,9 +270,9 @@ impl AbstractObjectInfo {
             .map(|(index, value)| (format!("{}", index), value.to_json_compact()));
         elements.push((
             "memory".to_string(),
-            serde_json::Value::Object(serde_json::Map::from_iter(memory)),
+            serde_json::Value::Object(memory.collect()),
         ));
-        serde_json::Value::Object(serde_json::Map::from_iter(elements.into_iter()))
+        serde_json::Value::Object(elements.into_iter().collect())
     }
 }
 

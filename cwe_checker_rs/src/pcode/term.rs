@@ -175,7 +175,7 @@ impl Def {
     pub fn correct_pointer_sizes(&mut self, pointer_size: ByteSize) {
         if self.rhs.mnemonic == ExpressionType::LOAD {
             let input1 = self.rhs.input1.as_mut().unwrap();
-            if input1.size == ByteSize::from(0 as u64) {
+            if input1.size == ByteSize::from(0u64) {
                 input1.size = pointer_size;
             }
         }

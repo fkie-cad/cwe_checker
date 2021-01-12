@@ -21,7 +21,6 @@ external to_string: serde_json -> string = "rs_convert_json_to_string"
 
 use super::OcamlSendable;
 use ocaml::{FromValue, ToValue};
-use std::iter::FromIterator;
 use std::rc::Rc;
 use std::str::FromStr;
 
@@ -61,12 +60,15 @@ impl From<&JsonBuilder> for serde_json::Value {
                 .map(|rc_elem| serde_json::Value::from(&**rc_elem))
                 .collect(),
             JsonBuilder::Object(tuple_vec) => serde_json::Value::Object(
-                serde_json::Map::from_iter(tuple_vec.iter().map(|(string_ref, json_builder)| {
-                    (
-                        string_ref.to_string(),
-                        serde_json::Value::from(&**json_builder),
-                    )
-                })),
+                tuple_vec
+                    .iter()
+                    .map(|(string_ref, json_builder)| {
+                        (
+                            string_ref.to_string(),
+                            serde_json::Value::from(&**json_builder),
+                        )
+                    })
+                    .collect(),
             ),
         }
     }

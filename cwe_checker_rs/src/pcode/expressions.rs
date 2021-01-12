@@ -94,7 +94,7 @@ impl Variable {
                 input0: None,
                 input1: Some(Variable::new_const(
                     self.address.as_ref().unwrap(),
-                    ByteSize::from(0 as u64), // We do not know the correct pointer size here.
+                    ByteSize::from(0u64), // We do not know the correct pointer size here.
                 )),
                 input2: None,
             },
