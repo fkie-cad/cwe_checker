@@ -119,7 +119,7 @@ Furthermore, false positives are to be expected due to shortcuts and the nature 
 
 *cwe_checker* comes with a script for Ghidra,
 which parses the output of the *cwe_checker* and annotates the found CWEs in the disassembler for easier manual analysis.
-See the [online documentation](https://fkie-cad.github.io/cwe_checker/doc/html/cwe_checker/index.html#ToolIntegration) for its usage.
+The script is located at `ghidra_plugin/cwe_checker_ghidra_plugin.py`, usage instructions are contained in the file.
 
 ## How does cwe_checker work internally? ##
 
