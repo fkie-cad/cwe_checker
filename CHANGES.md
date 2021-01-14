@@ -1,3 +1,8 @@
+0.5-dev
+====
+
+-   Switched default backend to Ghidra
+
 0.4 (2021-01)
 ====
 

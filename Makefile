@@ -3,14 +3,22 @@ GHIDRA_PATH =
 .PHONY: all clean test uninstall docker
 all:
 	cargo build --release
+ifdef GHIDRA_PATH
 	mkdir -p ${HOME}/.config/cwe_checker
 	cp src/config.json ${HOME}/.config/cwe_checker/config.json
-ifdef GHIDRA_PATH
 	cargo install --path caller --locked
 	echo "{ \"ghidra_path\": \"${GHIDRA_PATH}\" }" > ${HOME}/.config/cwe_checker/ghidra.json
 	mkdir -p ${HOME}/.local/share/cwe_checker
 	cp -r ghidra ${HOME}/.local/share/cwe_checker/ghidra
 else
+	echo "GHIDRA_PATH not specified. Please set it to the path to your local Ghidra installation."
+	false
+endif
+
+with_bap_backend:
+	cargo build --release
+	mkdir -p ${HOME}/.config/cwe_checker
+	cp src/config.json ${HOME}/.config/cwe_checker/config.json
 	cp target/release/libcwe_checker_rs.a src/libcwe_checker_rs.a
 	cp target/release/libcwe_checker_rs.so src/dllcwe_checker_rs.so
 	dune build
@@ -20,7 +28,6 @@ else
 	cd plugins/cwe_checker_type_inference && make all
 	cd plugins/cwe_checker_type_inference_print && make all
 	cd plugins/cwe_checker_pointer_inference_debug && make all
-endif
 
 test:
 	cargo test
@@ -69,8 +76,8 @@ uninstall:
 	cd plugins/cwe_checker_pointer_inference_debug; make uninstall; cd ../..
 
 documentation:
-	dune build @doc
-	cp -r _build/default/_doc/_html doc/html
+	cargo doc --open
 
 docker:
-	./install.sh
+	make clean
+	docker build -t cwe_checker .

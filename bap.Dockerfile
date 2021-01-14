@@ -1,13 +1,14 @@
-FROM fkiecad/cwe_checker_travis_docker_image:ghidra
+FROM fkiecad/cwe_checker_travis_docker_image:bap
 
 COPY . /home/cwe/cwe_checker/
 
 RUN sudo chown -R cwe:cwe /home/cwe/cwe_checker \
     && cd /home/cwe/cwe_checker \
-    && make all GHIDRA_PATH=/home/cwe/ghidra \
-    && cargo clean
+    && make with_bap_backend \
+    && cargo clean \
+    && dune clean
 
 WORKDIR /home/cwe/cwe_checker
 
-# ENTRYPOINT ["/bin/sh", "-c"]
+ENTRYPOINT ["opam", "config", "exec", "--"]
 CMD cwe_checker /tmp/input
