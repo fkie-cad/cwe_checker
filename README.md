@@ -21,7 +21,7 @@ Its main goal is to aid analysts to quickly find vulnerable code paths.
 Its main focus are ELF binaries that are commonly found on Linux and Unix operating systems.
 The *cwe_checker* uses [Ghidra](https://ghidra-sre.org/) to disassemble binaries into one common intermediate representation
 and implements its own analyses on this IR.
-Hence, the analyses can be run for all CPU architectures that Ghidra can disassemble,
+Hence, the analyses can be run on all CPU architectures that Ghidra can disassemble,
 which makes the *cwe_checker* a valuable tool for firmware analysis.
 
 The following arguments should convince you to give *cwe_checker* a try:
@@ -70,7 +70,7 @@ Just run `make with_bap_backend` to compile and register the plugin with BAP.
 
 ## Usage ##
 
-The *cwe_checker* takes as input a binary file,
+The *cwe_checker* takes a binary as input,
 runs several [checks](#checks) based on static analysis on the binary
 and then outputs a list of CWE warnings that have been found during the analysis.
 
