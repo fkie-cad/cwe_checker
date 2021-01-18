@@ -1,12 +1,12 @@
 # Import the results of the cwe_checker as bookmarks and comments into Ghidra.
 #
 # Usage:
-# - Run the cwe_checker on a binary and save its output as a json file.
 # - Copy this file into the Ghidra scripts folder
+# - Run the cwe_checker on a binary and save its output as a json file, e.g. with
+#   "cwe_checker BINARY --json --out output.json"
 # - Open the binary in Ghidra and run this file as a script. Select the generated json file when prompted.
 
 import json
-from ghidra.app.util.opinion import ElfLoader
 
 
 def bookmark_cwe(ghidra_address, text):
@@ -42,29 +42,12 @@ def get_cwe_checker_output():
         return json.load(json_file)
 
 
-def compute_ghidra_address(address_string):
-    fixed_address_string = address_string.replace(':32u', '').replace(':64u', '')
-    address_int = int(fixed_address_string, 16)
-    # Ghidra sometimes adds an offset to all addresses.
-    try:
-        # try for ELF-files
-        offset = currentProgram.getMinAddress().getOffset() - int(ElfLoader.getElfOriginalImageBase(currentProgram))
-        return currentProgram.getAddressFactory().getAddress(fixed_address_string).add(offset)
-    except:
-        # the file is probably not an ELF file, so we use a workaround that should work in most cases.
-        if address_int < currentProgram.getMinAddress().getOffset():
-            return currentProgram.getMinAddress().add(address_int)
-        else:
-            return currentProgram.getAddressFactory().getAddress(fixed_address_string)
-
-
 def main():
     """
-    Annotate cwe_checker results (including check_path paths) in Ghidra as end-of-line
+    Annotate cwe_checker results in Ghidra as end-of-line
     comments and bookmarks to the corresponding addresses.
     """
-    cwe_checker_output = get_cwe_checker_output()
-    warnings = cwe_checker_output['warnings']
+    warnings = get_cwe_checker_output()
     for warning in warnings:
         if len(warning['addresses']) == 0:
             cwe_text =  '[' + warning['name'] + '] ' + warning['description']
@@ -72,16 +55,9 @@ def main():
             bookmark_cwe(ghidra_address, cwe_text)
             comment_cwe_pre(ghidra_address, cwe_text)
         else:
-            for address_string in warning['addresses']:
-                ghidra_address = compute_ghidra_address(address_string)
-                bookmark_cwe(ghidra_address, warning['description'])
-                comment_cwe_eol(ghidra_address, warning['description'])
-    if 'check_path' in cwe_checker_output:
-        for check_path in cwe_checker_output['check_path']:
-            ghidra_address = compute_ghidra_address(check_path['source_addr'])
-            check_path_string = 'Path to CWE at ' + check_path['destination_addr'] + ': ' + check_path['path_str']
-            bookmark_cwe(ghidra_address, check_path_string)
-            comment_cwe_eol(ghidra_address, check_path_string)
-
+            address_string = warning['addresses'][0]
+            ghidra_address = currentProgram.getAddressFactory().getAddress(address_string)
+            bookmark_cwe(ghidra_address, warning['description'])
+            comment_cwe_eol(ghidra_address, warning['description'])
 
 main()

@@ -34,10 +34,6 @@ struct CmdlineArgs {
     #[structopt(long, short)]
     quiet: bool,
 
-    /// Checks if there is a path from an input function to a CWE hit.
-    #[structopt(long)]
-    check_path: bool,
-
     /// Prints out the version numbers of all known modules.
     #[structopt(long)]
     module_versions: bool,
@@ -86,9 +82,6 @@ fn build_bap_command(args: &CmdlineArgs) -> Command {
     if args.quiet {
         command.arg("--cwe-checker-no-logging");
     }
-    if args.check_path {
-        command.arg("--cwe-checker-check-path");
-    }
     if args.module_versions {
         command.arg("--cwe-checker-module-versions");
     }
@@ -117,10 +110,6 @@ fn run_with_ghidra(args: CmdlineArgs) {
             println!("{}", module);
         }
         return;
-    }
-
-    if args.check_path {
-        panic!("Check-path module not yet implemented for the Ghidra backend");
     }
 
     // Get the configuration file

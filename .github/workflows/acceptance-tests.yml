@@ -39,3 +39,13 @@ jobs:
         with:
           command: test
           args: --no-fail-fast -p acceptance_tests_ghidra -- --show-output --ignored --test-threads 1
+
+  docker-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build the docker image
+        run: docker build -t cwe_checker .
+      - name: Check functionality of the image
+        run: docker run --rm cwe_checker /bin/echo | grep -q CWE676
