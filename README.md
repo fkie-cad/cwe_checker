@@ -32,6 +32,10 @@ The following arguments should convince you to give *cwe_checker* a try:
 -  view results annotated in Ghidra
 -  *cwe_checker* can be integrated as a plugin into [FACT](https://github.com/fkie-cad/FACT_core)
 
+<p align="center">
+    <img src="doc/images/example_usage.png" alt="Usage Example" width="80%" height="80%"/>
+</p>
+
 ## Installation ##
 
 ### Using the docker image ###
@@ -120,6 +124,10 @@ Furthermore, false positives are to be expected due to shortcuts and the nature 
 *cwe_checker* comes with a script for Ghidra,
 which parses the output of the *cwe_checker* and annotates the found CWEs in the disassembler for easier manual analysis.
 The script is located at `ghidra_plugin/cwe_checker_ghidra_plugin.py`, usage instructions are contained in the file.
+
+<p align="center">
+    <img src="doc/images/example_ghidra_integration.png" alt="Ghidra Integration" width="90%" height="90%"/>
+</p>
 
 ## How does cwe_checker work internally? ##
 
