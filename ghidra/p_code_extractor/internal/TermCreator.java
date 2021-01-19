@@ -29,7 +29,8 @@ public class TermCreator {
      */
     public static Term<Program> createProgramTerm() {
         Tid progTid = new Tid(String.format("prog_%s", HelperFunctions.ghidraProgram.getMinAddress().toString()), HelperFunctions.ghidraProgram.getMinAddress().toString());
-        return new Term<Program>(progTid, new Program(new ArrayList<Term<Sub>>(), HelperFunctions.addEntryPoints(symTab)));
+        String imageBase = HelperFunctions.ghidraProgram.getImageBase().toString();
+        return new Term<Program>(progTid, new Program(new ArrayList<Term<Sub>>(), HelperFunctions.addEntryPoints(symTab), imageBase));
     }
 
 

@@ -28,7 +28,8 @@ impl Setup {
                       "term": {
                         "subs": [],
                         "extern_symbols": [],
-                        "entry_points":[]
+                        "entry_points":[],
+                        "image_base": "10000"
                       }
                     },
                     "stack_pointer_register": {
@@ -560,20 +561,21 @@ fn program_deserialization() {
             "term": {
                 "subs": [],
                 "extern_symbols": [],
-                "entry_points":[]
+                "entry_points":[],
+                "image_base": "10000"
             }
             }
             "#,
     )
     .unwrap();
-    let _: IrProgram = program_term.term.into();
+    let _: IrProgram = program_term.term.into_ir_program(10000);
 }
 
 #[test]
 fn project_deserialization() {
     let setup = Setup::new();
     let project: Project = setup.project.clone();
-    let _: IrProject = project.into();
+    let _: IrProject = project.into_ir_project(10000);
 }
 
 #[test]
@@ -660,7 +662,7 @@ fn from_project_to_ir_project() {
     sub.term.blocks.push(blk);
     mock_project.program.term.subs.push(sub.clone());
 
-    let ir_program = IrProject::from(mock_project).program.term;
+    let ir_program = mock_project.into_ir_project(10000).program.term;
     let ir_rdi_var = IrVariable {
         name: String::from("RDI"),
         size: ByteSize::new(8),

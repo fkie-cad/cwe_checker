@@ -76,6 +76,7 @@ fn mock_project() -> (Project, Config) {
             mock_extern_symbol("other"),
         ],
         entry_points: Vec::new(),
+        address_base_offset: 0,
     };
     let program_term = Term {
         tid: Tid::new("program"),

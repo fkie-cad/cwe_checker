@@ -1,7 +1,7 @@
-use cwe_checker_rs::intermediate_representation::Project;
 use cwe_checker_rs::utils::log::print_all_messages;
 use cwe_checker_rs::utils::{get_ghidra_plugin_path, read_config_file};
 use cwe_checker_rs::AnalysisResults;
+use cwe_checker_rs::{intermediate_representation::Project, utils::log::LogMessage};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -132,7 +132,7 @@ fn run_with_ghidra(args: CmdlineArgs) {
             binary_file_path.display()
         )
     });
-    let mut project = get_project_from_ghidra(&binary_file_path);
+    let mut project = get_project_from_ghidra(&binary_file_path, &binary[..], args.quiet);
     // Normalize the project and gather log messages generated from it.
     let mut all_logs = project.normalize();
     let mut analysis_results = AnalysisResults::new(&binary, &project);
@@ -197,7 +197,7 @@ fn filter_modules_for_partial_run(
 }
 
 /// Execute the `p_code_extractor` plugin in ghidra and parse its output into the `Project` data structure.
-fn get_project_from_ghidra(file_path: &Path) -> Project {
+fn get_project_from_ghidra(file_path: &Path, binary: &[u8], quiet_flag: bool) -> Project {
     let ghidra_path: std::path::PathBuf =
         serde_json::from_value(read_config_file("ghidra.json")["ghidra_path"].clone())
             .expect("Path to Ghidra not configured.");
@@ -263,7 +263,20 @@ fn get_project_from_ghidra(file_path: &Path) -> Project {
     let mut project_pcode: cwe_checker_rs::pcode::Project =
         serde_json::from_reader(std::io::BufReader::new(file)).unwrap();
     project_pcode.normalize();
-    let project: Project = project_pcode.into();
+    let project: Project = match cwe_checker_rs::utils::get_binary_base_address(binary) {
+        Ok(binary_base_address) => project_pcode.into_ir_project(binary_base_address),
+        Err(_err) => {
+            if !quiet_flag {
+                let log = LogMessage::new_info("Could not determine binary base address. Using base address of Ghidra output as fallback.");
+                println!("{}", log);
+            }
+            let mut project = project_pcode.into_ir_project(0);
+            // Setting the address_base_offset to zero is a hack, which worked for the tested PE files.
+            // But this hack will probably not work in general!
+            project.program.term.address_base_offset = 0;
+            project
+        }
+    };
     // delete the temporary file again.
     std::fs::remove_file(output_path).unwrap();
     project
