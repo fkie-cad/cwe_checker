@@ -298,6 +298,7 @@ impl From<Program> for IrProgram {
                 .map(|symbol| symbol.into())
                 .collect(),
             entry_points: program.entry_points,
+            address_base_offset: 0,
         }
     }
 }
