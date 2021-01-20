@@ -1,7 +1,10 @@
 use std::fmt::Display;
 
-use crate::{abstract_domain::{AbstractDomain, HasByteSize, HasTop, RegisterDomain}, intermediate_representation::BinOpType, intermediate_representation::{ByteSize, CastOpType, UnOpType}};
 use crate::prelude::*;
+use crate::{
+    abstract_domain::{AbstractDomain, HasByteSize, HasTop},
+    intermediate_representation::ByteSize,
+};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum Taint {
@@ -44,47 +47,17 @@ impl HasByteSize for Taint {
             Self::Tainted(size) | Self::Top(size) => *size,
         }
     }
+
+    /// Get a new `Top`-value with the given bytesize.
+    fn new_top(bytesize: ByteSize) -> Self {
+        Self::Top(bytesize)
+    }
 }
 
 impl HasTop for Taint {
     /// Get a new `Top`-value with the same bytesize as `self`.
     fn top(&self) -> Self {
         Self::Top(self.bytesize())
-    }
-}
-
-impl RegisterDomain for Taint {
-    /// Get a new `Top`-value with the given bytesize.
-    fn new_top(bytesize: ByteSize) -> Self {
-        Self::Top(bytesize)
-    }
-
-    /// The result of a binary operation is tainted if at least one input value was tainted.
-    fn bin_op(&self, op: BinOpType, rhs: &Self) -> Self {
-        *self
-    }
-
-    /// The result of a unary operation is tainted if the input was tainted.
-    fn un_op(&self, _op: UnOpType) -> Self {
-        *self
-    }
-
-    /// A subpiece of a tainted value is again tainted.
-    fn subpiece(&self, _low_byte: ByteSize, size: ByteSize) -> Self {
-        if let Self::Tainted(_) = self {
-            Self::Tainted(size)
-        } else {
-            Self::Top(size)
-        }
-    }
-
-    /// The result of a cast operation is tainted if the input was tainted.
-    fn cast(&self, _kind: CastOpType, width: ByteSize) -> Self {
-        if let Self::Tainted(_) = self {
-            Self::Tainted(width)
-        } else {
-            Self::Top(width)
-        }
     }
 }
 

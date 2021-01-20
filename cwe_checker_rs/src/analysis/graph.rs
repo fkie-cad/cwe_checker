@@ -414,10 +414,7 @@ impl<'a> GraphBuilder<'a> {
 }
 
 /// Build the interprocedural control flow graph for a program term.
-pub fn get_program_cfg(
-    program: &Term<Program>,
-    extern_subs: HashSet<Tid>,
-) -> Graph {
+pub fn get_program_cfg(program: &Term<Program>, extern_subs: HashSet<Tid>) -> Graph {
     let builder = GraphBuilder::new(program, extern_subs);
     builder.build()
 }
