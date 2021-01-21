@@ -22,11 +22,11 @@
 //! ## False Positives
 //!
 //! - The input comes from the user but proper sanitization was not detected by the analysis even though it exists.
-//! - The input comes from the user but the format string's input format could not be distinguised as non-string.
+//! - The input comes from the user but the format string's input format could not be distinguised as non-string input.
 //!
 //! ## False Negatives
 //!
-//! -
+//! - Loss of taints due to missing information from the pointer inference analysis
 
 use std::collections::HashMap;
 
@@ -73,7 +73,7 @@ pub fn check_cwe(
     let project = analysis_results.project;
     let pointer_inference_results = analysis_results.pointer_inference.unwrap();
 
-    let (cwe_sender, _cwe_receiver) = crossbeam_channel::unbounded();
+    let (cwe_sender, cwe_receiver) = crossbeam_channel::unbounded();
 
     let config: Config = serde_json::from_value(cwe_params.clone()).unwrap();
     let symbol_map =
@@ -88,8 +88,6 @@ pub fn check_cwe(
     );
 
     let entry_sub_to_entry_node_map = get_entry_sub_to_entry_node_map(project, &general_context);
-
-    let mut cwe_warnings: Vec<CweWarning> = Vec::new();
 
     for edge in general_context.get_pi_graph().edge_references() {
         if let Edge::ExternCallStub(jmp) = edge.weight() {
@@ -118,19 +116,11 @@ pub fn check_cwe(
                     );
                     computation.compute_with_max_steps(100);
 
-                    let taint_source = context.taint_source.unwrap();
-                    let taint_source_name = context.taint_source_name.unwrap();
-
                     for (sub_name, node_index) in entry_sub_to_entry_node_map.iter() {
                         if let Some(node_weight) = computation.get_node_value(node_index.clone()) {
                             let state = node_weight.unwrap_value();
                             if !state.is_empty() {
-                                cwe_warnings.push(generate_cwe_warning(
-                                    sub_name,
-                                    taint_source.clone(),
-                                    taint_source_name.clone(),
-                                    state.get_string_constants(),
-                                ))
+                                context.generate_cwe_warning(sub_name);
                             }
                         }
                     }
@@ -139,37 +129,19 @@ pub fn check_cwe(
         }
     }
 
+    let mut cwe_warnings = HashMap::new();
+    for cwe in cwe_receiver.try_iter() {
+        match &cwe.addresses[..] {
+            [taint_source_address, ..] => cwe_warnings.insert(taint_source_address.clone(), cwe),
+            _ => panic!(),
+        };
+    }
+    let cwe_warnings = cwe_warnings.into_iter().map(|(_, cwe)| cwe).collect();
+
     (Vec::new(), cwe_warnings)
 }
 
-fn generate_cwe_warning(
-    sub_name: &String,
-    source: Term<Jmp>,
-    name: String,
-    constants: Vec<Bitvector>,
-) -> CweWarning {
-    let mut param_location = String::new();
-    for constant in constants.clone() {
-        param_location.push_str(format!("    {}\n", constant.try_to_i64().unwrap()).as_str());
-    }
-    let description: String = format!(
-        "(Potential OS Command Injection) {} ({}) -> {}\n{}",
-        sub_name, source.tid.address, name, param_location
-    );
-    CweWarning::new(
-        String::from(CWE_MODULE.name),
-        String::from(CWE_MODULE.version),
-        description,
-    )
-    .addresses(vec![source.tid.address.clone()])
-    .tids(vec![format!("{}", source.tid)])
-    .symbols(vec![String::from(sub_name)])
-    .other(vec![vec![
-        String::from("OS Command Injection"),
-        String::from(name),
-    ]])
-}
-
+/// Returns a map from subroutine names to their corresponding start node index
 fn get_entry_sub_to_entry_node_map(
     project: &Project,
     context: &Context,

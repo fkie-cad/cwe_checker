@@ -148,7 +148,8 @@ fn run_with_ghidra(args: CmdlineArgs) {
     let mut all_logs = project.normalize();
     let mut analysis_results = AnalysisResults::new(&binary, &project);
 
-    let modules_depending_on_pointer_inference = vec!["CWE243", "CWE367", "CWE476", "Memory"];
+    let modules_depending_on_pointer_inference =
+        vec!["CWE78", "CWE243", "CWE367", "CWE476", "Memory"];
     let pointer_inference_results = if modules
         .iter()
         .any(|module| modules_depending_on_pointer_inference.contains(&module.name))

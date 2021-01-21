@@ -20,13 +20,11 @@ pub struct State {
     register_taint: HashMap<Variable, Taint>,
     /// The Taint contained in memory objects
     memory_taint: HashMap<AbstractIdentifier, MemRegion<Taint>>,
-    /// The set of string constants that were marked as part of the input to the taint source
+    /// The set of addresses in the binary where strings constants reside
     string_constants: Vec<Bitvector>,
-    /// The state of the pointer inference analysis.
-    /// Used only for preventing unneccessary recomputation during handling of `Def`s in a basic block.
-    /// It is set when handling `Def`s (except for the first `Def` in a block)
-    /// provided that a corresponding pointer inference analysis state exists.
-    /// Otherwise the field is ignored (including in the [merge](State::merge)-function) and usually set to `None`.
+    /// A map from Def Tids to their corresponding pointer inference state
+    /// The pointer inferenece states are calculated in a forward manner
+    /// from the BlkStart node when entering a BlkEnd node through a jump. 
     #[serde(skip_serializing)]
     pi_def_map: Option<HashMap<Tid, PointerInferenceState>>,
 }
@@ -34,7 +32,7 @@ pub struct State {
 impl PartialEq for State {
     /// Two states are equal if the same values are tainted in both states.
     ///
-    /// The equality operator ignores the `pointer_inference_state` field,
+    /// The equality operator ignores the `pi_def_map` field,
     /// since it only denotes an intermediate value.
     fn eq(&self, other: &Self) -> bool {
         self.register_taint == other.register_taint && self.memory_taint == other.memory_taint
@@ -172,14 +170,17 @@ impl State {
         self.pi_def_map = pi_def_map;
     }
 
+    /// Gets the taint state of a register if there is one.
     pub fn get_register_taint(&self, var: &Variable) -> Option<&Taint> {
         self.register_taint.get(var)
     }
 
+    /// Returns an iterator over currently tainted registers
     pub fn get_register_taints(&self) -> std::collections::hash_map::Iter<Variable, Taint> {
         self.register_taint.iter()
     }
 
+    /// Gets the string constant saved at the given address and saves it to the string constants field
     pub fn evaluate_constant(&mut self, constant: Bitvector) {
         // TODO: check whether the constant is a valid memory address in the binary
         // If so, get the string constant at that memory address and save it in the state
@@ -387,11 +388,6 @@ impl State {
     /// Check whether `self` contains any taint at all.
     pub fn is_empty(&self) -> bool {
         self.memory_taint.is_empty() && self.register_taint.is_empty()
-    }
-
-    /// Returns the string constants of the node value
-    pub fn get_string_constants(&self) -> Vec<Bitvector> {
-        self.string_constants.clone()
     }
 
     // Checks whether the return registers are contained in the current tainted registers

@@ -1,13 +1,12 @@
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
+    iter::FromIterator,
 };
 
 use petgraph::{graph::NodeIndex, visit::IntoNodeReferences};
 
-use std::iter::FromIterator;
-
-use super::{state::State, taint::Taint};
+use super::{state::State, taint::Taint, CWE_MODULE};
 use crate::{
     abstract_domain::AbstractDomain,
     analysis::{
@@ -106,6 +105,32 @@ impl<'a> Context<'a> {
         }
     }
 
+    /// Generates the CWE Warning for the CWE 78 check
+    pub fn generate_cwe_warning(
+        &self,
+        sub_name: &String,
+    ) {
+        let source = self.taint_source.unwrap();
+        let name = self.taint_source_name.clone().unwrap();
+        let description: String = format!(
+            "(Potential OS Command Injection) {} ({}) -> {}",
+            sub_name, source.tid.address, name
+        );
+        let cwe_warning = CweWarning::new(
+       String::from(CWE_MODULE.name),
+    String::from(CWE_MODULE.version),
+            description,
+        )
+        .addresses(vec![source.tid.address.clone()])
+        .tids(vec![format!("{}", source.tid)])
+        .symbols(vec![String::from(sub_name)])
+        .other(vec![vec![
+            String::from("OS Command Injection"),
+            String::from(name),
+        ]]);
+        let _ = self.cwe_collector.send(cwe_warning);
+    }
+
     /// Set the taint source and the current function for the analysis.
     pub fn set_taint_source(&mut self, taint_source: &'a Term<Jmp>, current_sub: &'a Term<Sub>) {
         let taint_source_name = match &taint_source.term {
@@ -142,23 +167,24 @@ impl<'a> Context<'a> {
         &self,
         state: &State,
         string_symbol: &ExternSymbol,
-        node_id: NodeIndex,
+        call_source_node: NodeIndex,
     ) -> State {
         let mut new_state = state.clone();
 
-        if let Some(NodeValue::Value(pi_state)) =
-            self.pointer_inference_results.get_node_value(node_id)
+        if let Some(NodeValue::Value(pi_state)) = self
+            .pointer_inference_results
+            .get_node_value(call_source_node)
         {
             let mut relevant_fuction_call = false;
             for parameter in string_symbol.parameters.iter() {
-                if let Ok(data) =
+                if let Ok(address) =
                     pi_state.eval_parameter_arg(parameter, &self.project.stack_pointer_register)
                 {
                     // Check whether the parameter points to a tainted memory target
                     // Since the first parameter of these string functions is also the return parameter,
                     // this will serve as an indicator whether the function call is relevant to the taint analysis.
-                    if state.check_if_address_points_to_taint(data.clone(), pi_state) == true {
-                        new_state.remove_mem_taint_at_target(&data);
+                    if state.check_if_address_points_to_taint(address.clone(), pi_state) == true {
+                        new_state.remove_mem_taint_at_target(&address);
                         relevant_fuction_call = true;
                     }
                     if relevant_fuction_call {
@@ -167,7 +193,7 @@ impl<'a> Context<'a> {
                                 new_state.set_register_taint(var, Taint::Tainted(var.size))
                             }
                             Arg::Stack { size, .. } => {
-                                new_state.save_taint_to_memory(&data, Taint::Tainted(*size))
+                                new_state.save_taint_to_memory(&address, Taint::Tainted(*size))
                             }
                         }
                     }
@@ -206,6 +232,9 @@ impl<'a> Context<'a> {
             if new_state.check_return_registers_for_taint(return_registers) {
                 new_state
                     .remove_non_callee_saved_taint(symbol.get_calling_convention(self.project));
+                if symbol.name == "scanf" {
+                    self.generate_cwe_warning(&self.current_sub.unwrap().term.name);
+                }
                 return self.taint_parameters(
                     &new_state,
                     symbol.parameters.clone(),
@@ -225,11 +254,10 @@ impl<'a> Context<'a> {
         size: ByteSize,
     ) -> State {
         let mut new_state = state.clone();
-        if let Some(pi_node) = self
+        if let Some(NodeValue::Value(pi_state)) = self
             .pointer_inference_results
             .get_node_value(call_source_node)
         {
-            let pi_state = pi_node.unwrap_value();
             let address_exp = Expression::BinOp {
                 op: BinOpType::IntAdd,
                 lhs: Box::new(Expression::Var(self.project.stack_pointer_register.clone())),

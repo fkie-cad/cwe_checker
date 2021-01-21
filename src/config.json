@@ -1,4 +1,16 @@
 {
+  "CWE78": {
+    "system_symbols": [
+      "system",
+      "execl"
+    ],
+    "string_symbols": [
+      "sprintf",
+      "snprintf",
+      "strcat",
+      "strncat"
+    ]
+  },
   "CWE190": {
     "symbols": [
       "xmalloc",

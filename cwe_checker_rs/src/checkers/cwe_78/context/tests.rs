@@ -1,5 +1,3 @@
-use std::clone;
-
 use super::*;
 
 use crate::analysis::backward_interprocedural_fixpoint::Context as BackwardContext;
@@ -10,6 +8,7 @@ use crate::{
     intermediate_representation::Variable,
 };
 
+#[cfg(test)]
 fn mock_block(tid: &str) -> Term<Blk> {
     Term {
         tid: Tid::new(tid),
@@ -20,6 +19,7 @@ fn mock_block(tid: &str) -> Term<Blk> {
     }
 }
 
+#[cfg(test)]
 fn mock_assign(tid: &str, var_name: &str, expr: Expression) -> Term<Def> {
     Term {
         tid: Tid::new(tid),
@@ -30,6 +30,7 @@ fn mock_assign(tid: &str, var_name: &str, expr: Expression) -> Term<Def> {
     }
 }
 
+#[cfg(test)]
 fn mock_load(tid: &str, var_name: &str, expr: Expression) -> Term<Def> {
     Term {
         tid: Tid::new(tid),
@@ -40,6 +41,7 @@ fn mock_load(tid: &str, var_name: &str, expr: Expression) -> Term<Def> {
     }
 }
 
+#[cfg(test)]
 fn mock_store(tid: &str, target: Expression, source: Expression) -> Term<Def> {
     Term {
         tid: Tid::new(tid),
@@ -50,6 +52,7 @@ fn mock_store(tid: &str, target: Expression, source: Expression) -> Term<Def> {
     }
 }
 
+#[cfg(test)]
 fn mock_jump(tid: &str, target_tid: &str, return_tid: &str) -> Term<Jmp> {
     Term {
         tid: Tid::new(tid),
@@ -60,6 +63,7 @@ fn mock_jump(tid: &str, target_tid: &str, return_tid: &str) -> Term<Jmp> {
     }
 }
 
+#[cfg(test)]
 fn register(name: &str) -> Variable {
     Variable {
         name: name.into(),
@@ -68,14 +72,17 @@ fn register(name: &str) -> Variable {
     }
 }
 
+#[cfg(test)]
 fn variable_expr(name: &str) -> Expression {
     Expression::Var(register(name))
 }
 
+#[cfg(test)]
 fn const_expr(value: Bitvector) -> Expression {
     Expression::Const(value)
 }
 
+#[cfg(test)]
 fn bin_op(op: BinOpType, lhs: Expression, rhs: Expression) -> Expression {
     Expression::BinOp {
         op,
@@ -84,18 +91,17 @@ fn bin_op(op: BinOpType, lhs: Expression, rhs: Expression) -> Expression {
     }
 }
 
+#[cfg(test)]
 fn int_add(name: &str, constant: Bitvector) -> Expression {
     bin_op(BinOpType::IntAdd, variable_expr(name), const_expr(constant))
 }
 
-fn int_sub(name: &str, constant: Bitvector) -> Expression {
-    bin_op(BinOpType::IntSub, variable_expr(name), const_expr(constant))
-}
-
+#[cfg(test)]
 fn bv(value: i64) -> BitvectorDomain {
     BitvectorDomain::Value(Bitvector::from_i64(value))
 }
 
+#[cfg(test)]
 impl ExternSymbol {
     fn mock_string() -> Self {
         ExternSymbol {
@@ -110,17 +116,18 @@ impl ExternSymbol {
     }
 }
 
+#[cfg(test)]
 struct Setup {
     project: Project,
     state: State,
     pi_state: PointerInferenceState,
-    jump: Term<Jmp>,
     string_sym: ExternSymbol,
     taint_source: Term<Jmp>,
     base_eight_offset: DataDomain<BitvectorDomain>,
     base_sixteen_offset: DataDomain<BitvectorDomain>,
 }
 
+#[cfg(test)]
 impl Setup {
     fn new() -> Self {
         let (state, pi_state) = State::mock_with_pi_state();
@@ -162,7 +169,6 @@ impl Setup {
             project,
             state,
             pi_state,
-            jump,
             string_sym: ExternSymbol::mock_string(),
             taint_source,
             base_eight_offset: Data::Pointer(PointerDomain::new(stack_id.clone(), bv(-8))),
@@ -171,6 +177,7 @@ impl Setup {
     }
 }
 
+#[cfg(test)]
 impl<'a> Context<'a> {
     fn mock(
         project: &'a Project,
@@ -220,6 +227,7 @@ fn tainting_string_function_parameters() {
         .jmp_to_blk_end_node_map
         .get(&(Tid::new("call_string"), Tid::new("func")))
         .unwrap();
+
     let new_state =
         context.taint_string_function_parameters(&setup.state, &setup.string_sym, *node_id);
 
@@ -275,11 +283,6 @@ fn tainting_generic_function_parameters_and_removing_non_callee_saved() {
         .get(&(Tid::new("call_string"), Tid::new("func")))
         .unwrap();
 
-    let target_tid = match setup.jump.term {
-        Jmp::Call { target, .. } => target,
-        _ => panic!("Unexpected Jmp Term"),
-    };
-
     // Test Case 1: String Symbol
     let mut new_state = context.taint_generic_function_parameters_and_remove_non_callee_saved(
         &setup.state,
@@ -334,6 +337,35 @@ fn tainting_generic_function_parameters_and_removing_non_callee_saved() {
 }
 
 #[test]
+fn tainting_stack_parameters() {
+    let setup = Setup::new();
+    let offset = 4 as i64;
+    let size = ByteSize::new(8);
+
+    let stack_id = setup.pi_state.stack_id.clone();
+
+    let mut pi_results = PointerInferenceComputation::mock(&setup.project);
+    pi_results.compute();
+
+    let context = Context::mock(&setup.project, HashMap::new(), &pi_results);
+    let call_source_node = context
+        .jmp_to_blk_end_node_map
+        .get(&(Tid::new("call_string"), Tid::new("func")))
+        .unwrap();
+
+    let new_state =
+        context.taint_stack_parameters(setup.state, call_source_node.clone(), offset, size);
+
+    assert_eq!(
+        new_state.check_if_address_points_to_taint(
+            Data::Pointer(PointerDomain::new(stack_id.clone(), bv(4))),
+            &setup.pi_state
+        ),
+        true
+    );
+}
+
+#[test]
 fn tainting_parameters() {
     let setup = Setup::new();
     let rdi_reg = register("RDI");
@@ -341,7 +373,13 @@ fn tainting_parameters() {
     let params = vec![
         Arg::Register(rdi_reg.clone()),
         Arg::Register(rsi_reg.clone()),
+        Arg::Stack {
+            offset: 4,
+            size: ByteSize::new(8),
+        },
     ];
+
+    let stack_id = setup.pi_state.stack_id.clone();
 
     let mut pi_results = PointerInferenceComputation::mock(&setup.project);
     pi_results.compute();
@@ -361,6 +399,14 @@ fn tainting_parameters() {
     assert_eq!(
         new_state.get_register_taint(&rsi_reg),
         Some(&Taint::Tainted(rsi_reg.size))
+    );
+
+    assert_eq!(
+        new_state.check_if_address_points_to_taint(
+            Data::Pointer(PointerDomain::new(stack_id.clone(), bv(4))),
+            &setup.pi_state
+        ),
+        true
     );
 }
 
