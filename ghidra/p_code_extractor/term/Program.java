@@ -14,6 +14,8 @@ public class Program {
     private ArrayList<ExternSymbol> externSymbols;
     @SerializedName("entry_points")
     private ArrayList<Tid> entryPoints;
+    @SerializedName("image_base")
+    private String imageBase;
 
     public Program() {
     }
@@ -22,9 +24,10 @@ public class Program {
         this.setSubs(subs);
     }
 
-    public Program(ArrayList<Term<Sub>> subs, ArrayList<Tid> entryPoints) {
+    public Program(ArrayList<Term<Sub>> subs, ArrayList<Tid> entryPoints, String imageBase) {
         this.setSubs(subs);
         this.setEntryPoints(entryPoints);
+        this.setImageBase(imageBase);
     }
 
 
@@ -54,5 +57,13 @@ public class Program {
 
     public void setEntryPoints(ArrayList<Tid> entryPoints) {
         this.entryPoints = entryPoints;
+    }
+
+    public String getImageBase() {
+        return imageBase;
+    }
+
+    public void setImageBase(String imageBase) {
+        this.imageBase = imageBase;
     }
 }

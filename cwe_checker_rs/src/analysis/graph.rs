@@ -500,6 +500,7 @@ mod tests {
                 subs: vec![sub1, sub2],
                 extern_symbols: Vec::new(),
                 entry_points: Vec::new(),
+                address_base_offset: 0,
             },
         };
         program

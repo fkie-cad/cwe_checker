@@ -175,7 +175,7 @@ impl Def {
     pub fn correct_pointer_sizes(&mut self, pointer_size: ByteSize) {
         if self.rhs.mnemonic == ExpressionType::LOAD {
             let input1 = self.rhs.input1.as_mut().unwrap();
-            if input1.size == ByteSize::from(0 as u64) {
+            if input1.size == ByteSize::from(0u64) {
                 input1.size = pointer_size;
             }
         }
@@ -354,12 +354,19 @@ pub struct Program {
     pub subs: Vec<Term<Sub>>,
     pub extern_symbols: Vec<ExternSymbol>,
     pub entry_points: Vec<Tid>,
+    pub image_base: String,
 }
 
-impl From<Program> for IrProgram {
+impl Program {
     /// Convert a program parsed from Ghidra to the internally used IR.
-    fn from(program: Program) -> IrProgram {
-        let subs = program
+    ///
+    /// The `binary_base_address` denotes the base address of the memory image of the binary
+    /// according to the program headers of the binary.
+    /// It is needed to detect whether Ghidra added a constant offset to all addresses of the memory address.
+    /// E.g. if the `binary_base_address` is 0 for shared object files,
+    /// Ghidra adds an offset so that the memory image does not actually start at address 0.
+    pub fn into_ir_program(self, binary_base_address: u64) -> IrProgram {
+        let subs = self
             .subs
             .into_iter()
             .map(|sub_term| Term {
@@ -367,14 +374,18 @@ impl From<Program> for IrProgram {
                 term: sub_term.term.into(),
             })
             .collect();
+        let extern_symbols = self
+            .extern_symbols
+            .into_iter()
+            .map(|symbol| symbol.into())
+            .collect();
+        let address_base_offset =
+            u64::from_str_radix(&self.image_base, 16).unwrap() - binary_base_address;
         IrProgram {
             subs,
-            extern_symbols: program
-                .extern_symbols
-                .into_iter()
-                .map(|symbol| symbol.into())
-                .collect(),
-            entry_points: program.entry_points,
+            extern_symbols,
+            entry_points: self.entry_points,
+            address_base_offset,
         }
     }
 }
@@ -409,14 +420,17 @@ pub struct Project {
     pub register_calling_convention: Vec<CallingConvention>,
 }
 
-impl From<Project> for IrProject {
+impl Project {
     /// Convert a project parsed from Ghidra to the internally used IR.
-    fn from(project: Project) -> IrProject {
+    ///
+    /// The `binary_base_address` denotes the base address of the memory image of the binary
+    /// according to the program headers of the binary.
+    pub fn into_ir_project(self, binary_base_address: u64) -> IrProject {
         let mut program: Term<IrProgram> = Term {
-            tid: project.program.tid,
-            term: project.program.term.into(),
+            tid: self.program.tid,
+            term: self.program.term.into_ir_program(binary_base_address),
         };
-        let register_map: HashMap<&String, &RegisterProperties> = project
+        let register_map: HashMap<&String, &RegisterProperties> = self
             .register_properties
             .iter()
             .map(|p| (&p.register, p))
@@ -511,9 +525,9 @@ impl From<Project> for IrProject {
         }
         IrProject {
             program,
-            cpu_architecture: project.cpu_architecture,
-            stack_pointer_register: project.stack_pointer_register.into(),
-            calling_conventions: project
+            cpu_architecture: self.cpu_architecture,
+            stack_pointer_register: self.stack_pointer_register.into(),
+            calling_conventions: self
                 .register_calling_convention
                 .into_iter()
                 .map(|cconv| cconv.into())

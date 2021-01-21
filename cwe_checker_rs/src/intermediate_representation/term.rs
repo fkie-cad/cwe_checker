@@ -288,10 +288,7 @@ impl ExternSymbol {
 
     /// Get the calling convention corresponding to the extern symbol.
     pub fn get_calling_convention<'a>(&self, project: &'a Project) -> &'a CallingConvention {
-        let cconv_name = match self.calling_convention {
-            Some(ref name) => name,
-            None => "default",
-        };
+        let cconv_name: &str = self.calling_convention.as_deref().unwrap_or("default");
         project
             .calling_conventions
             .iter()
@@ -310,6 +307,14 @@ pub struct Program {
     /// Entry points into to binary,
     /// i.e. the term identifiers of functions that may be called from outside of the binary.
     pub entry_points: Vec<Tid>,
+    /// An offset that has been added to all addresses in the program compared to the addresses
+    /// as specified in the binary file.
+    ///
+    /// In certain cases, e.g. if the binary specifies a segment to be loaded at address 0,
+    /// the Ghidra backend may shift the whole binary image by a constant value in memory.
+    /// Thus addresses as specified by the binary and addresses as reported by Ghidra may differ by a constant offset,
+    /// which is stored in this value.
+    pub address_base_offset: u64,
 }
 
 impl Program {
@@ -506,6 +511,7 @@ mod tests {
                 subs: Vec::new(),
                 extern_symbols: Vec::new(),
                 entry_points: Vec::new(),
+                address_base_offset: 0,
             }
         }
     }

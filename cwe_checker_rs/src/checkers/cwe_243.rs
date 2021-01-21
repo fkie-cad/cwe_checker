@@ -143,9 +143,18 @@ pub fn check_cwe(
                 if let Some(chdir_tid) =
                     find_symbol(&project.program, "chdir").map(|(tid, _)| tid.clone())
                 {
+                    if graph.neighbors(node).count() > 1 {
+                        panic!("Malformed Control flow graph: More than one edge for extern function call")
+                    }
+                    let chroot_return_to_node = graph.neighbors(node).next().unwrap();
                     // If chdir is called after chroot, we assume a secure chroot jail.
-                    if is_sink_call_reachable_from_source_call(graph, node, &chroot_tid, &chdir_tid)
-                        .is_none()
+                    if is_sink_call_reachable_from_source_call(
+                        graph,
+                        chroot_return_to_node,
+                        &chroot_tid,
+                        &chdir_tid,
+                    )
+                    .is_none()
                     {
                         // If chdir is not called after chroot, it has to be called before it.
                         // Additionally priviledges must be dropped to secure the chroot jail in this case.
