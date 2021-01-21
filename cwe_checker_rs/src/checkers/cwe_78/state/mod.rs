@@ -24,7 +24,7 @@ pub struct State {
     string_constants: Vec<Bitvector>,
     /// A map from Def Tids to their corresponding pointer inference state
     /// The pointer inferenece states are calculated in a forward manner
-    /// from the BlkStart node when entering a BlkEnd node through a jump. 
+    /// from the BlkStart node when entering a BlkEnd node through a jump.
     #[serde(skip_serializing)]
     pi_def_map: Option<HashMap<Tid, PointerInferenceState>>,
 }

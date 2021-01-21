@@ -1,7 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
-    sync::Arc,
     iter::FromIterator,
+    sync::Arc,
 };
 
 use petgraph::{graph::NodeIndex, visit::IntoNodeReferences};
@@ -106,10 +106,7 @@ impl<'a> Context<'a> {
     }
 
     /// Generates the CWE Warning for the CWE 78 check
-    pub fn generate_cwe_warning(
-        &self,
-        sub_name: &String,
-    ) {
+    pub fn generate_cwe_warning(&self, sub_name: &String) {
         let source = self.taint_source.unwrap();
         let name = self.taint_source_name.clone().unwrap();
         let description: String = format!(
@@ -117,8 +114,8 @@ impl<'a> Context<'a> {
             sub_name, source.tid.address, name
         );
         let cwe_warning = CweWarning::new(
-       String::from(CWE_MODULE.name),
-    String::from(CWE_MODULE.version),
+            String::from(CWE_MODULE.name),
+            String::from(CWE_MODULE.version),
             description,
         )
         .addresses(vec![source.tid.address.clone()])
