@@ -1,6 +1,5 @@
 use std::{
     collections::{HashMap, HashSet},
-    iter::FromIterator,
     sync::Arc,
 };
 
@@ -106,7 +105,7 @@ impl<'a> Context<'a> {
     }
 
     /// Generates the CWE Warning for the CWE 78 check
-    pub fn generate_cwe_warning(&self, sub_name: &String) {
+    pub fn generate_cwe_warning(&self, sub_name: &str) {
         let source = self.taint_source.unwrap();
         let name = self.taint_source_name.clone().unwrap();
         let description: String = format!(
@@ -121,10 +120,7 @@ impl<'a> Context<'a> {
         .addresses(vec![source.tid.address.clone()])
         .tids(vec![format!("{}", source.tid)])
         .symbols(vec![String::from(sub_name)])
-        .other(vec![vec![
-            String::from("OS Command Injection"),
-            String::from(name),
-        ]]);
+        .other(vec![vec![String::from("OS Command Injection"), name]]);
         let _ = self.cwe_collector.send(cwe_warning);
     }
 
@@ -180,7 +176,7 @@ impl<'a> Context<'a> {
                     // Check whether the parameter points to a tainted memory target
                     // Since the first parameter of these string functions is also the return parameter,
                     // this will serve as an indicator whether the function call is relevant to the taint analysis.
-                    if state.check_if_address_points_to_taint(address.clone(), pi_state) == true {
+                    if state.check_if_address_points_to_taint(address.clone(), pi_state) {
                         new_state.remove_mem_taint_at_target(&address);
                         relevant_fuction_call = true;
                     }
@@ -250,7 +246,7 @@ impl<'a> Context<'a> {
         offset: i64,
         size: ByteSize,
     ) -> State {
-        let mut new_state = state.clone();
+        let mut new_state = state;
         if let Some(NodeValue::Value(pi_state)) = self
             .pointer_inference_results
             .get_node_value(call_source_node)
@@ -360,16 +356,15 @@ impl<'a> Context<'a> {
         var: &Variable,
         input: &Expression,
     ) -> State {
-        let mut new_state = state.clone();
+        let mut new_state = state;
         if let Some(taint) = new_state.get_register_taint(var) {
-            match taint {
-                Taint::Tainted(_) => new_state.set_expression_taint_and_store_constants(
+            if let Taint::Tainted(_) = taint {
+                new_state.set_expression_taint_and_store_constants(
                     &def.tid,
                     var,
                     input,
                     &self.project.stack_pointer_register,
-                ),
-                _ => (),
+                )
             }
         }
 
@@ -384,7 +379,7 @@ impl<'a> Context<'a> {
         address: &Expression,
         value: &Expression,
     ) -> State {
-        let mut new_state = state.clone();
+        let mut new_state = state;
         let target = match address {
             Expression::Var(ram_target) => ram_target,
             Expression::Subpiece { arg, .. } => {
@@ -408,7 +403,7 @@ impl<'a> Context<'a> {
             .get(&(call_source.clone(), self.current_sub.unwrap().tid.clone()));
 
         if let Some(blk_end_node) = blk_end_node_id {
-            return blk_end_node.clone();
+            *blk_end_node
         } else {
             panic!("Malformed Control Flow Graph.");
         }
@@ -484,7 +479,7 @@ impl<'a> crate::analysis::backward_interprocedural_fixpoint::Context<'a> for Con
                 new_state.remove_non_parameter_taints_for_generic_function(self.project);
                 if let Some(calling_conv) = self.project.get_standard_calling_convention() {
                     let callee_saved_registers: HashSet<String> =
-                        HashSet::from_iter(calling_conv.callee_saved_register.iter().cloned());
+                        calling_conv.callee_saved_register.iter().cloned().collect();
                     for (variable, taint) in return_.get_register_taints() {
                         if callee_saved_registers.get(&variable.name).is_some() {
                             new_state.set_register_taint(variable, *taint);
@@ -519,8 +514,7 @@ impl<'a> crate::analysis::backward_interprocedural_fixpoint::Context<'a> for Con
         let mut new_state = combined_state.clone();
         if let Some(calling_conv) = self.project.get_standard_calling_convention() {
             let return_registers: HashSet<String> =
-                HashSet::from_iter(calling_conv.return_register.iter().cloned());
-
+                calling_conv.return_register.iter().cloned().collect();
             new_state.remove_all_except_return_register_taints(return_registers);
         }
         Some(new_state)

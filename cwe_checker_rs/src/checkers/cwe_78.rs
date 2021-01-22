@@ -93,9 +93,9 @@ pub fn check_cwe(
         if let Edge::ExternCallStub(jmp) = edge.weight() {
             if let Jmp::Call { target, .. } = &jmp.term {
                 if let Some(symbol) = symbol_map.get(target) {
-                    let node = edge.target();
+                    let node = edge.source();
                     let current_sub = match general_context.get_pi_graph()[node] {
-                        Node::BlkStart(_blk, sub) => sub,
+                        Node::BlkEnd(_blk, sub) => sub,
                         _ => panic!(),
                     };
                     let mut context = general_context.clone();
@@ -117,7 +117,7 @@ pub fn check_cwe(
                     computation.compute_with_max_steps(100);
 
                     for (sub_name, node_index) in entry_sub_to_entry_node_map.iter() {
-                        if let Some(node_weight) = computation.get_node_value(node_index.clone()) {
+                        if let Some(node_weight) = computation.get_node_value(*node_index) {
                             let state = node_weight.unwrap_value();
                             if !state.is_empty() {
                                 context.generate_cwe_warning(sub_name);
@@ -174,9 +174,7 @@ fn get_entry_sub_to_entry_node_map(
     entry_sub_to_entry_blocks_map
         .into_iter()
         .filter_map(|((sub_tid, name), block_tid)| {
-            if let Some(start_node_index) =
-                tid_to_graph_indices_map.get(&(block_tid, sub_tid.clone()))
-            {
+            if let Some(start_node_index) = tid_to_graph_indices_map.get(&(block_tid, sub_tid)) {
                 Some((name, *start_node_index))
             } else {
                 None

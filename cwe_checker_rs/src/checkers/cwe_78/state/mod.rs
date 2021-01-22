@@ -1,5 +1,4 @@
 use std::collections::{HashMap, HashSet};
-use std::iter::FromIterator;
 
 use crate::{
     abstract_domain::{
@@ -239,7 +238,7 @@ impl State {
         if let Some(pid_map) = self.pi_def_map.as_ref() {
             if let Some(pi_state) = pid_map.get(def_tid) {
                 if let Ok(address) = pi_state.get_register(target) {
-                    if self.check_if_address_points_to_taint(address.clone(), &pi_state) == true {
+                    if self.check_if_address_points_to_taint(address.clone(), &pi_state) {
                         let new_taint_register = match value {
                             Expression::Var(input) => input,
                             Expression::Subpiece { arg, .. } => {
@@ -345,7 +344,7 @@ impl State {
     pub fn remove_non_parameter_taints_for_generic_function(&mut self, project: &Project) {
         if let Some(calling_conv) = project.get_standard_calling_convention() {
             let register_names: HashSet<String> =
-                HashSet::from_iter(calling_conv.parameter_register.iter().cloned());
+                calling_conv.parameter_register.iter().cloned().collect();
             let taints = self.register_taint.clone();
             for (register, _) in taints.iter() {
                 if register_names.get(&register.name).is_none() {
