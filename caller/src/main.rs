@@ -1,3 +1,4 @@
+use cwe_checker_rs::utils::binary::RuntimeMemoryImage;
 use cwe_checker_rs::utils::log::print_all_messages;
 use cwe_checker_rs::utils::{get_ghidra_plugin_path, read_config_file};
 use cwe_checker_rs::AnalysisResults;
@@ -135,7 +136,18 @@ fn run_with_ghidra(args: CmdlineArgs) {
     let mut project = get_project_from_ghidra(&binary_file_path, &binary[..], args.quiet);
     // Normalize the project and gather log messages generated from it.
     let mut all_logs = project.normalize();
-    let mut analysis_results = AnalysisResults::new(&binary, &project);
+
+    // Generate the representation of the runtime memory image of the binary
+    let mut runtime_memory_image = RuntimeMemoryImage::new(&binary).unwrap_or_else(|err| {
+        panic!("Error while generating runtime memory image: {}", err);
+    });
+    if project.program.term.address_base_offset != 0 {
+        // We adjust the memory addresses once globally
+        // so that other analyses do not have to adjust their addresses.
+        runtime_memory_image.add_global_memory_offset(project.program.term.address_base_offset);
+    }
+
+    let mut analysis_results = AnalysisResults::new(&binary, &runtime_memory_image, &project);
 
     let modules_depending_on_pointer_inference =
         vec!["CWE78", "CWE243", "CWE367", "CWE476", "Memory"];
