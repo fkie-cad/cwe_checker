@@ -1,4 +1,4 @@
-FROM ubuntu:xenial
+FROM ubuntu:focal
 
 RUN apt-get -y update \
     && apt-get install -y sudo \
@@ -9,11 +9,11 @@ RUN apt-get -y update \
     
 USER cwe
 
-RUN sudo apt-get install python-pip apt-utils -y
+RUN sudo apt-get install python3-pip apt-utils -y
 
-RUN pip install --upgrade pip
+RUN pip3 install --upgrade pip
 
-RUN pip install scons
+RUN sudo pip3 install scons
 
 ENV PATH="/home/cwe/.local/bin/:${PATH}"
 
@@ -22,5 +22,3 @@ COPY . /home/cwe/artificial_samples/
 WORKDIR /home/cwe/artificial_samples/
 
 RUN ./install_cross_compilers.sh
-
-# RUN sudo /home/cwe/.local/bin/scons
