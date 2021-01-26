@@ -9,6 +9,7 @@ extern crate ocaml;
 
 use crate::analysis::pointer_inference::PointerInference;
 use crate::intermediate_representation::Project;
+use crate::utils::binary::RuntimeMemoryImage;
 use crate::utils::log::{CweWarning, LogMessage};
 
 pub mod abstract_domain;
@@ -75,6 +76,8 @@ pub fn get_modules() -> Vec<&'static CweModule> {
 pub struct AnalysisResults<'a> {
     /// The content of the binary file
     pub binary: &'a [u8],
+    /// A representation of the runtime memory image of the binary.
+    pub runtime_memory_image: &'a RuntimeMemoryImage,
     /// A pointer to the project struct
     pub project: &'a Project,
     /// The result of the pointer inference analysis if already computed.
@@ -83,9 +86,14 @@ pub struct AnalysisResults<'a> {
 
 impl<'a> AnalysisResults<'a> {
     /// Create a new `AnalysisResults` struct with only the project itself known.
-    pub fn new(binary: &'a [u8], project: &'a Project) -> AnalysisResults<'a> {
+    pub fn new(
+        binary: &'a [u8],
+        runtime_memory_image: &'a RuntimeMemoryImage,
+        project: &'a Project,
+    ) -> AnalysisResults<'a> {
         AnalysisResults {
             binary,
+            runtime_memory_image,
             project,
             pointer_inference: None,
         }
