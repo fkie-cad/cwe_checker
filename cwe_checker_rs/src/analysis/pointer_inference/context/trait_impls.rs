@@ -45,7 +45,10 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
             }
             Def::Load { var, address } => {
                 let mut new_state = state.clone();
-                self.log_debug(new_state.handle_load(var, address), Some(&def.tid));
+                self.log_debug(
+                    new_state.handle_load(var, address, &self.runtime_memory_image),
+                    Some(&def.tid),
+                );
                 Some(new_state)
             }
         }

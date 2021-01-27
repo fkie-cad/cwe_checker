@@ -16,11 +16,14 @@
 use super::fixpoint::Computation;
 use super::forward_interprocedural_fixpoint::GeneralizedContext;
 use super::interprocedural_fixpoint_generic::NodeValue;
-use crate::abstract_domain::{BitvectorDomain, DataDomain};
 use crate::analysis::graph::{Graph, Node};
 use crate::intermediate_representation::*;
 use crate::prelude::*;
 use crate::utils::log::*;
+use crate::{
+    abstract_domain::{BitvectorDomain, DataDomain},
+    utils::binary::RuntimeMemoryImage,
+};
 use petgraph::graph::NodeIndex;
 use petgraph::visit::IntoNodeReferences;
 use petgraph::Direction;
@@ -70,10 +73,11 @@ impl<'a> PointerInference<'a> {
     /// Generate a new pointer inference compuation for a project.
     pub fn new(
         project: &'a Project,
+        runtime_memory_image: &'a RuntimeMemoryImage,
         config: Config,
         log_sender: crossbeam_channel::Sender<LogThreadMsg>,
     ) -> PointerInference<'a> {
-        let context = Context::new(project, config, log_sender.clone());
+        let context = Context::new(project, runtime_memory_image, config, log_sender.clone());
 
         let mut entry_sub_to_entry_blocks_map = HashMap::new();
         let subs: HashMap<Tid, &Term<Sub>> = project
@@ -398,10 +402,20 @@ pub fn extract_pi_analysis_results(
 ///
 /// If `print_debug` is set to `true` print debug information to *stdout*.
 /// Note that the format of the debug information is currently unstable and subject to change.
-pub fn run(project: &Project, config: Config, print_debug: bool) -> PointerInference {
+pub fn run<'a>(
+    project: &'a Project,
+    runtime_memory_image: &'a RuntimeMemoryImage,
+    config: Config,
+    print_debug: bool,
+) -> PointerInference<'a> {
     let logging_thread = LogThread::spawn(collect_all_logs);
 
-    let mut computation = PointerInference::new(project, config, logging_thread.get_msg_sender());
+    let mut computation = PointerInference::new(
+        project,
+        runtime_memory_image,
+        config,
+        logging_thread.get_msg_sender(),
+    );
 
     computation.compute_with_speculative_entry_points(project);
 
@@ -457,13 +471,16 @@ mod tests {
     use super::*;
 
     impl<'a> PointerInference<'a> {
-        pub fn mock(project: &'a Project) -> PointerInference<'a> {
+        pub fn mock(
+            project: &'a Project,
+            mem_image: &'a RuntimeMemoryImage,
+        ) -> PointerInference<'a> {
             let config = Config {
                 allocation_symbols: vec!["malloc".to_string()],
                 deallocation_symbols: vec!["free".to_string()],
             };
             let (log_sender, _) = crossbeam_channel::unbounded();
-            PointerInference::new(project, config, log_sender)
+            PointerInference::new(project, mem_image, config, log_sender)
         }
     }
 }

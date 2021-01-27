@@ -1,3 +1,5 @@
+use crate::utils::binary::RuntimeMemoryImage;
+
 use super::*;
 
 impl State {
@@ -105,15 +107,32 @@ impl State {
     }
 
     /// Evaluate the given load instruction and return the data read on success.
-    pub fn load_value(&self, address: &Expression, size: ByteSize) -> Result<Data, Error> {
-        Ok(self
-            .memory
-            .get_value(&self.adjust_pointer_for_read(&self.eval(address)?), size)?)
+    pub fn load_value(
+        &self,
+        address: &Expression,
+        size: ByteSize,
+        global_memory: &RuntimeMemoryImage,
+    ) -> Result<Data, Error> {
+        let address = self.adjust_pointer_for_read(&self.eval(address)?);
+        match address {
+            DataDomain::Value(BitvectorDomain::Value(address_bitvector)) => {
+                Ok(global_memory.read(&address_bitvector, size)?.into())
+            }
+            DataDomain::Value(BitvectorDomain::Top(_)) | DataDomain::Top(_) => {
+                Ok(DataDomain::new_top(size))
+            }
+            DataDomain::Pointer(_) => Ok(self.memory.get_value(&address, size)?),
+        }
     }
 
     /// Handle a load instruction by assigning the value loaded from the address given by the `address` expression to `var`.
-    pub fn handle_load(&mut self, var: &Variable, address: &Expression) -> Result<(), Error> {
-        match self.load_value(address, var.size) {
+    pub fn handle_load(
+        &mut self,
+        var: &Variable,
+        address: &Expression,
+        global_memory: &RuntimeMemoryImage,
+    ) -> Result<(), Error> {
+        match self.load_value(address, var.size, global_memory) {
             Ok(data) => {
                 self.set_register(var, data);
                 Ok(())
@@ -196,6 +215,7 @@ impl State {
         &self,
         parameter: &Arg,
         stack_pointer: &Variable,
+        global_memory: &RuntimeMemoryImage,
     ) -> Result<Data, Error> {
         match parameter {
             Arg::Register(var) => self.eval(&Expression::Var(var.clone())),
@@ -210,6 +230,7 @@ impl State {
                     )),
                 },
                 *size,
+                global_memory,
             ),
         }
     }

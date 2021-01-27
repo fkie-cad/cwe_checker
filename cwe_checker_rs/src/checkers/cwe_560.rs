@@ -26,6 +26,7 @@ use crate::abstract_domain::{BitvectorDomain, DataDomain};
 use crate::analysis::pointer_inference::State;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
+use crate::utils::binary::RuntimeMemoryImage;
 use crate::utils::log::{CweWarning, LogMessage};
 use crate::utils::symbol_utils::{get_callsites, get_symbol_map};
 use crate::CweModule;
@@ -46,6 +47,7 @@ fn get_umask_permission_arg(
     block: &Term<Blk>,
     umask_symbol: &ExternSymbol,
     project: &Project,
+    global_memory: &RuntimeMemoryImage,
 ) -> Result<u64, Error> {
     let stack_register = &project.stack_pointer_register;
     let mut state = State::new(stack_register, block.tid.clone());
@@ -59,13 +61,14 @@ fn get_umask_permission_arg(
                 let _ = state.handle_register_assign(var, value);
             }
             Def::Load { var, address } => {
-                let _ = state.handle_load(var, address);
+                let _ = state.handle_load(var, address, global_memory);
             }
         }
     }
 
     let parameter = umask_symbol.get_unique_parameter()?;
-    let param_value = state.eval_parameter_arg(parameter, &project.stack_pointer_register)?;
+    let param_value =
+        state.eval_parameter_arg(parameter, &project.stack_pointer_register, global_memory)?;
     if let DataDomain::Value(BitvectorDomain::Value(umask_arg)) = param_value {
         Ok(umask_arg.try_to_u64()?)
     } else {
@@ -108,7 +111,12 @@ pub fn check_cwe(
     if !umask_symbol_map.is_empty() {
         for sub in project.program.term.subs.iter() {
             for (block, jmp, umask_symbol) in get_callsites(sub, &umask_symbol_map) {
-                match get_umask_permission_arg(block, umask_symbol, project) {
+                match get_umask_permission_arg(
+                    block,
+                    umask_symbol,
+                    project,
+                    analysis_results.runtime_memory_image,
+                ) {
                     Ok(permission_const) => {
                         if is_chmod_style_arg(permission_const) {
                             cwes.push(generate_cwe_warning(sub, jmp, permission_const));

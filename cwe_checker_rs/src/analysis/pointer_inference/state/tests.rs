@@ -1,4 +1,5 @@
 use super::*;
+use crate::utils::binary::RuntimeMemoryImage;
 
 fn bv(value: i64) -> BitvectorDomain {
     BitvectorDomain::Value(Bitvector::from_i64(value))
@@ -39,6 +40,7 @@ fn reg_sub(name: &str, value: i64) -> Expression {
 fn state() {
     use crate::analysis::pointer_inference::object::*;
     use Expression::*;
+    let global_memory = RuntimeMemoryImage::mock();
     let mut state = State::new(&register("RSP"), Tid::new("time0"));
     let stack_id = new_id("time0", "RSP");
     let stack_addr = Data::Pointer(PointerDomain::new(stack_id.clone(), bv(8)));
@@ -48,7 +50,7 @@ fn state() {
     state.register.insert(register("RSP"), stack_addr.clone());
     assert_eq!(
         state
-            .load_value(&Var(register("RSP")), ByteSize::new(8))
+            .load_value(&Var(register("RSP")), ByteSize::new(8), &global_memory)
             .unwrap(),
         Data::Value(bv(42))
     );
@@ -69,7 +71,7 @@ fn state() {
     assert_eq!(merged_state.register.get(&register("RBX")), None);
     assert_eq!(
         merged_state
-            .load_value(&Var(register("RSP")), ByteSize::new(8))
+            .load_value(&Var(register("RSP")), ByteSize::new(8), &global_memory)
             .unwrap(),
         Data::new_top(ByteSize::new(8))
     );
@@ -97,7 +99,7 @@ fn state() {
     );
     assert_eq!(
         state
-            .load_value(&Var(register("RSP")), ByteSize::new(8))
+            .load_value(&Var(register("RSP")), ByteSize::new(8), &global_memory)
             .unwrap(),
         Data::Value(bv(15))
     );
@@ -108,14 +110,14 @@ fn state() {
     state.store_value(&pointer, &Data::Value(bv(7))).unwrap();
     assert_eq!(
         state
-            .load_value(&Var(register("RSP")), ByteSize::new(8))
+            .load_value(&Var(register("RSP")), ByteSize::new(8), &global_memory)
             .unwrap(),
         Data::Value(bv(7))
     );
     state.replace_abstract_id(&stack_id, &new_id("time0", "callee"), &bv(-8));
     assert_eq!(
         state
-            .load_value(&Var(register("RSP")), ByteSize::new(8))
+            .load_value(&Var(register("RSP")), ByteSize::new(8), &global_memory)
             .unwrap(),
         Data::Value(bv(7))
     );
@@ -154,6 +156,7 @@ fn state() {
 #[test]
 fn handle_store() {
     use Expression::*;
+    let global_memory = RuntimeMemoryImage::mock();
     let mut state = State::new(&register("RSP"), Tid::new("time0"));
     let stack_id = new_id("time0", "RSP");
     assert_eq!(
@@ -191,19 +194,19 @@ fn handle_store() {
 
     assert_eq!(
         state
-            .load_value(&reg_add("RSP", 12), ByteSize::new(8))
+            .load_value(&reg_add("RSP", 12), ByteSize::new(8), &global_memory)
             .unwrap(),
         bv(1).into()
     );
     assert_eq!(
         state
-            .load_value(&reg_sub("RSP", 4), ByteSize::new(8))
+            .load_value(&reg_sub("RSP", 4), ByteSize::new(8), &global_memory)
             .unwrap(),
         bv(2).into()
     );
     assert_eq!(
         state
-            .load_value(&reg_add("RSP", -12), ByteSize::new(8))
+            .load_value(&reg_add("RSP", -12), ByteSize::new(8), &global_memory)
             .unwrap(),
         bv(3).into()
     );
@@ -213,6 +216,7 @@ fn handle_store() {
 fn handle_caller_stack_stores() {
     use super::super::object::ObjectType;
     use Expression::*;
+    let global_memory = RuntimeMemoryImage::mock();
     let mut state = State::new(&register("RSP"), Tid::new("time0"));
     state.memory.add_abstract_object(
         new_id("caller1", "RSP"),
@@ -251,7 +255,7 @@ fn handle_caller_stack_stores() {
     // accessing through a positive stack register offset should yield the value of the caller stacks
     assert_eq!(
         state
-            .load_value(&reg_add("RSP", 8), ByteSize::new(8))
+            .load_value(&reg_add("RSP", 8), ByteSize::new(8), &global_memory)
             .unwrap(),
         bv(42).into()
     );
