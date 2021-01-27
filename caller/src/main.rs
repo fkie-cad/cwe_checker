@@ -166,6 +166,7 @@ fn run_with_ghidra(args: CmdlineArgs) {
     if args.debug {
         cwe_checker_rs::analysis::pointer_inference::run(
             &project,
+            &runtime_memory_image,
             serde_json::from_value(config["Memory"].clone()).unwrap(),
             true,
         );

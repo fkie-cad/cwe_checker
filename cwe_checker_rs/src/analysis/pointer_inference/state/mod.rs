@@ -3,6 +3,7 @@ use super::Data;
 use crate::abstract_domain::*;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
+use crate::utils::binary::RuntimeMemoryImage;
 use std::collections::{BTreeMap, BTreeSet};
 
 mod access_handling;
@@ -89,6 +90,7 @@ impl State {
         &mut self,
         extern_call: &ExternSymbol,
         stack_pointer_register: &Variable,
+        global_memory: &RuntimeMemoryImage,
     ) -> Result<(), Error> {
         let mut result_log = Ok(());
         for arg in &extern_call.parameters {
@@ -105,7 +107,9 @@ impl State {
                                 .unwrap(),
                         )),
                     };
-                    if let Err(err) = self.write_to_address(&location_expression, &data_top) {
+                    if let Err(err) =
+                        self.write_to_address(&location_expression, &data_top, global_memory)
+                    {
                         result_log = Err(err);
                     }
                 }

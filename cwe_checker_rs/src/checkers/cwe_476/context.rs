@@ -9,6 +9,7 @@ use crate::analysis::pointer_inference::PointerInference as PointerInferenceComp
 use crate::analysis::pointer_inference::State as PointerInferenceState;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
+use crate::utils::binary::RuntimeMemoryImage;
 use crate::utils::log::CweWarning;
 use petgraph::graph::NodeIndex;
 use petgraph::visit::IntoNodeReferences;
@@ -26,6 +27,8 @@ use std::sync::Arc;
 pub struct Context<'a> {
     /// A pointer to the corresponding project struct.
     project: &'a Project,
+    /// A pointer to the representation of the runtime memory image.
+    runtime_memory_image: &'a RuntimeMemoryImage,
     /// A pointer to the results of the pointer inference analysis.
     /// They are used to determine the targets of pointers to memory,
     /// which in turn is used to keep track of taint on the stack or on the heap.
@@ -62,6 +65,7 @@ impl<'a> Context<'a> {
     /// since this function can be expensive!
     pub fn new(
         project: &'a Project,
+        runtime_memory_image: &'a RuntimeMemoryImage,
         pointer_inference_results: &'a PointerInferenceComputation<'a>,
         cwe_collector: crossbeam_channel::Sender<CweWarning>,
     ) -> Self {
@@ -89,6 +93,7 @@ impl<'a> Context<'a> {
         }
         Context {
             project,
+            runtime_memory_image,
             pointer_inference_results,
             block_start_node_map: Arc::new(block_start_node_map),
             extern_symbol_map: Arc::new(extern_symbol_map),
@@ -220,9 +225,11 @@ impl<'a> Context<'a> {
                                 return true;
                             }
                         }
-                        if let Ok(stack_param) = pi_state
-                            .eval_parameter_arg(parameter, &self.project.stack_pointer_register)
-                        {
+                        if let Ok(stack_param) = pi_state.eval_parameter_arg(
+                            parameter,
+                            &self.project.stack_pointer_register,
+                            &self.runtime_memory_image,
+                        ) {
                             if state.check_if_address_points_to_taint(stack_param, pi_state) {
                                 return true;
                             }
@@ -428,14 +435,16 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::utils::binary::RuntimeMemoryImage;
 
     impl<'a> Context<'a> {
         pub fn mock(
             project: &'a Project,
+            runtime_memory_image: &'a RuntimeMemoryImage,
             pi_results: &'a PointerInferenceComputation<'a>,
         ) -> Context<'a> {
             let (cwe_sender, _) = crossbeam_channel::unbounded();
-            let mut context = Context::new(project, pi_results, cwe_sender);
+            let mut context = Context::new(project, runtime_memory_image, pi_results, cwe_sender);
             let taint_source = Box::new(Term {
                 tid: Tid::new("taint_source"),
                 term: Jmp::Call {
@@ -454,8 +463,9 @@ mod tests {
     #[test]
     fn check_parameter_arg_for_taint() {
         let project = Project::mock_empty();
-        let pi_results = PointerInferenceComputation::mock(&project);
-        let context = Context::mock(&project, &pi_results);
+        let runtime_memory_image = RuntimeMemoryImage::mock();
+        let pi_results = PointerInferenceComputation::mock(&project, &runtime_memory_image);
+        let context = Context::mock(&project, &runtime_memory_image, &pi_results);
         let (mut state, _pi_state) = State::mock_with_pi_state();
 
         assert_eq!(
@@ -476,8 +486,9 @@ mod tests {
     #[test]
     fn handle_generic_call() {
         let project = Project::mock_empty();
-        let pi_results = PointerInferenceComputation::mock(&project);
-        let context = Context::mock(&project, &pi_results);
+        let runtime_memory_image = RuntimeMemoryImage::mock();
+        let pi_results = PointerInferenceComputation::mock(&project, &runtime_memory_image);
+        let context = Context::mock(&project, &runtime_memory_image, &pi_results);
         let mut state = State::mock();
 
         assert!(context
@@ -496,8 +507,9 @@ mod tests {
     #[test]
     fn update_def() {
         let project = Project::mock_empty();
-        let pi_results = PointerInferenceComputation::mock(&project);
-        let context = Context::mock(&project, &pi_results);
+        let runtime_memory_image = RuntimeMemoryImage::mock();
+        let pi_results = PointerInferenceComputation::mock(&project, &runtime_memory_image);
+        let context = Context::mock(&project, &runtime_memory_image, &pi_results);
         let (mut state, pi_state) = State::mock_with_pi_state();
         state.set_pointer_inference_state(Some(pi_state));
 
@@ -548,8 +560,9 @@ mod tests {
     #[test]
     fn update_jump() {
         let project = Project::mock_empty();
-        let pi_results = PointerInferenceComputation::mock(&project);
-        let context = Context::mock(&project, &pi_results);
+        let runtime_memory_image = RuntimeMemoryImage::mock();
+        let pi_results = PointerInferenceComputation::mock(&project, &runtime_memory_image);
+        let context = Context::mock(&project, &runtime_memory_image, &pi_results);
         let (state, _pi_state) = State::mock_with_pi_state();
 
         let jump = Term {

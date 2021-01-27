@@ -104,6 +104,7 @@ impl<'a> AnalysisResults<'a> {
     pub fn compute_pointer_inference(&self, config: &serde_json::Value) -> PointerInference<'a> {
         crate::analysis::pointer_inference::run(
             self.project,
+            self.runtime_memory_image,
             serde_json::from_value(config.clone()).unwrap(),
             false,
         )

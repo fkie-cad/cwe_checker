@@ -70,7 +70,7 @@ impl AbstractObjectList {
     /// Returns an error if the address is a `Data::Value`, i.e. not a pointer.
     pub fn get_value(&self, address: &Data, size: ByteSize) -> Result<Data, Error> {
         match address {
-            Data::Value(value) => Err(anyhow!("Load from non-pointer value:\n{:?}", value)),
+            Data::Value(_) => Err(anyhow!("Load from non-pointer value")),
             Data::Top(_) => Ok(Data::new_top(size)),
             Data::Pointer(pointer) => {
                 let mut merged_value: Option<Data> = None;
