@@ -13,6 +13,6 @@ The provided dockerfile should be used for the build process.
 Inside this directory run the following commands:
 ```shell
 docker build -t cross_compiling .
-docker run --rm -v $(pwd)/build:/home/cwe/artificial_samples/build cross_compiling sudo /home/cwe/.local/bin/scons
+docker run --rm -v $(pwd)/build:/home/cwe/artificial_samples/build cross_compiling sudo python3 -m SCons
 ```
 
