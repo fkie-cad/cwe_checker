@@ -316,7 +316,11 @@ impl<'a> Context<'a> {
         extern_symbol: &ExternSymbol,
     ) -> Option<State> {
         self.log_debug(
-            new_state.clear_stack_parameter(extern_symbol, &self.project.stack_pointer_register),
+            new_state.clear_stack_parameter(
+                extern_symbol,
+                &self.project.stack_pointer_register,
+                self.runtime_memory_image,
+            ),
             Some(&call.tid),
         );
         let calling_conv = extern_symbol.get_calling_convention(&self.project);

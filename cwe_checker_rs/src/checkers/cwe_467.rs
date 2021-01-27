@@ -55,7 +55,7 @@ fn compute_block_end_state(
     for def in block.term.defs.iter() {
         match &def.term {
             Def::Store { address, value } => {
-                let _ = state.handle_store(address, value);
+                let _ = state.handle_store(address, value, global_memory);
             }
             Def::Assign { var, value } => {
                 let _ = state.handle_register_assign(var, value);

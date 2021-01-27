@@ -45,7 +45,7 @@ fn state() {
     let stack_id = new_id("time0", "RSP");
     let stack_addr = Data::Pointer(PointerDomain::new(stack_id.clone(), bv(8)));
     state
-        .store_value(&stack_addr, &Data::Value(bv(42)))
+        .store_value(&stack_addr, &Data::Value(bv(42)), &global_memory)
         .unwrap();
     state.register.insert(register("RSP"), stack_addr.clone());
     assert_eq!(
@@ -85,7 +85,7 @@ fn state() {
     );
     state.caller_stack_ids.insert(new_id("time0", "caller"));
     state
-        .store_value(&stack_addr, &Data::Value(bv(15)))
+        .store_value(&stack_addr, &Data::Value(bv(15)), &global_memory)
         .unwrap();
     assert_eq!(
         state
@@ -107,7 +107,9 @@ fn state() {
     // Test replace_abstract_id
     let pointer = Data::Pointer(PointerDomain::new(stack_id.clone(), bv(-16)));
     state.register.insert(register("RSP"), pointer.clone());
-    state.store_value(&pointer, &Data::Value(bv(7))).unwrap();
+    state
+        .store_value(&pointer, &Data::Value(bv(7)), &global_memory)
+        .unwrap();
     assert_eq!(
         state
             .load_value(&Var(register("RSP")), ByteSize::new(8), &global_memory)
@@ -180,13 +182,25 @@ fn handle_store() {
     );
 
     state
-        .handle_store(&reg_add("RSP", 8), &Const(Bitvector::from_i64(1)))
+        .handle_store(
+            &reg_add("RSP", 8),
+            &Const(Bitvector::from_i64(1)),
+            &global_memory,
+        )
         .unwrap();
     state
-        .handle_store(&reg_sub("RSP", 8), &Const(Bitvector::from_i64(2)))
+        .handle_store(
+            &reg_sub("RSP", 8),
+            &Const(Bitvector::from_i64(2)),
+            &global_memory,
+        )
         .unwrap();
     state
-        .handle_store(&reg_add("RSP", -16), &Const(Bitvector::from_i64(3)))
+        .handle_store(
+            &reg_add("RSP", -16),
+            &Const(Bitvector::from_i64(3)),
+            &global_memory,
+        )
         .unwrap();
     state
         .handle_register_assign(&register("RSP"), &reg_sub("RSP", 4))
@@ -234,7 +248,11 @@ fn handle_caller_stack_stores() {
     state.caller_stack_ids.insert(new_id("caller2", "RSP"));
     // store something on the caller stack
     state
-        .handle_store(&reg_add("RSP", 8), &Const(Bitvector::from_i64(42)))
+        .handle_store(
+            &reg_add("RSP", 8),
+            &Const(Bitvector::from_i64(42)),
+            &global_memory,
+        )
         .unwrap();
     // check that it was saved in all caller objects and not on the callee stack object
     let pointer = PointerDomain::new(new_id("time0", "RSP"), bv(8)).into();
@@ -264,6 +282,7 @@ fn handle_caller_stack_stores() {
 #[test]
 fn clear_parameters_on_the_stack_on_extern_calls() {
     use Expression::*;
+    let global_memory = RuntimeMemoryImage::mock();
     let mut state = State::new(&register("RSP"), Tid::new("time0"));
     state.register.insert(
         register("RSP"),
@@ -271,7 +290,11 @@ fn clear_parameters_on_the_stack_on_extern_calls() {
     );
     // write something onto the stack
     state
-        .handle_store(&reg_add("RSP", 8), &Const(Bitvector::from_i64(42)))
+        .handle_store(
+            &reg_add("RSP", 8),
+            &Const(Bitvector::from_i64(42)),
+            &global_memory,
+        )
         .unwrap();
     // create an extern symbol which uses the value on the stack as a parameter
     let stack_param = Arg::Stack {
@@ -295,7 +318,7 @@ fn clear_parameters_on_the_stack_on_extern_calls() {
     );
     // clear stack parameter
     state
-        .clear_stack_parameter(&extern_symbol, &register("RSP"))
+        .clear_stack_parameter(&extern_symbol, &register("RSP"), &global_memory)
         .unwrap();
     // check the value after
     assert_eq!(
@@ -365,6 +388,7 @@ fn remove_and_restore_callee_saved_register() {
 
 #[test]
 fn reachable_ids_under_and_overapproximation() {
+    let global_memory = RuntimeMemoryImage::mock();
     let mut state = State::new(&register("RSP"), Tid::new("func_tid"));
     let stack_id = new_id("func_tid", "RSP");
     let heap_id = new_id("heap_obj", "RAX");
@@ -380,7 +404,9 @@ fn reachable_ids_under_and_overapproximation() {
         ByteSize::new(8),
     );
 
-    state.store_value(&stack_address, &heap_address).unwrap();
+    state
+        .store_value(&stack_address, &heap_address, &global_memory)
+        .unwrap();
     let reachable_ids: BTreeSet<AbstractIdentifier> = vec![stack_id.clone()].into_iter().collect();
     assert_eq!(
         state.add_directly_reachable_ids_to_id_set(reachable_ids.clone()),
@@ -398,6 +424,7 @@ fn reachable_ids_under_and_overapproximation() {
     let _ = state.store_value(
         &PointerDomain::new(stack_id.clone(), BitvectorDomain::new_top(ByteSize::new(8))).into(),
         &Data::Value(Bitvector::from_i64(42).into()),
+        &global_memory,
     );
     assert_eq!(
         state.add_directly_reachable_ids_to_id_set(reachable_ids.clone()),
@@ -409,4 +436,55 @@ fn reachable_ids_under_and_overapproximation() {
             .into_iter()
             .collect()
     );
+}
+
+#[test]
+fn global_mem_access() {
+    let global_memory = RuntimeMemoryImage::mock();
+    let mut state = State::new(&register("RSP"), Tid::new("func_tid"));
+
+    // global read-only address
+    let address_expr = Expression::Const(Bitvector::from_u64(0x1000));
+    assert_eq!(
+        state
+            .load_value(&address_expr, ByteSize::new(4), &global_memory)
+            .unwrap(),
+        DataDomain::Value(Bitvector::from_u32(0xb3b2b1b0).into()) // note that we read in little-endian byte order
+    );
+    assert!(state
+        .write_to_address(
+            &address_expr,
+            &DataDomain::Top(ByteSize::new(4)),
+            &global_memory
+        )
+        .is_err());
+
+    // global writeable address
+    let address_expr = Expression::Const(Bitvector::from_u64(0x2000));
+    assert_eq!(
+        state
+            .load_value(&address_expr, ByteSize::new(4), &global_memory)
+            .unwrap(),
+        DataDomain::Top(ByteSize::new(4))
+    );
+    assert!(state
+        .write_to_address(
+            &address_expr,
+            &DataDomain::Top(ByteSize::new(4)),
+            &global_memory
+        )
+        .is_ok());
+
+    // invalid global address
+    let address_expr = Expression::Const(Bitvector::from_u64(0x3456));
+    assert!(state
+        .load_value(&address_expr, ByteSize::new(4), &global_memory)
+        .is_err());
+    assert!(state
+        .write_to_address(
+            &address_expr,
+            &DataDomain::Top(ByteSize::new(4)),
+            &global_memory
+        )
+        .is_err());
 }

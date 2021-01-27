@@ -57,7 +57,12 @@ impl State {
     }
 
     /// Store `value` at the given `address`.
-    pub fn store_value(&mut self, address: &Data, value: &Data) -> Result<(), Error> {
+    pub fn store_value(
+        &mut self,
+        address: &Data,
+        value: &Data,
+        global_memory: &RuntimeMemoryImage,
+    ) -> Result<(), Error> {
         // If the address is a unique caller stack address, write to *all* caller stacks.
         if let Some(offset) = self.unwrap_offset_if_caller_stack_address(address) {
             let caller_addresses: Vec<_> = self
@@ -69,38 +74,60 @@ impl State {
                 .collect();
             let mut result = Ok(());
             for address in caller_addresses {
-                if let Err(err) = self.store_value(&address, &value.clone()) {
+                if let Err(err) = self.store_value(&address, &value.clone(), global_memory) {
                     result = Err(err);
                 }
             }
             // Note that this only returns the last error that was detected.
             result
-        } else if let Data::Pointer(pointer) = self.adjust_pointer_for_read(address) {
-            self.memory.set_value(pointer, value.clone())?;
-            Ok(())
         } else {
-            // TODO: Implement recognition of stores to global memory.
-            Err(anyhow!("Memory write to non-pointer data"))
+            match self.adjust_pointer_for_read(address) {
+                Data::Pointer(pointer) => {
+                    self.memory.set_value(pointer, value.clone())?;
+                    Ok(())
+                }
+                Data::Value(BitvectorDomain::Value(address_to_global_data)) => {
+                    match global_memory.is_address_writeable(&address_to_global_data) {
+                        Ok(true) => Ok(()),
+                        Ok(false) => Err(anyhow!("Write to read-only global data")),
+                        Err(err) => Err(err),
+                    }
+                }
+                Data::Value(BitvectorDomain::Top(_)) | Data::Top(_) => Ok(()),
+            }
         }
     }
 
     /// Write a value to the address one gets when evaluating the address expression.
-    pub fn write_to_address(&mut self, address: &Expression, value: &Data) -> Result<(), Error> {
+    pub fn write_to_address(
+        &mut self,
+        address: &Expression,
+        value: &Data,
+        global_memory: &RuntimeMemoryImage,
+    ) -> Result<(), Error> {
         match self.eval(address) {
-            Ok(address_data) => self.store_value(&address_data, value),
+            Ok(address_data) => self.store_value(&address_data, value, global_memory),
             Err(err) => Err(err),
         }
     }
 
-    /// Evaluate the given store instruction on the given state and return the resulting state.
+    /// Evaluate the store instruction, given by its address and value expressions,
+    /// and modify the state accordingly.
     ///
-    /// The function panics if given anything else than a store expression.
-    pub fn handle_store(&mut self, address: &Expression, value: &Expression) -> Result<(), Error> {
+    /// If an error occurs, the state is still modified before the error is returned.
+    /// E.g. if the value expression cannot be evaluated,
+    /// the value at the target address is overwritten with a `Top` value.
+    pub fn handle_store(
+        &mut self,
+        address: &Expression,
+        value: &Expression,
+        global_memory: &RuntimeMemoryImage,
+    ) -> Result<(), Error> {
         match self.eval(value) {
-            Ok(data) => self.write_to_address(address, &data),
+            Ok(data) => self.write_to_address(address, &data, global_memory),
             Err(err) => {
                 // we still need to write to the target location before reporting the error
-                self.write_to_address(address, &Data::new_top(value.bytesize()))?;
+                self.write_to_address(address, &Data::new_top(value.bytesize()), global_memory)?;
                 Err(err)
             }
         }
@@ -115,13 +142,16 @@ impl State {
     ) -> Result<Data, Error> {
         let address = self.adjust_pointer_for_read(&self.eval(address)?);
         match address {
-            DataDomain::Value(BitvectorDomain::Value(address_bitvector)) => {
-                Ok(global_memory.read(&address_bitvector, size)?.into())
+            Data::Value(BitvectorDomain::Value(address_bitvector)) => {
+                let loaded_value = global_memory.read(&address_bitvector, size)?;
+                if loaded_value.is_top() {
+                    Ok(Data::Top(loaded_value.bytesize()))
+                } else {
+                    Ok(Data::Value(loaded_value))
+                }
             }
-            DataDomain::Value(BitvectorDomain::Top(_)) | DataDomain::Top(_) => {
-                Ok(DataDomain::new_top(size))
-            }
-            DataDomain::Pointer(_) => Ok(self.memory.get_value(&address, size)?),
+            Data::Value(BitvectorDomain::Top(_)) | Data::Top(_) => Ok(Data::new_top(size)),
+            Data::Pointer(_) => Ok(self.memory.get_value(&address, size)?),
         }
     }
 
