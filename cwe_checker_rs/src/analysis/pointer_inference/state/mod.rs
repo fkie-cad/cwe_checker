@@ -305,14 +305,13 @@ impl State {
         stack_register: &Variable,
     ) {
         for (register, value) in caller_state.register.iter() {
-            if register != stack_register {
-                if cconv
+            if register != stack_register
+                && cconv
                     .callee_saved_register
                     .iter()
                     .any(|reg_name| *reg_name == register.name)
-                {
-                    self.set_register(register, value.clone());
-                }
+            {
+                self.set_register(register, value.clone());
             }
         }
     }
