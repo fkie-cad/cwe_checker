@@ -171,6 +171,22 @@ fn context_problem_implementation() {
             Data::Value(bv(33).into()),
         )
         .unwrap();
+    // Emulate  removing the return pointer from the stack for x64
+    let stack_pointer_update_def = Term {
+        tid: Tid::new("stack_pointer_update_def"),
+        term: Def::Assign {
+            var: register("RSP"),
+            value: BinOp {
+                op: BinOpType::IntAdd,
+                lhs: Box::new(Var(register("RSP"))),
+                rhs: Box::new(Const(Bitvector::from_i64(8))),
+            },
+        },
+    };
+    callee_state = context
+        .update_def(&callee_state, &stack_pointer_update_def)
+        .unwrap();
+    // Test update_return
     let return_state = context
         .update_return(
             Some(&callee_state),
@@ -184,7 +200,10 @@ fn context_problem_implementation() {
     assert_eq!(return_state.memory, state.memory);
     assert_eq!(
         return_state.get_register(&register("RSP")).unwrap(),
-        state.get_register(&register("RSP")).unwrap()
+        state
+            .get_register(&register("RSP"))
+            .unwrap()
+            .bin_op(BinOpType::IntAdd, &Bitvector::from_i64(8).into())
     );
 
     state.set_register(&register("callee_saved_reg"), Data::Value(bv(13)));

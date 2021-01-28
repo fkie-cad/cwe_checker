@@ -291,24 +291,28 @@ impl State {
         self.memory.append_unknown_objects(&caller_state.memory);
     }
 
-    /// Restore the content of callee-saved registers from the caller state.
+    /// Restore the content of callee-saved registers from the caller state
+    /// with the exception of the stack register.
     ///
     /// This function does not check what the callee state currently contains in these registers.
     /// If the callee does not adhere to the given calling convention, this may introduce analysis errors!
-    /// It will also mask cases,
+    /// It will also mask cases
     /// where a callee-saved register was incorrectly modified (e.g. because of a bug in the callee).
     pub fn restore_callee_saved_register(
         &mut self,
         caller_state: &State,
         cconv: &CallingConvention,
+        stack_register: &Variable,
     ) {
         for (register, value) in caller_state.register.iter() {
-            if cconv
-                .callee_saved_register
-                .iter()
-                .any(|reg_name| *reg_name == register.name)
-            {
-                self.set_register(register, value.clone());
+            if register != stack_register {
+                if cconv
+                    .callee_saved_register
+                    .iter()
+                    .any(|reg_name| *reg_name == register.name)
+                {
+                    self.set_register(register, value.clone());
+                }
             }
         }
     }

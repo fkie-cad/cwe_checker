@@ -378,7 +378,7 @@ fn remove_and_restore_callee_saved_register() {
 
     let other_value: Data = Bitvector::from_u64(13).into();
     callee_state.set_register(&register("RAX"), other_value.clone());
-    callee_state.restore_callee_saved_register(&state, &cconv);
+    callee_state.restore_callee_saved_register(&state, &cconv, &register("RSP"));
     assert_eq!(callee_state.get_register(&register("RBP")).unwrap(), value);
     assert_eq!(
         callee_state.get_register(&register("RAX")).unwrap(),
