@@ -1,4 +1,4 @@
-use super::{AbstractDomain, HasByteSize, HasTop, RegisterDomain};
+use super::{AbstractDomain, SizedDomain, HasTop, RegisterDomain};
 use crate::bil::BitSize;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
@@ -35,7 +35,7 @@ impl HasTop for BitvectorDomain {
     }
 }
 
-impl HasByteSize for BitvectorDomain {
+impl SizedDomain for BitvectorDomain {
     /// Return the bytesize of `self`.
     fn bytesize(&self) -> ByteSize {
         use BitvectorDomain::*;

@@ -1,4 +1,4 @@
-use super::{AbstractDomain, HasByteSize, HasTop};
+use super::{AbstractDomain, SizedDomain, HasTop};
 use crate::bil::Bitvector;
 use crate::intermediate_representation::ByteSize;
 use apint::{Int, Width};
@@ -22,17 +22,17 @@ use std::sync::Arc;
 /// To allow cheap cloning of a `MemRegion`, the actual data is wrapped inside an `Arc`.
 #[derive(Serialize, Deserialize, Debug, Hash, Clone, PartialEq, Eq, Deref)]
 #[deref(forward)]
-pub struct MemRegion<T: AbstractDomain + HasByteSize + HasTop + std::fmt::Debug>(
+pub struct MemRegion<T: AbstractDomain + SizedDomain + HasTop + std::fmt::Debug>(
     Arc<MemRegionData<T>>,
 );
 
-impl<T: AbstractDomain + HasByteSize + HasTop + std::fmt::Debug> DerefMut for MemRegion<T> {
+impl<T: AbstractDomain + SizedDomain + HasTop + std::fmt::Debug> DerefMut for MemRegion<T> {
     fn deref_mut(&mut self) -> &mut MemRegionData<T> {
         Arc::make_mut(&mut self.0)
     }
 }
 
-impl<T: AbstractDomain + HasByteSize + HasTop + std::fmt::Debug> AbstractDomain for MemRegion<T> {
+impl<T: AbstractDomain + SizedDomain + HasTop + std::fmt::Debug> AbstractDomain for MemRegion<T> {
     /// Short-circuting the `MemRegionData::merge` function if `self==other`,
     /// to prevent unneccessary cloning.
     fn merge(&self, other: &Self) -> Self {
@@ -49,14 +49,14 @@ impl<T: AbstractDomain + HasByteSize + HasTop + std::fmt::Debug> AbstractDomain 
     }
 }
 
-impl<T: AbstractDomain + HasByteSize + HasTop + std::fmt::Debug> HasTop for MemRegion<T> {
+impl<T: AbstractDomain + SizedDomain + HasTop + std::fmt::Debug> HasTop for MemRegion<T> {
     /// Return a new, empty memory region with the same address bytesize as `self`, representing the *Top* element of the abstract domain.
     fn top(&self) -> Self {
         Self::new(self.get_address_bytesize())
     }
 }
 
-impl<T: AbstractDomain + HasByteSize + HasTop + std::fmt::Debug> MemRegion<T> {
+impl<T: AbstractDomain + SizedDomain + HasTop + std::fmt::Debug> MemRegion<T> {
     // Create a new, empty memory region.
     pub fn new(address_bytesize: ByteSize) -> Self {
         MemRegion(Arc::new(MemRegionData::new(address_bytesize)))
@@ -65,12 +65,12 @@ impl<T: AbstractDomain + HasByteSize + HasTop + std::fmt::Debug> MemRegion<T> {
 
 /// The internal data of a memory region. See the description of `MemRegion` for more.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
-pub struct MemRegionData<T: AbstractDomain + HasByteSize + HasTop + std::fmt::Debug> {
+pub struct MemRegionData<T: AbstractDomain + SizedDomain + HasTop + std::fmt::Debug> {
     address_bytesize: ByteSize,
     values: BTreeMap<i64, T>,
 }
 
-impl<T: AbstractDomain + HasByteSize + HasTop + std::fmt::Debug> MemRegionData<T> {
+impl<T: AbstractDomain + SizedDomain + HasTop + std::fmt::Debug> MemRegionData<T> {
     /// create a new, empty MemRegion
     pub fn new(address_bytesize: ByteSize) -> MemRegionData<T> {
         MemRegionData {
@@ -254,7 +254,7 @@ mod tests {
         }
     }
 
-    impl HasByteSize for MockDomain {
+    impl SizedDomain for MockDomain {
         fn bytesize(&self) -> ByteSize {
             self.1
         }

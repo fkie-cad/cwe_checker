@@ -1,5 +1,5 @@
 use super::{
-    AbstractDomain, AbstractIdentifier, HasByteSize, HasTop, PointerDomain, RegisterDomain,
+    AbstractDomain, AbstractIdentifier, SizedDomain, HasTop, PointerDomain, RegisterDomain,
 };
 use crate::intermediate_representation::*;
 use crate::prelude::*;
@@ -62,7 +62,7 @@ impl<T: RegisterDomain> DataDomain<T> {
     }
 }
 
-impl<T: RegisterDomain> HasByteSize for DataDomain<T> {
+impl<T: RegisterDomain> SizedDomain for DataDomain<T> {
     // Return the bitsize of `self`.
     fn bytesize(&self) -> ByteSize {
         use DataDomain::*;

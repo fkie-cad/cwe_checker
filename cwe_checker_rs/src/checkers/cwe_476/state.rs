@@ -1,5 +1,5 @@
 use crate::abstract_domain::{
-    AbstractDomain, AbstractIdentifier, BitvectorDomain, HasByteSize, MemRegion, RegisterDomain,
+    AbstractDomain, AbstractIdentifier, BitvectorDomain, SizedDomain, MemRegion, RegisterDomain,
 };
 use crate::analysis::pointer_inference::Data;
 use crate::analysis::pointer_inference::State as PointerInferenceState;
