@@ -1,4 +1,4 @@
-use super::{AbstractDomain, SizedDomain, HasTop};
+use super::{AbstractDomain, HasTop, SizedDomain};
 use crate::bil::Bitvector;
 use crate::intermediate_representation::ByteSize;
 use apint::{Int, Width};

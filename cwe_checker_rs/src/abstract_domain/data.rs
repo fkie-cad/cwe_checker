@@ -1,5 +1,5 @@
 use super::{
-    AbstractDomain, AbstractIdentifier, SizedDomain, HasTop, PointerDomain, RegisterDomain,
+    AbstractDomain, AbstractIdentifier, HasTop, PointerDomain, RegisterDomain, SizedDomain,
 };
 use crate::intermediate_representation::*;
 use crate::prelude::*;

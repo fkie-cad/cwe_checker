@@ -1,4 +1,4 @@
-use super::{AbstractDomain, AbstractIdentifier, SizedDomain, RegisterDomain};
+use super::{AbstractDomain, AbstractIdentifier, RegisterDomain, SizedDomain};
 use crate::intermediate_representation::{BinOpType, ByteSize};
 use crate::prelude::*;
 use std::collections::BTreeMap;

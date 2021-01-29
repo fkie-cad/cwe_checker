@@ -1,4 +1,4 @@
-use crate::abstract_domain::{AbstractDomain, SizedDomain, HasTop, RegisterDomain};
+use crate::abstract_domain::{AbstractDomain, HasTop, RegisterDomain, SizedDomain};
 use crate::intermediate_representation::*;
 use crate::prelude::*;
 use std::fmt::Display;

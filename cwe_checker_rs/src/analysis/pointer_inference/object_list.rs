@@ -18,7 +18,7 @@ pub struct AbstractObjectList {
     /// Each abstract object comes with an offset given as a [`BitvectorDomain`].
     /// This offset determines where the zero offset corresponding to the abstract identifier inside the object is.
     /// Note that this offset may be a `Top` element
-    /// if the exact offset corresponding to the identifier is unknown. 
+    /// if the exact offset corresponding to the identifier is unknown.
     objects: BTreeMap<AbstractIdentifier, (AbstractObject, BitvectorDomain)>,
 }
 
