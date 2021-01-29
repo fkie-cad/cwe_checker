@@ -233,7 +233,7 @@ impl LogThread {
     ///
     /// The parameter is the function containing the actual log collection logic.
     /// I.e. the function should receive messages through the given receiver until the channel disconnects
-    /// or until it receives a [`LogThread::Terminate`] message.
+    /// or until it receives a [`LogThreadMsg::Terminate`] message.
     /// After that it should return the logs collected up to that point.
     pub fn spawn<F>(collector_func: F) -> LogThread
     where
