@@ -33,11 +33,7 @@ fn register(name: &str) -> Variable {
 }
 
 fn reg_add_term(name: &str, value: i64, tid_name: &str) -> Term<Def> {
-    let add_expr = Expression::BinOp {
-        op: BinOpType::IntAdd,
-        lhs: Box::new(Expression::Var(register(name))),
-        rhs: Box::new(Expression::Const(Bitvector::from_i64(value))),
-    };
+    let add_expr = Expression::Var(register(name)).plus_const(value);
     Term {
         tid: Tid::new(format!("{}", tid_name)),
         term: Def::Assign {
@@ -118,11 +114,7 @@ fn context_problem_implementation() {
         tid: Tid::new("def"),
         term: Def::Assign {
             var: register("RSP"),
-            value: BinOp {
-                op: BinOpType::IntAdd,
-                lhs: Box::new(Var(register("RSP"))),
-                rhs: Box::new(Const(Bitvector::from_i64(-16))),
-            },
+            value: Var(register("RSP")).plus_const(-16),
         },
     };
     let store_term = Term {

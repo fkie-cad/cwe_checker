@@ -99,17 +99,8 @@ impl State {
                 }
                 Arg::Stack { offset, size } => {
                     if let Some(pi_state) = pi_state {
-                        let address_exp = Expression::BinOp {
-                            op: BinOpType::IntAdd,
-                            lhs: Box::new(Expression::Var(stack_pointer_register.clone())),
-                            rhs: Box::new(Expression::Const(
-                                Bitvector::from_i64(*offset)
-                                    .into_truncate(apint::BitWidth::from(
-                                        stack_pointer_register.size,
-                                    ))
-                                    .unwrap(),
-                            )),
-                        };
+                        let address_exp =
+                            Expression::Var(stack_pointer_register.clone()).plus_const(*offset);
                         if let Ok(address) = pi_state.eval(&address_exp) {
                             state.save_taint_to_memory(&address, Taint::Tainted(*size));
                         }
@@ -494,11 +485,7 @@ mod tests {
     fn eval_expression() {
         let (state, _pi_state) = State::mock_with_pi_state();
 
-        let expr = Expression::BinOp {
-            lhs: Box::new(Expression::Var(register("RAX"))),
-            op: BinOpType::IntAdd,
-            rhs: Box::new(Expression::Var(register("RBX"))),
-        };
+        let expr = Expression::Var(register("RAX")).plus(Expression::Var(register("RBX")));
         assert!(state.eval(&expr).is_tainted());
 
         let expr = Expression::UnOp {

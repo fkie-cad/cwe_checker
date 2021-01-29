@@ -250,15 +250,7 @@ impl State {
         match parameter {
             Arg::Register(var) => self.eval(&Expression::Var(var.clone())),
             Arg::Stack { offset, size } => self.load_value(
-                &Expression::BinOp {
-                    op: BinOpType::IntAdd,
-                    lhs: Box::new(Expression::Var(stack_pointer.clone())),
-                    rhs: Box::new(Expression::Const(
-                        Bitvector::from_i64(*offset)
-                            .into_truncate(apint::BitWidth::from(stack_pointer.size))
-                            .unwrap(),
-                    )),
-                },
+                &Expression::Var(stack_pointer.clone()).plus_const(*offset),
                 *size,
                 global_memory,
             ),

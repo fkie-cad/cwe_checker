@@ -98,15 +98,8 @@ impl State {
                 Arg::Register(_) => (),
                 Arg::Stack { offset, size } => {
                     let data_top = Data::new_top(*size);
-                    let location_expression = Expression::BinOp {
-                        lhs: Box::new(Expression::Var(stack_pointer_register.clone())),
-                        op: BinOpType::IntAdd,
-                        rhs: Box::new(Expression::Const(
-                            Bitvector::from_i64(*offset)
-                                .into_truncate(apint::BitWidth::from(stack_pointer_register.size))
-                                .unwrap(),
-                        )),
-                    };
+                    let location_expression =
+                        Expression::Var(stack_pointer_register.clone()).plus_const(*offset);
                     if let Err(err) =
                         self.write_to_address(&location_expression, &data_top, global_memory)
                     {
