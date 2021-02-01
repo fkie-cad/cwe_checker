@@ -1,4 +1,4 @@
-use super::{AbstractDomain, HasByteSize, HasTop, RegisterDomain};
+use super::{AbstractDomain, HasTop, RegisterDomain, SizedDomain};
 use crate::bil::BitSize;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
@@ -35,7 +35,7 @@ impl HasTop for BitvectorDomain {
     }
 }
 
-impl HasByteSize for BitvectorDomain {
+impl SizedDomain for BitvectorDomain {
     /// Return the bytesize of `self`.
     fn bytesize(&self) -> ByteSize {
         use BitvectorDomain::*;
@@ -121,13 +121,34 @@ impl RegisterDomain for BitvectorDomain {
                         Bitvector::from_u8(0).into()
                     }
                 }
-                IntMult => BitvectorDomain::Value(lhs_bitvec * rhs_bitvec),
-                IntDiv => BitvectorDomain::Value(
-                    lhs_bitvec.clone().into_checked_udiv(rhs_bitvec).unwrap(),
-                ),
-                IntSDiv => BitvectorDomain::Value(
-                    lhs_bitvec.clone().into_checked_sdiv(rhs_bitvec).unwrap(),
-                ),
+                IntMult => {
+                    // FIXME: Multiplication for bitvectors larger than 8 bytes is not yet implemented in the `apint` crate (version 0.2).
+                    if u64::from(self.bytesize()) > 8 {
+                        BitvectorDomain::Top(self.bytesize())
+                    } else {
+                        BitvectorDomain::Value(lhs_bitvec * rhs_bitvec)
+                    }
+                }
+                IntDiv => {
+                    // FIXME: Division for bitvectors larger than 8 bytes is not yet implemented in the `apint` crate (version 0.2).
+                    if u64::from(self.bytesize()) > 8 {
+                        BitvectorDomain::Top(self.bytesize())
+                    } else {
+                        BitvectorDomain::Value(
+                            lhs_bitvec.clone().into_checked_udiv(rhs_bitvec).unwrap(),
+                        )
+                    }
+                }
+                IntSDiv => {
+                    // FIXME: Division for bitvectors larger than 8 bytes is not yet implemented in the `apint` crate (version 0.2).
+                    if u64::from(self.bytesize()) > 8 {
+                        BitvectorDomain::Top(self.bytesize())
+                    } else {
+                        BitvectorDomain::Value(
+                            lhs_bitvec.clone().into_checked_sdiv(rhs_bitvec).unwrap(),
+                        )
+                    }
+                }
                 IntRem => BitvectorDomain::Value(
                     lhs_bitvec.clone().into_checked_urem(rhs_bitvec).unwrap(),
                 ),

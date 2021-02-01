@@ -8,7 +8,6 @@ use crate::analysis::interprocedural_fixpoint_generic::NodeValue;
 use crate::analysis::pointer_inference::PointerInference as PointerInferenceComputation;
 use crate::analysis::pointer_inference::State as PointerInferenceState;
 use crate::intermediate_representation::*;
-use crate::prelude::*;
 use crate::utils::binary::RuntimeMemoryImage;
 use crate::utils::log::CweWarning;
 use petgraph::graph::NodeIndex;
@@ -205,19 +204,10 @@ impl<'a> Context<'a> {
                         }
                     }
                     Arg::Stack { offset, size } => {
-                        if let Ok(stack_address) = pi_state.eval(&Expression::BinOp {
-                            op: BinOpType::IntAdd,
-                            lhs: Box::new(Expression::Var(
-                                self.project.stack_pointer_register.clone(),
-                            )),
-                            rhs: Box::new(Expression::Const(
-                                Bitvector::from_i64(*offset)
-                                    .into_truncate(apint::BitWidth::from(
-                                        self.project.stack_pointer_register.size,
-                                    ))
-                                    .unwrap(),
-                            )),
-                        }) {
+                        if let Ok(stack_address) = pi_state.eval(
+                            &Expression::Var(self.project.stack_pointer_register.clone())
+                                .plus_const(*offset),
+                        ) {
                             if state
                                 .load_taint_from_memory(&stack_address, *size)
                                 .is_tainted()

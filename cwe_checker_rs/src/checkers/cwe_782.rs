@@ -49,8 +49,7 @@ pub fn generate_cwe_warning(calls: &[(&str, &Tid, &str)]) -> Vec<CweWarning> {
     for (sub_name, jmp_tid, _) in calls.iter() {
         let address: &String = &jmp_tid.address;
         let description = format!(
-            "(Exposed IOCTL with Insufficient Access Control) Program uses ioctl at {} ({}). 
-        Be sure to double check the program and the corresponding driver.",
+            "(Exposed IOCTL with Insufficient Access Control) Program uses ioctl at {} ({}). Be sure to double check the program and the corresponding driver.",
             sub_name, address
         );
         let cwe_warning = CweWarning::new(

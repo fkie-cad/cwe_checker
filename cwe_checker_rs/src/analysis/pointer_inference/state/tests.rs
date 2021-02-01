@@ -21,11 +21,7 @@ fn register(name: &str) -> Variable {
 }
 
 fn reg_add(name: &str, value: i64) -> Expression {
-    Expression::BinOp {
-        op: BinOpType::IntAdd,
-        lhs: Box::new(Expression::Var(register(name))),
-        rhs: Box::new(Expression::Const(Bitvector::from_i64(value))),
-    }
+    Expression::Var(register(name)).plus_const(value)
 }
 
 fn reg_sub(name: &str, value: i64) -> Expression {

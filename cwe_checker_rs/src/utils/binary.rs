@@ -1,8 +1,8 @@
 //! Utility structs and functions which directly parse the binary file.
 
 use crate::abstract_domain::BitvectorDomain;
-use crate::abstract_domain::HasByteSize;
 use crate::abstract_domain::RegisterDomain;
+use crate::abstract_domain::SizedDomain;
 use crate::intermediate_representation::BinOpType;
 use crate::prelude::*;
 use goblin::elf;
