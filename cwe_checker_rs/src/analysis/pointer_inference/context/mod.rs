@@ -87,12 +87,13 @@ impl<'a> Context<'a> {
     fn detect_stack_pointer_information_loss_on_return(
         &self,
         state_before_return: &State,
-        return_term: &Term<Jmp>,
-    ) {
+    ) -> Result<(), Error> {
         let expected_stack_pointer_offset = match self.project.cpu_architecture.as_str() {
-            "x86" | "x86_64" => Bitvector::from_u64(u64::from(self.project.get_pointer_bytesize()))
-                .into_truncate(apint::BitWidth::from(self.project.get_pointer_bytesize()))
-                .unwrap(),
+            "x86" | "x86_32" | "x86_64" => {
+                Bitvector::from_u64(u64::from(self.project.get_pointer_bytesize()))
+                    .into_truncate(apint::BitWidth::from(self.project.get_pointer_bytesize()))
+                    .unwrap()
+            }
             _ => Bitvector::zero(apint::BitWidth::from(self.project.get_pointer_bytesize())),
         };
         match state_before_return.get_register(&self.project.stack_pointer_register) {
@@ -102,26 +103,21 @@ impl<'a> Context<'a> {
                     if *id != state_before_return.stack_id
                         || *offset != expected_stack_pointer_offset.into()
                     {
-                        self.log_debug(
-                            Err(anyhow!(
-                                "Unexpected stack register value at return instruction"
-                            )),
-                            Some(&return_term.tid),
-                        );
+                        Err(anyhow!("Unexpected stack register value on return"))
+                    } else {
+                        Ok(())
                     }
+                } else {
+                    Err(anyhow!(
+                        "Unexpected number of stack register targets on return"
+                    ))
                 }
             }
-            Ok(Data::Top(_)) => self.log_debug(
-                Err(anyhow!(
-                    "Stack register value lost during function execution"
-                )),
-                Some(&return_term.tid),
-            ),
-            Ok(Data::Value(_)) => self.log_debug(
-                Err(anyhow!("Unexpected stack register value on return")),
-                Some(&return_term.tid),
-            ),
-            Err(err) => self.log_debug(Err(err), Some(&return_term.tid)),
+            Ok(Data::Top(_)) => Err(anyhow!(
+                "Stack register value lost during function execution"
+            )),
+            Ok(Data::Value(_)) => Err(anyhow!("Unexpected stack register value on return")),
+            Err(err) => Err(err),
         }
     }
 
