@@ -1,4 +1,4 @@
-use super::{AbstractDomain, AbstractIdentifier, HasByteSize, RegisterDomain};
+use super::{AbstractDomain, AbstractIdentifier, RegisterDomain, SizedDomain};
 use crate::intermediate_representation::{BinOpType, ByteSize};
 use crate::prelude::*;
 use std::collections::BTreeMap;
@@ -38,7 +38,7 @@ impl<T: RegisterDomain> AbstractDomain for PointerDomain<T> {
     }
 }
 
-impl<T: RegisterDomain> HasByteSize for PointerDomain<T> {
+impl<T: RegisterDomain> SizedDomain for PointerDomain<T> {
     /// Return the bitsize of the pointer.
     /// Should always equal the pointer size of the CPU architecture.
     fn bytesize(&self) -> ByteSize {

@@ -34,7 +34,7 @@ pub trait AbstractDomain: Sized + Eq + Clone {
 /// For abstract domains, the bytesize is a parameter of the domain itself,
 /// i.e. you cannot merge values of different bytesizes,
 /// since they lie in different posets (one for each bytesize).
-pub trait HasByteSize {
+pub trait SizedDomain {
     /// Return the size of the represented value in bytes.
     fn bytesize(&self) -> ByteSize;
 
@@ -58,7 +58,7 @@ pub trait HasTop {
 /// The domain implements all general operations used to manipulate register values.
 /// The domain is parametrized by its bytesize (which represents the size of the register).
 /// It has a *Top* element, which is only characterized by its bytesize.
-pub trait RegisterDomain: AbstractDomain + HasByteSize + HasTop {
+pub trait RegisterDomain: AbstractDomain + SizedDomain + HasTop {
     /// Compute the (abstract) result of a binary operation
     fn bin_op(&self, op: BinOpType, rhs: &Self) -> Self;
 

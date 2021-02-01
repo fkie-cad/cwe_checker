@@ -4,6 +4,8 @@ use super::Variable;
 use super::{ByteSize, Def};
 use crate::{pcode::RegisterProperties, prelude::*};
 
+mod builder;
+
 /// An expression is a calculation rule
 /// on how to compute a certain value given some variables (register values) as input.
 ///

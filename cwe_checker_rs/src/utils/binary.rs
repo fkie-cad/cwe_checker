@@ -1,8 +1,8 @@
 //! Utility structs and functions which directly parse the binary file.
 
 use crate::abstract_domain::BitvectorDomain;
-use crate::abstract_domain::HasByteSize;
 use crate::abstract_domain::RegisterDomain;
+use crate::abstract_domain::SizedDomain;
 use crate::intermediate_representation::BinOpType;
 use crate::prelude::*;
 use goblin::elf;
@@ -192,6 +192,21 @@ impl RuntimeMemoryImage {
         }
         Err(anyhow!("Pointer target not in global memory."))
     }
+
+    /// Check whether the given address points to a writeable segment in the runtime memory image.
+    ///
+    /// Returns an error if the address does not point to global memory.
+    pub fn is_address_writeable(&self, address: &Bitvector) -> Result<bool, Error> {
+        let address = address.try_to_u64().unwrap();
+        for segment in self.memory_segments.iter() {
+            if address >= segment.base_address
+                && address < segment.base_address + segment.bytes.len() as u64
+            {
+                return Ok(segment.write_flag);
+            }
+        }
+        Err(anyhow!("Address not contained in runtime memory image"))
+    }
 }
 
 #[cfg(test)]
@@ -202,13 +217,22 @@ pub mod tests {
         /// Create a mock runtime memory image for unit tests.
         pub fn mock() -> RuntimeMemoryImage {
             RuntimeMemoryImage {
-                memory_segments: vec![MemorySegment {
-                    bytes: [0xb0u8, 0xb1, 0xb2, 0xb3, 0xb4].to_vec(),
-                    base_address: 0x1000,
-                    read_flag: true,
-                    write_flag: false,
-                    execute_flag: false,
-                }],
+                memory_segments: vec![
+                    MemorySegment {
+                        bytes: [0xb0u8, 0xb1, 0xb2, 0xb3, 0xb4].to_vec(),
+                        base_address: 0x1000,
+                        read_flag: true,
+                        write_flag: false,
+                        execute_flag: false,
+                    },
+                    MemorySegment {
+                        bytes: [0u8; 8].to_vec(),
+                        base_address: 0x2000,
+                        read_flag: true,
+                        write_flag: true,
+                        execute_flag: false,
+                    },
+                ],
                 is_little_endian: true,
             }
         }

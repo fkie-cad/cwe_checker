@@ -423,6 +423,7 @@ mod tests {
 
         // Only one instance is found.
         // Other instance cannot be found, since the constant is not defined in the basic block of the call instruction.
+        mark_skipped(&mut tests, "aarch64", "clang");
         mark_skipped(&mut tests, "arm", "clang");
         mark_skipped(&mut tests, "mips", "clang");
         mark_skipped(&mut tests, "mipsel", "clang");
@@ -462,10 +463,10 @@ mod tests {
         let mut tests = all_test_cases("cwe_476", "CWE476");
 
         // TODO: Check reason for failure!
-        mark_skipped(&mut tests, "mips64", "gcc");
-        mark_skipped(&mut tests, "mips64el", "gcc");
-        mark_skipped(&mut tests, "mips", "gcc");
-        mark_skipped(&mut tests, "mipsel", "gcc");
+        mark_architecture_skipped(&mut tests, "mips64");
+        mark_architecture_skipped(&mut tests, "mips64el");
+        mark_architecture_skipped(&mut tests, "mips");
+        mark_architecture_skipped(&mut tests, "mipsel");
 
         mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
         mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.

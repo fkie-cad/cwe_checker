@@ -24,6 +24,7 @@ use crate::abstract_domain::{BitvectorDomain, DataDomain};
 use crate::analysis::pointer_inference::State;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
+use crate::utils::binary::RuntimeMemoryImage;
 use crate::utils::log::{CweWarning, LogMessage};
 use crate::utils::symbol_utils::{get_callsites, get_symbol_map};
 use crate::CweModule;
@@ -43,20 +44,24 @@ pub struct Config {
 
 /// Compute the program state at the end of the given basic block
 /// assuming nothing is known about the state at the start of the block.
-fn compute_block_end_state(project: &Project, block: &Term<Blk>) -> State {
+fn compute_block_end_state(
+    project: &Project,
+    global_memory: &RuntimeMemoryImage,
+    block: &Term<Blk>,
+) -> State {
     let stack_register = &project.stack_pointer_register;
     let mut state = State::new(stack_register, block.tid.clone());
 
     for def in block.term.defs.iter() {
         match &def.term {
             Def::Store { address, value } => {
-                let _ = state.handle_store(address, value);
+                let _ = state.handle_store(address, value, global_memory);
             }
             Def::Assign { var, value } => {
                 let _ = state.handle_register_assign(var, value);
             }
             Def::Load { var, address } => {
-                let _ = state.handle_load(var, address);
+                let _ = state.handle_load(var, address, global_memory);
             }
         }
     }
@@ -66,14 +71,15 @@ fn compute_block_end_state(project: &Project, block: &Term<Blk>) -> State {
 /// Check whether a parameter value of the call to `symbol` has value `sizeof(void*)`.
 fn check_for_pointer_sized_arg(
     project: &Project,
+    global_memory: &RuntimeMemoryImage,
     block: &Term<Blk>,
     symbol: &ExternSymbol,
 ) -> bool {
     let pointer_size = project.stack_pointer_register.size;
-    let state = compute_block_end_state(project, block);
+    let state = compute_block_end_state(project, global_memory, block);
     for parameter in symbol.parameters.iter() {
         if let Ok(DataDomain::Value(BitvectorDomain::Value(param_value))) =
-            state.eval_parameter_arg(parameter, &project.stack_pointer_register)
+            state.eval_parameter_arg(parameter, &project.stack_pointer_register, global_memory)
         {
             if Ok(u64::from(pointer_size)) == param_value.try_to_u64() {
                 return true;
@@ -113,7 +119,12 @@ pub fn check_cwe(
     let symbol_map = get_symbol_map(project, &config.symbols);
     for sub in project.program.term.subs.iter() {
         for (block, jmp, symbol) in get_callsites(sub, &symbol_map) {
-            if check_for_pointer_sized_arg(project, block, symbol) {
+            if check_for_pointer_sized_arg(
+                project,
+                analysis_results.runtime_memory_image,
+                block,
+                symbol,
+            ) {
                 cwe_warnings.push(generate_cwe_warning(jmp, symbol))
             }
         }

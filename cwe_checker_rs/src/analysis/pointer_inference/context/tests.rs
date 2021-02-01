@@ -33,11 +33,7 @@ fn register(name: &str) -> Variable {
 }
 
 fn reg_add_term(name: &str, value: i64, tid_name: &str) -> Term<Def> {
-    let add_expr = Expression::BinOp {
-        op: BinOpType::IntAdd,
-        lhs: Box::new(Expression::Var(register(name))),
-        rhs: Box::new(Expression::Const(Bitvector::from_i64(value))),
-    };
+    let add_expr = Expression::Var(register(name)).plus_const(value);
     Term {
         tid: Tid::new(format!("{}", tid_name)),
         term: Def::Assign {
@@ -109,19 +105,16 @@ fn context_problem_implementation() {
     use Expression::*;
 
     let (project, config) = mock_project();
+    let runtime_memory_image = RuntimeMemoryImage::mock();
     let (log_sender, _log_receiver) = crossbeam_channel::unbounded();
-    let context = Context::new(&project, config, log_sender);
+    let context = Context::new(&project, &runtime_memory_image, config, log_sender);
     let mut state = State::new(&register("RSP"), Tid::new("main"));
 
     let def = Term {
         tid: Tid::new("def"),
         term: Def::Assign {
             var: register("RSP"),
-            value: BinOp {
-                op: BinOpType::IntAdd,
-                lhs: Box::new(Var(register("RSP"))),
-                rhs: Box::new(Const(Bitvector::from_i64(-16))),
-            },
+            value: Var(register("RSP")).plus_const(-16),
         },
     };
     let store_term = Term {
@@ -170,6 +163,22 @@ fn context_problem_implementation() {
             Data::Value(bv(33).into()),
         )
         .unwrap();
+    // Emulate  removing the return pointer from the stack for x64
+    let stack_pointer_update_def = Term {
+        tid: Tid::new("stack_pointer_update_def"),
+        term: Def::Assign {
+            var: register("RSP"),
+            value: BinOp {
+                op: BinOpType::IntAdd,
+                lhs: Box::new(Var(register("RSP"))),
+                rhs: Box::new(Const(Bitvector::from_i64(8))),
+            },
+        },
+    };
+    callee_state = context
+        .update_def(&callee_state, &stack_pointer_update_def)
+        .unwrap();
+    // Test update_return
     let return_state = context
         .update_return(
             Some(&callee_state),
@@ -183,7 +192,10 @@ fn context_problem_implementation() {
     assert_eq!(return_state.memory, state.memory);
     assert_eq!(
         return_state.get_register(&register("RSP")).unwrap(),
-        state.get_register(&register("RSP")).unwrap()
+        state
+            .get_register(&register("RSP"))
+            .unwrap()
+            .bin_op(BinOpType::IntAdd, &Bitvector::from_i64(8).into())
     );
 
     state.set_register(&register("callee_saved_reg"), Data::Value(bv(13)));
@@ -271,8 +283,9 @@ fn update_return() {
     use crate::analysis::pointer_inference::object::ObjectType;
     use crate::analysis::pointer_inference::Data;
     let (project, config) = mock_project();
+    let runtime_memory_image = RuntimeMemoryImage::mock();
     let (log_sender, _log_receiver) = crossbeam_channel::unbounded();
-    let context = Context::new(&project, config, log_sender);
+    let context = Context::new(&project, &runtime_memory_image, config, log_sender);
     let state_before_return = State::new(&register("RSP"), Tid::new("callee"));
     let mut state_before_return = context
         .update_def(

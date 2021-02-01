@@ -1,9 +1,9 @@
 use super::object::ObjectType;
-use crate::abstract_domain::*;
 use crate::analysis::graph::Graph;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
 use crate::utils::log::*;
+use crate::{abstract_domain::*, utils::binary::RuntimeMemoryImage};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use super::state::State;
@@ -21,6 +21,9 @@ pub struct Context<'a> {
     pub graph: Graph<'a>,
     /// A reference to the `Project` object representing the binary
     pub project: &'a Project,
+    /// The runtime memory image for reading global read-only variables.
+    /// Note that values of writeable global memory segments are not tracked.
+    pub runtime_memory_image: &'a RuntimeMemoryImage,
     /// Maps the TIDs of functions that shall be treated as extern symbols to the `ExternSymbol` object representing it.
     pub extern_symbol_map: BTreeMap<Tid, &'a ExternSymbol>,
     /// A channel where found CWE warnings and log messages should be sent to.
@@ -39,10 +42,11 @@ impl<'a> Context<'a> {
     /// Create a new context object for a given project.
     /// Also needs two channels as input to know where CWE warnings and log messages should be sent to.
     pub fn new(
-        project: &Project,
+        project: &'a Project,
+        runtime_memory_image: &'a RuntimeMemoryImage,
         config: Config,
         log_collector: crossbeam_channel::Sender<LogThreadMsg>,
-    ) -> Context {
+    ) -> Context<'a> {
         let mut extern_symbol_map = BTreeMap::new();
         for symbol in project.program.term.extern_symbols.iter() {
             extern_symbol_map.insert(symbol.tid.clone(), symbol);
@@ -59,6 +63,7 @@ impl<'a> Context<'a> {
         Context {
             graph,
             project,
+            runtime_memory_image,
             extern_symbol_map,
             log_collector,
             allocation_symbols: config.allocation_symbols,
@@ -82,12 +87,13 @@ impl<'a> Context<'a> {
     fn detect_stack_pointer_information_loss_on_return(
         &self,
         state_before_return: &State,
-        return_term: &Term<Jmp>,
-    ) {
+    ) -> Result<(), Error> {
         let expected_stack_pointer_offset = match self.project.cpu_architecture.as_str() {
-            "x86" | "x86_64" => Bitvector::from_u64(u64::from(self.project.get_pointer_bytesize()))
-                .into_truncate(apint::BitWidth::from(self.project.get_pointer_bytesize()))
-                .unwrap(),
+            "x86" | "x86_32" | "x86_64" => {
+                Bitvector::from_u64(u64::from(self.project.get_pointer_bytesize()))
+                    .into_truncate(apint::BitWidth::from(self.project.get_pointer_bytesize()))
+                    .unwrap()
+            }
             _ => Bitvector::zero(apint::BitWidth::from(self.project.get_pointer_bytesize())),
         };
         match state_before_return.get_register(&self.project.stack_pointer_register) {
@@ -97,26 +103,21 @@ impl<'a> Context<'a> {
                     if *id != state_before_return.stack_id
                         || *offset != expected_stack_pointer_offset.into()
                     {
-                        self.log_debug(
-                            Err(anyhow!(
-                                "Unexpected stack register value at return instruction"
-                            )),
-                            Some(&return_term.tid),
-                        );
+                        Err(anyhow!("Unexpected stack register value on return"))
+                    } else {
+                        Ok(())
                     }
+                } else {
+                    Err(anyhow!(
+                        "Unexpected number of stack register targets on return"
+                    ))
                 }
             }
-            Ok(Data::Top(_)) => self.log_debug(
-                Err(anyhow!(
-                    "Stack register value lost during function execution"
-                )),
-                Some(&return_term.tid),
-            ),
-            Ok(Data::Value(_)) => self.log_debug(
-                Err(anyhow!("Unexpected stack register value on return")),
-                Some(&return_term.tid),
-            ),
-            Err(err) => self.log_debug(Err(err), Some(&return_term.tid)),
+            Ok(Data::Top(_)) => Err(anyhow!(
+                "Stack register value lost during function execution"
+            )),
+            Ok(Data::Value(_)) => Err(anyhow!("Unexpected stack register value on return")),
+            Err(err) => Err(err),
         }
     }
 
@@ -169,8 +170,11 @@ impl<'a> Context<'a> {
     ) -> Option<State> {
         match extern_symbol.get_unique_parameter() {
             Ok(parameter) => {
-                let parameter_value =
-                    state.eval_parameter_arg(parameter, &self.project.stack_pointer_register);
+                let parameter_value = state.eval_parameter_arg(
+                    parameter,
+                    &self.project.stack_pointer_register,
+                    &self.runtime_memory_image,
+                );
                 match parameter_value {
                     Ok(memory_object_pointer) => {
                         if let Data::Pointer(pointer) = memory_object_pointer {
@@ -225,7 +229,11 @@ impl<'a> Context<'a> {
         extern_symbol: &ExternSymbol,
     ) {
         for parameter in extern_symbol.parameters.iter() {
-            match state.eval_parameter_arg(parameter, &self.project.stack_pointer_register) {
+            match state.eval_parameter_arg(
+                parameter,
+                &self.project.stack_pointer_register,
+                &self.runtime_memory_image,
+            ) {
                 Ok(value) => {
                     if state.memory.is_dangling_pointer(&value, true) {
                         let warning = CweWarning {
@@ -304,7 +312,11 @@ impl<'a> Context<'a> {
         extern_symbol: &ExternSymbol,
     ) -> Option<State> {
         self.log_debug(
-            new_state.clear_stack_parameter(extern_symbol, &self.project.stack_pointer_register),
+            new_state.clear_stack_parameter(
+                extern_symbol,
+                &self.project.stack_pointer_register,
+                self.runtime_memory_image,
+            ),
             Some(&call.tid),
         );
         let calling_conv = extern_symbol.get_calling_convention(&self.project);
@@ -320,9 +332,11 @@ impl<'a> Context<'a> {
             }
         } else {
             for parameter in extern_symbol.parameters.iter() {
-                if let Ok(data) =
-                    state.eval_parameter_arg(parameter, &self.project.stack_pointer_register)
-                {
+                if let Ok(data) = state.eval_parameter_arg(
+                    parameter,
+                    &self.project.stack_pointer_register,
+                    &self.runtime_memory_image,
+                ) {
                     possible_referenced_ids.append(&mut data.referenced_ids());
                 }
             }

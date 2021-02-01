@@ -35,7 +35,10 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
         match &def.term {
             Def::Store { address, value } => {
                 let mut new_state = state.clone();
-                self.log_debug(new_state.handle_store(address, value), Some(&def.tid));
+                self.log_debug(
+                    new_state.handle_store(address, value, self.runtime_memory_image),
+                    Some(&def.tid),
+                );
                 Some(new_state)
             }
             Def::Assign { var, value } => {
@@ -45,7 +48,10 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
             }
             Def::Load { var, address } => {
                 let mut new_state = state.clone();
-                self.log_debug(new_state.handle_load(var, address), Some(&def.tid));
+                self.log_debug(
+                    new_state.handle_load(var, address, &self.runtime_memory_image),
+                    Some(&def.tid),
+                );
                 Some(new_state)
             }
         }
@@ -184,7 +190,13 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
         let stack_offset_on_call = self.get_current_stack_offset(state_before_call);
 
         // Detect possible information loss on the stack pointer and report it.
-        self.detect_stack_pointer_information_loss_on_return(state_before_return, return_term);
+        if let Err(err) = self.detect_stack_pointer_information_loss_on_return(state_before_return)
+        {
+            self.log_debug(Err(err), Some(&return_term.tid));
+            // This is an indicator of an analysis error
+            // or a call to a non-returning extern function that was not marked as non-returning.
+            return None;
+        }
 
         // Check whether state_before_return actually knows the `caller_stack_id`.
         // If not, we are returning from a state that cannot correspond to this callsite.
@@ -222,7 +234,11 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
             // The current workaround should be reasonably exact for programs written in C,
             // but may introduce a lot of errors
             // if the compiler often uses other calling conventions for internal function calls.
-            state_after_return.restore_callee_saved_register(state_before_call, cconv);
+            state_after_return.restore_callee_saved_register(
+                state_before_call,
+                cconv,
+                &self.project.stack_pointer_register,
+            );
         }
 
         // remove non-referenced objects from the state

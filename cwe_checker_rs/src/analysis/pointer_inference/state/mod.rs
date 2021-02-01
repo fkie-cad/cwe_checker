@@ -3,6 +3,7 @@ use super::Data;
 use crate::abstract_domain::*;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
+use crate::utils::binary::RuntimeMemoryImage;
 use std::collections::{BTreeMap, BTreeSet};
 
 mod access_handling;
@@ -89,6 +90,7 @@ impl State {
         &mut self,
         extern_call: &ExternSymbol,
         stack_pointer_register: &Variable,
+        global_memory: &RuntimeMemoryImage,
     ) -> Result<(), Error> {
         let mut result_log = Ok(());
         for arg in &extern_call.parameters {
@@ -96,16 +98,11 @@ impl State {
                 Arg::Register(_) => (),
                 Arg::Stack { offset, size } => {
                     let data_top = Data::new_top(*size);
-                    let location_expression = Expression::BinOp {
-                        lhs: Box::new(Expression::Var(stack_pointer_register.clone())),
-                        op: BinOpType::IntAdd,
-                        rhs: Box::new(Expression::Const(
-                            Bitvector::from_i64(*offset)
-                                .into_truncate(apint::BitWidth::from(stack_pointer_register.size))
-                                .unwrap(),
-                        )),
-                    };
-                    if let Err(err) = self.write_to_address(&location_expression, &data_top) {
+                    let location_expression =
+                        Expression::Var(stack_pointer_register.clone()).plus_const(*offset);
+                    if let Err(err) =
+                        self.write_to_address(&location_expression, &data_top, global_memory)
+                    {
                         result_log = Err(err);
                     }
                 }
@@ -287,22 +284,25 @@ impl State {
         self.memory.append_unknown_objects(&caller_state.memory);
     }
 
-    /// Restore the content of callee-saved registers from the caller state.
+    /// Restore the content of callee-saved registers from the caller state
+    /// with the exception of the stack register.
     ///
     /// This function does not check what the callee state currently contains in these registers.
     /// If the callee does not adhere to the given calling convention, this may introduce analysis errors!
-    /// It will also mask cases,
+    /// It will also mask cases
     /// where a callee-saved register was incorrectly modified (e.g. because of a bug in the callee).
     pub fn restore_callee_saved_register(
         &mut self,
         caller_state: &State,
         cconv: &CallingConvention,
+        stack_register: &Variable,
     ) {
         for (register, value) in caller_state.register.iter() {
-            if cconv
-                .callee_saved_register
-                .iter()
-                .any(|reg_name| *reg_name == register.name)
+            if register != stack_register
+                && cconv
+                    .callee_saved_register
+                    .iter()
+                    .any(|reg_name| *reg_name == register.name)
             {
                 self.set_register(register, value.clone());
             }

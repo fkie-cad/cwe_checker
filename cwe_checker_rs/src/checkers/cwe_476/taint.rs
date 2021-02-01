@@ -1,4 +1,4 @@
-use crate::abstract_domain::{AbstractDomain, HasByteSize, HasTop, RegisterDomain};
+use crate::abstract_domain::{AbstractDomain, HasTop, RegisterDomain, SizedDomain};
 use crate::intermediate_representation::*;
 use crate::prelude::*;
 use std::fmt::Display;
@@ -45,7 +45,7 @@ impl AbstractDomain for Taint {
     }
 }
 
-impl HasByteSize for Taint {
+impl SizedDomain for Taint {
     /// The size in bytes of the `Taint` value.
     fn bytesize(&self) -> ByteSize {
         match self {
