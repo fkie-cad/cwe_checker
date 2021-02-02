@@ -20,7 +20,7 @@ pub struct State {
     memory_taint: HashMap<AbstractIdentifier, MemRegion<Taint>>,
     /// The set of addresses in the binary where string constants reside
     string_constants: Vec<Bitvector>,
-    /// A map from Def Tids to their corresponding pointer inference state
+    /// A map from Def Tids to their corresponding pointer inference state.
     /// The pointer inferenece states are calculated in a forward manner
     /// from the BlkStart node when entering a BlkEnd node through a jump.
     #[serde(skip_serializing)]
