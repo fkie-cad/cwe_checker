@@ -1,22 +1,10 @@
-#[cfg(test)]
 use crate::{
     abstract_domain::{DataDomain, PointerDomain},
     intermediate_representation::CastOpType,
 };
 
-#[cfg(test)]
 use super::*;
 
-#[cfg(test)]
-fn register(name: &str) -> Variable {
-    Variable {
-        name: name.into(),
-        size: ByteSize::new(8),
-        is_temp: false,
-    }
-}
-
-#[cfg(test)]
 fn extern_symbol(name: &str, return_args: Vec<Arg>) -> ExternSymbol {
     ExternSymbol {
         tid: Tid::new(name.to_string()),
@@ -29,60 +17,23 @@ fn extern_symbol(name: &str, return_args: Vec<Arg>) -> ExternSymbol {
     }
 }
 
-#[cfg(test)]
-fn bin_op(op: BinOpType, lhs: Expression, rhs: Expression) -> Expression {
-    Expression::BinOp {
-        op,
-        lhs: Box::new(lhs),
-        rhs: Box::new(rhs),
-    }
-}
-
-#[cfg(test)]
-fn cast_op(op: CastOpType, arg: Expression) -> Expression {
-    Expression::Cast {
-        op,
-        size: ByteSize::new(8),
-        arg: Box::new(arg),
-    }
-}
-
-#[cfg(test)]
-fn variable_expr(name: &str) -> Expression {
-    Expression::Var(register(name))
-}
-
-#[cfg(test)]
-fn const_expr(value: Bitvector) -> Expression {
-    Expression::Const(value)
-}
-
-#[cfg(test)]
-fn subpiece_expr(low_byte: ByteSize, size: ByteSize, arg: Expression) -> Expression {
-    Expression::Subpiece {
-        low_byte,
-        size,
-        arg: Box::new(arg),
-    }
-}
-
-#[cfg(test)]
-fn int_add(name: &str, constant: Bitvector) -> Expression {
-    bin_op(BinOpType::IntAdd, variable_expr(name), const_expr(constant))
-}
-
-#[cfg(test)]
 fn bv(value: i64) -> BitvectorDomain {
     BitvectorDomain::Value(Bitvector::from_i64(value))
 }
 
-#[cfg(test)]
 impl State {
     pub fn mock_with_pi_state() -> (State, PointerInferenceState) {
-        let arg = Arg::Register(register("RAX"));
-        let pi_state = PointerInferenceState::new(&register("RSP"), Tid::new("func"));
+        let arg = Arg::Register(Variable::mock("RAX", 8 as u64));
+        let pi_state =
+            PointerInferenceState::new(&Variable::mock("RSP", 8 as u64), Tid::new("func"));
         let symbol = extern_symbol("system", vec![arg]);
-        let mut state = State::new(&symbol, &register("RSP"), Some(&pi_state));
+        let current_sub = Sub::mock("current");
+        let mut state = State::new(
+            &symbol,
+            &Variable::mock("RSP", 8 as u64),
+            Some(&pi_state),
+            &current_sub,
+        );
         state.pi_def_map = Some(HashMap::new());
         (state, pi_state)
     }
@@ -113,6 +64,10 @@ impl State {
 
         None
     }
+
+    pub fn remove_all_register_taints(&mut self) {
+        self.register_taint = HashMap::new();
+    }
 }
 
 #[cfg(test)]
@@ -137,9 +92,9 @@ impl Setup {
         Setup {
             state,
             pi_state,
-            rdi: register("RDI"),
-            rsi: register("RSI"),
-            rsp: register("RSP"),
+            rdi: Variable::mock("RDI", 8 as u64),
+            rsi: Variable::mock("RSI", 8 as u64),
+            rsp: Variable::mock("RSP", 8 as u64),
             constant: Bitvector::from_str_radix(16, "ffcc00").unwrap(),
             def_tid: Tid::new("def"),
             stack_pointer: Data::Pointer(PointerDomain::new(stack_id.clone(), bv(0))),
@@ -161,7 +116,7 @@ fn setting_expression_and_constants() {
         .set_pointer_inference_state_for_def(Some(setup.pi_state.clone()), &setup.def_tid);
 
     // Test Case 1: Constants
-    let copy_const_expr = const_expr(setup.constant.clone());
+    let copy_const_expr = Expression::const_from_apint(setup.constant.clone());
     setup
         .state
         .set_register_taint(&setup.rdi, Taint::Tainted(setup.rdi.size));
@@ -180,7 +135,7 @@ fn setting_expression_and_constants() {
     );
 
     // Test Case 2: Variables
-    let copy_var_expr = variable_expr("RSI");
+    let copy_var_expr = Expression::var("RSI");
     setup
         .state
         .set_register_taint(&setup.rdi, Taint::Tainted(setup.rdi.size));
@@ -198,7 +153,7 @@ fn setting_expression_and_constants() {
     );
 
     // Test Case 2.5: Stack Pointer Assignment
-    let stack_expression = variable_expr("RSP");
+    let stack_expression = Expression::var("RSP");
     setup
         .state
         .set_register_taint(&setup.rdi, Taint::Tainted(setup.rdi.size));
@@ -217,7 +172,7 @@ fn setting_expression_and_constants() {
     );
 
     // Test Case 3: Bin Ops
-    let bin_op_expr = int_add("RBP", Bitvector::from_i8(-8));
+    let bin_op_expr = Expression::var("RBP").plus_const(-8);
     setup
         .state
         .set_register_taint(&setup.rdi, Taint::Tainted(setup.rdi.size));
@@ -237,10 +192,10 @@ fn setting_expression_and_constants() {
     );
 
     // Test Case 4: Any other Expression
-    let cast_expr = cast_op(
-        CastOpType::IntZExt,
-        subpiece_expr(ByteSize::new(0), ByteSize::new(4), variable_expr("RDI")),
-    );
+    let cast_expr = Expression::var("RDI")
+        .subpiece(ByteSize::new(0), ByteSize::new(4))
+        .cast(CastOpType::IntZExt);
+
     setup
         .state
         .set_register_taint(&setup.rdi, Taint::Tainted(setup.rdi.size));
@@ -259,6 +214,7 @@ fn setting_expression_and_constants() {
 #[test]
 fn tainting_values_to_be_stored() {
     let mut setup = Setup::new();
+    let stack_pointer = Variable::mock("RSP", 8 as u64);
 
     // Test Case: Memory target is tainted. --> Taint the input register
     setup
@@ -270,9 +226,12 @@ fn tainting_values_to_be_stored() {
     setup
         .state
         .save_taint_to_memory(&setup.base_eight_offset, Taint::Tainted(ByteSize::new(8)));
-    setup
-        .state
-        .taint_value_to_be_stored(&setup.def_tid, &setup.rdi, &variable_expr("RSI"));
+    setup.state.taint_value_to_be_stored(
+        &setup.def_tid,
+        &Expression::var("RDI"),
+        &Expression::var("RSI"),
+        &stack_pointer,
+    );
     assert_eq!(
         setup
             .state
@@ -292,10 +251,103 @@ fn tainting_values_to_be_stored() {
     setup
         .state
         .set_pointer_inference_state_for_def(Some(setup.pi_state.clone()), &setup.def_tid);
+    setup.state.taint_value_to_be_stored(
+        &setup.def_tid,
+        &Expression::var("RDI"),
+        &Expression::var("RSI"),
+        &stack_pointer,
+    );
+    assert_eq!(setup.state.get_register_taint(&setup.rsi), None);
+}
+
+#[test]
+fn tainting_def_input_register() {
+    let mut setup = Setup::new();
+    let rdi_reg = Variable::mock("RDI", 8 as u64);
+    let stack_pointer = Variable::mock("RSP", 8 as u64);
+
     setup
         .state
-        .taint_value_to_be_stored(&setup.def_tid, &setup.rdi, &variable_expr("RSI"));
-    assert_eq!(setup.state.get_register_taint(&setup.rsi), None);
+        .set_pointer_inference_state_for_def(Some(setup.pi_state.clone()), &setup.def_tid);
+
+    // Test Case 1: Variable input
+    setup
+        .state
+        .taint_def_input_register(&Expression::var("RDI"), &stack_pointer, &setup.def_tid);
+    assert_eq!(
+        setup.state.get_register_taint(&rdi_reg),
+        Some(&Taint::Tainted(rdi_reg.size))
+    );
+
+    // Test Case 2: Stack Pointer input
+    setup
+        .state
+        .taint_def_input_register(&Expression::var("RSP"), &stack_pointer, &setup.def_tid);
+
+    assert_eq!(
+        setup
+            .state
+            .check_if_address_points_to_taint(setup.stack_pointer.clone(), &setup.pi_state),
+        true
+    );
+
+    setup.state.remove_all_register_taints();
+
+    // Test Case 3: Bin Op Input
+    setup.state.taint_def_input_register(
+        &Expression::var("RDI").plus_const(8),
+        &stack_pointer,
+        &setup.def_tid,
+    );
+    assert_eq!(
+        setup.state.get_register_taint(&rdi_reg),
+        Some(&Taint::Tainted(rdi_reg.size))
+    );
+
+    setup.state.remove_all_register_taints();
+
+    // Test Case 4: Cast Op Input
+    setup.state.taint_def_input_register(
+        &Expression::var("RDI").cast(CastOpType::IntZExt),
+        &stack_pointer,
+        &setup.def_tid,
+    );
+    assert_eq!(
+        setup.state.get_register_taint(&rdi_reg),
+        Some(&Taint::Tainted(rdi_reg.size))
+    );
+}
+
+#[test]
+fn tainting_variable_input() {
+    let mut setup = Setup::new();
+    let rdi_reg = Variable::mock("RDI", 8 as u64);
+    let stack_pointer = Variable::mock("RSP", 8 as u64);
+
+    setup
+        .state
+        .set_pointer_inference_state_for_def(Some(setup.pi_state.clone()), &setup.def_tid);
+
+    // Test Case 1: Register input
+    setup
+        .state
+        .taint_variable_input(&rdi_reg, &stack_pointer, &setup.def_tid);
+    assert_eq!(
+        setup.state.get_register_taint(&rdi_reg),
+        Some(&Taint::Tainted(rdi_reg.size))
+    );
+
+    // Test Case 2: Stack Pointer input
+    setup
+        .state
+        .taint_variable_input(&stack_pointer, &stack_pointer, &setup.def_tid);
+
+    assert_eq!(
+        setup
+            .state
+            .check_if_address_points_to_taint(setup.stack_pointer.clone(), &setup.pi_state),
+        true
+    );
 }
 
 #[test]
@@ -391,7 +443,7 @@ fn removing_non_parameter_taints_for_generic_function() {
 fn removing_non_callee_saved_taint() {
     let mut setup = Setup::new();
     let cconv = CallingConvention::mock();
-    let rbp_reg = register("RBP");
+    let rbp_reg = Variable::mock("RBP", 8 as u64);
     setup
         .state
         .set_register_taint(&setup.rdi, Taint::Tainted(setup.rsi.size));
@@ -413,7 +465,7 @@ fn removing_all_but_return() {
     let mut setup = Setup::new();
     let mut return_regs: HashSet<String> = HashSet::new();
     return_regs.insert("RAX".to_string());
-    let rax_reg = register("RAX");
+    let rax_reg = Variable::mock("RAX", 8 as u64);
 
     setup
         .state
@@ -457,8 +509,8 @@ fn checking_if_address_points_to_taint() {
 #[test]
 fn checking_return_registers_for_taint() {
     let mut setup = Setup::new();
-    let rax_reg = register("RAX");
-    let rdi_reg = register("RDI");
+    let rax_reg = Variable::mock("RAX", 8 as u64);
+    let rdi_reg = Variable::mock("RDI", 8 as u64);
 
     // Test Case: Empty Taint
     assert_eq!(

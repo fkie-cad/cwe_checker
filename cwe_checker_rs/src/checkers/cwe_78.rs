@@ -8,25 +8,24 @@
 //!
 //! ## How the check works
 //!
-//! Using dataflow analysis we search for an executation path from a system call parameter (string) to an user input
+//! Using backward dataflow analysis we search for an executation path from a system call parameter (string) to an user input
 //! to identify possible command injections.
 //!
 //! ### Symbols configurable in config.json
 //!
 //! The symbols are the functions which
-//!   1. take user input (e.g. scanf)
-//!   2. make system calls (e.g. system)
+//!   1. make system calls (e.g. system)
 //!   3. manipulate strings (e.g. sprintf, strcat, memcpy, etc.)
-//!   4. check strings for characters (e.g. regexp)
 //!
 //! ## False Positives
 //!
 //! - The input comes from the user but proper sanitization was not detected by the analysis even though it exists.
-//! - The input comes from the user but the format string's input format could not be distinguised as non-string input.
+//! - The input comes from the user but the format string's input format could not be distinguished as non-string input.
 //!
 //! ## False Negatives
 //!
-//! - Loss of taints due to missing information from the pointer inference analysis
+//! - Missing Taints due to lost track of pointer targets
+//! - Non tracked function parameters cause incomplete taints that could miss possible dangerous inputs
 
 use std::collections::HashMap;
 
@@ -49,9 +48,6 @@ use state::*;
 mod context;
 use context::*;
 
-mod taint;
-use taint::*;
-
 pub static CWE_MODULE: CweModule = CweModule {
     name: "CWE78",
     version: "0.1",
@@ -63,9 +59,13 @@ pub static CWE_MODULE: CweModule = CweModule {
 pub struct Config {
     /// The names of the system call symbols
     system_symbols: Vec<String>,
+    /// The names of the string manipulating symbols
     string_symbols: Vec<String>,
 }
 
+/// This check searches for system calls and sets their parameters as taint source if available.
+/// Then the fixpoint computation is executed and its result may generate cwe warnings if
+/// the parameters can be tracked back to user inputs
 pub fn check_cwe(
     analysis_results: &AnalysisResults,
     cwe_params: &serde_json::Value,
@@ -82,6 +82,7 @@ pub fn check_cwe(
         crate::utils::symbol_utils::get_symbol_map(project, &config.string_symbols[..]);
     let general_context = Context::new(
         project,
+        analysis_results.runtime_memory_image,
         &pointer_inference_results,
         string_symbols,
         cwe_sender,
@@ -99,7 +100,7 @@ pub fn check_cwe(
                         _ => panic!(),
                     };
                     let mut context = general_context.clone();
-                    context.set_taint_source(jmp, current_sub);
+                    context.set_taint_source(jmp, &symbol.name, current_sub);
                     let pi_state_at_taint_source =
                         match pointer_inference_results.get_node_value(node) {
                             Some(NodeValue::Value(val)) => Some(val.clone()),
@@ -112,6 +113,7 @@ pub fn check_cwe(
                             symbol,
                             &project.stack_pointer_register,
                             pi_state_at_taint_source.as_ref(),
+                            current_sub,
                         )),
                     );
                     computation.compute_with_max_steps(100);

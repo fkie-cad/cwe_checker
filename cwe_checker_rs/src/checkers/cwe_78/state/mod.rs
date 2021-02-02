@@ -2,16 +2,15 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{
     abstract_domain::{
-        AbstractDomain, AbstractIdentifier, BitvectorDomain, HasByteSize, MemRegion,
+        AbstractDomain, AbstractIdentifier, BitvectorDomain, MemRegion, SizedDomain,
     },
     analysis::pointer_inference::{Data, State as PointerInferenceState},
+    checkers::cwe_476::Taint,
     intermediate_representation::{
-        Arg, BinOpType, CallingConvention, Expression, ExternSymbol, Project, Variable,
+        Arg, BinOpType, CallingConvention, Expression, ExternSymbol, Project, Sub, Variable,
     },
     prelude::*,
 };
-
-use super::Taint;
 
 #[derive(Serialize, Deserialize, Debug, Eq, Clone)]
 pub struct State {
@@ -19,13 +18,15 @@ pub struct State {
     register_taint: HashMap<Variable, Taint>,
     /// The Taint contained in memory objects
     memory_taint: HashMap<AbstractIdentifier, MemRegion<Taint>>,
-    /// The set of addresses in the binary where strings constants reside
+    /// The set of addresses in the binary where string constants reside
     string_constants: Vec<Bitvector>,
     /// A map from Def Tids to their corresponding pointer inference state
     /// The pointer inferenece states are calculated in a forward manner
     /// from the BlkStart node when entering a BlkEnd node through a jump.
     #[serde(skip_serializing)]
     pi_def_map: Option<HashMap<Tid, PointerInferenceState>>,
+    /// Holds the currently analyzed subroutine term
+    current_sub: Option<Term<Sub>>,
 }
 
 impl PartialEq for State {
@@ -34,7 +35,9 @@ impl PartialEq for State {
     /// The equality operator ignores the `pi_def_map` field,
     /// since it only denotes an intermediate value.
     fn eq(&self, other: &Self) -> bool {
-        self.register_taint == other.register_taint && self.memory_taint == other.memory_taint
+        self.register_taint == other.register_taint
+            && self.memory_taint == other.memory_taint
+            && self.string_constants == other.string_constants
     }
 }
 
@@ -70,12 +73,15 @@ impl AbstractDomain for State {
 
         let mut constants = self.string_constants.clone();
         constants.extend(other.string_constants.clone());
+        let set: HashSet<_> = constants.drain(..).collect(); // dedup
+        constants.extend(set.into_iter());
 
         State {
             register_taint,
             memory_taint,
             string_constants: constants,
             pi_def_map: None, // At nodes this intermediate value can be safely forgotten.
+            current_sub: self.current_sub.clone(),
         }
     }
 
@@ -91,12 +97,14 @@ impl State {
         taint_source: &ExternSymbol,
         stack_pointer_register: &Variable,
         pi_state: Option<&PointerInferenceState>,
+        current_sub: &Term<Sub>,
     ) -> State {
         let mut state = State {
             register_taint: HashMap::new(),
             memory_taint: HashMap::new(),
             string_constants: Vec::new(),
             pi_def_map: None,
+            current_sub: Some(current_sub.clone()),
         };
         for parameter in taint_source.parameters.iter() {
             match parameter {
@@ -164,6 +172,15 @@ impl State {
         }
     }
 
+    /// Returns the sub of the currently analysed nodes
+    pub fn get_current_sub(&self) -> &Option<Term<Sub>> {
+        &self.current_sub
+    }
+
+    pub fn set_current_sub(&mut self, current_sub: &Term<Sub>) {
+        self.current_sub = Some(current_sub.clone());
+    }
+
     /// Sets the pointer inference to definition map for the current state
     pub fn set_pi_def_map(&mut self, pi_def_map: Option<HashMap<Tid, PointerInferenceState>>) {
         self.pi_def_map = pi_def_map;
@@ -196,24 +213,10 @@ impl State {
         expression: &Expression,
         stack_pointer_register: &Variable,
     ) {
+        self.remove_register_taint(result);
         match expression {
             Expression::Const(constant) => self.evaluate_constant(constant.clone()),
-            Expression::Var(var) => {
-                if var.name == stack_pointer_register.name {
-                    if let Some(pid_map) = self.pi_def_map.as_ref() {
-                        if let Some(pi_state) = pid_map.get(def_tid) {
-                            if let Ok(address) = pi_state.get_register(stack_pointer_register) {
-                                self.save_taint_to_memory(
-                                    &address,
-                                    Taint::Tainted(stack_pointer_register.size),
-                                );
-                            }
-                        }
-                    }
-                } else {
-                    self.set_register_taint(var, Taint::Tainted(var.size));
-                }
-            }
+            Expression::Var(var) => self.taint_variable_input(var, stack_pointer_register, def_tid),
             Expression::BinOp { .. } => {
                 if let Some(pid_map) = self.pi_def_map.as_ref() {
                     if let Some(pi_state) = pid_map.get(def_tid) {
@@ -223,42 +226,79 @@ impl State {
                     }
                 }
             }
-            _ => return,
+            Expression::UnOp { arg, .. }
+            | Expression::Cast { arg, .. }
+            | Expression::Subpiece { arg, .. } => {
+                self.taint_def_input_register(arg, stack_pointer_register, def_tid)
+            }
+            _ => (),
         }
-        self.remove_register_taint(result);
     }
 
     /// Taints the input register of a store instruction and removes the memory taint at the target address
     pub fn taint_value_to_be_stored(
         &mut self,
         def_tid: &Tid,
-        target: &Variable,
+        target: &Expression,
         value: &Expression,
+        stack_pointer_register: &Variable,
     ) {
         if let Some(pid_map) = self.pi_def_map.as_ref() {
             if let Some(pi_state) = pid_map.get(def_tid) {
-                if let Ok(address) = pi_state.get_register(target) {
+                if let Ok(address) = pi_state.eval(target) {
                     if self.check_if_address_points_to_taint(address.clone(), &pi_state) {
-                        let new_taint_register = match value {
-                            Expression::Var(input) => input,
-                            Expression::Subpiece { arg, .. } => {
-                                let argument: &Expression = arg;
-                                match argument {
-                                    Expression::Var(input) => input,
-                                    _ => panic!("Unexpected input format for Store instruction!"),
-                                }
-                            }
-                            _ => panic!("Unexpected input format for Store instruction!"),
-                        };
-
-                        self.set_register_taint(
-                            new_taint_register,
-                            Taint::Tainted(new_taint_register.size),
-                        );
+                        self.taint_def_input_register(value, stack_pointer_register, def_tid);
                         self.remove_mem_taint_at_target(&address);
                     }
                 }
             }
+        }
+    }
+
+    /// Taints all input register of a expression
+    pub fn taint_def_input_register(
+        &mut self,
+        expr: &Expression,
+        stack_pointer_register: &Variable,
+        def_tid: &Tid,
+    ) {
+        match expr {
+            // TODO: Distinguish integer constants from global addresses in evaluate constant
+            Expression::Const(constant) => self.evaluate_constant(constant.clone()),
+            Expression::Var(var) => self.taint_variable_input(var, stack_pointer_register, def_tid),
+            Expression::BinOp { lhs, rhs, .. } => {
+                self.taint_def_input_register(lhs, stack_pointer_register, def_tid);
+                self.taint_def_input_register(rhs, stack_pointer_register, def_tid);
+            }
+            Expression::UnOp { arg, .. }
+            | Expression::Cast { arg, .. }
+            | Expression::Subpiece { arg, .. } => {
+                self.taint_def_input_register(arg, stack_pointer_register, def_tid)
+            }
+            _ => (),
+        }
+    }
+
+    /// Either taints the input register or a memory position if it is the stack pointer register
+    pub fn taint_variable_input(
+        &mut self,
+        var: &Variable,
+        stack_pointer_register: &Variable,
+        def_tid: &Tid,
+    ) {
+        if var.name == stack_pointer_register.name {
+            if let Some(pid_map) = self.pi_def_map.as_ref() {
+                if let Some(pi_state) = pid_map.get(def_tid) {
+                    if let Ok(address) = pi_state.get_register(stack_pointer_register) {
+                        self.save_taint_to_memory(
+                            &address,
+                            Taint::Tainted(stack_pointer_register.size),
+                        );
+                    }
+                }
+            }
+        } else {
+            self.set_register_taint(var, Taint::Tainted(var.size));
         }
     }
 
@@ -404,14 +444,24 @@ impl State {
 
         false
     }
-}
 
-#[cfg(test)]
-
-impl State {
-    pub fn remove_all_register_taints(&mut self) {
-        self.register_taint = HashMap::new();
+    /// Merges callee saved register taints into the current state
+    pub fn merge_callee_saved_taints_from_return_state(
+        &mut self,
+        return_state: &State,
+        calling_convention: Option<&CallingConvention>,
+    ) {
+        if let Some(calling_conv) = calling_convention {
+            let callee_saved_registers: HashSet<String> =
+                calling_conv.callee_saved_register.iter().cloned().collect();
+            for (variable, taint) in return_state.get_register_taints() {
+                if callee_saved_registers.get(&variable.name).is_some() {
+                    self.set_register_taint(variable, *taint);
+                }
+            }
+        }
     }
 }
 
+#[cfg(test)]
 mod tests;

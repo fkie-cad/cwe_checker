@@ -50,8 +50,8 @@ use std::collections::HashMap;
 mod state;
 use state::*;
 
-mod taint;
-use taint::*;
+pub mod taint;
+pub use taint::*;
 
 mod context;
 use context::*;

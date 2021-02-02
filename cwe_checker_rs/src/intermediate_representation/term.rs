@@ -3,6 +3,8 @@ use crate::prelude::*;
 use crate::utils::log::LogMessage;
 use std::collections::HashSet;
 
+pub mod builder;
+
 /// A term identifier consisting of an ID string (which is required to be unique)
 /// and an address to indicate where the term is located.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
