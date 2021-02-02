@@ -81,6 +81,55 @@ impl Expression {
         }
     }
 
+    /// Substitute trivial BinOp-expressions with their results,
+    /// e.g. substitute `a or a` with `a`.
+    ///
+    /// This function assumes that `self` is a `BinOp`
+    /// and it does not substitute trivial expressions in the two input expressions of the `BinOp`.
+    fn substitute_trivial_binops(&mut self) {
+        use BinOpType::*;
+        use Expression::*;
+        if let BinOp { op, lhs, rhs } = self {
+            if lhs == rhs {
+                match op {
+                    BoolAnd | BoolOr | IntAnd | IntOr => {
+                        // This is an identity operation
+                        *self = (**lhs).clone();
+                    }
+                    BoolXOr | IntXOr => {
+                        // `a xor a` always equals zero.
+                        *self = Expression::Const(Bitvector::zero(lhs.bytesize().into()));
+                    }
+                    IntEqual | IntLessEqual | IntSLessEqual => {
+                        *self = Expression::Const(Bitvector::one(ByteSize::new(1).into()));
+                    }
+                    IntNotEqual | IntLess | IntSLess => {
+                        *self = Expression::Const(Bitvector::zero(ByteSize::new(1).into()));
+                    }
+                    _ => (),
+                }
+            } else {
+                match (&**lhs, &**rhs) {
+                    (Const(bitvec), other) | (other, Const(bitvec)) if bitvec.is_zero() => {
+                        if matches!(op, IntOr | IntXOr | BoolOr | BoolXOr) {
+                            // `a or 0 = a` and `a xor 0 = a`
+                            *self = other.clone();
+                        }
+                    }
+                    (Const(bitvec), other) | (other, Const(bitvec))
+                        if bitvec.clone().into_bitnot().is_zero() =>
+                    {
+                        if matches!(op, IntAnd | BoolAnd) {
+                            // `a and -1 = a` since all bits of -1 are 1.
+                            *self = other.clone()
+                        }
+                    }
+                    _ => (),
+                }
+            }
+        }
+    }
+
     /// Substitute some trivial expressions with their result.
     /// E.g. substitute `a XOR a` with zero or substitute `a OR a` with `a`.
     pub fn substitute_trivial_operations(&mut self) {
@@ -106,33 +155,10 @@ impl Expression {
                 }
             }
             UnOp { op: _, arg } => arg.substitute_trivial_operations(),
-            BinOp { op, lhs, rhs } => {
+            BinOp { op: _, lhs, rhs } => {
                 lhs.substitute_trivial_operations();
                 rhs.substitute_trivial_operations();
-                if lhs == rhs {
-                    match op {
-                        BinOpType::BoolAnd
-                        | BinOpType::BoolOr
-                        | BinOpType::IntAnd
-                        | BinOpType::IntOr => {
-                            // This is an identity operation
-                            *self = (**lhs).clone();
-                        }
-                        BinOpType::BoolXOr | BinOpType::IntXOr => {
-                            // `a xor a` always equals zero.
-                            *self = Expression::Const(Bitvector::zero(lhs.bytesize().into()));
-                        }
-                        BinOpType::IntEqual
-                        | BinOpType::IntLessEqual
-                        | BinOpType::IntSLessEqual => {
-                            *self = Expression::Const(Bitvector::one(ByteSize::new(1).into()));
-                        }
-                        BinOpType::IntNotEqual | BinOpType::IntLess | BinOpType::IntSLess => {
-                            *self = Expression::Const(Bitvector::zero(ByteSize::new(1).into()));
-                        }
-                        _ => (),
-                    }
-                }
+                self.substitute_trivial_binops();
             }
         }
     }
