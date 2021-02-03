@@ -19,9 +19,9 @@ pub struct State {
     /// The Taint contained in memory objects
     memory_taint: HashMap<AbstractIdentifier, MemRegion<Taint>>,
     /// The set of addresses in the binary where string constants reside
-    string_constants: Vec<Bitvector>,
+    string_constants: HashSet<Bitvector>,
     /// A map from Def Tids to their corresponding pointer inference state.
-    /// The pointer inferenece states are calculated in a forward manner
+    /// The pointer inference states are calculated in a forward manner
     /// from the BlkStart node when entering a BlkEnd node through a jump.
     #[serde(skip_serializing)]
     pi_def_map: Option<HashMap<Tid, PointerInferenceState>>,
@@ -71,10 +71,8 @@ impl AbstractDomain for State {
             }
         }
 
-        let mut constants = self.string_constants.clone();
-        constants.extend(other.string_constants.clone());
-        let set: HashSet<_> = constants.drain(..).collect(); // dedup
-        constants.extend(set.into_iter());
+        let constants = self.string_constants.clone();
+        constants.union(&other.string_constants);
 
         State {
             register_taint,
@@ -102,7 +100,7 @@ impl State {
         let mut state = State {
             register_taint: HashMap::new(),
             memory_taint: HashMap::new(),
-            string_constants: Vec::new(),
+            string_constants: HashSet::new(),
             pi_def_map: None,
             current_sub: Some(current_sub.clone()),
         };
@@ -200,7 +198,7 @@ impl State {
     pub fn evaluate_constant(&mut self, constant: Bitvector) {
         // TODO: check whether the constant is a valid memory address in the binary
         // If so, get the string constant at that memory address and save it in the state
-        self.string_constants.push(constant);
+        self.string_constants.insert(constant);
     }
 
     /// Taints inputs registers and evalutates constant memory addresses for simple assignments

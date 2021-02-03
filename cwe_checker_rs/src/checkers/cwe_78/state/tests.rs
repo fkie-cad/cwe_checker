@@ -130,8 +130,8 @@ fn setting_expression_and_constants() {
     assert_eq!(setup.state.get_register_taint(&setup.rdi), None);
     assert_eq!(setup.state.string_constants.len(), 1);
     assert_eq!(
-        *setup.state.string_constants.get(0).unwrap(),
-        setup.constant
+        setup.state.string_constants.get(&setup.constant),
+        Some(&setup.constant)
     );
 
     // Test Case 2: Variables
