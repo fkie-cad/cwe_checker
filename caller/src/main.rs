@@ -245,7 +245,7 @@ fn get_project_from_ghidra(file_path: &Path, binary: &[u8], quiet_flag: bool) ->
     let output_path = tmp_folder.join(output_filename);
     let ghidra_plugin_path = get_ghidra_plugin_path("p_code_extractor");
     // Execute Ghidra
-    let output = Command::new(&headless_path)
+    let output = match Command::new(&headless_path)
         .arg(&tmp_folder) // The folder where temporary files should be stored
         .arg(format!("PcodeExtractor_{}_{}", filename, timestamp_suffix)) // The name of the temporary Ghidra Project.
         .arg("-import") // Import a file into the Ghidra project
@@ -259,15 +259,25 @@ fn get_project_from_ghidra(file_path: &Path, binary: &[u8], quiet_flag: bool) ->
         .arg("-analysisTimeoutPerFile") // Set a timeout for how long the standard analysis can run before getting aborted
         .arg("3600") // Timeout of one hour (=3600 seconds) // TODO: The post-script can detect that the timeout fired and react accordingly.
         .output() // Execute the command and catch its output.
-        .unwrap();
+    {
+        Ok(output) => output,
+        Err(err) => {
+            eprintln!("Error: Ghidra could not be executed:\n{}", err);
+            std::process::exit(101);
+        }
+    };
     if !output.status.success() {
         match output.status.code() {
             Some(code) => {
-                println!("{}", String::from_utf8(output.stdout).unwrap());
-                println!("{}", String::from_utf8(output.stderr).unwrap());
-                panic!("Execution of Ghidra plugin failed with exit code {}", code)
+                eprintln!("{}", String::from_utf8(output.stdout).unwrap());
+                eprintln!("{}", String::from_utf8(output.stderr).unwrap());
+                eprintln!("Execution of Ghidra plugin failed with exit code {}", code);
+                std::process::exit(101);
             }
-            None => panic!("Execution of Ghidra plugin failed: Process was terminated."),
+            None => {
+                eprintln!("Execution of Ghidra plugin failed: Process was terminated.");
+                std::process::exit(101);
+            }
         }
     }
     // Read the results from the Ghidra script
