@@ -111,7 +111,14 @@ impl<'a> Context<'a> {
         mem_image: &'a RuntimeMemoryImage,
     ) -> Self {
         let (cwe_sender, _) = crossbeam_channel::unbounded();
-        Context::new(project, mem_image, pi_results, string_symbols, cwe_sender)
+        Context::new(
+            project,
+            mem_image,
+            pi_results,
+            string_symbols,
+            HashMap::new(),
+            cwe_sender,
+        )
     }
 }
 
@@ -181,6 +188,37 @@ fn tainting_string_function_parameters() {
     assert_eq!(
         new_state.get_register_taint(&rbp_reg),
         Some(&Taint::Tainted(rbp_reg.size))
+    );
+}
+
+#[test]
+fn first_param_pointing_to_memory_taint() {
+    let mut setup = Setup::new();
+
+    let rdi_reg = Variable::mock("RDI", 8 as u64);
+    setup
+        .state
+        .save_taint_to_memory(&setup.base_eight_offset, Taint::Tainted(ByteSize::new(8)));
+    setup
+        .pi_state
+        .set_register(&rdi_reg, setup.base_eight_offset.clone());
+
+    let mem_image = RuntimeMemoryImage::mock();
+    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image);
+    pi_results.compute();
+
+    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
+
+    let arg = Arg::Register(rdi_reg);
+    assert_eq!(
+        context.first_param_points_to_memory_taint(&setup.pi_state, &mut setup.state, &arg),
+        true
+    );
+    assert_eq!(
+        setup
+            .state
+            .check_if_address_points_to_taint(setup.base_eight_offset, &setup.pi_state),
+        false
     );
 }
 

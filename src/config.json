@@ -9,6 +9,10 @@
       "snprintf",
       "strcat",
       "strncat"
+    ],
+    "user_input_symbols": [
+      "scanf",
+      "__isoc99_scanf"
     ]
   },
   "CWE190": {

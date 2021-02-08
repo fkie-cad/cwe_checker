@@ -1,21 +1,28 @@
+#[cfg(test)]
 use apint::ApInt;
 
-use super::{BinOpType, CastOpType, Expression, Variable};
+#[cfg(test)]
+use super::{CastOpType, Variable};
+
+use super::{BinOpType, Expression};
 use crate::prelude::*;
 
 /// ## Helper functions for building expressions
 impl Expression {
-    // Shortcut for creating a constant expression from an i64 value
+    /// Shortcut for creating a constant expression from an i64 value
+    #[cfg(test)]
     pub fn const_from_i64(value: i64) -> Expression {
         Expression::Const(Bitvector::from_i64(value))
     }
 
-    // Shortcut for creating a constant expression from an apint value (e.g. copy of global address)
+    /// Shortcut for creating a constant expression from an apint value (e.g. copy of global address)
+    #[cfg(test)]
     pub fn const_from_apint(value: ApInt) -> Expression {
         Expression::Const(value)
     }
 
-    // Shortcut for creating a variable expression
+    /// Shortcut for creating a variable expression
+    #[cfg(test)]
     pub fn var(name: &str) -> Expression {
         Expression::Var(Variable {
             name: name.into(),
@@ -24,7 +31,8 @@ impl Expression {
         })
     }
 
-    // Shortcut for creating a cast expression
+    /// Shortcut for creating a cast expression
+    #[cfg(test)]
     pub fn cast(self, op: CastOpType) -> Expression {
         Expression::Cast {
             op,
@@ -33,7 +41,8 @@ impl Expression {
         }
     }
 
-    // Shortcut for creating a subpiece expression
+    /// Shortcut for creating a subpiece expression
+    #[cfg(test)]
     pub fn subpiece(self, low_byte: ByteSize, size: ByteSize) -> Expression {
         Expression::Subpiece {
             low_byte,

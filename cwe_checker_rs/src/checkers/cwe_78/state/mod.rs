@@ -7,7 +7,7 @@ use crate::{
     analysis::pointer_inference::{Data, State as PointerInferenceState},
     checkers::cwe_476::Taint,
     intermediate_representation::{
-        Arg, BinOpType, CallingConvention, Expression, ExternSymbol, Project, Sub, Variable,
+        Arg, CallingConvention, Expression, ExternSymbol, Project, Sub, Variable,
     },
     prelude::*,
 };
@@ -113,17 +113,8 @@ impl State {
                 }
                 Arg::Stack { offset, size } => {
                     if let Some(pi_state) = pi_state {
-                        let address_exp = Expression::BinOp {
-                            op: BinOpType::IntAdd,
-                            lhs: Box::new(Expression::Var(stack_pointer_register.clone())),
-                            rhs: Box::new(Expression::Const(
-                                Bitvector::from_i64(*offset)
-                                    .into_truncate(apint::BitWidth::from(
-                                        stack_pointer_register.size,
-                                    ))
-                                    .unwrap(),
-                            )),
-                        };
+                        let address_exp =
+                            Expression::Var(stack_pointer_register.clone()).plus_const(*offset);
                         if let Ok(address) = pi_state.eval(&address_exp) {
                             state.save_taint_to_memory(&address, Taint::Tainted(*size));
                         }
@@ -170,16 +161,17 @@ impl State {
         }
     }
 
-    /// Returns the sub of the currently analysed nodes
+    /// Returns the sub of the currently analysed nodes.
     pub fn get_current_sub(&self) -> &Option<Term<Sub>> {
         &self.current_sub
     }
 
+    /// Set the current sub to locate the analysis.
     pub fn set_current_sub(&mut self, current_sub: &Term<Sub>) {
         self.current_sub = Some(current_sub.clone());
     }
 
-    /// Sets the pointer inference to definition map for the current state
+    /// Sets the pointer inference to definition map for the current state.
     pub fn set_pi_def_map(&mut self, pi_def_map: Option<HashMap<Tid, PointerInferenceState>>) {
         self.pi_def_map = pi_def_map;
     }
@@ -189,19 +181,19 @@ impl State {
         self.register_taint.get(var)
     }
 
-    /// Returns an iterator over currently tainted registers
+    /// Returns an iterator over currently tainted registers.
     pub fn get_register_taints(&self) -> std::collections::hash_map::Iter<Variable, Taint> {
         self.register_taint.iter()
     }
 
-    /// Gets the string constant saved at the given address and saves it to the string constants field
+    /// Gets the string constant saved at the given address and saves it to the string constants field.
     pub fn evaluate_constant(&mut self, constant: Bitvector) {
         // TODO: check whether the constant is a valid memory address in the binary
         // If so, get the string constant at that memory address and save it in the state
         self.string_constants.insert(constant);
     }
 
-    /// Taints inputs registers and evalutates constant memory addresses for simple assignments
+    /// Taints input registers and evalutates constant memory addresses for simple assignments
     /// and taints memory if a pointer is overwritten.
     /// The taint on the result register is removed.
     pub fn set_expression_taint_and_store_constants(
@@ -233,7 +225,7 @@ impl State {
         }
     }
 
-    /// Taints the input register of a store instruction and removes the memory taint at the target address
+    /// Taints the input register of a store instruction and removes the memory taint at the target address.
     pub fn taint_value_to_be_stored(
         &mut self,
         def_tid: &Tid,
@@ -253,7 +245,7 @@ impl State {
         }
     }
 
-    /// Taints all input register of a expression
+    /// Taints all input register of an expression.
     pub fn taint_def_input_register(
         &mut self,
         expr: &Expression,
@@ -277,7 +269,7 @@ impl State {
         }
     }
 
-    /// Either taints the input register or a memory position if it is the stack pointer register
+    /// Either taints the input register or a memory position if it is the stack pointer register.
     pub fn taint_variable_input(
         &mut self,
         var: &Variable,
@@ -300,7 +292,7 @@ impl State {
         }
     }
 
-    /// Remove the taint in the specified memory regions at the specified offsets
+    /// Remove the taint in the specified memory regions at the specified offsets.
     pub fn remove_mem_taint_at_target(&mut self, address: &Data) {
         if let Data::Pointer(pointer) = address {
             for (mem_id, offset) in pointer.targets().iter() {
@@ -376,7 +368,7 @@ impl State {
         false
     }
 
-    /// Check whether a generic function call may contain tainted values in its parameters.
+    /// Removes all taints of registers that are not generic function parameters.
     /// Since we don't know the actual calling convention of the call,
     /// we approximate the parameters with all parameter registers of the standard calling convention of the project.
     pub fn remove_non_parameter_taints_for_generic_function(&mut self, project: &Project) {
@@ -427,7 +419,7 @@ impl State {
         self.memory_taint.is_empty() && self.register_taint.is_empty()
     }
 
-    // Checks whether the return registers are contained in the current tainted registers
+    /// Checks whether the return registers are contained in the current tainted registers
     pub fn check_return_registers_for_taint(&self, register_list: Vec<String>) -> bool {
         // Check whether a register contains taint
         for (register, taint) in &self.register_taint {

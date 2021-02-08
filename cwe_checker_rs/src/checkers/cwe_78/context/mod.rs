@@ -15,7 +15,6 @@ use crate::{
         pointer_inference::PointerInference as PointerInferenceComputation,
         pointer_inference::State as PointerInferenceState,
     },
-    bil::Bitvector,
     checkers::cwe_476::Taint,
     intermediate_representation::*,
     utils::{binary::RuntimeMemoryImage, log::CweWarning},
@@ -27,7 +26,7 @@ pub struct Context<'a> {
     project: &'a Project,
     /// A pointer to the representation of the runtime memory image.
     runtime_memory_image: &'a RuntimeMemoryImage,
-    /// The reversed pointer inference graph
+    /// The reversed control flow graph for the analysis
     graph: Graph<'a>,
     /// A pointer to the results of the pointer inference analysis.
     /// They are used to determine the targets of pointers to memory,
@@ -45,6 +44,8 @@ pub struct Context<'a> {
     extern_symbol_map: Arc<HashMap<Tid, &'a ExternSymbol>>,
     /// Maps the TID of an extern string related symbol to the corresponding extern symbol struct.
     string_symbol_map: Arc<HashMap<Tid, &'a ExternSymbol>>,
+    /// Maps the TID of an extern symbol that take input from the user to the corresponding extern symbol struct.
+    user_input_symbol_map: Arc<HashMap<Tid, &'a ExternSymbol>>,
     /// A map to get the node index of the `BlkEnd` node containing a given [`Jmp`].
     /// The keys are of the form `(Jmp-TID, Current-Sub-TID)`
     /// to distinguish the nodes for blocks contained in more than one function.
@@ -66,6 +67,7 @@ impl<'a> Context<'a> {
         runtime_memory_image: &'a RuntimeMemoryImage,
         pointer_inference_results: &'a PointerInferenceComputation<'a>,
         string_symbols: HashMap<Tid, &'a ExternSymbol>,
+        user_input_symbols: HashMap<Tid, &'a ExternSymbol>,
         cwe_collector: crossbeam_channel::Sender<CweWarning>,
     ) -> Self {
         let mut block_first_def_set = HashSet::new();
@@ -108,6 +110,7 @@ impl<'a> Context<'a> {
             block_first_def_set: Arc::new(block_first_def_set),
             extern_symbol_map: Arc::new(extern_symbol_map),
             string_symbol_map: Arc::new(string_symbols),
+            user_input_symbol_map: Arc::new(user_input_symbols),
             jmp_to_blk_end_node_map: Arc::new(jmp_to_blk_end_node_map),
             taint_source: None,
             taint_source_sub: None,
@@ -121,8 +124,8 @@ impl<'a> Context<'a> {
         let source = self.taint_source.unwrap();
         let name = self.taint_source_name.clone().unwrap();
         let description: String = format!(
-            "(Potential OS Command Injection) {} ({}) -> {}",
-            sub_name, source.tid.address, name
+            "(Input for call {} is not properly sanitized) {} ({}) -> {}",
+            name, sub_name, source.tid.address, name
         );
         let cwe_warning = CweWarning::new(
             String::from(CWE_MODULE.name),
@@ -168,26 +171,26 @@ impl<'a> Context<'a> {
             .pointer_inference_results
             .get_node_value(call_source_node)
         {
-            let mut relevant_fuction_call = false;
-            for parameter in string_symbol.parameters.iter() {
-                if let Ok(address) = pi_state.eval_parameter_arg(
-                    parameter,
-                    &self.project.stack_pointer_register,
-                    self.runtime_memory_image,
-                ) {
-                    // Check whether the parameter points to a tainted memory target
-                    // Since the first parameter of these string functions is also the return parameter,
-                    // this will serve as an indicator whether the function call is relevant to the taint analysis.
-                    if state.check_if_address_points_to_taint(address.clone(), pi_state) {
-                        new_state.remove_mem_taint_at_target(&address);
-                        relevant_fuction_call = true;
-                    }
-                    if relevant_fuction_call {
-                        match parameter {
-                            Arg::Register(var) => {
-                                new_state.set_register_taint(var, Taint::Tainted(var.size))
-                            }
-                            Arg::Stack { size, .. } => {
+            // Check whether the parameter points to a tainted memory target
+            // Since the first parameter of these string functions is also the return parameter,
+            // this will serve as an indicator whether the function call is relevant to the taint analysis.
+            let relevant_fuction_call = if let Some(param) = string_symbol.parameters.get(0) {
+                self.first_param_points_to_memory_taint(pi_state, &mut new_state, param)
+            } else {
+                panic!("Missing parameters for string related function!");
+            };
+            if relevant_fuction_call {
+                for parameter in string_symbol.parameters.iter() {
+                    match parameter {
+                        Arg::Register(var) => {
+                            new_state.set_register_taint(var, Taint::Tainted(var.size))
+                        }
+                        Arg::Stack { size, .. } => {
+                            if let Ok(address) = pi_state.eval_parameter_arg(
+                                parameter,
+                                &self.project.stack_pointer_register,
+                                self.runtime_memory_image,
+                            ) {
                                 new_state.save_taint_to_memory(&address, Taint::Tainted(*size))
                             }
                         }
@@ -196,6 +199,28 @@ impl<'a> Context<'a> {
             }
         }
         new_state
+    }
+
+    /// Checks whether the firt parameter of a string related function points to a taint.
+    /// If so, removes the taint at the target memory.
+    pub fn first_param_points_to_memory_taint(
+        &self,
+        pi_state: &PointerInferenceState,
+        state: &mut State,
+        parameter: &Arg,
+    ) -> bool {
+        if let Ok(address) = pi_state.eval_parameter_arg(
+            parameter,
+            &self.project.stack_pointer_register,
+            self.runtime_memory_image,
+        ) {
+            if state.check_if_address_points_to_taint(address.clone(), pi_state) {
+                state.remove_mem_taint_at_target(&address);
+                return true;
+            }
+        }
+
+        false
     }
 
     /// This function taints the registers and stack positions of the parameter pointers of external functions
@@ -229,7 +254,7 @@ impl<'a> Context<'a> {
                     .remove_non_callee_saved_taint(symbol.get_calling_convention(self.project));
                 // TODO: Parameter detection since targets of input parameters are the return locations
                 // Taint memory for string inputs
-                if symbol.name == "scanf" {
+                if self.user_input_symbol_map.get(&symbol.tid).is_some() {
                     self.generate_cwe_warning(
                         &new_state.get_current_sub().as_ref().unwrap().term.name,
                     );
@@ -258,17 +283,8 @@ impl<'a> Context<'a> {
             .pointer_inference_results
             .get_node_value(call_source_node)
         {
-            let address_exp = Expression::BinOp {
-                op: BinOpType::IntAdd,
-                lhs: Box::new(Expression::Var(self.project.stack_pointer_register.clone())),
-                rhs: Box::new(Expression::Const(
-                    Bitvector::from_i64(offset)
-                        .into_truncate(apint::BitWidth::from(
-                            self.project.stack_pointer_register.size,
-                        ))
-                        .unwrap(),
-                )),
-            };
+            let address_exp =
+                Expression::Var(self.project.stack_pointer_register.clone()).plus_const(offset);
             if let Ok(address) = pi_state.eval(&address_exp) {
                 new_state.save_taint_to_memory(&address, Taint::Tainted(size));
             }

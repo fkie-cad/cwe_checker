@@ -70,7 +70,6 @@ impl State {
     }
 }
 
-#[cfg(test)]
 struct Setup {
     state: State,
     pi_state: PointerInferenceState,
@@ -84,7 +83,6 @@ struct Setup {
     base_sixteen_offset: DataDomain<BitvectorDomain>,
 }
 
-#[cfg(test)]
 impl Setup {
     fn new() -> Self {
         let (state, pi_state) = State::mock_with_pi_state();

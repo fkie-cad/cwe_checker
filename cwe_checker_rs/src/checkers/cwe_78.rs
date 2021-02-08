@@ -11,11 +11,24 @@
 //! Using backward dataflow analysis we search for an executation path from a system call parameter (string) to an user input
 //! to identify possible command injections.
 //!
+//! To find relevant string related functions, such as sprintf, it is assumed that the first input parameter points
+//! to the memory position that will be used as the return location. (e.g. char *strcat(char *dest, const char *src)
+//! where 'char *dest' will contain the return value)
+//!
+//! For instance:
+//!     ...
+//!     MOV RAX, qword ptr [RBP + local_10]
+//!     MOV RDI, RAX                        // RDI is the first input parameter for the strcat call and it points to [RBP + local_10]
+//!     CALL strcat
+//!     MOV RAX, qword ptr [RBP + local_10] // In the backwards analysis [RBP + local_10] will be tainted and it contains the return value
+//!     ...
+//!
 //! ### Symbols configurable in config.json
 //!
 //! The symbols are the functions which
 //!   1. make system calls (e.g. system)
-//!   3. manipulate strings (e.g. sprintf, strcat, memcpy, etc.)
+//!   2. manipulate strings (e.g. sprintf, strcat, memcpy, etc.)
+//!   3. take user input (e.g. scanf)
 //!
 //! ## False Positives
 //!
@@ -61,6 +74,8 @@ pub struct Config {
     system_symbols: Vec<String>,
     /// The names of the string manipulating symbols
     string_symbols: Vec<String>,
+    /// The name of the user input symbols
+    user_input_symbols: Vec<String>,
 }
 
 /// This check searches for system calls and sets their parameters as taint source if available.
@@ -76,15 +91,18 @@ pub fn check_cwe(
     let (cwe_sender, cwe_receiver) = crossbeam_channel::unbounded();
 
     let config: Config = serde_json::from_value(cwe_params.clone()).unwrap();
-    let symbol_map =
+    let system_symbols =
         crate::utils::symbol_utils::get_symbol_map(project, &config.system_symbols[..]);
     let string_symbols =
         crate::utils::symbol_utils::get_symbol_map(project, &config.string_symbols[..]);
+    let user_input_symbols =
+        crate::utils::symbol_utils::get_symbol_map(project, &config.user_input_symbols[..]);
     let general_context = Context::new(
         project,
         analysis_results.runtime_memory_image,
         &pointer_inference_results,
         string_symbols,
+        user_input_symbols,
         cwe_sender,
     );
 
@@ -93,7 +111,7 @@ pub fn check_cwe(
     for edge in general_context.get_pi_graph().edge_references() {
         if let Edge::ExternCallStub(jmp) = edge.weight() {
             if let Jmp::Call { target, .. } = &jmp.term {
-                if let Some(symbol) = symbol_map.get(target) {
+                if let Some(symbol) = system_symbols.get(target) {
                     let node = edge.source();
                     let current_sub = match general_context.get_pi_graph()[node] {
                         Node::BlkEnd(_blk, sub) => sub,
