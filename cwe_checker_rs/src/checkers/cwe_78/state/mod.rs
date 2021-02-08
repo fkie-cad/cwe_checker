@@ -193,7 +193,7 @@ impl State {
         self.string_constants.insert(constant);
     }
 
-    /// Taints input registers and evalutates constant memory addresses for simple assignments
+    /// Taints input registers and evaluates constant memory addresses for simple assignments
     /// and taints memory if a pointer is overwritten.
     /// The taint on the result register is removed.
     pub fn set_expression_taint_and_store_constants(
