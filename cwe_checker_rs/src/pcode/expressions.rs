@@ -216,6 +216,7 @@ pub enum ExpressionType {
     FLOAT_SQRT,
     FLOAT_CEIL,
     FLOAT_FLOOR,
+    #[serde(alias = "ROUND")]
     FLOAT_ROUND,
     FLOAT_NAN,
 
