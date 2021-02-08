@@ -125,7 +125,7 @@ impl<'a> Context<'a> {
         let name = self.taint_source_name.clone().unwrap();
         let description: String = format!(
             "(Potential OS Command Injection) Input for call to {} is not properly sanitized in function {} ({})",
-            sub_name, source.tid.address, name
+            name, sub_name, source.tid.address,
         );
         let cwe_warning = CweWarning::new(
             String::from(CWE_MODULE.name),
