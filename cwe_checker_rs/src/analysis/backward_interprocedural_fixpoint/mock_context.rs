@@ -88,6 +88,7 @@ impl<'a> crate::analysis::backward_interprocedural_fixpoint::Context<'a> for Con
         &self,
         target_value: Option<&u64>,
         return_value: Option<&u64>,
+        _caller_sub: &Term<Sub>,
         _call: &Term<Jmp>,
         _return_: &Term<Jmp>,
     ) -> Option<u64> {
@@ -105,7 +106,11 @@ impl<'a> crate::analysis::backward_interprocedural_fixpoint::Context<'a> for Con
     }
 
     /// Simply copy the value
-    fn split_return_stub(&self, combined_value: &u64) -> Option<u64> {
+    fn split_return_stub(
+        &self,
+        combined_value: &u64,
+        _returned_from_sub: &Term<Sub>,
+    ) -> Option<u64> {
         Some(*combined_value)
     }
 

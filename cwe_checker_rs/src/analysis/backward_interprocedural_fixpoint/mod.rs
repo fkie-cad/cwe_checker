@@ -59,6 +59,7 @@ pub trait Context<'a> {
         &self,
         target_value: Option<&Self::Value>,
         return_value: Option<&Self::Value>,
+        caller_sub: &Term<Sub>,
         call: &Term<Jmp>,
         return_: &Term<Jmp>,
     ) -> Option<Self::Value>;
@@ -71,7 +72,11 @@ pub trait Context<'a> {
     /// Transition function for return stub split.
     /// Has access to the value at the ReturnCombine node and
     /// decides which data is transferred along the Return Stub Edge.
-    fn split_return_stub(&self, combined_value: &Self::Value) -> Option<Self::Value>;
+    fn split_return_stub(
+        &self,
+        combined_value: &Self::Value,
+        returned_from_sub: &Term<Sub>,
+    ) -> Option<Self::Value>;
 
     /// Transition function for calls to functions not contained in the binary.
     /// The corresponding edge goes from the callsite to the returned-to block.
@@ -165,10 +170,16 @@ impl<'a, T: Context<'a>> GeneralFPContext for GeneralizedContext<'a, T> {
             }),
             // The user has the ability to split the node value at the BlkStart return node
             // to only send specific data along the ReturnStub Edge to the last BlkEnd node called subroutine
-            Edge::CRReturnStub => self
-                .context
-                .split_return_stub(node_value.unwrap_value())
-                .map(NodeValue::Value),
+            Edge::CRReturnStub => {
+                // The subroutine term from which the program returns
+                let returned_from_sub = match graph.node_weight(end_node) {
+                    Some(Node::BlkEnd { 0: _, 1: sub_term }) => sub_term,
+                    _ => panic!("Malformed Control flow graph"),
+                };
+                self.context
+                    .split_return_stub(node_value.unwrap_value(), returned_from_sub)
+                    .map(NodeValue::Value)
+            }
 
             // The CallCombine Edge merges the values coming in from the CallStub Edge and Call Edge
             // It also gives the user access to the call and return term.
@@ -178,17 +189,18 @@ impl<'a, T: Context<'a>> GeneralFPContext for GeneralizedContext<'a, T> {
                     call_stub,
                     interprocedural_flow,
                 } => {
-                    let call_block = match graph.node_weight(start_node) {
+                    let (call_block, caller_sub) = match graph.node_weight(start_node) {
                         Some(Node::CallSource {
-                            source: (call_block, ..),
+                            source: (call_block, call_sub),
                             target: _,
-                        }) => call_block,
+                        }) => (call_block, call_sub),
                         _ => panic!("Malformed Control flow graph"),
                     };
                     let call_term = &call_block.term.jmps[0];
                     match self.context.update_callsite(
                         interprocedural_flow.as_ref(),
                         call_stub.as_ref(),
+                        caller_sub,
                         call_term,
                         return_term,
                     ) {

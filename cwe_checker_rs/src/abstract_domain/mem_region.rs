@@ -200,6 +200,11 @@ impl<T: AbstractDomain + SizedDomain + HasTop + std::fmt::Debug> MemRegionData<T
         self.values.values()
     }
 
+    /// Get the map of all elements including their offset into the memory region.
+    pub fn entry_map(&self) -> &BTreeMap<i64, T> {
+        &self.values
+    }
+
     /// Get an iterator over all values in the memory region for in-place manipulation.
     /// Note that one can changes values to *Top* using the iterator.
     /// These values should be removed from the memory region using `clear_top_values()`.

@@ -17,7 +17,7 @@ pub struct State {
     /// The list of all known memory objects.
     pub memory: AbstractObjectList,
     /// The abstract identifier of the current stack frame.
-    /// It points to the to the base of the stack frame, i.e. only negative offsets point into the current stack frame.
+    /// It points to the base of the stack frame, i.e. only negative offsets point into the current stack frame.
     pub stack_id: AbstractIdentifier,
     /// All known IDs of caller stack frames.
     /// Note that these IDs are named after the callsite,
