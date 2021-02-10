@@ -9,7 +9,6 @@ use std::process::Command;
 use std::thread;
 use std::{collections::HashSet, io::Read};
 use structopt::StructOpt;
-use tempfile::TempDir;
 
 #[derive(Debug, StructOpt)]
 /// Find vulnerable patterns in binary executables
@@ -249,8 +248,11 @@ fn get_project_from_ghidra(file_path: &Path, binary: &[u8], quiet_flag: bool) ->
     let ghidra_plugin_path = get_ghidra_plugin_path("p_code_extractor");
 
     // Create a temporary pipe directory in which a new named pipe (fifo) is created.
-    let tmp_dir = TempDir::new_in(".").unwrap();
-    let fifo_path = tmp_dir.path().join("pcode.pipe");
+    let tmp_pipe_dir = tmp_folder.join(format!("tmp_pipe_dir_{}", timestamp_suffix));
+    if !tmp_pipe_dir.exists() {
+        std::fs::create_dir(tmp_pipe_dir.clone()).expect("Unable to create temporary folder");
+    }
+    let fifo_path = tmp_pipe_dir.join("pcode.pipe");
 
     // Create a new fifo and give read, write and execute rights to the owner
     match unistd::mkfifo(&fifo_path, stat::Mode::S_IRWXU) {
