@@ -2,7 +2,6 @@ import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.stream.StreamSupport;
-import java.util.concurrent.TimeUnit;
 
 import bil.*;
 import term.*;
@@ -58,7 +57,6 @@ public class PcodeExtractor extends GhidraScript {
         String jsonPath = getScriptArgs()[0];
         Serializer ser = new Serializer(project, jsonPath);
         ser.serializeProject();
-        TimeUnit.SECONDS.sleep(3);
 
     }
 
