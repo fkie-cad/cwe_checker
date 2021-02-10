@@ -206,13 +206,6 @@ mod tests {
         let mut error_log = Vec::new();
         let mut tests = all_test_cases("cwe_190", "CWE190");
 
-        // Ghidra does not recognize all extern function calls in the disassembly step for MIPS.
-        // Needs own control flow graph analysis to be fixed.
-        mark_skipped(&mut tests, "mips64", "clang");
-        mark_skipped(&mut tests, "mips64el", "clang");
-        mark_skipped(&mut tests, "mips", "gcc");
-        mark_skipped(&mut tests, "mipsel", "gcc");
-
         mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
         mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.
 
@@ -321,13 +314,6 @@ mod tests {
         let mut error_log = Vec::new();
         let mut tests = all_test_cases("cwe_415", "Memory");
 
-        // Ghidra does not recognize all extern function calls in the disassembly step for MIPS.
-        // Needs own control flow graph analysis to be fixed.
-        mark_architecture_skipped(&mut tests, "mips64");
-        mark_architecture_skipped(&mut tests, "mips64el");
-        mark_architecture_skipped(&mut tests, "mips");
-        mark_architecture_skipped(&mut tests, "mipsel");
-
         mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
         mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.
 
@@ -356,20 +342,13 @@ mod tests {
         let mut error_log = Vec::new();
         let mut tests = all_test_cases("cwe_416", "Memory");
 
-        // Ghidra does not recognize all extern function calls in the disassembly step for MIPS.
-        // Needs own control flow graph analysis to be fixed.
-        mark_architecture_skipped(&mut tests, "mips64");
-        mark_architecture_skipped(&mut tests, "mips64el");
-        mark_architecture_skipped(&mut tests, "mips");
-        mark_architecture_skipped(&mut tests, "mipsel");
-
         mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
         mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.
 
         // The analysis loses track of the stack pointer offset in the main() function
         // because of a "INT_AND ESP 0xfffffff0" instruction.
         // We would need knowledge about alignment guarantees for the stack pointer at the start of main() to fix this.
-        mark_architecture_skipped(&mut tests, "x86");
+        mark_skipped(&mut tests, "x86", "gcc");
 
         mark_compiler_skipped(&mut tests, "mingw32-gcc"); // TODO: Check reason for failure!
 
@@ -390,13 +369,6 @@ mod tests {
     fn cwe_426() {
         let mut error_log = Vec::new();
         let mut tests = all_test_cases("cwe_426", "CWE426");
-
-        // Ghidra does not recognize all extern function calls in the disassembly step for MIPS.
-        // Needs own control flow graph analysis to be fixed.
-        mark_skipped(&mut tests, "mips64", "clang");
-        mark_skipped(&mut tests, "mips64el", "clang");
-        mark_skipped(&mut tests, "mips", "gcc");
-        mark_skipped(&mut tests, "mipsel", "gcc");
 
         mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
         mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.
@@ -427,20 +399,11 @@ mod tests {
         mark_skipped(&mut tests, "arm", "clang");
         mark_skipped(&mut tests, "mips", "clang");
         mark_skipped(&mut tests, "mipsel", "clang");
-
-        // Ghidra does not recognize all extern function calls in the disassembly step for MIPS.
-        // Needs own control flow graph analysis to be fixed.
         mark_skipped(&mut tests, "mips64", "clang");
         mark_skipped(&mut tests, "mips64el", "clang");
-        mark_skipped(&mut tests, "mips", "gcc");
-        mark_skipped(&mut tests, "mipsel", "gcc");
 
         mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
         mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.
-
-        // This is a bug in the handling of sub-registers.
-        // Register `ECX` is read, but the analysis doesn't know that `ECX` is a sub-register of `RCX`.
-        mark_skipped(&mut tests, "x64", "clang");
 
         mark_compiler_skipped(&mut tests, "mingw32-gcc"); // TODO: Check reason for failure!
 
@@ -461,12 +424,6 @@ mod tests {
     fn cwe_476() {
         let mut error_log = Vec::new();
         let mut tests = all_test_cases("cwe_476", "CWE476");
-
-        // TODO: Check reason for failure!
-        mark_architecture_skipped(&mut tests, "mips64");
-        mark_architecture_skipped(&mut tests, "mips64el");
-        mark_architecture_skipped(&mut tests, "mips");
-        mark_architecture_skipped(&mut tests, "mipsel");
 
         mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
         mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.
@@ -491,9 +448,6 @@ mod tests {
         let mut error_log = Vec::new();
         let mut tests = linux_test_cases("cwe_560", "CWE560");
 
-        mark_skipped(&mut tests, "arm", "gcc"); // The parameter is loaded from global memory (which is not supported yet)
-        mark_skipped(&mut tests, "mips", "gcc"); // The parameter is loaded from global memory (which is not supported yet)
-        mark_skipped(&mut tests, "mipsel", "gcc"); // The parameter is loaded from global memory (which is not supported yet)
         mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
         mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.
 

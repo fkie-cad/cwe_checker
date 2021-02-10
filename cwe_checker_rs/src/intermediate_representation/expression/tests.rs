@@ -116,6 +116,13 @@ fn trivial_expression_substitution() {
         expr,
         Expression::Const(Bitvector::zero(ByteSize::new(8).into()))
     );
+    let mut expr = Expression::BinOp {
+        op: BinOpType::IntOr,
+        lhs: Box::new(setup.rax_variable.clone()),
+        rhs: Box::new(Expression::Const(Bitvector::zero(ByteSize::new(8).into()))),
+    };
+    expr.substitute_trivial_operations();
+    assert_eq!(expr, setup.rax_variable);
 }
 
 #[test]
