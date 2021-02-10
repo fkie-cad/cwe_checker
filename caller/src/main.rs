@@ -301,13 +301,7 @@ fn get_project_from_ghidra(file_path: &Path, binary: &[u8], quiet_flag: bool) ->
     });
 
     // Open the FIFO
-    let file = match std::fs::File::open(fifo_path.clone()) {
-        Ok(file) => file,
-        Err(err) => panic!(
-            "Could not open fifo pipe after contents have been written by Ghidra. {}",
-            err
-        ),
-    };
+    let file = std::fs::File::open(fifo_path.clone()).expect("Could not open FIFO.");
 
     let mut project_pcode: cwe_checker_rs::pcode::Project =
         serde_json::from_reader(std::io::BufReader::new(file)).unwrap();
