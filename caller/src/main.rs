@@ -7,7 +7,7 @@ use nix::{sys::stat, unistd};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::thread;
-use std::{collections::HashSet, io::Read};
+use std::collections::HashSet;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -247,15 +247,11 @@ fn get_project_from_ghidra(file_path: &Path, binary: &[u8], quiet_flag: bool) ->
         .to_string();
     let ghidra_plugin_path = get_ghidra_plugin_path("p_code_extractor");
 
-    // Create a temporary pipe directory in which a new named pipe (fifo) is created.
-    let tmp_pipe_dir = tmp_folder.join(format!("tmp_pipe_dir_{}", timestamp_suffix));
-    if !tmp_pipe_dir.exists() {
-        std::fs::create_dir(tmp_pipe_dir.clone()).expect("Unable to create temporary folder");
-    }
-    let fifo_path = tmp_pipe_dir.join("pcode.pipe");
+    // Create a unique name for the pipe
+    let fifo_path = tmp_folder.join(format!("pcode_{}.pipe", timestamp_suffix));
 
-    // Create a new fifo and give read, write and execute rights to the owner
-    match unistd::mkfifo(&fifo_path, stat::Mode::S_IRWXU) {
+    // Create a new fifo and give read and write rights to the owner
+    match unistd::mkfifo(&fifo_path, stat::Mode::from_bits(384).unwrap()) {
         Ok(_) => println!("created {:?}", fifo_path),
         Err(err) => println!("Error creating fifo: {}", err),
     }
@@ -304,19 +300,14 @@ fn get_project_from_ghidra(file_path: &Path, binary: &[u8], quiet_flag: bool) ->
         }
     });
 
-    // Read the contents that Ghidra has written into the fifo pipe and put them into a string
-    let json_string = if let Ok(mut file) = std::fs::File::open(fifo_path) {
-        let mut contents = String::new();
-        match file.read_to_string(&mut contents) {
-            Ok(_) => contents,
-            Err(err) => panic!("Failed to read contents from fifo pipe {}", err),
-        }
-    } else {
-        panic!("Could not open fifo pipe after contents have been written by Ghidra.");
+    // Open the FIFO 
+    let file = match std::fs::File::open(fifo_path.clone()) {
+        Ok(file) => file,
+        Err(err) => panic!("Could not open fifo pipe after contents have been written by Ghidra. {}", err),
     };
 
     let mut project_pcode: cwe_checker_rs::pcode::Project =
-        serde_json::from_str(json_string.as_str()).unwrap();
+        serde_json::from_reader(std::io::BufReader::new(file)).unwrap();
     project_pcode.normalize();
     let project: Project = match cwe_checker_rs::utils::get_binary_base_address(binary) {
         Ok(binary_base_address) => project_pcode.into_ir_project(binary_base_address),
@@ -336,6 +327,8 @@ fn get_project_from_ghidra(file_path: &Path, binary: &[u8], quiet_flag: bool) ->
     ghidra_subprocess
         .join()
         .expect("The Ghidra thread to be joined has panicked!");
+
+    std::fs::remove_file(fifo_path).unwrap();
 
     project
 }
