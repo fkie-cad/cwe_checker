@@ -45,16 +45,12 @@ impl Variable {
     pub fn parse_to_bitvector(&self) -> Bitvector {
         match (&self.value, &self.address) {
             (Some(hex_value), None) | (None, Some(hex_value)) => {
-                // TODO: Implement parsing for large hex values.
-                if u64::from(self.size) > 8 {
-                    panic!(
-                        "Parsing of immediates greater than 8 bytes not yet implemented: {}",
-                        hex_value
-                    );
+                let mut bitvector = Bitvector::from_str_radix(16, hex_value).unwrap();
+                match bitvector.width().cmp(&self.size.into()) {
+                    std::cmp::Ordering::Greater => bitvector.truncate(self.size).unwrap(),
+                    std::cmp::Ordering::Less => bitvector.zero_extend(self.size).unwrap(),
+                    std::cmp::Ordering::Equal => (),
                 }
-                let val: u64 = u64::from_str_radix(&hex_value, 16).unwrap();
-                let mut bitvector: Bitvector = Bitvector::from_u64(val);
-                bitvector.truncate(self.size).unwrap();
                 bitvector
             }
             _ => panic!(),
@@ -379,5 +375,35 @@ mod tests {
             "#,
         )
         .unwrap();
+    }
+
+    #[test]
+    fn parse_to_bitvector() {
+        let mut var = Variable {
+            name: None,
+            value: Some("0".to_string()),
+            address: None,
+            size: ByteSize::new(8),
+            is_virtual: false,
+        };
+        assert_eq!(var.parse_to_bitvector(), Bitvector::from_u64(0));
+        var.value = Some("0010f".to_string());
+        assert_eq!(var.parse_to_bitvector(), Bitvector::from_u64(271));
+        var.value = Some("1ff".to_string());
+        var.size = ByteSize::new(1);
+        assert_eq!(var.parse_to_bitvector(), Bitvector::from_u8(255));
+        var.size = ByteSize::new(16);
+        assert_eq!(var.parse_to_bitvector(), Bitvector::from_u128(511));
+
+        var.value = Some("00_ffffffffffffffff_ffffffffffffffff".to_string());
+        var.size = ByteSize::new(16);
+        assert_eq!(var.parse_to_bitvector(), Bitvector::from_i128(-1));
+        var.size = ByteSize::new(10);
+        assert_eq!(
+            var.parse_to_bitvector(),
+            Bitvector::from_i128(-1)
+                .into_truncate(ByteSize::new(10))
+                .unwrap()
+        );
     }
 }
