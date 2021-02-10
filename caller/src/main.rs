@@ -4,10 +4,10 @@ use cwe_checker_rs::utils::{get_ghidra_plugin_path, read_config_file};
 use cwe_checker_rs::AnalysisResults;
 use cwe_checker_rs::{intermediate_representation::Project, utils::log::LogMessage};
 use nix::{sys::stat, unistd};
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::thread;
-use std::collections::HashSet;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -300,10 +300,13 @@ fn get_project_from_ghidra(file_path: &Path, binary: &[u8], quiet_flag: bool) ->
         }
     });
 
-    // Open the FIFO 
+    // Open the FIFO
     let file = match std::fs::File::open(fifo_path.clone()) {
         Ok(file) => file,
-        Err(err) => panic!("Could not open fifo pipe after contents have been written by Ghidra. {}", err),
+        Err(err) => panic!(
+            "Could not open fifo pipe after contents have been written by Ghidra. {}",
+            err
+        ),
     };
 
     let mut project_pcode: cwe_checker_rs::pcode::Project =
