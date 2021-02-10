@@ -4,10 +4,10 @@ use cwe_checker_rs::utils::{get_ghidra_plugin_path, read_config_file};
 use cwe_checker_rs::AnalysisResults;
 use cwe_checker_rs::{intermediate_representation::Project, utils::log::LogMessage};
 use nix::{sys::stat, unistd};
-use std::{collections::HashSet, io::Read};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::thread;
+use std::{collections::HashSet, io::Read};
 use structopt::StructOpt;
 use tempfile::TempDir;
 
@@ -244,7 +244,8 @@ fn get_project_from_ghidra(file_path: &Path, binary: &[u8], quiet_flag: bool) ->
     let filename = file_path
         .file_name()
         .expect("Invalid file name")
-        .to_string_lossy().to_string();
+        .to_string_lossy()
+        .to_string();
     let ghidra_plugin_path = get_ghidra_plugin_path("p_code_extractor");
 
     // Create a temporary pipe directory in which a new named pipe (fifo) is created.
@@ -311,7 +312,7 @@ fn get_project_from_ghidra(file_path: &Path, binary: &[u8], quiet_flag: bool) ->
     } else {
         panic!("Could not open fifo pipe after contents have been written by Ghidra.");
     };
-    
+
     let mut project_pcode: cwe_checker_rs::pcode::Project =
         serde_json::from_str(json_string.as_str()).unwrap();
     project_pcode.normalize();
@@ -330,7 +331,9 @@ fn get_project_from_ghidra(file_path: &Path, binary: &[u8], quiet_flag: bool) ->
         }
     };
 
-    ghidra_subprocess.join().expect("The Ghidra thread to be joined has panicked!");
+    ghidra_subprocess
+        .join()
+        .expect("The Ghidra thread to be joined has panicked!");
 
     project
 }
