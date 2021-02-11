@@ -251,9 +251,9 @@ fn get_project_from_ghidra(file_path: &Path, binary: &[u8], quiet_flag: bool) ->
     let fifo_path = tmp_folder.join(format!("pcode_{}.pipe", timestamp_suffix));
 
     // Create a new fifo and give read and write rights to the owner
-    match unistd::mkfifo(&fifo_path, stat::Mode::from_bits(0o600).unwrap()) {
-        Ok(_) => println!("created {:?}", fifo_path),
-        Err(err) => println!("Error creating fifo: {}", err),
+    if let Err(err) = unistd::mkfifo(&fifo_path, stat::Mode::from_bits(0o600).unwrap()) {
+        eprintln!("Error creating FIFO pipe: {}", err);
+        std::process::exit(101);
     }
 
     let thread_fifo_path = fifo_path.clone();
