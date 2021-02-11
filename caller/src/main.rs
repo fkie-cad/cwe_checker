@@ -131,7 +131,7 @@ fn run_with_ghidra(args: CmdlineArgs) {
         // because it uses up huge amounts of RAM and computation time on some binaries.
         modules = modules
             .into_iter()
-            .filter(|module| module.name == "CWE78")
+            .filter(|module| module.name != "CWE78")
             .collect();
     }
 
