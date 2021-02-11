@@ -7,6 +7,7 @@ Parts of the cwe_checker that are written in Rust.
 #[macro_use]
 extern crate ocaml;
 
+use crate::analysis::graph::Graph;
 use crate::analysis::pointer_inference::PointerInference;
 use crate::intermediate_representation::Project;
 use crate::utils::binary::RuntimeMemoryImage;
@@ -79,6 +80,8 @@ pub struct AnalysisResults<'a> {
     pub binary: &'a [u8],
     /// A representation of the runtime memory image of the binary.
     pub runtime_memory_image: &'a RuntimeMemoryImage,
+    /// The computed control flow graph of the program.
+    pub control_flow_graph: &'a Graph<'a>,
     /// A pointer to the project struct
     pub project: &'a Project,
     /// The result of the pointer inference analysis if already computed.
@@ -90,11 +93,13 @@ impl<'a> AnalysisResults<'a> {
     pub fn new(
         binary: &'a [u8],
         runtime_memory_image: &'a RuntimeMemoryImage,
+        control_flow_graph: &'a Graph<'a>,
         project: &'a Project,
     ) -> AnalysisResults<'a> {
         AnalysisResults {
             binary,
             runtime_memory_image,
+            control_flow_graph,
             project,
             pointer_inference: None,
         }
@@ -102,10 +107,11 @@ impl<'a> AnalysisResults<'a> {
 
     /// Compute the pointer inference analysis.
     /// The result gets returned, but not saved to the `AnalysisResults` struct itself.
-    pub fn compute_pointer_inference(&self, config: &serde_json::Value) -> PointerInference<'a> {
+    pub fn compute_pointer_inference(&'a self, config: &serde_json::Value) -> PointerInference<'a> {
         crate::analysis::pointer_inference::run(
             self.project,
             self.runtime_memory_image,
+            self.control_flow_graph,
             serde_json::from_value(config.clone()).unwrap(),
             false,
         )

@@ -1,4 +1,5 @@
 use super::*;
+use std::collections::HashSet;
 
 fn bv(value: i64) -> BitvectorDomain {
     BitvectorDomain::Value(Bitvector::from_i64(value))
@@ -106,8 +107,9 @@ fn context_problem_implementation() {
 
     let (project, config) = mock_project();
     let runtime_memory_image = RuntimeMemoryImage::mock();
+    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
     let (log_sender, _log_receiver) = crossbeam_channel::unbounded();
-    let context = Context::new(&project, &runtime_memory_image, config, log_sender);
+    let context = Context::new(&project, &runtime_memory_image, &graph, config, log_sender);
     let mut state = State::new(&register("RSP"), Tid::new("main"));
 
     let def = Term {
@@ -283,9 +285,10 @@ fn update_return() {
     use crate::analysis::pointer_inference::object::ObjectType;
     use crate::analysis::pointer_inference::Data;
     let (project, config) = mock_project();
+    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
     let runtime_memory_image = RuntimeMemoryImage::mock();
     let (log_sender, _log_receiver) = crossbeam_channel::unbounded();
-    let context = Context::new(&project, &runtime_memory_image, config, log_sender);
+    let context = Context::new(&project, &runtime_memory_image, &graph, config, log_sender);
     let state_before_return = State::new(&register("RSP"), Tid::new("callee"));
     let mut state_before_return = context
         .update_def(
