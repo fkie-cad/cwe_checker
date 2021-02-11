@@ -126,6 +126,10 @@ fn run_with_ghidra(args: CmdlineArgs) {
     // Filter the modules to be executed if the `--partial` parameter is set.
     if let Some(ref partial_module_list) = args.partial {
         filter_modules_for_partial_run(&mut modules, partial_module_list);
+    } else {
+        // TODO: CWE78 is disabled on a standard run for now,
+        // because it uses up huge amounts of RAM and computation time on some binaries.
+        modules = modules.into_iter().filter(|module| module.name == "CWE78").collect();
     }
 
     let binary_file_path = PathBuf::from(args.binary.unwrap());
