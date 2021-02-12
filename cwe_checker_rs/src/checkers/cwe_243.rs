@@ -116,7 +116,7 @@ pub fn check_cwe(
     cwe_params: &serde_json::Value,
 ) -> (Vec<LogMessage>, Vec<CweWarning>) {
     let project = analysis_results.project;
-    let graph = analysis_results.pointer_inference.unwrap().get_graph();
+    let graph = analysis_results.control_flow_graph;
 
     let config: Config = serde_json::from_value(cwe_params.clone()).unwrap();
     let priviledge_dropping_tids: Vec<Tid> = config

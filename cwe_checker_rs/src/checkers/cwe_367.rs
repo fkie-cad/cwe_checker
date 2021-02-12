@@ -72,7 +72,7 @@ pub fn check_cwe(
 ) -> (Vec<LogMessage>, Vec<CweWarning>) {
     let config: Config = serde_json::from_value(cwe_params.clone()).unwrap();
     let project = analysis_results.project;
-    let graph = analysis_results.pointer_inference.unwrap().get_graph();
+    let graph = analysis_results.control_flow_graph;
     let mut cwe_warnings = Vec::new();
 
     let symbol_map: HashMap<&str, Tid> = project

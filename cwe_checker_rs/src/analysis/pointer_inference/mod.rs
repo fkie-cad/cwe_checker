@@ -74,10 +74,17 @@ impl<'a> PointerInference<'a> {
     pub fn new(
         project: &'a Project,
         runtime_memory_image: &'a RuntimeMemoryImage,
+        control_flow_graph: &'a Graph<'a>,
         config: Config,
         log_sender: crossbeam_channel::Sender<LogThreadMsg>,
     ) -> PointerInference<'a> {
-        let context = Context::new(project, runtime_memory_image, config, log_sender.clone());
+        let context = Context::new(
+            project,
+            runtime_memory_image,
+            control_flow_graph,
+            config,
+            log_sender.clone(),
+        );
 
         let mut entry_sub_to_entry_blocks_map = HashMap::new();
         let subs: HashMap<Tid, &Term<Sub>> = project
@@ -405,6 +412,7 @@ pub fn extract_pi_analysis_results(
 pub fn run<'a>(
     project: &'a Project,
     runtime_memory_image: &'a RuntimeMemoryImage,
+    control_flow_graph: &'a Graph<'a>,
     config: Config,
     print_debug: bool,
 ) -> PointerInference<'a> {
@@ -413,6 +421,7 @@ pub fn run<'a>(
     let mut computation = PointerInference::new(
         project,
         runtime_memory_image,
+        control_flow_graph,
         config,
         logging_thread.get_msg_sender(),
     );
@@ -474,13 +483,14 @@ mod tests {
         pub fn mock(
             project: &'a Project,
             mem_image: &'a RuntimeMemoryImage,
+            graph: &'a Graph,
         ) -> PointerInference<'a> {
             let config = Config {
                 allocation_symbols: vec!["malloc".to_string()],
                 deallocation_symbols: vec!["free".to_string()],
             };
             let (log_sender, _) = crossbeam_channel::unbounded();
-            PointerInference::new(project, mem_image, config, log_sender)
+            PointerInference::new(project, mem_image, graph, config, log_sender)
         }
     }
 }

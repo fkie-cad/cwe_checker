@@ -1,3 +1,4 @@
+use cwe_checker_rs::analysis::graph;
 use cwe_checker_rs::utils::binary::RuntimeMemoryImage;
 use cwe_checker_rs::utils::log::print_all_messages;
 use cwe_checker_rs::utils::{get_ghidra_plugin_path, read_config_file};
@@ -155,11 +156,24 @@ fn run_with_ghidra(args: CmdlineArgs) {
         // so that other analyses do not have to adjust their addresses.
         runtime_memory_image.add_global_memory_offset(project.program.term.address_base_offset);
     }
+    // Generate the control flow graph of the program
+    let extern_sub_tids = project
+        .program
+        .term
+        .extern_symbols
+        .iter()
+        .map(|symbol| symbol.tid.clone())
+        .collect();
+    let control_flow_graph = graph::get_program_cfg(&project.program, extern_sub_tids);
 
-    let mut analysis_results = AnalysisResults::new(&binary, &runtime_memory_image, &project);
+    let analysis_results = AnalysisResults::new(
+        &binary,
+        &runtime_memory_image,
+        &control_flow_graph,
+        &project,
+    );
 
-    let modules_depending_on_pointer_inference =
-        vec!["CWE78", "CWE243", "CWE367", "CWE476", "Memory"];
+    let modules_depending_on_pointer_inference = vec!["CWE78", "CWE476", "Memory"];
     let pointer_inference_results = if modules
         .iter()
         .any(|module| modules_depending_on_pointer_inference.contains(&module.name))
@@ -168,7 +182,8 @@ fn run_with_ghidra(args: CmdlineArgs) {
     } else {
         None
     };
-    analysis_results = analysis_results.set_pointer_inference(pointer_inference_results.as_ref());
+    let analysis_results =
+        analysis_results.set_pointer_inference(pointer_inference_results.as_ref());
 
     // Print debug and then return.
     // Right now there is only one debug printing function.
@@ -177,6 +192,7 @@ fn run_with_ghidra(args: CmdlineArgs) {
         cwe_checker_rs::analysis::pointer_inference::run(
             &project,
             &runtime_memory_image,
+            &control_flow_graph,
             serde_json::from_value(config["Memory"].clone()).unwrap(),
             true,
         );

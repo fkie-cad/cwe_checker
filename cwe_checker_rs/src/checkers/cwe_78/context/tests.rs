@@ -128,7 +128,8 @@ fn setting_taint_source() {
     let current_sub = Sub::mock("func");
 
     let mem_image = RuntimeMemoryImage::mock();
-    let pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image);
+    let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
+    let pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     let mem_image = RuntimeMemoryImage::mock();
     let mut context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
 
@@ -157,7 +158,8 @@ fn tainting_string_function_parameters() {
         .save_taint_to_memory(&setup.base_sixteen_offset, Taint::Tainted(ByteSize::new(8)));
 
     let mem_image = RuntimeMemoryImage::mock();
-    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image);
+    let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
     let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
@@ -204,7 +206,8 @@ fn first_param_pointing_to_memory_taint() {
         .set_register(&rdi_reg, setup.base_eight_offset.clone());
 
     let mem_image = RuntimeMemoryImage::mock();
-    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image);
+    let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
     let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
@@ -232,7 +235,8 @@ fn tainting_generic_function_parameters_and_removing_non_callee_saved() {
     let rax_reg = Variable::mock("RAX", 8 as u64);
 
     let mem_image = RuntimeMemoryImage::mock();
-    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image);
+    let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
     setup
@@ -317,7 +321,8 @@ fn tainting_stack_parameters() {
     let stack_id = setup.pi_state.stack_id.clone();
 
     let mem_image = RuntimeMemoryImage::mock();
-    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image);
+    let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
     let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
@@ -355,7 +360,8 @@ fn tainting_parameters() {
     let stack_id = setup.pi_state.stack_id.clone();
 
     let mem_image = RuntimeMemoryImage::mock();
-    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image);
+    let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
     let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
@@ -394,7 +400,8 @@ fn creating_pi_def_map() {
     let stack_id = setup.pi_state.stack_id.clone();
 
     let mem_image = RuntimeMemoryImage::mock();
-    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image);
+    let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
     let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
@@ -436,7 +443,8 @@ fn getting_blk_start_node_if_last_def() {
     );
 
     let mem_image = RuntimeMemoryImage::mock();
-    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image);
+    let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
     let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
@@ -464,7 +472,8 @@ fn getting_source_node() {
     let call_tid = Tid::new("call_string");
 
     let mem_image = RuntimeMemoryImage::mock();
-    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image);
+    let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
     let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
@@ -491,7 +500,8 @@ fn updating_target_state_for_callsite() {
     let rdi_reg = Variable::mock("RDI", 8 as u64);
 
     let mem_image = RuntimeMemoryImage::mock();
-    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image);
+    let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
     let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
@@ -567,7 +577,8 @@ fn handling_assign_and_load() {
     let stack_id = setup.pi_state.stack_id.clone();
 
     let mem_image = RuntimeMemoryImage::mock();
-    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image);
+    let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
     let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
@@ -643,7 +654,8 @@ fn updating_def() {
     let stack_id = setup.pi_state.stack_id.clone();
 
     let mem_image = RuntimeMemoryImage::mock();
-    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image);
+    let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
     let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
@@ -724,7 +736,8 @@ fn updating_jumpsite() {
         .save_taint_to_memory(&setup.base_eight_offset, Taint::Tainted(ByteSize::new(8)));
 
     let mem_image = RuntimeMemoryImage::mock();
-    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image);
+    let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
     let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
@@ -770,7 +783,8 @@ fn updating_callsite() {
     let caller_sub = Sub::mock("caller");
 
     let mem_image = RuntimeMemoryImage::mock();
-    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image);
+    let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
     let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
@@ -861,7 +875,8 @@ fn splitting_call_stub() {
         .save_taint_to_memory(&setup.base_eight_offset, Taint::Tainted(ByteSize::new(8)));
 
     let mem_image = RuntimeMemoryImage::mock();
-    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image);
+    let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
     let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
@@ -906,7 +921,8 @@ fn splitting_return_stub() {
         .save_taint_to_memory(&setup.base_eight_offset, Taint::Tainted(ByteSize::new(8)));
 
     let mem_image = RuntimeMemoryImage::mock();
-    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image);
+    let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
     let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
@@ -960,7 +976,8 @@ fn updating_call_stub() {
         .save_taint_to_memory(&setup.base_sixteen_offset, Taint::Tainted(ByteSize::new(8)));
 
     let mem_image = RuntimeMemoryImage::mock();
-    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image);
+    let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
     let mut string_symbols: HashMap<Tid, &ExternSymbol> = HashMap::new();
@@ -1009,7 +1026,8 @@ fn specializing_conditional() {
         .save_taint_to_memory(&setup.base_eight_offset, Taint::Tainted(ByteSize::new(8)));
 
     let mem_image = RuntimeMemoryImage::mock();
-    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image);
+    let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
     let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);

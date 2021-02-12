@@ -4,7 +4,7 @@ use crate::intermediate_representation::*;
 use crate::prelude::*;
 use crate::utils::log::*;
 use crate::{abstract_domain::*, utils::binary::RuntimeMemoryImage};
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 
 use super::state::State;
 use super::{Config, Data, VERSION};
@@ -18,7 +18,7 @@ mod trait_impls;
 /// The struct also implements the `interprocedural_fixpoint::Context` trait to enable the fixpoint computation.
 pub struct Context<'a> {
     /// The program control flow graph on which the fixpoint will be computed
-    pub graph: Graph<'a>,
+    pub graph: &'a Graph<'a>,
     /// A reference to the `Project` object representing the binary
     pub project: &'a Project,
     /// The runtime memory image for reading global read-only variables.
@@ -44,6 +44,7 @@ impl<'a> Context<'a> {
     pub fn new(
         project: &'a Project,
         runtime_memory_image: &'a RuntimeMemoryImage,
+        control_flow_graph: &'a Graph<'a>,
         config: Config,
         log_collector: crossbeam_channel::Sender<LogThreadMsg>,
     ) -> Context<'a> {
@@ -51,17 +52,8 @@ impl<'a> Context<'a> {
         for symbol in project.program.term.extern_symbols.iter() {
             extern_symbol_map.insert(symbol.tid.clone(), symbol);
         }
-        let extern_symbol_tid_set: HashSet<Tid> = project
-            .program
-            .term
-            .extern_symbols
-            .iter()
-            .map(|symb| symb.tid.clone())
-            .collect();
-        let graph =
-            crate::analysis::graph::get_program_cfg(&project.program, extern_symbol_tid_set);
         Context {
-            graph,
+            graph: control_flow_graph,
             project,
             runtime_memory_image,
             extern_symbol_map,
