@@ -354,7 +354,7 @@ impl<'a> GraphBuilder<'a> {
                 .term
                 .jmps
                 .iter()
-                .find(|jump| matches!(jump.term, Jmp::Call{..}))
+                .find(|jump| matches!(jump.term, Jmp::Call { .. }))
                 .unwrap();
             let return_combine_node = self.graph.add_node(Node::CallReturn {
                 call: (call_block, caller_sub),

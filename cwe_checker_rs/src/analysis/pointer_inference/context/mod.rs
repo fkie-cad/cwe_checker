@@ -129,7 +129,7 @@ impl<'a> Context<'a> {
         mut state: State,
         call: &Term<Jmp>,
         extern_symbol: &ExternSymbol,
-    ) -> Option<State> {
+    ) -> State {
         match extern_symbol.get_unique_return_register() {
             Ok(return_register) => {
                 let object_id = AbstractIdentifier::new(
@@ -148,12 +148,12 @@ impl<'a> Context<'a> {
                     Bitvector::zero(apint::BitWidth::from(address_bytesize)).into(),
                 );
                 state.set_register(return_register, pointer.into());
-                Some(state)
+                state
             }
             Err(err) => {
                 // We cannot track the new object, since we do not know where to store the pointer to it.
                 self.log_debug(Err(err), Some(&call.tid));
-                Some(state)
+                state
             }
         }
     }
@@ -167,7 +167,7 @@ impl<'a> Context<'a> {
         mut new_state: State,
         call: &Term<Jmp>,
         extern_symbol: &ExternSymbol,
-    ) -> Option<State> {
+    ) -> State {
         match extern_symbol.get_unique_parameter() {
             Ok(parameter) => {
                 let parameter_value = state.eval_parameter_arg(
@@ -205,18 +205,18 @@ impl<'a> Context<'a> {
                             );
                         }
                         new_state.remove_unreferenced_objects();
-                        Some(new_state)
+                        new_state
                     }
                     Err(err) => {
                         self.log_debug(Err(err), Some(&call.tid));
-                        Some(new_state)
+                        new_state
                     }
                 }
             }
             Err(err) => {
                 // We do not know which memory object to free
                 self.log_debug(Err(err), Some(&call.tid));
-                Some(new_state)
+                new_state
             }
         }
     }
@@ -310,7 +310,7 @@ impl<'a> Context<'a> {
         mut new_state: State,
         call: &Term<Jmp>,
         extern_symbol: &ExternSymbol,
-    ) -> Option<State> {
+    ) -> State {
         self.log_debug(
             new_state.clear_stack_parameter(
                 extern_symbol,
@@ -349,7 +349,7 @@ impl<'a> Context<'a> {
                 .memory
                 .assume_arbitrary_writes_to_object(id, &possible_referenced_ids);
         }
-        Some(new_state)
+        new_state
     }
 
     /// Handle a generic call whose target function is unknown.

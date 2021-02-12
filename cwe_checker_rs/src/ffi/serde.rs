@@ -83,7 +83,7 @@ caml!(rs_finalize_json_builder(builder_val) {
 
 /// Build JsonBuilder::Null as Ocaml value
 fn build_serde_null() -> ocaml::Value {
-    JsonBuilder::Null.to_ocaml()
+    JsonBuilder::Null.into_ocaml()
 }
 
 caml!(rs_build_serde_null(_unit) {
@@ -95,7 +95,7 @@ caml!(rs_build_serde_null(_unit) {
 /// Build JsonBuilder::Bool as Ocaml value
 fn build_serde_bool(bool_val: ocaml::Value) -> ocaml::Value {
     let boolean: bool = bool::from_value(bool_val);
-    JsonBuilder::Bool(boolean).to_ocaml()
+    JsonBuilder::Bool(boolean).into_ocaml()
 }
 
 caml!(rs_build_serde_bool(bool_val) {
@@ -107,7 +107,7 @@ caml!(rs_build_serde_bool(bool_val) {
 /// Build JsonBuilder::Number as Ocaml value
 fn build_serde_number(num: ocaml::Value) -> ocaml::Value {
     let num: isize = ocaml::Value::isize_val(&num);
-    JsonBuilder::Number(num).to_ocaml()
+    JsonBuilder::Number(num).into_ocaml()
 }
 
 caml!(rs_build_serde_number(number) {
@@ -154,7 +154,7 @@ fn build_serde_bitvector(bitvector_string_val: ocaml::Value) -> ocaml::Value {
         ("width".to_string(), Rc::new(JsonBuilder::Array(width_list))),
     ]);
 
-    result.to_ocaml()
+    result.into_ocaml()
 }
 
 caml!(rs_build_serde_bitvector(bitvector_string) {
@@ -166,7 +166,7 @@ caml!(rs_build_serde_bitvector(bitvector_string) {
 /// Build JsonBuilder::String as Ocaml value
 fn build_serde_string(string_val: ocaml::Value) -> ocaml::Value {
     let string = String::from_value(string_val);
-    JsonBuilder::String(string).to_ocaml()
+    JsonBuilder::String(string).into_ocaml()
 }
 
 caml!(rs_build_serde_string(string_val) {
@@ -183,7 +183,7 @@ fn build_serde_array_from_list(list_val: ocaml::Value) -> ocaml::Value {
         .into_iter()
         .map(|ocaml_val| unsafe { JsonBuilder::from_ocaml_rc(&ocaml_val) })
         .collect();
-    JsonBuilder::Array(vec).to_ocaml()
+    JsonBuilder::Array(vec).into_ocaml()
 }
 
 caml!(rs_build_serde_array_from_list(list_val) {
@@ -211,7 +211,7 @@ fn build_serde_object(tuple_list_val: ocaml::Value) -> ocaml::Value {
             (key, data)
         })
         .collect();
-    JsonBuilder::Object(pairs).to_ocaml()
+    JsonBuilder::Object(pairs).into_ocaml()
 }
 
 caml!(rs_build_serde_object(tuple_list_val) {
