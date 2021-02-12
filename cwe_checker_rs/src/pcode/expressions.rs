@@ -210,9 +210,9 @@ pub enum ExpressionType {
     FLOAT_NEG,
     FLOAT_ABS,
     FLOAT_SQRT,
-    #[serde(alias="CEIL")]
+    #[serde(alias = "CEIL")]
     FLOAT_CEIL,
-    #[serde(alias="FLOOR")]
+    #[serde(alias = "FLOOR")]
     FLOAT_FLOOR,
     #[serde(alias = "ROUND")]
     FLOAT_ROUND,
