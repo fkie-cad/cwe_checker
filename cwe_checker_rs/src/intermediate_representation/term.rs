@@ -80,21 +80,23 @@ impl Term<Def> {
         output_sub_register: String,
     ) -> Option<Tid> {
         match &self.term {
-            Def::Assign { var, value } if output_name == var.name => match value {
-                Expression::Cast { op, arg, .. } => {
-                    let argument: &Expression = arg;
-                    match op {
-                        CastOpType::IntZExt => match argument {
-                            Expression::Var(var) if var.name == output_sub_register => {
-                                Some(self.tid.clone())
-                            }
-                            _ => None,
-                        },
-                        _ => None,
+            Def::Assign {
+                var,
+                value:
+                    Expression::Cast {
+                        op: CastOpType::IntZExt,
+                        arg,
+                        ..
+                    },
+            } if output_name == var.name => {
+                let argument: &Expression = arg;
+                match argument {
+                    Expression::Var(var) if var.name == output_sub_register => {
+                        Some(self.tid.clone())
                     }
+                    _ => None,
                 }
-                _ => None,
-            },
+            }
             _ => None,
         }
     }

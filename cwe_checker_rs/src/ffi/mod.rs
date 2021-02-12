@@ -42,7 +42,7 @@ where
 /// the finalizer must be attached to it on the Ocaml side!
 trait OcamlSendable: std::marker::Sized {
     /// Pack the object into an Ocaml value
-    fn to_ocaml(self) -> ocaml::Value {
+    fn into_ocaml(self) -> ocaml::Value {
         let boxed_val = Rc::new(self);
         ocaml::Value::nativeint(Rc::into_raw(boxed_val) as isize)
     }

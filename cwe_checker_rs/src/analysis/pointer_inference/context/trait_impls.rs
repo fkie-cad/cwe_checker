@@ -274,12 +274,16 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
 
             match extern_symbol.name.as_str() {
                 malloc_like_fn if self.allocation_symbols.iter().any(|x| x == malloc_like_fn) => {
-                    self.add_new_object_in_call_return_register(new_state, call, extern_symbol)
+                    Some(self.add_new_object_in_call_return_register(
+                        new_state,
+                        call,
+                        extern_symbol,
+                    ))
                 }
                 free_like_fn if self.deallocation_symbols.iter().any(|x| x == free_like_fn) => {
-                    self.mark_parameter_object_as_freed(state, new_state, call, extern_symbol)
+                    Some(self.mark_parameter_object_as_freed(state, new_state, call, extern_symbol))
                 }
-                _ => self.handle_generic_extern_call(state, new_state, call, extern_symbol),
+                _ => Some(self.handle_generic_extern_call(state, new_state, call, extern_symbol)),
             }
         } else {
             panic!("Extern symbol not found.");
