@@ -1,9 +1,0 @@
-(install
-  (section etc)
-  (files
-    (src/config.json as config.json)
-    (src/utils/registers.json as registers.json)
-  )
-)
-
-(documentation)
