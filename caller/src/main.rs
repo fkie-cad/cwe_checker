@@ -27,6 +27,8 @@ struct CmdlineArgs {
     out: Option<String>,
 
     /// Specify a specific set of checks to be run as a comma separated list, e.g. 'CWE332,CWE476,CWE782'.
+    ///
+    /// Use the "--module-names" command line option to get a list of all valid check names.
     #[structopt(long, short)]
     partial: Option<String>,
 
