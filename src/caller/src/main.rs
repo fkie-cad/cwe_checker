@@ -1,9 +1,9 @@
-use cwe_checker_rs::analysis::graph;
-use cwe_checker_rs::utils::binary::RuntimeMemoryImage;
-use cwe_checker_rs::utils::log::print_all_messages;
-use cwe_checker_rs::utils::{get_ghidra_plugin_path, read_config_file};
-use cwe_checker_rs::AnalysisResults;
-use cwe_checker_rs::{intermediate_representation::Project, utils::log::LogMessage};
+use cwe_checker_lib::analysis::graph;
+use cwe_checker_lib::utils::binary::RuntimeMemoryImage;
+use cwe_checker_lib::utils::log::print_all_messages;
+use cwe_checker_lib::utils::{get_ghidra_plugin_path, read_config_file};
+use cwe_checker_lib::AnalysisResults;
+use cwe_checker_lib::{intermediate_representation::Project, utils::log::LogMessage};
 use nix::{sys::stat, unistd};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -108,7 +108,7 @@ fn check_file_existence(file_path: String) -> Result<(), String> {
 
 /// Run the cwe_checker with Ghidra as its backend.
 fn run_with_ghidra(args: CmdlineArgs) {
-    let mut modules = cwe_checker_rs::get_modules();
+    let mut modules = cwe_checker_lib::get_modules();
     if args.module_versions {
         // Only print the module versions and then quit.
         println!("[cwe_checker] module_versions:");
@@ -191,7 +191,7 @@ fn run_with_ghidra(args: CmdlineArgs) {
     // Right now there is only one debug printing function.
     // When more debug printing modes exist, this behaviour will change!
     if args.debug {
-        cwe_checker_rs::analysis::pointer_inference::run(
+        cwe_checker_lib::analysis::pointer_inference::run(
             &project,
             &runtime_memory_image,
             &control_flow_graph,
@@ -219,7 +219,7 @@ fn run_with_ghidra(args: CmdlineArgs) {
 /// Only keep the modules specified by the `--partial` parameter in the `modules` list.
 /// The parameter is a comma-separated list of module names, e.g. 'CWE332,CWE476,CWE782'.
 fn filter_modules_for_partial_run(
-    modules: &mut Vec<&cwe_checker_rs::CweModule>,
+    modules: &mut Vec<&cwe_checker_lib::CweModule>,
     partial_param: &str,
 ) {
     let module_names: HashSet<&str> = partial_param.split(',').collect();
@@ -328,10 +328,10 @@ fn get_project_from_ghidra(file_path: &Path, binary: &[u8], quiet_flag: bool) ->
     // Open the FIFO
     let file = std::fs::File::open(fifo_path.clone()).expect("Could not open FIFO.");
 
-    let mut project_pcode: cwe_checker_rs::pcode::Project =
+    let mut project_pcode: cwe_checker_lib::pcode::Project =
         serde_json::from_reader(std::io::BufReader::new(file)).unwrap();
     project_pcode.normalize();
-    let project: Project = match cwe_checker_rs::utils::get_binary_base_address(binary) {
+    let project: Project = match cwe_checker_lib::utils::get_binary_base_address(binary) {
         Ok(binary_base_address) => project_pcode.into_ir_project(binary_base_address),
         Err(_err) => {
             if !quiet_flag {

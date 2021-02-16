@@ -18,7 +18,7 @@ USER cwe
 # Install all necessary files from the builder stage
 COPY --from=builder /cwe_checker/target/release/cwe_checker /home/cwe/cwe_checker
 COPY --from=builder /cwe_checker/src/config.json /home/cwe/.config/cwe_checker/config.json
-COPY --from=builder /cwe_checker/ghidra/p_code_extractor /home/cwe/.local/share/cwe_checker/ghidra/p_code_extractor
+COPY --from=builder /cwe_checker/src/ghidra/p_code_extractor /home/cwe/.local/share/cwe_checker/ghidra/p_code_extractor
 RUN echo "{ \"ghidra_path\": \"/opt/ghidra\" }" | sudo tee /home/cwe/.config/cwe_checker/ghidra.json
 
 WORKDIR /

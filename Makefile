@@ -6,10 +6,10 @@ all:
 ifdef GHIDRA_PATH
 	mkdir -p ${HOME}/.config/cwe_checker
 	cp src/config.json ${HOME}/.config/cwe_checker/config.json
-	cargo install --path caller --locked
+	cargo install --path src/caller --locked
 	echo "{ \"ghidra_path\": \"${GHIDRA_PATH}\" }" > ${HOME}/.config/cwe_checker/ghidra.json
 	mkdir -p ${HOME}/.local/share/cwe_checker
-	cp -r ghidra ${HOME}/.local/share/cwe_checker/ghidra
+	cp -r src/ghidra ${HOME}/.local/share/cwe_checker/ghidra
 else
 	echo "GHIDRA_PATH not specified. Please set it to the path to your local Ghidra installation."
 	false

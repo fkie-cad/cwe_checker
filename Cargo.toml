@@ -1,2 +1,2 @@
 [workspace]
-members = ["cwe_checker_rs", "caller", "test"]
+members = ["src/cwe_checker_lib", "src/caller", "test"]
