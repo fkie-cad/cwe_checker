@@ -1,5 +1,5 @@
 [package]
-name = "cwe_checker_rs"
+name = "cwe_checker_lib"
 version = "0.5.0-dev"
 authors = ["Nils-Edvin Enkelmann <nils-edvin.enkelmann@fkie.fraunhofer.de>"]
 edition = "2018"
@@ -19,5 +19,4 @@ directories = "3.0"
 goblin = "0.2"
 
 [lib]
-name = "cwe_checker_rs"
-crate-type = ["staticlib", "cdylib", "lib"]
+name = "cwe_checker_lib"

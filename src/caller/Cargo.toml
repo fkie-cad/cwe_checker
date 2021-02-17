@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 structopt = "0.3"
-cwe_checker_rs = { path = "../cwe_checker_rs" }
+cwe_checker_lib = { path = "../cwe_checker_lib" }
 serde_json = "1.0"
 directories = "3.0"
 nix = "0.19.1"

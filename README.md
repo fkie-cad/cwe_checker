@@ -54,24 +54,6 @@ The following dependencies must be installed in order to build and install the *
 
 Run `make all GHIDRA_PATH=path/to/ghidra_folder` (with the correct path to the local Ghidra installation inserted) to compile and install the *cwe_checker*.
 
-### Local installation with BAP as backend ###
-
-If you want to use the older [BAP](https://github.com/BinaryAnalysisPlatform/bap) backend instead of Ghidra, you must ensure that the following dependencies are fulfilled:
--   Ocaml 4.08.0
--   Opam 2.0.2
--   dune >= 2.0
--   BAP 2.2.0 (and its dependencies).
--   yojson >= 1.6.0
--   ppx_deriving_yojson >= 3.5.1
--   alcotest >= 0.8.3 (for tests)
--   Sark (latest) for IDA Pro annotations
--   pytest >= 3.5.1 (for tests)
--   SCons >= 3.0.5 (for tests)
--   odoc >= 1.4 (for documentation)
--   [Rust](https://www.rust-lang.org) >= 1.49
-
-Just run `make with_bap_backend` to compile and register the plugin with BAP.
-
 ## Usage ##
 
 The *cwe_checker* takes a binary as input,
