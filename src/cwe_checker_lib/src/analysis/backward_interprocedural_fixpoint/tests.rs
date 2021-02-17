@@ -1,4 +1,4 @@
-use crate::{bil::Bitvector, intermediate_representation::*};
+use crate::intermediate_representation::*;
 
 use super::{create_computation, mock_context, NodeValue};
 

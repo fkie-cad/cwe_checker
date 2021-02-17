@@ -1,7 +1,6 @@
 use super::object::*;
 use super::Data;
 use crate::abstract_domain::*;
-use crate::bil::Bitvector;
 use crate::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};

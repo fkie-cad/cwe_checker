@@ -1,5 +1,4 @@
 use super::{AbstractDomain, HasTop, RegisterDomain, SizedDomain};
-use crate::bil::BitSize;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
 
@@ -64,17 +63,14 @@ impl RegisterDomain for BitvectorDomain {
         match (self, rhs) {
             (BitvectorDomain::Value(lhs_bitvec), BitvectorDomain::Value(rhs_bitvec)) => match op {
                 Piece => {
-                    let new_bitwidth = BitSize::from(self.bytesize() + rhs.bytesize());
+                    let new_bitwidth = (self.bytesize() + rhs.bytesize()).as_bit_length();
                     let upper_bits = lhs_bitvec
                         .clone()
-                        .into_zero_extend(new_bitwidth as usize)
+                        .into_zero_extend(new_bitwidth)
                         .unwrap()
-                        .into_checked_shl(BitSize::from(rhs.bytesize()) as usize)
+                        .into_checked_shl(rhs.bytesize().as_bit_length())
                         .unwrap();
-                    let lower_bits = rhs_bitvec
-                        .clone()
-                        .into_zero_extend(new_bitwidth as usize)
-                        .unwrap();
+                    let lower_bits = rhs_bitvec.clone().into_zero_extend(new_bitwidth).unwrap();
                     BitvectorDomain::Value(upper_bits | &lower_bits)
                 }
                 IntAdd => BitvectorDomain::Value(lhs_bitvec + rhs_bitvec),
@@ -259,9 +255,9 @@ impl RegisterDomain for BitvectorDomain {
             BitvectorDomain::Value(
                 bitvec
                     .clone()
-                    .into_checked_lshr(BitSize::from(low_byte) as usize)
+                    .into_checked_lshr(low_byte.as_bit_length())
                     .unwrap()
-                    .into_truncate(BitSize::from(size) as usize)
+                    .into_truncate(size.as_bit_length())
                     .unwrap(),
             )
         } else {
@@ -342,7 +338,7 @@ impl std::convert::TryFrom<&BitvectorDomain> for Bitvector {
 impl std::fmt::Display for BitvectorDomain {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Self::Top(bytesize) => write!(formatter, "Top:u{}", BitSize::from(*bytesize)),
+            Self::Top(bytesize) => write!(formatter, "Top:u{}", bytesize.as_bit_length()),
             Self::Value(bitvector) => write!(
                 formatter,
                 "0x{:016x}:u{:?}",
