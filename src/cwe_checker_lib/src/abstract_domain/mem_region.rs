@@ -1,6 +1,6 @@
 use super::{AbstractDomain, HasTop, SizedDomain};
-use crate::bil::Bitvector;
 use crate::intermediate_representation::ByteSize;
+use crate::prelude::*;
 use apint::{Int, Width};
 use derive_more::Deref;
 use serde::{Deserialize, Serialize};
@@ -238,7 +238,6 @@ impl<T: AbstractDomain + SizedDomain + HasTop + std::fmt::Debug> MemRegionData<T
 mod tests {
     use super::*;
     use crate::abstract_domain::RegisterDomain;
-    use crate::bil::Bitvector;
     use crate::intermediate_representation::*;
 
     #[derive(PartialEq, Eq, Clone, Copy, Debug, Hash, PartialOrd, Ord)]

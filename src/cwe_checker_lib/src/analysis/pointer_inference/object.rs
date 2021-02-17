@@ -1,6 +1,5 @@
 use super::Data;
 use crate::abstract_domain::*;
-use crate::bil::Bitvector;
 use crate::prelude::*;
 use derive_more::Deref;
 use serde::{Deserialize, Serialize};

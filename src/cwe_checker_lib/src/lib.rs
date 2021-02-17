@@ -4,9 +4,6 @@
 Parts of the cwe_checker that are written in Rust.
 */
 
-#[macro_use]
-extern crate ocaml;
-
 use crate::analysis::graph::Graph;
 use crate::analysis::pointer_inference::PointerInference;
 use crate::intermediate_representation::Project;
@@ -15,20 +12,16 @@ use crate::utils::log::{CweWarning, LogMessage};
 
 pub mod abstract_domain;
 pub mod analysis;
-pub mod bil;
 pub mod checkers;
-pub mod ffi;
 pub mod intermediate_representation;
 pub mod pcode;
-pub mod term;
 pub mod utils;
 
 mod prelude {
     pub use apint::Width;
     pub use serde::{Deserialize, Serialize};
 
-    pub use crate::bil::{BitSize, Bitvector};
-    pub use crate::intermediate_representation::ByteSize;
+    pub use crate::intermediate_representation::{Bitvector, ByteSize};
     pub use crate::intermediate_representation::{Term, Tid};
     pub use crate::AnalysisResults;
     pub use anyhow::{anyhow, Error};

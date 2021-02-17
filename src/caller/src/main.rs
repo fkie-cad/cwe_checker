@@ -48,50 +48,12 @@ struct CmdlineArgs {
     /// The current behavior of this flag is unstable and subject to change.
     #[structopt(long, hidden = true)]
     debug: bool,
-
-    /// Use BAP as backend (instead of Ghidra). Requires BAP and the cwe_checker-BAP-plugin to be installed.
-    #[structopt(long, hidden = true)]
-    bap: bool,
 }
 
 fn main() {
     let cmdline_args = CmdlineArgs::from_args();
 
-    if cmdline_args.bap {
-        // Use BAP as backend
-        if let Some(exit_code) = build_bap_command(&cmdline_args).status().unwrap().code() {
-            std::process::exit(exit_code);
-        }
-    } else {
-        // Use Ghidra as backend
-        run_with_ghidra(cmdline_args);
-    }
-}
-
-/// Build the BAP command corresponding to the given command line arguments.
-fn build_bap_command(args: &CmdlineArgs) -> Command {
-    let mut command = Command::new("bap");
-    command.arg(args.binary.as_ref().unwrap());
-    command.arg("--pass=cwe-checker");
-    if let Some(ref string) = args.config {
-        command.arg("--cwe-checker-config=".to_string() + string);
-    }
-    if let Some(ref string) = args.out {
-        command.arg("--cwe-checker-out=".to_string() + string);
-    }
-    if let Some(ref string) = args.partial {
-        command.arg("--cwe-checker-partial=".to_string() + string);
-    }
-    if args.json {
-        command.arg("--cwe-checker-json");
-    }
-    if args.quiet {
-        command.arg("--cwe-checker-no-logging");
-    }
-    if args.module_versions {
-        command.arg("--cwe-checker-module-versions");
-    }
-    command
+    run_with_ghidra(cmdline_args);
 }
 
 /// Check the existence of a file

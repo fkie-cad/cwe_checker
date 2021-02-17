@@ -4,7 +4,6 @@ use crate::analysis::backward_interprocedural_fixpoint::Context as BackwardConte
 use crate::{
     abstract_domain::{BitvectorDomain, DataDomain, PointerDomain, SizedDomain},
     analysis::pointer_inference::{Data, State as PointerInferenceState},
-    bil::Bitvector,
     intermediate_representation::{Expression, Variable},
 };
 

@@ -9,7 +9,6 @@
 
 use crate::prelude::*;
 use derive_more::*;
-use std::convert::TryFrom;
 
 mod variable;
 pub use variable::*;
@@ -17,6 +16,13 @@ mod expression;
 pub use expression::*;
 mod term;
 pub use term::*;
+
+/// A bitvector is a fixed-length vector of bits
+/// with the semantics of a CPU register,
+/// i.e. it supports two's complement modulo arithmetic.
+///
+/// Bitvector is just an alias for the [`apint::ApInt`] type.
+pub type Bitvector = apint::ApInt;
 
 /// An unsigned number of bytes.
 ///
@@ -61,12 +67,6 @@ pub use term::*;
 #[serde(transparent)]
 pub struct ByteSize(u64);
 
-impl From<ByteSize> for BitSize {
-    fn from(bytesize: ByteSize) -> BitSize {
-        u16::try_from(u64::from(bytesize) * 8).unwrap()
-    }
-}
-
 impl From<ByteSize> for apint::BitWidth {
     fn from(bytesize: ByteSize) -> apint::BitWidth {
         apint::BitWidth::from((u64::from(bytesize) * 8) as usize)
@@ -81,21 +81,31 @@ impl From<apint::BitWidth> for ByteSize {
 }
 
 impl ByteSize {
+    /// Create a new `ByteSize` object
     pub fn new(value: u64) -> ByteSize {
         ByteSize(value)
+    }
+
+    /// Convert to the equivalent size in bits (by multiplying with 8).
+    pub fn as_bit_length(self) -> usize {
+        (u64::from(self) * 8) as usize
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use apint::BitWidth;
+
     use super::*;
 
     #[test]
     fn check_bit_to_byte_conversion() {
-        let bits: BitSize = 8;
+        let bits: BitWidth = BitWidth::new(8).unwrap();
         let bytes: ByteSize = bits.into();
         assert_eq!(u64::from(bytes), 1);
-        let bits: BitSize = bytes.into();
-        assert_eq!(bits, 8);
+        let bits: BitWidth = bytes.into();
+        assert_eq!(bits.to_usize(), 8);
+
+        assert_eq!(ByteSize::new(2).as_bit_length(), 16);
     }
 }
