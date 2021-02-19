@@ -239,6 +239,36 @@ pub struct Blk {
     pub indirect_jmp_targets: Vec<String>,
 }
 
+impl Term<Blk> {
+    /// Remove indirect jump target addresses for which no corresponding target block exists.
+    /// Return an error message for each removed address.
+    pub fn remove_nonexisting_indirect_jump_targets(
+        &mut self,
+        known_block_tids: &HashSet<Tid>,
+    ) -> Result<(), Vec<LogMessage>> {
+        let mut logs = Vec::new();
+        self.term.indirect_jmp_targets = self
+            .term
+            .indirect_jmp_targets
+            .iter()
+            .filter_map(|target_address| {
+                if known_block_tids.get(&Tid::blk_id_at_address(&target_address)).is_some() {
+                    Some(target_address.to_string())
+                } else {
+                    let error_msg = format!("Indirect jump target at {} does not exist", target_address);
+                    logs.push(LogMessage::new_error(error_msg).location(self.tid.clone()));
+                    None
+                }
+            })
+            .collect();
+        if logs.is_empty() {
+            Ok(())
+        } else {
+            Err(logs)
+        }
+    }
+}
+
 /// A `Sub` or subroutine represents a function with a given name and a list of basic blocks belonging to it.
 ///
 /// Subroutines are *single-entry*,
@@ -453,6 +483,9 @@ impl Project {
         let mut log_messages = Vec::new();
         for sub in self.program.term.subs.iter_mut() {
             for block in sub.term.blocks.iter_mut() {
+                if let Err(mut logs) = block.remove_nonexisting_indirect_jump_targets(&jump_target_tids) {
+                    log_messages.append(&mut logs);
+                }
                 for jmp in block.term.jmps.iter_mut() {
                     if let Err(log_msg) = jmp.retarget_nonexisting_jump_targets_to_dummy_tid(
                         &jump_target_tids,
