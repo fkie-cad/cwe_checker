@@ -252,10 +252,14 @@ impl Term<Blk> {
             .indirect_jmp_targets
             .iter()
             .filter_map(|target_address| {
-                if known_block_tids.get(&Tid::blk_id_at_address(&target_address)).is_some() {
+                if known_block_tids
+                    .get(&Tid::blk_id_at_address(&target_address))
+                    .is_some()
+                {
                     Some(target_address.to_string())
                 } else {
-                    let error_msg = format!("Indirect jump target at {} does not exist", target_address);
+                    let error_msg =
+                        format!("Indirect jump target at {} does not exist", target_address);
                     logs.push(LogMessage::new_error(error_msg).location(self.tid.clone()));
                     None
                 }
@@ -483,7 +487,9 @@ impl Project {
         let mut log_messages = Vec::new();
         for sub in self.program.term.subs.iter_mut() {
             for block in sub.term.blocks.iter_mut() {
-                if let Err(mut logs) = block.remove_nonexisting_indirect_jump_targets(&jump_target_tids) {
+                if let Err(mut logs) =
+                    block.remove_nonexisting_indirect_jump_targets(&jump_target_tids)
+                {
                     log_messages.append(&mut logs);
                 }
                 for jmp in block.term.jmps.iter_mut() {
