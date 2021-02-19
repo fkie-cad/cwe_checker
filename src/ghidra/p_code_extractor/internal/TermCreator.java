@@ -8,6 +8,8 @@ import ghidra.program.model.address.Address;
 import ghidra.program.model.listing.Function;
 import ghidra.program.model.pcode.PcodeOp;
 import ghidra.program.model.pcode.Varnode;
+import ghidra.program.model.symbol.Reference;
+import ghidra.program.model.symbol.RefType;
 import ghidra.program.model.symbol.SymbolTable;
 import symbol.ExternSymbolCreator;
 import term.*;
@@ -91,8 +93,11 @@ public class TermCreator {
             case PcodeOp.CBRANCH:
                 return handleConditionalBranches(jmpTid, intraJump);
             case PcodeOp.BRANCH:
-            case PcodeOp.BRANCHIND:
                 jumps.add(new Term<Jmp>(jmpTid, new Jmp(ExecutionType.JmpType.GOTO, mnemonic, createLabel(null), PcodeBlockData.pcodeIndex)));
+                break;
+            case PcodeOp.BRANCHIND:
+                Jmp jump = createIndirectJump(mnemonic);
+                jumps.add(new Term<Jmp>(jmpTid, jump));
                 break;
             case PcodeOp.RETURN:
                 jumps.add(new Term<Jmp>(jmpTid, new Jmp(ExecutionType.JmpType.RETURN, mnemonic, createLabel(null), PcodeBlockData.pcodeIndex)));
@@ -100,6 +105,26 @@ public class TermCreator {
         }
 
         return jumps;
+    }
+
+    /**
+     * 
+     * @param mnemonic: The Mnemonic of the jump term
+     * @return: The created indirect jump term
+     * 
+     * Creates a jump term for an indirect jump and adds jump targets as computed by Ghidra to it as target hints.
+     */
+    public static Jmp createIndirectJump(String mnemonic) {
+        Jmp jump = new Jmp(ExecutionType.JmpType.GOTO, mnemonic, createLabel(null), PcodeBlockData.pcodeIndex);
+        ArrayList<String> target_hints = new ArrayList<String>();        
+
+        for(Reference reference: PcodeBlockData.instruction.getReferencesFrom()) {
+            if(reference.getReferenceType() == RefType.COMPUTED_JUMP || reference.getReferenceType() == RefType.CONDITIONAL_COMPUTED_JUMP) {
+                target_hints.add(reference.getToAddress().toString());
+            }
+        }
+        jump.setTargetHints(target_hints);
+        return jump;
     }
 
 

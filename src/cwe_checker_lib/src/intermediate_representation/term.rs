@@ -32,6 +32,18 @@ impl Tid {
             address: self.address,
         }
     }
+
+    /// Generate the ID of a block starting at the given address.
+    ///
+    /// Note that the block may not actually exist.
+    /// For cases where one assembly instruction generates more than one block,
+    /// the returned block ID is the one that would be executed first if a jump to the given address happened.
+    pub fn blk_id_at_address(address: &str) -> Tid {
+        Tid {
+            id: format!("blk_{}", address),
+            address: address.to_string(),
+        }
+    }
 }
 
 impl std::fmt::Display for Tid {
@@ -212,6 +224,10 @@ impl Term<Jmp> {
 /// - For two jumps, the first one has to be a conditional jump,
 /// where the second unconditional jump is only taken if the condition of the first jump evaluates to false.
 ///
+/// If one of the `Jmp` instructions is an indirect jump,
+/// then the `indirect_jmp_targets` is a list of possible jump target addresses for that jump.
+/// The list may not be complete and the entries are not guaranteed to be correct.
+///
 /// Basic blocks are *single entry, single exit*, i.e. a basic block is only entered at the beginning
 /// and is only exited by the jump instructions at the end of the block.
 /// If a new control flow edge is discovered that would jump to the middle of a basic block,
@@ -220,6 +236,7 @@ impl Term<Jmp> {
 pub struct Blk {
     pub defs: Vec<Term<Def>>,
     pub jmps: Vec<Term<Jmp>>,
+    pub indirect_jmp_targets: Vec<String>,
 }
 
 /// A `Sub` or subroutine represents a function with a given name and a list of basic blocks belonging to it.
@@ -458,6 +475,7 @@ impl Project {
                         term: Blk {
                             defs: Vec::new(),
                             jmps: Vec::new(),
+                            indirect_jmp_targets: Vec::new(),
                         },
                     }],
                 },
@@ -492,6 +510,7 @@ mod tests {
                 term: Blk {
                     defs: Vec::new(),
                     jmps: Vec::new(),
+                    indirect_jmp_targets: Vec::new(),
                 },
             }
         }

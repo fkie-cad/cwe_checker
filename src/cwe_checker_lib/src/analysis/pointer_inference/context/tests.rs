@@ -139,6 +139,7 @@ fn context_problem_implementation() {
         term: Blk {
             defs: Vec::new(),
             jmps: Vec::new(),
+            indirect_jmp_targets: Vec::new(),
         },
     };
     let sub = Term {

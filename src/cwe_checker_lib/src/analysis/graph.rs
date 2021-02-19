@@ -203,6 +203,54 @@ impl<'a> GraphBuilder<'a> {
         }
     }
 
+    /// Add an intraprocedural jump edge from the `source` node to the `target_tid`.
+    /// If no node corresponding to the `target_tid` exists,
+    /// new nodes corresponding to the (target block, current sub) combination will be created.
+    fn add_intraprocedural_edge(
+        &mut self,
+        source: NodeIndex,
+        target_tid: &Tid,
+        jump: &'a Term<Jmp>,
+        untaken_conditional: Option<&'a Term<Jmp>>,
+    ) {
+        let sub_term = match self.graph[source] {
+            Node::BlkEnd(_, sub_term) => sub_term,
+            _ => panic!(),
+        };
+        if let Some((target_node, _)) = self
+            .jump_targets
+            .get(&(target_tid.clone(), sub_term.tid.clone()))
+        {
+            self.graph
+                .add_edge(source, *target_node, Edge::Jump(jump, untaken_conditional));
+        } else {
+            let target_block = self.program.term.find_block(target_tid).unwrap();
+            let (target_node, _) = self.add_block(target_block, sub_term);
+            self.graph
+                .add_edge(source, target_node, Edge::Jump(jump, untaken_conditional));
+        }
+    }
+
+    /// Read in target hints for indirect intraprocedural jumps from the source block
+    /// and add intraprocedural jump edges for them to the graph.
+    ///
+    /// The function assumes (but does not check) that the `jump` is an intraprocedural indirect jump.
+    fn add_indirect_jumps(
+        &mut self,
+        source: NodeIndex,
+        jump: &'a Term<Jmp>,
+        untaken_conditional: Option<&'a Term<Jmp>>,
+    ) {
+        let source_block = match self.graph[source] {
+            Node::BlkEnd(source_block, _) => source_block,
+            _ => panic!(),
+        };
+        for target_address in source_block.term.indirect_jmp_targets.iter() {
+            let target_tid = Tid::blk_id_at_address(target_address);
+            self.add_intraprocedural_edge(source, &target_tid, jump, untaken_conditional);
+        }
+    }
+
     /// add call edges and interprocedural jump edges for a specific jump term to the graph
     fn add_jump_edge(
         &mut self,
@@ -220,22 +268,11 @@ impl<'a> GraphBuilder<'a> {
                 target: tid,
                 condition: _,
             } => {
-                if let Some((target_node, _)) =
-                    self.jump_targets.get(&(tid.clone(), sub_term.tid.clone()))
-                {
-                    self.graph.add_edge(
-                        source,
-                        *target_node,
-                        Edge::Jump(jump, untaken_conditional),
-                    );
-                } else {
-                    let target_block = self.program.term.find_block(tid).unwrap();
-                    let (target_node, _) = self.add_block(target_block, sub_term);
-                    self.graph
-                        .add_edge(source, target_node, Edge::Jump(jump, untaken_conditional));
-                }
+                self.add_intraprocedural_edge(source, tid, jump, untaken_conditional);
             }
-            Jmp::BranchInd(_) => (), // TODO: add handling of indirect edges!
+            Jmp::BranchInd(_) => {
+                self.add_indirect_jumps(source, jump, untaken_conditional);
+            }
             Jmp::Call { target, return_ } => {
                 // first make sure that the return block exists
                 let return_to_node_option = if let Some(return_tid) = return_ {
@@ -445,6 +482,7 @@ mod tests {
             term: Blk {
                 defs: Vec::new(),
                 jmps: vec![call_term],
+                indirect_jmp_targets: Vec::new(),
             },
         };
         let sub1_blk2 = Term {
@@ -452,6 +490,7 @@ mod tests {
             term: Blk {
                 defs: Vec::new(),
                 jmps: vec![jmp_term],
+                indirect_jmp_targets: Vec::new(),
             },
         };
         let sub1 = Term {
@@ -478,6 +517,7 @@ mod tests {
             term: Blk {
                 defs: Vec::new(),
                 jmps: vec![cond_jump_term, jump_term_2],
+                indirect_jmp_targets: Vec::new(),
             },
         };
         let sub2_blk2 = Term {
@@ -485,6 +525,7 @@ mod tests {
             term: Blk {
                 defs: Vec::new(),
                 jmps: vec![return_term],
+                indirect_jmp_targets: Vec::new(),
             },
         };
         let sub2 = Term {
@@ -513,5 +554,39 @@ mod tests {
         println!("{}", serde_json::to_string_pretty(&graph).unwrap());
         assert_eq!(graph.node_count(), 16);
         assert_eq!(graph.edge_count(), 20);
+    }
+
+    #[test]
+    fn add_indirect_jumps() {
+        let indirect_jmp_term = Term {
+            tid: Tid::new("indrect_jmp".to_string()),
+            term: Jmp::BranchInd(Expression::Const(Bitvector::from_u32(0x1000))), // At the moment the expression does not matter
+        };
+        let mut blk_tid = Tid::new("blk_00001000");
+        blk_tid.address = "00001000".to_string();
+        let blk_term = Term {
+            tid: blk_tid,
+            term: Blk {
+                defs: Vec::new(),
+                jmps: vec![indirect_jmp_term],
+                indirect_jmp_targets: vec!["00001000".to_string()],
+            },
+        };
+        let sub_term = Term {
+            tid: Tid::new("sub"),
+            term: Sub {
+                name: "sub".to_string(),
+                blocks: vec![blk_term],
+            },
+        };
+        let mut program = Program::mock_empty();
+        program.subs.push(sub_term);
+        let program_term = Term {
+            tid: Tid::new("program".to_string()),
+            term: program,
+        };
+        let graph = get_program_cfg(&program_term, HashSet::new());
+        assert_eq!(graph.node_count(), 2);
+        assert_eq!(graph.edge_count(), 2);
     }
 }
