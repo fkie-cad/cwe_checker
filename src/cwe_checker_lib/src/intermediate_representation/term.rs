@@ -32,6 +32,18 @@ impl Tid {
             address: self.address,
         }
     }
+
+    /// Generate the ID of a block starting at the given address.
+    ///
+    /// Note that the block may not actually exist.
+    /// For cases where one assembly instruction generates more than one block,
+    /// the returned block ID is the one that would be executed first if a jump to the given address happened.
+    pub fn blk_id_at_address(address: &str) -> Tid {
+        Tid {
+            id: format!("blk_{}", address),
+            address: address.to_string(),
+        }
+    }
 }
 
 impl std::fmt::Display for Tid {
@@ -212,6 +224,10 @@ impl Term<Jmp> {
 /// - For two jumps, the first one has to be a conditional jump,
 /// where the second unconditional jump is only taken if the condition of the first jump evaluates to false.
 ///
+/// If one of the `Jmp` instructions is an indirect jump,
+/// then the `indirect_jmp_targets` is a list of possible jump target addresses for that jump.
+/// The list may not be complete and the entries are not guaranteed to be correct.
+///
 /// Basic blocks are *single entry, single exit*, i.e. a basic block is only entered at the beginning
 /// and is only exited by the jump instructions at the end of the block.
 /// If a new control flow edge is discovered that would jump to the middle of a basic block,
@@ -220,6 +236,41 @@ impl Term<Jmp> {
 pub struct Blk {
     pub defs: Vec<Term<Def>>,
     pub jmps: Vec<Term<Jmp>>,
+    pub indirect_jmp_targets: Vec<String>,
+}
+
+impl Term<Blk> {
+    /// Remove indirect jump target addresses for which no corresponding target block exists.
+    /// Return an error message for each removed address.
+    pub fn remove_nonexisting_indirect_jump_targets(
+        &mut self,
+        known_block_tids: &HashSet<Tid>,
+    ) -> Result<(), Vec<LogMessage>> {
+        let mut logs = Vec::new();
+        self.term.indirect_jmp_targets = self
+            .term
+            .indirect_jmp_targets
+            .iter()
+            .filter_map(|target_address| {
+                if known_block_tids
+                    .get(&Tid::blk_id_at_address(&target_address))
+                    .is_some()
+                {
+                    Some(target_address.to_string())
+                } else {
+                    let error_msg =
+                        format!("Indirect jump target at {} does not exist", target_address);
+                    logs.push(LogMessage::new_error(error_msg).location(self.tid.clone()));
+                    None
+                }
+            })
+            .collect();
+        if logs.is_empty() {
+            Ok(())
+        } else {
+            Err(logs)
+        }
+    }
 }
 
 /// A `Sub` or subroutine represents a function with a given name and a list of basic blocks belonging to it.
@@ -436,6 +487,11 @@ impl Project {
         let mut log_messages = Vec::new();
         for sub in self.program.term.subs.iter_mut() {
             for block in sub.term.blocks.iter_mut() {
+                if let Err(mut logs) =
+                    block.remove_nonexisting_indirect_jump_targets(&jump_target_tids)
+                {
+                    log_messages.append(&mut logs);
+                }
                 for jmp in block.term.jmps.iter_mut() {
                     if let Err(log_msg) = jmp.retarget_nonexisting_jump_targets_to_dummy_tid(
                         &jump_target_tids,
@@ -458,6 +514,7 @@ impl Project {
                         term: Blk {
                             defs: Vec::new(),
                             jmps: Vec::new(),
+                            indirect_jmp_targets: Vec::new(),
                         },
                     }],
                 },
@@ -492,6 +549,7 @@ mod tests {
                 term: Blk {
                     defs: Vec::new(),
                     jmps: Vec::new(),
+                    indirect_jmp_targets: Vec::new(),
                 },
             }
         }

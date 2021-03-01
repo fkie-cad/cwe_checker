@@ -71,6 +71,7 @@ fn mock_program() -> Term<Program> {
         term: Blk {
             defs: vec![def_term1],
             jmps: vec![call_term],
+            indirect_jmp_targets: Vec::new(),
         },
     };
     let sub1_blk2 = Term {
@@ -78,6 +79,7 @@ fn mock_program() -> Term<Program> {
         term: Blk {
             defs: vec![def_term5],
             jmps: vec![jmp_term],
+            indirect_jmp_targets: Vec::new(),
         },
     };
     let sub1 = Term {
@@ -104,6 +106,7 @@ fn mock_program() -> Term<Program> {
         term: Blk {
             defs: vec![def_term2, def_term3],
             jmps: vec![cond_jump_term, jump_term_2],
+            indirect_jmp_targets: Vec::new(),
         },
     };
     let sub2_blk2 = Term {
@@ -111,6 +114,7 @@ fn mock_program() -> Term<Program> {
         term: Blk {
             defs: vec![def_term4],
             jmps: vec![return_term],
+            indirect_jmp_targets: Vec::new(),
         },
     };
     let sub2 = Term {

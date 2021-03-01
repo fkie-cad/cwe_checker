@@ -3,6 +3,7 @@ package term;
 import bil.ExecutionType;
 import bil.Variable;
 
+import java.util.ArrayList;
 import com.google.gson.annotations.SerializedName;
 
 public class Jmp {
@@ -19,6 +20,8 @@ public class Jmp {
     private Variable condition;
     @SerializedName("pcode_index")
     private int pcodeIndex;
+    @SerializedName("target_hints")
+    private ArrayList<String> targetHints;
 
     public Jmp() {
     }
@@ -93,4 +96,11 @@ public class Jmp {
         this.pcodeIndex = pcodeIndex;
     }
 
+    public ArrayList<String> getTargetHints() {
+        return targetHints;
+    }
+
+    public void setTargetHints(ArrayList<String> targetHints) {
+        this.targetHints = targetHints;
+    }
 }

@@ -30,6 +30,7 @@ pub struct Jmp {
     pub goto: Option<Label>,
     pub call: Option<Call>,
     pub condition: Option<Variable>,
+    pub target_hints: Option<Vec<String>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy)]
@@ -199,6 +200,11 @@ impl From<Blk> for IrBlk {
                 term: def_term.term.into(),
             })
             .collect();
+        let indirect_jmp_targets = blk
+            .jmps
+            .iter()
+            .find_map(|jmp_term| jmp_term.term.target_hints.clone())
+            .unwrap_or_default();
         let jmps: Vec<Term<IrJmp>> = blk
             .jmps
             .into_iter()
@@ -207,7 +213,11 @@ impl From<Blk> for IrBlk {
                 term: jmp_term.term.into(),
             })
             .collect();
-        IrBlk { defs, jmps }
+        IrBlk {
+            defs,
+            jmps,
+            indirect_jmp_targets,
+        }
     }
 }
 
