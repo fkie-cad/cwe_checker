@@ -86,19 +86,50 @@ impl Interval {
         }
     }
 
-    pub fn subpiece(mut self, low_byte: ByteSize, size: ByteSize) -> Self {
+    pub fn subpiece(self, low_byte: ByteSize, size: ByteSize) -> Self {
         if self.start == self.end {
-            let new_val = self.start.into_checked_lshr(low_byte.as_bit_length())
-            .unwrap()
-            .into_truncate(size.as_bit_length())
-            .unwrap();
-            new_val.into()
+            self.start.subpiece(low_byte, size).into()
         } else if low_byte == ByteSize::new(0) {
-            self.start.truncate(size.as_bit_length()).unwrap();
-            self.end.truncate(size.as_bit_length()).unwrap();
-            self
+            let new_min = Bitvector::signed_min_value(size.into())
+                .into_sign_extend(self.bytesize())
+                .unwrap();
+            let new_max = Bitvector::signed_max_value(size.into())
+                .into_sign_extend(self.bytesize())
+                .unwrap();
+            if self.start.checked_sge(&new_min).unwrap() && self.end.checked_sle(&new_max).unwrap()
+            {
+                Interval {
+                    start: self.start.into_truncate(size).unwrap(),
+                    end: self.end.into_truncate(size).unwrap(),
+                }
+            } else {
+                Interval::new_top(size)
+            }
         } else {
             Interval::new_top(size)
+        }
+    }
+
+    pub fn int_2_comp(self) -> Self {
+        if self
+            .start
+            .checked_sgt(&Bitvector::signed_min_value(self.bytesize().into()))
+            .unwrap()
+        {
+            Interval {
+                start: -self.end,
+                end: -self.start,
+            }
+        } else {
+            Interval::new_top(self.bytesize())
+        }
+    }
+
+    pub fn bitwise_not(self) -> Self {
+        if self.start == self.end {
+            self.start.into_bitnot().into()
+        } else {
+            Interval::new_top(self.bytesize())
         }
     }
 }
@@ -354,20 +385,71 @@ impl RegisterDomain for IntervalDomain {
     }
 
     fn un_op(&self, op: UnOpType) -> Self {
-        todo!()
+        use UnOpType::*;
+        match op {
+            Int2Comp => {
+                let interval = self.interval.clone().int_2_comp();
+                let mut new_upper_bound = None;
+                if let Some(bound) = self.widening_lower_bound.clone() {
+                    if bound.checked_sgt(&Bitvector::signed_min_value(self.bytesize().into())).unwrap() {
+                        new_upper_bound = Some(-bound);
+                    }
+                };
+                let new_lower_bound = self.widening_upper_bound.clone().map(|bound| -bound);
+                IntervalDomain {
+                    interval,
+                    widening_lower_bound: new_lower_bound,
+                    widening_upper_bound: new_upper_bound,
+                }
+            },
+            IntNegate => IntervalDomain {
+                interval: self.interval.clone().bitwise_not(),
+                widening_lower_bound: None,
+                widening_upper_bound: None,
+            },
+            BoolNegate => {
+                if self.interval.start == self.interval.end {
+                    if self.interval.start == Bitvector::zero(ByteSize::new(1).into()) {
+                        Bitvector::one(ByteSize::new(1).into()).into()
+                    } else {
+                        Bitvector::zero(ByteSize::new(1).into()).into()
+                    }
+                } else {
+                    IntervalDomain::new_top(self.bytesize())
+                }
+            }
+            FloatAbs | FloatCeil | FloatFloor | FloatNaN | FloatNegate | FloatRound | FloatSqrt => {
+                IntervalDomain::new_top(self.bytesize())
+            }
+        }
     }
 
     fn subpiece(&self, low_byte: ByteSize, size: ByteSize) -> Self {
         let new_interval = self.interval.clone().subpiece(low_byte, size);
-        let new_lower_bound = {
-            if let Some(bound) = &self.widening_lower_bound {
-                todo!()
-            };
-
-            todo!()
-        };
-
-        todo!()
+        let (mut new_lower_bound, mut new_upper_bound) = (None, None);
+        if low_byte == ByteSize::new(0) {
+            if let (Some(lower_bound), Some(upper_bound)) =
+                (&self.widening_lower_bound, &self.widening_upper_bound)
+            {
+                let new_min = Bitvector::signed_min_value(size.into())
+                    .into_sign_extend(self.bytesize())
+                    .unwrap();
+                let new_max = Bitvector::signed_max_value(size.into())
+                    .into_sign_extend(self.bytesize())
+                    .unwrap();
+                if lower_bound.checked_sge(&new_min).unwrap()
+                    && upper_bound.checked_sle(&new_max).unwrap()
+                {
+                    new_lower_bound = Some(lower_bound.clone().into_truncate(size).unwrap());
+                    new_upper_bound = Some(upper_bound.clone().into_truncate(size).unwrap());
+                }
+            }
+        }
+        IntervalDomain {
+            interval: new_interval,
+            widening_lower_bound: new_lower_bound,
+            widening_upper_bound: new_upper_bound,
+        }
     }
 
     fn cast(&self, kind: CastOpType, width: ByteSize) -> Self {
@@ -387,10 +469,7 @@ impl RegisterDomain for IntervalDomain {
             Float2Float | Int2Float | Trunc => IntervalDomain::new_top(width),
             PopCount => {
                 if let Ok(bitvec) = self.try_to_bitvec() {
-                    Bitvector::from_u64(bitvec.count_ones() as u64)
-                        .into_truncate(width)
-                        .unwrap()
-                        .into()
+                    bitvec.cast(kind, width).unwrap().into()
                 } else {
                     IntervalDomain::new(
                         Bitvector::zero(width.into()),

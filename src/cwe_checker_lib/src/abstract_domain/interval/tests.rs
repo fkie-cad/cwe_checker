@@ -162,3 +162,43 @@ fn cast_zero_and_signed_extend() {
         IntervalDomain::mock_with_bounds(Some(-20), -10, -5, Some(3))
     );
 }
+
+#[test]
+fn subpiece() {
+    let val = IntervalDomain::mock_with_bounds(None, -3, 5, Some(10));
+    let subpieced_val = val.subpiece(ByteSize::new(0), ByteSize::new(1));
+    assert_eq!(subpieced_val, IntervalDomain::mock_i8_with_bounds(None, -3, 5, None));
+    let val = IntervalDomain::mock_with_bounds(Some(-30), 2, 5, Some(10));
+    let subpieced_val = val.subpiece(ByteSize::new(0), ByteSize::new(1));
+    assert_eq!(subpieced_val, IntervalDomain::mock_i8_with_bounds(Some(-30), 2, 5, Some(10)));
+    let val = IntervalDomain::mock_with_bounds(Some(-500), 2, 5, Some(10));
+    let subpieced_val = val.subpiece(ByteSize::new(0), ByteSize::new(1));
+    assert_eq!(subpieced_val, IntervalDomain::mock_i8_with_bounds(None, 2, 5, None));
+    let val = IntervalDomain::mock_with_bounds(Some(-30), 2, 567, Some(777));
+    let subpieced_val = val.subpiece(ByteSize::new(0), ByteSize::new(1));
+    assert_eq!(subpieced_val, IntervalDomain::new_top(ByteSize::new(1)));
+    let val = IntervalDomain::mock_with_bounds(Some(-30), 2, 3, Some(777));
+    let subpieced_val = val.subpiece(ByteSize::new(1), ByteSize::new(1));
+    assert_eq!(subpieced_val, IntervalDomain::new_top(ByteSize::new(1)));
+    let val = IntervalDomain::mock_with_bounds(Some(-30), 512, 512, Some(777));
+    let subpieced_val = val.subpiece(ByteSize::new(1), ByteSize::new(1));
+    assert_eq!(subpieced_val, IntervalDomain::mock_i8_with_bounds(None, 2, 2, None));
+}
+
+#[test]
+fn un_op() {
+    // Int2Comp
+    let mut val = IntervalDomain::mock_with_bounds(None, -3, 5, Some(10));
+    val = val.un_op(UnOpType::Int2Comp);
+    assert_eq!(val, IntervalDomain::mock_with_bounds(Some(-10), -5, 3, None));
+    let mut val = IntervalDomain::mock_i8_with_bounds(Some(-128), -3, 5, Some(127));
+    val = val.un_op(UnOpType::Int2Comp);
+    assert_eq!(val, IntervalDomain::mock_i8_with_bounds(Some(-127), -5, 3, None));
+    // IntNegate
+    let mut val = IntervalDomain::mock_with_bounds(None, -3, 5, Some(10));
+    val = val.un_op(UnOpType::IntNegate);
+    assert_eq!(val, IntervalDomain::new_top(ByteSize::new(8)));
+    let mut val = IntervalDomain::mock_with_bounds(None, -4, -4, Some(10));
+    val = val.un_op(UnOpType::IntNegate);
+    assert_eq!(val, IntervalDomain::mock(3,3));
+}

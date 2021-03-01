@@ -10,6 +10,8 @@
 use crate::prelude::*;
 use derive_more::*;
 
+mod bitvector;
+pub use bitvector::*;
 mod variable;
 pub use variable::*;
 mod expression;
@@ -17,12 +19,7 @@ pub use expression::*;
 mod term;
 pub use term::*;
 
-/// A bitvector is a fixed-length vector of bits
-/// with the semantics of a CPU register,
-/// i.e. it supports two's complement modulo arithmetic.
-///
-/// Bitvector is just an alias for the [`apint::ApInt`] type.
-pub type Bitvector = apint::ApInt;
+
 
 /// An unsigned number of bytes.
 ///
