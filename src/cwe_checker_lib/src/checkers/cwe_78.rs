@@ -88,6 +88,9 @@ pub fn check_cwe(
     let project = analysis_results.project;
     let pointer_inference_results = analysis_results.pointer_inference.unwrap();
 
+    let mut cwe_78_graph = analysis_results.control_flow_graph.clone();
+    cwe_78_graph.reverse();
+
     let (cwe_sender, cwe_receiver) = crossbeam_channel::unbounded();
 
     let config: Config = serde_json::from_value(cwe_params.clone()).unwrap();
@@ -100,6 +103,7 @@ pub fn check_cwe(
     let general_context = Context::new(
         project,
         analysis_results.runtime_memory_image,
+        &cwe_78_graph,
         &pointer_inference_results,
         string_symbols,
         user_input_symbols,

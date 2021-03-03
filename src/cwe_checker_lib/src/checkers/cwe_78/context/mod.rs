@@ -27,7 +27,7 @@ pub struct Context<'a> {
     /// A pointer to the representation of the runtime memory image.
     runtime_memory_image: &'a RuntimeMemoryImage,
     /// The reversed control flow graph for the analysis
-    graph: Graph<'a>,
+    graph: &'a Graph<'a>,
     /// A pointer to the results of the pointer inference analysis.
     /// They are used to determine the targets of pointers to memory,
     /// which in turn is used to keep track of taint on the stack or on the heap.
@@ -65,6 +65,7 @@ impl<'a> Context<'a> {
     pub fn new(
         project: &'a Project,
         runtime_memory_image: &'a RuntimeMemoryImage,
+        graph: &'a Graph<'a>,
         pointer_inference_results: &'a PointerInferenceComputation<'a>,
         string_symbols: HashMap<Tid, &'a ExternSymbol>,
         user_input_symbols: HashMap<Tid, &'a ExternSymbol>,
@@ -77,8 +78,8 @@ impl<'a> Context<'a> {
             extern_symbol_map.insert(symbol.tid.clone(), symbol);
         }
         let mut jmp_to_blk_end_node_map = HashMap::new();
-        let graph = pointer_inference_results.get_graph();
-        for (node_id, node) in graph.node_references() {
+        let pi_graph = pointer_inference_results.get_graph();
+        for (node_id, node) in pi_graph.node_references() {
             match node {
                 Node::BlkStart(block, sub) => match block.term.defs.len() {
                     0 => (),
@@ -98,13 +99,11 @@ impl<'a> Context<'a> {
                 _ => (),
             }
         }
-        let mut cwe_78_graph = graph.clone();
-        cwe_78_graph.reverse();
 
         Context {
             project,
             runtime_memory_image,
-            graph: cwe_78_graph,
+            graph,
             pointer_inference_results,
             block_start_last_def_map: Arc::new(block_start_last_def_map),
             block_first_def_set: Arc::new(block_first_def_set),
