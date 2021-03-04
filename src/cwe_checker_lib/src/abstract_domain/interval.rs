@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::intermediate_representation::*;
 use crate::prelude::*;
 
@@ -6,16 +8,27 @@ use super::{AbstractDomain, HasTop, RegisterDomain, SizedDomain};
 mod simple_interval;
 use simple_interval::*;
 
-/// TODO: Write doc comment!
-/// TODO: implementation as interval of signed integers with widening hints
+mod bin_ops;
+
+/// An abstract domain representing values in an interval range.
+///
+/// The interval bounds are signed integers,
+/// i.e. the domain looses precision if tasked to represent large unsigned integers.
+///
+/// The domain also contains widening hints to faciliate fast and exact widening for simple loop counter variables.
+/// See the [`IntervalDomain::signed_merge_and_widen`] method for details on the widening strategy.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 struct IntervalDomain {
+    /// The underlying interval.
     interval: Interval,
+    /// A lower bound for widening operations.
     widening_upper_bound: Option<Bitvector>,
+    /// An upper bound for widening operations.
     widening_lower_bound: Option<Bitvector>,
 }
 
 impl From<Interval> for IntervalDomain {
+    /// Generate an interval domain without widening hints.
     fn from(interval: Interval) -> IntervalDomain {
         IntervalDomain {
             interval,
@@ -29,6 +42,7 @@ impl IntervalDomain {
     /// Create a new interval domain with the given bounds.
     ///
     /// Both `start` and `end` are inclusive, i.e. contained in the interval.
+    /// The widening hints are set to `None`.
     pub fn new(start: Bitvector, end: Bitvector) -> Self {
         IntervalDomain {
             interval: Interval::new(start, end),
@@ -37,8 +51,8 @@ impl IntervalDomain {
         }
     }
 
-    /// Returns true if the two strided intervals represent the same value sets.
-    /// This function ignores differences in the widening hints of the two strided intervals.
+    /// Returns true if the two intervals represent the same value sets.
+    /// This function ignores differences in the widening hints of the two intervals.
     pub fn equal_as_value_sets(&self, other: &IntervalDomain) -> bool {
         self.interval == other.interval
     }
@@ -90,9 +104,16 @@ impl IntervalDomain {
 
     /// Merge as signed intervals and perform widening if necessary.
     ///
-    /// No widening is performed for very small intervals
-    /// or if the interval (as value set) is the same for `self` and `other`.
+    /// No widening is performed for very small intervals (currently set to interval lengths not greater than 2)
+    /// or if the merged interval (as value set) equals one of the input intervals.
+    /// In all other cases widening is performed after merging the underlying intervals.
+    ///
+    /// ### Widening Strategy
+    ///
     /// If no suitable widening bounds for widening exist, widen to the `Top` value.
+    /// If exactly one widening bound exists, widen up to the bound,
+    /// but do not perform widening in the other direction of the interval.
+    /// If widening bounds for both directions exist, widen up to the bounds in both directions.
     pub fn signed_merge_and_widen(&self, other: &IntervalDomain) -> IntervalDomain {
         let mut merged_domain = self.signed_merge(other);
         if merged_domain.equal_as_value_sets(self) || merged_domain.equal_as_value_sets(other) {
@@ -128,6 +149,7 @@ impl IntervalDomain {
         }
     }
 
+    /// If the interval contains exactly one value, return the value.
     pub fn try_to_bitvec(&self) -> Result<Bitvector, ()> {
         if self.interval.start == self.interval.end {
             Ok(self.interval.start.clone())
@@ -136,6 +158,7 @@ impl IntervalDomain {
         }
     }
 
+    /// Zero-extend the values in the interval to the given width.
     pub fn zero_extend(self, width: ByteSize) -> IntervalDomain {
         let lower_bound = match self.widening_lower_bound {
             Some(bound)
@@ -174,6 +197,7 @@ impl IntervalDomain {
         }
     }
 
+    /// Sign-extend the values in the interval to the given width.
     pub fn sign_extend(mut self, width: ByteSize) -> Self {
         assert!(self.bytesize() <= width);
         if self.widening_lower_bound.is_none() {
@@ -203,157 +227,11 @@ impl IntervalDomain {
                 .map(|bitvec| bitvec.into_sign_extend(width).unwrap()),
         }
     }
-
-    pub fn add(&self, rhs: &Self) -> Self {
-        let interval = self.interval.add(&rhs.interval);
-        if interval.is_top() {
-            interval.into()
-        } else {
-            let new_lower_bound = if let (Some(self_bound), Some(rhs_bound)) =
-                (&self.widening_lower_bound, &rhs.widening_lower_bound)
-            {
-                if self_bound.signed_add_overflow_check(rhs_bound) {
-                    None
-                } else {
-                    Some(self_bound.clone().into_checked_add(rhs_bound).unwrap())
-                }
-            } else {
-                None
-            };
-            let new_upper_bound = if let (Some(self_bound), Some(rhs_bound)) =
-                (&self.widening_upper_bound, &rhs.widening_upper_bound)
-            {
-                if self_bound.signed_add_overflow_check(rhs_bound) {
-                    None
-                } else {
-                    Some(self_bound.clone().into_checked_add(rhs_bound).unwrap())
-                }
-            } else {
-                None
-            };
-            IntervalDomain {
-                interval,
-                widening_upper_bound: new_upper_bound,
-                widening_lower_bound: new_lower_bound,
-            }
-        }
-    }
-
-    pub fn sub(&self, rhs: &Self) -> Self {
-        let interval = self.interval.sub(&rhs.interval);
-        if interval.is_top() {
-            interval.into()
-        } else {
-            let new_lower_bound = if let (Some(self_bound), Some(rhs_bound)) =
-                (&self.widening_lower_bound, &rhs.widening_upper_bound)
-            {
-                if self_bound.signed_sub_overflow_check(rhs_bound) {
-                    None
-                } else {
-                    Some(self_bound.clone().into_checked_sub(rhs_bound).unwrap())
-                }
-            } else {
-                None
-            };
-            let new_upper_bound = if let (Some(self_bound), Some(rhs_bound)) =
-                (&self.widening_upper_bound, &rhs.widening_lower_bound)
-            {
-                if self_bound.signed_sub_overflow_check(rhs_bound) {
-                    None
-                } else {
-                    Some(self_bound.clone().into_checked_sub(rhs_bound).unwrap())
-                }
-            } else {
-                None
-            };
-            IntervalDomain {
-                interval,
-                widening_upper_bound: new_upper_bound,
-                widening_lower_bound: new_lower_bound,
-            }
-        }
-    }
-
-    pub fn signed_mul(&self, rhs: &Self) -> Self {
-        let interval = self.interval.signed_mul(&rhs.interval);
-        if interval.is_top() {
-            interval.into()
-        } else {
-            let mut possible_bounds = Vec::new();
-            if let (Some(bound1), Some(bound2)) =
-                (&self.widening_lower_bound, &rhs.widening_lower_bound)
-            {
-                if let (result, false) = bound1.signed_mult_with_overflow_flag(bound2) {
-                    possible_bounds.push(result);
-                }
-            }
-            if let (Some(bound1), Some(bound2)) =
-                (&self.widening_lower_bound, &rhs.widening_upper_bound)
-            {
-                if let (result, false) = bound1.signed_mult_with_overflow_flag(bound2) {
-                    possible_bounds.push(result);
-                }
-            }
-            if let (Some(bound1), Some(bound2)) =
-                (&self.widening_upper_bound, &rhs.widening_lower_bound)
-            {
-                if let (result, false) = bound1.signed_mult_with_overflow_flag(bound2) {
-                    possible_bounds.push(result);
-                }
-            }
-            if let (Some(bound1), Some(bound2)) =
-                (&self.widening_upper_bound, &rhs.widening_upper_bound)
-            {
-                if let (result, false) = bound1.signed_mult_with_overflow_flag(bound2) {
-                    possible_bounds.push(result);
-                }
-            }
-            let mut lower_bound: Option<Bitvector> = None;
-            for bound in possible_bounds.iter() {
-                if bound.checked_slt(&interval.start).unwrap() {
-                    match lower_bound {
-                        Some(prev_bound) if prev_bound.checked_slt(bound).unwrap() => {
-                            lower_bound = Some(bound.clone())
-                        }
-                        None => lower_bound = Some(bound.clone()),
-                        _ => (),
-                    }
-                }
-            }
-            let mut upper_bound: Option<Bitvector> = None;
-            for bound in possible_bounds.iter() {
-                if bound.checked_sgt(&interval.end).unwrap() {
-                    match upper_bound {
-                        Some(prev_bound) if prev_bound.checked_sgt(bound).unwrap() => {
-                            upper_bound = Some(bound.clone())
-                        }
-                        None => upper_bound = Some(bound.clone()),
-                        _ => (),
-                    }
-                }
-            }
-            IntervalDomain {
-                interval,
-                widening_lower_bound: lower_bound,
-                widening_upper_bound: upper_bound,
-            }
-        }
-    }
-
-    pub fn shift_left(&self, rhs: &Self) -> Self {
-        if rhs.interval.start == rhs.interval.end {
-            let multiplicator = Bitvector::one(self.bytesize().into())
-                .into_checked_shl(rhs.interval.start.try_to_u64().unwrap() as usize)
-                .unwrap();
-            self.signed_mul(&multiplicator.into())
-        } else {
-            Self::new_top(self.bytesize())
-        }
-    }
 }
 
 impl AbstractDomain for IntervalDomain {
     /// Merge two interval domains and perform widening if necessary.
+    /// See [`IntervalDomain::signed_merge_and_widen`] for the widening strategy.
     fn merge(&self, other: &IntervalDomain) -> IntervalDomain {
         self.signed_merge_and_widen(other)
     }
@@ -384,12 +262,17 @@ impl SizedDomain for IntervalDomain {
 }
 
 impl HasTop for IntervalDomain {
+    /// Return a new interval with the same byte size as `self` and representing the `Top` value of the domain.
     fn top(&self) -> Self {
         Self::new_top(self.bytesize())
     }
 }
 
 impl RegisterDomain for IntervalDomain {
+    /// Compute the result of a binary operation between two interval domains.
+    ///
+    /// For binary operations that are not explicitly implemented
+    /// the result is only exact if both intervals contain exactly one value.
     fn bin_op(&self, op: BinOpType, rhs: &Self) -> Self {
         use BinOpType::*;
         match op {
@@ -422,6 +305,7 @@ impl RegisterDomain for IntervalDomain {
         }
     }
 
+    /// Compute the result of an unary operation on the interval domain.
     fn un_op(&self, op: UnOpType) -> Self {
         use UnOpType::*;
         match op {
@@ -465,6 +349,9 @@ impl RegisterDomain for IntervalDomain {
         }
     }
 
+    /// Take a sub-bitvector of the values in the interval domain.
+    ///
+    /// If `low_byte` is not zero, the result will generally be not exact.
     fn subpiece(&self, low_byte: ByteSize, size: ByteSize) -> Self {
         let new_interval = self.interval.clone().subpiece(low_byte, size);
         let (mut new_lower_bound, mut new_upper_bound) = (None, None);
@@ -493,6 +380,7 @@ impl RegisterDomain for IntervalDomain {
         }
     }
 
+    /// Compute the result of a cast operation on the interval domain.
     fn cast(&self, kind: CastOpType, width: ByteSize) -> Self {
         use CastOpType::*;
         match kind {
@@ -531,6 +419,18 @@ impl From<Bitvector> for IntervalDomain {
             interval: bitvec.into(),
             widening_lower_bound: None,
             widening_upper_bound: None,
+        }
+    }
+}
+
+impl Display for IntervalDomain {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.is_top() {
+            write!(f, "Top:i{}", self.bytesize().as_bit_length())
+        } else {
+            let start_int = apint::Int::from(self.interval.start.clone());
+            let end_int = apint::Int::from(self.interval.end.clone());
+            write!(f, "[{:016x}, {:016x}]:i{}", start_int, end_int, self.bytesize().as_bit_length())
         }
     }
 }

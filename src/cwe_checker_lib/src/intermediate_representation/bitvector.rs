@@ -7,6 +7,9 @@ use super::*;
 /// Bitvector is just an alias for the [`apint::ApInt`] type.
 pub type Bitvector = apint::ApInt;
 
+/// A trait to extend the bitvector type with useful helper functions
+/// that are not contained in the [`apint`] crate.
+/// See the implementation of the trait on the [`Bitvector`] type for more information.
 pub trait BitvectorExtended: Sized {
     fn cast(&self, kind: CastOpType, width: ByteSize) -> Result<Self, ()>;
 
@@ -24,6 +27,8 @@ pub trait BitvectorExtended: Sized {
 }
 
 impl BitvectorExtended for Bitvector {
+    /// Perform a cast operation on the bitvector.
+    /// Returns an error for non-implemented cast operations (currently all float-related casts).
     fn cast(&self, kind: CastOpType, width: ByteSize) -> Result<Self, ()> {
         match kind {
             CastOpType::IntZExt => Ok(self.clone().into_zero_extend(width).unwrap()),
@@ -35,6 +40,7 @@ impl BitvectorExtended for Bitvector {
         }
     }
 
+    /// Extract a subpiece of the given bitvector.
     fn subpiece(&self, low_byte: ByteSize, size: ByteSize) -> Self {
         self.clone()
             .into_checked_lshr(low_byte.as_bit_length())
@@ -43,6 +49,8 @@ impl BitvectorExtended for Bitvector {
             .unwrap()
     }
 
+    /// Perform a unary operation on the given bitvector.
+    /// Returns an error for non-implemented operations (currently all float-related operations).
     fn un_op(&self, op: UnOpType) -> Result<Self, ()> {
         use UnOpType::*;
         match op {
@@ -61,6 +69,8 @@ impl BitvectorExtended for Bitvector {
         }
     }
 
+    /// Perform a binary operation on the given bitvectors.
+    /// Returns an error for non-implemented operations (currently all float-related operations).
     fn bin_op(&self, op: BinOpType, rhs: &Self) -> Result<Self, ()> {
         use BinOpType::*;
         match op {
@@ -196,6 +206,7 @@ impl BitvectorExtended for Bitvector {
         }
     }
 
+    /// Returns `true` if adding `self` to `rhs` would result in a signed integer overflow or underflow.
     fn signed_add_overflow_check(&self, rhs: &Self) -> bool {
         let result = self.clone().into_checked_add(rhs).unwrap();
         if rhs.sign_bit().to_bool() {
@@ -205,6 +216,7 @@ impl BitvectorExtended for Bitvector {
         }
     }
 
+    /// Returns `true` if subtracting `rhs` from `self` would result in a signed integer overflow or underflow.
     fn signed_sub_overflow_check(&self, rhs: &Self) -> bool {
         let result = self.clone().into_checked_sub(rhs).unwrap();
         if rhs.sign_bit().to_bool() {
@@ -214,6 +226,8 @@ impl BitvectorExtended for Bitvector {
         }
     }
 
+    /// Return the result of multiplying `self` with `rhs`
+    /// and a flag that is set to `true` if the multiplication resulted in a signed integer overflow or underflow.
     fn signed_mult_with_overflow_flag(&self, rhs: &Self) -> (Self, bool) {
         if self.is_zero() {
             (Bitvector::zero(self.width()), false)

@@ -117,11 +117,11 @@ fn cast_zero_and_signed_extend() {
         extended_val,
         IntervalDomain::mock_with_bounds(None, 0, 255, None)
     );
-    let val = IntervalDomain::mock_i8_with_bounds(Some(-20), -10, -5, None);
+    let val = IntervalDomain::mock_i8_with_bounds(Some(-14), -9, -5, Some(-2));
     let extended_val = val.cast(CastOpType::IntZExt, ByteSize::new(8));
     assert_eq!(
         extended_val,
-        IntervalDomain::mock_with_bounds(Some(236), 246, 251, Some(255))
+        IntervalDomain::mock_with_bounds(Some(242), 247, 251, Some(254))
     );
     let val = IntervalDomain::mock_i8_with_bounds(Some(-20), -10, -5, Some(3));
     let extended_val = val.cast(CastOpType::IntZExt, ByteSize::new(8));

@@ -205,6 +205,7 @@ impl From<Bitvector> for Interval {
     }
 }
 
+/// Helper function returning the (signed) minimum of two bitvectors.
 fn signed_min(v1: &Bitvector, v2: &Bitvector) -> Bitvector {
     if v1.checked_sle(v2).unwrap() {
         v1.clone()
@@ -213,6 +214,7 @@ fn signed_min(v1: &Bitvector, v2: &Bitvector) -> Bitvector {
     }
 }
 
+/// Helper function returning the (signed) maximum of two bitvectors.
 fn signed_max(v1: &Bitvector, v2: &Bitvector) -> Bitvector {
     if v1.checked_sge(v2).unwrap() {
         v1.clone()
