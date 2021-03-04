@@ -1,150 +1,13 @@
 use crate::intermediate_representation::*;
 use crate::prelude::*;
-use std::convert::TryFrom;
 
 use super::{AbstractDomain, HasTop, RegisterDomain, SizedDomain};
 
-/// An interval of values with a fixed byte size.
-/// The interval does not contain any type information,
-/// i.e. the values can be interpreted as both signed or unsigned integers.
-#[derive(Serialize, Deserialize, Debug, Eq, Hash, Clone)]
-struct Interval {
-    start: Bitvector,
-    end: Bitvector,
-}
-
-impl PartialEq for Interval {
-    fn eq(&self, other: &Interval) -> bool {
-        // The `Top` value has more than one correct representation.
-        (self.is_top() && other.is_top()) || (self.start == other.start && self.end == other.end)
-    }
-}
-
-impl Interval {
-    /// Construct a new interval.
-    ///
-    /// Both `start` and `end` of the interval are inclusive,
-    /// i.e. contained in the represented interval.
-    pub fn new(start: Bitvector, end: Bitvector) -> Interval {
-        assert_eq!(start.width(), end.width());
-        Interval { start, end }
-    }
-
-    pub fn new_top(bytesize: ByteSize) -> Interval {
-        Interval {
-            start: Bitvector::signed_min_value(bytesize.into()),
-            end: Bitvector::signed_max_value(bytesize.into()),
-        }
-    }
-
-    pub fn is_top(&self) -> bool {
-        (self.start.clone() - &Bitvector::one(self.start.width())) == self.end
-    }
-
-    pub fn bytesize(&self) -> ByteSize {
-        self.start.width().into()
-    }
-
-    /// Merge two intervals interpreting both as intervals of signed integers.
-    pub fn signed_merge(&self, other: &Interval) -> Interval {
-        if self.start.checked_sgt(&self.end).unwrap()
-            || other.start.checked_sgt(&other.end).unwrap()
-        {
-            // One of the intervals wraps around
-            return Interval::new_top(self.bytesize());
-        }
-        let start = signed_min(&self.start, &other.start);
-        let end = signed_max(&self.end, &other.end);
-        Interval { start, end }
-    }
-
-    /// Return the number of contained values of the interval.
-    pub fn length(&self) -> Bitvector {
-        self.end.clone() - &self.start + &Bitvector::one(self.start.width())
-    }
-
-    /// Compute the interval represented if the byte size of the value is zero-extended.
-    pub fn zero_extend(self, width: ByteSize) -> Interval {
-        assert!(self.bytesize() <= width);
-        if self.bytesize() == width {
-            return self;
-        }
-        if self.start.sign_bit().to_bool() == self.end.sign_bit().to_bool() {
-            // Both start and end have the same sign
-            Interval {
-                start: self.start.into_zero_extend(width).unwrap(),
-                end: self.end.into_zero_extend(width).unwrap(),
-            }
-        } else {
-            // The interval either contains both -1 and 0 or wraps around
-            Interval {
-                start: Bitvector::zero(width.into()),
-                end: Bitvector::unsigned_max_value(self.end.width())
-                    .into_zero_extend(width)
-                    .unwrap(),
-            }
-        }
-    }
-
-    pub fn subpiece(self, low_byte: ByteSize, size: ByteSize) -> Self {
-        if self.start == self.end {
-            self.start.subpiece(low_byte, size).into()
-        } else if low_byte == ByteSize::new(0) {
-            let new_min = Bitvector::signed_min_value(size.into())
-                .into_sign_extend(self.bytesize())
-                .unwrap();
-            let new_max = Bitvector::signed_max_value(size.into())
-                .into_sign_extend(self.bytesize())
-                .unwrap();
-            if self.start.checked_sge(&new_min).unwrap() && self.end.checked_sle(&new_max).unwrap()
-            {
-                Interval {
-                    start: self.start.into_truncate(size).unwrap(),
-                    end: self.end.into_truncate(size).unwrap(),
-                }
-            } else {
-                Interval::new_top(size)
-            }
-        } else {
-            Interval::new_top(size)
-        }
-    }
-
-    pub fn int_2_comp(self) -> Self {
-        if self
-            .start
-            .checked_sgt(&Bitvector::signed_min_value(self.bytesize().into()))
-            .unwrap()
-        {
-            Interval {
-                start: -self.end,
-                end: -self.start,
-            }
-        } else {
-            Interval::new_top(self.bytesize())
-        }
-    }
-
-    pub fn bitwise_not(self) -> Self {
-        if self.start == self.end {
-            self.start.into_bitnot().into()
-        } else {
-            Interval::new_top(self.bytesize())
-        }
-    }
-}
-
-impl From<Bitvector> for Interval {
-    /// Create an interval that only contains the given bitvector.
-    fn from(bitvec: Bitvector) -> Self {
-        Interval {
-            start: bitvec.clone(),
-            end: bitvec,
-        }
-    }
-}
+mod simple_interval;
+use simple_interval::*;
 
 /// TODO: Write doc comment!
+/// TODO: implementation as interval of signed integers with widening hints
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 struct IntervalDomain {
     interval: Interval,
@@ -340,6 +203,153 @@ impl IntervalDomain {
                 .map(|bitvec| bitvec.into_sign_extend(width).unwrap()),
         }
     }
+
+    pub fn add(&self, rhs: &Self) -> Self {
+        let interval = self.interval.add(&rhs.interval);
+        if interval.is_top() {
+            interval.into()
+        } else {
+            let new_lower_bound = if let (Some(self_bound), Some(rhs_bound)) =
+                (&self.widening_lower_bound, &rhs.widening_lower_bound)
+            {
+                if self_bound.signed_add_overflow_check(rhs_bound) {
+                    None
+                } else {
+                    Some(self_bound.clone().into_checked_add(rhs_bound).unwrap())
+                }
+            } else {
+                None
+            };
+            let new_upper_bound = if let (Some(self_bound), Some(rhs_bound)) =
+                (&self.widening_upper_bound, &rhs.widening_upper_bound)
+            {
+                if self_bound.signed_add_overflow_check(rhs_bound) {
+                    None
+                } else {
+                    Some(self_bound.clone().into_checked_add(rhs_bound).unwrap())
+                }
+            } else {
+                None
+            };
+            IntervalDomain {
+                interval,
+                widening_upper_bound: new_upper_bound,
+                widening_lower_bound: new_lower_bound,
+            }
+        }
+    }
+
+    pub fn sub(&self, rhs: &Self) -> Self {
+        let interval = self.interval.sub(&rhs.interval);
+        if interval.is_top() {
+            interval.into()
+        } else {
+            let new_lower_bound = if let (Some(self_bound), Some(rhs_bound)) =
+                (&self.widening_lower_bound, &rhs.widening_upper_bound)
+            {
+                if self_bound.signed_sub_overflow_check(rhs_bound) {
+                    None
+                } else {
+                    Some(self_bound.clone().into_checked_sub(rhs_bound).unwrap())
+                }
+            } else {
+                None
+            };
+            let new_upper_bound = if let (Some(self_bound), Some(rhs_bound)) =
+                (&self.widening_upper_bound, &rhs.widening_lower_bound)
+            {
+                if self_bound.signed_sub_overflow_check(rhs_bound) {
+                    None
+                } else {
+                    Some(self_bound.clone().into_checked_sub(rhs_bound).unwrap())
+                }
+            } else {
+                None
+            };
+            IntervalDomain {
+                interval,
+                widening_upper_bound: new_upper_bound,
+                widening_lower_bound: new_lower_bound,
+            }
+        }
+    }
+
+    pub fn signed_mul(&self, rhs: &Self) -> Self {
+        let interval = self.interval.signed_mul(&rhs.interval);
+        if interval.is_top() {
+            interval.into()
+        } else {
+            let mut possible_bounds = Vec::new();
+            if let (Some(bound1), Some(bound2)) =
+                (&self.widening_lower_bound, &rhs.widening_lower_bound)
+            {
+                if let (result, false) = bound1.signed_mult_with_overflow_flag(bound2) {
+                    possible_bounds.push(result);
+                }
+            }
+            if let (Some(bound1), Some(bound2)) =
+                (&self.widening_lower_bound, &rhs.widening_upper_bound)
+            {
+                if let (result, false) = bound1.signed_mult_with_overflow_flag(bound2) {
+                    possible_bounds.push(result);
+                }
+            }
+            if let (Some(bound1), Some(bound2)) =
+                (&self.widening_upper_bound, &rhs.widening_lower_bound)
+            {
+                if let (result, false) = bound1.signed_mult_with_overflow_flag(bound2) {
+                    possible_bounds.push(result);
+                }
+            }
+            if let (Some(bound1), Some(bound2)) =
+                (&self.widening_upper_bound, &rhs.widening_upper_bound)
+            {
+                if let (result, false) = bound1.signed_mult_with_overflow_flag(bound2) {
+                    possible_bounds.push(result);
+                }
+            }
+            let mut lower_bound: Option<Bitvector> = None;
+            for bound in possible_bounds.iter() {
+                if bound.checked_slt(&interval.start).unwrap() {
+                    match lower_bound {
+                        Some(prev_bound) if prev_bound.checked_slt(bound).unwrap() => {
+                            lower_bound = Some(bound.clone())
+                        }
+                        None => lower_bound = Some(bound.clone()),
+                        _ => (),
+                    }
+                }
+            }
+            let mut upper_bound: Option<Bitvector> = None;
+            for bound in possible_bounds.iter() {
+                if bound.checked_sgt(&interval.end).unwrap() {
+                    match upper_bound {
+                        Some(prev_bound) if prev_bound.checked_sgt(bound).unwrap() => {
+                            upper_bound = Some(bound.clone())
+                        }
+                        None => upper_bound = Some(bound.clone()),
+                        _ => (),
+                    }
+                }
+            }
+            IntervalDomain {
+                interval,
+                widening_lower_bound: lower_bound,
+                widening_upper_bound: upper_bound,
+            }
+        }
+    }
+
+    pub fn shift_left(&self, rhs: &Self) -> Self {
+        if rhs.interval.start == rhs.interval.end {
+            let multiplicator = Bitvector::one(self.bytesize().into())
+                .into_checked_shl(rhs.interval.start.try_to_u64().unwrap() as usize)
+                .unwrap();
+            self.signed_mul(&multiplicator.into())
+        } else {
+            Self::new_top(self.bytesize())
+        }
+    }
 }
 
 impl AbstractDomain for IntervalDomain {
@@ -381,7 +391,35 @@ impl HasTop for IntervalDomain {
 
 impl RegisterDomain for IntervalDomain {
     fn bin_op(&self, op: BinOpType, rhs: &Self) -> Self {
-        todo!()
+        use BinOpType::*;
+        match op {
+            Piece | IntEqual | IntNotEqual | IntLess | IntSLess | IntLessEqual | IntSLessEqual
+            | IntCarry | IntSCarry | IntSBorrow | IntAnd | IntOr | IntXOr | IntRight
+            | IntSRight | IntDiv | IntSDiv | IntRem | IntSRem | BoolAnd | BoolOr | BoolXOr
+            | FloatEqual | FloatNotEqual | FloatLess | FloatLessEqual | FloatAdd | FloatSub
+            | FloatMult | FloatDiv => {
+                let new_interval = if self.interval.start == self.interval.end
+                    && rhs.interval.start == rhs.interval.end
+                {
+                    if let Ok(bitvec) = self.interval.start.bin_op(op, &rhs.interval.start) {
+                        bitvec.into()
+                    } else {
+                        Interval::new_top(self.bin_op_bytesize(op, rhs))
+                    }
+                } else {
+                    Interval::new_top(self.bin_op_bytesize(op, rhs))
+                };
+                IntervalDomain {
+                    interval: new_interval,
+                    widening_lower_bound: None,
+                    widening_upper_bound: None,
+                }
+            }
+            IntAdd => self.add(rhs),
+            IntSub => self.sub(rhs),
+            IntMult => self.signed_mul(rhs),
+            IntLeft => self.shift_left(rhs),
+        }
     }
 
     fn un_op(&self, op: UnOpType) -> Self {
@@ -391,7 +429,10 @@ impl RegisterDomain for IntervalDomain {
                 let interval = self.interval.clone().int_2_comp();
                 let mut new_upper_bound = None;
                 if let Some(bound) = self.widening_lower_bound.clone() {
-                    if bound.checked_sgt(&Bitvector::signed_min_value(self.bytesize().into())).unwrap() {
+                    if bound
+                        .checked_sgt(&Bitvector::signed_min_value(self.bytesize().into()))
+                        .unwrap()
+                    {
                         new_upper_bound = Some(-bound);
                     }
                 };
@@ -401,7 +442,7 @@ impl RegisterDomain for IntervalDomain {
                     widening_lower_bound: new_lower_bound,
                     widening_upper_bound: new_upper_bound,
                 }
-            },
+            }
             IntNegate => IntervalDomain {
                 interval: self.interval.clone().bitwise_not(),
                 widening_lower_bound: None,
@@ -491,22 +532,6 @@ impl From<Bitvector> for IntervalDomain {
             widening_lower_bound: None,
             widening_upper_bound: None,
         }
-    }
-}
-
-fn signed_min(v1: &Bitvector, v2: &Bitvector) -> Bitvector {
-    if v1.checked_sle(v2).unwrap() {
-        v1.clone()
-    } else {
-        v2.clone()
-    }
-}
-
-fn signed_max(v1: &Bitvector, v2: &Bitvector) -> Bitvector {
-    if v1.checked_sge(v2).unwrap() {
-        v1.clone()
-    } else {
-        v2.clone()
     }
 }
 

@@ -15,6 +15,12 @@ pub trait BitvectorExtended: Sized {
     fn un_op(&self, op: UnOpType) -> Result<Self, ()>;
 
     fn bin_op(&self, op: BinOpType, rhs: &Self) -> Result<Self, ()>;
+
+    fn signed_add_overflow_check(&self, rhs: &Self) -> bool;
+
+    fn signed_sub_overflow_check(&self, rhs: &Self) -> bool;
+
+    fn signed_mult_with_overflow_flag(&self, rhs: &Self) -> (Self, bool);
 }
 
 impl BitvectorExtended for Bitvector {
@@ -160,7 +166,7 @@ impl BitvectorExtended for Bitvector {
                             Bitvector::zero(self.width()) - &Bitvector::one(self.width());
                         Ok(minus_one)
                     } else {
-                       Ok(Bitvector::zero(self.width()))
+                        Ok(Bitvector::zero(self.width()))
                     }
                 }
             }
@@ -175,18 +181,10 @@ impl BitvectorExtended for Bitvector {
                 assert_eq!(self.width(), rhs.width());
                 Ok(Bitvector::from((self != rhs) as u8))
             }
-            IntLess => {
-                Ok(Bitvector::from(self.checked_ult(rhs).unwrap() as u8))
-            }
-            IntLessEqual => {
-                Ok(Bitvector::from(self.checked_ule(rhs).unwrap() as u8))
-            }
-            IntSLess => {
-                Ok(Bitvector::from(self.checked_slt(rhs).unwrap() as u8))
-            }
-            IntSLessEqual => {
-                Ok(Bitvector::from(self.checked_sle(rhs).unwrap() as u8))
-            }
+            IntLess => Ok(Bitvector::from(self.checked_ult(rhs).unwrap() as u8)),
+            IntLessEqual => Ok(Bitvector::from(self.checked_ule(rhs).unwrap() as u8)),
+            IntSLess => Ok(Bitvector::from(self.checked_slt(rhs).unwrap() as u8)),
+            IntSLessEqual => Ok(Bitvector::from(self.checked_sle(rhs).unwrap() as u8)),
             FloatEqual | FloatNotEqual | FloatLess | FloatLessEqual => {
                 // TODO: Implement floating point comparison operators!
                 Err(())
@@ -194,6 +192,37 @@ impl BitvectorExtended for Bitvector {
             FloatAdd | FloatSub | FloatMult | FloatDiv => {
                 // TODO: Implement floating point arithmetic operators!
                 Err(())
+            }
+        }
+    }
+
+    fn signed_add_overflow_check(&self, rhs: &Self) -> bool {
+        let result = self.clone().into_checked_add(rhs).unwrap();
+        if rhs.sign_bit().to_bool() {
+            self.checked_sle(&result).unwrap()
+        } else {
+            self.checked_sgt(&result).unwrap()
+        }
+    }
+
+    fn signed_sub_overflow_check(&self, rhs: &Self) -> bool {
+        let result = self.clone().into_checked_sub(rhs).unwrap();
+        if rhs.sign_bit().to_bool() {
+            self.checked_sge(&result).unwrap()
+        } else {
+            self.checked_slt(&result).unwrap()
+        }
+    }
+
+    fn signed_mult_with_overflow_flag(&self, rhs: &Self) -> (Self, bool) {
+        if self.is_zero() {
+            (Bitvector::zero(self.width()), false)
+        } else {
+            let result = self.clone().into_checked_mul(rhs).unwrap();
+            if result.clone().into_checked_sdiv(self).unwrap() != *rhs {
+                (result, true)
+            } else {
+                (result, false)
             }
         }
     }

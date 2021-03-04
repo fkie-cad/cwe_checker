@@ -202,3 +202,67 @@ fn un_op() {
     val = val.un_op(UnOpType::IntNegate);
     assert_eq!(val, IntervalDomain::mock(3,3));
 }
+
+#[test]
+fn add() {
+    let lhs = IntervalDomain::mock_with_bounds(None, 3,7, Some(10));
+    let rhs = IntervalDomain::mock_with_bounds(Some(-20), -3,0, Some(10));
+    let result = lhs.bin_op(BinOpType::IntAdd, &rhs);
+    assert_eq!(result, IntervalDomain::mock_with_bounds(None, 0,7,Some(20)));
+    let lhs = IntervalDomain::mock_i8_with_bounds(Some(-121), -120,-120, Some(10));
+    let rhs = IntervalDomain::mock_i8_with_bounds(Some(-10), -9,0, Some(10));
+    let result = lhs.bin_op(BinOpType::IntAdd, &rhs);
+    assert_eq!(result, IntervalDomain::new_top(ByteSize::new(1)));
+    let lhs = IntervalDomain::mock_i8_with_bounds(Some(-100), 2,4, Some(100));
+    let rhs = IntervalDomain::mock_i8_with_bounds(Some(-50), 10,20, Some(50));
+    let result = lhs.bin_op(BinOpType::IntAdd, &rhs);
+    assert_eq!(result, IntervalDomain::mock_i8_with_bounds(None, 12, 24, None));
+}
+
+#[test]
+fn sub() {
+    let lhs = IntervalDomain::mock_with_bounds(None, 3,7, Some(10));
+    let rhs = IntervalDomain::mock_with_bounds(Some(-20), -3,0, Some(10));
+    let result = lhs.bin_op(BinOpType::IntSub, &rhs);
+    assert_eq!(result, IntervalDomain::mock_with_bounds(None, 3,10,Some(30)));
+    let lhs = IntervalDomain::mock_i8_with_bounds(Some(-121), -120,-120, Some(10));
+    let rhs = IntervalDomain::mock_i8_with_bounds(Some(-10), -9,9, Some(10));
+    let result = lhs.bin_op(BinOpType::IntSub, &rhs);
+    assert_eq!(result, IntervalDomain::new_top(ByteSize::new(1)));
+    let lhs = IntervalDomain::mock_i8_with_bounds(Some(-100), 2,4, Some(100));
+    let rhs = IntervalDomain::mock_i8_with_bounds(Some(-50), 10,20, Some(50));
+    let result = lhs.bin_op(BinOpType::IntSub, &rhs);
+    assert_eq!(result, IntervalDomain::mock_i8_with_bounds(None, -18, -6, None));
+}
+
+#[test]
+fn multiplication() {
+    let lhs = IntervalDomain::mock_with_bounds(None, 3,7, Some(10));
+    let rhs = IntervalDomain::mock_with_bounds(Some(-20), -3,0, Some(10));
+    let result = lhs.bin_op(BinOpType::IntMult, &rhs);
+    assert_eq!(result, IntervalDomain::mock_with_bounds(Some(-200), -21, 0, Some(100)));
+    let lhs = IntervalDomain::mock_with_bounds(Some(-4), -3,1, Some(2));
+    let rhs = IntervalDomain::mock_with_bounds(Some(-6), -5,7, Some(8));
+    let result = lhs.bin_op(BinOpType::IntMult, &rhs);
+    assert_eq!(result, IntervalDomain::mock_with_bounds(Some(-32), -21, 15, Some(16)));
+    let lhs = IntervalDomain::mock_i8_with_bounds(None, 3,7, Some(50));
+    let rhs = IntervalDomain::mock_i8_with_bounds(Some(-30), -3,0, Some(50));
+    let result = lhs.bin_op(BinOpType::IntMult, &rhs);
+    assert_eq!(result, IntervalDomain::mock_i8_with_bounds(None, -21, 0, None));
+}
+
+#[test]
+fn shift_left() {
+    let lhs = IntervalDomain::mock_i8_with_bounds(None, 3,3, Some(50));
+    let rhs = IntervalDomain::mock_i8_with_bounds(Some(1), 2,3, Some(4));
+    let result = lhs.bin_op(BinOpType::IntLeft, &rhs);
+    assert_eq!(result, IntervalDomain::new_top(ByteSize::new(1)));
+    let lhs = IntervalDomain::mock_i8_with_bounds(None, 3,4, Some(5));
+    let rhs = IntervalDomain::mock_i8_with_bounds(Some(1), 2,2, Some(4));
+    let result = lhs.bin_op(BinOpType::IntLeft, &rhs);
+    assert_eq!(result, IntervalDomain::mock_i8_with_bounds(None, 12, 16, None));
+    let lhs = IntervalDomain::mock_i8_with_bounds(Some(2), 3,4, Some(64));
+    let rhs = IntervalDomain::mock_i8_with_bounds(Some(0), 1,1, Some(4));
+    let result = lhs.bin_op(BinOpType::IntLeft, &rhs);
+    assert_eq!(result, IntervalDomain::mock_i8_with_bounds(None, 6, 8, None));
+}
