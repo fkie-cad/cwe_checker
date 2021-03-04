@@ -80,7 +80,7 @@ fn get_umask_permission_arg(
 ///
 /// Note that `0o777` is not considered a chmod-style argument as it also denotes a usually correct umask argument.
 fn is_chmod_style_arg(arg: u64) -> bool {
-    arg > UPPER_BOUND_CORRECT_UMASK_ARG_VALUE && arg < UPPER_BOUND_CORRECT_CHMOD_ARG_VALUE
+    arg > UPPER_BOUND_CORRECT_UMASK_ARG_VALUE && arg != UPPER_BOUND_CORRECT_CHMOD_ARG_VALUE
 }
 
 /// Generate the CWE warning for a detected instance of the CWE.
