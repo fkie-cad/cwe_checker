@@ -10,7 +10,7 @@
 //! ## How the check works
 //!
 //! This check looks for umask calls and checks if they have a reasonable value, i.e. smaller than
-//! a certain value, currently set to 1000 and greater than a reasonable value for umask, currently set to 100.
+//! a certain value, currently set to 0o777 and greater than a reasonable value for umask, currently set to 0o177.
 //!
 //! ## False Positives
 //!
@@ -37,8 +37,8 @@ pub static CWE_MODULE: CweModule = CweModule {
     run: check_cwe,
 };
 
-pub static UPPER_BOUND_CORRECT_UMASK_ARG_VALUE: u64 = 100;
-pub static UPPER_BOUND_CORRECT_CHMOD_ARG_VALUE: u64 = 1000;
+pub static UPPER_BOUND_CORRECT_UMASK_ARG_VALUE: u64 = 0o177;
+pub static UPPER_BOUND_CORRECT_CHMOD_ARG_VALUE: u64 = 0o777;
 
 /// Compute the parameter value of umask out of the basic block right before the umask call.
 ///
@@ -77,8 +77,10 @@ fn get_umask_permission_arg(
 }
 
 /// Is the given argument value considered to be a chmod-style argument?
+///
+/// Note that `0o777` is not considered a chmod-style argument as it also denotes a usually correct umask argument.
 fn is_chmod_style_arg(arg: u64) -> bool {
-    arg > UPPER_BOUND_CORRECT_UMASK_ARG_VALUE && arg <= UPPER_BOUND_CORRECT_CHMOD_ARG_VALUE
+    arg > UPPER_BOUND_CORRECT_UMASK_ARG_VALUE && arg < UPPER_BOUND_CORRECT_CHMOD_ARG_VALUE
 }
 
 /// Generate the CWE warning for a detected instance of the CWE.
