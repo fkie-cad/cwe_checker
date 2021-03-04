@@ -6,19 +6,12 @@ use crate::prelude::*;
 /// The interval bounds are interpreted as signed integers,
 /// i.e. `self.start` is not allowed to be greater than `self.end`
 /// as signed integers.
-#[derive(Serialize, Deserialize, Debug, Eq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Interval {
-    /// The start of the interval. The bound is included in the represented interval. 
+    /// The start of the interval. The bound is included in the represented interval.
     pub start: Bitvector,
     /// The end of the interval. The bound is included in the represented interval.
     pub end: Bitvector,
-}
-
-impl PartialEq for Interval {
-    fn eq(&self, other: &Interval) -> bool {
-        // The `Top` value has more than one correct representation.
-        (self.is_top() && other.is_top()) || (self.start == other.start && self.end == other.end)
-    }
 }
 
 impl Interval {
@@ -159,7 +152,6 @@ impl Interval {
         }
     }
 
-
     /// Compute the interval of possible results
     /// if one subtracts a value in `rhs` from a value in `self`.
     pub fn sub(&self, rhs: &Interval) -> Interval {
@@ -181,7 +173,10 @@ impl Interval {
         if self.bytesize().as_bit_length() > 64 {
             return Interval::new_top(self.bytesize());
         }
-        let val1 = self.start.signed_mult_with_overflow_flag(&rhs.start).unwrap();
+        let val1 = self
+            .start
+            .signed_mult_with_overflow_flag(&rhs.start)
+            .unwrap();
         let val2 = self.start.signed_mult_with_overflow_flag(&rhs.end).unwrap();
         let val3 = self.end.signed_mult_with_overflow_flag(&rhs.start).unwrap();
         let val4 = self.end.signed_mult_with_overflow_flag(&rhs.end).unwrap();

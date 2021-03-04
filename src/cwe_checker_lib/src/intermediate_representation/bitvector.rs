@@ -11,29 +11,31 @@ pub type Bitvector = apint::ApInt;
 /// that are not contained in the [`apint`] crate.
 /// See the implementation of the trait on the [`Bitvector`] type for more information.
 pub trait BitvectorExtended: Sized {
-    fn cast(&self, kind: CastOpType, width: ByteSize) -> Result<Self, ()>;
+    fn cast(&self, kind: CastOpType, width: ByteSize) -> Result<Self, Error>;
 
     fn subpiece(&self, low_byte: ByteSize, size: ByteSize) -> Self;
 
-    fn un_op(&self, op: UnOpType) -> Result<Self, ()>;
+    fn un_op(&self, op: UnOpType) -> Result<Self, Error>;
 
-    fn bin_op(&self, op: BinOpType, rhs: &Self) -> Result<Self, ()>;
+    fn bin_op(&self, op: BinOpType, rhs: &Self) -> Result<Self, Error>;
 
     fn signed_add_overflow_check(&self, rhs: &Self) -> bool;
 
     fn signed_sub_overflow_check(&self, rhs: &Self) -> bool;
 
-    fn signed_mult_with_overflow_flag(&self, rhs: &Self) -> Result<(Self, bool), ()>;
+    fn signed_mult_with_overflow_flag(&self, rhs: &Self) -> Result<(Self, bool), Error>;
 }
 
 impl BitvectorExtended for Bitvector {
     /// Perform a cast operation on the bitvector.
     /// Returns an error for non-implemented cast operations (currently all float-related casts).
-    fn cast(&self, kind: CastOpType, width: ByteSize) -> Result<Self, ()> {
+    fn cast(&self, kind: CastOpType, width: ByteSize) -> Result<Self, Error> {
         match kind {
             CastOpType::IntZExt => Ok(self.clone().into_zero_extend(width).unwrap()),
             CastOpType::IntSExt => Ok(self.clone().into_sign_extend(width).unwrap()),
-            CastOpType::Int2Float | CastOpType::Float2Float | CastOpType::Trunc => Err(()),
+            CastOpType::Int2Float | CastOpType::Float2Float | CastOpType::Trunc => {
+                Err(anyhow!("Float operations not yet implemented"))
+            }
             CastOpType::PopCount => Ok(Bitvector::from_u64(self.count_ones() as u64)
                 .into_truncate(width)
                 .unwrap()),
@@ -51,7 +53,7 @@ impl BitvectorExtended for Bitvector {
 
     /// Perform a unary operation on the given bitvector.
     /// Returns an error for non-implemented operations (currently all float-related operations).
-    fn un_op(&self, op: UnOpType) -> Result<Self, ()> {
+    fn un_op(&self, op: UnOpType) -> Result<Self, Error> {
         use UnOpType::*;
         match op {
             Int2Comp => Ok(-self.clone()),
@@ -64,14 +66,14 @@ impl BitvectorExtended for Bitvector {
                 }
             }
             FloatNegate | FloatAbs | FloatSqrt | FloatCeil | FloatFloor | FloatRound | FloatNaN => {
-                Err(())
+                Err(anyhow!("Float operations not yet implemented"))
             }
         }
     }
 
     /// Perform a binary operation on the given bitvectors.
     /// Returns an error for non-implemented operations (currently all float-related operations).
-    fn bin_op(&self, op: BinOpType, rhs: &Self) -> Result<Self, ()> {
+    fn bin_op(&self, op: BinOpType, rhs: &Self) -> Result<Self, Error> {
         use BinOpType::*;
         match op {
             Piece => {
@@ -126,7 +128,7 @@ impl BitvectorExtended for Bitvector {
             IntMult => {
                 // FIXME: Multiplication for bitvectors larger than 8 bytes is not yet implemented in the `apint` crate (version 0.2).
                 if self.width().to_usize() > 64 {
-                    Err(())
+                    Err(anyhow!("Multiplication and division of integers larger than 8 bytes not yet implemented."))
                 } else {
                     Ok(self * rhs)
                 }
@@ -134,7 +136,7 @@ impl BitvectorExtended for Bitvector {
             IntDiv => {
                 // FIXME: Division for bitvectors larger than 8 bytes is not yet implemented in the `apint` crate (version 0.2).
                 if self.width().to_usize() > 64 {
-                    Err(())
+                    Err(anyhow!("Multiplication and division of integers larger than 8 bytes not yet implemented."))
                 } else {
                     Ok(self.clone().into_checked_udiv(rhs).unwrap())
                 }
@@ -142,7 +144,7 @@ impl BitvectorExtended for Bitvector {
             IntSDiv => {
                 // FIXME: Division for bitvectors larger than 8 bytes is not yet implemented in the `apint` crate (version 0.2).
                 if self.width().to_usize() > 64 {
-                    Err(())
+                    Err(anyhow!("Multiplication and division of integers larger than 8 bytes not yet implemented."))
                 } else {
                     Ok(self.clone().into_checked_sdiv(rhs).unwrap())
                 }
@@ -197,11 +199,11 @@ impl BitvectorExtended for Bitvector {
             IntSLessEqual => Ok(Bitvector::from(self.checked_sle(rhs).unwrap() as u8)),
             FloatEqual | FloatNotEqual | FloatLess | FloatLessEqual => {
                 // TODO: Implement floating point comparison operators!
-                Err(())
+                Err(anyhow!("Float operations not yet implemented"))
             }
             FloatAdd | FloatSub | FloatMult | FloatDiv => {
                 // TODO: Implement floating point arithmetic operators!
-                Err(())
+                Err(anyhow!("Float operations not yet implemented"))
             }
         }
     }
@@ -231,12 +233,14 @@ impl BitvectorExtended for Bitvector {
     ///
     /// Returns an error for bitvectors larger than 8 bytes,
     /// since multiplication for them is not yet implemented in the [`apint`] crate.
-    fn signed_mult_with_overflow_flag(&self, rhs: &Self) -> Result<(Self, bool), ()> {
+    fn signed_mult_with_overflow_flag(&self, rhs: &Self) -> Result<(Self, bool), Error> {
         if self.is_zero() {
             Ok((Bitvector::zero(self.width()), false))
         } else if self.width().to_usize() > 64 {
             // FIXME: Multiplication for bitvectors larger than 8 bytes is not yet implemented in the `apint` crate (version 0.2).
-            Err(())
+            Err(anyhow!(
+                "Multiplication and division of integers larger than 8 bytes not yet implemented."
+            ))
         } else {
             let result = self.clone().into_checked_mul(rhs).unwrap();
             if result.clone().into_checked_sdiv(self).unwrap() != *rhs {

@@ -155,5 +155,4 @@ impl IntervalDomain {
             Self::new_top(self.bytesize())
         }
     }
-
 }

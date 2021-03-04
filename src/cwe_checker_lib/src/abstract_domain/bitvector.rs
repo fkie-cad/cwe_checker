@@ -61,10 +61,12 @@ impl RegisterDomain for BitvectorDomain {
             _ => assert_eq!(self.bytesize(), rhs.bytesize()),
         }
         match (self, rhs) {
-            (BitvectorDomain::Value(lhs_bitvec), BitvectorDomain::Value(rhs_bitvec)) => match lhs_bitvec.bin_op(op, rhs_bitvec) {
-                Ok(val) => BitvectorDomain::Value(val),
-                Err(()) => BitvectorDomain::new_top(self.bin_op_bytesize(op, rhs))
-            },
+            (BitvectorDomain::Value(lhs_bitvec), BitvectorDomain::Value(rhs_bitvec)) => {
+                match lhs_bitvec.bin_op(op, rhs_bitvec) {
+                    Ok(val) => BitvectorDomain::Value(val),
+                    Err(_) => BitvectorDomain::new_top(self.bin_op_bytesize(op, rhs)),
+                }
+            }
             _ => BitvectorDomain::new_top(self.bin_op_bytesize(op, rhs)),
         }
     }
@@ -75,7 +77,7 @@ impl RegisterDomain for BitvectorDomain {
         if let BitvectorDomain::Value(bitvec) = self {
             match bitvec.un_op(op) {
                 Ok(val) => BitvectorDomain::Value(val),
-                Err(()) => BitvectorDomain::new_top(self.bytesize()),
+                Err(_) => BitvectorDomain::new_top(self.bytesize()),
             }
         } else {
             match op {
@@ -99,7 +101,7 @@ impl RegisterDomain for BitvectorDomain {
         if let BitvectorDomain::Value(bitvec) = self {
             match bitvec.cast(kind, width) {
                 Ok(val) => BitvectorDomain::Value(val),
-                Err(()) => BitvectorDomain::new_top(width)
+                Err(_) => BitvectorDomain::new_top(width),
             }
         } else {
             BitvectorDomain::new_top(width)

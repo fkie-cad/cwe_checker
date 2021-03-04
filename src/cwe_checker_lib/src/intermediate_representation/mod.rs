@@ -19,8 +19,6 @@ pub use expression::*;
 mod term;
 pub use term::*;
 
-
-
 /// An unsigned number of bytes.
 ///
 /// Used to represent sizes of values in registers or in memory.

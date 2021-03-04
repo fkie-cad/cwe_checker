@@ -219,11 +219,9 @@ impl IntervalDomain {
             },
             widening_lower_bound: self
                 .widening_lower_bound
-                .clone()
                 .map(|bitvec| bitvec.into_sign_extend(width).unwrap()),
             widening_upper_bound: self
                 .widening_upper_bound
-                .clone()
                 .map(|bitvec| bitvec.into_sign_extend(width).unwrap()),
         }
     }
@@ -430,7 +428,13 @@ impl Display for IntervalDomain {
         } else {
             let start_int = apint::Int::from(self.interval.start.clone());
             let end_int = apint::Int::from(self.interval.end.clone());
-            write!(f, "[{:016x}, {:016x}]:i{}", start_int, end_int, self.bytesize().as_bit_length())
+            write!(
+                f,
+                "[{:016x}, {:016x}]:i{}",
+                start_int,
+                end_int,
+                self.bytesize().as_bit_length()
+            )
         }
     }
 }
