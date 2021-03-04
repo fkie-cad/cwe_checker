@@ -6,7 +6,7 @@
 #include <unistd.h>
 
 void umask_incorrect(){
-        umask(666);
+        umask(0666);
         int fd = open("some_random_file", O_CREAT|O_WRONLY, 0666);
         close(fd);
 }
