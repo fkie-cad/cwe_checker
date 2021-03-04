@@ -86,28 +86,28 @@ impl IntervalDomain {
             if let (Some(bound1), Some(bound2)) =
                 (&self.widening_lower_bound, &rhs.widening_lower_bound)
             {
-                if let (result, false) = bound1.signed_mult_with_overflow_flag(bound2) {
+                if let (result, false) = bound1.signed_mult_with_overflow_flag(bound2).unwrap() {
                     possible_bounds.push(result);
                 }
             }
             if let (Some(bound1), Some(bound2)) =
                 (&self.widening_lower_bound, &rhs.widening_upper_bound)
             {
-                if let (result, false) = bound1.signed_mult_with_overflow_flag(bound2) {
+                if let (result, false) = bound1.signed_mult_with_overflow_flag(bound2).unwrap() {
                     possible_bounds.push(result);
                 }
             }
             if let (Some(bound1), Some(bound2)) =
                 (&self.widening_upper_bound, &rhs.widening_lower_bound)
             {
-                if let (result, false) = bound1.signed_mult_with_overflow_flag(bound2) {
+                if let (result, false) = bound1.signed_mult_with_overflow_flag(bound2).unwrap() {
                     possible_bounds.push(result);
                 }
             }
             if let (Some(bound1), Some(bound2)) =
                 (&self.widening_upper_bound, &rhs.widening_upper_bound)
             {
-                if let (result, false) = bound1.signed_mult_with_overflow_flag(bound2) {
+                if let (result, false) = bound1.signed_mult_with_overflow_flag(bound2).unwrap() {
                     possible_bounds.push(result);
                 }
             }

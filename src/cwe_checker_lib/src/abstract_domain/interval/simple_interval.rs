@@ -178,10 +178,13 @@ impl Interval {
     /// Compute the interval of possible results
     /// if one multiplies a value in `self` with a value in `rhs`.
     pub fn signed_mul(&self, rhs: &Interval) -> Interval {
-        let val1 = self.start.signed_mult_with_overflow_flag(&rhs.start);
-        let val2 = self.start.signed_mult_with_overflow_flag(&rhs.end);
-        let val3 = self.end.signed_mult_with_overflow_flag(&rhs.start);
-        let val4 = self.end.signed_mult_with_overflow_flag(&rhs.end);
+        if self.bytesize().as_bit_length() > 64 {
+            return Interval::new_top(self.bytesize());
+        }
+        let val1 = self.start.signed_mult_with_overflow_flag(&rhs.start).unwrap();
+        let val2 = self.start.signed_mult_with_overflow_flag(&rhs.end).unwrap();
+        let val3 = self.end.signed_mult_with_overflow_flag(&rhs.start).unwrap();
+        let val4 = self.end.signed_mult_with_overflow_flag(&rhs.end).unwrap();
         if val1.1 || val2.1 || val3.1 || val4.1 {
             // (signed) overflow during multiplication
             return Interval::new_top(self.bytesize());

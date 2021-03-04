@@ -23,7 +23,7 @@ pub trait BitvectorExtended: Sized {
 
     fn signed_sub_overflow_check(&self, rhs: &Self) -> bool;
 
-    fn signed_mult_with_overflow_flag(&self, rhs: &Self) -> (Self, bool);
+    fn signed_mult_with_overflow_flag(&self, rhs: &Self) -> Result<(Self, bool), ()>;
 }
 
 impl BitvectorExtended for Bitvector {
@@ -228,15 +228,21 @@ impl BitvectorExtended for Bitvector {
 
     /// Return the result of multiplying `self` with `rhs`
     /// and a flag that is set to `true` if the multiplication resulted in a signed integer overflow or underflow.
-    fn signed_mult_with_overflow_flag(&self, rhs: &Self) -> (Self, bool) {
+    ///
+    /// Returns an error for bitvectors larger than 8 bytes,
+    /// since multiplication for them is not yet implemented in the [`apint`] crate.
+    fn signed_mult_with_overflow_flag(&self, rhs: &Self) -> Result<(Self, bool), ()> {
         if self.is_zero() {
-            (Bitvector::zero(self.width()), false)
+            Ok((Bitvector::zero(self.width()), false))
+        } else if self.width().to_usize() > 64 {
+            // FIXME: Multiplication for bitvectors larger than 8 bytes is not yet implemented in the `apint` crate (version 0.2).
+            Err(())
         } else {
             let result = self.clone().into_checked_mul(rhs).unwrap();
             if result.clone().into_checked_sdiv(self).unwrap() != *rhs {
-                (result, true)
+                Ok((result, true))
             } else {
-                (result, false)
+                Ok((result, false))
             }
         }
     }
