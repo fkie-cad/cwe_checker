@@ -40,7 +40,7 @@
 //! - Missing Taints due to lost track of pointer targets
 //! - Non tracked function parameters cause incomplete taints that could miss possible dangerous inputs
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     analysis::{
@@ -54,7 +54,10 @@ use crate::{
     AnalysisResults, CweModule,
 };
 
-use petgraph::{graph::NodeIndex, visit::EdgeRef};
+use petgraph::{
+    graph::NodeIndex,
+    visit::{EdgeRef, IntoNodeReferences},
+};
 mod state;
 use state::*;
 
@@ -100,13 +103,26 @@ pub fn check_cwe(
         crate::utils::symbol_utils::get_symbol_map(project, &config.string_symbols[..]);
     let user_input_symbols =
         crate::utils::symbol_utils::get_symbol_map(project, &config.user_input_symbols[..]);
+
+    let (block_first_def_set, block_start_last_def_map, jmp_to_blk_end_node_map) =
+        create_block_maps(analysis_results);
+
+    let mut extern_symbol_map = HashMap::new();
+    for symbol in project.program.term.extern_symbols.iter() {
+        extern_symbol_map.insert(symbol.tid.clone(), symbol);
+    }
+
     let general_context = Context::new(
         project,
         analysis_results.runtime_memory_image,
-        &cwe_78_graph,
-        &pointer_inference_results,
-        string_symbols,
-        user_input_symbols,
+        std::sync::Arc::new(cwe_78_graph),
+        pointer_inference_results,
+        std::sync::Arc::new(string_symbols),
+        std::sync::Arc::new(user_input_symbols),
+        std::sync::Arc::new(block_first_def_set),
+        std::sync::Arc::new(extern_symbol_map),
+        std::sync::Arc::new(block_start_last_def_map),
+        std::sync::Arc::new(jmp_to_blk_end_node_map),
         cwe_sender,
     );
 
@@ -205,4 +221,55 @@ fn get_entry_sub_to_entry_node_map(
             }
         })
         .collect()
+}
+
+/// Creates three collections with the following information:
+/// block_first_def_set:
+///       A set containing a given [`Def`] as the first `Def` of the block.
+///       The keys are of the form `(Def-TID, Current-Sub-TID)`
+///       to distinguish the nodes for blocks contained in more than one function.
+/// block_start_last_def_map:
+///       A map to get the node index of the `BlkStart` node containing a given [`Def`] as the last `Def` of the block.
+///       The keys are of the form `(Def-TID, Current-Sub-TID)`
+///       to distinguish the nodes for blocks contained in more than one function.
+/// jmp_to_blk_end_node_map:
+///       A map to get the node index of the `BlkEnd` node containing a given [`Jmp`].
+///       The keys are of the form `(Jmp-TID, Current-Sub-TID)`
+///       to distinguish the nodes for blocks contained in more than one function.
+fn create_block_maps(
+    analysis_results: &AnalysisResults,
+) -> (
+    HashSet<(Tid, Tid)>,
+    HashMap<(Tid, Tid), NodeIndex>,
+    HashMap<(Tid, Tid), NodeIndex>,
+) {
+    let mut block_first_def_set = HashSet::new();
+    let mut block_start_last_def_map = HashMap::new();
+    let mut jmp_to_blk_end_node_map = HashMap::new();
+    for (node_id, node) in analysis_results.control_flow_graph.node_references() {
+        match node {
+            Node::BlkStart(block, sub) => match block.term.defs.len() {
+                0 => (),
+                num_of_defs => {
+                    let first_def = block.term.defs.get(0).unwrap();
+                    let last_def = block.term.defs.get(num_of_defs - 1).unwrap();
+                    block_first_def_set.insert((first_def.tid.clone(), sub.tid.clone()));
+                    block_start_last_def_map
+                        .insert((last_def.tid.clone(), sub.tid.clone()), node_id);
+                }
+            },
+            Node::BlkEnd(block, sub) => {
+                for jmp in block.term.jmps.iter() {
+                    jmp_to_blk_end_node_map.insert((jmp.tid.clone(), sub.tid.clone()), node_id);
+                }
+            }
+            _ => (),
+        }
+    }
+
+    (
+        block_first_def_set,
+        block_start_last_def_map,
+        jmp_to_blk_end_node_map,
+    )
 }

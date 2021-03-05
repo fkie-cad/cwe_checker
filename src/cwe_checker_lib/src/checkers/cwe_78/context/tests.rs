@@ -1,6 +1,8 @@
+use petgraph::visit::IntoNodeReferences;
+
 use super::*;
 
-use crate::analysis::backward_interprocedural_fixpoint::Context as BackwardContext;
+use crate::analysis::{backward_interprocedural_fixpoint::Context as BackwardContext, graph::Node};
 use crate::{
     abstract_domain::{BitvectorDomain, DataDomain, PointerDomain, SizedDomain},
     analysis::pointer_inference::{Data, State as PointerInferenceState},
@@ -111,12 +113,49 @@ impl<'a> Context<'a> {
         mem_image: &'a RuntimeMemoryImage,
     ) -> Self {
         let (cwe_sender, _) = crossbeam_channel::unbounded();
+        let mut graph = pi_results.get_graph().clone();
+        graph.reverse();
+
+        let mut extern_symbol_map = HashMap::new();
+        for symbol in project.program.term.extern_symbols.iter() {
+            extern_symbol_map.insert(symbol.tid.clone(), symbol);
+        }
+
+        let mut block_first_def_set: HashSet<(Tid, Tid)> = HashSet::new();
+        let mut block_start_last_def_map = HashMap::new();
+        let mut jmp_to_blk_end_node_map = HashMap::new();
+        for (node_id, node) in graph.node_references() {
+            match node {
+                Node::BlkStart(block, sub) => match block.term.defs.len() {
+                    0 => (),
+                    num_of_defs => {
+                        let first_def = block.term.defs.get(0).unwrap();
+                        let last_def = block.term.defs.get(num_of_defs - 1).unwrap();
+                        block_first_def_set.insert((first_def.tid.clone(), sub.tid.clone()));
+                        block_start_last_def_map
+                            .insert((last_def.tid.clone(), sub.tid.clone()), node_id);
+                    }
+                },
+                Node::BlkEnd(block, sub) => {
+                    for jmp in block.term.jmps.iter() {
+                        jmp_to_blk_end_node_map.insert((jmp.tid.clone(), sub.tid.clone()), node_id);
+                    }
+                }
+                _ => (),
+            }
+        }
+
         Context::new(
             project,
             mem_image,
+            std::sync::Arc::new(graph),
             pi_results,
-            string_symbols,
-            HashMap::new(),
+            std::sync::Arc::new(string_symbols),
+            std::sync::Arc::new(HashMap::new()),
+            std::sync::Arc::new(block_first_def_set),
+            std::sync::Arc::new(extern_symbol_map),
+            std::sync::Arc::new(block_start_last_def_map),
+            std::sync::Arc::new(jmp_to_blk_end_node_map),
             cwe_sender,
         )
     }

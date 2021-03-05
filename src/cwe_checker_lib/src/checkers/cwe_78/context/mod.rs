@@ -3,14 +3,13 @@ use std::{
     sync::Arc,
 };
 
-use petgraph::{graph::NodeIndex, visit::IntoNodeReferences};
+use petgraph::graph::NodeIndex;
 
 use super::{state::State, CWE_MODULE};
 use crate::{
     abstract_domain::AbstractDomain,
     analysis::{
-        forward_interprocedural_fixpoint::Context as PiContext,
-        graph::{Graph, Node},
+        forward_interprocedural_fixpoint::Context as PiContext, graph::Graph,
         interprocedural_fixpoint_generic::NodeValue,
         pointer_inference::PointerInference as PointerInferenceComputation,
         pointer_inference::State as PointerInferenceState,
@@ -27,7 +26,7 @@ pub struct Context<'a> {
     /// A pointer to the representation of the runtime memory image.
     runtime_memory_image: &'a RuntimeMemoryImage,
     /// The reversed control flow graph for the analysis
-    graph: &'a Graph<'a>,
+    graph: Arc<Graph<'a>>,
     /// A pointer to the results of the pointer inference analysis.
     /// They are used to determine the targets of pointers to memory,
     /// which in turn is used to keep track of taint on the stack or on the heap.
@@ -65,52 +64,27 @@ impl<'a> Context<'a> {
     pub fn new(
         project: &'a Project,
         runtime_memory_image: &'a RuntimeMemoryImage,
-        graph: &'a Graph<'a>,
+        graph: Arc<Graph<'a>>,
         pointer_inference_results: &'a PointerInferenceComputation<'a>,
-        string_symbols: HashMap<Tid, &'a ExternSymbol>,
-        user_input_symbols: HashMap<Tid, &'a ExternSymbol>,
+        string_symbol_map: Arc<HashMap<Tid, &'a ExternSymbol>>,
+        user_input_symbol_map: Arc<HashMap<Tid, &'a ExternSymbol>>,
+        block_first_def_set: Arc<HashSet<(Tid, Tid)>>,
+        extern_symbol_map: Arc<HashMap<Tid, &'a ExternSymbol>>,
+        block_start_last_def_map: Arc<HashMap<(Tid, Tid), NodeIndex>>,
+        jmp_to_blk_end_node_map: Arc<HashMap<(Tid, Tid), NodeIndex>>,
         cwe_collector: crossbeam_channel::Sender<CweWarning>,
     ) -> Self {
-        let mut block_first_def_set = HashSet::new();
-        let mut block_start_last_def_map = HashMap::new();
-        let mut extern_symbol_map = HashMap::new();
-        for symbol in project.program.term.extern_symbols.iter() {
-            extern_symbol_map.insert(symbol.tid.clone(), symbol);
-        }
-        let mut jmp_to_blk_end_node_map = HashMap::new();
-        let pi_graph = pointer_inference_results.get_graph();
-        for (node_id, node) in pi_graph.node_references() {
-            match node {
-                Node::BlkStart(block, sub) => match block.term.defs.len() {
-                    0 => (),
-                    num_of_defs => {
-                        let first_def = block.term.defs.get(0).unwrap();
-                        let last_def = block.term.defs.get(num_of_defs - 1).unwrap();
-                        block_first_def_set.insert((first_def.tid.clone(), sub.tid.clone()));
-                        block_start_last_def_map
-                            .insert((last_def.tid.clone(), sub.tid.clone()), node_id);
-                    }
-                },
-                Node::BlkEnd(block, sub) => {
-                    for jmp in block.term.jmps.iter() {
-                        jmp_to_blk_end_node_map.insert((jmp.tid.clone(), sub.tid.clone()), node_id);
-                    }
-                }
-                _ => (),
-            }
-        }
-
         Context {
             project,
             runtime_memory_image,
             graph,
             pointer_inference_results,
-            block_start_last_def_map: Arc::new(block_start_last_def_map),
-            block_first_def_set: Arc::new(block_first_def_set),
-            extern_symbol_map: Arc::new(extern_symbol_map),
-            string_symbol_map: Arc::new(string_symbols),
-            user_input_symbol_map: Arc::new(user_input_symbols),
-            jmp_to_blk_end_node_map: Arc::new(jmp_to_blk_end_node_map),
+            block_start_last_def_map,
+            block_first_def_set,
+            extern_symbol_map,
+            string_symbol_map,
+            user_input_symbol_map,
+            jmp_to_blk_end_node_map,
             taint_source: None,
             taint_source_sub: None,
             taint_source_name: None,
