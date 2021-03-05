@@ -145,17 +145,25 @@ impl<'a> Context<'a> {
             }
         }
 
+        let block_maps: BlockMaps = BlockMaps {
+            block_first_def_set,
+            block_start_last_def_map,
+            jmp_to_blk_end_node_map,
+        };
+
+        let symbol_maps: SymbolMaps = SymbolMaps {
+            string_symbol_map: string_symbols,
+            user_input_symbol_map: HashMap::new(),
+            extern_symbol_map,
+        };
+
         Context::new(
             project,
             mem_image,
             std::sync::Arc::new(graph),
             pi_results,
-            std::sync::Arc::new(string_symbols),
-            std::sync::Arc::new(HashMap::new()),
-            std::sync::Arc::new(block_first_def_set),
-            std::sync::Arc::new(extern_symbol_map),
-            std::sync::Arc::new(block_start_last_def_map),
-            std::sync::Arc::new(jmp_to_blk_end_node_map),
+            std::sync::Arc::new(symbol_maps),
+            std::sync::Arc::new(block_maps),
             cwe_sender,
         )
     }
@@ -203,6 +211,7 @@ fn tainting_string_function_parameters() {
 
     let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
     let node_id = context
+        .block_maps
         .jmp_to_blk_end_node_map
         .get(&(Tid::new("call_string"), Tid::new("func")))
         .unwrap();
@@ -292,6 +301,7 @@ fn tainting_generic_function_parameters_and_removing_non_callee_saved() {
     string_syms.insert(Tid::new("sprintf"), &setup.string_sym);
     let context = Context::mock(&setup.project, string_syms, &pi_results, &mem_image);
     let node_id = context
+        .block_maps
         .jmp_to_blk_end_node_map
         .get(&(Tid::new("call_string"), Tid::new("func")))
         .unwrap();
@@ -366,6 +376,7 @@ fn tainting_stack_parameters() {
 
     let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
     let call_source_node = context
+        .block_maps
         .jmp_to_blk_end_node_map
         .get(&(Tid::new("call_string"), Tid::new("func")))
         .unwrap();
@@ -405,6 +416,7 @@ fn tainting_parameters() {
 
     let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
     let call_source_node = context
+        .block_maps
         .jmp_to_blk_end_node_map
         .get(&(Tid::new("call_string"), Tid::new("func")))
         .unwrap();
@@ -446,6 +458,7 @@ fn creating_pi_def_map() {
     let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
     let current_sub = setup.project.program.term.subs.get(0).unwrap();
     let start_node = context
+        .block_maps
         .block_start_last_def_map
         .get(&(def2.clone(), current_sub.tid.clone()))
         .unwrap();
@@ -491,6 +504,7 @@ fn getting_blk_start_node_if_last_def() {
     setup.state.set_current_sub(current_sub);
 
     let start_node = context
+        .block_maps
         .block_start_last_def_map
         .get(&(def2.tid.clone(), current_sub.tid.clone()))
         .unwrap();
@@ -520,6 +534,7 @@ fn getting_source_node() {
     setup.state.set_current_sub(current_sub);
 
     let blk_end_node_id = context
+        .block_maps
         .jmp_to_blk_end_node_map
         .get(&(call_tid.clone(), current_sub.tid.clone()))
         .unwrap();

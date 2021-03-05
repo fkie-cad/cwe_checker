@@ -48,7 +48,7 @@ use crate::{
         graph::{self, Edge, Node},
         interprocedural_fixpoint_generic::NodeValue,
     },
-    intermediate_representation::{Jmp, Project, Sub},
+    intermediate_representation::{ExternSymbol, Jmp, Project, Sub},
     prelude::*,
     utils::log::{CweWarning, LogMessage},
     AnalysisResults, CweModule,
@@ -81,6 +81,12 @@ pub struct Config {
     user_input_symbols: Vec<String>,
 }
 
+pub struct SymbolMaps<'a> {
+    string_symbol_map: HashMap<Tid, &'a ExternSymbol>,
+    user_input_symbol_map: HashMap<Tid, &'a ExternSymbol>,
+    extern_symbol_map: HashMap<Tid, &'a ExternSymbol>,
+}
+
 /// This check searches for system calls and sets their parameters as taint source if available.
 /// Then the fixpoint computation is executed and its result may generate cwe warnings if
 /// the parameters can be tracked back to user inputs
@@ -99,30 +105,33 @@ pub fn check_cwe(
     let config: Config = serde_json::from_value(cwe_params.clone()).unwrap();
     let system_symbols =
         crate::utils::symbol_utils::get_symbol_map(project, &config.system_symbols[..]);
-    let string_symbols =
-        crate::utils::symbol_utils::get_symbol_map(project, &config.string_symbols[..]);
-    let user_input_symbols =
-        crate::utils::symbol_utils::get_symbol_map(project, &config.user_input_symbols[..]);
-
-    let (block_first_def_set, block_start_last_def_map, jmp_to_blk_end_node_map) =
-        create_block_maps(analysis_results);
 
     let mut extern_symbol_map = HashMap::new();
     for symbol in project.program.term.extern_symbols.iter() {
         extern_symbol_map.insert(symbol.tid.clone(), symbol);
     }
 
+    let symbol_maps: SymbolMaps = SymbolMaps {
+        string_symbol_map: crate::utils::symbol_utils::get_symbol_map(
+            project,
+            &config.string_symbols[..],
+        ),
+        user_input_symbol_map: crate::utils::symbol_utils::get_symbol_map(
+            project,
+            &config.user_input_symbols[..],
+        ),
+        extern_symbol_map,
+    };
+
+    let block_maps = create_block_maps(analysis_results);
+
     let general_context = Context::new(
         project,
         analysis_results.runtime_memory_image,
         std::sync::Arc::new(cwe_78_graph),
         pointer_inference_results,
-        std::sync::Arc::new(string_symbols),
-        std::sync::Arc::new(user_input_symbols),
-        std::sync::Arc::new(block_first_def_set),
-        std::sync::Arc::new(extern_symbol_map),
-        std::sync::Arc::new(block_start_last_def_map),
-        std::sync::Arc::new(jmp_to_blk_end_node_map),
+        std::sync::Arc::new(symbol_maps),
+        std::sync::Arc::new(block_maps),
         cwe_sender,
     );
 
@@ -223,7 +232,6 @@ fn get_entry_sub_to_entry_node_map(
         .collect()
 }
 
-/// Creates three collections with the following information:
 /// block_first_def_set:
 ///       A set containing a given [`Def`] as the first `Def` of the block.
 ///       The keys are of the form `(Def-TID, Current-Sub-TID)`
@@ -236,13 +244,14 @@ fn get_entry_sub_to_entry_node_map(
 ///       A map to get the node index of the `BlkEnd` node containing a given [`Jmp`].
 ///       The keys are of the form `(Jmp-TID, Current-Sub-TID)`
 ///       to distinguish the nodes for blocks contained in more than one function.
-fn create_block_maps(
-    analysis_results: &AnalysisResults,
-) -> (
-    HashSet<(Tid, Tid)>,
-    HashMap<(Tid, Tid), NodeIndex>,
-    HashMap<(Tid, Tid), NodeIndex>,
-) {
+pub struct BlockMaps {
+    block_first_def_set: HashSet<(Tid, Tid)>,
+    block_start_last_def_map: HashMap<(Tid, Tid), NodeIndex>,
+    jmp_to_blk_end_node_map: HashMap<(Tid, Tid), NodeIndex>,
+}
+
+/// Creates three collections with the following information:
+fn create_block_maps(analysis_results: &AnalysisResults) -> BlockMaps {
     let mut block_first_def_set = HashSet::new();
     let mut block_start_last_def_map = HashMap::new();
     let mut jmp_to_blk_end_node_map = HashMap::new();
@@ -267,9 +276,9 @@ fn create_block_maps(
         }
     }
 
-    (
+    BlockMaps {
         block_first_def_set,
         block_start_last_def_map,
         jmp_to_blk_end_node_map,
-    )
+    }
 }

@@ -5,7 +5,7 @@ use std::{
 
 use petgraph::graph::NodeIndex;
 
-use super::{state::State, CWE_MODULE};
+use super::{state::State, BlockMaps, SymbolMaps, CWE_MODULE};
 use crate::{
     abstract_domain::AbstractDomain,
     analysis::{
@@ -31,24 +31,23 @@ pub struct Context<'a> {
     /// They are used to determine the targets of pointers to memory,
     /// which in turn is used to keep track of taint on the stack or on the heap.
     pub pointer_inference_results: &'a PointerInferenceComputation<'a>,
-    /// A map to get the node index of the `BlkStart` node containing a given [`Def`] as the last `Def` of the block.
-    /// The keys are of the form `(Def-TID, Current-Sub-TID)`
-    /// to distinguish the nodes for blocks contained in more than one function.
-    block_start_last_def_map: Arc<HashMap<(Tid, Tid), NodeIndex>>,
-    /// A set containing a given [`Def`] as the first `Def` of the block.
-    /// The keys are of the form `(Def-TID, Current-Sub-TID)`
-    /// to distinguish the nodes for blocks contained in more than one function.
-    block_first_def_set: Arc<HashSet<(Tid, Tid)>>,
+    /// block_first_def_set:
+    ///       A set containing a given [`Def`] as the first `Def` of the block.
+    ///       The keys are of the form `(Def-TID, Current-Sub-TID)`
+    ///       to distinguish the nodes for blocks contained in more than one function.
+    /// block_start_last_def_map:
+    ///       A map to get the node index of the `BlkStart` node containing a given [`Def`] as the last `Def` of the block.
+    ///       The keys are of the form `(Def-TID, Current-Sub-TID)`
+    ///       to distinguish the nodes for blocks contained in more than one function.
+    /// jmp_to_blk_end_node_map:
+    ///       A map to get the node index of the `BlkEnd` node containing a given [`Jmp`].
+    ///       The keys are of the form `(Jmp-TID, Current-Sub-TID)`
+    ///       to distinguish the nodes for blocks contained in more than one function.
+    block_maps: Arc<BlockMaps>,
     /// Maps the TID of an extern symbol to the extern symbol struct.
-    extern_symbol_map: Arc<HashMap<Tid, &'a ExternSymbol>>,
     /// Maps the TID of an extern string related symbol to the corresponding extern symbol struct.
-    string_symbol_map: Arc<HashMap<Tid, &'a ExternSymbol>>,
     /// Maps the TID of an extern symbol that take input from the user to the corresponding extern symbol struct.
-    user_input_symbol_map: Arc<HashMap<Tid, &'a ExternSymbol>>,
-    /// A map to get the node index of the `BlkEnd` node containing a given [`Jmp`].
-    /// The keys are of the form `(Jmp-TID, Current-Sub-TID)`
-    /// to distinguish the nodes for blocks contained in more than one function.
-    jmp_to_blk_end_node_map: Arc<HashMap<(Tid, Tid), NodeIndex>>,
+    symbol_maps: Arc<SymbolMaps<'a>>,
     /// The call whose parameter values are the sources for taint for the analysis.
     pub taint_source: Option<&'a Term<Jmp>>,
     /// The subroutine from which the taint source originates
@@ -66,12 +65,8 @@ impl<'a> Context<'a> {
         runtime_memory_image: &'a RuntimeMemoryImage,
         graph: Arc<Graph<'a>>,
         pointer_inference_results: &'a PointerInferenceComputation<'a>,
-        string_symbol_map: Arc<HashMap<Tid, &'a ExternSymbol>>,
-        user_input_symbol_map: Arc<HashMap<Tid, &'a ExternSymbol>>,
-        block_first_def_set: Arc<HashSet<(Tid, Tid)>>,
-        extern_symbol_map: Arc<HashMap<Tid, &'a ExternSymbol>>,
-        block_start_last_def_map: Arc<HashMap<(Tid, Tid), NodeIndex>>,
-        jmp_to_blk_end_node_map: Arc<HashMap<(Tid, Tid), NodeIndex>>,
+        symbol_maps: Arc<SymbolMaps<'a>>,
+        block_maps: Arc<BlockMaps>,
         cwe_collector: crossbeam_channel::Sender<CweWarning>,
     ) -> Self {
         Context {
@@ -79,12 +74,8 @@ impl<'a> Context<'a> {
             runtime_memory_image,
             graph,
             pointer_inference_results,
-            block_start_last_def_map,
-            block_first_def_set,
-            extern_symbol_map,
-            string_symbol_map,
-            user_input_symbol_map,
-            jmp_to_blk_end_node_map,
+            symbol_maps,
+            block_maps,
             taint_source: None,
             taint_source_sub: None,
             taint_source_name: None,
@@ -208,7 +199,12 @@ impl<'a> Context<'a> {
         let mut new_state = state.clone();
         // Check if the extern symbol is a string symbol, since the return register is not tainted for these.
         // Instead, is has to be checked whether the first function parameter points to a tainted memory address
-        if self.string_symbol_map.get(&symbol.tid).is_some() {
+        if self
+            .symbol_maps
+            .string_symbol_map
+            .get(&symbol.tid)
+            .is_some()
+        {
             new_state.remove_non_callee_saved_taint(symbol.get_calling_convention(self.project));
             new_state = self.taint_string_function_parameters(&new_state, symbol, call_source_node);
         } else {
@@ -227,7 +223,12 @@ impl<'a> Context<'a> {
                     .remove_non_callee_saved_taint(symbol.get_calling_convention(self.project));
                 // TODO: Parameter detection since targets of input parameters are the return locations
                 // Taint memory for string inputs
-                if self.user_input_symbol_map.get(&symbol.tid).is_some() {
+                if self
+                    .symbol_maps
+                    .user_input_symbol_map
+                    .get(&symbol.tid)
+                    .is_some()
+                {
                     self.generate_cwe_warning(
                         &new_state.get_current_sub().as_ref().unwrap().term.name,
                     );
@@ -301,6 +302,7 @@ impl<'a> Context<'a> {
     ) -> Option<NodeIndex> {
         if let Some(sub) = state.get_current_sub() {
             if let Some(node) = self
+                .block_maps
                 .block_start_last_def_map
                 .get(&(def.tid.clone(), sub.tid.clone()))
             {
@@ -376,7 +378,7 @@ impl<'a> Context<'a> {
 
     /// Gets the BlkEnd node of an external function call
     pub fn get_source_node(&self, state: &State, call_source: &Tid) -> NodeIndex {
-        let blk_end_node_id = self.jmp_to_blk_end_node_map.get(&(
+        let blk_end_node_id = self.block_maps.jmp_to_blk_end_node_map.get(&(
             call_source.clone(),
             state.get_current_sub().as_ref().unwrap().tid.clone(),
         ));
@@ -457,6 +459,7 @@ impl<'a> crate::analysis::backward_interprocedural_fixpoint::Context<'a> for Con
         // Check whether the current def term is the first of the block and if so, remove
         // the pi_def_map for the current state to save memory
         if self
+            .block_maps
             .block_first_def_set
             .get(&(
                 def.tid.clone(),
@@ -565,7 +568,7 @@ impl<'a> crate::analysis::backward_interprocedural_fixpoint::Context<'a> for Con
         match &call.term {
             Jmp::Call { target, .. } => {
                 let source_node = self.get_source_node(&new_state, &call.tid);
-                if let Some(extern_symbol) = self.extern_symbol_map.get(target) {
+                if let Some(extern_symbol) = self.symbol_maps.extern_symbol_map.get(target) {
                     new_state = self.taint_generic_function_parameters_and_remove_non_callee_saved(
                         &new_state,
                         extern_symbol,
