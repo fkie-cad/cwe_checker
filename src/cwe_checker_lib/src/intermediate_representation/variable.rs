@@ -11,8 +11,11 @@ use crate::prelude::*;
 /// (but never more than one function).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct Variable {
+    /// The name of the variable. Equals the register name if the variable is a physical register.
     pub name: String,
+    /// The size (in bytes) of the variable.
     pub size: ByteSize,
+    /// Set to `false` for physical registers and to `true` for temporary (virtual) variables.
     pub is_temp: bool,
 }
 

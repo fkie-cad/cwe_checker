@@ -1,3 +1,5 @@
+//! Helper functions for common tasks utilizing the control flow graph of the binary.
+
 use crate::analysis::graph::*;
 use crate::intermediate_representation::Jmp;
 use crate::prelude::*;

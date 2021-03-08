@@ -32,6 +32,7 @@ use serde::{Deserialize, Serialize};
 
 const VERSION: &str = "0.1";
 
+/// The module name and version
 pub static CWE_MODULE: crate::CweModule = crate::CweModule {
     name: "CWE676",
     version: VERSION,
@@ -106,6 +107,8 @@ pub fn resolve_symbols<'a>(
         .collect()
 }
 
+/// Iterate through all function calls inside the program and flag calls to those functions
+/// that are marked as unsafe via the configuration file.
 pub fn check_cwe(
     analysis_results: &AnalysisResults,
     cwe_params: &serde_json::Value,

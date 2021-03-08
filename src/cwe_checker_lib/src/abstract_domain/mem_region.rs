@@ -57,7 +57,7 @@ impl<T: AbstractDomain + SizedDomain + HasTop + std::fmt::Debug> HasTop for MemR
 }
 
 impl<T: AbstractDomain + SizedDomain + HasTop + std::fmt::Debug> MemRegion<T> {
-    // Create a new, empty memory region.
+    /// Create a new, empty memory region.
     pub fn new(address_bytesize: ByteSize) -> Self {
         MemRegion(Arc::new(MemRegionData::new(address_bytesize)))
     }

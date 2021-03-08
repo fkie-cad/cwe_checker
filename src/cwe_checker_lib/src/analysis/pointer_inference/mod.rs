@@ -40,6 +40,7 @@ pub use state::State;
 /// The version number of the analysis.
 const VERSION: &str = "0.1";
 
+/// The name and version number of the "Memory" CWE check.
 pub static CWE_MODULE: crate::CweModule = crate::CweModule {
     name: "Memory",
     version: VERSION,
@@ -66,6 +67,7 @@ pub struct Config {
 pub struct PointerInference<'a> {
     computation: Computation<GeneralizedContext<'a, Context<'a>>>,
     log_collector: crossbeam_channel::Sender<LogThreadMsg>,
+    /// The log messages and CWE warnings that have been generated during the pointer inference analysis.
     pub collected_logs: (Vec<LogMessage>, Vec<CweWarning>),
 }
 
@@ -166,7 +168,7 @@ impl<'a> PointerInference<'a> {
 
     /// Generate a compacted json representation of the results.
     /// Note that this output cannot be used for serialization/deserialization,
-    /// but is only intended for user output.
+    /// but is only intended for user output and debugging.
     pub fn generate_compact_json(&self) -> serde_json::Value {
         let graph = self.computation.get_graph();
         let mut json_nodes = serde_json::Map::new();
@@ -179,18 +181,26 @@ impl<'a> PointerInference<'a> {
         serde_json::Value::Object(json_nodes)
     }
 
+    /// Print a compacted json representation of the results to stdout.
+    /// Note that this output cannot be used for serialization/deserialization,
+    /// but is only intended for user output and debugging.
     pub fn print_compact_json(&self) {
         println!("{:#}", self.generate_compact_json());
     }
 
+    /// Get the underlying graph of the computation.
     pub fn get_graph(&self) -> &Graph {
         self.computation.get_graph()
     }
 
+    /// Get the context object of the computation.
     pub fn get_context(&self) -> &Context {
         self.computation.get_context().get_context()
     }
 
+    /// Get the value associated to a node in the computed fixpoint
+    /// (or intermediate state of the algorithm if the fixpoint has not been reached yet).
+    /// Returns `None` if no value is associated to the Node.
     pub fn get_node_value(&self, node_id: NodeIndex) -> Option<&NodeValue<State>> {
         self.computation.get_node_value(node_id)
     }

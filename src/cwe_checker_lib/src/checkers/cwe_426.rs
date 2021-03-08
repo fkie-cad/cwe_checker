@@ -38,6 +38,7 @@ use crate::utils::symbol_utils::{find_symbol, get_calls_to_symbols};
 use crate::CweModule;
 use std::collections::HashMap;
 
+/// The module name and version
 pub static CWE_MODULE: CweModule = CweModule {
     name: "CWE426",
     version: "0.1",

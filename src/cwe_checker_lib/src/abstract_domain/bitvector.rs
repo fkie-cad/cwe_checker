@@ -7,7 +7,9 @@ use crate::prelude::*;
 /// As values it can only assume a known bitvector or *Top(bytesize)*.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub enum BitvectorDomain {
+    /// The `Top` value of the domain, representing the case that nothing is known about the actual value.
     Top(ByteSize),
+    /// The exact value of the bitvector is known.
     Value(Bitvector),
 }
 

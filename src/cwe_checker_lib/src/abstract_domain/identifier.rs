@@ -57,7 +57,12 @@ impl std::fmt::Display for AbstractIdentifier {
 /// It is also impossible to accidently describe circular references.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
 pub enum AbstractLocation {
+    /// The location is given by a register with the given name and byte size.
     Register(String, ByteSize),
+    /// The location is in memory.
+    /// One needs to follow the pointer in the register with the given name (as `String`)
+    /// and then follow the abstract memory location inside the pointed to memory object
+    /// to find the actual memory location.
     Pointer(String, AbstractMemoryLocation),
 }
 
@@ -93,13 +98,20 @@ impl AbstractLocation {
 /// The offset and size variables are given in bytes.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
 pub enum AbstractMemoryLocation {
+    /// A location inside the current memory object.
     Location {
+        /// The offset with respect to the zero offset of the memory object where the value can be found.
         offset: isize,
+        /// The size in bytes of the value that the memory location points to.
         size: usize,
     },
+    /// A pointer which needs to be followed to get to the actual memory location
     Pointer {
+        /// The offset inside the current memory object where the pointer can be found.
         offset: isize,
+        /// The size in bytes of the pointer.
         size: usize,
+        /// The memory location inside the target of the pointer that this memory location points to.
         target: Box<AbstractMemoryLocation>,
     },
 }

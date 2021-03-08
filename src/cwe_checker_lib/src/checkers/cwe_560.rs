@@ -31,13 +31,16 @@ use crate::utils::log::{CweWarning, LogMessage};
 use crate::utils::symbol_utils::{get_callsites, get_symbol_map};
 use crate::CweModule;
 
+/// The module name and version
 pub static CWE_MODULE: CweModule = CweModule {
     name: "CWE560",
     version: "0.2",
     run: check_cwe,
 };
 
+/// An upper bound for the value of a presumably correct umask argument.
 pub static UPPER_BOUND_CORRECT_UMASK_ARG_VALUE: u64 = 0o177;
+/// An upper bound for the value of a chmod-style argument.
 pub static UPPER_BOUND_CORRECT_CHMOD_ARG_VALUE: u64 = 0o777;
 
 /// Compute the parameter value of umask out of the basic block right before the umask call.

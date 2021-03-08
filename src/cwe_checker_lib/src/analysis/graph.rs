@@ -65,14 +65,25 @@ pub type Graph<'a> = DiGraph<Node<'a>, Edge<'a>>;
 /// to allow unambigous node identification.
 #[derive(Serialize, Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum Node<'a> {
+    /// A node corresponding to the start of a basic block,
+    /// i.e. to the point in time just before the execution of the block.
     BlkStart(&'a Term<Blk>, &'a Term<Sub>),
+    /// A node corresponding to the end of the basic block,
+    /// i.e. to the point in time just after the execution of all `Def` instructions in the block
+    /// but before execution of the jump instructions at the end of the block.
     BlkEnd(&'a Term<Blk>, &'a Term<Sub>),
+    /// An artificial node. See the module-level documentation for more information.
     CallReturn {
+        /// The block containing the callsite of the call.
         call: (&'a Term<Blk>, &'a Term<Sub>),
+        /// The block that the called functions returns to.
         return_: (&'a Term<Blk>, &'a Term<Sub>),
     },
+    /// An artificial node. See the module-level documentation for more information.
     CallSource {
+        /// The block containing the callsite of the call
         source: (&'a Term<Blk>, &'a Term<Sub>),
+        /// The block containing the target of the call, i.e. the first block of the target function.
         target: (&'a Term<Blk>, &'a Term<Sub>),
     },
 }
@@ -124,13 +135,29 @@ impl<'a> std::fmt::Display for Node<'a> {
 /// In this case the other jump reference points to the untaken conditional jump.
 #[derive(Serialize, Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum Edge<'a> {
+    /// An edge between the `BlkStart` and `BlkEnd` nodes of a basic block.
     Block,
+    /// An edge corresponding to an intraprocedural jump instruction.
+    /// If the jump is only taken if a previous conditional jump is not taken,
+    /// then a reference to the untaken conditional jump is also added to the jump label.
     Jump(&'a Term<Jmp>, Option<&'a Term<Jmp>>),
+    /// An edge corresponding to a function call instruction.
+    /// Only generated for calls to functions inside the binary.
+    /// See the module-level documentation for more information.
     Call(&'a Term<Jmp>),
+    /// An edge corresponding to a call to a function not contained in the binary,
+    /// i.e. the target is located in a shared object loaded by the binary.
+    /// The edge goes directly from the callsite to the return-to-site inside the caller.
     ExternCallStub(&'a Term<Jmp>),
+    /// An artificial edge. See the module-level documentation for more information.
     CRCallStub,
+    /// An artificial edge. See the module-level documentation for more information.
     CRReturnStub,
+    /// An artificial edge to combine intra- and interprocedural data flows at the callsite of calls.
+    /// See the module-level documentation for more information.
     CallCombine(&'a Term<Jmp>),
+    /// An artificial edge to combine intra- and interprocedural data flows at the return-to site of calls.
+    /// See the module-level documentation for more information.
     ReturnCombine(&'a Term<Jmp>),
 }
 
