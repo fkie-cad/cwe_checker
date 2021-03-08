@@ -1,13 +1,13 @@
 /*!
 This module implements a check for CWE-676: Use of Potentially Dangerous Function.
-Potentially dangerous functions like memcpy can lead to security issues like buffer overflows.
 
+Potentially dangerous functions like memcpy can lead to security issues like buffer overflows.
 See <https://cwe.mitre.org/data/definitions/676.html> for a detailed description.
 
 How the check works:
 
   * Calls to dangerous functions are flagged. The list of functions that are considered
-dangerous can be configured in config.json. The default list is taken from
+dangerous can be configured in config.json. The default list is based on
 <https://github.com/01org/safestringlib/wiki/SDL-List-of-Banned-Functions>.
 
 False Positives

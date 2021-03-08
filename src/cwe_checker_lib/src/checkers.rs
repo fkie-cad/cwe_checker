@@ -1,3 +1,10 @@
+//! The implemented CWE checks.
+//! See their module descriptions for detailed information about each check.
+//!
+//! Currently the `Memory` check is not contained in this module
+//! but directly incorporated into the [`pointer_inference`](crate::analysis::pointer_inference) module.
+//! See there for detailed information about this check.
+
 pub mod cwe_190;
 pub mod cwe_215;
 pub mod cwe_243;

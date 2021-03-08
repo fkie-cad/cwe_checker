@@ -27,7 +27,7 @@ compile_test_files:
 
 codestyle-check:
 	cargo fmt -- --check
-	cargo clippy -- -D clippy::all
+	cargo clippy -- -D clippy::all -D missing_docs
 
 clean:
 	cargo clean

@@ -1,4 +1,4 @@
-//! The pointer inference analysis.
+//! A fixpoint algorithm analyzing all memory accesses in a program.
 //!
 //! The goal of the pointer inference analysis is to keep track of all memory objects and pointers
 //! that the program knows about at specific program points during execution.
@@ -55,12 +55,12 @@ pub type Data = DataDomain<BitvectorDomain>;
 pub struct Config {
     /// Names of extern functions that are `malloc`-like,
     /// i.e. the unique return value is a pointer to a newly allocated chunk of memory or a NULL pointer.
-    allocation_symbols: Vec<String>,
+    pub allocation_symbols: Vec<String>,
     /// Names of extern functions that are `free`-like,
     /// i.e. the memory chunk that the unique parameter of the function points to gets deallocated.
     /// Note that the analysis currently does not detect mismatching allocation-deallocation pairs,
     /// i.e. it cannot distinguish between memory allocated by `malloc` and memory allocated by `new`.
-    deallocation_symbols: Vec<String>,
+    pub deallocation_symbols: Vec<String>,
 }
 
 /// A wrapper struct for the pointer inference computation object.

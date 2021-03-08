@@ -1,3 +1,8 @@
+//! This crate defines the command line interface for the cwe_checker.
+//! General documentation about the cwe_checker is contained in the [`cwe_checker_lib`] crate.
+
+extern crate cwe_checker_lib; // Needed for the docstring-link to work
+
 use cwe_checker_lib::analysis::graph;
 use cwe_checker_lib::utils::binary::RuntimeMemoryImage;
 use cwe_checker_lib::utils::log::print_all_messages;
@@ -22,7 +27,8 @@ struct CmdlineArgs {
     #[structopt(long, short, validator(check_file_existence))]
     config: Option<String>,
 
-    /// Write the results to a file.
+    /// Write the results to a file instead of stdout.
+    /// This only affects CWE warnings. Log messages are still printed to stdout.
     #[structopt(long, short)]
     out: Option<String>,
 
@@ -36,7 +42,7 @@ struct CmdlineArgs {
     #[structopt(long, short)]
     json: bool,
 
-    /// Do not print log messages. This prevents polluting STDOUT for json output.
+    /// Do not print log messages. This prevents polluting stdout for json output.
     #[structopt(long, short)]
     quiet: bool,
 
