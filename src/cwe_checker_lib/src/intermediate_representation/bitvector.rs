@@ -9,20 +9,33 @@ pub type Bitvector = apint::ApInt;
 
 /// A trait to extend the bitvector type with useful helper functions
 /// that are not contained in the [`apint`] crate.
-/// See the implementation of the trait on the [`Bitvector`] type for more information.
 pub trait BitvectorExtended: Sized {
+    /// Perform a cast operation on the bitvector.
+    /// Returns an error for non-implemented cast operations (currently all float-related casts).
     fn cast(&self, kind: CastOpType, width: ByteSize) -> Result<Self, Error>;
 
+    /// Extract a subpiece from the given bitvector.
     fn subpiece(&self, low_byte: ByteSize, size: ByteSize) -> Self;
 
+    /// Perform a unary operation on the given bitvector.
+    /// Returns an error for non-implemented operations (currently all float-related operations).
     fn un_op(&self, op: UnOpType) -> Result<Self, Error>;
 
+    /// Perform a binary operation on the given bitvectors.
+    /// Returns an error for non-implemented operations (currently all float-related operations).
     fn bin_op(&self, op: BinOpType, rhs: &Self) -> Result<Self, Error>;
 
+    /// Returns `true` if adding `self` to `rhs` would result in a signed integer overflow or underflow.
     fn signed_add_overflow_check(&self, rhs: &Self) -> bool;
 
+    /// Returns `true` if subtracting `rhs` from `self` would result in a signed integer overflow or underflow.
     fn signed_sub_overflow_check(&self, rhs: &Self) -> bool;
 
+    /// Return the result of multiplying `self` with `rhs`
+    /// and a flag that is set to `true` if the multiplication resulted in a signed integer overflow or underflow.
+    ///
+    /// Returns an error for bitvectors larger than 8 bytes,
+    /// since multiplication for them is not yet implemented in the [`apint`] crate.
     fn signed_mult_with_overflow_flag(&self, rhs: &Self) -> Result<(Self, bool), Error>;
 }
 
@@ -42,7 +55,7 @@ impl BitvectorExtended for Bitvector {
         }
     }
 
-    /// Extract a subpiece of the given bitvector.
+    /// Extract a subpiece from the given bitvector.
     fn subpiece(&self, low_byte: ByteSize, size: ByteSize) -> Self {
         self.clone()
             .into_checked_lshr(low_byte.as_bit_length())
