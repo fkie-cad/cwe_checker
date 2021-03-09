@@ -122,7 +122,7 @@ impl IntervalDomain {
         }
         if let Ok(length) = merged_domain.interval.length().try_to_u64() {
             if length <= 2 {
-                // Do not widen for very small intervals
+                // Do not widen for very small intervals or for already unconstrained intervals (case length() returning zero).
                 return merged_domain;
             }
         }
@@ -425,6 +425,8 @@ impl Display for IntervalDomain {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.is_top() {
             write!(f, "Top:i{}", self.bytesize().as_bit_length())
+        } else if self.interval.start == self.interval.end {
+            write!(f, "{:016x}:i{}", apint::Int::from(self.interval.start.clone()), self.bytesize().as_bit_length())
         } else {
             let start_int = apint::Int::from(self.interval.start.clone());
             let end_int = apint::Int::from(self.interval.end.clone());

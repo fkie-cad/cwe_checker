@@ -55,7 +55,9 @@ impl Interval {
         Interval { start, end }
     }
 
-    /// Return the number of contained values of the interval.
+    /// Return the number of contained values of the interval as an unsigned bitvector.
+    /// If the interval is unconstrained, return zero
+    /// (since the maximal number of elements is not representable in a bitvector of the same byte size). 
     pub fn length(&self) -> Bitvector {
         self.end.clone() - &self.start + &Bitvector::one(self.start.width())
     }
@@ -85,7 +87,7 @@ impl Interval {
 
     /// Take a subpiece of the bitvectors.
     ///
-    /// The function only tries to be exact if the interval contains exact one value
+    /// The function only tries to be exact if the interval contains exactly one value
     /// or if the `low_byte` is zero.
     pub fn subpiece(self, low_byte: ByteSize, size: ByteSize) -> Self {
         if self.start == self.end {
