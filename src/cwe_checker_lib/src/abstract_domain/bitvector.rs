@@ -61,165 +61,12 @@ impl RegisterDomain for BitvectorDomain {
             _ => assert_eq!(self.bytesize(), rhs.bytesize()),
         }
         match (self, rhs) {
-            (BitvectorDomain::Value(lhs_bitvec), BitvectorDomain::Value(rhs_bitvec)) => match op {
-                Piece => {
-                    let new_bitwidth = (self.bytesize() + rhs.bytesize()).as_bit_length();
-                    let upper_bits = lhs_bitvec
-                        .clone()
-                        .into_zero_extend(new_bitwidth)
-                        .unwrap()
-                        .into_checked_shl(rhs.bytesize().as_bit_length())
-                        .unwrap();
-                    let lower_bits = rhs_bitvec.clone().into_zero_extend(new_bitwidth).unwrap();
-                    BitvectorDomain::Value(upper_bits | &lower_bits)
+            (BitvectorDomain::Value(lhs_bitvec), BitvectorDomain::Value(rhs_bitvec)) => {
+                match lhs_bitvec.bin_op(op, rhs_bitvec) {
+                    Ok(val) => BitvectorDomain::Value(val),
+                    Err(_) => BitvectorDomain::new_top(self.bin_op_bytesize(op, rhs)),
                 }
-                IntAdd => BitvectorDomain::Value(lhs_bitvec + rhs_bitvec),
-                IntSub => BitvectorDomain::Value(lhs_bitvec - rhs_bitvec),
-                IntCarry => {
-                    let result = lhs_bitvec + rhs_bitvec;
-                    if result.checked_ult(lhs_bitvec).unwrap()
-                        || result.checked_ult(rhs_bitvec).unwrap()
-                    {
-                        Bitvector::from_u8(1).into()
-                    } else {
-                        Bitvector::from_u8(0).into()
-                    }
-                }
-                IntSCarry => {
-                    let result = apint::Int::from(lhs_bitvec + rhs_bitvec);
-                    let lhs_bitvec = apint::Int::from(lhs_bitvec.clone());
-                    let rhs_bitvec = apint::Int::from(rhs_bitvec.clone());
-                    if (result.is_negative()
-                        && lhs_bitvec.is_positive()
-                        && rhs_bitvec.is_positive())
-                        || (!result.is_negative()
-                            && lhs_bitvec.is_negative()
-                            && rhs_bitvec.is_negative())
-                    {
-                        Bitvector::from_u8(1).into()
-                    } else {
-                        Bitvector::from_u8(0).into()
-                    }
-                }
-                IntSBorrow => {
-                    let result = apint::Int::from(lhs_bitvec - rhs_bitvec);
-                    let lhs_bitvec = apint::Int::from(lhs_bitvec.clone());
-                    let rhs_bitvec = apint::Int::from(rhs_bitvec.clone());
-                    if (result.is_negative()
-                        && !lhs_bitvec.is_positive()
-                        && rhs_bitvec.is_negative())
-                        || (result.is_positive()
-                            && lhs_bitvec.is_negative()
-                            && rhs_bitvec.is_positive())
-                    {
-                        Bitvector::from_u8(1).into()
-                    } else {
-                        Bitvector::from_u8(0).into()
-                    }
-                }
-                IntMult => {
-                    // FIXME: Multiplication for bitvectors larger than 8 bytes is not yet implemented in the `apint` crate (version 0.2).
-                    if u64::from(self.bytesize()) > 8 {
-                        BitvectorDomain::Top(self.bytesize())
-                    } else {
-                        BitvectorDomain::Value(lhs_bitvec * rhs_bitvec)
-                    }
-                }
-                IntDiv => {
-                    // FIXME: Division for bitvectors larger than 8 bytes is not yet implemented in the `apint` crate (version 0.2).
-                    if u64::from(self.bytesize()) > 8 {
-                        BitvectorDomain::Top(self.bytesize())
-                    } else {
-                        BitvectorDomain::Value(
-                            lhs_bitvec.clone().into_checked_udiv(rhs_bitvec).unwrap(),
-                        )
-                    }
-                }
-                IntSDiv => {
-                    // FIXME: Division for bitvectors larger than 8 bytes is not yet implemented in the `apint` crate (version 0.2).
-                    if u64::from(self.bytesize()) > 8 {
-                        BitvectorDomain::Top(self.bytesize())
-                    } else {
-                        BitvectorDomain::Value(
-                            lhs_bitvec.clone().into_checked_sdiv(rhs_bitvec).unwrap(),
-                        )
-                    }
-                }
-                IntRem => BitvectorDomain::Value(
-                    lhs_bitvec.clone().into_checked_urem(rhs_bitvec).unwrap(),
-                ),
-                IntSRem => BitvectorDomain::Value(
-                    lhs_bitvec.clone().into_checked_srem(rhs_bitvec).unwrap(),
-                ),
-                IntLeft => {
-                    let shift_amount = rhs_bitvec.try_to_u64().unwrap() as usize;
-                    if shift_amount < lhs_bitvec.width().to_usize() {
-                        BitvectorDomain::Value(
-                            lhs_bitvec.clone().into_checked_shl(shift_amount).unwrap(),
-                        )
-                    } else {
-                        BitvectorDomain::Value(Bitvector::zero(lhs_bitvec.width()))
-                    }
-                }
-                IntRight => {
-                    let shift_amount = rhs_bitvec.try_to_u64().unwrap() as usize;
-                    if shift_amount < lhs_bitvec.width().to_usize() {
-                        BitvectorDomain::Value(
-                            lhs_bitvec.clone().into_checked_lshr(shift_amount).unwrap(),
-                        )
-                    } else {
-                        BitvectorDomain::Value(Bitvector::zero(lhs_bitvec.width()))
-                    }
-                }
-                IntSRight => {
-                    let shift_amount = rhs_bitvec.try_to_u64().unwrap() as usize;
-                    if shift_amount < lhs_bitvec.width().to_usize() {
-                        BitvectorDomain::Value(
-                            lhs_bitvec.clone().into_checked_ashr(shift_amount).unwrap(),
-                        )
-                    } else {
-                        let signed_bitvec = apint::Int::from(lhs_bitvec.clone());
-                        if signed_bitvec.is_negative() {
-                            let minus_one = Bitvector::zero(lhs_bitvec.width())
-                                - &Bitvector::one(lhs_bitvec.width());
-                            BitvectorDomain::Value(minus_one)
-                        } else {
-                            BitvectorDomain::Value(Bitvector::zero(lhs_bitvec.width()))
-                        }
-                    }
-                }
-                IntAnd | BoolAnd => BitvectorDomain::Value(lhs_bitvec & rhs_bitvec),
-                IntOr | BoolOr => BitvectorDomain::Value(lhs_bitvec | rhs_bitvec),
-                IntXOr | BoolXOr => BitvectorDomain::Value(lhs_bitvec ^ rhs_bitvec),
-                IntEqual => {
-                    assert_eq!(lhs_bitvec.width(), rhs_bitvec.width());
-                    BitvectorDomain::Value(Bitvector::from((lhs_bitvec == rhs_bitvec) as u8))
-                }
-                IntNotEqual => {
-                    assert_eq!(lhs_bitvec.width(), rhs_bitvec.width());
-                    BitvectorDomain::Value(Bitvector::from((lhs_bitvec != rhs_bitvec) as u8))
-                }
-                IntLess => BitvectorDomain::Value(Bitvector::from(
-                    lhs_bitvec.checked_ult(rhs_bitvec).unwrap() as u8,
-                )),
-                IntLessEqual => BitvectorDomain::Value(Bitvector::from(
-                    lhs_bitvec.checked_ule(rhs_bitvec).unwrap() as u8,
-                )),
-                IntSLess => BitvectorDomain::Value(Bitvector::from(
-                    lhs_bitvec.checked_slt(rhs_bitvec).unwrap() as u8,
-                )),
-                IntSLessEqual => BitvectorDomain::Value(Bitvector::from(
-                    lhs_bitvec.checked_sle(rhs_bitvec).unwrap() as u8,
-                )),
-                FloatEqual | FloatNotEqual | FloatLess | FloatLessEqual => {
-                    // TODO: Implement floating point comparison operators!
-                    BitvectorDomain::new_top(ByteSize::new(1))
-                }
-                FloatAdd | FloatSub | FloatMult | FloatDiv => {
-                    // TODO: Implement floating point arithmetic operators!
-                    BitvectorDomain::new_top(self.bytesize())
-                }
-            },
+            }
             _ => BitvectorDomain::new_top(self.bin_op_bytesize(op, rhs)),
         }
     }
@@ -228,18 +75,9 @@ impl RegisterDomain for BitvectorDomain {
     fn un_op(&self, op: UnOpType) -> Self {
         use UnOpType::*;
         if let BitvectorDomain::Value(bitvec) = self {
-            match op {
-                Int2Comp => BitvectorDomain::Value(-bitvec),
-                IntNegate => BitvectorDomain::Value(bitvec.clone().into_bitnot()),
-                BoolNegate => {
-                    if bitvec.is_zero() {
-                        BitvectorDomain::Value(Bitvector::from_u8(1))
-                    } else {
-                        BitvectorDomain::Value(Bitvector::from_u8(0))
-                    }
-                }
-                FloatNegate | FloatAbs | FloatSqrt | FloatCeil | FloatFloor | FloatRound
-                | FloatNaN => BitvectorDomain::new_top(self.bytesize()),
+            match bitvec.un_op(op) {
+                Ok(val) => BitvectorDomain::Value(val),
+                Err(_) => BitvectorDomain::new_top(self.bytesize()),
             }
         } else {
             match op {
@@ -252,14 +90,7 @@ impl RegisterDomain for BitvectorDomain {
     /// Extract a sub-bitvector out of a bitvector
     fn subpiece(&self, low_byte: ByteSize, size: ByteSize) -> Self {
         if let BitvectorDomain::Value(bitvec) = self {
-            BitvectorDomain::Value(
-                bitvec
-                    .clone()
-                    .into_checked_lshr(low_byte.as_bit_length())
-                    .unwrap()
-                    .into_truncate(size.as_bit_length())
-                    .unwrap(),
-            )
+            BitvectorDomain::Value(bitvec.subpiece(low_byte, size))
         } else {
             BitvectorDomain::new_top(size)
         }
@@ -268,26 +99,9 @@ impl RegisterDomain for BitvectorDomain {
     /// Perform a size-changing cast on a bitvector.
     fn cast(&self, kind: CastOpType, width: ByteSize) -> Self {
         if let BitvectorDomain::Value(bitvec) = self {
-            use CastOpType::*;
-            match kind {
-                IntZExt => BitvectorDomain::Value(
-                    bitvec
-                        .clone()
-                        .into_zero_extend(apint::BitWidth::from(width))
-                        .unwrap(),
-                ),
-                IntSExt => BitvectorDomain::Value(
-                    bitvec
-                        .clone()
-                        .into_sign_extend(apint::BitWidth::from(width))
-                        .unwrap(),
-                ),
-                PopCount => BitvectorDomain::Value(
-                    Bitvector::from_u64(bitvec.count_ones() as u64)
-                        .into_truncate(apint::BitWidth::from(width))
-                        .unwrap(),
-                ),
-                Int2Float | Float2Float | Trunc => BitvectorDomain::new_top(width),
+            match bitvec.cast(kind, width) {
+                Ok(val) => BitvectorDomain::Value(val),
+                Err(_) => BitvectorDomain::new_top(width),
             }
         } else {
             BitvectorDomain::new_top(width)
