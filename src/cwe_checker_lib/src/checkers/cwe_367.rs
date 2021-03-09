@@ -31,6 +31,7 @@ use crate::CweModule;
 use petgraph::visit::EdgeRef;
 use std::collections::HashMap;
 
+/// The module name and version
 pub static CWE_MODULE: CweModule = CweModule {
     name: "CWE367",
     version: "0.1",

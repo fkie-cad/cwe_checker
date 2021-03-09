@@ -1,10 +1,12 @@
+//! Types and functions shared between the implementations
+//! of forward and backward interprocedural fixpoint computations.
+
 use crate::prelude::*;
 
 /// NodeValue that can either be a single abstract value or a
-/// composition of the abstract value computed following an interprocedural
-/// call in the graph and of the abstract value when the call is not taken.
-/// The CallFlowCombinator then allows for a merge of the values computed
-/// over both paths.
+/// composition of the abstract value computed following an interprocedural call in the graph
+/// and of the abstract value before or after the call (depending on the direction of the fixpoint analysis).
+/// The CallFlowCombinator then allows for a merge of the values computed over both paths.
 ///
 /// The call_stub value will either be transferred from the callsite to the return site
 /// in a forward analysis or the other way around in a backward analysis.
@@ -14,14 +16,22 @@ use crate::prelude::*;
 /// to the callsite in a backward analysis.
 #[derive(PartialEq, Eq, Serialize, Deserialize)]
 pub enum NodeValue<T: PartialEq + Eq> {
+    /// A single abstract value
     Value(T),
+    /// The value saved at artificial combinator nodes.
     CallFlowCombinator {
+        /// The value flowing through the intraprocedural edge of the corresponding call.
         call_stub: Option<T>,
+        /// The value flowing through the interprocedural edge of the corresponding call,
+        /// i.e. either between callsite and start of the called function
+        /// or between end of the called function and the return-to site of the call.
         interprocedural_flow: Option<T>,
     },
 }
 
 impl<T: PartialEq + Eq> NodeValue<T> {
+    /// Unwraps the contained value for non-combinator nodes.
+    /// Panics if given a combinator value of an artificial node.
     pub fn unwrap_value(&self) -> &T {
         match self {
             NodeValue::Value(value) => value,

@@ -1,3 +1,5 @@
+//! This module contains the definition of the abstract memory object type.
+
 use super::Data;
 use crate::abstract_domain::*;
 use crate::prelude::*;
@@ -287,14 +289,18 @@ fn same_or_none<T: Eq + Clone>(left: &Option<T>, right: &Option<T>) -> Option<T>
 /// An object is either a stack or a heap object.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy, PartialOrd, Ord)]
 pub enum ObjectType {
+    /// A stack object, i.e. the stack frame of a function.
     Stack,
+    /// A memory object located on the heap.
     Heap,
 }
 
 /// An object is either alive or dangling (because the memory was freed or a function return invalidated the stack frame).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy, PartialOrd, Ord)]
 pub enum ObjectState {
+    /// The object is alive.
     Alive,
+    /// The object is dangling, i.e. the memory has been freed already.
     Dangling,
 }
 

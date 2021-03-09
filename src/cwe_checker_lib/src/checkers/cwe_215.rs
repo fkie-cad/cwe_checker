@@ -22,6 +22,7 @@ use crate::prelude::*;
 use crate::utils::log::{CweWarning, LogMessage};
 use crate::CweModule;
 
+/// The module name and version
 pub static CWE_MODULE: CweModule = CweModule {
     name: "CWE215",
     version: "0.2",

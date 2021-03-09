@@ -32,26 +32,45 @@ pub enum Expression {
     /// Note that most (but not all) operations require the left hand side (`lhs`)
     /// and right hand side (`rhs`) to be of equal size.
     BinOp {
+        /// The opcode/type of the operation
         op: BinOpType,
+        /// The left hand side expression
         lhs: Box<Expression>,
+        /// The right hand side expression
         rhs: Box<Expression>,
     },
     /// A unary operation
-    UnOp { op: UnOpType, arg: Box<Expression> },
+    UnOp {
+        /// The opcode/type of the operation
+        op: UnOpType,
+        /// The argument expression
+        arg: Box<Expression>,
+    },
     /// A cast operation for type cast between integer and floating point types of different byte lengths.
     Cast {
+        /// The opcode/type of the cast operation
         op: CastOpType,
+        /// The byte size of the result value of the expresion
         size: ByteSize,
+        /// The argument of the expression
         arg: Box<Expression>,
     },
     /// An unknown value but with known size.
     /// This may be generated for e.g. unsupported assembly instructions.
     /// Note that computation of an unknown value is still required to be side-effect-free!
-    Unknown { description: String, size: ByteSize },
+    Unknown {
+        /// A description of the operation
+        description: String,
+        /// The byte size of the result of the unknown expression
+        size: ByteSize,
+    },
     /// Extracting a sub-bitvector from the argument expression.
     Subpiece {
+        /// The lowest byte (i.e. least significant byte if interpreted as integer) of the sub-bitvector to extract.
         low_byte: ByteSize,
+        /// The size of the resulting sub-bitvector
         size: ByteSize,
+        /// The argument from which to extract the bitvector from.
         arg: Box<Expression>,
     },
 }
@@ -368,7 +387,9 @@ impl Expression {
     }
 }
 
-/// The type/mnemonic of a binary operation
+/// The type/mnemonic of a binary operation.
+/// See the Ghidra P-Code documentation for more information.
+#[allow(missing_docs)]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum BinOpType {
     Piece,
@@ -408,6 +429,8 @@ pub enum BinOpType {
 }
 
 /// The type/mnemonic of a typecast
+/// See the Ghidra P-Code documentation for more information.
+#[allow(missing_docs)]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum CastOpType {
     IntZExt,
@@ -419,6 +442,8 @@ pub enum CastOpType {
 }
 
 /// The type/mnemonic of an unary operation
+/// See the Ghidra P-Code documentation for more information.
+#[allow(missing_docs)]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum UnOpType {
     IntNegate,

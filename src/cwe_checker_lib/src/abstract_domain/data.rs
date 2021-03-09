@@ -10,8 +10,13 @@ use std::fmt::Display;
 /// Both non-pointer values and offsets of pointers are represented by the same abstract domain `T`.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub enum DataDomain<T: RegisterDomain> {
+    /// The `Top` element of the domain.
+    /// Describes a value for which nothing is known.
     Top(ByteSize),
+    /// The value is a pointer to an abstract memory object.
     Pointer(PointerDomain<T>),
+    /// The value is a non-pointer value or a pointer to global memory.
+    /// The latter can happen if pointers to global memory are described by their absolute value.
     Value(T),
 }
 

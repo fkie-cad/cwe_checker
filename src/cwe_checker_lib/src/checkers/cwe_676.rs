@@ -1,13 +1,13 @@
 /*!
 This module implements a check for CWE-676: Use of Potentially Dangerous Function.
-Potentially dangerous functions like memcpy can lead to security issues like buffer overflows.
 
+Potentially dangerous functions like memcpy can lead to security issues like buffer overflows.
 See <https://cwe.mitre.org/data/definitions/676.html> for a detailed description.
 
 How the check works:
 
   * Calls to dangerous functions are flagged. The list of functions that are considered
-dangerous can be configured in config.json. The default list is taken from
+dangerous can be configured in config.json. The default list is based on
 <https://github.com/01org/safestringlib/wiki/SDL-List-of-Banned-Functions>.
 
 False Positives
@@ -32,6 +32,7 @@ use serde::{Deserialize, Serialize};
 
 const VERSION: &str = "0.1";
 
+/// The module name and version
 pub static CWE_MODULE: crate::CweModule = crate::CweModule {
     name: "CWE676",
     version: VERSION,
@@ -106,6 +107,8 @@ pub fn resolve_symbols<'a>(
         .collect()
 }
 
+/// Iterate through all function calls inside the program and flag calls to those functions
+/// that are marked as unsafe via the configuration file.
 pub fn check_cwe(
     analysis_results: &AnalysisResults,
     cwe_params: &serde_json::Value,

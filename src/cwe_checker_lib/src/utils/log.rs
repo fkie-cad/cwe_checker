@@ -1,15 +1,28 @@
+//! Structs and functions for generating log messages and CWE warnings.
+
 use crate::prelude::*;
 use std::thread::JoinHandle;
 
 /// A CWE warning message.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord, Default)]
 pub struct CweWarning {
+    /// A short name of the CWE check, e.g. `CWE190`.
     pub name: String,
+    /// The version number of the check.
     pub version: String,
+    /// Addresses in the binary associated with the CWE warning.
+    /// The first address usually denotes the program point where the CWE warning was generated.
     pub addresses: Vec<String>,
+    /// Term IDs associated to the CWE warning.
+    /// May be more exact than the addresses, e.g. for `Def` terms.
     pub tids: Vec<String>,
+    /// Symbol names (usually of extern symbols) associated to the CWE warning.
     pub symbols: Vec<String>,
+    /// Other useful information. Content depends on the check that generated the CWE warning.
     pub other: Vec<Vec<String>>,
+    /// A short description of the warning that is presented to the user.
+    /// Should contain all essential information necessary to understand the warning,
+    /// including the address in the binary for which the warning was generated.
     pub description: String,
 }
 

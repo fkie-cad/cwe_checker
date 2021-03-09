@@ -1,3 +1,5 @@
+//! This module contains various utility modules and helper functions.
+
 pub mod binary;
 pub mod graph_utils;
 pub mod log;

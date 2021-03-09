@@ -1,3 +1,6 @@
+//! This module contains the implementations of various builder functions
+//! for different terms.
+
 #[cfg(test)]
 use crate::intermediate_representation::{Expression, Variable};
 

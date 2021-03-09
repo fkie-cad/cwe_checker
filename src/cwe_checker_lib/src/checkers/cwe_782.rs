@@ -28,6 +28,7 @@ use crate::{
 
 const VERSION: &str = "0.1";
 
+/// The module name and version
 pub static CWE_MODULE: crate::CweModule = crate::CweModule {
     name: "CWE782",
     version: VERSION,
@@ -66,6 +67,7 @@ pub fn generate_cwe_warning(calls: &[(&str, &Tid, &str)]) -> Vec<CweWarning> {
     cwe_warnings
 }
 
+/// Iterate through all calls of the program and flag calls to `ioctl()` as CWE warnings.
 pub fn check_cwe(
     analysis_results: &AnalysisResults,
     _cwe_params: &serde_json::Value,
