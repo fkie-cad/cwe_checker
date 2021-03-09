@@ -25,7 +25,7 @@ docker run --rm -v $(pwd)/BINARY:/input fkiecad/cwe_checker /input
 ```
 One can modify the behaviour of the cwe_checker through the command line.
 Use the `--help` command line option for more information.
-Once can also provide a custom configuration file to modify the behaviour of each check
+One can also provide a custom configuration file to modify the behaviour of each check
 through the `--config` command line option.
 Start by taking a look at the standard configuration file located at `src/config.json`
 and read the [check-specific documentation](crate::checkers) for more details about each field in the configuration file.

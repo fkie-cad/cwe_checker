@@ -342,7 +342,7 @@ pub struct RegisterProperties {
     pub register: String,
     /// The name of the base register.
     pub base_register: String,
-    /// The least signicant byte of the register when viewed as a sub-register of the base register.
+    /// The least significant byte of the register when viewed as a sub-register of the base register.
     pub lsb: ByteSize,
     /// The size (in bytes) of the register
     pub size: ByteSize,
