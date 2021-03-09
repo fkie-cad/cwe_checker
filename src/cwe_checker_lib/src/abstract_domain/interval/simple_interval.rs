@@ -57,7 +57,7 @@ impl Interval {
 
     /// Return the number of contained values of the interval as an unsigned bitvector.
     /// If the interval is unconstrained, return zero
-    /// (since the maximal number of elements is not representable in a bitvector of the same byte size). 
+    /// (since the maximal number of elements is not representable in a bitvector of the same byte size).
     pub fn length(&self) -> Bitvector {
         self.end.clone() - &self.start + &Bitvector::one(self.start.width())
     }

@@ -426,7 +426,12 @@ impl Display for IntervalDomain {
         if self.is_top() {
             write!(f, "Top:i{}", self.bytesize().as_bit_length())
         } else if self.interval.start == self.interval.end {
-            write!(f, "{:016x}:i{}", apint::Int::from(self.interval.start.clone()), self.bytesize().as_bit_length())
+            write!(
+                f,
+                "{:016x}:i{}",
+                apint::Int::from(self.interval.start.clone()),
+                self.bytesize().as_bit_length()
+            )
         } else {
             let start_int = apint::Int::from(self.interval.start.clone());
             let end_int = apint::Int::from(self.interval.end.clone());
