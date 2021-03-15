@@ -1,6 +1,6 @@
 //! This module contains the definition of the abstract memory object type.
 
-use super::Data;
+use super::{Data, ValueDomain};
 use crate::abstract_domain::*;
 use crate::prelude::*;
 use derive_more::Deref;
@@ -72,20 +72,23 @@ impl AbstractObjectInfo {
     ///
     /// If the abstract object is not unique (i.e. may represent more than one actual object),
     /// merge the old value at the given offset with the new value.
-    pub fn set_value(&mut self, value: Data, offset: &BitvectorDomain) -> Result<(), Error> {
+    pub fn set_value(&mut self, value: Data, offset: &ValueDomain) -> Result<(), Error> {
         if let Data::Pointer(ref pointer) = value {
             self.pointer_targets.extend(pointer.ids().cloned());
         };
-        if let BitvectorDomain::Value(ref concrete_offset) = offset {
+        if let Ok(concrete_offset) = offset.try_to_bitvec() {
             if self.is_unique {
-                self.memory.add(value, concrete_offset.clone());
+                self.memory.add(value, concrete_offset);
             } else {
                 let merged_value = self
                     .memory
                     .get(concrete_offset.clone(), value.bytesize())
                     .merge(&value);
-                self.memory.add(merged_value, concrete_offset.clone());
+                self.memory.add(merged_value, concrete_offset);
             };
+        } else if let Ok((start, end)) = offset.try_to_offset_interval() {
+            self.memory
+                .clear_offset_interval(start, end, value.bytesize());
         } else {
             self.memory = MemRegion::new(self.memory.get_address_bytesize());
         }
@@ -93,16 +96,19 @@ impl AbstractObjectInfo {
     }
 
     /// Merge `value` at position `offset` with the value currently saved at that position.
-    pub fn merge_value(&mut self, value: Data, offset: &BitvectorDomain) {
+    pub fn merge_value(&mut self, value: Data, offset: &ValueDomain) {
         if let Data::Pointer(ref pointer) = value {
             self.pointer_targets.extend(pointer.ids().cloned());
         };
-        if let BitvectorDomain::Value(ref concrete_offset) = offset {
+        if let Ok(concrete_offset) = offset.try_to_bitvec() {
             let merged_value = self
                 .memory
                 .get(concrete_offset.clone(), value.bytesize())
                 .merge(&value);
-            self.memory.add(merged_value, concrete_offset.clone());
+            self.memory.add(merged_value, concrete_offset);
+        } else if let Ok((start, end)) = offset.try_to_offset_interval() {
+            self.memory
+                .clear_offset_interval(start, end, value.bytesize());
         } else {
             self.memory = MemRegion::new(self.memory.get_address_bytesize());
         }
@@ -131,7 +137,7 @@ impl AbstractObjectInfo {
         &mut self,
         old_id: &AbstractIdentifier,
         new_id: &AbstractIdentifier,
-        offset_adjustment: &BitvectorDomain,
+        offset_adjustment: &ValueDomain,
     ) {
         for elem in self.memory.values_mut() {
             elem.replace_abstract_id(old_id, new_id, offset_adjustment);
@@ -323,8 +329,8 @@ mod tests {
         Data::Value(bv(number))
     }
 
-    fn bv(number: i64) -> BitvectorDomain {
-        BitvectorDomain::Value(Bitvector::from_i64(number))
+    fn bv(number: i64) -> ValueDomain {
+        ValueDomain::from(Bitvector::from_i64(number))
     }
 
     fn new_id(tid: &str, reg_name: &str) -> AbstractIdentifier {
@@ -353,10 +359,10 @@ mod tests {
             object.get_value(Bitvector::from_i64(-15), ByteSize::new(8)),
             Data::Top(ByteSize::new(8))
         );
-        object.merge_value(new_data(5), &bv(-12));
+        object.merge_value(new_data(23), &bv(-12));
         assert_eq!(
             object.get_value(Bitvector::from_i64(-12), ByteSize::new(8)),
-            Data::Value(BitvectorDomain::new_top(ByteSize::new(8)))
+            Data::Value(ValueDomain::new_top(ByteSize::new(8)))
         );
 
         let mut other_object = new_abstract_object();

@@ -109,6 +109,16 @@ impl<T: AbstractDomain + SizedDomain + HasTop + std::fmt::Debug> MemRegionData<T
         }
     }
 
+    /// Clear all values that might be overwritten if one writes a value with byte size `value_size`
+    /// to an offset contained in the interval from `start` to `end` (both bounds included in the interval).
+    ///
+    /// This represents the effect of writing an arbitrary value (with known byte size)
+    /// to an arbitrary offset contained in the interval.
+    pub fn clear_offset_interval(&mut self, start: i64, end: i64, value_size: ByteSize) {
+        let size = end - start + (u64::from(value_size) as i64);
+        self.clear_interval(start, size);
+    }
+
     /// Add a value to the memory region.
     pub fn add(&mut self, value: T, position: Bitvector) {
         assert_eq!(ByteSize::from(position.width()), self.address_bytesize);

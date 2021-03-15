@@ -21,7 +21,7 @@ use crate::intermediate_representation::*;
 use crate::prelude::*;
 use crate::utils::log::*;
 use crate::{
-    abstract_domain::{BitvectorDomain, DataDomain},
+    abstract_domain::{DataDomain, IntervalDomain},
     utils::binary::RuntimeMemoryImage,
 };
 use petgraph::graph::NodeIndex;
@@ -47,8 +47,11 @@ pub static CWE_MODULE: crate::CweModule = crate::CweModule {
     run: extract_pi_analysis_results,
 };
 
+/// The abstract domain to use for absolute values.
+pub type ValueDomain = IntervalDomain;
+
 /// The abstract domain type for representing register values.
-pub type Data = DataDomain<BitvectorDomain>;
+pub type Data = DataDomain<ValueDomain>;
 
 /// Configurable parameters for the analysis.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]

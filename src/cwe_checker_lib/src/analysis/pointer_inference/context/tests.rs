@@ -1,8 +1,8 @@
 use super::*;
 use std::collections::HashSet;
 
-fn bv(value: i64) -> BitvectorDomain {
-    BitvectorDomain::Value(Bitvector::from_i64(value))
+fn bv(value: i64) -> ValueDomain {
+    ValueDomain::from(Bitvector::from_i64(value))
 }
 
 fn new_id(time: &str, reg_name: &str) -> AbstractIdentifier {

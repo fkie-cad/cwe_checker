@@ -1,9 +1,7 @@
 //! Utility structs and functions which directly parse the binary file.
 
-use crate::abstract_domain::BitvectorDomain;
-use crate::abstract_domain::RegisterDomain;
-use crate::abstract_domain::SizedDomain;
 use crate::intermediate_representation::BinOpType;
+use crate::intermediate_representation::BitvectorExtended;
 use crate::prelude::*;
 use goblin::elf;
 use goblin::pe;
@@ -131,16 +129,16 @@ impl RuntimeMemoryImage {
         }
     }
 
-    /// Read the contents of the memory image at the given address into a `BitvectorDomain`,
+    /// Read the contents of the memory image at the given address
     /// to emulate a read instruction to global data at runtime.
     ///
     /// The read method is endian-aware,
     /// i.e. values are interpreted with the endianness of the CPU architecture.
-    /// If the address points to a writeable segment, the returned value is a `Top` value,
+    /// If the address points to a writeable segment, the returned value is a `Ok(None)` value,
     /// since the data may change during program execution.
     ///
     /// Returns an error if the address is not contained in the global data address range.
-    pub fn read(&self, address: &Bitvector, size: ByteSize) -> Result<BitvectorDomain, Error> {
+    pub fn read(&self, address: &Bitvector, size: ByteSize) -> Result<Option<Bitvector>, Error> {
         let address = address.try_to_u64().unwrap();
         for segment in self.memory_segments.iter() {
             if address >= segment.base_address
@@ -148,7 +146,7 @@ impl RuntimeMemoryImage {
             {
                 if segment.write_flag {
                     // The segment is writeable, thus we do not know the content at runtime.
-                    return Ok(BitvectorDomain::new_top(size));
+                    return Ok(None);
                 }
                 let index = (address - segment.base_address) as usize;
                 let mut bytes = segment.bytes[index..index + u64::from(size) as usize].to_vec();
@@ -156,17 +154,39 @@ impl RuntimeMemoryImage {
                     bytes = bytes.into_iter().rev().collect();
                 }
                 let mut bytes = bytes.into_iter();
-                let mut bitvector: BitvectorDomain =
-                    Bitvector::from_u8(bytes.next().unwrap()).into();
+                let mut bitvector = Bitvector::from_u8(bytes.next().unwrap());
                 for byte in bytes {
-                    let new_byte: BitvectorDomain = Bitvector::from_u8(byte).into();
-                    bitvector = bitvector.bin_op(BinOpType::Piece, &new_byte);
+                    let new_byte = Bitvector::from_u8(byte);
+                    bitvector = bitvector.bin_op(BinOpType::Piece, &new_byte)?;
                 }
-                return Ok(bitvector);
+                return Ok(Some(bitvector));
             }
         }
         // No segment fully contains the read.
         Err(anyhow!("Address is not a valid global memory address."))
+    }
+
+    /// Check whether all addresses in the given interval point to a readable segment in the runtime memory image.
+    ///
+    /// Returns an error if the address interval intersects more than one memory segment
+    /// or if it does not point to global memory at all.
+    pub fn is_interval_readable(
+        &self,
+        start_address: u64,
+        end_address: u64,
+    ) -> Result<bool, Error> {
+        for segment in self.memory_segments.iter() {
+            if start_address >= segment.base_address
+                && start_address < segment.base_address + segment.bytes.len() as u64
+            {
+                if end_address <= segment.base_address + segment.bytes.len() as u64 {
+                    return Ok(segment.read_flag);
+                } else {
+                    return Err(anyhow!("Interval spans more than one segment"));
+                }
+            }
+        }
+        Err(anyhow!("Address not contained in runtime memory image"))
     }
 
     /// For an address to global read-only memory, return the memory segment it points to
@@ -203,6 +223,29 @@ impl RuntimeMemoryImage {
                 && address < segment.base_address + segment.bytes.len() as u64
             {
                 return Ok(segment.write_flag);
+            }
+        }
+        Err(anyhow!("Address not contained in runtime memory image"))
+    }
+
+    /// Check whether all addresses in the given interval point to a writeable segment in the runtime memory image.
+    ///
+    /// Returns an error if the address interval intersects more than one memory segment
+    /// or if it does not point to global memory at all.
+    pub fn is_interval_writeable(
+        &self,
+        start_address: u64,
+        end_address: u64,
+    ) -> Result<bool, Error> {
+        for segment in self.memory_segments.iter() {
+            if start_address >= segment.base_address
+                && start_address < segment.base_address + segment.bytes.len() as u64
+            {
+                if end_address <= segment.base_address + segment.bytes.len() as u64 {
+                    return Ok(segment.write_flag);
+                } else {
+                    return Err(anyhow!("Interval spans more than one segment"));
+                }
             }
         }
         Err(anyhow!("Address not contained in runtime memory image"))

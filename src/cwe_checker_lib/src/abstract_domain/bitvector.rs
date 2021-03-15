@@ -1,4 +1,5 @@
-use super::{AbstractDomain, HasTop, RegisterDomain, SizedDomain};
+use super::Interval;
+use super::{AbstractDomain, HasTop, RegisterDomain, SizedDomain, TryToBitvec, TryToInterval};
 use crate::intermediate_representation::*;
 use crate::prelude::*;
 
@@ -141,12 +142,22 @@ impl std::convert::From<Bitvector> for BitvectorDomain {
     }
 }
 
-impl std::convert::TryFrom<&BitvectorDomain> for Bitvector {
-    type Error = ();
-    fn try_from(bitvec_domain: &BitvectorDomain) -> Result<Bitvector, ()> {
-        match bitvec_domain {
-            BitvectorDomain::Value(bitvec) => Ok(bitvec.clone()),
-            BitvectorDomain::Top(_) => Err(()),
+impl TryToBitvec for BitvectorDomain {
+    /// If the domain represents an absoulute value, return it.
+    fn try_to_bitvec(&self) -> Result<Bitvector, Error> {
+        match self {
+            BitvectorDomain::Value(val) => Ok(val.clone()),
+            BitvectorDomain::Top(_) => Err(anyhow!("Value is Top")),
+        }
+    }
+}
+
+impl TryToInterval for BitvectorDomain {
+    /// If the domain represents an absolute value, return it as an interval of length one.
+    fn try_to_interval(&self) -> Result<Interval, Error> {
+        match self {
+            BitvectorDomain::Value(val) => Ok(Interval::new(val.clone(), val.clone())),
+            BitvectorDomain::Top(_) => Err(anyhow!("Value is Top")),
         }
     }
 }

@@ -4,9 +4,10 @@ use crate::intermediate_representation::*;
 use crate::prelude::*;
 
 use super::{AbstractDomain, HasTop, RegisterDomain, SizedDomain};
+use super::{TryToBitvec, TryToInterval};
 
 mod simple_interval;
-use simple_interval::*;
+pub use simple_interval::*;
 
 mod bin_ops;
 
@@ -18,7 +19,7 @@ mod bin_ops;
 /// The domain also contains widening hints to faciliate fast and exact widening for simple loop counter variables.
 /// See the [`IntervalDomain::signed_merge_and_widen`] method for details on the widening strategy.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
-struct IntervalDomain {
+pub struct IntervalDomain {
     /// The underlying interval.
     interval: Interval,
     /// A lower bound for widening operations.
@@ -146,15 +147,6 @@ impl IntervalDomain {
         } else {
             // No widening bounds could be used for widening, so we have to widen to the `Top` value.
             IntervalDomain::new_top(merged_domain.bytesize())
-        }
-    }
-
-    /// If the interval contains exactly one value, return the value.
-    pub fn try_to_bitvec(&self) -> Result<Bitvector, ()> {
-        if self.interval.start == self.interval.end {
-            Ok(self.interval.start.clone())
-        } else {
-            Err(())
         }
     }
 
@@ -410,6 +402,30 @@ impl RegisterDomain for IntervalDomain {
     }
 }
 
+impl std::ops::Add for IntervalDomain {
+    type Output = IntervalDomain;
+
+    fn add(self, rhs: Self) -> Self {
+        self.bin_op(BinOpType::IntAdd, &rhs)
+    }
+}
+
+impl std::ops::Sub for IntervalDomain {
+    type Output = IntervalDomain;
+
+    fn sub(self, rhs: Self) -> Self {
+        self.bin_op(BinOpType::IntSub, &rhs)
+    }
+}
+
+impl std::ops::Neg for IntervalDomain {
+    type Output = IntervalDomain;
+
+    fn neg(self) -> Self {
+        self.un_op(UnOpType::Int2Comp)
+    }
+}
+
 impl From<Bitvector> for IntervalDomain {
     /// Create an interval containing only `bitvec`.
     fn from(bitvec: Bitvector) -> Self {
@@ -417,6 +433,28 @@ impl From<Bitvector> for IntervalDomain {
             interval: bitvec.into(),
             widening_lower_bound: None,
             widening_upper_bound: None,
+        }
+    }
+}
+
+impl TryToBitvec for IntervalDomain {
+    /// If the domain represents an interval of length one, return the contained value.
+    fn try_to_bitvec(&self) -> Result<Bitvector, Error> {
+        if self.interval.start == self.interval.end {
+            Ok(self.interval.start.clone())
+        } else {
+            Err(anyhow!("More than one value in the interval."))
+        }
+    }
+}
+
+impl TryToInterval for IntervalDomain {
+    /// If the domain represents a bounded (i.e. not `Top`) interval, return it.
+    fn try_to_interval(&self) -> Result<Interval, Error> {
+        if self.is_top() {
+            Err(anyhow!("Value is Top"))
+        } else {
+            Ok(self.interval.clone())
         }
     }
 }

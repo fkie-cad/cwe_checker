@@ -1,5 +1,5 @@
 use super::object::*;
-use super::Data;
+use super::{Data, ValueDomain};
 use crate::abstract_domain::*;
 use crate::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -14,11 +14,11 @@ use std::collections::{BTreeMap, BTreeSet};
 pub struct AbstractObjectList {
     /// The abstract objects.
     ///
-    /// Each abstract object comes with an offset given as a [`BitvectorDomain`].
+    /// Each abstract object comes with an offset given as a [`ValueDomain`].
     /// This offset determines where the zero offset corresponding to the abstract identifier inside the object is.
     /// Note that this offset may be a `Top` element
     /// if the exact offset corresponding to the identifier is unknown.
-    objects: BTreeMap<AbstractIdentifier, (AbstractObject, BitvectorDomain)>,
+    objects: BTreeMap<AbstractIdentifier, (AbstractObject, ValueDomain)>,
 }
 
 impl AbstractObjectList {
@@ -81,7 +81,7 @@ impl AbstractObjectList {
                 for (id, offset_pointer_domain) in pointer.targets() {
                     let (object, offset_identifier) = self.objects.get(id).unwrap();
                     let offset = offset_pointer_domain.clone() + offset_identifier.clone();
-                    if let BitvectorDomain::Value(concrete_offset) = offset {
+                    if let Ok(concrete_offset) = offset.try_to_bitvec() {
                         let value = object.get_value(concrete_offset, size);
                         merged_value = match merged_value {
                             Some(accum) => Some(accum.merge(&value)),
@@ -103,7 +103,7 @@ impl AbstractObjectList {
     /// we merge-write the value to all targets.
     pub fn set_value(
         &mut self,
-        pointer: PointerDomain<BitvectorDomain>,
+        pointer: PointerDomain<ValueDomain>,
         value: Data,
     ) -> Result<(), Error> {
         let targets = pointer.targets();
@@ -136,7 +136,7 @@ impl AbstractObjectList {
         &mut self,
         old_id: &AbstractIdentifier,
         new_id: &AbstractIdentifier,
-        offset_adjustment: &BitvectorDomain,
+        offset_adjustment: &ValueDomain,
     ) {
         let negative_offset = -offset_adjustment.clone();
         for (object, _) in self.objects.values_mut() {
@@ -160,7 +160,7 @@ impl AbstractObjectList {
     pub fn add_abstract_object(
         &mut self,
         object_id: AbstractIdentifier,
-        initial_offset: BitvectorDomain,
+        initial_offset: ValueDomain,
         type_: ObjectType,
         address_bytesize: ByteSize,
     ) {
@@ -225,7 +225,7 @@ impl AbstractObjectList {
     /// Returns either a non-empty list of detected errors (like possible double frees) or `OK(())` if no errors were found.
     pub fn mark_mem_object_as_freed(
         &mut self,
-        object_pointer: &PointerDomain<BitvectorDomain>,
+        object_pointer: &PointerDomain<ValueDomain>,
     ) -> Result<(), Vec<(AbstractIdentifier, Error)>> {
         let ids: Vec<AbstractIdentifier> = object_pointer.ids().cloned().collect();
         let mut possible_double_free_ids = Vec::new();
@@ -358,8 +358,8 @@ impl AbstractObjectList {
 mod tests {
     use super::*;
 
-    fn bv(value: i64) -> BitvectorDomain {
-        BitvectorDomain::Value(Bitvector::from_i64(value))
+    fn bv(value: i64) -> ValueDomain {
+        ValueDomain::from(Bitvector::from_i64(value))
     }
 
     fn new_id(name: &str) -> AbstractIdentifier {
@@ -442,7 +442,7 @@ mod tests {
             merged
                 .get_value(&Data::Pointer(pointer.clone()), ByteSize::new(8))
                 .unwrap(),
-            Data::Value(BitvectorDomain::new_top(ByteSize::new(8)))
+            Data::Value(ValueDomain::new_top(ByteSize::new(8)))
         );
         assert_eq!(
             merged

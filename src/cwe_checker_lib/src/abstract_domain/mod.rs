@@ -2,6 +2,7 @@
 //! as well as several abstract domain types implementing these traits.
 
 use crate::intermediate_representation::*;
+use crate::prelude::*;
 
 mod bitvector;
 pub use bitvector::*;
@@ -89,5 +90,36 @@ pub trait RegisterDomain: AbstractDomain + SizedDomain + HasTop {
             | IntCarry | IntSCarry | IntSBorrow | BoolAnd | BoolOr | BoolXOr | FloatEqual
             | FloatNotEqual | FloatLess | FloatLessEqual => ByteSize::new(1),
         }
+    }
+}
+
+/// A conversion trait for abstract domains that can represent register values.
+pub trait TryToBitvec {
+    /// If `self` represents a single absolute value, return it.
+    /// In all other cases return an error.
+    fn try_to_bitvec(&self) -> Result<Bitvector, Error>;
+
+    /// If `self` represents a single absolute value, try to convert it to a signed integer and return it.
+    /// Else return an error.
+    /// Note that the conversion loses information about the bytesize of the value.
+    fn try_to_offset(&self) -> Result<i64, Error> {
+        Ok(self.try_to_bitvec()?.try_to_i64()?)
+    }
+}
+
+/// A conversion trait for abstract domains that can represent register values.
+pub trait TryToInterval {
+    /// If `self` represents an interval of absolute values (or can be widened to represent such an interval)
+    /// then return it if the interval is bounded.
+    /// For unbounded (i.e. `Top`) intervals or if the abstract value does not represent absolute values return an error.
+    fn try_to_interval(&self) -> Result<Interval, Error>;
+
+    /// If `self` represents an interval of absolute values (or can be widened to represent such an interval)
+    /// then return it as an interval of signed integers if the interval is bounded.
+    /// Else return an error.
+    /// Note that the conversion loses information about the bytesize of the values contained in the interval.
+    fn try_to_offset_interval(&self) -> Result<(i64, i64), Error> {
+        let interval = self.try_to_interval()?;
+        Ok((interval.start.try_to_i64()?, interval.end.try_to_i64()?))
     }
 }
