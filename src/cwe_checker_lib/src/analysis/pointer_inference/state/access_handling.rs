@@ -4,13 +4,11 @@ use super::*;
 
 impl State {
     /// Get the value of a register or Top() if no value is known.
-    ///
-    /// Returns an error if the variable is not a register.
-    pub fn get_register(&self, variable: &Variable) -> Result<Data, Error> {
+    pub fn get_register(&self, variable: &Variable) -> Data {
         if let Some(data) = self.register.get(variable) {
-            Ok(data.clone())
+            data.clone()
         } else {
-            Ok(Data::new_top(variable.size))
+            Data::new_top(variable.size)
         }
     }
 
@@ -28,8 +26,6 @@ impl State {
     }
 
     /// Set the value of a register.
-    ///
-    /// Returns an error if the variable is not a register.
     pub fn set_register(&mut self, variable: &Variable, value: Data) {
         if !value.is_top() {
             self.register.insert(variable.clone(), value);
@@ -39,21 +35,8 @@ impl State {
     }
 
     /// Evaluate expression on the given state and write the result to the target register.
-    pub fn handle_register_assign(
-        &mut self,
-        target: &Variable,
-        expression: &Expression,
-    ) -> Result<(), Error> {
-        match self.eval(expression) {
-            Ok(new_value) => {
-                self.set_register(target, new_value);
-                Ok(())
-            }
-            Err(err) => {
-                self.set_register(target, Data::new_top(target.size));
-                Err(err)
-            }
-        }
+    pub fn handle_register_assign(&mut self, target: &Variable, expression: &Expression) {
+        self.set_register(target, self.eval(expression))
     }
 
     /// Store `value` at the given `address`.
@@ -116,32 +99,19 @@ impl State {
         value: &Data,
         global_memory: &RuntimeMemoryImage,
     ) -> Result<(), Error> {
-        match self.eval(address) {
-            Ok(address_data) => self.store_value(&address_data, value, global_memory),
-            Err(err) => Err(err),
-        }
+        let address_data = self.eval(address);
+        self.store_value(&address_data, value, global_memory)
     }
 
     /// Evaluate the store instruction, given by its address and value expressions,
     /// and modify the state accordingly.
-    ///
-    /// If an error occurs, the state is still modified before the error is returned.
-    /// E.g. if the value expression cannot be evaluated,
-    /// the value at the target address is overwritten with a `Top` value.
     pub fn handle_store(
         &mut self,
         address: &Expression,
         value: &Expression,
         global_memory: &RuntimeMemoryImage,
     ) -> Result<(), Error> {
-        match self.eval(value) {
-            Ok(data) => self.write_to_address(address, &data, global_memory),
-            Err(err) => {
-                // we still need to write to the target location before reporting the error
-                self.write_to_address(address, &Data::new_top(value.bytesize()), global_memory)?;
-                Err(err)
-            }
-        }
+        self.write_to_address(address, &self.eval(value), global_memory)
     }
 
     /// Evaluate the given load instruction and return the data read on success.
@@ -151,7 +121,7 @@ impl State {
         size: ByteSize,
         global_memory: &RuntimeMemoryImage,
     ) -> Result<Data, Error> {
-        let address = self.adjust_pointer_for_read(&self.eval(address)?);
+        let address = self.adjust_pointer_for_read(&self.eval(address));
         match address {
             Data::Value(global_address) => {
                 if let Ok(address_bitvector) = global_address.try_to_bitvec() {
@@ -233,30 +203,30 @@ impl State {
     }
 
     /// Evaluate the value of an expression in the current state
-    pub fn eval(&self, expression: &Expression) -> Result<Data, Error> {
+    pub fn eval(&self, expression: &Expression) -> Data {
         use Expression::*;
         match expression {
             Var(variable) => self.get_register(&variable),
-            Const(bitvector) => Ok(bitvector.clone().into()),
+            Const(bitvector) => bitvector.clone().into(),
             BinOp { op, lhs, rhs } => {
                 if *op == BinOpType::IntXOr && lhs == rhs {
                     // the result of `x XOR x` is always zero.
-                    return Ok(Bitvector::zero(apint::BitWidth::from(lhs.bytesize())).into());
+                    return Bitvector::zero(apint::BitWidth::from(lhs.bytesize())).into();
                 }
-                let (left, right) = (self.eval(lhs)?, self.eval(rhs)?);
-                Ok(left.bin_op(*op, &right))
+                let (left, right) = (self.eval(lhs), self.eval(rhs));
+                left.bin_op(*op, &right)
             }
-            UnOp { op, arg } => Ok(self.eval(arg)?.un_op(*op)),
-            Cast { op, size, arg } => Ok(self.eval(arg)?.cast(*op, *size)),
+            UnOp { op, arg } => self.eval(arg).un_op(*op),
+            Cast { op, size, arg } => self.eval(arg).cast(*op, *size),
             Unknown {
                 description: _,
                 size,
-            } => Ok(Data::new_top(*size)),
+            } => Data::new_top(*size),
             Subpiece {
                 low_byte,
                 size,
                 arg,
-            } => Ok(self.eval(arg)?.subpiece(*low_byte, *size)),
+            } => self.eval(arg).subpiece(*low_byte, *size),
         }
     }
 
@@ -268,7 +238,7 @@ impl State {
         global_memory: &RuntimeMemoryImage,
     ) -> Result<Data, Error> {
         match parameter {
-            Arg::Register(var) => self.eval(&Expression::Var(var.clone())),
+            Arg::Register(var) => Ok(self.eval(&Expression::Var(var.clone()))),
             Arg::Stack { offset, size } => self.load_value(
                 &Expression::Var(stack_pointer.clone()).plus_const(*offset),
                 *size,
@@ -281,11 +251,7 @@ impl State {
     pub fn contains_access_of_dangling_memory(&self, def: &Def) -> bool {
         match def {
             Def::Load { address, .. } | Def::Store { address, .. } => {
-                if let Ok(pointer) = self.eval(address) {
-                    self.memory.is_dangling_pointer(&pointer, true)
-                } else {
-                    false
-                }
+                self.memory.is_dangling_pointer(&self.eval(address), true)
             }
             _ => false,
         }

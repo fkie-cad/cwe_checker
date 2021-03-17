@@ -158,22 +158,18 @@ fn handle_store() {
     let mut state = State::new(&register("RSP"), Tid::new("time0"));
     let stack_id = new_id("time0", "RSP");
     assert_eq!(
-        state.eval(&Var(register("RSP"))).unwrap(),
+        state.eval(&Var(register("RSP"))),
         Data::Pointer(PointerDomain::new(stack_id.clone(), bv(0)))
     );
 
-    state
-        .handle_register_assign(&register("RSP"), &reg_sub("RSP", 32))
-        .unwrap();
+    state.handle_register_assign(&register("RSP"), &reg_sub("RSP", 32));
     assert_eq!(
-        state.eval(&Var(register("RSP"))).unwrap(),
+        state.eval(&Var(register("RSP"))),
         Data::Pointer(PointerDomain::new(stack_id.clone(), bv(-32)))
     );
-    state
-        .handle_register_assign(&register("RSP"), &reg_add("RSP", -8))
-        .unwrap();
+    state.handle_register_assign(&register("RSP"), &reg_add("RSP", -8));
     assert_eq!(
-        state.eval(&Var(register("RSP"))).unwrap(),
+        state.eval(&Var(register("RSP"))),
         Data::Pointer(PointerDomain::new(stack_id.clone(), bv(-40)))
     );
 
@@ -198,9 +194,7 @@ fn handle_store() {
             &global_memory,
         )
         .unwrap();
-    state
-        .handle_register_assign(&register("RSP"), &reg_sub("RSP", 4))
-        .unwrap();
+    state.handle_register_assign(&register("RSP"), &reg_sub("RSP", 4));
 
     assert_eq!(
         state
@@ -364,22 +358,16 @@ fn remove_and_restore_callee_saved_register() {
     let mut callee_state = state.clone();
     callee_state.remove_callee_saved_register(&cconv);
     assert_eq!(
-        callee_state.get_register(&register("RBP")).unwrap(),
+        callee_state.get_register(&register("RBP")),
         Data::new_top(ByteSize::new(8))
     );
-    assert_eq!(
-        callee_state.get_register(&register("RAX")).unwrap(),
-        value.clone()
-    );
+    assert_eq!(callee_state.get_register(&register("RAX")), value.clone());
 
     let other_value: Data = Bitvector::from_u64(13).into();
     callee_state.set_register(&register("RAX"), other_value.clone());
     callee_state.restore_callee_saved_register(&state, &cconv, &register("RSP"));
-    assert_eq!(callee_state.get_register(&register("RBP")).unwrap(), value);
-    assert_eq!(
-        callee_state.get_register(&register("RAX")).unwrap(),
-        other_value
-    );
+    assert_eq!(callee_state.get_register(&register("RBP")), value);
+    assert_eq!(callee_state.get_register(&register("RAX")), other_value);
 }
 
 #[test]

@@ -130,7 +130,7 @@ fn context_problem_implementation() {
     // test update_def
     state = context.update_def(&state, &def).unwrap();
     let stack_pointer = Data::Pointer(PointerDomain::new(new_id("main", "RSP"), bv(-16)));
-    assert_eq!(state.eval(&Var(register("RSP"))).unwrap(), stack_pointer);
+    assert_eq!(state.eval(&Var(register("RSP"))), stack_pointer);
     state = context.update_def(&state, &store_term).unwrap();
 
     // Test update_call
@@ -194,10 +194,9 @@ fn context_problem_implementation() {
     assert_eq!(return_state.caller_stack_ids, BTreeSet::new());
     assert_eq!(return_state.memory, state.memory);
     assert_eq!(
-        return_state.get_register(&register("RSP")).unwrap(),
+        return_state.get_register(&register("RSP")),
         state
             .get_register(&register("RSP"))
-            .unwrap()
             .bin_op(BinOpType::IntAdd, &Bitvector::from_i64(8).into())
     );
 
@@ -207,7 +206,7 @@ fn context_problem_implementation() {
     let malloc = call_term("extern_malloc");
     let mut state_after_malloc = context.update_call_stub(&state, &malloc).unwrap();
     assert_eq!(
-        state_after_malloc.get_register(&register("RDX")).unwrap(),
+        state_after_malloc.get_register(&register("RDX")),
         Data::Pointer(PointerDomain::new(
             new_id("call_extern_malloc", "RDX"),
             bv(0)
@@ -215,21 +214,17 @@ fn context_problem_implementation() {
     );
     assert_eq!(state_after_malloc.memory.get_num_objects(), 2);
     assert_eq!(
-        state_after_malloc.get_register(&register("RSP")).unwrap(),
+        state_after_malloc.get_register(&register("RSP")),
         state
             .get_register(&register("RSP"))
-            .unwrap()
             .bin_op(BinOpType::IntAdd, &Data::Value(bv(8)))
     );
     assert_eq!(
-        state_after_malloc
-            .get_register(&register("callee_saved_reg"))
-            .unwrap(),
+        state_after_malloc.get_register(&register("callee_saved_reg")),
         Data::Value(bv(13))
     );
     assert!(state_after_malloc
         .get_register(&register("other_reg"))
-        .unwrap()
         .is_top());
 
     state_after_malloc.set_register(
@@ -243,15 +238,10 @@ fn context_problem_implementation() {
     let state_after_free = context
         .update_call_stub(&state_after_malloc, &free)
         .unwrap();
-    assert!(state_after_free
-        .get_register(&register("RDX"))
-        .unwrap()
-        .is_top());
+    assert!(state_after_free.get_register(&register("RDX")).is_top());
     assert_eq!(state_after_free.memory.get_num_objects(), 2);
     assert_eq!(
-        state_after_free
-            .get_register(&register("callee_saved_reg"))
-            .unwrap(),
+        state_after_free.get_register(&register("callee_saved_reg")),
         Data::Pointer(PointerDomain::new(
             new_id("call_extern_malloc", "RDX"),
             bv(0)
@@ -262,21 +252,17 @@ fn context_problem_implementation() {
     let state_after_other_fn = context.update_call_stub(&state, &other_extern_fn).unwrap();
 
     assert_eq!(
-        state_after_other_fn.get_register(&register("RSP")).unwrap(),
+        state_after_other_fn.get_register(&register("RSP")),
         state
             .get_register(&register("RSP"))
-            .unwrap()
             .bin_op(BinOpType::IntAdd, &Data::Value(bv(8)))
     );
     assert_eq!(
-        state_after_other_fn
-            .get_register(&register("callee_saved_reg"))
-            .unwrap(),
+        state_after_other_fn.get_register(&register("callee_saved_reg")),
         Data::Value(bv(13))
     );
     assert!(state_after_other_fn
         .get_register(&register("other_reg"))
-        .unwrap()
         .is_top());
 }
 
@@ -380,10 +366,9 @@ fn update_return() {
         .get_all_object_ids()
         .get(&new_id("caller_caller", "RSP"))
         .is_some());
-    assert!(state.get_register(&register("RSP")).is_ok());
     let expected_rsp = Data::Pointer(PointerDomain::new(
         new_id("original_caller_id", "RSP"),
         bv(-8),
     ));
-    assert_eq!(state.get_register(&register("RSP")).unwrap(), expected_rsp);
+    assert_eq!(state.get_register(&register("RSP")), expected_rsp);
 }

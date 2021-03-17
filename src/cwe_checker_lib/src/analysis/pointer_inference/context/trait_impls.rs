@@ -43,7 +43,7 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
             }
             Def::Assign { var, value } => {
                 let mut new_state = state.clone();
-                self.log_debug(new_state.handle_register_assign(var, value), Some(&def.tid));
+                new_state.handle_register_assign(var, value);
                 Some(new_state)
             }
             Def::Load { var, address } => {
@@ -296,6 +296,7 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
         &self,
         value: &State,
         _condition: &Expression,
+        _block_before_condition: &Term<Blk>,
         _is_true: bool,
     ) -> Option<State> {
         Some(value.clone())
