@@ -142,7 +142,8 @@ impl RuntimeMemoryImage {
         let address = address.try_to_u64().unwrap();
         for segment in self.memory_segments.iter() {
             if address >= segment.base_address
-                && address + u64::from(size) <= segment.base_address + segment.bytes.len() as u64
+                && u64::from(size) <= segment.base_address + segment.bytes.len() as u64
+                && address <= segment.base_address + segment.bytes.len() as u64 - u64::from(size)
             {
                 if segment.write_flag {
                     // The segment is writeable, thus we do not know the content at runtime.
