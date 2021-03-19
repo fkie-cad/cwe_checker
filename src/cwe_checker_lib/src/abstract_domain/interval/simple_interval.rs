@@ -193,6 +193,12 @@ impl Interval {
             end: max,
         }
     }
+
+    /// Return `true` if `bitvec` is contained in the interval.
+    /// Panics if the interval and `bitvec` have different bytesizes.
+    pub fn contains(&self, bitvec: &Bitvector) -> bool {
+        self.start.checked_sle(bitvec).unwrap() && self.end.checked_sge(bitvec).unwrap()
+    }
 }
 
 impl From<Bitvector> for Interval {

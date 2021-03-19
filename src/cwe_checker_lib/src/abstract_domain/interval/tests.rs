@@ -311,3 +311,13 @@ fn shift_left() {
         IntervalDomain::mock_i8_with_bounds(None, 6, 8, None)
     );
 }
+
+#[test]
+fn contains() {
+    let domain = IntervalDomain::mock(-10, 5);
+    assert!(!domain.interval.contains(&Bitvector::from_i64(-11)));
+    assert!(domain.interval.contains(&Bitvector::from_i64(-10)));
+    assert!(domain.interval.contains(&Bitvector::from_i64(-4)));
+    assert!(domain.interval.contains(&Bitvector::from_i64(5)));
+    assert!(!domain.interval.contains(&Bitvector::from_i64(6)));
+}
