@@ -313,11 +313,177 @@ fn shift_left() {
 }
 
 #[test]
-fn contains() {
+fn simple_interval_contains() {
     let domain = IntervalDomain::mock(-10, 5);
     assert!(!domain.interval.contains(&Bitvector::from_i64(-11)));
     assert!(domain.interval.contains(&Bitvector::from_i64(-10)));
     assert!(domain.interval.contains(&Bitvector::from_i64(-4)));
     assert!(domain.interval.contains(&Bitvector::from_i64(5)));
     assert!(!domain.interval.contains(&Bitvector::from_i64(6)));
+}
+
+#[test]
+fn add_signed_bounds() {
+    let interval = IntervalDomain::mock_with_bounds(Some(-100), -10, 10, Some(100));
+
+    // signed_less_equal
+    let x = interval
+        .clone()
+        .add_signed_less_equal_bound(&Bitvector::from_i64(20));
+    assert_eq!(
+        x.unwrap(),
+        IntervalDomain::mock_with_bounds(Some(-100), -10, 10, Some(20))
+    );
+    let x = interval
+        .clone()
+        .add_signed_less_equal_bound(&Bitvector::from_i64(-5));
+    assert_eq!(
+        x.unwrap(),
+        IntervalDomain::mock_with_bounds(Some(-100), -10, -5, None)
+    );
+    let x = interval
+        .clone()
+        .add_signed_less_equal_bound(&Bitvector::from_i64(-20));
+    assert!(x.is_err());
+
+    //signed_greater_equal
+    let x = interval
+        .clone()
+        .add_signed_greater_equal_bound(&Bitvector::from_i64(20));
+    assert!(x.is_err());
+    let x = interval
+        .clone()
+        .add_signed_greater_equal_bound(&Bitvector::from_i64(-5));
+    assert_eq!(
+        x.unwrap(),
+        IntervalDomain::mock_with_bounds(None, -5, 10, Some(100))
+    );
+    let x = interval
+        .clone()
+        .add_signed_greater_equal_bound(&Bitvector::from_i64(-20));
+    assert_eq!(
+        x.unwrap(),
+        IntervalDomain::mock_with_bounds(Some(-20), -10, 10, Some(100))
+    );
+}
+
+#[test]
+fn add_unsigned_bounds() {
+    let positive_interval = IntervalDomain::mock_with_bounds(Some(10), 20, 30, Some(40));
+    let wrapped_interval = IntervalDomain::mock_with_bounds(Some(-100), -10, 10, Some(100));
+    let negative_interval = IntervalDomain::mock_with_bounds(Some(-40), -30, -20, Some(-10));
+
+    // unsigned_less_equal
+    let x = positive_interval
+        .clone()
+        .add_unsigned_less_equal_bound(&Bitvector::from_i64(35));
+    assert_eq!(
+        x.unwrap(),
+        IntervalDomain::mock_with_bounds(Some(10), 20, 30, Some(35))
+    );
+    let x = positive_interval
+        .clone()
+        .add_unsigned_less_equal_bound(&Bitvector::from_i64(15));
+    assert!(x.is_err());
+
+    let x = wrapped_interval
+        .clone()
+        .add_unsigned_less_equal_bound(&Bitvector::from_i64(35));
+    assert_eq!(
+        x.unwrap(),
+        IntervalDomain::mock_with_bounds(None, 0, 10, Some(35))
+    );
+    let x = wrapped_interval
+        .clone()
+        .add_unsigned_less_equal_bound(&Bitvector::from_i64(-5));
+    assert_eq!(x.unwrap(), wrapped_interval); // Cannot remove a subinterval from the domain
+
+    let x = negative_interval
+        .clone()
+        .add_unsigned_less_equal_bound(&Bitvector::from_i64(-25));
+    assert_eq!(
+        x.unwrap(),
+        IntervalDomain::mock_with_bounds(Some(-40), -30, -25, None)
+    );
+    let x = negative_interval
+        .clone()
+        .add_unsigned_less_equal_bound(&Bitvector::from_i64(-35));
+    assert!(x.is_err());
+
+    // unsigned_greater_equal
+    let x = positive_interval
+        .clone()
+        .add_unsigned_greater_equal_bound(&Bitvector::from_i64(25));
+    assert_eq!(
+        x.unwrap(),
+        IntervalDomain::mock_with_bounds(None, 25, 30, Some(40))
+    );
+    let x = positive_interval
+        .clone()
+        .add_unsigned_greater_equal_bound(&Bitvector::from_i64(35));
+    assert!(x.is_err());
+
+    let x = wrapped_interval
+        .clone()
+        .add_unsigned_greater_equal_bound(&Bitvector::from_i64(5));
+    assert_eq!(x.unwrap(), wrapped_interval);
+    let x = wrapped_interval
+        .clone()
+        .add_unsigned_greater_equal_bound(&Bitvector::from_i64(35));
+    assert_eq!(
+        x.unwrap(),
+        IntervalDomain::mock_with_bounds(Some(-100), -10, -1, None)
+    );
+    let x = wrapped_interval
+        .clone()
+        .add_unsigned_greater_equal_bound(&Bitvector::from_i64(-50));
+    assert_eq!(
+        x.unwrap(),
+        IntervalDomain::mock_with_bounds(Some(-50), -10, -1, None)
+    );
+
+    let x = negative_interval
+        .clone()
+        .add_unsigned_greater_equal_bound(&Bitvector::from_i64(25));
+    assert_eq!(x.unwrap(), negative_interval);
+    let x = negative_interval
+        .clone()
+        .add_unsigned_greater_equal_bound(&Bitvector::from_i64(-25));
+    assert_eq!(
+        x.unwrap(),
+        IntervalDomain::mock_with_bounds(None, -25, -20, Some(-10))
+    );
+}
+
+#[test]
+fn add_not_equal_bounds() {
+    let interval = IntervalDomain::mock_with_bounds(None, -10, 10, None);
+
+    let x = interval
+        .clone()
+        .add_not_equal_bound(&Bitvector::from_i64(-20));
+    assert_eq!(
+        x.unwrap(),
+        IntervalDomain::mock_with_bounds(Some(-19), -10, 10, None)
+    );
+    let x = interval
+        .clone()
+        .add_not_equal_bound(&Bitvector::from_i64(-0));
+    assert_eq!(x.unwrap(), interval);
+    let x = interval
+        .clone()
+        .add_not_equal_bound(&Bitvector::from_i64(20));
+    assert_eq!(
+        x.unwrap(),
+        IntervalDomain::mock_with_bounds(None, -10, 10, Some(19))
+    );
+
+    let interval = IntervalDomain::mock(5, 5);
+    let x = interval
+        .clone()
+        .add_not_equal_bound(&Bitvector::from_i64(5));
+    assert!(x.is_err());
+    let interval = IntervalDomain::mock(5, 6);
+    let x = interval.add_not_equal_bound(&Bitvector::from_i64(5));
+    assert_eq!(x.unwrap(), IntervalDomain::mock(6, 6));
 }

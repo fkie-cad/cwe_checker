@@ -3,7 +3,7 @@ use std::fmt::Display;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
 
-use super::{AbstractDomain, HasTop, RegisterDomain, SizedDomain};
+use super::{AbstractDomain, HasTop, RegisterDomain, SizedDomain, SpecializeByConditional};
 use super::{TryToBitvec, TryToInterval};
 
 mod simple_interval;
@@ -215,6 +215,103 @@ impl IntervalDomain {
             widening_upper_bound: self
                 .widening_upper_bound
                 .map(|bitvec| bitvec.into_sign_extend(width).unwrap()),
+        }
+    }
+}
+
+impl SpecializeByConditional for IntervalDomain {
+    fn add_signed_less_equal_bound(mut self, bound: &Bitvector) -> Result<Self, Error> {
+        if let Some(old_upper_bound) = &self.widening_upper_bound {
+            if old_upper_bound.checked_sle(bound).unwrap() {
+                return Ok(self);
+            } else if self.interval.end.checked_slt(bound).unwrap() {
+                self.widening_upper_bound = Some(bound.clone());
+                return Ok(self);
+            } else {
+                self.widening_upper_bound = None;
+            }
+        } else if self.interval.end.checked_slt(bound).unwrap() {
+            self.widening_upper_bound = Some(bound.clone());
+            return Ok(self);
+        }
+        // we already know that the bound is less equal to `self.interval.end`
+        if self.interval.start.checked_sle(bound).unwrap() {
+            self.interval.end = bound.clone();
+            Ok(self)
+        } else {
+            Err(anyhow!("Empty interval"))
+        }
+    }
+
+    fn add_signed_greater_equal_bound(mut self, bound: &Bitvector) -> Result<Self, Error> {
+        if let Some(old_lower_bound) = &self.widening_lower_bound {
+            if old_lower_bound.checked_sge(bound).unwrap() {
+                return Ok(self);
+            } else if self.interval.start.checked_sgt(bound).unwrap() {
+                self.widening_lower_bound = Some(bound.clone());
+                return Ok(self);
+            } else {
+                self.widening_lower_bound = None;
+            }
+        } else if self.interval.start.checked_sgt(bound).unwrap() {
+            self.widening_lower_bound = Some(bound.clone());
+            return Ok(self);
+        }
+        // we already know that the bound is greater equal to `self.interval.start`
+        if self.interval.end.checked_sge(bound).unwrap() {
+            self.interval.start = bound.clone();
+            Ok(self)
+        } else {
+            Err(anyhow!("Empty interval"))
+        }
+    }
+
+    fn add_unsigned_less_equal_bound(mut self, bound: &Bitvector) -> Result<Self, Error> {
+        if bound.sign_bit().to_bool() {
+            if self.interval.end.sign_bit().to_bool() {
+                self.add_signed_less_equal_bound(bound)
+            } else if self.interval.start.sign_bit().to_bool() {
+                Ok(self)
+            } else {
+                self.add_signed_greater_equal_bound(&Bitvector::zero(bound.width()))
+            }
+        } else {
+            self = self.add_signed_greater_equal_bound(&Bitvector::zero(bound.width()))?;
+            self.add_signed_less_equal_bound(bound)
+        }
+    }
+
+    fn add_unsigned_greater_equal_bound(mut self, bound: &Bitvector) -> Result<Self, Error> {
+        if bound.sign_bit().to_bool() {
+            self = self.add_signed_less_equal_bound(&(-Bitvector::one(bound.width())))?;
+            self.add_signed_greater_equal_bound(bound)
+        } else {
+            if self.interval.end.checked_slt(bound).unwrap() {
+                self.add_signed_less_equal_bound(&(-Bitvector::one(bound.width())))
+            } else if self.interval.start.sign_bit().to_bool() {
+                Ok(self)
+            } else {
+                self.add_signed_greater_equal_bound(bound)
+            }
+        }
+    }
+
+    fn add_not_equal_bound(mut self, bound: &Bitvector) -> Result<Self, Error> {
+        if self.interval.start == *bound && self.interval.end == *bound {
+            return Err(anyhow!("Empty interval"));
+        }
+        if self.interval.start.checked_sgt(bound).unwrap() {
+            self.add_signed_greater_equal_bound(&(bound + &Bitvector::one(bound.width())))
+        } else if self.interval.start == *bound {
+            self.interval.start += &Bitvector::one(bound.width());
+            Ok(self)
+        } else if self.interval.end.checked_slt(bound).unwrap() {
+            self.add_signed_less_equal_bound(&(bound - &Bitvector::one(bound.width())))
+        } else if self.interval.end == *bound {
+            self.interval.end -= &Bitvector::one(bound.width());
+            Ok(self)
+        } else {
+            Ok(self)
         }
     }
 }

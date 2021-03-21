@@ -123,3 +123,34 @@ pub trait TryToInterval {
         Ok((interval.start.try_to_i64()?, interval.end.try_to_i64()?))
     }
 }
+
+/// A trait for domains whose values can be restricted by knowing the result of a comparison of it with a known bitvector.
+/// The comparison may also be used to add widening hints to the domain.
+///
+/// Note that the value set represented by the domain after the restriction may be an upper bound,
+/// i.e. it is possible that the result still contains values not satisfying the restricting comparison.
+pub trait SpecializeByConditional: Sized {
+    /// Return the restriction of `self` to values satisfying `self <= bound`
+    /// with `self` and `bound` interpreted as signed integers.
+    /// Returns an error if no value represented by `self` can satisfy the comparison.
+    fn add_signed_less_equal_bound(self, bound: &Bitvector) -> Result<Self, Error>;
+
+    /// Return the restriction of `self` to values satisfying `self <= bound`
+    /// with `self` and `bound` interpreted as unsigned integers.
+    /// Returns an error if no value represented by `self` can satisfy the comparison.
+    fn add_unsigned_less_equal_bound(self, bound: &Bitvector) -> Result<Self, Error>;
+
+    /// Return the restriction of `self` to values satisfying `self >= bound`
+    /// with `self` and `bound` interpreted as signed integers.
+    /// Returns an error if no value represented by `self` can satisfy the comparison.
+    fn add_signed_greater_equal_bound(self, bound: &Bitvector) -> Result<Self, Error>;
+
+    /// Return the restriction of `self` to values satisfying `self >= bound`
+    /// with `self` and `bound` interpreted as unsigned integers.
+    /// Returns an error if no value represented by `self` can satisfy the comparison.
+    fn add_unsigned_greater_equal_bound(self, bound: &Bitvector) -> Result<Self, Error>;
+
+    /// Return the restriction of `self` to values satisfying `self != bound`
+    /// Returns an error if `self` only represents one value for which `self == bound` holds.
+    fn add_not_equal_bound(self, bound: &Bitvector) -> Result<Self, Error>;
+}

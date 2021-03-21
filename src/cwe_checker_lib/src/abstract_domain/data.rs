@@ -1,7 +1,4 @@
-use super::{
-    AbstractDomain, AbstractIdentifier, HasTop, Interval, PointerDomain, RegisterDomain,
-    SizedDomain, TryToBitvec, TryToInterval,
-};
+use super::{AbstractDomain, AbstractIdentifier, HasTop, Interval, PointerDomain, RegisterDomain, SizedDomain, SpecializeByConditional, TryToBitvec, TryToInterval};
 use crate::intermediate_representation::*;
 use crate::prelude::*;
 use std::collections::{BTreeMap, BTreeSet};
@@ -64,6 +61,48 @@ impl<T: RegisterDomain> DataDomain<T> {
             } else {
                 *self = Self::Pointer(PointerDomain::with_targets(remaining_targets));
             }
+        }
+    }
+}
+
+impl<T: SpecializeByConditional + RegisterDomain> SpecializeByConditional for DataDomain<T> {
+    fn add_signed_less_equal_bound(self, bound: &Bitvector) -> Result<Self, Error> {
+        if let Self::Value(value) = self {
+            Ok(Self::Value(value.add_signed_less_equal_bound(bound)?))
+        } else {
+            Ok(self)
+        }
+    }
+
+    fn add_unsigned_less_equal_bound(self, bound: &Bitvector) -> Result<Self, Error> {
+        if let Self::Value(value) = self {
+            Ok(Self::Value(value.add_unsigned_less_equal_bound(bound)?))
+        } else {
+            Ok(self)
+        }
+    }
+
+    fn add_signed_greater_equal_bound(self, bound: &Bitvector) -> Result<Self, Error> {
+        if let Self::Value(value) = self {
+            Ok(Self::Value(value.add_signed_greater_equal_bound(bound)?))
+        } else {
+            Ok(self)
+        }
+    }
+
+    fn add_unsigned_greater_equal_bound(self, bound: &Bitvector) -> Result<Self, Error> {
+        if let Self::Value(value) = self {
+            Ok(Self::Value(value.add_unsigned_greater_equal_bound(bound)?))
+        } else {
+            Ok(self)
+        }
+    }
+
+    fn add_not_equal_bound(self, bound: &Bitvector) -> Result<Self, Error> {
+        if let Self::Value(value) = self {
+            Ok(Self::Value(value.add_not_equal_bound(bound)?))
+        } else {
+            Ok(self)
         }
     }
 }
