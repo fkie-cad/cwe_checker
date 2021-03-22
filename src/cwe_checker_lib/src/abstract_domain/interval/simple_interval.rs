@@ -55,6 +55,18 @@ impl Interval {
         Interval { start, end }
     }
 
+    /// Compute the intersection of two intervals as intervals of signed integers.
+    /// Return an error if the intersection is empty.
+    pub fn signed_intersect(&self, other: &Interval) -> Result<Interval, Error> {
+        let start = signed_max(&self.start, &other.start);
+        let end = signed_min(&self.end, &other.end);
+        if start.checked_sle(&end).unwrap() {
+            Ok(Interval { start, end })
+        } else {
+            Err(anyhow!("Empty interval"))
+        }
+    }
+
     /// Return the number of contained values of the interval as an unsigned bitvector.
     /// If the interval is unconstrained, return zero
     /// (since the maximal number of elements is not representable in a bitvector of the same byte size).

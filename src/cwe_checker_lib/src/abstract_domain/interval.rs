@@ -217,6 +217,18 @@ impl IntervalDomain {
                 .map(|bitvec| bitvec.into_sign_extend(width).unwrap()),
         }
     }
+
+    /// Compute the intersection of two intervals.
+    /// Return an error if the intersection is empty.
+    pub fn intersect(&self, other: &Self) -> Result<Self, Error> {
+        let mut intersected_domain: IntervalDomain =
+            self.interval.signed_intersect(&other.interval)?.into();
+        intersected_domain.update_widening_lower_bound(&self.widening_lower_bound);
+        intersected_domain.update_widening_lower_bound(&other.widening_lower_bound);
+        intersected_domain.update_widening_upper_bound(&self.widening_upper_bound);
+        intersected_domain.update_widening_upper_bound(&other.widening_upper_bound);
+        Ok(intersected_domain)
+    }
 }
 
 impl SpecializeByConditional for IntervalDomain {

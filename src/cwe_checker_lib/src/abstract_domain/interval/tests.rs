@@ -487,3 +487,12 @@ fn add_not_equal_bounds() {
     let x = interval.add_not_equal_bound(&Bitvector::from_i64(5));
     assert_eq!(x.unwrap(), IntervalDomain::mock(6, 6));
 }
+
+#[test]
+fn intersection() {
+    let interval1 = IntervalDomain::mock_with_bounds(Some(-100), -10, 10, Some (100));
+    let interval2 = IntervalDomain::mock_with_bounds(Some(-20), 2, 30, None);
+    let intersection = interval1.intersect(&interval2).unwrap();
+    assert_eq!(intersection, IntervalDomain::mock_with_bounds(Some(-20), 2, 10, Some(100)));
+    assert!(interval1.intersect(&IntervalDomain::mock(50,55)).is_err());
+}
