@@ -297,14 +297,12 @@ impl SpecializeByConditional for IntervalDomain {
         if bound.sign_bit().to_bool() {
             self = self.add_signed_less_equal_bound(&(-Bitvector::one(bound.width())))?;
             self.add_signed_greater_equal_bound(bound)
+        } else if self.interval.end.checked_slt(bound).unwrap() {
+            self.add_signed_less_equal_bound(&(-Bitvector::one(bound.width())))
+        } else if self.interval.start.sign_bit().to_bool() {
+            Ok(self)
         } else {
-            if self.interval.end.checked_slt(bound).unwrap() {
-                self.add_signed_less_equal_bound(&(-Bitvector::one(bound.width())))
-            } else if self.interval.start.sign_bit().to_bool() {
-                Ok(self)
-            } else {
-                self.add_signed_greater_equal_bound(bound)
-            }
+            self.add_signed_greater_equal_bound(bound)
         }
     }
 

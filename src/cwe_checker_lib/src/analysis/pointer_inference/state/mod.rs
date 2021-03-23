@@ -359,9 +359,9 @@ impl State {
                         Err(anyhow!("Unsatisfiable state"))
                     }
                 }
-                Expression::BinOp { op, lhs, rhs } => match op {
-                    _ => self.specialize_by_binop_expression_result(op, lhs, rhs, result_bitvec),
-                },
+                Expression::BinOp { op, lhs, rhs } => {
+                    self.specialize_by_binop_expression_result(op, lhs, rhs, result_bitvec)
+                }
                 Expression::UnOp { op, arg } => {
                     use UnOpType::*;
                     match op {
