@@ -1,4 +1,7 @@
-use super::{AbstractDomain, AbstractIdentifier, HasTop, Interval, PointerDomain, RegisterDomain, SizedDomain, SpecializeByConditional, TryToBitvec, TryToInterval};
+use super::{
+    AbstractDomain, AbstractIdentifier, HasTop, Interval, PointerDomain, RegisterDomain,
+    SizedDomain, SpecializeByConditional, TryToBitvec, TryToInterval,
+};
 use crate::intermediate_representation::*;
 use crate::prelude::*;
 use std::collections::{BTreeMap, BTreeSet};

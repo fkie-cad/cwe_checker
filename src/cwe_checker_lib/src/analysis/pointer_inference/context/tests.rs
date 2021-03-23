@@ -479,7 +479,6 @@ fn specialize_conditional() {
     );
 
     state.set_register(&register("RAX"), IntervalDomain::mock(-20, 0).into());
-    let result = context
-        .specialize_conditional(&state, &condition, &block, false);
+    let result = context.specialize_conditional(&state, &condition, &block, false);
     assert!(result.is_none());
 }

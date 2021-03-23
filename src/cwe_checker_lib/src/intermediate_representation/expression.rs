@@ -106,15 +106,13 @@ impl Expression {
         use Expression::*;
         match self {
             Var(var) => vec![var],
-            Const(_) | Unknown {..} => Vec::new(),
-            BinOp {op:_, lhs, rhs} => {
+            Const(_) | Unknown { .. } => Vec::new(),
+            BinOp { op: _, lhs, rhs } => {
                 let mut vars = lhs.input_vars();
                 vars.append(&mut rhs.input_vars());
                 vars
             }
-            UnOp{arg, ..} | Cast {arg, ..} | Subpiece {arg, ..} => {
-                arg.input_vars()
-            }
+            UnOp { arg, .. } | Cast { arg, .. } | Subpiece { arg, .. } => arg.input_vars(),
         }
     }
 

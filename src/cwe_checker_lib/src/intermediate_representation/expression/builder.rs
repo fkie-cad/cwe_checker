@@ -55,7 +55,7 @@ impl Expression {
     pub fn un_op(self, op: UnOpType) -> Expression {
         Expression::UnOp {
             op,
-            arg: Box::new(self)
+            arg: Box::new(self),
         }
     }
 

@@ -490,9 +490,12 @@ fn add_not_equal_bounds() {
 
 #[test]
 fn intersection() {
-    let interval1 = IntervalDomain::mock_with_bounds(Some(-100), -10, 10, Some (100));
+    let interval1 = IntervalDomain::mock_with_bounds(Some(-100), -10, 10, Some(100));
     let interval2 = IntervalDomain::mock_with_bounds(Some(-20), 2, 30, None);
     let intersection = interval1.intersect(&interval2).unwrap();
-    assert_eq!(intersection, IntervalDomain::mock_with_bounds(Some(-20), 2, 10, Some(100)));
-    assert!(interval1.intersect(&IntervalDomain::mock(50,55)).is_err());
+    assert_eq!(
+        intersection,
+        IntervalDomain::mock_with_bounds(Some(-20), 2, 10, Some(100))
+    );
+    assert!(interval1.intersect(&IntervalDomain::mock(50, 55)).is_err());
 }
