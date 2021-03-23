@@ -1,5 +1,6 @@
 use super::{
-    AbstractDomain, AbstractIdentifier, HasTop, PointerDomain, RegisterDomain, SizedDomain,
+    AbstractDomain, AbstractIdentifier, HasTop, Interval, PointerDomain, RegisterDomain,
+    SizedDomain, TryToBitvec, TryToInterval,
 };
 use crate::intermediate_representation::*;
 use crate::prelude::*;
@@ -218,6 +219,28 @@ impl<T: RegisterDomain> From<T> for DataDomain<T> {
 impl<T: RegisterDomain + From<Bitvector>> From<Bitvector> for DataDomain<T> {
     fn from(bitvector: Bitvector) -> Self {
         Self::Value(bitvector.into())
+    }
+}
+
+impl<T: RegisterDomain + TryToBitvec> TryToBitvec for DataDomain<T> {
+    /// If the domain represents a single, absolute value, return it.
+    fn try_to_bitvec(&self) -> Result<Bitvector, Error> {
+        match self {
+            DataDomain::Value(value) => value.try_to_bitvec(),
+            DataDomain::Pointer(_) => Err(anyhow!("Value is a pointer.")),
+            DataDomain::Top(_) => Err(anyhow!("Value is Top")),
+        }
+    }
+}
+
+impl<T: RegisterDomain + TryToInterval> TryToInterval for DataDomain<T> {
+    /// If the domain represents (or can be widened to) an interval of absolute values, return the interval.
+    fn try_to_interval(&self) -> Result<Interval, Error> {
+        match self {
+            DataDomain::Value(value) => value.try_to_interval(),
+            DataDomain::Pointer(_) => Err(anyhow!("Value is a pointer.")),
+            DataDomain::Top(_) => Err(anyhow!("Value is Top")),
+        }
     }
 }
 

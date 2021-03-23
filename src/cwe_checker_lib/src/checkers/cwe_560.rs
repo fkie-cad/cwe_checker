@@ -22,7 +22,7 @@
 //! - If the input to umask is not defined in the basic block before the call, the check will not see it.
 //! However, a log message will be generated whenever the check is unable to determine the parameter value of umask.
 
-use crate::abstract_domain::{BitvectorDomain, DataDomain};
+use crate::abstract_domain::TryToBitvec;
 use crate::analysis::pointer_inference::State;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
@@ -72,7 +72,7 @@ fn get_umask_permission_arg(
     let parameter = umask_symbol.get_unique_parameter()?;
     let param_value =
         state.eval_parameter_arg(parameter, &project.stack_pointer_register, global_memory)?;
-    if let DataDomain::Value(BitvectorDomain::Value(umask_arg)) = param_value {
+    if let Ok(umask_arg) = param_value.try_to_bitvec() {
         Ok(umask_arg.try_to_u64()?)
     } else {
         Err(anyhow!("Parameter value unknown"))

@@ -1,5 +1,5 @@
 use super::object_list::AbstractObjectList;
-use super::Data;
+use super::{Data, ValueDomain};
 use crate::abstract_domain::*;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
@@ -124,7 +124,7 @@ impl State {
         &mut self,
         old_id: &AbstractIdentifier,
         new_id: &AbstractIdentifier,
-        offset_adjustment: &BitvectorDomain,
+        offset_adjustment: &ValueDomain,
     ) {
         for register_data in self.register.values_mut() {
             register_data.replace_abstract_id(old_id, new_id, &(-offset_adjustment.clone()));
@@ -226,7 +226,7 @@ impl State {
         &mut self,
         callee_id: &AbstractIdentifier,
         caller_id: &AbstractIdentifier,
-        offset_adjustment: &BitvectorDomain,
+        offset_adjustment: &ValueDomain,
     ) {
         self.memory.remove_object(callee_id);
         self.replace_abstract_id(callee_id, caller_id, offset_adjustment);
@@ -239,7 +239,7 @@ impl State {
     /// an error with the list of possibly already freed objects is returned.
     pub fn mark_mem_object_as_freed(
         &mut self,
-        object_pointer: &PointerDomain<BitvectorDomain>,
+        object_pointer: &PointerDomain<ValueDomain>,
     ) -> Result<(), Vec<(AbstractIdentifier, Error)>> {
         self.memory.mark_mem_object_as_freed(object_pointer)
     }

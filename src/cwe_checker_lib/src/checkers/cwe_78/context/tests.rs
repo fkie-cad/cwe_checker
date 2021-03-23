@@ -2,8 +2,8 @@ use super::*;
 
 use crate::analysis::backward_interprocedural_fixpoint::Context as BackwardContext;
 use crate::{
-    abstract_domain::{BitvectorDomain, DataDomain, PointerDomain, SizedDomain},
-    analysis::pointer_inference::{Data, State as PointerInferenceState},
+    abstract_domain::{DataDomain, PointerDomain, SizedDomain},
+    analysis::pointer_inference::{Data, State as PointerInferenceState, ValueDomain},
     intermediate_representation::{Expression, Variable},
 };
 
@@ -19,8 +19,8 @@ fn mock_block(tid: &str) -> Term<Blk> {
     }
 }
 
-fn bv(value: i64) -> BitvectorDomain {
-    BitvectorDomain::Value(Bitvector::from_i64(value))
+fn bv(value: i64) -> ValueDomain {
+    ValueDomain::from(Bitvector::from_i64(value))
 }
 
 impl ExternSymbol {
@@ -42,8 +42,8 @@ struct Setup {
     pi_state: PointerInferenceState,
     string_sym: ExternSymbol,
     taint_source: Term<Jmp>,
-    base_eight_offset: DataDomain<BitvectorDomain>,
-    base_sixteen_offset: DataDomain<BitvectorDomain>,
+    base_eight_offset: DataDomain<ValueDomain>,
+    base_sixteen_offset: DataDomain<ValueDomain>,
 }
 
 impl Setup {
