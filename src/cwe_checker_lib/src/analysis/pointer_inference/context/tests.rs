@@ -372,3 +372,114 @@ fn update_return() {
     ));
     assert_eq!(state.get_register(&register("RSP")), expected_rsp);
 }
+
+#[test]
+fn specialize_conditional() {
+    use crate::analysis::forward_interprocedural_fixpoint::Context as IpFpContext;
+    let (project, config) = mock_project();
+    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
+    let runtime_memory_image = RuntimeMemoryImage::mock();
+    let (log_sender, _log_receiver) = crossbeam_channel::unbounded();
+    let context = Context::new(&project, &runtime_memory_image, &graph, config, log_sender);
+
+    let mut state = State::new(&register("RSP"), Tid::new("func"));
+    state.set_register(&register("RAX"), IntervalDomain::mock(-10, 20).into());
+
+    let condition = Expression::Var(Variable::mock("FLAG", 1));
+
+    // A complicated way of computing the result of `RAX <= 0`
+    // and assigning the result to the `FLAG` register.
+    let defs = vec![
+        Def::assign("def1", register("RAX"), Expression::Var(register("RAX"))),
+        Def::assign(
+            "def_that_should_be_ignored",
+            Variable::mock("FLAG", 1),
+            Expression::Const(Bitvector::from_u8(42)),
+        ),
+        Def::assign(
+            "def2",
+            Variable::mock("FLAG_SLESS", 1),
+            Expression::BinOp {
+                lhs: Box::new(Expression::Var(register("RAX"))),
+                op: BinOpType::IntSLess,
+                rhs: Box::new(Expression::Const(Bitvector::from_u64(0))),
+            },
+        ),
+        Def::assign(
+            "def3",
+            Variable::mock("FLAG_EQUAL", 1),
+            Expression::BinOp {
+                lhs: Box::new(Expression::Var(register("RAX"))),
+                op: BinOpType::IntEqual,
+                rhs: Box::new(Expression::Const(Bitvector::from_u64(0))),
+            },
+        ),
+        Def::assign(
+            "def4",
+            Variable::mock("FLAG_NOTEQUAL", 1),
+            Expression::BinOp {
+                lhs: Box::new(Expression::Var(Variable::mock("FLAG_SLESS", 1))),
+                op: BinOpType::IntNotEqual,
+                rhs: Box::new(Expression::Const(Bitvector::from_u8(0))),
+            },
+        ),
+        Def::assign(
+            "def5",
+            Variable::mock("FLAG", 1),
+            Expression::BinOp {
+                lhs: Box::new(Expression::Var(Variable::mock("FLAG_EQUAL", 1))),
+                op: BinOpType::BoolOr,
+                rhs: Box::new(Expression::Var(Variable::mock("FLAG_NOTEQUAL", 1))),
+            },
+        ),
+    ];
+
+    let block = Term {
+        tid: Tid::new("block"),
+        term: Blk {
+            defs,
+            jmps: Vec::new(),
+            indirect_jmp_targets: Vec::new(),
+        },
+    };
+
+    let result = context
+        .specialize_conditional(&state, &condition, &block, false)
+        .unwrap();
+    assert_eq!(
+        result.get_register(&Variable::mock("FLAG", 1)),
+        Bitvector::from_u8(0).into()
+    );
+    assert_eq!(
+        result.get_register(&Variable::mock("FLAG_NOTEQUAL", 1)),
+        Bitvector::from_u8(0).into()
+    );
+    assert_eq!(
+        result.get_register(&Variable::mock("FLAG_EQUAL", 1)),
+        Bitvector::from_u8(0).into()
+    );
+    assert_eq!(
+        result.get_register(&Variable::mock("FLAG_SLESS", 1)),
+        Bitvector::from_u8(0).into()
+    );
+    // The result is technically false, since RAX == 0 should be excluded.
+    // This impreciseness is due to the way that the result is calculated.
+    assert_eq!(
+        result.get_register(&register("RAX")),
+        IntervalDomain::mock(0, 20).into()
+    );
+
+    state.set_register(&register("RAX"), IntervalDomain::mock(0, 20).into());
+    let result = context
+        .specialize_conditional(&state, &condition, &block, false)
+        .unwrap();
+    assert_eq!(
+        result.get_register(&register("RAX")),
+        IntervalDomain::mock_with_bounds(Some(0), 1, 20, None).into()
+    );
+
+    state.set_register(&register("RAX"), IntervalDomain::mock(-20, 0).into());
+    let result = context
+        .specialize_conditional(&state, &condition, &block, false);
+    assert!(result.is_none());
+}
