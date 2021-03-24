@@ -150,9 +150,9 @@ impl IntervalDomain {
             let shift_amount = rhs.interval.start.try_to_u64().unwrap() as usize;
             if shift_amount < self.bytesize().as_bit_length() {
                 let multiplicator = Bitvector::one(self.bytesize().into())
-                .into_checked_shl(shift_amount)
-                .unwrap();
-            self.signed_mul(&multiplicator.into())
+                    .into_checked_shl(shift_amount)
+                    .unwrap();
+                self.signed_mul(&multiplicator.into())
             } else {
                 Bitvector::zero(self.bytesize().into()).into()
             }
