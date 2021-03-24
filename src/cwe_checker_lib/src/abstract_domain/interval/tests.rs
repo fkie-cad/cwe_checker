@@ -310,4 +310,8 @@ fn shift_left() {
         result,
         IntervalDomain::mock_i8_with_bounds(None, 6, 8, None)
     );
+    let lhs = IntervalDomain::mock_with_bounds(Some(2), 3, 4, Some(64));
+    let rhs = IntervalDomain::mock_i8_with_bounds(None, 127, 127, None);
+    let result = lhs.bin_op(BinOpType::IntLeft, &rhs);
+    assert_eq!(result, IntervalDomain::mock(0, 0));
 }
