@@ -147,10 +147,15 @@ impl IntervalDomain {
     /// The result is only exact if the `rhs` interval contains exactly one value.
     pub fn shift_left(&self, rhs: &Self) -> Self {
         if rhs.interval.start == rhs.interval.end {
-            let multiplicator = Bitvector::one(self.bytesize().into())
-                .into_checked_shl(rhs.interval.start.try_to_u64().unwrap() as usize)
+            let shift_amount = rhs.interval.start.try_to_u64().unwrap() as usize;
+            if shift_amount < self.bytesize().as_bit_length() {
+                let multiplicator = Bitvector::one(self.bytesize().into())
+                .into_checked_shl(shift_amount)
                 .unwrap();
             self.signed_mul(&multiplicator.into())
+            } else {
+                Bitvector::zero(self.bytesize().into()).into()
+            }
         } else {
             Self::new_top(self.bytesize())
         }
