@@ -318,13 +318,36 @@ pub struct Sub {
     /// The name of the function.
     pub name: String,
     /// The basic blocks of the function.
-    /// The first block of the array is also the entry point into the function.
+    ///
+    /// Note that the first block of the array may *not* be the function entry point!
     pub blocks: Vec<Term<Blk>>,
 }
 
-impl From<Sub> for IrSub {
-    fn from(sub: Sub) -> IrSub {
+impl From<Term<Sub>> for Term<IrSub> {
+    /// Convert a `Sub` term in the P-Code representation to a `Sub` term in the intermediate representation.
+    /// The conversion also repairs the order of the basic blocks in the `blocks` array of the `Sub`
+    /// in the sense that the first block of the array is required to also be the function entry point
+    /// after the conversion.
+    fn from(mut sub: Term<Sub>) -> Term<IrSub> {
+        // Since the intermediate representation expects that the first block of a function is its entry point,
+        // we have to make sure that this actually holds.
+        if !sub.term.blocks.is_empty() && sub.tid.address != sub.term.blocks[0].tid.address {
+            let mut start_block_index = None;
+            for (i, block) in sub.term.blocks.iter().enumerate() {
+                if block.tid.address == sub.tid.address {
+                    start_block_index = Some(i);
+                    break;
+                }
+            }
+            if let Some(start_block_index) = start_block_index {
+                sub.term.blocks.swap(0, start_block_index);
+            } else {
+                panic!("Non-empty function without correct starting block encountered. Name: {}, TID: {}", sub.term.name, sub.tid);
+            }
+        }
+
         let blocks = sub
+            .term
             .blocks
             .into_iter()
             .map(|block_term| Term {
@@ -332,9 +355,12 @@ impl From<Sub> for IrSub {
                 term: block_term.term.into(),
             })
             .collect();
-        IrSub {
-            name: sub.name,
-            blocks,
+        Term {
+            tid: sub.tid,
+            term: IrSub {
+                name: sub.term.name,
+                blocks,
+            },
         }
     }
 }
@@ -428,14 +454,7 @@ impl Program {
     /// E.g. if the `binary_base_address` is 0 for shared object files,
     /// Ghidra adds an offset so that the memory image does not actually start at address 0.
     pub fn into_ir_program(self, binary_base_address: u64) -> IrProgram {
-        let subs = self
-            .subs
-            .into_iter()
-            .map(|sub_term| Term {
-                tid: sub_term.tid,
-                term: sub_term.term.into(),
-            })
-            .collect();
+        let subs = self.subs.into_iter().map(|sub| sub.into()).collect();
         let extern_symbols = self
             .extern_symbols
             .into_iter()
