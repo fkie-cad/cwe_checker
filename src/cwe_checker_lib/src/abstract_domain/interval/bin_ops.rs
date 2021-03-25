@@ -9,24 +9,26 @@ impl IntervalDomain {
             interval
         } else {
             interval.update_widening_lower_bound(
-                &self.widening_lower_bound.as_ref().map_or(None, |bound| {
-                    bound.signed_add_overflow_checked(&rhs.interval.start)
-                }),
+                &self
+                    .widening_lower_bound
+                    .as_ref()
+                    .and_then(|bound| bound.signed_add_overflow_checked(&rhs.interval.start)),
             );
             interval.update_widening_lower_bound(
-                &rhs.widening_lower_bound.as_ref().map_or(None, |bound| {
-                    bound.signed_add_overflow_checked(&self.interval.start)
-                }),
+                &rhs.widening_lower_bound
+                    .as_ref()
+                    .and_then(|bound| bound.signed_add_overflow_checked(&self.interval.start)),
             );
             interval.update_widening_upper_bound(
-                &self.widening_upper_bound.as_ref().map_or(None, |bound| {
-                    bound.signed_add_overflow_checked(&rhs.interval.end)
-                }),
+                &self
+                    .widening_upper_bound
+                    .as_ref()
+                    .and_then(|bound| bound.signed_add_overflow_checked(&rhs.interval.end)),
             );
             interval.update_widening_upper_bound(
-                &rhs.widening_upper_bound.as_ref().map_or(None, |bound| {
-                    bound.signed_add_overflow_checked(&self.interval.end)
-                }),
+                &rhs.widening_upper_bound
+                    .as_ref()
+                    .and_then(|bound| bound.signed_add_overflow_checked(&self.interval.end)),
             );
             interval
         }
@@ -40,24 +42,26 @@ impl IntervalDomain {
             interval
         } else {
             interval.update_widening_lower_bound(
-                &self.widening_lower_bound.as_ref().map_or(None, |bound| {
-                    bound.signed_sub_overflow_checked(&rhs.interval.end)
-                }),
+                &self
+                    .widening_lower_bound
+                    .as_ref()
+                    .and_then(|bound| bound.signed_sub_overflow_checked(&rhs.interval.end)),
             );
             interval.update_widening_lower_bound(
-                &rhs.widening_upper_bound.as_ref().map_or(None, |bound| {
-                    self.interval.start.signed_sub_overflow_checked(bound)
-                }),
+                &rhs.widening_upper_bound
+                    .as_ref()
+                    .and_then(|bound| self.interval.start.signed_sub_overflow_checked(bound)),
             );
             interval.update_widening_upper_bound(
-                &self.widening_upper_bound.as_ref().map_or(None, |bound| {
-                    bound.signed_sub_overflow_checked(&rhs.interval.start)
-                }),
+                &self
+                    .widening_upper_bound
+                    .as_ref()
+                    .and_then(|bound| bound.signed_sub_overflow_checked(&rhs.interval.start)),
             );
             interval.update_widening_upper_bound(
-                &rhs.widening_lower_bound.as_ref().map_or(None, |bound| {
-                    self.interval.end.signed_sub_overflow_checked(bound)
-                }),
+                &rhs.widening_lower_bound
+                    .as_ref()
+                    .and_then(|bound| self.interval.end.signed_sub_overflow_checked(bound)),
             );
             interval
         }
