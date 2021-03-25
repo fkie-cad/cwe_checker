@@ -154,30 +154,26 @@ impl Interval {
     /// Compute the interval of possible results
     /// if one adds a value from `self` to a value from `rhs`.
     pub fn add(&self, rhs: &Interval) -> Interval {
-        if self.start.signed_add_overflow_check(&rhs.start)
-            || self.end.signed_add_overflow_check(&rhs.end)
-        {
-            Interval::new_top(self.bytesize())
+        if let (Some(start), Some(end)) = (
+            self.start.signed_add_overflow_checked(&rhs.start),
+            self.end.signed_add_overflow_checked(&rhs.end),
+        ) {
+            Interval { start, end }
         } else {
-            Interval {
-                start: self.start.clone().into_checked_add(&rhs.start).unwrap(),
-                end: self.end.clone().into_checked_add(&rhs.end).unwrap(),
-            }
+            Interval::new_top(self.bytesize())
         }
     }
 
     /// Compute the interval of possible results
     /// if one subtracts a value in `rhs` from a value in `self`.
     pub fn sub(&self, rhs: &Interval) -> Interval {
-        if self.start.signed_sub_overflow_check(&rhs.end)
-            || self.end.signed_sub_overflow_check(&rhs.start)
-        {
-            Interval::new_top(self.bytesize())
+        if let (Some(start), Some(end)) = (
+            self.start.signed_sub_overflow_checked(&rhs.end),
+            self.end.signed_sub_overflow_checked(&rhs.start),
+        ) {
+            Interval { start, end }
         } else {
-            Interval {
-                start: self.start.clone().into_checked_sub(&rhs.end).unwrap(),
-                end: self.end.clone().into_checked_sub(&rhs.start).unwrap(),
-            }
+            Interval::new_top(self.bytesize())
         }
     }
 

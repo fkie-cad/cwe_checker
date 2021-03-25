@@ -228,18 +228,18 @@ fn add() {
     let result = lhs.bin_op(BinOpType::IntAdd, &rhs);
     assert_eq!(
         result,
-        IntervalDomain::mock_with_bounds(None, 0, 7, Some(20))
+        IntervalDomain::mock_with_bounds(Some(-17), 0, 7, Some(10))
     );
     let lhs = IntervalDomain::mock_i8_with_bounds(Some(-121), -120, -120, Some(10));
     let rhs = IntervalDomain::mock_i8_with_bounds(Some(-10), -9, 0, Some(10));
     let result = lhs.bin_op(BinOpType::IntAdd, &rhs);
     assert_eq!(result, IntervalDomain::new_top(ByteSize::new(1)));
-    let lhs = IntervalDomain::mock_i8_with_bounds(Some(-100), 2, 4, Some(100));
-    let rhs = IntervalDomain::mock_i8_with_bounds(Some(-50), 10, 20, Some(50));
+    let lhs = IntervalDomain::mock_i8_with_bounds(Some(-100), -30, 40, Some(100));
+    let rhs = IntervalDomain::mock_i8_with_bounds(Some(-100), -30, 20, Some(50));
     let result = lhs.bin_op(BinOpType::IntAdd, &rhs);
     assert_eq!(
         result,
-        IntervalDomain::mock_i8_with_bounds(None, 12, 24, None)
+        IntervalDomain::mock_i8_with_bounds(None, -60, 60, Some(90))
     );
 }
 
@@ -250,18 +250,18 @@ fn sub() {
     let result = lhs.bin_op(BinOpType::IntSub, &rhs);
     assert_eq!(
         result,
-        IntervalDomain::mock_with_bounds(None, 3, 10, Some(30))
+        IntervalDomain::mock_with_bounds(Some(-7), 3, 10, Some(13))
     );
     let lhs = IntervalDomain::mock_i8_with_bounds(Some(-121), -120, -120, Some(10));
     let rhs = IntervalDomain::mock_i8_with_bounds(Some(-10), -9, 9, Some(10));
     let result = lhs.bin_op(BinOpType::IntSub, &rhs);
     assert_eq!(result, IntervalDomain::new_top(ByteSize::new(1)));
-    let lhs = IntervalDomain::mock_i8_with_bounds(Some(-100), 2, 4, Some(100));
-    let rhs = IntervalDomain::mock_i8_with_bounds(Some(-50), 10, 20, Some(50));
+    let lhs = IntervalDomain::mock_i8_with_bounds(Some(-100), 2, 40, Some(100));
+    let rhs = IntervalDomain::mock_i8_with_bounds(Some(-50), -30, 3, Some(100));
     let result = lhs.bin_op(BinOpType::IntSub, &rhs);
     assert_eq!(
         result,
-        IntervalDomain::mock_i8_with_bounds(None, -18, -6, None)
+        IntervalDomain::mock_i8_with_bounds(Some(-98), -1, 70, Some(90))
     );
 }
 

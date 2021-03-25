@@ -4,74 +4,62 @@ impl IntervalDomain {
     /// Compute the interval of possible results
     /// if one adds a value from `self` to a value from `rhs`.
     pub fn add(&self, rhs: &Self) -> Self {
-        let interval = self.interval.add(&rhs.interval);
+        let mut interval: IntervalDomain = self.interval.add(&rhs.interval).into();
         if interval.is_top() {
-            interval.into()
+            interval
         } else {
-            let new_lower_bound = if let (Some(self_bound), Some(rhs_bound)) =
-                (&self.widening_lower_bound, &rhs.widening_lower_bound)
-            {
-                if self_bound.signed_add_overflow_check(rhs_bound) {
-                    None
-                } else {
-                    Some(self_bound.clone().into_checked_add(rhs_bound).unwrap())
-                }
-            } else {
-                None
-            };
-            let new_upper_bound = if let (Some(self_bound), Some(rhs_bound)) =
-                (&self.widening_upper_bound, &rhs.widening_upper_bound)
-            {
-                if self_bound.signed_add_overflow_check(rhs_bound) {
-                    None
-                } else {
-                    Some(self_bound.clone().into_checked_add(rhs_bound).unwrap())
-                }
-            } else {
-                None
-            };
-            IntervalDomain {
-                interval,
-                widening_upper_bound: new_upper_bound,
-                widening_lower_bound: new_lower_bound,
-            }
+            interval.update_widening_lower_bound(
+                &self.widening_lower_bound.as_ref().map_or(None, |bound| {
+                    bound.signed_add_overflow_checked(&rhs.interval.start)
+                }),
+            );
+            interval.update_widening_lower_bound(
+                &rhs.widening_lower_bound.as_ref().map_or(None, |bound| {
+                    bound.signed_add_overflow_checked(&self.interval.start)
+                }),
+            );
+            interval.update_widening_upper_bound(
+                &self.widening_upper_bound.as_ref().map_or(None, |bound| {
+                    bound.signed_add_overflow_checked(&rhs.interval.end)
+                }),
+            );
+            interval.update_widening_upper_bound(
+                &rhs.widening_upper_bound.as_ref().map_or(None, |bound| {
+                    bound.signed_add_overflow_checked(&self.interval.end)
+                }),
+            );
+            interval
         }
     }
 
     /// Compute the interval of possible results
     /// if one subtracts a value in `rhs` from a value in `self`.
     pub fn sub(&self, rhs: &Self) -> Self {
-        let interval = self.interval.sub(&rhs.interval);
+        let mut interval: IntervalDomain = self.interval.sub(&rhs.interval).into();
         if interval.is_top() {
-            interval.into()
+            interval
         } else {
-            let new_lower_bound = if let (Some(self_bound), Some(rhs_bound)) =
-                (&self.widening_lower_bound, &rhs.widening_upper_bound)
-            {
-                if self_bound.signed_sub_overflow_check(rhs_bound) {
-                    None
-                } else {
-                    Some(self_bound.clone().into_checked_sub(rhs_bound).unwrap())
-                }
-            } else {
-                None
-            };
-            let new_upper_bound = if let (Some(self_bound), Some(rhs_bound)) =
-                (&self.widening_upper_bound, &rhs.widening_lower_bound)
-            {
-                if self_bound.signed_sub_overflow_check(rhs_bound) {
-                    None
-                } else {
-                    Some(self_bound.clone().into_checked_sub(rhs_bound).unwrap())
-                }
-            } else {
-                None
-            };
-            IntervalDomain {
-                interval,
-                widening_upper_bound: new_upper_bound,
-                widening_lower_bound: new_lower_bound,
-            }
+            interval.update_widening_lower_bound(
+                &self.widening_lower_bound.as_ref().map_or(None, |bound| {
+                    bound.signed_sub_overflow_checked(&rhs.interval.end)
+                }),
+            );
+            interval.update_widening_lower_bound(
+                &rhs.widening_upper_bound.as_ref().map_or(None, |bound| {
+                    self.interval.start.signed_sub_overflow_checked(bound)
+                }),
+            );
+            interval.update_widening_upper_bound(
+                &self.widening_upper_bound.as_ref().map_or(None, |bound| {
+                    bound.signed_sub_overflow_checked(&rhs.interval.start)
+                }),
+            );
+            interval.update_widening_upper_bound(
+                &rhs.widening_lower_bound.as_ref().map_or(None, |bound| {
+                    self.interval.end.signed_sub_overflow_checked(bound)
+                }),
+            );
+            interval
         }
     }
 
