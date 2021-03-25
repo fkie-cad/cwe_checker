@@ -286,6 +286,22 @@ impl<T: RegisterDomain + TryToInterval> TryToInterval for DataDomain<T> {
     }
 }
 
+impl<T: RegisterDomain> std::ops::Add for DataDomain<T> {
+    type Output = DataDomain<T>;
+
+    fn add(self, rhs: Self) -> Self {
+        self.bin_op(BinOpType::IntAdd, &rhs)
+    }
+}
+
+impl<T: RegisterDomain> std::ops::Sub for DataDomain<T> {
+    type Output = DataDomain<T>;
+
+    fn sub(self, rhs: Self) -> Self {
+        self.bin_op(BinOpType::IntSub, &rhs)
+    }
+}
+
 impl<T: RegisterDomain + Display> DataDomain<T> {
     /// Get a more compact json-representation of the data domain.
     /// Intended for pretty printing, not useable for serialization/deserialization.

@@ -554,12 +554,12 @@ fn specialize_by_binop() {
     let mut state = base_state.clone();
     let x = state.specialize_by_expression_result(
         &Expression::var("RAX").plus_const(20),
-        Bitvector::from_i64(5).into(),
+        IntervalDomain::mock(5, 7).into(),
     );
     assert!(x.is_ok());
     assert_eq!(
         state.get_register(&register("RAX")),
-        Bitvector::from_i64(-15).into()
+        IntervalDomain::mock(-15, -13).into()
     );
 
     // Expr = RAX - Const

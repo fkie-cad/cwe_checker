@@ -349,6 +349,8 @@ impl State {
                 _ => (),
             }
             Ok(())
+        } else if let Expression::BinOp { op, lhs, rhs } = expression {
+            self.specialize_by_binop_expression_result(op, lhs, rhs, result)
         } else if let Ok(result_bitvec) = result.try_to_bitvec() {
             match expression {
                 Expression::Var(_) => panic!(),
@@ -359,8 +361,8 @@ impl State {
                         Err(anyhow!("Unsatisfiable state"))
                     }
                 }
-                Expression::BinOp { op, lhs, rhs } => {
-                    self.specialize_by_binop_expression_result(op, lhs, rhs, result_bitvec)
+                Expression::BinOp { .. } => {
+                    panic!() // Already handled above
                 }
                 Expression::UnOp { op, arg } => {
                     use UnOpType::*;
@@ -397,142 +399,149 @@ impl State {
         op: &BinOpType,
         lhs: &Expression,
         rhs: &Expression,
-        result_bitvec: Bitvector,
+        result: Data,
     ) -> Result<(), Error> {
         match op {
             BinOpType::IntAdd => {
                 if let Ok(bitvec) = self.eval(lhs).try_to_bitvec() {
-                    let intermediate_result = (result_bitvec - &bitvec).into();
-                    self.specialize_by_expression_result(rhs, intermediate_result)
+                    let intermediate_result = result - bitvec.into();
+                    return self.specialize_by_expression_result(rhs, intermediate_result);
                 } else if let Ok(bitvec) = self.eval(rhs).try_to_bitvec() {
-                    let intermediate_result = (result_bitvec - &bitvec).into();
-                    self.specialize_by_expression_result(lhs, intermediate_result)
+                    let intermediate_result = result - bitvec.into();
+                    return self.specialize_by_expression_result(lhs, intermediate_result);
                 } else {
-                    Ok(())
+                    return Ok(());
                 }
             }
             BinOpType::IntSub => {
                 if let Ok(bitvec) = self.eval(lhs).try_to_bitvec() {
-                    let intermediate_result = (bitvec - &result_bitvec).into();
-                    self.specialize_by_expression_result(rhs, intermediate_result)
+                    let intermediate_result: Data = Data::from(bitvec) - result;
+                    return self.specialize_by_expression_result(rhs, intermediate_result);
                 } else if let Ok(bitvec) = self.eval(rhs).try_to_bitvec() {
-                    let intermediate_result = (result_bitvec + &bitvec).into();
-                    self.specialize_by_expression_result(lhs, intermediate_result)
+                    let intermediate_result = result + bitvec.into();
+                    return self.specialize_by_expression_result(lhs, intermediate_result);
                 } else {
-                    Ok(())
+                    return Ok(());
                 }
             }
-            BinOpType::IntXOr | BinOpType::BoolXOr => {
-                if let Ok(bitvec) = self.eval(lhs).try_to_bitvec() {
-                    self.specialize_by_expression_result(rhs, (result_bitvec ^ &bitvec).into())
-                } else if let Ok(bitvec) = self.eval(rhs).try_to_bitvec() {
-                    self.specialize_by_expression_result(lhs, (result_bitvec ^ &bitvec).into())
-                } else {
-                    Ok(())
-                }
-            }
-            BinOpType::IntOr | BinOpType::BoolOr => {
-                if result_bitvec.is_zero() {
-                    self.specialize_by_expression_result(lhs, result_bitvec.clone().into())?;
-                    self.specialize_by_expression_result(rhs, result_bitvec.into())
-                } else if self
-                    .eval(lhs)
-                    .try_to_bitvec()
-                    .map_or(false, |bitvec| bitvec.is_zero())
-                {
-                    self.specialize_by_expression_result(rhs, result_bitvec.into())
-                } else if self
-                    .eval(rhs)
-                    .try_to_bitvec()
-                    .map_or(false, |bitvec| bitvec.is_zero())
-                {
-                    self.specialize_by_expression_result(lhs, result_bitvec.into())
-                } else {
-                    Ok(())
-                }
-            }
-            BinOpType::BoolAnd => {
-                if !result_bitvec.is_zero() {
-                    self.specialize_by_expression_result(lhs, result_bitvec.clone().into())?;
-                    self.specialize_by_expression_result(rhs, result_bitvec.into())
-                } else if self
-                    .eval(lhs)
-                    .try_to_bitvec()
-                    .map_or(false, |bitvec| !bitvec.is_zero())
-                {
-                    self.specialize_by_expression_result(rhs, result_bitvec.into())
-                } else if self
-                    .eval(rhs)
-                    .try_to_bitvec()
-                    .map_or(false, |bitvec| !bitvec.is_zero())
-                {
-                    self.specialize_by_expression_result(lhs, result_bitvec.into())
-                } else {
-                    Ok(())
-                }
-            }
-            BinOpType::IntEqual | BinOpType::IntNotEqual => {
-                match (op, !result_bitvec.is_zero()) {
-                    (BinOpType::IntEqual, true) | (BinOpType::IntNotEqual, false) => {
-                        // lhs == rhs
-                        if let Ok(bitvec) = self.eval(lhs).try_to_bitvec() {
-                            self.specialize_by_expression_result(rhs, bitvec.into())
-                        } else if let Ok(bitvec) = self.eval(rhs).try_to_bitvec() {
-                            self.specialize_by_expression_result(lhs, bitvec.into())
-                        } else {
-                            Ok(())
-                        }
-                    }
-                    (BinOpType::IntEqual, false) | (BinOpType::IntNotEqual, true) => {
-                        // lhs != rhs
-                        if let Ok(bitvec) = self.eval(lhs).try_to_bitvec() {
-                            let new_result = self.eval(rhs).add_not_equal_bound(&bitvec)?;
-                            self.specialize_by_expression_result(rhs, new_result)
-                        } else if let Ok(bitvec) = self.eval(rhs).try_to_bitvec() {
-                            let new_result = self.eval(lhs).add_not_equal_bound(&bitvec)?;
-                            self.specialize_by_expression_result(lhs, new_result)
-                        } else {
-                            Ok(())
-                        }
-                    }
-                    _ => panic!(),
-                }
-            }
-            BinOpType::IntSLess
-            | BinOpType::IntLess
-            | BinOpType::IntLessEqual
-            | BinOpType::IntSLessEqual => {
-                use BinOpType::*;
-                let mut op = *op;
-                let (mut left_expr, mut right_expr) = (lhs, rhs);
-                if result_bitvec.is_zero() {
-                    std::mem::swap(&mut left_expr, &mut right_expr);
-                    op = match op {
-                        IntSLess => IntSLessEqual,
-                        IntSLessEqual => IntSLess,
-                        IntLess => IntLessEqual,
-                        IntLessEqual => IntLess,
-                        _ => panic!(),
-                    }
-                }
-                self.specialize_by_comparison_op(&op, left_expr, right_expr)
-            }
-            _ => {
-                let original_expression = Expression::BinOp {
-                    lhs: Box::new(lhs.clone()),
-                    op: *op,
-                    rhs: Box::new(rhs.clone()),
-                };
-                if let Ok(interval) = self.eval(&original_expression).try_to_interval() {
-                    if !interval.contains(&result_bitvec) {
-                        Err(anyhow!("Unsatisfiable bound"))
+            _ => (),
+        }
+        if let Ok(result_bitvec) = result.try_to_bitvec() {
+            match op {
+                BinOpType::IntXOr | BinOpType::BoolXOr => {
+                    if let Ok(bitvec) = self.eval(lhs).try_to_bitvec() {
+                        self.specialize_by_expression_result(rhs, (result_bitvec ^ &bitvec).into())
+                    } else if let Ok(bitvec) = self.eval(rhs).try_to_bitvec() {
+                        self.specialize_by_expression_result(lhs, (result_bitvec ^ &bitvec).into())
                     } else {
                         Ok(())
                     }
-                } else {
-                    Ok(())
+                }
+                BinOpType::IntOr | BinOpType::BoolOr => {
+                    if result_bitvec.is_zero() {
+                        self.specialize_by_expression_result(lhs, result_bitvec.clone().into())?;
+                        self.specialize_by_expression_result(rhs, result_bitvec.into())
+                    } else if self
+                        .eval(lhs)
+                        .try_to_bitvec()
+                        .map_or(false, |bitvec| bitvec.is_zero())
+                    {
+                        self.specialize_by_expression_result(rhs, result_bitvec.into())
+                    } else if self
+                        .eval(rhs)
+                        .try_to_bitvec()
+                        .map_or(false, |bitvec| bitvec.is_zero())
+                    {
+                        self.specialize_by_expression_result(lhs, result_bitvec.into())
+                    } else {
+                        Ok(())
+                    }
+                }
+                BinOpType::BoolAnd => {
+                    if !result_bitvec.is_zero() {
+                        self.specialize_by_expression_result(lhs, result_bitvec.clone().into())?;
+                        self.specialize_by_expression_result(rhs, result_bitvec.into())
+                    } else if self
+                        .eval(lhs)
+                        .try_to_bitvec()
+                        .map_or(false, |bitvec| !bitvec.is_zero())
+                    {
+                        self.specialize_by_expression_result(rhs, result_bitvec.into())
+                    } else if self
+                        .eval(rhs)
+                        .try_to_bitvec()
+                        .map_or(false, |bitvec| !bitvec.is_zero())
+                    {
+                        self.specialize_by_expression_result(lhs, result_bitvec.into())
+                    } else {
+                        Ok(())
+                    }
+                }
+                BinOpType::IntEqual | BinOpType::IntNotEqual => {
+                    match (op, !result_bitvec.is_zero()) {
+                        (BinOpType::IntEqual, true) | (BinOpType::IntNotEqual, false) => {
+                            // lhs == rhs
+                            if let Ok(bitvec) = self.eval(lhs).try_to_bitvec() {
+                                self.specialize_by_expression_result(rhs, bitvec.into())
+                            } else if let Ok(bitvec) = self.eval(rhs).try_to_bitvec() {
+                                self.specialize_by_expression_result(lhs, bitvec.into())
+                            } else {
+                                Ok(())
+                            }
+                        }
+                        (BinOpType::IntEqual, false) | (BinOpType::IntNotEqual, true) => {
+                            // lhs != rhs
+                            if let Ok(bitvec) = self.eval(lhs).try_to_bitvec() {
+                                let new_result = self.eval(rhs).add_not_equal_bound(&bitvec)?;
+                                self.specialize_by_expression_result(rhs, new_result)
+                            } else if let Ok(bitvec) = self.eval(rhs).try_to_bitvec() {
+                                let new_result = self.eval(lhs).add_not_equal_bound(&bitvec)?;
+                                self.specialize_by_expression_result(lhs, new_result)
+                            } else {
+                                Ok(())
+                            }
+                        }
+                        _ => panic!(),
+                    }
+                }
+                BinOpType::IntSLess
+                | BinOpType::IntLess
+                | BinOpType::IntLessEqual
+                | BinOpType::IntSLessEqual => {
+                    use BinOpType::*;
+                    let mut op = *op;
+                    let (mut left_expr, mut right_expr) = (lhs, rhs);
+                    if result_bitvec.is_zero() {
+                        std::mem::swap(&mut left_expr, &mut right_expr);
+                        op = match op {
+                            IntSLess => IntSLessEqual,
+                            IntSLessEqual => IntSLess,
+                            IntLess => IntLessEqual,
+                            IntLessEqual => IntLess,
+                            _ => panic!(),
+                        }
+                    }
+                    self.specialize_by_comparison_op(&op, left_expr, right_expr)
+                }
+                _ => {
+                    let original_expression = Expression::BinOp {
+                        lhs: Box::new(lhs.clone()),
+                        op: *op,
+                        rhs: Box::new(rhs.clone()),
+                    };
+                    if let Ok(interval) = self.eval(&original_expression).try_to_interval() {
+                        if !interval.contains(&result_bitvec) {
+                            Err(anyhow!("Unsatisfiable bound"))
+                        } else {
+                            Ok(())
+                        }
+                    } else {
+                        Ok(())
+                    }
                 }
             }
+        } else {
+            Ok(())
         }
     }
 
