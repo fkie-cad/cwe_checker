@@ -165,11 +165,11 @@ impl<'a, T: Context<'a>> GeneralFPContext for GeneralizedContext<'a, T> {
                 .context
                 .update_call(node_value.unwrap_value(), call, &graph[end_node])
                 .map(NodeValue::Value),
-            Edge::CRCallStub => Some(NodeValue::CallFlowCombinator {
+            Edge::CrCallStub => Some(NodeValue::CallFlowCombinator {
                 call_stub: Some(node_value.unwrap_value().clone()),
                 interprocedural_flow: None,
             }),
-            Edge::CRReturnStub => Some(NodeValue::CallFlowCombinator {
+            Edge::CrReturnStub => Some(NodeValue::CallFlowCombinator {
                 call_stub: None,
                 interprocedural_flow: Some(node_value.unwrap_value().clone()),
             }),
