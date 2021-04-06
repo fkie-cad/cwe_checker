@@ -64,6 +64,7 @@ use state::*;
 mod context;
 use context::*;
 
+/// The module name and version
 pub static CWE_MODULE: CweModule = CweModule {
     name: "CWE78",
     version: "0.1",

@@ -28,6 +28,7 @@ use std::marker::PhantomData;
 /// All edge transition functions can return `None` to indicate that no information flows through the edge.
 /// For example, this can be used to indicate edges that can never been taken.
 pub trait Context<'a> {
+    /// The type of the values that are assigned to nodes during the fixpoint computation.
     type Value: PartialEq + Eq + Clone;
 
     /// Get a reference to the graph that the fixpoint is computed on.
@@ -241,6 +242,7 @@ impl<'a, T: Context<'a>> GeneralizedContext<'a, T> {
         }
     }
 
+    /// Get the inner context object.
     pub fn get_context(&self) -> &T {
         &self.context
     }

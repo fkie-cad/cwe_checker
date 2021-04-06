@@ -1,5 +1,5 @@
 use crate::abstract_domain::{
-    AbstractDomain, AbstractIdentifier, BitvectorDomain, MemRegion, RegisterDomain, SizedDomain,
+    AbstractDomain, AbstractIdentifier, MemRegion, RegisterDomain, SizedDomain, TryToBitvec,
 };
 use crate::analysis::pointer_inference::Data;
 use crate::analysis::pointer_inference::State as PointerInferenceState;
@@ -153,8 +153,8 @@ impl State {
         let mut taint = Taint::Top(size);
         if let Data::Pointer(pointer) = address {
             for (mem_id, offset) in pointer.targets().iter() {
-                if let (Some(mem_region), BitvectorDomain::Value(position)) =
-                    (self.memory_taint.get(mem_id), offset)
+                if let (Some(mem_region), Ok(position)) =
+                    (self.memory_taint.get(mem_id), offset.try_to_bitvec())
                 {
                     taint = taint.merge(&mem_region.get(position.clone(), size));
                 }
@@ -172,7 +172,7 @@ impl State {
         if let Data::Pointer(pointer) = address {
             if pointer.targets().len() == 1 {
                 for (mem_id, offset) in pointer.targets().iter() {
-                    if let BitvectorDomain::Value(position) = offset {
+                    if let Ok(position) = offset.try_to_bitvec() {
                         if let Some(mem_region) = self.memory_taint.get_mut(mem_id) {
                             mem_region.add(taint, position.clone());
                         } else {
@@ -184,7 +184,7 @@ impl State {
                 }
             } else {
                 for (mem_id, offset) in pointer.targets().iter() {
-                    if let BitvectorDomain::Value(position) = offset {
+                    if let Ok(position) = offset.try_to_bitvec() {
                         if let Some(mem_region) = self.memory_taint.get_mut(mem_id) {
                             let old_taint = mem_region.get(position.clone(), taint.bytesize());
                             mem_region.add(old_taint.merge(&taint), position.clone());
@@ -239,8 +239,8 @@ impl State {
             for (target, offset) in pointer.targets() {
                 if let Ok(Some(ObjectType::Stack)) = pi_state.memory.get_object_type(target) {
                     // Only check if the value at the address is tainted
-                    if let (Some(mem_object), BitvectorDomain::Value(target_offset)) =
-                        (self.memory_taint.get(target), offset)
+                    if let (Some(mem_object), Ok(target_offset)) =
+                        (self.memory_taint.get(target), offset.try_to_bitvec())
                     {
                         if let Some(taint) = mem_object.get_unsized(target_offset.clone()) {
                             if taint.is_tainted() {
@@ -384,6 +384,7 @@ impl State {
 mod tests {
     use super::*;
     use crate::abstract_domain::*;
+    use crate::analysis::pointer_inference::ValueDomain;
 
     impl State {
         pub fn mock() -> State {
@@ -423,8 +424,8 @@ mod tests {
         }
     }
 
-    fn bv(value: i64) -> BitvectorDomain {
-        BitvectorDomain::Value(Bitvector::from_i64(value))
+    fn bv(value: i64) -> ValueDomain {
+        ValueDomain::from(Bitvector::from_i64(value))
     }
 
     fn new_id(name: &str) -> AbstractIdentifier {
@@ -434,7 +435,7 @@ mod tests {
         )
     }
 
-    fn new_pointer_domain(location: &str, offset: i64) -> PointerDomain<BitvectorDomain> {
+    fn new_pointer_domain(location: &str, offset: i64) -> PointerDomain<ValueDomain> {
         let id = new_id(location);
         PointerDomain::new(id, bv(offset))
     }

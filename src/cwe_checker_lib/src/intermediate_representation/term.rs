@@ -3,7 +3,7 @@ use crate::prelude::*;
 use crate::utils::log::LogMessage;
 use std::collections::HashSet;
 
-pub mod builder;
+mod builder;
 
 /// A term identifier consisting of an ID string (which is required to be unique)
 /// and an address to indicate where the term is located.
@@ -66,20 +66,30 @@ pub struct Term<T> {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub enum Def {
     /// A memory load into the register given by `var`.
-    ///
-    /// The size of `var` also determines the number of bytes read from memory.
-    /// The size of `address` is required to match the pointer size of the corresponding CPU architecture.
-    Load { var: Variable, address: Expression },
-    /// A memory store operation.
-    ///
-    /// The size of `value` determines the number of bytes written.
-    /// The size of `address` is required to match the pointer size of the corresponding CPU architecture.
-    Store {
+    Load {
+        /// The target register of the memory load.
+        /// The size of `var` also determines the number of bytes read from memory.
+        var: Variable,
+        /// The expression computing the address from which to read from.
+        /// The size of `address` is required to match the pointer size of the corresponding CPU architecture.
         address: Expression,
+    },
+    /// A memory store operation.
+    Store {
+        /// The expression computing the address that is written to.
+        /// The size of `address` is required to match the pointer size of the corresponding CPU architecture.
+        address: Expression,
+        /// The expression computing the value that is written to memory.
+        /// The size of `value` also determines the number of bytes written.
         value: Expression,
     },
     /// A register assignment, assigning the result of the expression `value` to the register `var`.
-    Assign { var: Variable, value: Expression },
+    Assign {
+        /// The register that is written to.
+        var: Variable,
+        /// The expression computing the value that is assigned to the register.
+        value: Expression,
+    },
 }
 
 impl Term<Def> {
@@ -119,9 +129,6 @@ impl Term<Def> {
 ///
 /// `Jmp` instructions carry some semantic information with it, like whether a jump is intra- or interprocedural.
 /// Note that this semantic information may not always be correct.
-///
-/// The targets (and return targets) of jumps are, if known, either basic blocks (`Blk`) or subroutines (`Sub`)
-/// depending of the type of the jump.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub enum Jmp {
     /// A direct intraprocedural jump to the targeted `Blk` term identifier.
@@ -129,19 +136,31 @@ pub enum Jmp {
     /// An indirect intraprocedural jump to the address that the given expression evaluates to.
     BranchInd(Expression),
     /// A direct intraprocedural jump that is only taken if the condition evaluates to true (i.e. not zero).
-    CBranch { target: Tid, condition: Expression },
+    CBranch {
+        /// The term ID of the target block of the jump.
+        target: Tid,
+        /// The jump is only taken if this expression evaluates to `true`, (i.e. not zero).
+        condition: Expression,
+    },
     /// A direct interprocedural jump representing a subroutine call.
     ///
     /// Note that this is syntactically equivalent to a `Jmp::Branch`.
-    /// If the `return_` is `None`, then the called function does not return to its caller.
-    Call { target: Tid, return_: Option<Tid> },
+    Call {
+        /// The term ID of the target subroutine (`Sub`) or extern symbol of the call.
+        target: Tid,
+        /// The term ID of the block that the called function returns to.
+        /// May be `None` if it is assumed that the called function never returns.
+        return_: Option<Tid>,
+    },
     /// An indirect interprocedural jump to the address the `target` expression evaluates to
     /// and representing a subroutine call.
     ///
     /// Note that this is syntactically equivalent to a `Jmp::BranchInd`.
-    /// If the `return_` is `None`, then the called function is believed to not return to its caller.
     CallInd {
+        /// An expression computing the target address of the call.
         target: Expression,
+        /// The term ID of the block that the called function returns to.
+        /// May be `None` if it is assumed that the called function never returns.
         return_: Option<Tid>,
     },
     /// A indirect interprocedural jump indicating a return from a subroutine.
@@ -154,11 +173,11 @@ pub enum Jmp {
     /// E.g. syscalls and other interrupts are mapped to `CallOther`.
     /// Assembly instructions that the disassembler does not support are also mapped to `CallOther`.
     /// One can use the `description` field to match for and handle known side effects (e.g. syscalls).
-    ///
-    /// The `return_` field indicates the `Blk` term identifier
-    /// where the disassembler assumes that execution will continue after handling of the side effect.
     CallOther {
+        /// A description of the side effect.
         description: String,
+        /// The block term identifier of the block
+        /// where the disassembler assumes that execution will continue after handling of the side effect.
         return_: Option<Tid>,
     },
 }
@@ -234,8 +253,12 @@ impl Term<Jmp> {
 /// the block structure needs to be updated accordingly.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Blk {
+    /// The `Def` instructions of the basic block in order of execution.
     pub defs: Vec<Term<Def>>,
+    /// The `Jmp` instructions of the basic block
     pub jmps: Vec<Term<Jmp>>,
+    /// If the basic block contains an indirect jump,
+    /// this field contains possible jump target addresses for the jump.
     pub indirect_jmp_targets: Vec<String>,
 }
 
@@ -290,17 +313,24 @@ pub struct Sub {
 /// A parameter or return argument of a function.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub enum Arg {
-    /// The argument is passed in a register
+    /// The argument is passed in the given register
     Register(Variable),
     /// The argument is passed on the stack.
     /// It is positioned at the given offset (in bytes) relative to the stack pointer on function entry
     /// and has the given size.
-    Stack { offset: i64, size: ByteSize },
+    Stack {
+        /// The position of the argument on the stack
+        /// given as offset relative to the stack pointer on function entry.
+        offset: i64,
+        /// The size in bytes of the argument.
+        size: ByteSize,
+    },
 }
 
 /// An extern symbol represents a funtion that is dynamically linked from another binary.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct ExternSymbol {
+    /// The term ID of the extern symbol.
     pub tid: Tid,
     /// Addresses of possibly multiple locations of the same extern symbol
     pub addresses: Vec<String>,

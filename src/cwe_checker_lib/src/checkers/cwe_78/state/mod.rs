@@ -1,9 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    abstract_domain::{
-        AbstractDomain, AbstractIdentifier, BitvectorDomain, MemRegion, SizedDomain,
-    },
+    abstract_domain::{AbstractDomain, AbstractIdentifier, MemRegion, SizedDomain, TryToBitvec},
     analysis::pointer_inference::{Data, State as PointerInferenceState},
     checkers::cwe_476::Taint,
     intermediate_representation::{
@@ -134,7 +132,7 @@ impl State {
         if let Data::Pointer(pointer) = address {
             if pointer.targets().len() == 1 {
                 for (mem_id, offset) in pointer.targets().iter() {
-                    if let BitvectorDomain::Value(position) = offset {
+                    if let Ok(position) = offset.try_to_bitvec() {
                         if let Some(mem_region) = self.memory_taint.get_mut(mem_id) {
                             mem_region.add(taint, position.clone());
                         } else {
@@ -146,7 +144,7 @@ impl State {
                 }
             } else {
                 for (mem_id, offset) in pointer.targets().iter() {
-                    if let BitvectorDomain::Value(position) = offset {
+                    if let Ok(position) = offset.try_to_bitvec() {
                         if let Some(mem_region) = self.memory_taint.get_mut(mem_id) {
                             let old_taint = mem_region.get(position.clone(), taint.bytesize());
                             mem_region.add(old_taint.merge(&taint), position.clone());
@@ -296,8 +294,8 @@ impl State {
     pub fn remove_mem_taint_at_target(&mut self, address: &Data) {
         if let Data::Pointer(pointer) = address {
             for (mem_id, offset) in pointer.targets().iter() {
-                if let (Some(mem_region), BitvectorDomain::Value(position)) =
-                    (self.memory_taint.get_mut(mem_id), offset.clone())
+                if let (Some(mem_region), Ok(position)) =
+                    (self.memory_taint.get_mut(mem_id), offset.try_to_bitvec())
                 {
                     if let Some(taint) = mem_region.get_unsized(position.clone()) {
                         mem_region
@@ -348,8 +346,8 @@ impl State {
             for (target, offset) in pointer.targets() {
                 if let Ok(Some(ObjectType::Stack)) = pi_state.memory.get_object_type(target) {
                     // Only check if the value at the address is tainted
-                    if let (Some(mem_object), BitvectorDomain::Value(target_offset)) =
-                        (self.memory_taint.get(target), offset)
+                    if let (Some(mem_object), Ok(target_offset)) =
+                        (self.memory_taint.get(target), offset.try_to_bitvec())
                     {
                         if let Some(taint) = mem_object.get_unsized(target_offset.clone()) {
                             if taint.is_tainted() {

@@ -7,12 +7,19 @@ use crate::intermediate_representation::UnOpType as IrUnOpType;
 use crate::intermediate_representation::Variable as IrVariable;
 use crate::prelude::*;
 
+/// A variable representing a varnode in Ghidra P-Code
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Variable {
+    /// The name of the register if the varnode represents a register
     pub name: Option<String>,
+    /// The value of the varnode if it represents a constant
     pub value: Option<String>,
+    /// If the varnode represents an implicit `LOAD` from memory,
+    /// the (necessarily constant) address of the `LOAD`.
     pub address: Option<String>,
+    /// The size (in bytes) of the varnode
     pub size: ByteSize,
+    /// A flag set to `true` for virtual/temporary registers.
     pub is_virtual: bool,
 }
 
@@ -110,11 +117,21 @@ impl Variable {
     }
 }
 
+/// A P-Code expression.
+///
+/// P-Code itself does not divide instructions into expressions, definitions and jumps,
+/// like in the internally used IR.
+/// This type roughly corresponds to P-Code instructions without side effects
+/// (except for assigning to the output register).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Expression {
+    /// The instruction mnemonic
     pub mnemonic: ExpressionType,
+    /// The first input varnode (if it exists).
     pub input0: Option<Variable>,
+    /// The second input varnode (if it exists).
     pub input1: Option<Variable>,
+    /// The third input varnode (if it exists).
     pub input2: Option<Variable>,
 }
 
@@ -152,6 +169,8 @@ impl From<Expression> for IrExpression {
     }
 }
 
+/// Expression Opcodes as parsed from Ghidra
+#[allow(missing_docs)]
 #[allow(non_camel_case_types)]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum ExpressionType {
@@ -316,11 +335,16 @@ impl From<ExpressionType> for IrCastOpType {
     }
 }
 
+/// Properties of a register with respect to its base register.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct RegisterProperties {
+    /// The register name.
     pub register: String,
+    /// The name of the base register.
     pub base_register: String,
+    /// The least significant byte of the register when viewed as a sub-register of the base register.
     pub lsb: ByteSize,
+    /// The size (in bytes) of the register
     pub size: ByteSize,
 }
 

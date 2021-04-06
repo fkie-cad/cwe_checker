@@ -57,7 +57,7 @@ impl<T: AbstractDomain + SizedDomain + HasTop + std::fmt::Debug> HasTop for MemR
 }
 
 impl<T: AbstractDomain + SizedDomain + HasTop + std::fmt::Debug> MemRegion<T> {
-    // Create a new, empty memory region.
+    /// Create a new, empty memory region.
     pub fn new(address_bytesize: ByteSize) -> Self {
         MemRegion(Arc::new(MemRegionData::new(address_bytesize)))
     }
@@ -107,6 +107,16 @@ impl<T: AbstractDomain + SizedDomain + HasTop + std::fmt::Debug> MemRegionData<T
         for index in intersecting_elements {
             self.values.remove(&index);
         }
+    }
+
+    /// Clear all values that might be overwritten if one writes a value with byte size `value_size`
+    /// to an offset contained in the interval from `start` to `end` (both bounds included in the interval).
+    ///
+    /// This represents the effect of writing an arbitrary value (with known byte size)
+    /// to an arbitrary offset contained in the interval.
+    pub fn clear_offset_interval(&mut self, start: i64, end: i64, value_size: ByteSize) {
+        let size = end - start + (u64::from(value_size) as i64);
+        self.clear_interval(start, size);
     }
 
     /// Add a value to the memory region.

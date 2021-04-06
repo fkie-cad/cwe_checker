@@ -1,8 +1,8 @@
 use super::*;
 use crate::utils::binary::RuntimeMemoryImage;
 
-fn bv(value: i64) -> BitvectorDomain {
-    BitvectorDomain::Value(Bitvector::from_i64(value))
+fn bv(value: i64) -> ValueDomain {
+    ValueDomain::from(Bitvector::from_i64(value))
 }
 
 fn new_id(time: &str, register: &str) -> AbstractIdentifier {
@@ -418,7 +418,7 @@ fn reachable_ids_under_and_overapproximation() {
     );
 
     let _ = state.store_value(
-        &PointerDomain::new(stack_id.clone(), BitvectorDomain::new_top(ByteSize::new(8))).into(),
+        &PointerDomain::new(stack_id.clone(), ValueDomain::new_top(ByteSize::new(8))).into(),
         &Data::Value(Bitvector::from_i64(42).into()),
         &global_memory,
     );

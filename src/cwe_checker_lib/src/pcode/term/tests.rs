@@ -503,7 +503,47 @@ fn arg_deserialization() {
 fn sub_deserialization() {
     let setup = Setup::new();
     let sub_term: Term<Sub> = setup.sub_t.clone();
-    let _: IrSub = sub_term.term.into();
+    let _: Term<IrSub> = sub_term.into();
+    let sub_term: Term<Sub> = serde_json::from_str(
+        r#"
+          {
+          "tid": {
+              "id": "sub_00101000",
+              "address": "00101000"
+          },
+          "term": {
+              "name": "sub_name",
+              "blocks": [
+                {
+                  "tid": {
+                      "id": "blk_0010030",
+                      "address": "00100030"
+                  },
+                  "term": {
+                      "defs": [],
+                      "jmps": []
+                  }
+                },
+                {
+                  "tid": {
+                      "id": "blk_00101000",
+                      "address": "00101000"
+                  },
+                  "term": {
+                      "defs": [],
+                      "jmps": []
+                  }
+                }
+              ]
+          }
+          }
+          "#,
+    )
+    .unwrap();
+    // Example has special case where the starting block has to be corrected
+    assert!(sub_term.tid.address != sub_term.term.blocks[0].tid.address);
+    let ir_sub: Term<IrSub> = sub_term.into();
+    assert_eq!(ir_sub.tid.address, ir_sub.term.blocks[0].tid.address);
 }
 
 #[test]

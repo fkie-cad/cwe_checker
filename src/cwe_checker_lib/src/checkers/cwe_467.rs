@@ -20,7 +20,7 @@
 //! - If the incorrect size value is generated before the basic block that contains
 //! the call, the check will not be able to find it.
 
-use crate::abstract_domain::{BitvectorDomain, DataDomain};
+use crate::abstract_domain::TryToBitvec;
 use crate::analysis::pointer_inference::State;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
@@ -29,6 +29,7 @@ use crate::utils::log::{CweWarning, LogMessage};
 use crate::utils::symbol_utils::{get_callsites, get_symbol_map};
 use crate::CweModule;
 
+/// The module name and version
 pub static CWE_MODULE: CweModule = CweModule {
     name: "CWE467",
     version: "0.2",
@@ -78,11 +79,13 @@ fn check_for_pointer_sized_arg(
     let pointer_size = project.stack_pointer_register.size;
     let state = compute_block_end_state(project, global_memory, block);
     for parameter in symbol.parameters.iter() {
-        if let Ok(DataDomain::Value(BitvectorDomain::Value(param_value))) =
+        if let Ok(param) =
             state.eval_parameter_arg(parameter, &project.stack_pointer_register, global_memory)
         {
-            if Ok(u64::from(pointer_size)) == param_value.try_to_u64() {
-                return true;
+            if let Ok(param_value) = param.try_to_bitvec() {
+                if Ok(u64::from(pointer_size)) == param_value.try_to_u64() {
+                    return true;
+                }
             }
         }
     }

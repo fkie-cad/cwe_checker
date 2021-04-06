@@ -86,14 +86,25 @@ impl State {
                     self.memory.set_value(pointer, value.clone())?;
                     Ok(())
                 }
-                Data::Value(BitvectorDomain::Value(address_to_global_data)) => {
-                    match global_memory.is_address_writeable(&address_to_global_data) {
-                        Ok(true) => Ok(()),
-                        Ok(false) => Err(anyhow!("Write to read-only global data")),
-                        Err(err) => Err(err),
+                Data::Value(absolute_address) => {
+                    if let Ok(address_to_global_data) = absolute_address.try_to_bitvec() {
+                        match global_memory.is_address_writeable(&address_to_global_data) {
+                            Ok(true) => Ok(()),
+                            Ok(false) => Err(anyhow!("Write to read-only global data")),
+                            Err(err) => Err(err),
+                        }
+                    } else if let Ok((start, end)) = absolute_address.try_to_offset_interval() {
+                        match global_memory.is_interval_writeable(start as u64, end as u64) {
+                            Ok(true) => Ok(()),
+                            Ok(false) => Err(anyhow!("Write to read-only global data")),
+                            Err(err) => Err(err),
+                        }
+                    } else {
+                        // We assume inexactness of the algorithm instead of a possible CWE here.
+                        Ok(())
                     }
                 }
-                Data::Value(BitvectorDomain::Top(_)) | Data::Top(_) => Ok(()),
+                Data::Top(_) => Ok(()),
             }
         }
     }
@@ -142,15 +153,26 @@ impl State {
     ) -> Result<Data, Error> {
         let address = self.adjust_pointer_for_read(&self.eval(address)?);
         match address {
-            Data::Value(BitvectorDomain::Value(address_bitvector)) => {
-                let loaded_value = global_memory.read(&address_bitvector, size)?;
-                if loaded_value.is_top() {
-                    Ok(Data::Top(loaded_value.bytesize()))
+            Data::Value(global_address) => {
+                if let Ok(address_bitvector) = global_address.try_to_bitvec() {
+                    if let Some(loaded_value) = global_memory.read(&address_bitvector, size)? {
+                        Ok(Data::Value(loaded_value.into()))
+                    } else {
+                        Ok(Data::Top(size))
+                    }
+                } else if let Ok((start, end)) = global_address.try_to_offset_interval() {
+                    if global_memory
+                        .is_interval_readable(start as u64, end as u64 + u64::from(size))?
+                    {
+                        Ok(Data::new_top(size))
+                    } else {
+                        Err(anyhow!("Target address is not readable."))
+                    }
                 } else {
-                    Ok(Data::Value(loaded_value))
+                    Ok(Data::new_top(size))
                 }
             }
-            Data::Value(BitvectorDomain::Top(_)) | Data::Top(_) => Ok(Data::new_top(size)),
+            Data::Top(_) => Ok(Data::new_top(size)),
             Data::Pointer(_) => Ok(self.memory.get_value(&address, size)?),
         }
     }
@@ -181,26 +203,24 @@ impl State {
             let mut new_targets = BTreeMap::new();
             for (id, offset) in pointer.targets() {
                 if *id == self.stack_id {
-                    match offset {
-                        BitvectorDomain::Value(offset_val) => {
-                            if offset_val.try_to_i64().unwrap() >= 0
-                                && !self.caller_stack_ids.is_empty()
-                            {
-                                for caller_id in self.caller_stack_ids.iter() {
-                                    new_targets.insert(caller_id.clone(), offset.clone());
-                                }
-                            // Note that the id of the current stack frame was *not* added.
-                            } else {
-                                new_targets.insert(id.clone(), offset.clone());
-                            }
-                        }
-                        BitvectorDomain::Top(_bytesize) => {
+                    if let Ok((interval_start, interval_end)) = offset.try_to_offset_interval() {
+                        if interval_start >= 0
+                            && interval_end >= 0
+                            && !self.caller_stack_ids.is_empty()
+                        {
                             for caller_id in self.caller_stack_ids.iter() {
                                 new_targets.insert(caller_id.clone(), offset.clone());
                             }
-                            // Note that we also add the id of the current stack frame
+                        // Note that the id of the current stack frame was *not* added.
+                        } else {
                             new_targets.insert(id.clone(), offset.clone());
                         }
+                    } else {
+                        for caller_id in self.caller_stack_ids.iter() {
+                            new_targets.insert(caller_id.clone(), offset.clone());
+                        }
+                        // Note that we also add the id of the current stack frame
+                        new_targets.insert(id.clone(), offset.clone());
                     }
                 } else {
                     new_targets.insert(id.clone(), offset.clone());
@@ -275,15 +295,15 @@ impl State {
     /// i.e. it is an access to the caller stack, return the offset.
     ///
     /// In all other cases, including the case that the address has more than one target, return `None`.
-    fn unwrap_offset_if_caller_stack_address(&self, address: &Data) -> Option<BitvectorDomain> {
+    fn unwrap_offset_if_caller_stack_address(&self, address: &Data) -> Option<ValueDomain> {
         if self.caller_stack_ids.is_empty() {
             return None;
         }
         if let Data::Pointer(pointer) = address {
             match (pointer.targets().len(), pointer.targets().iter().next()) {
                 (1, Some((id, offset))) if self.stack_id == *id => {
-                    if let BitvectorDomain::Value(offset_val) = offset {
-                        if offset_val.try_to_i64().unwrap() >= 0 {
+                    if let Ok((interval_start, _interval_end)) = offset.try_to_offset_interval() {
+                        if interval_start >= 0 {
                             return Some(offset.clone());
                         }
                     }

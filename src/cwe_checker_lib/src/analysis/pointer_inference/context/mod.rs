@@ -7,6 +7,7 @@ use crate::{abstract_domain::*, utils::binary::RuntimeMemoryImage};
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::state::State;
+use super::ValueDomain;
 use super::{Config, Data, VERSION};
 
 // contains trait implementations for the `Context` struct,
@@ -380,7 +381,7 @@ impl<'a> Context<'a> {
     }
 
     /// Get the offset of the current stack pointer to the base of the current stack frame.
-    fn get_current_stack_offset(&self, state: &State) -> BitvectorDomain {
+    fn get_current_stack_offset(&self, state: &State) -> ValueDomain {
         if let Ok(Data::Pointer(ref stack_pointer)) =
             state.get_register(&self.project.stack_pointer_register)
         {
@@ -388,16 +389,11 @@ impl<'a> Context<'a> {
                 let (stack_id, stack_offset_domain) =
                     stack_pointer.targets().iter().next().unwrap();
                 if *stack_id == state.stack_id {
-                    stack_offset_domain.clone()
-                } else {
-                    BitvectorDomain::new_top(stack_pointer.bytesize())
+                    return stack_offset_domain.clone();
                 }
-            } else {
-                BitvectorDomain::new_top(self.project.stack_pointer_register.size)
             }
-        } else {
-            BitvectorDomain::new_top(self.project.stack_pointer_register.size)
         }
+        ValueDomain::new_top(self.project.stack_pointer_register.size)
     }
 }
 

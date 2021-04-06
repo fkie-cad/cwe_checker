@@ -16,23 +16,39 @@ use crate::prelude::*;
 
 // TODO: Handle the case where an indirect tail call is represented by CALLIND plus RETURN
 
+// TODO: Since we do not support BAP anymore, this module should be refactored
+// to remove BAP-specific artifacts like the jump label type.
+
+/// A call instruction.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Call {
+    /// The target label. May be `None` for `CALLOTHER` instructions.
     pub target: Option<Label>,
+    /// The return label if the call is expected to return.
     #[serde(rename = "return")]
     pub return_: Option<Label>,
+    /// A description of the instruction for `CALLOTHER` instructions.
     pub call_string: Option<String>,
 }
 
+/// A jump instruction.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Jmp {
+    /// The mnemonic of the jump.
     pub mnemonic: JmpType,
+    /// The target label for intraprocedural jumps.
     pub goto: Option<Label>,
+    /// The call struct for interprocedural jumps.
     pub call: Option<Call>,
+    /// If the jump is a conditional jump,
+    /// the varnode that has to evaluate to `true` for the jump to be taken.
     pub condition: Option<Variable>,
+    /// A list of potential jump targets for indirect jumps.
     pub target_hints: Option<Vec<String>>,
 }
 
+/// A jump type mnemonic.
+#[allow(missing_docs)]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum JmpType {
     BRANCH,
@@ -111,15 +127,21 @@ impl From<Jmp> for IrJmp {
     }
 }
 
+/// A jump label for distinguishing between direct and indirect jumps.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub enum Label {
+    /// The term identifier of the target of a direct jump.
     Direct(Tid),
+    /// The varnode holding the target address of an indirect jump.
     Indirect(Variable),
 }
 
+/// An assignment instruction, assigning the result of an expression to a varnode.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Def {
+    /// The target varnode whose value gets overwritten.
     pub lhs: Option<Variable>,
+    /// The expression that determines the value to be written.
     pub rhs: Expression,
 }
 
@@ -183,9 +205,12 @@ impl Def {
     }
 }
 
+/// A basic block.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Blk {
+    /// The `Def` instructions of the block in chronological order.
     pub defs: Vec<Term<Def>>,
+    /// The jump instructions at the end of the basic block.
     pub jmps: Vec<Term<Jmp>>,
 }
 
@@ -267,28 +292,62 @@ impl Blk {
     }
 }
 
+/// An argument (parameter or return value) of an extern symbol.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Arg {
+    /// The register containing the argument if it is passed in a register.
     pub var: Option<Variable>,
+    /// The expression computing the location of the argument if it is passed on the stack.
     pub location: Option<Expression>,
+    /// The intent (input or output) of the argument.
     pub intent: ArgIntent,
 }
 
+/// The intent (input or output) of a function argument.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub enum ArgIntent {
+    /// The argument is an input parameter.
     INPUT,
+    /// The argument is a return value.
     OUTPUT,
 }
 
+/// A subfunction.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Sub {
+    /// The name of the function.
     pub name: String,
+    /// The basic blocks of the function.
+    ///
+    /// Note that the first block of the array may *not* be the function entry point!
     pub blocks: Vec<Term<Blk>>,
 }
 
-impl From<Sub> for IrSub {
-    fn from(sub: Sub) -> IrSub {
+impl From<Term<Sub>> for Term<IrSub> {
+    /// Convert a `Sub` term in the P-Code representation to a `Sub` term in the intermediate representation.
+    /// The conversion also repairs the order of the basic blocks in the `blocks` array of the `Sub`
+    /// in the sense that the first block of the array is required to also be the function entry point
+    /// after the conversion.
+    fn from(mut sub: Term<Sub>) -> Term<IrSub> {
+        // Since the intermediate representation expects that the first block of a function is its entry point,
+        // we have to make sure that this actually holds.
+        if !sub.term.blocks.is_empty() && sub.tid.address != sub.term.blocks[0].tid.address {
+            let mut start_block_index = None;
+            for (i, block) in sub.term.blocks.iter().enumerate() {
+                if block.tid.address == sub.tid.address {
+                    start_block_index = Some(i);
+                    break;
+                }
+            }
+            if let Some(start_block_index) = start_block_index {
+                sub.term.blocks.swap(0, start_block_index);
+            } else {
+                panic!("Non-empty function without correct starting block encountered. Name: {}, TID: {}", sub.term.name, sub.tid);
+            }
+        }
+
         let blocks = sub
+            .term
             .blocks
             .into_iter()
             .map(|block_term| Term {
@@ -296,20 +355,31 @@ impl From<Sub> for IrSub {
                 term: block_term.term.into(),
             })
             .collect();
-        IrSub {
-            name: sub.name,
-            blocks,
+        Term {
+            tid: sub.tid,
+            term: IrSub {
+                name: sub.term.name,
+                blocks,
+            },
         }
     }
 }
 
+/// An extern symbol, i.e. a function not contained in the binary but loaded from a shared library.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct ExternSymbol {
+    /// The term identifier of the extern symbol.
     pub tid: Tid,
+    /// The addresses to call the extern symbol.
+    /// May be more than one, since we also identify thunk functions calling the extern symbol with the symbol itself.
     pub addresses: Vec<String>,
+    /// The name of the extern symbol.
     pub name: String,
+    /// The calling convention used (as reported by Ghidra, i.e. this may not be correct).
     pub calling_convention: Option<String>,
+    /// The input and output arguments of the function.
     pub arguments: Vec<Arg>,
+    /// If the function is assumed to never return to the caller, this flag is set to `true`.
     pub no_return: bool,
 }
 
@@ -359,11 +429,19 @@ impl From<ExternSymbol> for IrExternSymbol {
     }
 }
 
+/// The program struct containing all information about the binary
+/// except for CPU-architecture-related information.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Program {
+    /// The subfunctions contained in the binary.
     pub subs: Vec<Term<Sub>>,
+    /// The extern symbols referenced by the binary.
     pub extern_symbols: Vec<ExternSymbol>,
+    /// The term identifiers of entry points into the binary.
     pub entry_points: Vec<Tid>,
+    /// The base address of the memory image of the binary in RAM as reported by Ghidra.
+    ///
+    /// Note that Ghidra may add an offset to the image base address as reported by the binary itself.
     pub image_base: String,
 }
 
@@ -376,14 +454,7 @@ impl Program {
     /// E.g. if the `binary_base_address` is 0 for shared object files,
     /// Ghidra adds an offset so that the memory image does not actually start at address 0.
     pub fn into_ir_program(self, binary_base_address: u64) -> IrProgram {
-        let subs = self
-            .subs
-            .into_iter()
-            .map(|sub_term| Term {
-                tid: sub_term.tid,
-                term: sub_term.term.into(),
-            })
-            .collect();
+        let subs = self.subs.into_iter().map(|sub| sub.into()).collect();
         let extern_symbols = self
             .extern_symbols
             .into_iter()
@@ -400,13 +471,19 @@ impl Program {
     }
 }
 
+/// A struct describing a calling convention.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct CallingConvention {
+    /// The name of the calling convention.
     #[serde(rename = "calling_convention")]
     pub name: String,
+    /// Possible parameter registers.
     parameter_register: Vec<String>,
+    /// Possible return registers.
     return_register: Vec<String>,
+    /// Callee-saved registers.
     unaffected_register: Vec<String>,
+    /// Registers that may be overwritten by the call, i.e. caller-saved registers.
     killed_by_call_register: Vec<String>,
 }
 
@@ -421,12 +498,18 @@ impl From<CallingConvention> for IrCallingConvention {
     }
 }
 
+/// The project struct describing all known information about the binary.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Project {
+    /// The program struct containing all binary-specific information.
     pub program: Term<Program>,
+    /// The CPU-architecture that the binary uses.
     pub cpu_architecture: String,
+    /// The stack pointer register of the CPU-architecture.
     pub stack_pointer_register: Variable,
+    /// Information about all CPU-architecture-specific registers.
     pub register_properties: Vec<RegisterProperties>,
+    /// Information about known calling conventions for the given CPU architecture.
     pub register_calling_convention: Vec<CallingConvention>,
 }
 

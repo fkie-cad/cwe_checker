@@ -1,3 +1,4 @@
+use crate::analysis::pointer_inference::ValueDomain;
 use crate::{
     abstract_domain::{DataDomain, PointerDomain},
     intermediate_representation::CastOpType,
@@ -17,8 +18,8 @@ fn extern_symbol(name: &str, return_args: Vec<Arg>) -> ExternSymbol {
     }
 }
 
-fn bv(value: i64) -> BitvectorDomain {
-    BitvectorDomain::Value(Bitvector::from_i64(value))
+fn bv(value: i64) -> ValueDomain {
+    ValueDomain::from(Bitvector::from_i64(value))
 }
 
 impl State {
@@ -78,9 +79,9 @@ struct Setup {
     rsp: Variable,
     constant: Bitvector,
     def_tid: Tid,
-    stack_pointer: DataDomain<BitvectorDomain>,
-    base_eight_offset: DataDomain<BitvectorDomain>,
-    base_sixteen_offset: DataDomain<BitvectorDomain>,
+    stack_pointer: DataDomain<ValueDomain>,
+    base_eight_offset: DataDomain<ValueDomain>,
+    base_sixteen_offset: DataDomain<ValueDomain>,
 }
 
 impl Setup {

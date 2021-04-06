@@ -34,6 +34,7 @@ use crate::utils::log::{CweWarning, LogMessage};
 use crate::utils::symbol_utils::{get_callsites, get_symbol_map};
 use crate::CweModule;
 
+/// The module name and version
 pub static CWE_MODULE: CweModule = CweModule {
     name: "CWE190",
     version: "0.1",

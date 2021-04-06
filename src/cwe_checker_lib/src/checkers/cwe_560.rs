@@ -10,7 +10,7 @@
 //! ## How the check works
 //!
 //! This check looks for umask calls and checks if they have a reasonable value, i.e. smaller than
-//! a certain value, currently set to 1000 and greater than a reasonable value for umask, currently set to 100.
+//! a certain value, currently set to 0o777 and greater than a reasonable value for umask, currently set to 0o177.
 //!
 //! ## False Positives
 //!
@@ -22,7 +22,7 @@
 //! - If the input to umask is not defined in the basic block before the call, the check will not see it.
 //! However, a log message will be generated whenever the check is unable to determine the parameter value of umask.
 
-use crate::abstract_domain::{BitvectorDomain, DataDomain};
+use crate::abstract_domain::TryToBitvec;
 use crate::analysis::pointer_inference::State;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
@@ -31,14 +31,17 @@ use crate::utils::log::{CweWarning, LogMessage};
 use crate::utils::symbol_utils::{get_callsites, get_symbol_map};
 use crate::CweModule;
 
+/// The module name and version
 pub static CWE_MODULE: CweModule = CweModule {
     name: "CWE560",
     version: "0.2",
     run: check_cwe,
 };
 
-pub static UPPER_BOUND_CORRECT_UMASK_ARG_VALUE: u64 = 100;
-pub static UPPER_BOUND_CORRECT_CHMOD_ARG_VALUE: u64 = 1000;
+/// An upper bound for the value of a presumably correct umask argument.
+pub static UPPER_BOUND_CORRECT_UMASK_ARG_VALUE: u64 = 0o177;
+/// An upper bound for the value of a chmod-style argument.
+pub static UPPER_BOUND_CORRECT_CHMOD_ARG_VALUE: u64 = 0o777;
 
 /// Compute the parameter value of umask out of the basic block right before the umask call.
 ///
@@ -69,7 +72,7 @@ fn get_umask_permission_arg(
     let parameter = umask_symbol.get_unique_parameter()?;
     let param_value =
         state.eval_parameter_arg(parameter, &project.stack_pointer_register, global_memory)?;
-    if let DataDomain::Value(BitvectorDomain::Value(umask_arg)) = param_value {
+    if let Ok(umask_arg) = param_value.try_to_bitvec() {
         Ok(umask_arg.try_to_u64()?)
     } else {
         Err(anyhow!("Parameter value unknown"))
@@ -77,8 +80,10 @@ fn get_umask_permission_arg(
 }
 
 /// Is the given argument value considered to be a chmod-style argument?
+///
+/// Note that `0o777` is not considered a chmod-style argument as it also denotes a usually correct umask argument.
 fn is_chmod_style_arg(arg: u64) -> bool {
-    arg > UPPER_BOUND_CORRECT_UMASK_ARG_VALUE && arg <= UPPER_BOUND_CORRECT_CHMOD_ARG_VALUE
+    arg > UPPER_BOUND_CORRECT_UMASK_ARG_VALUE && arg != UPPER_BOUND_CORRECT_CHMOD_ARG_VALUE
 }
 
 /// Generate the CWE warning for a detected instance of the CWE.

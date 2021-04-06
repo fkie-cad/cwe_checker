@@ -50,12 +50,13 @@ use std::collections::HashMap;
 mod state;
 use state::*;
 
-pub mod taint;
+mod taint;
 pub use taint::*;
 
 mod context;
 use context::*;
 
+/// The module name and version
 pub static CWE_MODULE: CweModule = CweModule {
     name: "CWE476",
     version: "0.3",

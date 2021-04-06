@@ -1,3 +1,6 @@
+//! Helper functions for common tasks utilizing extern symbols,
+//! e.g. searching for calls to a specific extern symbol.
+
 use std::collections::HashMap;
 
 use crate::intermediate_representation::*;
