@@ -40,7 +40,7 @@
 //! - Missing Taints due to lost track of pointer targets
 //! - Non tracked function parameters cause incomplete taints that could miss possible dangerous inputs
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     analysis::{
@@ -48,13 +48,16 @@ use crate::{
         graph::{self, Edge, Node},
         interprocedural_fixpoint_generic::NodeValue,
     },
-    intermediate_representation::{Jmp, Project, Sub},
+    intermediate_representation::{ExternSymbol, Jmp, Project, Sub},
     prelude::*,
     utils::log::{CweWarning, LogMessage},
     AnalysisResults, CweModule,
 };
 
-use petgraph::{graph::NodeIndex, visit::EdgeRef};
+use petgraph::{
+    graph::NodeIndex,
+    visit::{EdgeRef, IntoNodeReferences},
+};
 mod state;
 use state::*;
 
@@ -89,21 +92,25 @@ pub fn check_cwe(
     let project = analysis_results.project;
     let pointer_inference_results = analysis_results.pointer_inference.unwrap();
 
+    let mut cwe_78_graph = analysis_results.control_flow_graph.clone();
+    cwe_78_graph.reverse();
+
     let (cwe_sender, cwe_receiver) = crossbeam_channel::unbounded();
 
     let config: Config = serde_json::from_value(cwe_params.clone()).unwrap();
     let system_symbols =
         crate::utils::symbol_utils::get_symbol_map(project, &config.system_symbols[..]);
-    let string_symbols =
-        crate::utils::symbol_utils::get_symbol_map(project, &config.string_symbols[..]);
-    let user_input_symbols =
-        crate::utils::symbol_utils::get_symbol_map(project, &config.user_input_symbols[..]);
+
+    let symbol_maps: SymbolMaps = SymbolMaps::new(project, &config);
+    let block_maps = BlockMaps::new(analysis_results);
+
     let general_context = Context::new(
         project,
         analysis_results.runtime_memory_image,
-        &pointer_inference_results,
-        string_symbols,
-        user_input_symbols,
+        std::sync::Arc::new(cwe_78_graph),
+        pointer_inference_results,
+        std::sync::Arc::new(symbol_maps),
+        std::sync::Arc::new(block_maps),
         cwe_sender,
     );
 
@@ -202,4 +209,90 @@ fn get_entry_sub_to_entry_node_map(
             }
         })
         .collect()
+}
+
+/// - string_symbols:
+///     - Maps the TID of an extern string related symbol to the corresponding extern symbol struct.
+/// - user_input_symbols:
+///     - Maps the TID of an extern symbol that take input from the user to the corresponding extern symbol struct.
+/// - extern_symbol_map:
+///     - Maps the TID of an extern symbol to the extern symbol struct.
+pub struct SymbolMaps<'a> {
+    string_symbol_map: HashMap<Tid, &'a ExternSymbol>,
+    user_input_symbol_map: HashMap<Tid, &'a ExternSymbol>,
+    extern_symbol_map: HashMap<Tid, &'a ExternSymbol>,
+}
+
+impl<'a> SymbolMaps<'a> {
+    /// Creates a new instance of the symbol maps struct.
+    pub fn new(project: &'a Project, config: &Config) -> Self {
+        let mut extern_symbol_map = HashMap::new();
+        for symbol in project.program.term.extern_symbols.iter() {
+            extern_symbol_map.insert(symbol.tid.clone(), symbol);
+        }
+        SymbolMaps {
+            string_symbol_map: crate::utils::symbol_utils::get_symbol_map(
+                project,
+                &config.string_symbols[..],
+            ),
+            user_input_symbol_map: crate::utils::symbol_utils::get_symbol_map(
+                project,
+                &config.user_input_symbols[..],
+            ),
+            extern_symbol_map,
+        }
+    }
+}
+
+/// - block_first_def_set:
+///       - A set containing a given [`Def`] as the first `Def` of the block.
+///       The keys are of the form `(Def-TID, Current-Sub-TID)`
+///       to distinguish the nodes for blocks contained in more than one function.
+/// - block_start_last_def_map:
+///       - A map to get the node index of the `BlkStart` node containing a given [`Def`] as the last `Def` of the block.
+///       The keys are of the form `(Def-TID, Current-Sub-TID)`
+///       to distinguish the nodes for blocks contained in more than one function.
+/// - jmp_to_blk_end_node_map:
+///       - A map to get the node index of the `BlkEnd` node containing a given [`Jmp`].
+///       The keys are of the form `(Jmp-TID, Current-Sub-TID)`
+///       to distinguish the nodes for blocks contained in more than one function.
+pub struct BlockMaps {
+    block_first_def_set: HashSet<(Tid, Tid)>,
+    block_start_last_def_map: HashMap<(Tid, Tid), NodeIndex>,
+    jmp_to_blk_end_node_map: HashMap<(Tid, Tid), NodeIndex>,
+}
+
+impl BlockMaps {
+    /// Creates a new instance of the block maps struct using the analysis results.
+    pub fn new(analysis_results: &AnalysisResults) -> Self {
+        let mut block_first_def_set = HashSet::new();
+        let mut block_start_last_def_map = HashMap::new();
+        let mut jmp_to_blk_end_node_map = HashMap::new();
+        for (node_id, node) in analysis_results.control_flow_graph.node_references() {
+            match node {
+                Node::BlkStart(block, sub) => match block.term.defs.len() {
+                    0 => (),
+                    num_of_defs => {
+                        let first_def = block.term.defs.get(0).unwrap();
+                        let last_def = block.term.defs.get(num_of_defs - 1).unwrap();
+                        block_first_def_set.insert((first_def.tid.clone(), sub.tid.clone()));
+                        block_start_last_def_map
+                            .insert((last_def.tid.clone(), sub.tid.clone()), node_id);
+                    }
+                },
+                Node::BlkEnd(block, sub) => {
+                    for jmp in block.term.jmps.iter() {
+                        jmp_to_blk_end_node_map.insert((jmp.tid.clone(), sub.tid.clone()), node_id);
+                    }
+                }
+                _ => (),
+            }
+        }
+
+        BlockMaps {
+            block_first_def_set,
+            block_start_last_def_map,
+            jmp_to_blk_end_node_map,
+        }
+    }
 }

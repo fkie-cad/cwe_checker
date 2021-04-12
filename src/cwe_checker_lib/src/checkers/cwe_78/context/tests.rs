@@ -1,6 +1,8 @@
+use petgraph::visit::IntoNodeReferences;
+
 use super::*;
 
-use crate::analysis::backward_interprocedural_fixpoint::Context as BackwardContext;
+use crate::analysis::{backward_interprocedural_fixpoint::Context as BackwardContext, graph::Node};
 use crate::{
     abstract_domain::{DataDomain, PointerDomain, SizedDomain},
     analysis::pointer_inference::{Data, State as PointerInferenceState, ValueDomain},
@@ -111,12 +113,57 @@ impl<'a> Context<'a> {
         mem_image: &'a RuntimeMemoryImage,
     ) -> Self {
         let (cwe_sender, _) = crossbeam_channel::unbounded();
+        let mut graph = pi_results.get_graph().clone();
+        graph.reverse();
+
+        let mut extern_symbol_map = HashMap::new();
+        for symbol in project.program.term.extern_symbols.iter() {
+            extern_symbol_map.insert(symbol.tid.clone(), symbol);
+        }
+
+        let mut block_first_def_set: HashSet<(Tid, Tid)> = HashSet::new();
+        let mut block_start_last_def_map = HashMap::new();
+        let mut jmp_to_blk_end_node_map = HashMap::new();
+        for (node_id, node) in graph.node_references() {
+            match node {
+                Node::BlkStart(block, sub) => match block.term.defs.len() {
+                    0 => (),
+                    num_of_defs => {
+                        let first_def = block.term.defs.get(0).unwrap();
+                        let last_def = block.term.defs.get(num_of_defs - 1).unwrap();
+                        block_first_def_set.insert((first_def.tid.clone(), sub.tid.clone()));
+                        block_start_last_def_map
+                            .insert((last_def.tid.clone(), sub.tid.clone()), node_id);
+                    }
+                },
+                Node::BlkEnd(block, sub) => {
+                    for jmp in block.term.jmps.iter() {
+                        jmp_to_blk_end_node_map.insert((jmp.tid.clone(), sub.tid.clone()), node_id);
+                    }
+                }
+                _ => (),
+            }
+        }
+
+        let block_maps: BlockMaps = BlockMaps {
+            block_first_def_set,
+            block_start_last_def_map,
+            jmp_to_blk_end_node_map,
+        };
+
+        let symbol_maps: SymbolMaps = SymbolMaps {
+            string_symbol_map: string_symbols,
+            user_input_symbol_map: HashMap::new(),
+            extern_symbol_map,
+        };
+
         Context::new(
             project,
             mem_image,
+            std::sync::Arc::new(graph),
             pi_results,
-            string_symbols,
-            HashMap::new(),
+            std::sync::Arc::new(symbol_maps),
+            std::sync::Arc::new(block_maps),
             cwe_sender,
         )
     }
@@ -164,6 +211,7 @@ fn tainting_string_function_parameters() {
 
     let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
     let node_id = context
+        .block_maps
         .jmp_to_blk_end_node_map
         .get(&(Tid::new("call_string"), Tid::new("func")))
         .unwrap();
@@ -253,6 +301,7 @@ fn tainting_generic_function_parameters_and_removing_non_callee_saved() {
     string_syms.insert(Tid::new("sprintf"), &setup.string_sym);
     let context = Context::mock(&setup.project, string_syms, &pi_results, &mem_image);
     let node_id = context
+        .block_maps
         .jmp_to_blk_end_node_map
         .get(&(Tid::new("call_string"), Tid::new("func")))
         .unwrap();
@@ -327,6 +376,7 @@ fn tainting_stack_parameters() {
 
     let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
     let call_source_node = context
+        .block_maps
         .jmp_to_blk_end_node_map
         .get(&(Tid::new("call_string"), Tid::new("func")))
         .unwrap();
@@ -366,6 +416,7 @@ fn tainting_parameters() {
 
     let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
     let call_source_node = context
+        .block_maps
         .jmp_to_blk_end_node_map
         .get(&(Tid::new("call_string"), Tid::new("func")))
         .unwrap();
@@ -407,6 +458,7 @@ fn creating_pi_def_map() {
     let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
     let current_sub = setup.project.program.term.subs.get(0).unwrap();
     let start_node = context
+        .block_maps
         .block_start_last_def_map
         .get(&(def2.clone(), current_sub.tid.clone()))
         .unwrap();
@@ -452,6 +504,7 @@ fn getting_blk_start_node_if_last_def() {
     setup.state.set_current_sub(current_sub);
 
     let start_node = context
+        .block_maps
         .block_start_last_def_map
         .get(&(def2.tid.clone(), current_sub.tid.clone()))
         .unwrap();
@@ -481,6 +534,7 @@ fn getting_source_node() {
     setup.state.set_current_sub(current_sub);
 
     let blk_end_node_id = context
+        .block_maps
         .jmp_to_blk_end_node_map
         .get(&(call_tid.clone(), current_sub.tid.clone()))
         .unwrap();
