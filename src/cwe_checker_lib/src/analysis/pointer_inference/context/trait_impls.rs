@@ -304,7 +304,7 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
             .specialize_by_expression_result(condition, Bitvector::from_u8(is_true as u8).into())
             .is_err()
         {
-            // State is unstatisfiable
+            // State is unsatisfiable
             return None;
         }
         let mut modified_vars: HashSet<Variable> = HashSet::new();
@@ -333,7 +333,7 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
                                 .specialize_by_expression_result(input_expr, expr_result.clone())
                                 .is_err()
                             {
-                                // State is unstatisfiable
+                                // State is unsatisfiable
                                 return None;
                             }
                         }
