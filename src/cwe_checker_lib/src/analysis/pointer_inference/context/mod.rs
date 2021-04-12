@@ -90,7 +90,7 @@ impl<'a> Context<'a> {
             _ => Bitvector::zero(apint::BitWidth::from(self.project.get_pointer_bytesize())),
         };
         match state_before_return.get_register(&self.project.stack_pointer_register) {
-            Ok(Data::Pointer(pointer)) => {
+            Data::Pointer(pointer) => {
                 if pointer.targets().len() == 1 {
                     let (id, offset) = pointer.targets().iter().next().unwrap();
                     if *id != state_before_return.stack_id
@@ -106,11 +106,10 @@ impl<'a> Context<'a> {
                     ))
                 }
             }
-            Ok(Data::Top(_)) => Err(anyhow!(
+            Data::Top(_) => Err(anyhow!(
                 "Stack register value lost during function execution"
             )),
-            Ok(Data::Value(_)) => Err(anyhow!("Unexpected stack register value on return")),
-            Err(err) => Err(err),
+            Data::Value(_) => Err(anyhow!("Unexpected stack register value on return")),
         }
     }
 
@@ -258,11 +257,7 @@ impl<'a> Context<'a> {
     /// Check whether the jump is an indirect call whose target evaluates to a *Top* value in the given state.
     fn is_indirect_call_with_top_target(&self, state: &State, call: &Term<Jmp>) -> bool {
         match &call.term {
-            Jmp::CallInd { target, .. }
-                if state.eval(target).map_or(false, |value| value.is_top()) =>
-            {
-                true
-            }
+            Jmp::CallInd { target, .. } => state.eval(target).is_top(),
             _ => false,
         }
     }
@@ -280,7 +275,7 @@ impl<'a> Context<'a> {
         new_state: &mut State,
     ) {
         let stack_register = &self.project.stack_pointer_register;
-        let stack_pointer = state_before_call.get_register(stack_register).unwrap();
+        let stack_pointer = state_before_call.get_register(stack_register);
         match self.project.cpu_architecture.as_str() {
             "x86" | "x86_64" => {
                 let offset = Bitvector::from_u64(stack_register.size.into())
@@ -382,7 +377,7 @@ impl<'a> Context<'a> {
 
     /// Get the offset of the current stack pointer to the base of the current stack frame.
     fn get_current_stack_offset(&self, state: &State) -> ValueDomain {
-        if let Ok(Data::Pointer(ref stack_pointer)) =
+        if let Data::Pointer(ref stack_pointer) =
             state.get_register(&self.project.stack_pointer_register)
         {
             if stack_pointer.targets().len() == 1 {

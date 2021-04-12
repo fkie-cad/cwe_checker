@@ -158,22 +158,18 @@ fn handle_store() {
     let mut state = State::new(&register("RSP"), Tid::new("time0"));
     let stack_id = new_id("time0", "RSP");
     assert_eq!(
-        state.eval(&Var(register("RSP"))).unwrap(),
+        state.eval(&Var(register("RSP"))),
         Data::Pointer(PointerDomain::new(stack_id.clone(), bv(0)))
     );
 
-    state
-        .handle_register_assign(&register("RSP"), &reg_sub("RSP", 32))
-        .unwrap();
+    state.handle_register_assign(&register("RSP"), &reg_sub("RSP", 32));
     assert_eq!(
-        state.eval(&Var(register("RSP"))).unwrap(),
+        state.eval(&Var(register("RSP"))),
         Data::Pointer(PointerDomain::new(stack_id.clone(), bv(-32)))
     );
-    state
-        .handle_register_assign(&register("RSP"), &reg_add("RSP", -8))
-        .unwrap();
+    state.handle_register_assign(&register("RSP"), &reg_add("RSP", -8));
     assert_eq!(
-        state.eval(&Var(register("RSP"))).unwrap(),
+        state.eval(&Var(register("RSP"))),
         Data::Pointer(PointerDomain::new(stack_id.clone(), bv(-40)))
     );
 
@@ -198,9 +194,7 @@ fn handle_store() {
             &global_memory,
         )
         .unwrap();
-    state
-        .handle_register_assign(&register("RSP"), &reg_sub("RSP", 4))
-        .unwrap();
+    state.handle_register_assign(&register("RSP"), &reg_sub("RSP", 4));
 
     assert_eq!(
         state
@@ -364,22 +358,16 @@ fn remove_and_restore_callee_saved_register() {
     let mut callee_state = state.clone();
     callee_state.remove_callee_saved_register(&cconv);
     assert_eq!(
-        callee_state.get_register(&register("RBP")).unwrap(),
+        callee_state.get_register(&register("RBP")),
         Data::new_top(ByteSize::new(8))
     );
-    assert_eq!(
-        callee_state.get_register(&register("RAX")).unwrap(),
-        value.clone()
-    );
+    assert_eq!(callee_state.get_register(&register("RAX")), value.clone());
 
     let other_value: Data = Bitvector::from_u64(13).into();
     callee_state.set_register(&register("RAX"), other_value.clone());
     callee_state.restore_callee_saved_register(&state, &cconv, &register("RSP"));
-    assert_eq!(callee_state.get_register(&register("RBP")).unwrap(), value);
-    assert_eq!(
-        callee_state.get_register(&register("RAX")).unwrap(),
-        other_value
-    );
+    assert_eq!(callee_state.get_register(&register("RBP")), value);
+    assert_eq!(callee_state.get_register(&register("RAX")), other_value);
 }
 
 #[test]
@@ -483,4 +471,496 @@ fn global_mem_access() {
             &global_memory
         )
         .is_err());
+}
+
+/// Test expression specialization except for binary operations.
+#[test]
+fn specialize_by_expression_results() {
+    let mut base_state = State::new(&register("RSP"), Tid::new("func_tid"));
+    base_state.set_register(
+        &register("RAX"),
+        IntervalDomain::new(Bitvector::from_i64(5), Bitvector::from_i64(10)).into(),
+    );
+
+    // Expr = Var(RAX)
+    let mut state = base_state.clone();
+    let x = state
+        .specialize_by_expression_result(&Expression::var("RAX"), Bitvector::from_i64(7).into());
+    assert!(x.is_ok());
+    assert_eq!(
+        state.get_register(&register("RAX")),
+        Bitvector::from_i64(7).into()
+    );
+    let mut state = base_state.clone();
+    let x = state
+        .specialize_by_expression_result(&Expression::var("RAX"), Bitvector::from_i64(-20).into());
+    assert!(x.is_err());
+
+    // Expr = Const
+    let mut state = base_state.clone();
+    let x = state.specialize_by_expression_result(
+        &Expression::Const(Bitvector::from_i64(-20)),
+        Bitvector::from_i64(-20).into(),
+    );
+    assert!(x.is_ok());
+    let mut state = base_state.clone();
+    let x = state.specialize_by_expression_result(
+        &Expression::Const(Bitvector::from_i64(5)),
+        Bitvector::from_i64(-20).into(),
+    );
+    assert!(x.is_err());
+
+    // Expr = -Var(RAX)
+    let mut state = base_state.clone();
+    let x = state.specialize_by_expression_result(
+        &Expression::var("RAX").un_op(UnOpType::Int2Comp),
+        Bitvector::from_i64(-7).into(),
+    );
+    assert!(x.is_ok());
+    assert_eq!(
+        state.get_register(&register("RAX")),
+        Bitvector::from_i64(7).into()
+    );
+
+    // Expr = IntSExt(Var(EAX))
+    let mut state = State::new(&register("RSP"), Tid::new("func_tid"));
+    let eax_register = Variable {
+        name: "EAX".to_string(),
+        size: ByteSize::new(4),
+        is_temp: false,
+    };
+    state.set_register(
+        &eax_register,
+        IntervalDomain::new(Bitvector::from_i32(-10), Bitvector::from_i32(-5)).into(),
+    );
+    let x = state.specialize_by_expression_result(
+        &Expression::Var(eax_register.clone()).cast(CastOpType::IntSExt),
+        Bitvector::from_i64(-7).into(),
+    );
+    assert!(x.is_ok());
+    assert_eq!(
+        state.get_register(&eax_register),
+        Bitvector::from_i32(-7).into()
+    );
+}
+
+/// Test expression specialization for binary operations
+/// except equality and inequality operations
+#[test]
+fn specialize_by_binop() {
+    let base_state = State::new(&register("RSP"), Tid::new("func_tid"));
+
+    // Expr = RAX + Const
+    let mut state = base_state.clone();
+    let x = state.specialize_by_expression_result(
+        &Expression::var("RAX").plus_const(20),
+        IntervalDomain::mock(5, 7).into(),
+    );
+    assert!(x.is_ok());
+    assert_eq!(
+        state.get_register(&register("RAX")),
+        IntervalDomain::mock(-15, -13).into()
+    );
+
+    // Expr = RAX - Const
+    let mut state = base_state.clone();
+    let x = state.specialize_by_expression_result(
+        &Expression::var("RAX").minus_const(20),
+        Bitvector::from_i64(5).into(),
+    );
+    assert!(x.is_ok());
+    assert_eq!(
+        state.get_register(&register("RAX")),
+        Bitvector::from_i64(25).into()
+    );
+
+    // Expr = RAX xor Const
+    let mut state = base_state.clone();
+    let x = state.specialize_by_expression_result(
+        &Expression::BinOp {
+            lhs: Box::new(Expression::var("RAX")),
+            op: BinOpType::IntXOr,
+            rhs: Box::new(Expression::const_from_i64(3)),
+        },
+        Bitvector::from_i64(-1).into(),
+    );
+    assert!(x.is_ok());
+    assert_eq!(
+        state.get_register(&register("RAX")),
+        Bitvector::from_i64(-4).into()
+    );
+
+    // Expr = (RAX or RBX == 0)
+    let mut state = base_state.clone();
+    let x = state.specialize_by_expression_result(
+        &Expression::BinOp {
+            lhs: Box::new(Expression::var("RAX")),
+            op: BinOpType::IntOr,
+            rhs: Box::new(Expression::var("RBX")),
+        },
+        Bitvector::from_i64(0).into(),
+    );
+    assert!(x.is_ok());
+    assert_eq!(
+        state.get_register(&register("RAX")),
+        Bitvector::from_i64(0).into()
+    );
+    assert_eq!(
+        state.get_register(&register("RBX")),
+        Bitvector::from_i64(0).into()
+    );
+    // Expr = (RAX or 0 == Const)
+    let mut state = base_state.clone();
+    let x = state.specialize_by_expression_result(
+        &Expression::BinOp {
+            lhs: Box::new(Expression::var("RAX")),
+            op: BinOpType::IntOr,
+            rhs: Box::new(Expression::const_from_i64(0)),
+        },
+        Bitvector::from_i64(42).into(),
+    );
+    assert!(x.is_ok());
+    assert_eq!(
+        state.get_register(&register("RAX")),
+        Bitvector::from_i64(42).into()
+    );
+
+    // Expr = (FLAG1 bool_and FLAG2 == 1)
+    let mut state = base_state.clone();
+    let x = state.specialize_by_expression_result(
+        &Expression::BinOp {
+            lhs: Box::new(Expression::Var(Variable::mock("FLAG1", 1u64))),
+            op: BinOpType::BoolAnd,
+            rhs: Box::new(Expression::Var(Variable::mock("FLAG2", 1u64))),
+        },
+        Bitvector::from_u8(1).into(),
+    );
+    assert!(x.is_ok());
+    assert_eq!(
+        state.get_register(&Variable::mock("FLAG1", 1u64)),
+        Bitvector::from_u8(1).into()
+    );
+    assert_eq!(
+        state.get_register(&Variable::mock("FLAG2", 1u64)),
+        Bitvector::from_u8(1).into()
+    );
+    // Expr = (FLAG bool_and 1 = Const)
+    let mut state = base_state.clone();
+    let x = state.specialize_by_expression_result(
+        &Expression::BinOp {
+            lhs: Box::new(Expression::Const(Bitvector::from_u8(1))),
+            op: BinOpType::BoolAnd,
+            rhs: Box::new(Expression::Var(Variable::mock("FLAG", 1u64))),
+        },
+        Bitvector::from_u8(0).into(),
+    );
+    assert!(x.is_ok());
+    assert_eq!(
+        state.get_register(&Variable::mock("FLAG", 1u64)),
+        Bitvector::from_u8(0).into()
+    );
+}
+
+/// Test expression specialization for comparison operations `==` and `!=`.
+#[test]
+fn specialize_by_equality_comparison() {
+    let mut base_state = State::new(&register("RSP"), Tid::new("func_tid"));
+    base_state.set_register(&register("RAX"), IntervalDomain::mock(0, 50).into());
+
+    // Expr = RAX == Const
+    let mut state = base_state.clone();
+    let x = state.specialize_by_expression_result(
+        &Expression::BinOp {
+            lhs: Box::new(Expression::const_from_i64(23)),
+            op: BinOpType::IntEqual,
+            rhs: Box::new(Expression::var("RAX")),
+        },
+        Bitvector::from_u8(1).into(),
+    );
+    assert!(x.is_ok());
+    assert_eq!(
+        state.get_register(&register("RAX")),
+        Bitvector::from_i64(23).into()
+    );
+    let mut state = base_state.clone();
+    let x = state.specialize_by_expression_result(
+        &Expression::BinOp {
+            lhs: Box::new(Expression::const_from_i64(23)),
+            op: BinOpType::IntNotEqual,
+            rhs: Box::new(Expression::var("RAX")),
+        },
+        Bitvector::from_u8(0).into(),
+    );
+    assert!(x.is_ok());
+    assert_eq!(
+        state.get_register(&register("RAX")),
+        Bitvector::from_i64(23).into()
+    );
+
+    // Expr = RAX != Const
+    let mut state = base_state.clone();
+    state.set_register(&register("RAX"), Bitvector::from_i64(23).into());
+    let x = state.specialize_by_expression_result(
+        &Expression::BinOp {
+            lhs: Box::new(Expression::const_from_i64(23)),
+            op: BinOpType::IntNotEqual,
+            rhs: Box::new(Expression::var("RAX")),
+        },
+        Bitvector::from_u8(1).into(),
+    );
+    assert!(x.is_err());
+    let mut state = base_state.clone();
+    let x = state.specialize_by_expression_result(
+        &Expression::BinOp {
+            lhs: Box::new(Expression::const_from_i64(100)),
+            op: BinOpType::IntEqual,
+            rhs: Box::new(Expression::var("RAX")),
+        },
+        Bitvector::from_u8(0).into(),
+    );
+    assert!(x.is_ok());
+    assert_eq!(
+        state.get_register(&register("RAX")),
+        IntervalDomain::mock_with_bounds(None, 0, 50, Some(99)).into()
+    );
+}
+
+/// Test expression specialization for signed comparison operations `<` and `<=`.
+#[test]
+fn specialize_by_signed_comparison_op() {
+    let mut base_state = State::new(&register("RSP"), Tid::new("func_tid"));
+    let interval = IntervalDomain::mock(5, 10);
+    base_state.set_register(&register("RAX"), interval.into());
+
+    // Expr = RAX < Const (signed)
+    let mut state = base_state.clone();
+    let x = state.specialize_by_expression_result(
+        &Expression::BinOp {
+            lhs: Box::new(Expression::const_from_i64(7)),
+            op: BinOpType::IntSLess,
+            rhs: Box::new(Expression::Var(register("RAX"))),
+        },
+        Bitvector::from_u8(1).into(),
+    );
+    assert!(x.is_ok());
+    assert_eq!(
+        state.get_register(&register("RAX")),
+        IntervalDomain::mock(8, 10).into()
+    );
+    let mut state = base_state.clone();
+    let x = state.specialize_by_expression_result(
+        &Expression::BinOp {
+            lhs: Box::new(Expression::const_from_i64(15)),
+            op: BinOpType::IntSLess,
+            rhs: Box::new(Expression::Var(register("RAX"))),
+        },
+        Bitvector::from_u8(0).into(),
+    );
+    assert!(x.is_ok());
+    assert_eq!(
+        state.get_register(&register("RAX")),
+        IntervalDomain::mock_with_bounds(None, 5, 10, Some(15)).into()
+    );
+    let mut state = base_state.clone();
+    let x = state.specialize_by_expression_result(
+        &Expression::BinOp {
+            lhs: Box::new(Expression::Var(register("RAX"))),
+            op: BinOpType::IntSLess,
+            rhs: Box::new(Expression::Const(Bitvector::signed_min_value(
+                ByteSize::new(8).into(),
+            ))),
+        },
+        Bitvector::from_u8(1).into(),
+    );
+    assert!(x.is_err());
+    let mut state = base_state.clone();
+    let x = state.specialize_by_expression_result(
+        &Expression::BinOp {
+            lhs: Box::new(Expression::Var(register("RAX"))),
+            op: BinOpType::IntSLess,
+            rhs: Box::new(Expression::const_from_i64(7)),
+        },
+        Bitvector::from_u8(0).into(),
+    );
+    assert!(x.is_ok());
+    assert_eq!(
+        state.get_register(&register("RAX")),
+        IntervalDomain::mock(7, 10).into()
+    );
+
+    // Expr = RAX <= Const (signed)
+    let mut state = base_state.clone();
+    let x = state.specialize_by_expression_result(
+        &Expression::BinOp {
+            lhs: Box::new(Expression::const_from_i64(7)),
+            op: BinOpType::IntSLessEqual,
+            rhs: Box::new(Expression::Var(register("RAX"))),
+        },
+        Bitvector::from_u8(1).into(),
+    );
+    assert!(x.is_ok());
+    assert_eq!(
+        state.get_register(&register("RAX")),
+        IntervalDomain::mock(7, 10).into()
+    );
+    let mut state = base_state.clone();
+    let x = state.specialize_by_expression_result(
+        &Expression::BinOp {
+            lhs: Box::new(Expression::const_from_i64(15)),
+            op: BinOpType::IntSLessEqual,
+            rhs: Box::new(Expression::Var(register("RAX"))),
+        },
+        Bitvector::from_u8(0).into(),
+    );
+    assert!(x.is_ok());
+    assert_eq!(
+        state.get_register(&register("RAX")),
+        IntervalDomain::mock_with_bounds(None, 5, 10, Some(14)).into()
+    );
+    let mut state = base_state.clone();
+    let x = state.specialize_by_expression_result(
+        &Expression::BinOp {
+            lhs: Box::new(Expression::Var(register("RAX"))),
+            op: BinOpType::IntSLessEqual,
+            rhs: Box::new(Expression::Const(Bitvector::signed_min_value(
+                ByteSize::new(8).into(),
+            ))),
+        },
+        Bitvector::from_u8(1).into(),
+    );
+    assert!(x.is_err());
+    let mut state = base_state.clone();
+    let x = state.specialize_by_expression_result(
+        &Expression::BinOp {
+            lhs: Box::new(Expression::Var(register("RAX"))),
+            op: BinOpType::IntSLessEqual,
+            rhs: Box::new(Expression::const_from_i64(7)),
+        },
+        Bitvector::from_u8(0).into(),
+    );
+    assert!(x.is_ok());
+    assert_eq!(
+        state.get_register(&register("RAX")),
+        IntervalDomain::mock(8, 10).into()
+    );
+}
+
+/// Test expression specialization for unsigned comparison operations `<` and `<=`.
+#[test]
+fn specialize_by_unsigned_comparison_op() {
+    let mut base_state = State::new(&register("RSP"), Tid::new("func_tid"));
+    let interval = IntervalDomain::mock(-5, 10);
+    base_state.set_register(&register("RAX"), interval.into());
+
+    // Expr = RAX < Const (unsigned)
+    let mut state = base_state.clone();
+    let x = state.specialize_by_expression_result(
+        &Expression::BinOp {
+            lhs: Box::new(Expression::const_from_i64(7)),
+            op: BinOpType::IntLess,
+            rhs: Box::new(Expression::Var(register("RAX"))),
+        },
+        Bitvector::from_u8(1).into(),
+    );
+    assert!(x.is_ok());
+    assert_eq!(
+        state.get_register(&register("RAX")),
+        IntervalDomain::mock(-5, 10).into()
+    );
+    let mut state = base_state.clone();
+    let x = state.specialize_by_expression_result(
+        &Expression::BinOp {
+            lhs: Box::new(Expression::const_from_i64(15)),
+            op: BinOpType::IntLess,
+            rhs: Box::new(Expression::Var(register("RAX"))),
+        },
+        Bitvector::from_u8(0).into(),
+    );
+    assert!(x.is_ok());
+    assert_eq!(
+        state.get_register(&register("RAX")),
+        IntervalDomain::mock_with_bounds(None, 0, 10, Some(15)).into()
+    );
+    let mut state = base_state.clone();
+    let x = state.specialize_by_expression_result(
+        &Expression::BinOp {
+            lhs: Box::new(Expression::Var(register("RAX"))),
+            op: BinOpType::IntLess,
+            rhs: Box::new(Expression::const_from_i64(0)),
+        },
+        Bitvector::from_u8(1).into(),
+    );
+    assert!(x.is_err());
+    let mut state = base_state.clone();
+    let x = state.specialize_by_expression_result(
+        &Expression::BinOp {
+            lhs: Box::new(Expression::Var(register("RAX"))),
+            op: BinOpType::IntLess,
+            rhs: Box::new(Expression::const_from_i64(-20)),
+        },
+        Bitvector::from_u8(0).into(),
+    );
+    assert!(x.is_ok());
+    assert_eq!(
+        state.get_register(&register("RAX")),
+        IntervalDomain::mock_with_bounds(Some(-20), -5, -1, None).into()
+    );
+
+    // Expr = RAX <= Const (unsigned)
+    let mut state = base_state.clone();
+    let x = state.specialize_by_expression_result(
+        &Expression::BinOp {
+            lhs: Box::new(Expression::const_from_i64(7)),
+            op: BinOpType::IntLessEqual,
+            rhs: Box::new(Expression::Var(register("RAX"))),
+        },
+        Bitvector::from_u8(1).into(),
+    );
+    assert!(x.is_ok());
+    assert_eq!(
+        state.get_register(&register("RAX")),
+        IntervalDomain::mock(-5, 10).into()
+    );
+    let mut state = base_state.clone();
+    let x = state.specialize_by_expression_result(
+        &Expression::BinOp {
+            lhs: Box::new(Expression::const_from_i64(15)),
+            op: BinOpType::IntLessEqual,
+            rhs: Box::new(Expression::Var(register("RAX"))),
+        },
+        Bitvector::from_u8(0).into(),
+    );
+    assert!(x.is_ok());
+    assert_eq!(
+        state.get_register(&register("RAX")),
+        IntervalDomain::mock_with_bounds(None, 0, 10, Some(14)).into()
+    );
+    let mut state = base_state.clone();
+    let x = state.specialize_by_expression_result(
+        &Expression::BinOp {
+            lhs: Box::new(Expression::Var(register("RAX"))),
+            op: BinOpType::IntLessEqual,
+            rhs: Box::new(Expression::const_from_i64(0)),
+        },
+        Bitvector::from_u8(1).into(),
+    );
+    assert!(x.is_ok());
+    assert_eq!(
+        state.get_register(&register("RAX")),
+        Bitvector::from_i64(0).into()
+    );
+    let mut state = base_state.clone();
+    let x = state.specialize_by_expression_result(
+        &Expression::BinOp {
+            lhs: Box::new(Expression::Var(register("RAX"))),
+            op: BinOpType::IntLessEqual,
+            rhs: Box::new(Expression::const_from_i64(-20)),
+        },
+        Bitvector::from_u8(0).into(),
+    );
+    assert!(x.is_ok());
+    assert_eq!(
+        state.get_register(&register("RAX")),
+        IntervalDomain::mock_with_bounds(Some(-19), -5, -1, None).into()
+    );
 }

@@ -101,9 +101,8 @@ impl State {
                     if let Some(pi_state) = pi_state {
                         let address_exp =
                             Expression::Var(stack_pointer_register.clone()).plus_const(*offset);
-                        if let Ok(address) = pi_state.eval(&address_exp) {
-                            state.save_taint_to_memory(&address, Taint::Tainted(*size));
-                        }
+                        let address = pi_state.eval(&address_exp);
+                        state.save_taint_to_memory(&address, Taint::Tainted(*size));
                     }
                 }
             }
@@ -369,12 +368,13 @@ impl State {
             }
             memory.push((format!("{}", tid), Value::Object(Map::from_iter(elements))));
         }
-        let mut state_map = Vec::new();
-        state_map.push((
-            "register".to_string(),
-            Value::Object(Map::from_iter(register)),
-        ));
-        state_map.push(("memory".to_string(), Value::Object(Map::from_iter(memory))));
+        let state_map = vec![
+            (
+                "register".to_string(),
+                Value::Object(Map::from_iter(register)),
+            ),
+            ("memory".to_string(), Value::Object(Map::from_iter(memory))),
+        ];
 
         Value::Object(Map::from_iter(state_map))
     }
@@ -477,7 +477,7 @@ mod tests {
         assert_eq!(state.register_taint.get(&register("RSP")), None);
         let address = Expression::Var(register("RSP"));
         assert_eq!(
-            state.load_taint_from_memory(&pi_state.eval(&address).unwrap(), ByteSize::new(8)),
+            state.load_taint_from_memory(&pi_state.eval(&address), ByteSize::new(8)),
             taint
         );
     }

@@ -100,6 +100,22 @@ impl Expression {
         }
     }
 
+    /// Return an array of all input variables of the given expression.
+    /// The array may contain duplicates.
+    pub fn input_vars(&self) -> Vec<&Variable> {
+        use Expression::*;
+        match self {
+            Var(var) => vec![var],
+            Const(_) | Unknown { .. } => Vec::new(),
+            BinOp { op: _, lhs, rhs } => {
+                let mut vars = lhs.input_vars();
+                vars.append(&mut rhs.input_vars());
+                vars
+            }
+            UnOp { arg, .. } | Cast { arg, .. } | Subpiece { arg, .. } => arg.input_vars(),
+        }
+    }
+
     /// Substitute trivial BinOp-expressions with their results,
     /// e.g. substitute `a or a` with `a`.
     ///

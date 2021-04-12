@@ -43,7 +43,7 @@ pub fn is_sink_call_reachable_from_source_call(
             // and as long as the edge does not leave the function.
             match edge.weight() {
                 Edge::Block
-                | Edge::CRCallStub
+                | Edge::CrCallStub
                 | Edge::CallCombine(_)
                 | Edge::ReturnCombine(_)
                 | Edge::Jump(_, _)
@@ -53,7 +53,7 @@ pub fn is_sink_call_reachable_from_source_call(
                         worklist.push(edge.target())
                     }
                 }
-                Edge::Call(_) | Edge::CRReturnStub => (), // These edges would leave the function control flow graph.
+                Edge::Call(_) | Edge::CrReturnStub => (), // These edges would leave the function control flow graph.
             }
         }
     }

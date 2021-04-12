@@ -197,23 +197,21 @@ impl<'a> Context<'a> {
             for parameter in extern_symbol.parameters.iter() {
                 match parameter {
                     Arg::Register(var) => {
-                        if let Ok(data) = pi_state.eval(&Expression::Var(var.clone())) {
-                            if state.check_if_address_points_to_taint(data, pi_state) {
-                                return true;
-                            }
+                        let data = pi_state.eval(&Expression::Var(var.clone()));
+                        if state.check_if_address_points_to_taint(data, pi_state) {
+                            return true;
                         }
                     }
                     Arg::Stack { offset, size } => {
-                        if let Ok(stack_address) = pi_state.eval(
+                        let stack_address = pi_state.eval(
                             &Expression::Var(self.project.stack_pointer_register.clone())
                                 .plus_const(*offset),
-                        ) {
-                            if state
-                                .load_taint_from_memory(&stack_address, *size)
-                                .is_tainted()
-                            {
-                                return true;
-                            }
+                        );
+                        if state
+                            .load_taint_from_memory(&stack_address, *size)
+                            .is_tainted()
+                        {
+                            return true;
                         }
                         if let Ok(stack_param) = pi_state.eval_parameter_arg(
                             parameter,
@@ -266,6 +264,7 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
         &self,
         state: &State,
         _condition: &Expression,
+        _block_before_condition: &Term<Blk>,
         _is_true: bool,
     ) -> Option<State> {
         Some(state.clone())
@@ -332,10 +331,9 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
                 } else if let Some(pi_state) =
                     self.get_current_pointer_inference_state(state, &def.tid)
                 {
-                    if let Ok(address_data) = pi_state.eval(address) {
-                        let taint = state.load_taint_from_memory(&address_data, var.size);
-                        new_state.set_register_taint(var, taint);
-                    }
+                    let address_data = pi_state.eval(address);
+                    let taint = state.load_taint_from_memory(&address_data, var.size);
+                    new_state.set_register_taint(var, taint);
                 } else {
                     new_state.set_register_taint(var, Taint::Top(var.size));
                 }
@@ -347,10 +345,9 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
                 } else if let Some(pi_state) =
                     self.get_current_pointer_inference_state(state, &def.tid)
                 {
-                    if let Ok(address_data) = pi_state.eval(address) {
-                        let taint = state.eval(value);
-                        new_state.save_taint_to_memory(&address_data, taint);
-                    }
+                    let address_data = pi_state.eval(address);
+                    let taint = state.eval(value);
+                    new_state.save_taint_to_memory(&address_data, taint);
                 } else {
                     // We lost all knowledge about memory pointers.
                     // We delete all memory taint to reduce false positives.

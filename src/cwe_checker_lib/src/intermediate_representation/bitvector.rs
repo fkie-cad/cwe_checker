@@ -25,11 +25,11 @@ pub trait BitvectorExtended: Sized {
     /// Returns an error for non-implemented operations (currently all float-related operations).
     fn bin_op(&self, op: BinOpType, rhs: &Self) -> Result<Self, Error>;
 
-    /// Returns `true` if adding `self` to `rhs` would result in a signed integer overflow or underflow.
-    fn signed_add_overflow_check(&self, rhs: &Self) -> bool;
+    /// Returns the result of `self + rhs` if the computation does not result in a signed integer overflow or underflow.
+    fn signed_add_overflow_checked(&self, rhs: &Self) -> Option<Self>;
 
-    /// Returns `true` if subtracting `rhs` from `self` would result in a signed integer overflow or underflow.
-    fn signed_sub_overflow_check(&self, rhs: &Self) -> bool;
+    /// Returns the result of `self - rhs` if the computation does not result in a signed integer overflow or underflow.
+    fn signed_sub_overflow_checked(&self, rhs: &Self) -> Option<Self>;
 
     /// Return the result of multiplying `self` with `rhs`
     /// and a flag that is set to `true` if the multiplication resulted in a signed integer overflow or underflow.
@@ -221,23 +221,21 @@ impl BitvectorExtended for Bitvector {
         }
     }
 
-    /// Returns `true` if adding `self` to `rhs` would result in a signed integer overflow or underflow.
-    fn signed_add_overflow_check(&self, rhs: &Self) -> bool {
+    /// Returns the result of `self + rhs` if the computation does not result in a signed integer overflow or underflow.
+    fn signed_add_overflow_checked(&self, rhs: &Self) -> Option<Self> {
         let result = self.clone().into_checked_add(rhs).unwrap();
-        if rhs.sign_bit().to_bool() {
-            self.checked_sle(&result).unwrap()
-        } else {
-            self.checked_sgt(&result).unwrap()
+        match (rhs.sign_bit().to_bool(), self.checked_sle(&result).unwrap()) {
+            (true, true) | (false, false) => None,
+            _ => Some(result),
         }
     }
 
-    /// Returns `true` if subtracting `rhs` from `self` would result in a signed integer overflow or underflow.
-    fn signed_sub_overflow_check(&self, rhs: &Self) -> bool {
+    /// Returns the result of `self - rhs` if the computation does not result in a signed integer overflow or underflow.
+    fn signed_sub_overflow_checked(&self, rhs: &Self) -> Option<Self> {
         let result = self.clone().into_checked_sub(rhs).unwrap();
-        if rhs.sign_bit().to_bool() {
-            self.checked_sge(&result).unwrap()
-        } else {
-            self.checked_slt(&result).unwrap()
+        match (rhs.sign_bit().to_bool(), self.checked_sge(&result).unwrap()) {
+            (true, true) | (false, false) => None,
+            _ => Some(result),
         }
     }
 
@@ -262,5 +260,38 @@ impl BitvectorExtended for Bitvector {
                 Ok((result, false))
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn overflow_checked_add_and_sub() {
+        let max = Bitvector::signed_max_value(ByteSize::new(8).into());
+        let min = Bitvector::signed_min_value(ByteSize::new(8).into());
+
+        assert_eq!(min.signed_add_overflow_checked(&min), None);
+        assert_eq!(
+            min.signed_add_overflow_checked(&max),
+            Some(-Bitvector::one(ByteSize::new(8).into()))
+        );
+        assert_eq!(
+            max.signed_add_overflow_checked(&min),
+            Some(-Bitvector::one(ByteSize::new(8).into()))
+        );
+        assert_eq!(max.signed_add_overflow_checked(&max), None);
+
+        assert_eq!(
+            min.signed_sub_overflow_checked(&min),
+            Some(Bitvector::zero(ByteSize::new(8).into()))
+        );
+        assert_eq!(min.signed_sub_overflow_checked(&max), None);
+        assert_eq!(max.signed_sub_overflow_checked(&min), None);
+        assert_eq!(
+            max.signed_sub_overflow_checked(&max),
+            Some(Bitvector::zero(ByteSize::new(8).into()))
+        );
     }
 }

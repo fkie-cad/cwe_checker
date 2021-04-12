@@ -172,6 +172,7 @@ impl From<Expression> for IrExpression {
 /// Expression Opcodes as parsed from Ghidra
 #[allow(missing_docs)]
 #[allow(non_camel_case_types)]
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum ExpressionType {
     COPY,

@@ -150,9 +150,9 @@ pub enum Edge<'a> {
     /// The edge goes directly from the callsite to the return-to-site inside the caller.
     ExternCallStub(&'a Term<Jmp>),
     /// An artificial edge. See the module-level documentation for more information.
-    CRCallStub,
+    CrCallStub,
     /// An artificial edge. See the module-level documentation for more information.
-    CRReturnStub,
+    CrReturnStub,
     /// An artificial edge to combine intra- and interprocedural data flows at the callsite of calls.
     /// See the module-level documentation for more information.
     CallCombine(&'a Term<Jmp>),
@@ -425,9 +425,9 @@ impl<'a> GraphBuilder<'a> {
                 return_: (return_from_block, return_from_sub),
             });
             self.graph
-                .add_edge(*call_node, return_combine_node, Edge::CRCallStub);
+                .add_edge(*call_node, return_combine_node, Edge::CrCallStub);
             self.graph
-                .add_edge(return_source, return_combine_node, Edge::CRReturnStub);
+                .add_edge(return_source, return_combine_node, Edge::CrReturnStub);
             self.graph.add_edge(
                 return_combine_node,
                 *return_to_node,
