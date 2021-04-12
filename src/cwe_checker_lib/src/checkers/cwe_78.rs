@@ -82,12 +82,6 @@ pub struct Config {
     user_input_symbols: Vec<String>,
 }
 
-pub struct SymbolMaps<'a> {
-    string_symbol_map: HashMap<Tid, &'a ExternSymbol>,
-    user_input_symbol_map: HashMap<Tid, &'a ExternSymbol>,
-    extern_symbol_map: HashMap<Tid, &'a ExternSymbol>,
-}
-
 /// This check searches for system calls and sets their parameters as taint source if available.
 /// Then the fixpoint computation is executed and its result may generate cwe warnings if
 /// the parameters can be tracked back to user inputs
@@ -107,24 +101,8 @@ pub fn check_cwe(
     let system_symbols =
         crate::utils::symbol_utils::get_symbol_map(project, &config.system_symbols[..]);
 
-    let mut extern_symbol_map = HashMap::new();
-    for symbol in project.program.term.extern_symbols.iter() {
-        extern_symbol_map.insert(symbol.tid.clone(), symbol);
-    }
-
-    let symbol_maps: SymbolMaps = SymbolMaps {
-        string_symbol_map: crate::utils::symbol_utils::get_symbol_map(
-            project,
-            &config.string_symbols[..],
-        ),
-        user_input_symbol_map: crate::utils::symbol_utils::get_symbol_map(
-            project,
-            &config.user_input_symbols[..],
-        ),
-        extern_symbol_map,
-    };
-
-    let block_maps = create_block_maps(analysis_results);
+    let symbol_maps: SymbolMaps = SymbolMaps::new(project, &config);
+    let block_maps = BlockMaps::new(analysis_results);
 
     let general_context = Context::new(
         project,
@@ -233,16 +211,49 @@ fn get_entry_sub_to_entry_node_map(
         .collect()
 }
 
-/// block_first_def_set:
-///       A set containing a given [`Def`] as the first `Def` of the block.
+/// - string_symbols:
+///     - Maps the TID of an extern string related symbol to the corresponding extern symbol struct.
+/// - user_input_symbols:
+///     - Maps the TID of an extern symbol that take input from the user to the corresponding extern symbol struct.
+/// - extern_symbol_map:
+///     - Maps the TID of an extern symbol to the extern symbol struct.
+pub struct SymbolMaps<'a> {
+    string_symbol_map: HashMap<Tid, &'a ExternSymbol>,
+    user_input_symbol_map: HashMap<Tid, &'a ExternSymbol>,
+    extern_symbol_map: HashMap<Tid, &'a ExternSymbol>,
+}
+
+impl<'a> SymbolMaps<'a> {
+    /// Creates a new instance of the symbol maps struct.
+    pub fn new(project: &'a Project, config: &Config) -> Self {
+        let mut extern_symbol_map = HashMap::new();
+        for symbol in project.program.term.extern_symbols.iter() {
+            extern_symbol_map.insert(symbol.tid.clone(), symbol);
+        }
+        SymbolMaps {
+            string_symbol_map: crate::utils::symbol_utils::get_symbol_map(
+                project,
+                &config.string_symbols[..],
+            ),
+            user_input_symbol_map: crate::utils::symbol_utils::get_symbol_map(
+                project,
+                &config.user_input_symbols[..],
+            ),
+            extern_symbol_map,
+        }
+    }
+}
+
+/// - block_first_def_set:
+///       - A set containing a given [`Def`] as the first `Def` of the block.
 ///       The keys are of the form `(Def-TID, Current-Sub-TID)`
 ///       to distinguish the nodes for blocks contained in more than one function.
-/// block_start_last_def_map:
-///       A map to get the node index of the `BlkStart` node containing a given [`Def`] as the last `Def` of the block.
+/// - block_start_last_def_map:
+///       - A map to get the node index of the `BlkStart` node containing a given [`Def`] as the last `Def` of the block.
 ///       The keys are of the form `(Def-TID, Current-Sub-TID)`
 ///       to distinguish the nodes for blocks contained in more than one function.
-/// jmp_to_blk_end_node_map:
-///       A map to get the node index of the `BlkEnd` node containing a given [`Jmp`].
+/// - jmp_to_blk_end_node_map:
+///       - A map to get the node index of the `BlkEnd` node containing a given [`Jmp`].
 ///       The keys are of the form `(Jmp-TID, Current-Sub-TID)`
 ///       to distinguish the nodes for blocks contained in more than one function.
 pub struct BlockMaps {
@@ -251,35 +262,37 @@ pub struct BlockMaps {
     jmp_to_blk_end_node_map: HashMap<(Tid, Tid), NodeIndex>,
 }
 
-/// Creates three collections with the following information:
-fn create_block_maps(analysis_results: &AnalysisResults) -> BlockMaps {
-    let mut block_first_def_set = HashSet::new();
-    let mut block_start_last_def_map = HashMap::new();
-    let mut jmp_to_blk_end_node_map = HashMap::new();
-    for (node_id, node) in analysis_results.control_flow_graph.node_references() {
-        match node {
-            Node::BlkStart(block, sub) => match block.term.defs.len() {
-                0 => (),
-                num_of_defs => {
-                    let first_def = block.term.defs.get(0).unwrap();
-                    let last_def = block.term.defs.get(num_of_defs - 1).unwrap();
-                    block_first_def_set.insert((first_def.tid.clone(), sub.tid.clone()));
-                    block_start_last_def_map
-                        .insert((last_def.tid.clone(), sub.tid.clone()), node_id);
+impl BlockMaps {
+    /// Creates a new instance of the block maps struct using the analysis results.
+    pub fn new(analysis_results: &AnalysisResults) -> Self {
+        let mut block_first_def_set = HashSet::new();
+        let mut block_start_last_def_map = HashMap::new();
+        let mut jmp_to_blk_end_node_map = HashMap::new();
+        for (node_id, node) in analysis_results.control_flow_graph.node_references() {
+            match node {
+                Node::BlkStart(block, sub) => match block.term.defs.len() {
+                    0 => (),
+                    num_of_defs => {
+                        let first_def = block.term.defs.get(0).unwrap();
+                        let last_def = block.term.defs.get(num_of_defs - 1).unwrap();
+                        block_first_def_set.insert((first_def.tid.clone(), sub.tid.clone()));
+                        block_start_last_def_map
+                            .insert((last_def.tid.clone(), sub.tid.clone()), node_id);
+                    }
+                },
+                Node::BlkEnd(block, sub) => {
+                    for jmp in block.term.jmps.iter() {
+                        jmp_to_blk_end_node_map.insert((jmp.tid.clone(), sub.tid.clone()), node_id);
+                    }
                 }
-            },
-            Node::BlkEnd(block, sub) => {
-                for jmp in block.term.jmps.iter() {
-                    jmp_to_blk_end_node_map.insert((jmp.tid.clone(), sub.tid.clone()), node_id);
-                }
+                _ => (),
             }
-            _ => (),
         }
-    }
 
-    BlockMaps {
-        block_first_def_set,
-        block_start_last_def_map,
-        jmp_to_blk_end_node_map,
+        BlockMaps {
+            block_first_def_set,
+            block_start_last_def_map,
+            jmp_to_blk_end_node_map,
+        }
     }
 }

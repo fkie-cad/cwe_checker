@@ -31,22 +31,25 @@ pub struct Context<'a> {
     /// They are used to determine the targets of pointers to memory,
     /// which in turn is used to keep track of taint on the stack or on the heap.
     pub pointer_inference_results: &'a PointerInferenceComputation<'a>,
-    /// block_first_def_set:
-    ///       A set containing a given [`Def`] as the first `Def` of the block.
+    /// - block_first_def_set:
+    ///       - A set containing a given [`Def`] as the first `Def` of the block.
     ///       The keys are of the form `(Def-TID, Current-Sub-TID)`
     ///       to distinguish the nodes for blocks contained in more than one function.
-    /// block_start_last_def_map:
-    ///       A map to get the node index of the `BlkStart` node containing a given [`Def`] as the last `Def` of the block.
+    /// - block_start_last_def_map:
+    ///       - A map to get the node index of the `BlkStart` node containing a given [`Def`] as the last `Def` of the block.
     ///       The keys are of the form `(Def-TID, Current-Sub-TID)`
     ///       to distinguish the nodes for blocks contained in more than one function.
-    /// jmp_to_blk_end_node_map:
-    ///       A map to get the node index of the `BlkEnd` node containing a given [`Jmp`].
+    /// - jmp_to_blk_end_node_map:
+    ///       - A map to get the node index of the `BlkEnd` node containing a given [`Jmp`].
     ///       The keys are of the form `(Jmp-TID, Current-Sub-TID)`
     ///       to distinguish the nodes for blocks contained in more than one function.
     block_maps: Arc<BlockMaps>,
-    /// Maps the TID of an extern symbol to the extern symbol struct.
-    /// Maps the TID of an extern string related symbol to the corresponding extern symbol struct.
-    /// Maps the TID of an extern symbol that take input from the user to the corresponding extern symbol struct.
+    /// - string_symbols:
+    ///     - Maps the TID of an extern string related symbol to the corresponding extern symbol struct.
+    /// - user_input_symbols:
+    ///     - Maps the TID of an extern symbol that take input from the user to the corresponding extern symbol struct.
+    /// - extern_symbol_map:
+    ///     - Maps the TID of an extern symbol to the extern symbol struct.
     symbol_maps: Arc<SymbolMaps<'a>>,
     /// The call whose parameter values are the sources for taint for the analysis.
     pub taint_source: Option<&'a Term<Jmp>>,
