@@ -79,6 +79,7 @@ pub trait Context<'a> {
         &self,
         value: &Self::Value,
         condition: &Expression,
+        block_before_condition: &Term<Blk>,
         is_true: bool,
     ) -> Option<Self::Value>;
 }
@@ -164,11 +165,11 @@ impl<'a, T: Context<'a>> GeneralFPContext for GeneralizedContext<'a, T> {
                 .context
                 .update_call(node_value.unwrap_value(), call, &graph[end_node])
                 .map(NodeValue::Value),
-            Edge::CRCallStub => Some(NodeValue::CallFlowCombinator {
+            Edge::CrCallStub => Some(NodeValue::CallFlowCombinator {
                 call_stub: Some(node_value.unwrap_value().clone()),
                 interprocedural_flow: None,
             }),
-            Edge::CRReturnStub => Some(NodeValue::CallFlowCombinator {
+            Edge::CrReturnStub => Some(NodeValue::CallFlowCombinator {
                 call_stub: None,
                 interprocedural_flow: Some(node_value.unwrap_value().clone()),
             }),
@@ -201,15 +202,51 @@ impl<'a, T: Context<'a>> GeneralFPContext for GeneralizedContext<'a, T> {
                 .context
                 .update_call_stub(node_value.unwrap_value(), call)
                 .map(NodeValue::Value),
-            Edge::Jump(jump, untaken_conditional) => self
-                .context
-                .update_jump(
-                    node_value.unwrap_value(),
-                    jump,
-                    *untaken_conditional,
-                    graph[end_node].get_block(),
-                )
-                .map(NodeValue::Value),
+            Edge::Jump(jump, untaken_conditional) => {
+                let value_after_condition = if let Jmp::CBranch {
+                    target: _,
+                    condition,
+                } = &jump.term
+                {
+                    let block = graph[start_node].get_block();
+                    self.context.specialize_conditional(
+                        node_value.unwrap_value(),
+                        condition,
+                        block,
+                        true,
+                    )
+                } else if let Some(untaken_conditional_jump) = untaken_conditional {
+                    if let Jmp::CBranch {
+                        target: _,
+                        condition,
+                    } = &untaken_conditional_jump.term
+                    {
+                        let block = graph[start_node].get_block();
+                        self.context.specialize_conditional(
+                            node_value.unwrap_value(),
+                            condition,
+                            block,
+                            false,
+                        )
+                    } else {
+                        panic!("Malformed control flow graph");
+                    }
+                } else {
+                    Some(node_value.unwrap_value().clone())
+                };
+                if let Some(value) = value_after_condition {
+                    self.context
+                        .update_jump(
+                            &value,
+                            jump,
+                            *untaken_conditional,
+                            graph[end_node].get_block(),
+                        )
+                        .map(NodeValue::Value)
+                } else {
+                    None
+                }
+            }
         }
     }
 }

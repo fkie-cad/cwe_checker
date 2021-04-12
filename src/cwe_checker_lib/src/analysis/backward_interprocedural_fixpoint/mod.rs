@@ -165,13 +165,13 @@ impl<'a, T: Context<'a>> GeneralFPContext for GeneralizedContext<'a, T> {
             // The CallStub Edge value is added to the CallSourceCombinator
             // The user has the ability to split the node value at the BlkStart return to node
             // to only send specific data along the CallStub Edge to the callsite
-            Edge::CRCallStub => Some(NodeValue::CallFlowCombinator {
+            Edge::CrCallStub => Some(NodeValue::CallFlowCombinator {
                 call_stub: self.context.split_call_stub(node_value.unwrap_value()),
                 interprocedural_flow: None,
             }),
             // The user has the ability to split the node value at the BlkStart return node
             // to only send specific data along the ReturnStub Edge to the last BlkEnd node called subroutine
-            Edge::CRReturnStub => {
+            Edge::CrReturnStub => {
                 // The subroutine term from which the program returns
                 let returned_from_sub = match graph.node_weight(end_node) {
                     Some(Node::BlkEnd { 0: _, 1: sub_term }) => sub_term,

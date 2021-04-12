@@ -113,9 +113,8 @@ impl State {
                     if let Some(pi_state) = pi_state {
                         let address_exp =
                             Expression::Var(stack_pointer_register.clone()).plus_const(*offset);
-                        if let Ok(address) = pi_state.eval(&address_exp) {
-                            state.save_taint_to_memory(&address, Taint::Tainted(*size));
-                        }
+                        let address = pi_state.eval(&address_exp);
+                        state.save_taint_to_memory(&address, Taint::Tainted(*size));
                     }
                 }
             }
@@ -208,9 +207,8 @@ impl State {
             Expression::BinOp { .. } => {
                 if let Some(pid_map) = self.pi_def_map.as_ref() {
                     if let Some(pi_state) = pid_map.get(def_tid) {
-                        if let Ok(address) = pi_state.get_register(result) {
-                            self.save_taint_to_memory(&address, Taint::Tainted(result.size));
-                        }
+                        let address = pi_state.get_register(result);
+                        self.save_taint_to_memory(&address, Taint::Tainted(result.size));
                     }
                 }
             }
@@ -233,11 +231,10 @@ impl State {
     ) {
         if let Some(pid_map) = self.pi_def_map.as_ref() {
             if let Some(pi_state) = pid_map.get(def_tid) {
-                if let Ok(address) = pi_state.eval(target) {
-                    if self.check_if_address_points_to_taint(address.clone(), &pi_state) {
-                        self.taint_def_input_register(value, stack_pointer_register, def_tid);
-                        self.remove_mem_taint_at_target(&address);
-                    }
+                let address = pi_state.eval(target);
+                if self.check_if_address_points_to_taint(address.clone(), &pi_state) {
+                    self.taint_def_input_register(value, stack_pointer_register, def_tid);
+                    self.remove_mem_taint_at_target(&address);
                 }
             }
         }
@@ -277,12 +274,11 @@ impl State {
         if var.name == stack_pointer_register.name {
             if let Some(pid_map) = self.pi_def_map.as_ref() {
                 if let Some(pi_state) = pid_map.get(def_tid) {
-                    if let Ok(address) = pi_state.get_register(stack_pointer_register) {
-                        self.save_taint_to_memory(
-                            &address,
-                            Taint::Tainted(stack_pointer_register.size),
-                        );
-                    }
+                    let address = pi_state.get_register(stack_pointer_register);
+                    self.save_taint_to_memory(
+                        &address,
+                        Taint::Tainted(stack_pointer_register.size),
+                    );
                 }
             }
         } else {

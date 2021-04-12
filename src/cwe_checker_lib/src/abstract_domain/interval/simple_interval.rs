@@ -55,6 +55,18 @@ impl Interval {
         Interval { start, end }
     }
 
+    /// Compute the intersection of two intervals as intervals of signed integers.
+    /// Return an error if the intersection is empty.
+    pub fn signed_intersect(&self, other: &Interval) -> Result<Interval, Error> {
+        let start = signed_max(&self.start, &other.start);
+        let end = signed_min(&self.end, &other.end);
+        if start.checked_sle(&end).unwrap() {
+            Ok(Interval { start, end })
+        } else {
+            Err(anyhow!("Empty interval"))
+        }
+    }
+
     /// Return the number of contained values of the interval as an unsigned bitvector.
     /// If the interval is unconstrained, return zero
     /// (since the maximal number of elements is not representable in a bitvector of the same byte size).
@@ -142,30 +154,26 @@ impl Interval {
     /// Compute the interval of possible results
     /// if one adds a value from `self` to a value from `rhs`.
     pub fn add(&self, rhs: &Interval) -> Interval {
-        if self.start.signed_add_overflow_check(&rhs.start)
-            || self.end.signed_add_overflow_check(&rhs.end)
-        {
-            Interval::new_top(self.bytesize())
+        if let (Some(start), Some(end)) = (
+            self.start.signed_add_overflow_checked(&rhs.start),
+            self.end.signed_add_overflow_checked(&rhs.end),
+        ) {
+            Interval { start, end }
         } else {
-            Interval {
-                start: self.start.clone().into_checked_add(&rhs.start).unwrap(),
-                end: self.end.clone().into_checked_add(&rhs.end).unwrap(),
-            }
+            Interval::new_top(self.bytesize())
         }
     }
 
     /// Compute the interval of possible results
     /// if one subtracts a value in `rhs` from a value in `self`.
     pub fn sub(&self, rhs: &Interval) -> Interval {
-        if self.start.signed_sub_overflow_check(&rhs.end)
-            || self.end.signed_sub_overflow_check(&rhs.start)
-        {
-            Interval::new_top(self.bytesize())
+        if let (Some(start), Some(end)) = (
+            self.start.signed_sub_overflow_checked(&rhs.end),
+            self.end.signed_sub_overflow_checked(&rhs.start),
+        ) {
+            Interval { start, end }
         } else {
-            Interval {
-                start: self.start.clone().into_checked_sub(&rhs.end).unwrap(),
-                end: self.end.clone().into_checked_sub(&rhs.start).unwrap(),
-            }
+            Interval::new_top(self.bytesize())
         }
     }
 
@@ -192,6 +200,12 @@ impl Interval {
             start: min,
             end: max,
         }
+    }
+
+    /// Return `true` if `bitvec` is contained in the interval.
+    /// Panics if the interval and `bitvec` have different bytesizes.
+    pub fn contains(&self, bitvec: &Bitvector) -> bool {
+        self.start.checked_sle(bitvec).unwrap() && self.end.checked_sge(bitvec).unwrap()
     }
 }
 

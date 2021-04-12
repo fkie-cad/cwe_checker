@@ -262,9 +262,8 @@ impl<'a> Context<'a> {
         {
             let address_exp =
                 Expression::Var(self.project.stack_pointer_register.clone()).plus_const(offset);
-            if let Ok(address) = pi_state.eval(&address_exp) {
-                new_state.save_taint_to_memory(&address, Taint::Tainted(size));
-            }
+            let address = pi_state.eval(&address_exp);
+            new_state.save_taint_to_memory(&address, Taint::Tainted(size));
         }
         new_state
     }

@@ -338,33 +338,21 @@ impl<'a> PointerInference<'a> {
                             for jmp in block.term.jmps.iter() {
                                 match &jmp.term {
                                     Jmp::BranchInd(target_expr) => {
-                                        if let Ok(address) = state.eval(&target_expr) {
-                                            println!(
-                                                "{}: Indirect jump to {}",
-                                                jmp.tid,
-                                                address.to_json_compact()
-                                            );
-                                        } else {
-                                            println!(
-                                                "{}: Indirect jump. Could not compute address",
-                                                jmp.tid
-                                            );
-                                        }
+                                        let address = state.eval(&target_expr);
+                                        println!(
+                                            "{}: Indirect jump to {}",
+                                            jmp.tid,
+                                            address.to_json_compact()
+                                        );
                                     }
                                     Jmp::CallInd { target, return_ } => {
-                                        if let Ok(address) = state.eval(&target) {
-                                            println!(
-                                                "{}: Indirect call to {}. HasReturn: {}",
-                                                jmp.tid,
-                                                address.to_json_compact(),
-                                                return_.is_some()
-                                            );
-                                        } else {
-                                            println!(
-                                                "{}: Indirect call. Could not compute address",
-                                                jmp.tid
-                                            );
-                                        }
+                                        let address = state.eval(&target);
+                                        println!(
+                                            "{}: Indirect call to {}. HasReturn: {}",
+                                            jmp.tid,
+                                            address.to_json_compact(),
+                                            return_.is_some()
+                                        );
                                     }
                                     Jmp::Return(_) => {
                                         if !state.caller_stack_ids.is_empty() {

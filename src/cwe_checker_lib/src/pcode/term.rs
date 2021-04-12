@@ -49,6 +49,7 @@ pub struct Jmp {
 
 /// A jump type mnemonic.
 #[allow(missing_docs)]
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum JmpType {
     BRANCH,
@@ -305,6 +306,7 @@ pub struct Arg {
 
 /// The intent (input or output) of a function argument.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum ArgIntent {
     /// The argument is an input parameter.
     INPUT,

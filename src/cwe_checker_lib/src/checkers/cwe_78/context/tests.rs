@@ -467,13 +467,10 @@ fn creating_pi_def_map() {
 
     for (def_tid, pi_state) in pi_def_map.iter() {
         if *def_tid == def1 {
-            assert_eq!(
-                pi_state.get_register(&rdi_reg).unwrap(),
-                Data::new_top(rdi_reg.size)
-            );
+            assert_eq!(pi_state.get_register(&rdi_reg), Data::new_top(rdi_reg.size));
         } else if *def_tid == def2 {
             assert_eq!(
-                pi_state.get_register(&rdi_reg).unwrap(),
+                pi_state.get_register(&rdi_reg),
                 Data::Pointer(PointerDomain::new(stack_id.clone(), bv(-8)))
             );
         }

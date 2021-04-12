@@ -258,19 +258,20 @@ impl AbstractObjectInfo {
     /// Get a more compact json-representation of the abstract object.
     /// Intended for pretty printing, not useable for serialization/deserialization.
     pub fn to_json_compact(&self) -> serde_json::Value {
-        let mut elements = Vec::new();
-        elements.push((
-            "is_unique".to_string(),
-            serde_json::Value::String(format!("{}", self.is_unique)),
-        ));
-        elements.push((
-            "state".to_string(),
-            serde_json::Value::String(format!("{:?}", self.state)),
-        ));
-        elements.push((
-            "type".to_string(),
-            serde_json::Value::String(format!("{:?}", self.type_)),
-        ));
+        let mut elements = vec![
+            (
+                "is_unique".to_string(),
+                serde_json::Value::String(format!("{}", self.is_unique)),
+            ),
+            (
+                "state".to_string(),
+                serde_json::Value::String(format!("{:?}", self.state)),
+            ),
+            (
+                "type".to_string(),
+                serde_json::Value::String(format!("{:?}", self.type_)),
+            ),
+        ];
         let memory = self
             .memory
             .iter()
