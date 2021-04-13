@@ -96,7 +96,7 @@ public class ExternSymbolCreator {
             ExternSymbol extSym = new ExternSymbol();
             extSym.setName(functions.getKey());
             for(Function func : functions.getValue()) {
-                if(HelperFunctions.notInReferences(func)) {
+                if(HelperFunctions.sameSymbolNameNotCallingCurrentSymbol(func)) {
                     extSym.setTid(new Tid(String.format("sub_%s", func.getEntryPoint().toString()), func.getEntryPoint().toString()));
                     extSym.setNoReturn(func.hasNoReturn());
                     extSym.setArguments(createArguments(func));
