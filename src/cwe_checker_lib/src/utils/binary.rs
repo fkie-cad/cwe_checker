@@ -167,6 +167,30 @@ impl RuntimeMemoryImage {
         Err(anyhow!("Address is not a valid global memory address."))
     }
 
+    /// Read the contents of memory from a given address onwards until a null byte is reached.
+    pub fn read_string_until_null_terminator(&self, address: &Bitvector) -> Result<Vec<u8>, Error> {
+        let address = address.try_to_u64().unwrap();
+        for segment in self.memory_segments.iter() {
+            if address >= segment.base_address
+                && address <= segment.base_address + segment.bytes.len() as u64
+            {
+                let index = (address - segment.base_address) as usize;
+                let mut bytes: Vec<u8> = Vec::new();
+                for byte in segment.bytes[index..].iter() {
+                    if *byte == 0 {
+                        if self.is_little_endian {
+                            bytes = bytes.into_iter().rev().collect();
+                        }
+                        return Ok(bytes);
+                    }
+                    bytes.push(*byte);
+                }
+            }
+        }
+
+        Err(anyhow!("Address is not a valid global memory address."))
+    }
+
     /// Check whether all addresses in the given interval point to a readable segment in the runtime memory image.
     ///
     /// Returns an error if the address interval intersects more than one memory segment
@@ -276,6 +300,17 @@ pub mod tests {
                         write_flag: true,
                         execute_flag: false,
                     },
+                    MemorySegment {
+                        bytes: [
+                            0x01, 0x02, 0x64, 0x6c, 0x72, 0x6f, 0x57, 0x20, 0x6f, 0x6c, 0x6c, 0x65,
+                            0x48, 0x00,
+                        ]
+                        .to_vec(),
+                        base_address: 0x3000,
+                        read_flag: true,
+                        write_flag: false,
+                        execute_flag: false,
+                    },
                 ],
                 is_little_endian: true,
             }
@@ -304,5 +339,19 @@ pub mod tests {
         let (slice, index) = mem_image.get_ro_data_pointer_at_address(&address).unwrap();
         assert_eq!(index, 2);
         assert_eq!(&slice[index..], &[0xb2u8, 0xb3, 0xb4]);
+    }
+
+    #[test]
+    fn test_read_string_until_null_terminator() {
+        let mem_image = RuntimeMemoryImage::mock();
+        // String contains "Hello World" in big endian format
+        let expected_string: Vec<u8> = b"\x48\x65\x6c\x6c\x6f\x20\x57\x6f\x72\x6c\x64".to_vec();
+        let address = Bitvector::from_u32(0x3002);
+        assert_eq!(
+            expected_string,
+            mem_image
+                .read_string_until_null_terminator(&address)
+                .unwrap()
+        );
     }
 }
