@@ -26,6 +26,9 @@ pub struct IntervalDomain {
     widening_upper_bound: Option<Bitvector>,
     /// An upper bound for widening operations.
     widening_lower_bound: Option<Bitvector>,
+    /// A delay counter to prevent unnecessary widenings.
+    /// See the [`IntervalDomain::signed_merge_and_widen`] method for its usage in the widening strategy.
+    widening_delay: u64,
 }
 
 impl From<Interval> for IntervalDomain {
@@ -35,6 +38,7 @@ impl From<Interval> for IntervalDomain {
             interval,
             widening_lower_bound: None,
             widening_upper_bound: None,
+            widening_delay: 0,
         }
     }
 }
@@ -49,6 +53,7 @@ impl IntervalDomain {
             interval: Interval::new(start, end),
             widening_upper_bound: None,
             widening_lower_bound: None,
+            widening_delay: 0,
         }
     }
 
@@ -99,22 +104,37 @@ impl IntervalDomain {
         merged_domain.update_widening_lower_bound(&other.widening_lower_bound);
         merged_domain.update_widening_upper_bound(&self.widening_upper_bound);
         merged_domain.update_widening_upper_bound(&other.widening_upper_bound);
+        merged_domain.widening_delay = std::cmp::max(self.widening_delay, other.widening_delay);
 
         merged_domain
     }
 
     /// Merge as signed intervals and perform widening if necessary.
     ///
-    /// No widening is performed for very small intervals (currently set to interval lengths not greater than 2)
-    /// or if the merged interval (as value set) equals one of the input intervals.
-    /// In all other cases widening is performed after merging the underlying intervals.
+    /// ## Widening Strategy
     ///
-    /// ### Widening Strategy
+    /// ### The widening delay
+    ///
+    /// Each interval has a `widening_delay` counter,
+    /// which denotes the length of the interval after the last time that widening was performed.
+    /// For operations with more than one input,
+    /// the widening delay is set to the maximum of the input widening delays.
+    /// The only exception to this is the [`IntervalDomain::intersect()`] method,
+    /// which may lower the value of the widening delay.
+    ///
+    /// ### When to widen
+    ///
+    /// If the merged interval equals one of the input intervals as value sets, do not perform widening.
+    /// Else widening is performed if and only if the length of the interval is greater than `widening_delay + 2`.
+    ///
+    /// ### How to widen
     ///
     /// If no suitable widening bounds for widening exist, widen to the `Top` value.
     /// If exactly one widening bound exists, widen up to the bound,
     /// but do not perform widening in the other direction of the interval.
     /// If widening bounds for both directions exist, widen up to the bounds in both directions.
+    ///
+    /// After that the `widening_delay` is set to the length of the resulting interval.
     pub fn signed_merge_and_widen(&self, other: &IntervalDomain) -> IntervalDomain {
         let mut merged_domain = self.signed_merge(other);
         if merged_domain.equal_as_value_sets(self) || merged_domain.equal_as_value_sets(other) {
@@ -122,8 +142,11 @@ impl IntervalDomain {
             return merged_domain;
         }
         if let Ok(length) = merged_domain.interval.length().try_to_u64() {
-            if length <= 2 {
-                // Do not widen for very small intervals or for already unconstrained intervals (case length() returning zero).
+            if length <= merged_domain.widening_delay + 2 {
+                // Do not widen for already unconstrained intervals (case length() returning zero)
+                // or if the interval length is not larger than `widening_delay + 2`.
+                // FIXME: `widening_delay + 2` may overflow.
+                // But such a large delay is probably incorrect anyway, so this should not cause unnecessary widenings.
                 return merged_domain;
             }
         }
@@ -143,6 +166,7 @@ impl IntervalDomain {
             has_been_widened = true;
         }
         if has_been_widened {
+            merged_domain.widening_delay = merged_domain.interval.length().try_to_u64().unwrap_or(0);
             merged_domain
         } else {
             // No widening bounds could be used for widening, so we have to widen to the `Top` value.
@@ -186,6 +210,7 @@ impl IntervalDomain {
             interval: new_interval,
             widening_lower_bound: lower_bound,
             widening_upper_bound: upper_bound,
+            widening_delay: self.widening_delay,
         }
     }
 
@@ -215,6 +240,7 @@ impl IntervalDomain {
             widening_upper_bound: self
                 .widening_upper_bound
                 .map(|bitvec| bitvec.into_sign_extend(width).unwrap()),
+            widening_delay: self.widening_delay,
         }
     }
 
@@ -227,6 +253,14 @@ impl IntervalDomain {
         intersected_domain.update_widening_lower_bound(&other.widening_lower_bound);
         intersected_domain.update_widening_upper_bound(&self.widening_upper_bound);
         intersected_domain.update_widening_upper_bound(&other.widening_upper_bound);
+        intersected_domain.widening_delay =
+            std::cmp::max(self.widening_delay, other.widening_delay);
+
+        if let Ok(interval_length) = intersected_domain.interval.length().try_to_u64() {
+            intersected_domain.widening_delay =
+                std::cmp::min(intersected_domain.widening_delay, interval_length);
+        }
+
         Ok(intersected_domain)
     }
 }
@@ -354,6 +388,7 @@ impl SizedDomain for IntervalDomain {
             },
             widening_lower_bound: None,
             widening_upper_bound: None,
+            widening_delay: 0,
         }
     }
 }
@@ -393,6 +428,7 @@ impl RegisterDomain for IntervalDomain {
                     interval: new_interval,
                     widening_lower_bound: None,
                     widening_upper_bound: None,
+                    widening_delay: std::cmp::max(self.widening_delay, rhs.widening_delay),
                 }
             }
             IntAdd => self.add(rhs),
@@ -422,12 +458,14 @@ impl RegisterDomain for IntervalDomain {
                     interval,
                     widening_lower_bound: new_lower_bound,
                     widening_upper_bound: new_upper_bound,
+                    widening_delay: self.widening_delay,
                 }
             }
             IntNegate => IntervalDomain {
                 interval: self.interval.clone().bitwise_not(),
                 widening_lower_bound: None,
                 widening_upper_bound: None,
+                widening_delay: self.widening_delay,
             },
             BoolNegate => {
                 if self.interval.start == self.interval.end {
@@ -474,6 +512,7 @@ impl RegisterDomain for IntervalDomain {
             interval: new_interval,
             widening_lower_bound: new_lower_bound,
             widening_upper_bound: new_upper_bound,
+            widening_delay: self.widening_delay,
         }
     }
 
@@ -540,6 +579,7 @@ impl From<Bitvector> for IntervalDomain {
             interval: bitvec.into(),
             widening_lower_bound: None,
             widening_upper_bound: None,
+            widening_delay: 0,
         }
     }
 }
@@ -573,7 +613,7 @@ impl Display for IntervalDomain {
         } else if self.interval.start == self.interval.end {
             write!(
                 f,
-                "{:016x}:i{}",
+                "0x{:016x}:i{}",
                 apint::Int::from(self.interval.start.clone()),
                 self.bytesize().as_bit_length()
             )
@@ -582,7 +622,7 @@ impl Display for IntervalDomain {
             let end_int = apint::Int::from(self.interval.end.clone());
             write!(
                 f,
-                "[{:016x}, {:016x}]:i{}",
+                "[0x{:016x}, 0x{:016x}]:i{}",
                 start_int,
                 end_int,
                 self.bytesize().as_bit_length()

@@ -8,6 +8,7 @@ impl IntervalDomain {
         if interval.is_top() {
             interval
         } else {
+            interval.widening_delay = std::cmp::max(self.widening_delay, rhs.widening_delay);
             interval.update_widening_lower_bound(
                 &self
                     .widening_lower_bound
@@ -41,6 +42,7 @@ impl IntervalDomain {
         if interval.is_top() {
             interval
         } else {
+            interval.widening_delay = std::cmp::max(self.widening_delay, rhs.widening_delay);
             interval.update_widening_lower_bound(
                 &self
                     .widening_lower_bound
@@ -131,6 +133,7 @@ impl IntervalDomain {
                 interval,
                 widening_lower_bound: lower_bound,
                 widening_upper_bound: upper_bound,
+                widening_delay: std::cmp::max(self.widening_delay, rhs.widening_delay),
             }
         }
     }
