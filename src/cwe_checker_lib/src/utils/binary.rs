@@ -167,7 +167,8 @@ impl RuntimeMemoryImage {
         Err(anyhow!("Address is not a valid global memory address."))
     }
 
-    /// Read the contents of memory from a given address onwards until a null byte is reached.
+    /// Read the contents of memory from a given address onwards until a null byte is reached and checks whether the
+    /// content is a valid UTF8 string.
     pub fn read_string_until_null_terminator(&self, address: &Bitvector) -> Result<&str, Error> {
         let address = address.try_to_u64().unwrap();
         for segment in self.memory_segments.iter() {
@@ -336,7 +337,7 @@ pub mod tests {
     #[test]
     fn test_read_string_until_null_terminator() {
         let mem_image = RuntimeMemoryImage::mock();
-        // String contains "Hello World" in big endian format
+        // the byte array contains "Hello World".
         let expected_string: &str =
             std::str::from_utf8(b"\x48\x65\x6c\x6c\x6f\x20\x57\x6f\x72\x6c\x64").unwrap();
         let address = Bitvector::from_u32(0x3002);
