@@ -669,23 +669,23 @@ impl Project {
 
         // remove all blocks from functions that have no correct starting block and generate a log-message.
         for sub in self.program.term.subs.iter_mut() {
-            if !sub.term.blocks.is_empty() && sub.tid.address != sub.term.blocks[0].tid.address {
-                if sub
+            if !sub.term.blocks.is_empty()
+                && sub.tid.address != sub.term.blocks[0].tid.address
+                && sub
                     .term
                     .blocks
                     .iter()
                     .find(|block| block.tid.address == sub.tid.address)
                     .is_none()
-                {
-                    log_messages.push(LogMessage::new_error(format!(
-                        "Starting block of function {} ({}) not found.",
-                        sub.term.name, sub.tid
-                    )));
-                    sub.term.blocks = Vec::new();
-                }
+            {
+                log_messages.push(LogMessage::new_error(format!(
+                    "Starting block of function {} ({}) not found.",
+                    sub.term.name, sub.tid
+                )));
+                sub.term.blocks = Vec::new();
             }
         }
-        
+
         log_messages
     }
 }
