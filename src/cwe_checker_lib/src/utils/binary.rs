@@ -7,6 +7,8 @@ use goblin::elf;
 use goblin::pe;
 use goblin::Object;
 
+use std::ffi::CStr;
+
 /// A representation of the runtime image of a binary after being loaded into memory by the loader.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct RuntimeMemoryImage {
@@ -168,27 +170,29 @@ impl RuntimeMemoryImage {
     }
 
     /// Read the contents of memory from a given address onwards until a null byte is reached.
-    pub fn read_string_until_null_terminator(&self, address: &Bitvector) -> Result<Vec<u8>, Error> {
+    pub fn read_string_until_null_terminator(&self, address: &Bitvector) -> &str {
         let address = address.try_to_u64().unwrap();
         for segment in self.memory_segments.iter() {
             if address >= segment.base_address
                 && address <= segment.base_address + segment.bytes.len() as u64
             {
                 let index = (address - segment.base_address) as usize;
-                let mut bytes: Vec<u8> = Vec::new();
-                for byte in segment.bytes[index..].iter() {
-                    if *byte == 0 {
-                        if self.is_little_endian {
-                            bytes = bytes.into_iter().rev().collect();
-                        }
-                        return Ok(bytes);
-                    }
-                    bytes.push(*byte);
-                }
+                return match std::ffi::CStr::from_bytes_with_nul(&segment.bytes[index..]) {
+                    Ok(c_str) => RuntimeMemoryImage::try_to_cast_c_str_to_str(c_str),
+                    Err(_) => panic!("Could not read string from memory."),
+                };
             }
         }
 
-        Err(anyhow!("Address is not a valid global memory address."))
+        panic!("Address is not a valid global memory address.")
+    }
+
+    /// Tries to cast a CStr wrapper to a str.
+    pub fn try_to_cast_c_str_to_str(c_str: &CStr) -> &str {
+        match c_str.to_str() {
+            Ok(mem_str) => mem_str,
+            Err(_) => panic!("Could not parse CStr to str."),
+        }
     }
 
     /// Check whether all addresses in the given interval point to a readable segment in the runtime memory image.
@@ -302,8 +306,8 @@ pub mod tests {
                     },
                     MemorySegment {
                         bytes: [
-                            0x01, 0x02, 0x64, 0x6c, 0x72, 0x6f, 0x57, 0x20, 0x6f, 0x6c, 0x6c, 0x65,
-                            0x48, 0x00,
+                            0x01, 0x02, 0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x57, 0x6f, 0x72, 0x6c,
+                            0x64, 0x00,
                         ]
                         .to_vec(),
                         base_address: 0x3000,
@@ -345,13 +349,12 @@ pub mod tests {
     fn test_read_string_until_null_terminator() {
         let mem_image = RuntimeMemoryImage::mock();
         // String contains "Hello World" in big endian format
-        let expected_string: Vec<u8> = b"\x48\x65\x6c\x6c\x6f\x20\x57\x6f\x72\x6c\x64".to_vec();
+        let expected_string: &str =
+            std::str::from_utf8(b"\x48\x65\x6c\x6c\x6f\x20\x57\x6f\x72\x6c\x64").unwrap();
         let address = Bitvector::from_u32(0x3002);
         assert_eq!(
             expected_string,
-            mem_image
-                .read_string_until_null_terminator(&address)
-                .unwrap()
+            mem_image.read_string_until_null_terminator(&address)
         );
     }
 }
