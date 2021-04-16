@@ -166,7 +166,8 @@ impl IntervalDomain {
             has_been_widened = true;
         }
         if has_been_widened {
-            merged_domain.widening_delay = merged_domain.interval.length().try_to_u64().unwrap_or(0);
+            merged_domain.widening_delay =
+                merged_domain.interval.length().try_to_u64().unwrap_or(0);
             merged_domain
         } else {
             // No widening bounds could be used for widening, so we have to widen to the `Top` value.
