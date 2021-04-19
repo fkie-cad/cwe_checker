@@ -113,9 +113,9 @@ fn run_with_ghidra(args: CmdlineArgs) {
             binary_file_path.display()
         )
     });
-    let mut project = get_project_from_ghidra(&binary_file_path, &binary[..], args.quiet);
+    let (mut project, mut all_logs) = get_project_from_ghidra(&binary_file_path, &binary[..]);
     // Normalize the project and gather log messages generated from it.
-    let mut all_logs = project.normalize();
+    all_logs.append(&mut project.normalize());
 
     // Generate the representation of the runtime memory image of the binary
     let mut runtime_memory_image = RuntimeMemoryImage::new(&binary).unwrap_or_else(|err| {
@@ -206,7 +206,7 @@ fn filter_modules_for_partial_run(
 }
 
 /// Execute the `p_code_extractor` plugin in ghidra and parse its output into the `Project` data structure.
-fn get_project_from_ghidra(file_path: &Path, binary: &[u8], quiet_flag: bool) -> Project {
+fn get_project_from_ghidra(file_path: &Path, binary: &[u8]) -> (Project, Vec<LogMessage>) {
     let ghidra_path: std::path::PathBuf =
         serde_json::from_value(read_config_file("ghidra.json")["ghidra_path"].clone())
             .expect("Path to Ghidra not configured.");
@@ -298,14 +298,11 @@ fn get_project_from_ghidra(file_path: &Path, binary: &[u8], quiet_flag: bool) ->
 
     let mut project_pcode: cwe_checker_lib::pcode::Project =
         serde_json::from_reader(std::io::BufReader::new(file)).unwrap();
-    project_pcode.normalize();
+    let mut log_messages = project_pcode.normalize();
     let project: Project = match cwe_checker_lib::utils::get_binary_base_address(binary) {
         Ok(binary_base_address) => project_pcode.into_ir_project(binary_base_address),
         Err(_err) => {
-            if !quiet_flag {
-                let log = LogMessage::new_info("Could not determine binary base address. Using base address of Ghidra output as fallback.");
-                println!("{}", log);
-            }
+            log_messages.push(LogMessage::new_info("Could not determine binary base address. Using base address of Ghidra output as fallback."));
             let mut project = project_pcode.into_ir_project(0);
             // Setting the address_base_offset to zero is a hack, which worked for the tested PE files.
             // But this hack will probably not work in general!
@@ -320,5 +317,5 @@ fn get_project_from_ghidra(file_path: &Path, binary: &[u8], quiet_flag: bool) ->
 
     std::fs::remove_file(fifo_path).unwrap();
 
-    project
+    (project, log_messages)
 }

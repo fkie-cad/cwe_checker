@@ -503,3 +503,11 @@ fn intersection() {
     );
     assert!(interval1.intersect(&IntervalDomain::mock(50, 55)).is_err());
 }
+
+#[test]
+fn float_nan_bytesize() {
+    let top_value = IntervalDomain::new_top(ByteSize::new(8));
+    let result = top_value.un_op(UnOpType::FloatNaN);
+    assert!(result.is_top());
+    assert_eq!(result.bytesize(), ByteSize::new(1));
+}
