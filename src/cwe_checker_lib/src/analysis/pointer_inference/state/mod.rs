@@ -351,14 +351,18 @@ impl State {
             Ok(())
         } else if let Expression::BinOp { op, lhs, rhs } = expression {
             self.specialize_by_binop_expression_result(op, lhs, rhs, result)
-        } else if let Ok(result_bitvec) = result.try_to_bitvec() {
+        } else {
             match expression {
                 Expression::Var(_) => panic!(),
                 Expression::Const(input_bitvec) => {
-                    if *input_bitvec == result_bitvec {
-                        Ok(())
+                    if let Ok(result_bitvec) = result.try_to_bitvec() {
+                        if *input_bitvec == result_bitvec {
+                            Ok(())
+                        } else {
+                            Err(anyhow!("Unsatisfiable state"))
+                        }
                     } else {
-                        Err(anyhow!("Unsatisfiable state"))
+                        Ok(())
                     }
                 }
                 Expression::BinOp { .. } => {
@@ -403,8 +407,6 @@ impl State {
                     Ok(())
                 }
             }
-        } else {
-            Ok(())
         }
     }
 
@@ -446,10 +448,16 @@ impl State {
             match op {
                 BinOpType::IntXOr | BinOpType::BoolXOr => {
                     if let Ok(bitvec) = self.eval(lhs).try_to_bitvec() {
-                        self.specialize_by_expression_result(rhs, (result_bitvec.clone() ^ &bitvec).into())?;
+                        self.specialize_by_expression_result(
+                            rhs,
+                            (result_bitvec.clone() ^ &bitvec).into(),
+                        )?;
                     }
                     if let Ok(bitvec) = self.eval(rhs).try_to_bitvec() {
-                        self.specialize_by_expression_result(lhs, (result_bitvec ^ &bitvec).into())?;
+                        self.specialize_by_expression_result(
+                            lhs,
+                            (result_bitvec ^ &bitvec).into(),
+                        )?;
                     }
                     Ok(())
                 }
