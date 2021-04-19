@@ -420,25 +420,25 @@ impl State {
         match op {
             BinOpType::IntAdd => {
                 if let Ok(bitvec) = self.eval(lhs).try_to_bitvec() {
-                    let intermediate_result = result - bitvec.into();
-                    return self.specialize_by_expression_result(rhs, intermediate_result);
-                } else if let Ok(bitvec) = self.eval(rhs).try_to_bitvec() {
-                    let intermediate_result = result - bitvec.into();
-                    return self.specialize_by_expression_result(lhs, intermediate_result);
-                } else {
-                    return Ok(());
+                    let intermediate_result = result.clone() - bitvec.into();
+                    self.specialize_by_expression_result(rhs, intermediate_result)?;
                 }
+                if let Ok(bitvec) = self.eval(rhs).try_to_bitvec() {
+                    let intermediate_result = result - bitvec.into();
+                    self.specialize_by_expression_result(lhs, intermediate_result)?;
+                }
+                return Ok(());
             }
             BinOpType::IntSub => {
                 if let Ok(bitvec) = self.eval(lhs).try_to_bitvec() {
-                    let intermediate_result: Data = Data::from(bitvec) - result;
-                    return self.specialize_by_expression_result(rhs, intermediate_result);
-                } else if let Ok(bitvec) = self.eval(rhs).try_to_bitvec() {
-                    let intermediate_result = result + bitvec.into();
-                    return self.specialize_by_expression_result(lhs, intermediate_result);
-                } else {
-                    return Ok(());
+                    let intermediate_result: Data = Data::from(bitvec) - result.clone();
+                    self.specialize_by_expression_result(rhs, intermediate_result)?;
                 }
+                if let Ok(bitvec) = self.eval(rhs).try_to_bitvec() {
+                    let intermediate_result = result + bitvec.into();
+                    self.specialize_by_expression_result(lhs, intermediate_result)?;
+                }
+                return Ok(());
             }
             _ => (),
         }
@@ -446,12 +446,12 @@ impl State {
             match op {
                 BinOpType::IntXOr | BinOpType::BoolXOr => {
                     if let Ok(bitvec) = self.eval(lhs).try_to_bitvec() {
-                        self.specialize_by_expression_result(rhs, (result_bitvec ^ &bitvec).into())
-                    } else if let Ok(bitvec) = self.eval(rhs).try_to_bitvec() {
-                        self.specialize_by_expression_result(lhs, (result_bitvec ^ &bitvec).into())
-                    } else {
-                        Ok(())
+                        self.specialize_by_expression_result(rhs, (result_bitvec.clone() ^ &bitvec).into())?;
                     }
+                    if let Ok(bitvec) = self.eval(rhs).try_to_bitvec() {
+                        self.specialize_by_expression_result(lhs, (result_bitvec ^ &bitvec).into())?;
+                    }
+                    Ok(())
                 }
                 BinOpType::IntOr | BinOpType::BoolOr => {
                     if result_bitvec.is_zero() {
@@ -498,24 +498,24 @@ impl State {
                         (BinOpType::IntEqual, true) | (BinOpType::IntNotEqual, false) => {
                             // lhs == rhs
                             if let Ok(bitvec) = self.eval(lhs).try_to_bitvec() {
-                                self.specialize_by_expression_result(rhs, bitvec.into())
-                            } else if let Ok(bitvec) = self.eval(rhs).try_to_bitvec() {
-                                self.specialize_by_expression_result(lhs, bitvec.into())
-                            } else {
-                                Ok(())
+                                self.specialize_by_expression_result(rhs, bitvec.into())?;
                             }
+                            if let Ok(bitvec) = self.eval(rhs).try_to_bitvec() {
+                                self.specialize_by_expression_result(lhs, bitvec.into())?;
+                            }
+                            Ok(())
                         }
                         (BinOpType::IntEqual, false) | (BinOpType::IntNotEqual, true) => {
                             // lhs != rhs
                             if let Ok(bitvec) = self.eval(lhs).try_to_bitvec() {
                                 let new_result = self.eval(rhs).add_not_equal_bound(&bitvec)?;
-                                self.specialize_by_expression_result(rhs, new_result)
-                            } else if let Ok(bitvec) = self.eval(rhs).try_to_bitvec() {
-                                let new_result = self.eval(lhs).add_not_equal_bound(&bitvec)?;
-                                self.specialize_by_expression_result(lhs, new_result)
-                            } else {
-                                Ok(())
+                                self.specialize_by_expression_result(rhs, new_result)?;
                             }
+                            if let Ok(bitvec) = self.eval(rhs).try_to_bitvec() {
+                                let new_result = self.eval(lhs).add_not_equal_bound(&bitvec)?;
+                                self.specialize_by_expression_result(lhs, new_result)?;
+                            }
+                            Ok(())
                         }
                         _ => panic!(),
                     }
@@ -579,11 +579,11 @@ impl State {
                     }
                     lhs_bound += &Bitvector::one(lhs_bound.width());
                     let new_result = self.eval(rhs).add_signed_greater_equal_bound(&lhs_bound)?;
-                    return self.specialize_by_expression_result(rhs, new_result);
+                    self.specialize_by_expression_result(rhs, new_result)?;
                 }
                 IntSLessEqual => {
                     let new_result = self.eval(rhs).add_signed_greater_equal_bound(&lhs_bound)?;
-                    return self.specialize_by_expression_result(rhs, new_result);
+                    self.specialize_by_expression_result(rhs, new_result)?;
                 }
                 IntLess => {
                     if lhs_bound == Bitvector::unsigned_max_value(lhs_bound.width()) {
@@ -593,17 +593,18 @@ impl State {
                     let new_result = self
                         .eval(rhs)
                         .add_unsigned_greater_equal_bound(&lhs_bound)?;
-                    return self.specialize_by_expression_result(rhs, new_result);
+                    self.specialize_by_expression_result(rhs, new_result)?;
                 }
                 IntLessEqual => {
                     let new_result = self
                         .eval(rhs)
                         .add_unsigned_greater_equal_bound(&lhs_bound)?;
-                    return self.specialize_by_expression_result(rhs, new_result);
+                    self.specialize_by_expression_result(rhs, new_result)?;
                 }
                 _ => panic!(),
             }
-        } else if let Ok(mut rhs_bound) = self.eval(rhs).try_to_bitvec() {
+        }
+        if let Ok(mut rhs_bound) = self.eval(rhs).try_to_bitvec() {
             match op {
                 IntSLess => {
                     if rhs_bound == Bitvector::signed_min_value(rhs_bound.width()) {
@@ -611,11 +612,11 @@ impl State {
                     }
                     rhs_bound -= &Bitvector::one(rhs_bound.width());
                     let new_result = self.eval(lhs).add_signed_less_equal_bound(&rhs_bound)?;
-                    return self.specialize_by_expression_result(lhs, new_result);
+                    self.specialize_by_expression_result(lhs, new_result)?;
                 }
                 IntSLessEqual => {
                     let new_result = self.eval(lhs).add_signed_less_equal_bound(&rhs_bound)?;
-                    return self.specialize_by_expression_result(lhs, new_result);
+                    self.specialize_by_expression_result(lhs, new_result)?;
                 }
                 IntLess => {
                     if rhs_bound == Bitvector::zero(rhs_bound.width()) {
@@ -623,11 +624,11 @@ impl State {
                     }
                     rhs_bound -= &Bitvector::one(rhs_bound.width());
                     let new_result = self.eval(lhs).add_unsigned_less_equal_bound(&rhs_bound)?;
-                    return self.specialize_by_expression_result(lhs, new_result);
+                    self.specialize_by_expression_result(lhs, new_result)?;
                 }
                 IntLessEqual => {
                     let new_result = self.eval(lhs).add_unsigned_less_equal_bound(&rhs_bound)?;
-                    return self.specialize_by_expression_result(lhs, new_result);
+                    self.specialize_by_expression_result(lhs, new_result)?;
                 }
                 _ => panic!(),
             }
