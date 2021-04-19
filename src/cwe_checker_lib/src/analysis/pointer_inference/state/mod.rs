@@ -385,7 +385,23 @@ impl State {
                     description: _,
                     size: _,
                 } => Ok(()),
-                Expression::Subpiece { .. } => Ok(()),
+                Expression::Subpiece {
+                    low_byte,
+                    size,
+                    arg,
+                } => {
+                    if *low_byte == ByteSize::new(0) {
+                        if let Data::Value(arg_value) = self.eval(expression) {
+                            if arg_value.fits_into_size(*size) {
+                                let intermediate_result =
+                                    result.cast(CastOpType::IntSExt, arg.bytesize());
+                                return self
+                                    .specialize_by_expression_result(arg, intermediate_result);
+                            }
+                        }
+                    }
+                    Ok(())
+                }
             }
         } else {
             Ok(())
