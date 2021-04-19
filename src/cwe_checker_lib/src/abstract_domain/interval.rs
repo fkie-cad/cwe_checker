@@ -187,7 +187,7 @@ impl IntervalDomain {
             }
             _ => None,
         };
-        let mut upper_bound = match self.widening_upper_bound {
+        let upper_bound = match self.widening_upper_bound {
             Some(bound)
                 if (bound.sign_bit().to_bool() == self.interval.end.sign_bit().to_bool())
                     && (self.interval.start.sign_bit().to_bool()
@@ -197,16 +197,7 @@ impl IntervalDomain {
             }
             _ => None,
         };
-        let old_width = self.interval.start.width();
         let new_interval = self.interval.zero_extend(width);
-        if upper_bound.is_none() {
-            let max_val = Bitvector::unsigned_max_value(old_width)
-                .into_zero_extend(width)
-                .unwrap();
-            if new_interval.end.checked_ult(&max_val).unwrap() {
-                upper_bound = Some(max_val);
-            }
-        }
         IntervalDomain {
             interval: new_interval,
             widening_lower_bound: lower_bound,
@@ -216,20 +207,8 @@ impl IntervalDomain {
     }
 
     /// Sign-extend the values in the interval to the given width.
-    pub fn sign_extend(mut self, width: ByteSize) -> Self {
+    pub fn sign_extend(self, width: ByteSize) -> Self {
         assert!(self.bytesize() <= width);
-        if self.widening_lower_bound.is_none() {
-            let min_val = Bitvector::signed_min_value(self.interval.start.width());
-            if min_val.checked_slt(&self.interval.start).unwrap() {
-                self.widening_lower_bound = Some(min_val);
-            }
-        }
-        if self.widening_upper_bound.is_none() {
-            let max_val = Bitvector::signed_max_value(self.interval.end.width());
-            if max_val.checked_sgt(&self.interval.end).unwrap() {
-                self.widening_upper_bound = Some(max_val);
-            }
-        }
         IntervalDomain {
             interval: Interval {
                 start: self.interval.start.clone().into_sign_extend(width).unwrap(),
@@ -263,6 +242,21 @@ impl IntervalDomain {
         }
 
         Ok(intersected_domain)
+    }
+
+    /// Check whether all values in the interval are representable by bitvectors of the given `size`.
+    /// Does not check whether this is also true for the widening hints.
+    pub fn fits_into_size(&self, size: ByteSize) -> bool {
+        if size >= self.bytesize() {
+            return true;
+        }
+        let min = Bitvector::signed_min_value(size.into())
+            .into_sign_extend(self.bytesize())
+            .unwrap();
+        let max = Bitvector::signed_max_value(size.into())
+            .into_sign_extend(self.bytesize())
+            .unwrap();
+        min.checked_sle(&self.interval.start).unwrap() && max.checked_sge(&self.interval.end).unwrap()
     }
 }
 

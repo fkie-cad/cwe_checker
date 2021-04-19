@@ -145,7 +145,7 @@ fn cast_zero_and_signed_extend() {
     let extended_val = val.cast(CastOpType::IntZExt, ByteSize::new(8));
     assert_eq!(
         extended_val,
-        IntervalDomain::mock_with_bounds(Some(236), 246, 251, Some(255))
+        IntervalDomain::mock_with_bounds(Some(236), 246, 251, None)
     );
 
     // Sign extend
@@ -171,7 +171,7 @@ fn cast_zero_and_signed_extend() {
     let extended_val = val.cast(CastOpType::IntSExt, ByteSize::new(8));
     assert_eq!(
         extended_val,
-        IntervalDomain::mock_with_bounds(Some(-128), -10, -5, Some(127))
+        IntervalDomain::mock_with_bounds(None, -10, -5, None)
     );
     let val = IntervalDomain::mock_i8_with_bounds(Some(-20), -10, -5, Some(3));
     let extended_val = val.cast(CastOpType::IntSExt, ByteSize::new(8));
@@ -508,6 +508,10 @@ fn add_not_equal_bounds() {
     let interval = IntervalDomain::mock(5, 6);
     let x = interval.add_not_equal_bound(&Bitvector::from_i64(5));
     assert_eq!(x.unwrap(), IntervalDomain::mock(6, 6));
+
+    let interval = IntervalDomain::mock_with_bounds(None, 5, 6, Some(100));
+    let x = interval.add_not_equal_bound(&Bitvector::from_i64(10));
+    assert_eq!(x.unwrap(), IntervalDomain::mock_with_bounds(None, 5, 6, Some(9)));
 }
 
 #[test]
@@ -520,4 +524,12 @@ fn intersection() {
         IntervalDomain::mock_with_bounds(Some(-20), 2, 10, Some(100))
     );
     assert!(interval1.intersect(&IntervalDomain::mock(50, 55)).is_err());
+}
+
+#[test]
+fn fits_into_size() {
+    let interval = IntervalDomain::mock_with_bounds(Some(-300), -10, 10, Some(100));
+    assert!(interval.fits_into_size(ByteSize::new(1)));
+    let interval = IntervalDomain::mock_with_bounds(Some(-300), -128, 128, None);
+    assert!(!interval.fits_into_size(ByteSize::new(1)));
 }
