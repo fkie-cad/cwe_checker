@@ -13,6 +13,7 @@ use crate::intermediate_representation::Program as IrProgram;
 use crate::intermediate_representation::Project as IrProject;
 use crate::intermediate_representation::Sub as IrSub;
 use crate::prelude::*;
+use crate::utils::log::LogMessage;
 
 // TODO: Handle the case where an indirect tail call is represented by CALLIND plus RETURN
 
@@ -641,7 +642,18 @@ impl Project {
     ///
     /// Ghidra generates implicit loads for memory accesses, whose address is a constant.
     /// The pass converts them to explicit `LOAD` instructions.
-    pub fn normalize(&mut self) {
+    ///
+    /// ### Remove basic blocks of functions without correct starting block
+    ///
+    /// Sometimes Ghidra generates a (correct) function start inside another function.
+    /// But if the function start is not also the start of a basic block,
+    /// we cannot handle it correctly (yet) as this would need splitting of basic blocks.
+    /// So instead we generate a log message and handle the function as a function without code,
+    /// i.e. a dead end in the control flow graph.
+    #[must_use]
+    pub fn normalize(&mut self) -> Vec<LogMessage> {
+        let mut log_messages = Vec::new();
+
         // Insert explicit `LOAD` instructions for implicit memory loads in P-Code.
         let generic_pointer_size = self.stack_pointer_register.size;
         for sub in self.program.term.subs.iter_mut() {
@@ -654,6 +666,27 @@ impl Project {
                 }
             }
         }
+
+        // remove all blocks from functions that have no correct starting block and generate a log-message.
+        for sub in self.program.term.subs.iter_mut() {
+            if !sub.term.blocks.is_empty()
+                && sub.tid.address != sub.term.blocks[0].tid.address
+                && sub
+                    .term
+                    .blocks
+                    .iter()
+                    .find(|block| block.tid.address == sub.tid.address)
+                    .is_none()
+            {
+                log_messages.push(LogMessage::new_error(format!(
+                    "Starting block of function {} ({}) not found.",
+                    sub.term.name, sub.tid
+                )));
+                sub.term.blocks = Vec::new();
+            }
+        }
+
+        log_messages
     }
 }
 

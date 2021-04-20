@@ -474,9 +474,10 @@ impl RegisterDomain for IntervalDomain {
                     IntervalDomain::new_top(self.bytesize())
                 }
             }
-            FloatAbs | FloatCeil | FloatFloor | FloatNaN | FloatNegate | FloatRound | FloatSqrt => {
+            FloatAbs | FloatCeil | FloatFloor | FloatNegate | FloatRound | FloatSqrt => {
                 IntervalDomain::new_top(self.bytesize())
             }
+            FloatNaN => IntervalDomain::new_top(ByteSize::new(1)),
         }
     }
 

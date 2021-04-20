@@ -80,11 +80,14 @@ impl RegisterDomain for BitvectorDomain {
         if let BitvectorDomain::Value(bitvec) = self {
             match bitvec.un_op(op) {
                 Ok(val) => BitvectorDomain::Value(val),
-                Err(_) => BitvectorDomain::new_top(self.bytesize()),
+                Err(_) => match op {
+                    BoolNegate | FloatNaN => BitvectorDomain::new_top(ByteSize::new(1)),
+                    _ => BitvectorDomain::new_top(self.bytesize()),
+                },
             }
         } else {
             match op {
-                BoolNegate => BitvectorDomain::new_top(ByteSize::new(1)),
+                BoolNegate | FloatNaN => BitvectorDomain::new_top(ByteSize::new(1)),
                 _ => BitvectorDomain::new_top(self.bytesize()),
             }
         }
@@ -279,5 +282,13 @@ mod tests {
             negative_x.bin_op(IntSRight, &shift_70),
             BitvectorDomain::Value(Bitvector::from_i64(-1))
         );
+    }
+
+    #[test]
+    fn float_nan_bytesize() {
+        let top_value = BitvectorDomain::new_top(ByteSize::new(8));
+        let result = top_value.un_op(UnOpType::FloatNaN);
+        assert!(result.is_top());
+        assert_eq!(result.bytesize(), ByteSize::new(1));
     }
 }

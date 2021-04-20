@@ -164,9 +164,9 @@ public final class HelperFunctions {
      * by some_function().
      * 
      */
-    public static Boolean notInReferences(Function func) {
+    public static Boolean sameSymbolNameNotCallingCurrentSymbol(Function func) {
         for(Function calling : func.getCallingFunctions(monitor)) {
-            if(calling.getName().equals(func.getName()) && calling.isThunk()) {
+            if(calling.getName().equals(func.getName()) && calling.isThunk() && !calling.getEntryPoint().toString().equals(func.getEntryPoint().toString())) {
                 return false;
             }
         }

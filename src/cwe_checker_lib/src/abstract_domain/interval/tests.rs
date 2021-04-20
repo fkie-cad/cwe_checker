@@ -536,3 +536,11 @@ fn fits_into_size() {
     let interval = IntervalDomain::mock_with_bounds(Some(-300), -128, 128, None);
     assert!(!interval.fits_into_size(ByteSize::new(1)));
 }
+
+#[test]
+fn float_nan_bytesize() {
+    let top_value = IntervalDomain::new_top(ByteSize::new(8));
+    let result = top_value.un_op(UnOpType::FloatNaN);
+    assert!(result.is_top());
+    assert_eq!(result.bytesize(), ByteSize::new(1));
+}
