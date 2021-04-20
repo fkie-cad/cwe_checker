@@ -7,7 +7,7 @@ use petgraph::graph::NodeIndex;
 
 use super::{state::State, BlockMaps, SymbolMaps, CWE_MODULE};
 use crate::{
-    abstract_domain::AbstractDomain,
+    abstract_domain::{AbstractDomain, DataDomain, IntervalDomain},
     analysis::{
         forward_interprocedural_fixpoint::Context as PiContext, graph::Graph,
         interprocedural_fixpoint_generic::NodeValue,
@@ -147,25 +147,37 @@ impl<'a> Context<'a> {
                 panic!("Missing parameters for string related function!");
             };
             if relevant_fuction_call {
-                for parameter in string_symbol.parameters.iter() {
-                    match parameter {
-                        Arg::Register(var) => {
-                            new_state.set_register_taint(var, Taint::Tainted(var.size))
-                        }
-                        Arg::Stack { size, .. } => {
-                            if let Ok(address) = pi_state.eval_parameter_arg(
-                                parameter,
-                                &self.project.stack_pointer_register,
-                                self.runtime_memory_image,
-                            ) {
-                                new_state.save_taint_to_memory(&address, Taint::Tainted(*size))
-                            }
-                        }
+                self.taint_function_arguments(
+                    &mut new_state,
+                    pi_state,
+                    string_symbol.parameters.clone(),
+                );
+            }
+        }
+        new_state
+    }
+
+    /// Taints register and stack function arguments.
+    pub fn taint_function_arguments(
+        &self,
+        state: &mut State,
+        pi_state: &PointerInferenceState,
+        parameters: Vec<Arg>,
+    ) {
+        for parameter in parameters.iter() {
+            match parameter {
+                Arg::Register(var) => state.set_register_taint(var, Taint::Tainted(var.size)),
+                Arg::Stack { size, .. } => {
+                    if let Ok(address) = pi_state.eval_parameter_arg(
+                        parameter,
+                        &self.project.stack_pointer_register,
+                        self.runtime_memory_image,
+                    ) {
+                        state.save_taint_to_memory(&address, Taint::Tainted(*size))
                     }
                 }
             }
         }
-        new_state
     }
 
     /// Checks whether the firt parameter of a string related function points to a taint.
@@ -176,18 +188,48 @@ impl<'a> Context<'a> {
         state: &mut State,
         parameter: &Arg,
     ) -> bool {
+        let mut points_to_memory_taint: bool = false;
         if let Ok(address) = pi_state.eval_parameter_arg(
             parameter,
             &self.project.stack_pointer_register,
             self.runtime_memory_image,
         ) {
-            if state.check_if_address_points_to_taint(address.clone(), pi_state) {
+            let temp_mem_taints: Vec<DataDomain<IntervalDomain>> =
+                self.add_temporary_callee_saved_register_taints_to_mem_taints(pi_state, state);
+
+            if state.address_points_to_taint(address.clone(), pi_state) {
                 state.remove_mem_taint_at_target(&address);
-                return true;
+                points_to_memory_taint = true;
+            }
+
+            temp_mem_taints
+                .iter()
+                .for_each(|addr| state.remove_mem_taint_at_target(addr));
+        }
+
+        points_to_memory_taint
+    }
+
+    /// Takes taints of callee saved registers and adds them temporarily to the corresponding memory
+    /// taints if possible.
+    pub fn add_temporary_callee_saved_register_taints_to_mem_taints(
+        &self,
+        pi_state: &PointerInferenceState,
+        state: &mut State,
+    ) -> Vec<DataDomain<IntervalDomain>> {
+        let mut temp_mem_taints: Vec<DataDomain<IntervalDomain>> = Vec::new();
+        if let Some(standard_cconv) = self.project.get_standard_calling_convention() {
+            for (var, _) in state
+                .get_callee_saved_register_taints(standard_cconv)
+                .iter()
+            {
+                let address = pi_state.eval(&Expression::Var(var.clone()));
+                temp_mem_taints.push(address.clone());
+                state.save_taint_to_memory(&address, Taint::Tainted(var.size));
             }
         }
 
-        false
+        temp_mem_taints
     }
 
     /// This function taints the registers and stack positions of the parameter pointers of external functions
@@ -236,57 +278,14 @@ impl<'a> Context<'a> {
                         &new_state.get_current_sub().as_ref().unwrap().term.name,
                     );
                 }
-                return self.taint_parameters(
-                    &new_state,
-                    symbol.parameters.clone(),
-                    call_source_node,
-                );
-            }
-        }
-
-        new_state
-    }
-
-    /// Taints a stack parameter given a size and an offset
-    pub fn taint_stack_parameters(
-        &self,
-        state: State,
-        call_source_node: NodeIndex,
-        offset: i64,
-        size: ByteSize,
-    ) -> State {
-        let mut new_state = state;
-        if let Some(NodeValue::Value(pi_state)) = self
-            .pointer_inference_results
-            .get_node_value(call_source_node)
-        {
-            let address_exp =
-                Expression::Var(self.project.stack_pointer_register.clone()).plus_const(offset);
-            let address = pi_state.eval(&address_exp);
-            new_state.save_taint_to_memory(&address, Taint::Tainted(size));
-        }
-        new_state
-    }
-
-    /// Iterates over the given parameters of a function and returns an updated state
-    pub fn taint_parameters(
-        &self,
-        state: &State,
-        parameters: Vec<Arg>,
-        call_source_node: NodeIndex,
-    ) -> State {
-        let mut new_state = state.clone();
-        for parameter in parameters {
-            match parameter {
-                Arg::Register(param) => {
-                    new_state.set_register_taint(&param, Taint::Tainted(param.size))
-                }
-                Arg::Stack { offset, size } => {
-                    new_state = self.taint_stack_parameters(
-                        new_state.clone(),
-                        call_source_node,
-                        offset,
-                        size,
+                if let Some(NodeValue::Value(pi_state)) = self
+                    .pointer_inference_results
+                    .get_node_value(call_source_node)
+                {
+                    self.taint_function_arguments(
+                        &mut new_state,
+                        pi_state,
+                        symbol.parameters.clone(),
                     );
                 }
             }

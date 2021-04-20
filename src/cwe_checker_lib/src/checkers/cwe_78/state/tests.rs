@@ -166,7 +166,7 @@ fn setting_expression_and_constants() {
     assert_eq!(
         setup
             .state
-            .check_if_address_points_to_taint(setup.stack_pointer, &setup.pi_state),
+            .address_points_to_taint(setup.stack_pointer, &setup.pi_state),
         true
     );
 
@@ -186,7 +186,7 @@ fn setting_expression_and_constants() {
     assert_eq!(
         setup
             .state
-            .check_if_address_points_to_taint(setup.base_eight_offset, &setup.pi_state),
+            .address_points_to_taint(setup.base_eight_offset, &setup.pi_state),
         true
     );
 
@@ -234,7 +234,7 @@ fn tainting_values_to_be_stored() {
     assert_eq!(
         setup
             .state
-            .check_if_address_points_to_taint(setup.base_eight_offset, &setup.pi_state),
+            .address_points_to_taint(setup.base_eight_offset, &setup.pi_state),
         false
     );
     assert_eq!(
@@ -286,7 +286,7 @@ fn tainting_def_input_register() {
     assert_eq!(
         setup
             .state
-            .check_if_address_points_to_taint(setup.stack_pointer.clone(), &setup.pi_state),
+            .address_points_to_taint(setup.stack_pointer.clone(), &setup.pi_state),
         true
     );
 
@@ -344,7 +344,7 @@ fn tainting_variable_input() {
     assert_eq!(
         setup
             .state
-            .check_if_address_points_to_taint(setup.stack_pointer.clone(), &setup.pi_state),
+            .address_points_to_taint(setup.stack_pointer.clone(), &setup.pi_state),
         true
     );
 }
@@ -360,7 +360,7 @@ fn removing_memory_taint_at_target() {
     assert_eq!(
         setup
             .state
-            .check_if_address_points_to_taint(setup.base_eight_offset.clone(), &setup.pi_state),
+            .address_points_to_taint(setup.base_eight_offset.clone(), &setup.pi_state),
         true
     );
     setup
@@ -369,7 +369,7 @@ fn removing_memory_taint_at_target() {
     assert_eq!(
         setup
             .state
-            .check_if_address_points_to_taint(setup.base_eight_offset, &setup.pi_state),
+            .address_points_to_taint(setup.base_eight_offset, &setup.pi_state),
         false
     );
 
@@ -377,7 +377,7 @@ fn removing_memory_taint_at_target() {
     assert_eq!(
         setup
             .state
-            .check_if_address_points_to_taint(setup.base_sixteen_offset.clone(), &setup.pi_state),
+            .address_points_to_taint(setup.base_sixteen_offset.clone(), &setup.pi_state),
         false
     );
     setup
@@ -386,7 +386,7 @@ fn removing_memory_taint_at_target() {
     assert_eq!(
         setup
             .state
-            .check_if_address_points_to_taint(setup.base_sixteen_offset, &setup.pi_state),
+            .address_points_to_taint(setup.base_sixteen_offset, &setup.pi_state),
         false
     );
 }
@@ -398,7 +398,7 @@ fn saving_taint_to_memory() {
     assert_eq!(
         setup
             .state
-            .check_if_address_points_to_taint(setup.base_eight_offset.clone(), &setup.pi_state),
+            .address_points_to_taint(setup.base_eight_offset.clone(), &setup.pi_state),
         false
     );
     setup
@@ -407,7 +407,7 @@ fn saving_taint_to_memory() {
     assert_eq!(
         setup
             .state
-            .check_if_address_points_to_taint(setup.base_eight_offset.clone(), &setup.pi_state),
+            .address_points_to_taint(setup.base_eight_offset.clone(), &setup.pi_state),
         true
     );
 }
@@ -494,13 +494,13 @@ fn checking_if_address_points_to_taint() {
     assert_eq!(
         setup
             .state
-            .check_if_address_points_to_taint(setup.base_eight_offset, &setup.pi_state),
+            .address_points_to_taint(setup.base_eight_offset, &setup.pi_state),
         true
     );
     assert_eq!(
         setup
             .state
-            .check_if_address_points_to_taint(setup.base_sixteen_offset, &setup.pi_state),
+            .address_points_to_taint(setup.base_sixteen_offset, &setup.pi_state),
         false
     );
 }
