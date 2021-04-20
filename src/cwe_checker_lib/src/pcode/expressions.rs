@@ -87,9 +87,11 @@ impl Variable {
     }
 
     /// Create a LOAD instruction out of a variable representing a load from a constant address into a virtual register.
-    ///
-    /// Note that the address pointer size gets set to zero, since the function does not know the correct size for pointers.
-    pub fn to_load_def(&self, target_register_name: impl Into<String>) -> Def {
+    pub fn to_load_def(
+        &self,
+        target_register_name: impl Into<String>,
+        generic_pointer_size: ByteSize,
+    ) -> Def {
         Def {
             lhs: Some(Variable::new_virtual(target_register_name, self.size)),
             rhs: Expression {
@@ -97,7 +99,7 @@ impl Variable {
                 input0: None,
                 input1: Some(Variable::new_const(
                     self.address.as_ref().unwrap(),
-                    ByteSize::from(0u64), // We do not know the correct pointer size here.
+                    generic_pointer_size,
                 )),
                 input2: None,
             },
