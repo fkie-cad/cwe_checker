@@ -296,14 +296,8 @@ fn adding_temporary_callee_saved_register_taints_to_mem_taints() {
     let rbp_reg = Variable::mock("RBP", 8 as u64);
     let rcx_reg = Variable::mock("RCX", 8 as u64);
     setup
-        .state
-        .save_taint_to_memory(&setup.base_eight_offset, Taint::Tainted(ByteSize::new(8)));
-    setup
         .pi_state
         .set_register(&rbp_reg, setup.base_eight_offset.clone());
-    setup
-        .state
-        .save_taint_to_memory(&setup.base_sixteen_offset, Taint::Tainted(ByteSize::new(8)));
     setup
         .pi_state
         .set_register(&rcx_reg, setup.base_sixteen_offset.clone());

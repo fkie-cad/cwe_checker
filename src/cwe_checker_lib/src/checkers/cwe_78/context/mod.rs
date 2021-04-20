@@ -224,8 +224,10 @@ impl<'a> Context<'a> {
                 .iter()
             {
                 let address = pi_state.eval(&Expression::Var(var.clone()));
-                temp_mem_taints.push(address.clone());
-                state.save_taint_to_memory(&address, Taint::Tainted(var.size));
+                if !state.address_points_to_taint(address.clone(), pi_state) {
+                    temp_mem_taints.push(address.clone());
+                    state.save_taint_to_memory(&address, Taint::Tainted(var.size));
+                }
             }
         }
 
