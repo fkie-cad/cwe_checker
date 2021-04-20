@@ -242,7 +242,6 @@ fn tainting_string_function_parameters() {
 }
 
 #[test]
-#[ignore = "not yet implemented"]
 fn tainting_function_arguments() {
     let mut setup = Setup::new();
     let rdi_reg = Variable::mock("RDI", 8);
