@@ -542,6 +542,30 @@ fn specialize_by_expression_results() {
         state.get_register(&eax_register),
         Bitvector::from_i32(-7).into()
     );
+
+    // Expr = Subpiece(Var(RAX))
+    let mut state = State::new(&register("RSP"), Tid::new("func_tid"));
+    let rax_register = Variable {
+        name: "RAX".to_string(),
+        size: ByteSize::new(8),
+        is_temp: false,
+    };
+    let x = state.specialize_by_expression_result(
+        &Expression::Var(rax_register.clone()).subpiece(ByteSize::new(0), ByteSize::new(1)),
+        Bitvector::from_i8(5).into(),
+    );
+    assert!(x.is_ok());
+    assert!(state.get_register(&rax_register).is_top());
+    state.set_register(&rax_register, IntervalDomain::mock(3, 10).into());
+    let x = state.specialize_by_expression_result(
+        &Expression::Var(rax_register.clone()).subpiece(ByteSize::new(0), ByteSize::new(1)),
+        Bitvector::from_i8(5).into(),
+    );
+    assert!(x.is_ok());
+    assert_eq!(
+        state.get_register(&rax_register),
+        IntervalDomain::mock(5, 5).into()
+    );
 }
 
 /// Test expression specialization for binary operations

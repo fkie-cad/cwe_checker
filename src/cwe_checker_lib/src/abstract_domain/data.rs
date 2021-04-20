@@ -201,7 +201,10 @@ impl<T: RegisterDomain> RegisterDomain for DataDomain<T> {
         if let Self::Value(value) = self {
             Self::Value(value.un_op(op))
         } else {
-            Self::new_top(self.bytesize())
+            match op {
+                UnOpType::BoolNegate | UnOpType::FloatNaN => Self::new_top(ByteSize::new(1)),
+                _ => Self::new_top(self.bytesize()),
+            }
         }
     }
 
@@ -422,5 +425,13 @@ mod tests {
         data = bv(42).into();
         data.remove_ids(&ids_to_remove);
         assert_eq!(data, bv(42).into());
+    }
+
+    #[test]
+    fn float_nan_bytesize() {
+        let top_value: DataDomain<BitvectorDomain> = DataDomain::new_top(ByteSize::new(8));
+        let result = top_value.un_op(UnOpType::FloatNaN);
+        assert!(result.is_top());
+        assert_eq!(result.bytesize(), ByteSize::new(1));
     }
 }
