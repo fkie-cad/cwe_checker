@@ -183,6 +183,28 @@ impl State {
         self.register_taint.iter()
     }
 
+    /// Gets the callee saved taints from the register taints.
+    pub fn get_callee_saved_register_taints(
+        &self,
+        calling_conv: &CallingConvention,
+    ) -> HashMap<Variable, Taint> {
+        self.register_taint
+            .clone()
+            .iter()
+            .filter_map(|(register, taint)| {
+                if calling_conv
+                    .callee_saved_register
+                    .iter()
+                    .any(|callee_saved_reg| register.name == *callee_saved_reg)
+                {
+                    Some((register.clone(), *taint))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
     /// Gets the string constant saved at the given address and saves it to the string constants field.
     pub fn evaluate_constant(&mut self, constant: Bitvector) {
         // TODO: check whether the constant is a valid memory address in the binary
@@ -232,7 +254,7 @@ impl State {
         if let Some(pid_map) = self.pi_def_map.as_ref() {
             if let Some(pi_state) = pid_map.get(def_tid) {
                 let address = pi_state.eval(target);
-                if self.check_if_address_points_to_taint(address.clone(), &pi_state) {
+                if self.address_points_to_taint(address.clone(), &pi_state) {
                     self.taint_def_input_register(value, stack_pointer_register, def_tid);
                     self.remove_mem_taint_at_target(&address);
                 }
@@ -332,11 +354,7 @@ impl State {
     /// return true if and only if the value at that stack position is tainted.
     /// If the given address points to a non-stack memory object,
     /// return true if the memory object contains any tainted value (at any position).
-    pub fn check_if_address_points_to_taint(
-        &self,
-        address: Data,
-        pi_state: &PointerInferenceState,
-    ) -> bool {
+    pub fn address_points_to_taint(&self, address: Data, pi_state: &PointerInferenceState) -> bool {
         use crate::analysis::pointer_inference::object::ObjectType;
         if let Data::Pointer(pointer) = address {
             for (target, offset) in pointer.targets() {

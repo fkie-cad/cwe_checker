@@ -220,11 +220,11 @@ fn tainting_string_function_parameters() {
         context.taint_string_function_parameters(&setup.state, &setup.string_sym, *node_id);
 
     assert_eq!(
-        new_state.check_if_address_points_to_taint(setup.base_sixteen_offset, &setup.pi_state),
+        new_state.address_points_to_taint(setup.base_sixteen_offset, &setup.pi_state),
         true
     );
     assert_eq!(
-        new_state.check_if_address_points_to_taint(setup.base_eight_offset, &setup.pi_state),
+        new_state.address_points_to_taint(setup.base_eight_offset, &setup.pi_state),
         false
     );
     assert_eq!(
@@ -239,6 +239,91 @@ fn tainting_string_function_parameters() {
         new_state.get_register_taint(&rbp_reg),
         Some(&Taint::Tainted(rbp_reg.size))
     );
+}
+
+#[test]
+fn tainting_function_arguments() {
+    let mut setup = Setup::new();
+    let rdi_reg = Variable::mock("RDI", 8);
+    let args = vec![
+        Arg::Register(rdi_reg.clone()),
+        Arg::Stack {
+            offset: 24,
+            size: ByteSize::from(8),
+        },
+    ];
+
+    let mem_image = RuntimeMemoryImage::mock();
+    let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
+    pi_results.compute();
+
+    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
+
+    setup
+        .pi_state
+        .write_to_address(
+            &Expression::BinOp {
+                op: BinOpType::IntAdd,
+                lhs: Box::new(Expression::Var(Variable {
+                    name: String::from("RSP"),
+                    size: ByteSize::new(8),
+                    is_temp: false,
+                })),
+                rhs: Box::new(Expression::Const(Bitvector::from_u64(24))),
+            },
+            &Data::Pointer(PointerDomain::new(setup.pi_state.stack_id.clone(), bv(32))),
+            context.runtime_memory_image,
+        )
+        .expect("Failed to write to address.");
+
+    context.taint_function_arguments(&mut setup.state, &setup.pi_state, args);
+
+    assert_eq!(
+        setup.state.get_register_taint(&rdi_reg),
+        Some(&Taint::Tainted(rdi_reg.size))
+    );
+
+    assert!(setup.state.address_points_to_taint(
+        Data::Pointer(PointerDomain::new(setup.pi_state.stack_id.clone(), bv(32))),
+        &setup.pi_state
+    ));
+}
+
+#[test]
+fn adding_temporary_callee_saved_register_taints_to_mem_taints() {
+    let mut setup = Setup::new();
+    let rbp_reg = Variable::mock("RBP", 8 as u64);
+    let rcx_reg = Variable::mock("RCX", 8 as u64);
+    setup
+        .pi_state
+        .set_register(&rbp_reg, setup.base_eight_offset.clone());
+    setup
+        .pi_state
+        .set_register(&rcx_reg, setup.base_sixteen_offset.clone());
+    setup
+        .state
+        .set_register_taint(&rbp_reg, Taint::Tainted(rbp_reg.size));
+    setup
+        .state
+        .set_register_taint(&rcx_reg, Taint::Tainted(rcx_reg.size));
+
+    let mem_image = RuntimeMemoryImage::mock();
+    let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
+    pi_results.compute();
+
+    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
+
+    let result = context.add_temporary_callee_saved_register_taints_to_mem_taints(
+        &setup.pi_state,
+        &mut setup.state,
+    );
+
+    assert!(result.len() == 1);
+    assert!(setup
+        .state
+        .address_points_to_taint(result.get(0).unwrap().clone(), &setup.pi_state))
 }
 
 #[test]
@@ -268,7 +353,7 @@ fn first_param_pointing_to_memory_taint() {
     assert_eq!(
         setup
             .state
-            .check_if_address_points_to_taint(setup.base_eight_offset, &setup.pi_state),
+            .address_points_to_taint(setup.base_eight_offset, &setup.pi_state),
         false
     );
 }
@@ -359,86 +444,6 @@ fn tainting_generic_function_parameters_and_removing_non_callee_saved() {
     assert_eq!(new_state.get_register_taint(&rsi_reg), None);
 
     // TODO: add test for scanf when parameter detection is implemented
-}
-
-#[test]
-fn tainting_stack_parameters() {
-    let setup = Setup::new();
-    let offset = 4 as i64;
-    let size = ByteSize::new(8);
-
-    let stack_id = setup.pi_state.stack_id.clone();
-
-    let mem_image = RuntimeMemoryImage::mock();
-    let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
-    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
-    pi_results.compute();
-
-    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
-    let call_source_node = context
-        .block_maps
-        .jmp_to_blk_end_node_map
-        .get(&(Tid::new("call_string"), Tid::new("func")))
-        .unwrap();
-
-    let new_state =
-        context.taint_stack_parameters(setup.state, call_source_node.clone(), offset, size);
-
-    assert_eq!(
-        new_state.check_if_address_points_to_taint(
-            Data::Pointer(PointerDomain::new(stack_id.clone(), bv(4))),
-            &setup.pi_state
-        ),
-        true
-    );
-}
-
-#[test]
-fn tainting_parameters() {
-    let setup = Setup::new();
-    let rdi_reg = Variable::mock("RDI", 8 as u64);
-    let rsi_reg = Variable::mock("RSI", 8 as u64);
-    let params = vec![
-        Arg::Register(rdi_reg.clone()),
-        Arg::Register(rsi_reg.clone()),
-        Arg::Stack {
-            offset: 4,
-            size: ByteSize::new(8),
-        },
-    ];
-
-    let stack_id = setup.pi_state.stack_id.clone();
-
-    let mem_image = RuntimeMemoryImage::mock();
-    let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
-    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
-    pi_results.compute();
-
-    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
-    let call_source_node = context
-        .block_maps
-        .jmp_to_blk_end_node_map
-        .get(&(Tid::new("call_string"), Tid::new("func")))
-        .unwrap();
-
-    let new_state = context.taint_parameters(&setup.state, params, call_source_node.clone());
-
-    assert_eq!(
-        new_state.get_register_taint(&rdi_reg),
-        Some(&Taint::Tainted(rdi_reg.size))
-    );
-    assert_eq!(
-        new_state.get_register_taint(&rsi_reg),
-        Some(&Taint::Tainted(rsi_reg.size))
-    );
-
-    assert_eq!(
-        new_state.check_if_address_points_to_taint(
-            Data::Pointer(PointerDomain::new(stack_id.clone(), bv(4))),
-            &setup.pi_state
-        ),
-        true
-    );
 }
 
 #[test]
@@ -662,7 +667,7 @@ fn handling_assign_and_load() {
     new_state = context.update_def(&new_state, &mock_assign_stack).unwrap();
     assert_eq!(new_state.get_register_taint(&r9_reg), None);
     assert_eq!(
-        new_state.check_if_address_points_to_taint(
+        new_state.address_points_to_taint(
             Data::Pointer(PointerDomain::new(stack_id.clone(), bv(0))),
             &setup.pi_state
         ),
@@ -740,7 +745,7 @@ fn updating_def() {
     new_state = context.update_def(&new_state, &mock_assign_stack).unwrap();
     assert_eq!(new_state.get_register_taint(&r9_reg), None);
     assert_eq!(
-        new_state.check_if_address_points_to_taint(
+        new_state.address_points_to_taint(
             Data::Pointer(PointerDomain::new(stack_id.clone(), bv(0))),
             &setup.pi_state
         ),
@@ -769,7 +774,7 @@ fn updating_def() {
         Some(&Taint::Tainted(rdi_reg.size))
     );
     assert_eq!(
-        new_state.check_if_address_points_to_taint(setup.base_eight_offset, &setup.pi_state,),
+        new_state.address_points_to_taint(setup.base_eight_offset, &setup.pi_state,),
         false
     );
 }
@@ -811,7 +816,7 @@ fn updating_jumpsite() {
         Some(&Taint::Tainted(r9_reg.size))
     );
     assert_eq!(
-        new_state.check_if_address_points_to_taint(
+        new_state.address_points_to_taint(
             setup.base_eight_offset,
             new_state
                 .get_pointer_inference_state_at_def(&Tid::new("initial"))
@@ -944,7 +949,7 @@ fn splitting_call_stub() {
         Some(&Taint::Tainted(r9_reg.size))
     );
     assert_eq!(
-        new_state.check_if_address_points_to_taint(
+        new_state.address_points_to_taint(
             setup.base_eight_offset,
             new_state
                 .get_pointer_inference_state_at_def(&Tid::new("initial"))
@@ -993,7 +998,7 @@ fn splitting_return_stub() {
         Some(&Taint::Tainted(rax_reg.size))
     );
     assert_eq!(
-        new_state.check_if_address_points_to_taint(
+        new_state.address_points_to_taint(
             setup.base_eight_offset,
             new_state
                 .get_pointer_inference_state_at_def(&Tid::new("initial"))
@@ -1042,11 +1047,11 @@ fn updating_call_stub() {
     let new_state = context.update_call_stub(&setup.state, &mock_call).unwrap();
 
     assert_eq!(
-        new_state.check_if_address_points_to_taint(setup.base_sixteen_offset, &setup.pi_state),
+        new_state.address_points_to_taint(setup.base_sixteen_offset, &setup.pi_state),
         true
     );
     assert_eq!(
-        new_state.check_if_address_points_to_taint(setup.base_eight_offset, &setup.pi_state),
+        new_state.address_points_to_taint(setup.base_eight_offset, &setup.pi_state),
         false
     );
     assert_eq!(
@@ -1094,7 +1099,7 @@ fn specializing_conditional() {
         Some(&Taint::Tainted(r9_reg.size))
     );
     assert_eq!(
-        new_state.check_if_address_points_to_taint(
+        new_state.address_points_to_taint(
             setup.base_eight_offset,
             new_state
                 .get_pointer_inference_state_at_def(&Tid::new("initial"))
