@@ -511,7 +511,10 @@ fn add_not_equal_bounds() {
 
     let interval = IntervalDomain::mock_with_bounds(None, 5, 6, Some(100));
     let x = interval.add_not_equal_bound(&Bitvector::from_i64(10));
-    assert_eq!(x.unwrap(), IntervalDomain::mock_with_bounds(None, 5, 6, Some(9)));
+    assert_eq!(
+        x.unwrap(),
+        IntervalDomain::mock_with_bounds(None, 5, 6, Some(9))
+    );
 }
 
 #[test]

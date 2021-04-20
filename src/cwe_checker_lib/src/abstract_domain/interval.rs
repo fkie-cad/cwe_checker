@@ -256,7 +256,8 @@ impl IntervalDomain {
         let max = Bitvector::signed_max_value(size.into())
             .into_sign_extend(self.bytesize())
             .unwrap();
-        min.checked_sle(&self.interval.start).unwrap() && max.checked_sge(&self.interval.end).unwrap()
+        min.checked_sle(&self.interval.start).unwrap()
+            && max.checked_sge(&self.interval.end).unwrap()
     }
 }
 
