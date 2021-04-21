@@ -88,20 +88,7 @@ impl From<Jmp> for IrJmp {
             },
             BRANCHIND => {
                 let target = unwrap_label_indirect(jmp.goto.unwrap());
-                if let Some(address) = target.address {
-                    // Sometimes there are entries in jump tables that have no associated symbol,
-                    // i.e. jumping there means jumping to nowhere.
-                    // Usually the jump ends up jumping to address 0.
-                    IrJmp::CallOther {
-                        description: format!(
-                            "Unresolved jump: Jump to value read from address {}",
-                            address
-                        ),
-                        return_: None,
-                    }
-                } else {
-                    IrJmp::BranchInd(target.into())
-                }
+                IrJmp::BranchInd(target.into())
             }
             CALL => {
                 let call = jmp.call.unwrap();
@@ -273,6 +260,36 @@ impl Blk {
                 }
             }
             refactored_defs.push(cleaned_def);
+        }
+
+        for (index, jmp) in self.jmps.iter_mut().enumerate() {
+            match jmp.term.mnemonic {
+                JmpType::BRANCHIND | JmpType::CALLIND => {
+                    let input = match jmp.term.mnemonic {
+                        JmpType::BRANCHIND => match jmp.term.goto.as_mut().unwrap() {
+                            Label::Indirect(expr) => expr,
+                            Label::Direct(_) => panic!(),
+                        },
+                        JmpType::CALLIND => {
+                            match jmp.term.call.as_mut().unwrap().target.as_mut().unwrap() {
+                                Label::Indirect(expr) => expr,
+                                Label::Direct(_) => panic!(),
+                            }
+                        }
+                        _ => panic!(),
+                    };
+                    if input.address.is_some() {
+                        let temp_register_name = format!("$load_temp{}", index);
+                        let load_def = input.to_load_def(&temp_register_name, generic_pointer_size);
+                        *input = load_def.lhs.clone().unwrap();
+                        refactored_defs.push(Term {
+                            tid: jmp.tid.clone().with_id_suffix("_load"),
+                            term: load_def,
+                        });
+                    }
+                }
+                _ => (),
+            }
         }
         self.defs = refactored_defs;
     }
