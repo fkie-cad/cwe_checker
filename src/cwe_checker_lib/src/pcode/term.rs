@@ -88,20 +88,7 @@ impl From<Jmp> for IrJmp {
             },
             BRANCHIND => {
                 let target = unwrap_label_indirect(jmp.goto.unwrap());
-                if let Some(address) = target.address {
-                    // Sometimes there are entries in jump tables that have no associated symbol,
-                    // i.e. jumping there means jumping to nowhere.
-                    // Usually the jump ends up jumping to address 0.
-                    IrJmp::CallOther {
-                        description: format!(
-                            "Unresolved jump: Jump to value read from address {}",
-                            address
-                        ),
-                        return_: None,
-                    }
-                } else {
-                    IrJmp::BranchInd(target.into())
-                }
+                IrJmp::BranchInd(target.into())
             }
             CALL => {
                 let call = jmp.call.unwrap();
@@ -194,19 +181,6 @@ impl From<Def> for IrDef {
     }
 }
 
-impl Def {
-    /// For `LOAD` instruction with address pointer size zero,
-    /// correct the address size to the given pointer size.
-    pub fn correct_pointer_sizes(&mut self, pointer_size: ByteSize) {
-        if self.rhs.mnemonic == ExpressionType::LOAD {
-            let input1 = self.rhs.input1.as_mut().unwrap();
-            if input1.size == ByteSize::from(0u64) {
-                input1.size = pointer_size;
-            }
-        }
-    }
-}
-
 /// A basic block.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Blk {
@@ -251,16 +225,13 @@ impl From<Blk> for IrBlk {
 impl Blk {
     /// Add `LOAD` instructions for implicit memory accesses
     /// to convert them to explicit memory accesses.
-    ///
-    /// The generates `LOAD`s will have (incorrect) address sizes of zero,
-    /// which must be corrected afterwards.
-    fn add_load_defs_for_implicit_ram_access(&mut self) {
+    fn add_load_defs_for_implicit_ram_access(&mut self, generic_pointer_size: ByteSize) {
         let mut refactored_defs = Vec::new();
         for def in self.defs.iter() {
             let mut cleaned_def = def.clone();
             if let Some(input) = &def.term.rhs.input0 {
                 if input.address.is_some() {
-                    let load_def = input.to_load_def("$load_temp0");
+                    let load_def = input.to_load_def("$load_temp0", generic_pointer_size);
                     cleaned_def.term.rhs.input0 = load_def.lhs.clone();
                     refactored_defs.push(Term {
                         tid: def.tid.clone().with_id_suffix("_load0"),
@@ -270,7 +241,7 @@ impl Blk {
             }
             if let Some(input) = &def.term.rhs.input1 {
                 if input.address.is_some() {
-                    let load_def = input.to_load_def("$load_temp1");
+                    let load_def = input.to_load_def("$load_temp1", generic_pointer_size);
                     cleaned_def.term.rhs.input1 = load_def.lhs.clone();
                     refactored_defs.push(Term {
                         tid: def.tid.clone().with_id_suffix("_load1"),
@@ -280,7 +251,7 @@ impl Blk {
             }
             if let Some(input) = &def.term.rhs.input2 {
                 if input.address.is_some() {
-                    let load_def = input.to_load_def("$load_temp2");
+                    let load_def = input.to_load_def("$load_temp2", generic_pointer_size);
                     cleaned_def.term.rhs.input2 = load_def.lhs.clone();
                     refactored_defs.push(Term {
                         tid: def.tid.clone().with_id_suffix("_load2"),
@@ -289,6 +260,36 @@ impl Blk {
                 }
             }
             refactored_defs.push(cleaned_def);
+        }
+
+        for (index, jmp) in self.jmps.iter_mut().enumerate() {
+            match jmp.term.mnemonic {
+                JmpType::BRANCHIND | JmpType::CALLIND => {
+                    let input = match jmp.term.mnemonic {
+                        JmpType::BRANCHIND => match jmp.term.goto.as_mut().unwrap() {
+                            Label::Indirect(expr) => expr,
+                            Label::Direct(_) => panic!(),
+                        },
+                        JmpType::CALLIND => {
+                            match jmp.term.call.as_mut().unwrap().target.as_mut().unwrap() {
+                                Label::Indirect(expr) => expr,
+                                Label::Direct(_) => panic!(),
+                            }
+                        }
+                        _ => panic!(),
+                    };
+                    if input.address.is_some() {
+                        let temp_register_name = format!("$load_temp{}", index);
+                        let load_def = input.to_load_def(&temp_register_name, generic_pointer_size);
+                        *input = load_def.lhs.clone().unwrap();
+                        refactored_defs.push(Term {
+                            tid: jmp.tid.clone().with_id_suffix("_load"),
+                            term: load_def,
+                        });
+                    }
+                }
+                _ => (),
+            }
         }
         self.defs = refactored_defs;
     }
@@ -658,12 +659,9 @@ impl Project {
         let generic_pointer_size = self.stack_pointer_register.size;
         for sub in self.program.term.subs.iter_mut() {
             for block in sub.term.blocks.iter_mut() {
-                block.term.add_load_defs_for_implicit_ram_access();
-                // The artificially created LOADs have pointers of size 0,
-                // which we have to correct.
-                for def in block.term.defs.iter_mut() {
-                    def.term.correct_pointer_sizes(generic_pointer_size);
-                }
+                block
+                    .term
+                    .add_load_defs_for_implicit_ram_access(generic_pointer_size);
             }
         }
 

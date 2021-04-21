@@ -658,7 +658,7 @@ fn add_load_defs_for_implicit_ram_access() {
         )
         .unwrap(),
     );
-    blk.add_load_defs_for_implicit_ram_access();
+    blk.add_load_defs_for_implicit_ram_access(ByteSize::new(8));
     assert_eq!(
         blk.defs[0]
             .term
