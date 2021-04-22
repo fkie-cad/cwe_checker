@@ -66,7 +66,7 @@ mod prelude {
     pub use apint::Width;
     pub use serde::{Deserialize, Serialize};
 
-    pub use crate::intermediate_representation::{Bitvector, ByteSize};
+    pub use crate::intermediate_representation::{Bitvector, BitvectorExtended, ByteSize};
     pub use crate::intermediate_representation::{Term, Tid};
     pub use crate::AnalysisResults;
     pub use anyhow::{anyhow, Error};
