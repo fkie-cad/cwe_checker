@@ -175,13 +175,41 @@ impl RuntimeMemoryImage {
             if address >= segment.base_address
                 && address <= segment.base_address + segment.bytes.len() as u64
             {
-                let index = (address - segment.base_address) as usize;
-                let c_str = std::ffi::CStr::from_bytes_with_nul(&segment.bytes[index..])?;
-                return Ok(c_str.to_str()?);
+                let start_index = (address - segment.base_address) as usize;
+                if let Some(end_index) = segment.bytes[start_index..].iter().position(|&b| b == 0) {
+                    let c_str = std::ffi::CStr::from_bytes_with_nul(
+                        &segment.bytes[start_index..start_index + end_index + 1],
+                    )?;
+                    return Ok(c_str.to_str()?);
+                } else {
+                    return Err(anyhow!("Not a valid string in memory."));
+                }
             }
         }
 
         Err(anyhow!("Address is not a valid global memory address."))
+    }
+
+    /// Checks whether the memory content at the input address is
+    /// an address to another memory position and returns the address in memory.
+    pub fn parse_address_if_recursive(
+        &self,
+        address: &Bitvector,
+        arch_size: ByteSize,
+    ) -> Result<Bitvector, Error> {
+        match self.read(address, arch_size) {
+            Ok(Some(recursive_address)) => {
+                if let Ok(_) = self.read(&recursive_address, arch_size) {
+                    return Ok(recursive_address);
+                } else {
+                    return Ok(address.clone());
+                }
+            }
+            Ok(None) => Err(anyhow!(
+                "Writeable address does not guarantee correct content."
+            )),
+            Err(e) => Err(e),
+        }
     }
 
     /// Check whether all addresses in the given interval point to a readable segment in the runtime memory image.

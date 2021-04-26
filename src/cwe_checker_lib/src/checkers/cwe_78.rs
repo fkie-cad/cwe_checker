@@ -78,8 +78,10 @@ pub struct Config {
     system_symbols: Vec<String>,
     /// The names of the string manipulating symbols
     string_symbols: Vec<String>,
-    /// The name of the user input symbols
+    /// The names of the user input symbols
     user_input_symbols: Vec<String>,
+    /// The names of the variable parameter symbols
+    variable_parameter_symbols: Vec<String>,
 }
 
 /// This check searches for system calls and sets their parameters as taint source if available.
@@ -221,6 +223,7 @@ pub struct SymbolMaps<'a> {
     string_symbol_map: HashMap<Tid, &'a ExternSymbol>,
     user_input_symbol_map: HashMap<Tid, &'a ExternSymbol>,
     extern_symbol_map: HashMap<Tid, &'a ExternSymbol>,
+    variable_parameter_symbol_map: HashMap<Tid, &'a ExternSymbol>,
 }
 
 impl<'a> SymbolMaps<'a> {
@@ -240,6 +243,10 @@ impl<'a> SymbolMaps<'a> {
                 &config.user_input_symbols[..],
             ),
             extern_symbol_map,
+            variable_parameter_symbol_map: crate::utils::symbol_utils::get_symbol_map(
+                project,
+                &config.variable_parameter_symbols[..],
+            ),
         }
     }
 }

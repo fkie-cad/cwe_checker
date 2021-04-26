@@ -12,7 +12,15 @@
     ],
     "user_input_symbols": [
       "scanf",
-      "__isoc99_scanf"
+      "__isoc99_scanf",
+      "sscanf"
+    ],
+    "variable_parameter_symbols": [
+      "sprintf",
+      "snprintf",
+      "scanf",
+      "__isoc99_scanf",
+      "sscanf"
     ]
   },
   "CWE190": {
