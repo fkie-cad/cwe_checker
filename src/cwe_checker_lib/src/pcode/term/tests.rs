@@ -396,7 +396,7 @@ fn def_deserialization() {
       "#,
     )
     .unwrap();
-    let _: IrDef = def.into();
+    let _: IrDef = def.into_ir_def(ByteSize::new(8));
     let def: Def = serde_json::from_str(
         r#"
             {
@@ -422,7 +422,7 @@ fn def_deserialization() {
             "#,
     )
     .unwrap();
-    let _: IrDef = def.into();
+    let _: IrDef = def.into_ir_def(ByteSize::new(8));
 }
 
 #[test]
@@ -463,7 +463,7 @@ fn jmp_deserialization() {
 fn blk_deserialization() {
     let setup = Setup::new();
     let block_term: Term<Blk> = setup.blk_t.clone();
-    let _: IrBlk = block_term.term.into();
+    let _: IrBlk = block_term.term.into_ir_blk(ByteSize::new(8));
 }
 
 #[test]
@@ -503,7 +503,7 @@ fn arg_deserialization() {
 fn sub_deserialization() {
     let setup = Setup::new();
     let sub_term: Term<Sub> = setup.sub_t.clone();
-    let _: Term<IrSub> = sub_term.into();
+    let _: Term<IrSub> = sub_term.into_ir_sub_term(ByteSize::new(8));
     let sub_term: Term<Sub> = serde_json::from_str(
         r#"
           {
@@ -542,7 +542,7 @@ fn sub_deserialization() {
     .unwrap();
     // Example has special case where the starting block has to be corrected
     assert!(sub_term.tid.address != sub_term.term.blocks[0].tid.address);
-    let ir_sub: Term<IrSub> = sub_term.into();
+    let ir_sub: Term<IrSub> = sub_term.into_ir_sub_term(ByteSize::new(8));
     assert_eq!(ir_sub.tid.address, ir_sub.term.blocks[0].tid.address);
 }
 
@@ -608,7 +608,7 @@ fn program_deserialization() {
             "#,
     )
     .unwrap();
-    let _: IrProgram = program_term.term.into_ir_program(10000);
+    let _: IrProgram = program_term.term.into_ir_program(10000, ByteSize::new(8));
 }
 
 #[test]
