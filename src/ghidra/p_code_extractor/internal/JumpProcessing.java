@@ -45,7 +45,7 @@ public final class JumpProcessing {
             return processJumpInPcodeBlock(mnemonic, numberOfPcodeOps, currentBlock);
         }
 
-        processJumpAtEndOfPcodeBlocks(mnemonic, numberOfPcodeOps, currentBlock);
+        processJumpAtEndOfPcodeBlocks(mnemonic, currentBlock);
         return false;
     }
 
@@ -53,13 +53,12 @@ public final class JumpProcessing {
     /**
      * 
      * @param mnemonic: pcode mnemonic
-     * @param numberOfPcodeOps: number of pcode instruction in pcode block
      * @param currentBlock: current block term
      * 
      * Process jumps at the end of pcode blocks
      * If it is a return block, the call return address is changed to the current block
      */
-    private static void processJumpAtEndOfPcodeBlocks(String mnemonic, int numberOfPcodeOps, Term<Blk> currentBlock) {
+    private static void processJumpAtEndOfPcodeBlocks(String mnemonic, Term<Blk> currentBlock) {
         // Case 1: jump at the end of pcode group but not end of ghidra generated block. Create a block for the next assembly instruction.
         if(PcodeBlockData.instructionIndex < PcodeBlockData.numberOfInstructionsInBlock - 1 && PcodeBlockData.instruction.getDelaySlotDepth() == 0) {
             PcodeBlockData.blocks.add(TermCreator.createBlkTerm(PcodeBlockData.instruction.getFallThrough().toString(), null));
