@@ -134,46 +134,48 @@ pub struct Def {
     pub rhs: Expression,
 }
 
-impl From<Def> for IrDef {
+impl Def {
     /// Convert a P-Code instruction to the internally used IR.
-    fn from(def: Def) -> IrDef {
+    pub fn into_ir_def(self, generic_pointer_size: ByteSize) -> IrDef {
         use super::ExpressionType::*;
-        match def.rhs.mnemonic {
+        match self.rhs.mnemonic {
             LOAD => IrDef::Load {
-                var: def.lhs.unwrap().into(),
-                address: def.rhs.input1.unwrap().into(),
+                var: self.lhs.unwrap().into(),
+                address: self.rhs.input1.unwrap().into(),
             },
             STORE => IrDef::Store {
-                address: def.rhs.input1.unwrap().into(),
-                value: def.rhs.input2.unwrap().into(),
+                address: self.rhs.input1.unwrap().into(),
+                value: self.rhs.input2.unwrap().into(),
             },
             SUBPIECE => IrDef::Assign {
-                var: def.lhs.clone().unwrap().into(),
+                var: self.lhs.clone().unwrap().into(),
                 value: IrExpression::Subpiece {
-                    low_byte: def.rhs.input1.unwrap().parse_to_bytesize(),
-                    size: def.lhs.unwrap().size,
-                    arg: Box::new(def.rhs.input0.unwrap().into()),
+                    low_byte: self.rhs.input1.unwrap().parse_to_bytesize(),
+                    size: self.lhs.unwrap().size,
+                    arg: Box::new(self.rhs.input0.unwrap().into()),
                 },
             },
             INT_ZEXT | INT_SEXT | INT2FLOAT | FLOAT2FLOAT | TRUNC | POPCOUNT => IrDef::Assign {
-                var: def.lhs.clone().unwrap().into(),
+                var: self.lhs.clone().unwrap().into(),
                 value: IrExpression::Cast {
-                    op: def.rhs.mnemonic.into(),
-                    size: def.lhs.unwrap().size,
-                    arg: Box::new(def.rhs.input0.unwrap().into()),
+                    op: self.rhs.mnemonic.into(),
+                    size: self.lhs.unwrap().size,
+                    arg: Box::new(self.rhs.input0.unwrap().into()),
                 },
             },
             _ => {
-                let target_var = def.lhs.unwrap();
+                let target_var = self.lhs.unwrap();
                 if target_var.address.is_some() {
                     IrDef::Store {
-                        address: IrExpression::Const(target_var.parse_to_bitvector()),
-                        value: def.rhs.into(),
+                        address: IrExpression::Const(
+                            target_var.parse_address_to_bitvector(generic_pointer_size),
+                        ),
+                        value: self.rhs.into(),
                     }
                 } else {
                     IrDef::Assign {
                         var: target_var.into(),
-                        value: def.rhs.into(),
+                        value: self.rhs.into(),
                     }
                 }
             }
@@ -190,23 +192,23 @@ pub struct Blk {
     pub jmps: Vec<Term<Jmp>>,
 }
 
-impl From<Blk> for IrBlk {
+impl Blk {
     /// Convert a P-Code block to the internally used IR.
-    fn from(blk: Blk) -> IrBlk {
-        let defs: Vec<Term<IrDef>> = blk
+    pub fn into_ir_blk(self, generic_pointer_size: ByteSize) -> IrBlk {
+        let defs: Vec<Term<IrDef>> = self
             .defs
             .into_iter()
             .map(|def_term| Term {
                 tid: def_term.tid,
-                term: def_term.term.into(),
+                term: def_term.term.into_ir_def(generic_pointer_size),
             })
             .collect();
-        let indirect_jmp_targets = blk
+        let indirect_jmp_targets = self
             .jmps
             .iter()
             .find_map(|jmp_term| jmp_term.term.target_hints.clone())
             .unwrap_or_default();
-        let jmps: Vec<Term<IrJmp>> = blk
+        let jmps: Vec<Term<IrJmp>> = self
             .jmps
             .into_iter()
             .map(|jmp_term| Term {
@@ -327,42 +329,42 @@ pub struct Sub {
     pub blocks: Vec<Term<Blk>>,
 }
 
-impl From<Term<Sub>> for Term<IrSub> {
+impl Term<Sub> {
     /// Convert a `Sub` term in the P-Code representation to a `Sub` term in the intermediate representation.
     /// The conversion also repairs the order of the basic blocks in the `blocks` array of the `Sub`
     /// in the sense that the first block of the array is required to also be the function entry point
     /// after the conversion.
-    fn from(mut sub: Term<Sub>) -> Term<IrSub> {
+    pub fn into_ir_sub_term(mut self, generic_pointer_size: ByteSize) -> Term<IrSub> {
         // Since the intermediate representation expects that the first block of a function is its entry point,
         // we have to make sure that this actually holds.
-        if !sub.term.blocks.is_empty() && sub.tid.address != sub.term.blocks[0].tid.address {
+        if !self.term.blocks.is_empty() && self.tid.address != self.term.blocks[0].tid.address {
             let mut start_block_index = None;
-            for (i, block) in sub.term.blocks.iter().enumerate() {
-                if block.tid.address == sub.tid.address {
+            for (i, block) in self.term.blocks.iter().enumerate() {
+                if block.tid.address == self.tid.address {
                     start_block_index = Some(i);
                     break;
                 }
             }
             if let Some(start_block_index) = start_block_index {
-                sub.term.blocks.swap(0, start_block_index);
+                self.term.blocks.swap(0, start_block_index);
             } else {
-                panic!("Non-empty function without correct starting block encountered. Name: {}, TID: {}", sub.term.name, sub.tid);
+                panic!("Non-empty function without correct starting block encountered. Name: {}, TID: {}", self.term.name, self.tid);
             }
         }
 
-        let blocks = sub
+        let blocks = self
             .term
             .blocks
             .into_iter()
             .map(|block_term| Term {
                 tid: block_term.tid,
-                term: block_term.term.into(),
+                term: block_term.term.into_ir_blk(generic_pointer_size),
             })
             .collect();
         Term {
-            tid: sub.tid,
+            tid: self.tid,
             term: IrSub {
-                name: sub.term.name,
+                name: self.term.name,
                 blocks,
             },
         }
@@ -457,8 +459,16 @@ impl Program {
     /// It is needed to detect whether Ghidra added a constant offset to all addresses of the memory address.
     /// E.g. if the `binary_base_address` is 0 for shared object files,
     /// Ghidra adds an offset so that the memory image does not actually start at address 0.
-    pub fn into_ir_program(self, binary_base_address: u64) -> IrProgram {
-        let subs = self.subs.into_iter().map(|sub| sub.into()).collect();
+    pub fn into_ir_program(
+        self,
+        binary_base_address: u64,
+        generic_pointer_size: ByteSize,
+    ) -> IrProgram {
+        let subs = self
+            .subs
+            .into_iter()
+            .map(|sub| sub.into_ir_sub_term(generic_pointer_size))
+            .collect();
         let extern_symbols = self
             .extern_symbols
             .into_iter()
@@ -525,7 +535,10 @@ impl Project {
     pub fn into_ir_project(self, binary_base_address: u64) -> IrProject {
         let mut program: Term<IrProgram> = Term {
             tid: self.program.tid,
-            term: self.program.term.into_ir_program(binary_base_address),
+            term: self
+                .program
+                .term
+                .into_ir_program(binary_base_address, self.stack_pointer_register.size),
         };
         let register_map: HashMap<&String, &RegisterProperties> = self
             .register_properties
