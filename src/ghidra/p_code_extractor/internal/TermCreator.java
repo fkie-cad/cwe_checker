@@ -348,7 +348,11 @@ public class TermCreator {
             callString = "unimplemented";
             call = new Call(null, createLabel(PcodeBlockData.instruction.getFallThrough()), callString);
         } else {
-            call = new Call(createLabel(null), createLabel(PcodeBlockData.instruction.getFallThrough()));
+            if (PcodeBlockData.instruction.getFallThrough() == null) {
+                call = new Call(createLabel(null));
+            } else {
+                call = new Call(createLabel(null), createLabel(PcodeBlockData.instruction.getFallThrough()));
+            }
         }
 
         return call;    
