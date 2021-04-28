@@ -368,7 +368,8 @@ impl Expression {
             is_temp: false,
         }));
 
-        if sub_register.lsb > ByteSize::new(0) && sub_register.lsb + sub_register.size == base_size {
+        if sub_register.lsb > ByteSize::new(0) && sub_register.lsb + sub_register.size == base_size
+        {
             // Build PIECE as PIECE(lhs: sub_register, rhs: low subpiece)
             *self = Expression::BinOp {
                 op: BinOpType::Piece,

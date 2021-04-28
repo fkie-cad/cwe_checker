@@ -224,7 +224,7 @@ fn piecing_expressions_together() {
             low_byte: ByteSize(0),
             size: ByteSize::new(4),
             arg: Box::new(setup.rax_variable.clone()),
-        })
+        }),
     };
     expression.piece_two_expressions_together(&setup.rax_register, &higher_half_rax);
     assert_eq!(expression, expected_output);
