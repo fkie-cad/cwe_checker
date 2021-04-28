@@ -235,12 +235,11 @@ public final class HelperFunctions {
     public static ArrayList<RegisterProperties> getRegisterList() {
         ArrayList<RegisterProperties> regProps = new ArrayList<RegisterProperties>();
         Language language = ghidraProgram.getLanguage();
-        int archSizeInBytes = (int)(language.getLanguageDescription().getSize() / 8);
         for(Register reg : language.getRegisters()) {
             regProps.add(
                 new RegisterProperties(reg.getName(), 
                                        reg.getBaseRegister().getName(), 
-                                       (int)(reg.getLeastSignificatBitInBaseRegister() / archSizeInBytes),
+                                       (int)(reg.getLeastSignificatBitInBaseRegister() / 8),
                                        context.getRegisterVarnode(reg).getSize())
             );
         }
