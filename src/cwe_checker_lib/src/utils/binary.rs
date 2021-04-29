@@ -332,6 +332,13 @@ pub mod tests {
                         write_flag: false,
                         execute_flag: false,
                     },
+                    MemorySegment {
+                        bytes: [0x02, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00].to_vec(),
+                        base_address: 0x4000,
+                        read_flag: true,
+                        write_flag: false,
+                        execute_flag: false,
+                    },
                 ],
                 is_little_endian: true,
             }

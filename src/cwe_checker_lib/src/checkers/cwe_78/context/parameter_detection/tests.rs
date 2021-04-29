@@ -1,4 +1,4 @@
-use crate::abstract_domain::PointerDomain;
+use crate::abstract_domain::{DataDomain, IntervalDomain, PointerDomain};
 use crate::analysis::pointer_inference::{Data, PointerInference as PointerInferenceComputation};
 use crate::checkers::cwe_476::Taint;
 use crate::intermediate_representation::{
@@ -12,7 +12,7 @@ use super::Context;
 use std::collections::{HashMap, HashSet};
 
 #[test]
-fn tainting_generic_extern_symbol_parameters_and_removing_non_callee_saved() {
+fn tainting_generic_extern_symbol_parameters() {
     let mut setup = Setup::new();
     let r9_reg = Variable::mock("R9", 8 as u64);
     let rbp_reg = Variable::mock("RBP", 8 as u64);
@@ -37,7 +37,14 @@ fn tainting_generic_extern_symbol_parameters_and_removing_non_callee_saved() {
 
     let mut string_syms: HashMap<Tid, &ExternSymbol> = HashMap::new();
     string_syms.insert(Tid::new("sprintf"), &setup.string_sym);
-    let context = Context::mock(&setup.project, string_syms, &pi_results, &mem_image);
+    let context = Context::mock(
+        &setup.project,
+        string_syms,
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
     let node_id = context
         .block_maps
         .jmp_to_blk_end_node_map
@@ -122,7 +129,14 @@ fn tainting_extern_string_symbol_parameters() {
     let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
-    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
+    let context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
     let node_id = context
         .block_maps
         .jmp_to_blk_end_node_map
@@ -171,7 +185,14 @@ fn tainting_function_arguments() {
     let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
-    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
+    let context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
 
     setup
         .pi_state
@@ -202,3 +223,163 @@ fn tainting_function_arguments() {
         &setup.pi_state
     ));
 }
+
+#[test]
+fn test_is_string_symbol() {
+    let setup = Setup::new();
+    let mem_image = RuntimeMemoryImage::mock();
+    let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
+    pi_results.compute();
+    let mut string_symbol_map: HashMap<Tid, &ExternSymbol> = HashMap::new();
+    let sprintf_symbol = ExternSymbol::mock_string();
+    let mut memcpy_symbol = ExternSymbol::mock();
+    memcpy_symbol.tid = Tid::new("memcpy");
+    string_symbol_map.insert(Tid::new("sprintf"), &sprintf_symbol);
+    let context = Context::mock(
+        &setup.project,
+        string_symbol_map,
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
+
+    assert!(context.is_string_symbol(&sprintf_symbol));
+    assert!(!context.is_string_symbol(&memcpy_symbol));
+}
+
+#[test]
+fn test_is_user_input_symbol() {
+    let setup = Setup::new();
+    let mem_image = RuntimeMemoryImage::mock();
+    let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
+    pi_results.compute();
+    let mut user_input_symbol_map: HashMap<Tid, &ExternSymbol> = HashMap::new();
+    let mut scanf_symbol = ExternSymbol::mock();
+    scanf_symbol.tid = Tid::new("scanf");
+    let mut memcpy_symbol = ExternSymbol::mock();
+    memcpy_symbol.tid = Tid::new("memcpy");
+    user_input_symbol_map.insert(Tid::new("scanf"), &scanf_symbol);
+    let context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        user_input_symbol_map,
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
+
+    assert!(context.is_user_input_symbol(&scanf_symbol));
+    assert!(!context.is_user_input_symbol(&memcpy_symbol));
+}
+
+#[test]
+fn test_get_return_registers_from_symbol() {
+    assert_eq!(
+        vec!["RAX"],
+        Context::get_return_registers_from_symbol(&ExternSymbol::mock_string())
+    );
+}
+
+#[test]
+fn test_get_input_format_string() {
+    let mut setup = Setup::new();
+    let mem_image = RuntimeMemoryImage::mock();
+    let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
+    pi_results.compute();
+    let mut sprintf_symbol = ExternSymbol::mock_string();
+    sprintf_symbol.addresses = vec!["3002".to_string()];
+    let context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
+
+    let global_address = Bitvector::from_str_radix(16, "3002").unwrap();
+    setup.pi_state.set_register(
+        &Variable::mock("RSI", 8 as u64),
+        DataDomain::Value(IntervalDomain::new(global_address.clone(), global_address)),
+    );
+
+    assert_eq!(
+        "Hello World",
+        context.get_input_format_string(&setup.pi_state, &sprintf_symbol)
+    );
+}
+
+#[test]
+fn test_parse_format_string_destination_and_return_content() {
+    let setup = Setup::new();
+    let mem_image = RuntimeMemoryImage::mock();
+    let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
+    pi_results.compute();
+    let mut sprintf_symbol = ExternSymbol::mock_string();
+    sprintf_symbol.addresses = vec!["3002".to_string()];
+    let context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
+
+    // Test Case 1: Global Memory location contains pointer to another global memory location.
+    let pointer_address_vector = Bitvector::from_str_radix(16, "4000").unwrap();
+    let pointer_address = DataDomain::Value(IntervalDomain::new(
+        pointer_address_vector.clone(),
+        pointer_address_vector,
+    ));
+
+    assert_eq!(
+        "Hello World",
+        context.parse_format_string_destination_and_return_content(pointer_address)
+    );
+
+    // Test Case 2: Global memory location contains string itself.
+    let string_address_vector = Bitvector::from_str_radix(16, "3002").unwrap();
+    let string_address = DataDomain::Value(IntervalDomain::new(
+        string_address_vector.clone(),
+        string_address_vector,
+    ));
+
+    assert_eq!(
+        "Hello World",
+        context.parse_format_string_destination_and_return_content(string_address)
+    );
+}
+
+#[test]
+fn test_has_variable_number_of_parameters() {
+    let setup = Setup::new();
+    let mem_image = RuntimeMemoryImage::mock();
+    let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
+    pi_results.compute();
+    let sprintf_symbol = ExternSymbol::mock_string();
+    let mut variable_parameter_symbols: HashMap<Tid, &ExternSymbol> = HashMap::new();
+    variable_parameter_symbols.insert(Tid::new("sprintf"), &sprintf_symbol);
+    let mut memcpy_symbol = ExternSymbol::mock();
+    memcpy_symbol.tid = Tid::new("memcpy");
+    let context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        HashMap::new(),
+        variable_parameter_symbols,
+        &pi_results,
+        &mem_image,
+    );
+
+    assert!(context.has_variable_number_of_parameters(&sprintf_symbol));
+    assert!(!context.has_variable_number_of_parameters(&memcpy_symbol));
+}
+
+#[test]
+fn test_get_variable_number_parameters() {}

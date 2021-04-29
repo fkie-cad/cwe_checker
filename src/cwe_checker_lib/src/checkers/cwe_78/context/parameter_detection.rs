@@ -99,15 +99,7 @@ impl<'a> Context<'a> {
             .pointer_inference_results
             .get_node_value(call_source_node)
         {
-            // Check whether the parameter points to a tainted memory target
-            // Since the first parameter of these string functions is also the return parameter,
-            // this will serve as an indicator whether the function call is relevant to the taint analysis.
-            let relevant_fuction_call = if let Some(param) = string_symbol.parameters.get(0) {
-                self.first_param_points_to_memory_taint(pi_state, &mut new_state, param)
-            } else {
-                panic!("Missing parameters for string related function!");
-            };
-            if relevant_fuction_call {
+            if self.is_relevant_string_function_call(string_symbol, pi_state, &mut new_state) {
                 let mut parameters = string_symbol.parameters.clone();
                 if self.has_variable_number_of_parameters(string_symbol) {
                     parameters
@@ -119,18 +111,34 @@ impl<'a> Context<'a> {
         new_state
     }
 
+    /// Checks whether a string function call is a relevant call to the taint analysis.
+    /// Since the first parameter of these string functions is also the return parameter,
+    /// it is checked whether is points to a tainted memory address.
+    pub fn is_relevant_string_function_call(
+        &self,
+        string_symbol: &ExternSymbol,
+        pi_state: &PointerInferenceState,
+        state: &mut State,
+    ) -> bool {
+        if let Some(param) = string_symbol.parameters.get(0) {
+            self.first_param_points_to_memory_taint(pi_state, state, param)
+        } else {
+            panic!("Missing parameters for string related function!");
+        }
+    }
+
     /// Taints the input parameter of user input symbols.
     /// In case of a *scanf* call, no taint is added since the input can be arbitrary.
     /// However, the format string is analysed to avoid false positives. (e.g. pure integer input
     /// does not trigger a cwe warning)
     /// In case of a *sscanf* call, the source string pointer parameter is tainted, if one of the tainted
-    /// return values is a string. 
+    /// return values is a string.
     pub fn taint_user_input_symbol_parameters(
         &self,
-        _state: &State,
+        state: &State,
         _user_input_symbol: &ExternSymbol,
     ) -> State {
-        todo!()
+        state.clone()
     }
 
     /// Taints register and stack function arguments.
@@ -164,6 +172,7 @@ impl<'a> Context<'a> {
     ) -> String {
         let format_string_index = match extern_symbol.name.as_str() {
             "scanf" => 0,
+            "sscanf" => 1,
             "sprintf" => 1,
             "snprintf" => 2,
             _ => panic!("Invalid function."),
@@ -216,14 +225,13 @@ impl<'a> Context<'a> {
 
     /// Parses the format string parameters using a regex, determines their data types,
     /// and calculates their positions (register or memory).
-    pub fn _parse_format_string_parameters(&self, format_string: &str) {
+    pub fn _parse_format_string_parameters(&self, format_string: &str) -> Vec<String> {
         let re = Regex::new(r#"(%\d{0,2}[c,C,d,i,o,u,x,X,e,E,f,F,g,G,a,A,n,p,s,S,Z])"#)
             .expect("No valid regex!");
 
-        let _format_identifiers: Vec<String> = re
-            .captures_iter(format_string)
+        re.captures_iter(format_string)
             .map(|cap| cap[0].to_string())
-            .collect();
+            .collect()
     }
 
     /// Determines whether a function has a variable number of parameters.

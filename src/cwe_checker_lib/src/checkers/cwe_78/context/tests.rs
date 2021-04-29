@@ -109,6 +109,8 @@ impl<'a> Context<'a> {
     pub fn mock(
         project: &'a Project,
         string_symbols: HashMap<Tid, &'a ExternSymbol>,
+        user_input_symbols: HashMap<Tid, &'a ExternSymbol>,
+        variable_parameter_symbols: HashMap<Tid, &'a ExternSymbol>,
         pi_results: &'a PointerInferenceComputation<'a>,
         mem_image: &'a RuntimeMemoryImage,
     ) -> Self {
@@ -153,9 +155,9 @@ impl<'a> Context<'a> {
 
         let symbol_maps: SymbolMaps = SymbolMaps {
             string_symbol_map: string_symbols,
-            user_input_symbol_map: HashMap::new(),
+            user_input_symbol_map: user_input_symbols,
             extern_symbol_map,
-            variable_parameter_symbol_map: HashMap::new(),
+            variable_parameter_symbol_map: variable_parameter_symbols,
         };
 
         Context::new(
@@ -179,7 +181,14 @@ fn setting_taint_source() {
     let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
     let pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     let mem_image = RuntimeMemoryImage::mock();
-    let mut context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
+    let mut context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
 
     context.set_taint_source(&setup.taint_source, &String::from("system"), &current_sub);
     assert_eq!(context.taint_source, Some(&setup.taint_source));
@@ -210,7 +219,14 @@ fn adding_temporary_callee_saved_register_taints_to_mem_taints() {
     let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
-    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
+    let context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
 
     let result = context.add_temporary_callee_saved_register_taints_to_mem_taints(
         &setup.pi_state,
@@ -240,7 +256,14 @@ fn first_param_pointing_to_memory_taint() {
     let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
-    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
+    let context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
 
     let arg = Arg::Register(rdi_reg);
     assert_eq!(
@@ -269,7 +292,14 @@ fn creating_pi_def_map() {
     let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
-    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
+    let context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
     let current_sub = setup.project.program.term.subs.get(0).unwrap();
     let start_node = context
         .block_maps
@@ -310,7 +340,14 @@ fn getting_blk_start_node_if_last_def() {
     let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
-    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
+    let context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
     let current_sub = setup.project.program.term.subs.get(0).unwrap();
     setup.state.set_current_sub(current_sub);
 
@@ -340,7 +377,14 @@ fn getting_source_node() {
     let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
-    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
+    let context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
     let current_sub = setup.project.program.term.subs.get(0).unwrap();
     setup.state.set_current_sub(current_sub);
 
@@ -369,7 +413,14 @@ fn updating_target_state_for_callsite() {
     let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
-    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
+    let context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
 
     let mut return_state = setup.state.clone();
 
@@ -446,7 +497,14 @@ fn handling_assign_and_load() {
     let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
-    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
+    let context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
     let current_sub = setup.project.program.term.subs.get(0).unwrap();
     setup.state.set_current_sub(current_sub);
 
@@ -523,7 +581,14 @@ fn updating_def() {
     let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
-    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
+    let context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
     let current_sub = setup.project.program.term.subs.get(0).unwrap();
     setup.state.set_current_sub(current_sub);
 
@@ -605,7 +670,14 @@ fn updating_jumpsite() {
     let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
-    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
+    let context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
 
     let mut new_state = context
         .update_jumpsite(
@@ -652,7 +724,14 @@ fn updating_callsite() {
     let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
-    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
+    let context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
 
     // Test Case: No return state
     assert_eq!(
@@ -744,7 +823,14 @@ fn splitting_call_stub() {
     let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
-    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
+    let context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
 
     let mut new_state = context.split_call_stub(&setup.state).unwrap();
 
@@ -790,7 +876,14 @@ fn splitting_return_stub() {
     let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
-    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
+    let context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
 
     // Set pi_state to check for memory pointers
     let mut new_state = context
@@ -849,7 +942,14 @@ fn updating_call_stub() {
     let sprintf = &ExternSymbol::mock_string();
     string_symbols.insert(Tid::new("sprintf"), sprintf);
 
-    let context = Context::mock(&setup.project, string_symbols, &pi_results, &mem_image);
+    let context = Context::mock(
+        &setup.project,
+        string_symbols,
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
     let current_sub = Sub::mock("func");
     setup.state.set_current_sub(&current_sub);
 
@@ -895,7 +995,14 @@ fn specializing_conditional() {
     let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
-    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
+    let context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
 
     let mut new_state = context.split_call_stub(&setup.state).unwrap();
 
