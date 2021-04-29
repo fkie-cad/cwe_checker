@@ -988,3 +988,61 @@ fn specialize_by_unsigned_comparison_op() {
         IntervalDomain::mock_with_bounds(Some(-19), -5, -1, None).into()
     );
 }
+
+#[test]
+fn stack_pointer_with_nonnegative_offset() {
+    let state = State::new(&register("RSP"), Tid::new("func_tid"));
+    let pointer = PointerDomain::new(state.stack_id.clone(), Bitvector::from_i64(-1).into()).into();
+    assert!(!state.is_stack_pointer_with_nonnegative_offset(&pointer));
+    let pointer = PointerDomain::new(state.stack_id.clone(), Bitvector::from_i64(5).into()).into();
+    assert!(state.is_stack_pointer_with_nonnegative_offset(&pointer));
+    let pointer = PointerDomain::new(state.stack_id.clone(), IntervalDomain::mock(2, 3)).into();
+    assert!(!state.is_stack_pointer_with_nonnegative_offset(&pointer)); // The offset is not a constant
+}
+
+#[test]
+fn out_of_bounds_access_recognition() {
+    let mut state = State::new(&register("RSP"), Tid::new("func_tid"));
+    let global_data = RuntimeMemoryImage::mock();
+    let heap_obj_id = new_id("heap_malloc", "RAX");
+    state.memory.add_abstract_object(
+        heap_obj_id.clone(),
+        Bitvector::from_u64(0).into(),
+        crate::analysis::pointer_inference::object::ObjectType::Heap,
+        ByteSize::new(8),
+    );
+    state
+        .memory
+        .set_lower_index_bound(&heap_obj_id, &Bitvector::from_u64(0).into());
+    state
+        .memory
+        .set_upper_index_bound(&heap_obj_id, &Bitvector::from_u64(7).into());
+
+    let pointer = PointerDomain::new(heap_obj_id.clone(), Bitvector::from_i64(-1).into()).into();
+    assert!(state.pointer_contains_out_of_bounds_target(&pointer, &global_data));
+    let pointer = PointerDomain::new(heap_obj_id.clone(), Bitvector::from_u64(0).into()).into();
+    assert!(!state.pointer_contains_out_of_bounds_target(&pointer, &global_data));
+    let pointer = PointerDomain::new(heap_obj_id.clone(), Bitvector::from_u64(7).into()).into();
+    assert!(!state.pointer_contains_out_of_bounds_target(&pointer, &global_data));
+    let pointer = PointerDomain::new(heap_obj_id.clone(), Bitvector::from_u64(8).into()).into();
+    assert!(state.pointer_contains_out_of_bounds_target(&pointer, &global_data));
+
+    let address = PointerDomain::new(heap_obj_id.clone(), Bitvector::from_u64(0).into()).into();
+    state.set_register(&Variable::mock("RAX", 8), address);
+    let load_def = Def::load(
+        "tid",
+        Variable::mock("RBX", 8),
+        Expression::Var(Variable::mock("RAX", 8)),
+    );
+    assert!(!state.contains_out_of_bounds_mem_access(&load_def.term, &global_data));
+
+    let address = PointerDomain::new(heap_obj_id.clone(), Bitvector::from_u64(0).into()).into();
+    state.set_register(&Variable::mock("RAX", 8), address);
+    assert!(!state.contains_out_of_bounds_mem_access(&load_def.term, &global_data));
+    let address = PointerDomain::new(heap_obj_id.clone(), Bitvector::from_u64(1).into()).into();
+    state.set_register(&Variable::mock("RAX", 8), address);
+    assert!(state.contains_out_of_bounds_mem_access(&load_def.term, &global_data));
+    let address = PointerDomain::new(state.stack_id.clone(), Bitvector::from_u64(8).into()).into();
+    state.set_register(&Variable::mock("RAX", 8), address);
+    assert!(!state.contains_out_of_bounds_mem_access(&load_def.term, &global_data));
+}

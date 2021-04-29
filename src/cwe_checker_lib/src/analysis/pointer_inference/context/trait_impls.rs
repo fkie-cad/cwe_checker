@@ -32,6 +32,36 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
             };
             let _ = self.log_collector.send(LogThreadMsg::Cwe(warning));
         }
+        // check for out-of-bounds memory access
+        if state.contains_out_of_bounds_mem_access(&def.term, self.runtime_memory_image) {
+            let (warning_name, warning_description) = match def.term {
+                Def::Load { .. } => (
+                    "CWE125",
+                    format!(
+                        "(Out-of-bounds Read) Memory load at {} may be out of bounds",
+                        def.tid.address
+                    ),
+                ),
+                Def::Store { .. } => (
+                    "CWE787",
+                    format!(
+                        "(Out-of-bounds Write) Memory write at {} may be out of bounds",
+                        def.tid.address
+                    ),
+                ),
+                Def::Assign { .. } => panic!(),
+            };
+            let warning = CweWarning {
+                name: warning_name.to_string(),
+                version: VERSION.to_string(),
+                addresses: vec![def.tid.address.clone()],
+                tids: vec![format!("{}", def.tid)],
+                symbols: Vec::new(),
+                other: Vec::new(),
+                description: warning_description,
+            };
+            let _ = self.log_collector.send(LogThreadMsg::Cwe(warning));
+        }
 
         match &def.term {
             Def::Store { address, value } => {
@@ -59,8 +89,7 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
     }
 
     /// Update the state according to the effects of the given `Jmp` term.
-    /// Right now the state is not changed,
-    /// as specialization for conditional jumps is not implemented yet.
+    /// Right now the state is not changed.
     fn update_jump(
         &self,
         value: &State,
@@ -106,8 +135,14 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
                 // Note that this may lead to analysis errors if the function uses another calling convention.
                 callee_state.remove_callee_saved_register(cconv);
             }
+
+            // Set the lower index bound for the caller stack frame.
+            callee_state
+                .memory
+                .set_lower_index_bound(&state.stack_id, &stack_offset_adjustment);
             // Replace the caller stack ID with one determined by the call instruction.
-            // This has to be done *before* adding the new callee stack id to avoid confusing caller and callee stack ids in case of recursive calls.
+            // This has to be done *before* adding the new callee stack id
+            // to avoid confusing caller and callee stack ids in case of recursive calls.
             callee_state.replace_abstract_id(
                 &state.stack_id,
                 &new_caller_stack_id,
@@ -245,6 +280,12 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
         // remove non-referenced objects from the state
         state_after_return.remove_unreferenced_objects();
 
+        // remove the lower index bound of the stack frame
+        state_after_return.memory.set_lower_index_bound(
+            original_caller_stack_id,
+            &IntervalDomain::new_top(self.project.stack_pointer_register.size),
+        );
+
         Some(state_after_return)
     }
 
@@ -265,6 +306,8 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
         };
         let mut new_state = state.clone();
         if let Some(extern_symbol) = self.extern_symbol_map.get(call_target) {
+            // Generate a CWE-message if some argument is an out-of-bounds pointer.
+            self.check_parameter_register_for_out_of_bounds_pointer(state, call, extern_symbol);
             // Clear non-callee-saved registers from the state.
             let cconv = extern_symbol.get_calling_convention(&self.project);
             new_state.clear_non_callee_saved_register(&cconv.callee_saved_register[..]);

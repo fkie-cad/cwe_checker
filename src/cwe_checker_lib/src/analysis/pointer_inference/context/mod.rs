@@ -113,6 +113,65 @@ impl<'a> Context<'a> {
         }
     }
 
+    /// If the given `extern_symbol` is a call to a known allocation function
+    /// return the size of the memory object allocated by it.
+    ///
+    /// The function returns a `Top` element if the size could not be determined.
+    /// Known allocation functions: `malloc`, `realloc`, `calloc`.
+    fn get_allocation_size_of_alloc_call(
+        &self,
+        state: &State,
+        extern_symbol: &ExternSymbol,
+    ) -> ValueDomain {
+        let address_bytesize = self.project.get_pointer_bytesize();
+        let object_size = match extern_symbol.name.as_str() {
+            "malloc" => {
+                let size_parameter = extern_symbol.parameters.get(0).unwrap();
+                state
+                    .eval_parameter_arg(
+                        size_parameter,
+                        &self.project.stack_pointer_register,
+                        self.runtime_memory_image,
+                    )
+                    .unwrap_or_else(|_| Data::new_top(address_bytesize))
+            }
+            "realloc" => {
+                let size_parameter = extern_symbol.parameters.get(1).unwrap();
+                state
+                    .eval_parameter_arg(
+                        size_parameter,
+                        &self.project.stack_pointer_register,
+                        self.runtime_memory_image,
+                    )
+                    .unwrap_or_else(|_| Data::new_top(address_bytesize))
+            }
+            "calloc" => {
+                let size_param1 = extern_symbol.parameters.get(0).unwrap();
+                let size_param2 = extern_symbol.parameters.get(1).unwrap();
+                let param1_value = state
+                    .eval_parameter_arg(
+                        size_param1,
+                        &self.project.stack_pointer_register,
+                        self.runtime_memory_image,
+                    )
+                    .unwrap_or_else(|_| Data::new_top(address_bytesize));
+                let param2_value = state
+                    .eval_parameter_arg(
+                        size_param2,
+                        &self.project.stack_pointer_register,
+                        self.runtime_memory_image,
+                    )
+                    .unwrap_or_else(|_| Data::new_top(address_bytesize));
+                param1_value.bin_op(BinOpType::IntMult, &param2_value)
+            }
+            _ => DataDomain::new_top(address_bytesize),
+        };
+        match object_size {
+            Data::Value(val) => val,
+            _ => ValueDomain::new_top(address_bytesize),
+        }
+    }
+
     /// Add a new abstract object and a pointer to it in the return register of an extern call.
     /// This models the behaviour of `malloc`-like functions,
     /// except that we cannot represent possible `NULL` pointers as return values yet.
@@ -122,18 +181,28 @@ impl<'a> Context<'a> {
         call: &Term<Jmp>,
         extern_symbol: &ExternSymbol,
     ) -> State {
+        let address_bytesize = self.project.get_pointer_bytesize();
+        let object_size = self.get_allocation_size_of_alloc_call(&state, extern_symbol);
+
         match extern_symbol.get_unique_return_register() {
             Ok(return_register) => {
                 let object_id = AbstractIdentifier::new(
                     call.tid.clone(),
                     AbstractLocation::from_var(return_register).unwrap(),
                 );
-                let address_bytesize = self.project.get_pointer_bytesize();
                 state.memory.add_abstract_object(
                     object_id.clone(),
                     Bitvector::zero(apint::BitWidth::from(address_bytesize)).into(),
                     super::object::ObjectType::Heap,
                     address_bytesize,
+                );
+                state.memory.set_lower_index_bound(
+                    &object_id,
+                    &Bitvector::zero(address_bytesize.into()).into(),
+                );
+                state.memory.set_upper_index_bound(
+                    &object_id,
+                    &(object_size - Bitvector::one(address_bytesize.into()).into()),
                 );
                 let pointer = PointerDomain::new(
                     object_id,
@@ -238,6 +307,51 @@ impl<'a> Context<'a> {
                             description: format!(
                                 "(Use After Free) Call to {} may access freed memory at {}",
                                 extern_symbol.name, call.tid.address
+                            ),
+                        };
+                        let _ = self.log_collector.send(LogThreadMsg::Cwe(warning));
+                    }
+                }
+                Err(err) => self.log_debug(
+                    Err(err.context(format!(
+                        "Function parameter {:?} could not be evaluated",
+                        parameter
+                    ))),
+                    Some(&call.tid),
+                ),
+            }
+        }
+    }
+
+    /// Check whether a parameter of a call to an extern symbol may point outside of the bounds of a memory object.
+    /// If yes, generate a CWE-warning,
+    /// since the pointer may be used for an out-of-bounds memory access by the function.
+    fn check_parameter_register_for_out_of_bounds_pointer(
+        &self,
+        state: &State,
+        call: &Term<Jmp>,
+        extern_symbol: &ExternSymbol,
+    ) {
+        for parameter in extern_symbol.parameters.iter() {
+            match state.eval_parameter_arg(
+                parameter,
+                &self.project.stack_pointer_register,
+                &self.runtime_memory_image,
+            ) {
+                Ok(data) => {
+                    if state.pointer_contains_out_of_bounds_target(&data, self.runtime_memory_image)
+                    {
+                        let warning = CweWarning {
+                            name: "CWE119".to_string(),
+                            version: VERSION.to_string(),
+                            addresses: vec![call.tid.address.clone()],
+                            tids: vec![format!("{}", call.tid)],
+                            symbols: Vec::new(),
+                            other: Vec::new(),
+                            description: format!(
+                                "(Buffer Overflow) Call to {} at {} may access out-of-bounds memory",
+                                extern_symbol.name,
+                                call.tid.address
                             ),
                         };
                         let _ = self.log_collector.send(LogThreadMsg::Cwe(warning));

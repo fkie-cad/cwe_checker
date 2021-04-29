@@ -96,10 +96,12 @@ impl AbstractObjectInfo {
             }
             if let Ok(upper_bound) = self.upper_index_bound.try_to_bitvec() {
                 let mut size_as_bitvec = Bitvector::from_u64(u64::from(size));
-                if offset.bytesize() > size_as_bitvec.bytesize() {
-                    size_as_bitvec.sign_extend(offset.bytesize()).unwrap();
-                } else if offset.bytesize() < size_as_bitvec.bytesize() {
-                    size_as_bitvec.truncate(offset.bytesize()).unwrap();
+                match offset.bytesize().cmp(&size_as_bitvec.bytesize()) {
+                    std::cmp::Ordering::Less => size_as_bitvec.truncate(offset.bytesize()).unwrap(),
+                    std::cmp::Ordering::Greater => {
+                        size_as_bitvec.sign_extend(offset.bytesize()).unwrap()
+                    }
+                    std::cmp::Ordering::Equal => (),
                 }
                 let max_index = if let Some(val) = offset_interval
                     .end
@@ -328,6 +330,14 @@ impl AbstractObjectInfo {
             (
                 "type".to_string(),
                 serde_json::Value::String(format!("{:?}", self.type_)),
+            ),
+            (
+                "lower_index_bound".to_string(),
+                serde_json::Value::String(format!("{}", self.lower_index_bound)),
+            ),
+            (
+                "upper_index_bound".to_string(),
+                serde_json::Value::String(format!("{}", self.upper_index_bound)),
             ),
         ];
         let memory = self
