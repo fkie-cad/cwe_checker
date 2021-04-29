@@ -319,6 +319,7 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
             match extern_symbol.name.as_str() {
                 malloc_like_fn if self.allocation_symbols.iter().any(|x| x == malloc_like_fn) => {
                     Some(self.add_new_object_in_call_return_register(
+                        state,
                         new_state,
                         call,
                         extern_symbol,

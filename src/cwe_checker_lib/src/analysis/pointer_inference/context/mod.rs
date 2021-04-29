@@ -177,7 +177,8 @@ impl<'a> Context<'a> {
     /// except that we cannot represent possible `NULL` pointers as return values yet.
     fn add_new_object_in_call_return_register(
         &self,
-        mut state: State,
+        state: &State,
+        mut new_state: State,
         call: &Term<Jmp>,
         extern_symbol: &ExternSymbol,
     ) -> State {
@@ -190,17 +191,17 @@ impl<'a> Context<'a> {
                     call.tid.clone(),
                     AbstractLocation::from_var(return_register).unwrap(),
                 );
-                state.memory.add_abstract_object(
+                new_state.memory.add_abstract_object(
                     object_id.clone(),
                     Bitvector::zero(apint::BitWidth::from(address_bytesize)).into(),
                     super::object::ObjectType::Heap,
                     address_bytesize,
                 );
-                state.memory.set_lower_index_bound(
+                new_state.memory.set_lower_index_bound(
                     &object_id,
                     &Bitvector::zero(address_bytesize.into()).into(),
                 );
-                state.memory.set_upper_index_bound(
+                new_state.memory.set_upper_index_bound(
                     &object_id,
                     &(object_size - Bitvector::one(address_bytesize.into()).into()),
                 );
@@ -208,13 +209,13 @@ impl<'a> Context<'a> {
                     object_id,
                     Bitvector::zero(apint::BitWidth::from(address_bytesize)).into(),
                 );
-                state.set_register(return_register, pointer.into());
-                state
+                new_state.set_register(return_register, pointer.into());
+                new_state
             }
             Err(err) => {
                 // We cannot track the new object, since we do not know where to store the pointer to it.
                 self.log_debug(Err(err), Some(&call.tid));
-                state
+                new_state
             }
         }
     }
