@@ -456,7 +456,7 @@ impl Project {
     pub fn get_standard_calling_convention(&self) -> Option<&CallingConvention> {
         self.calling_conventions
             .iter()
-            .find(|cconv| cconv.name == "__stdcall")
+            .find(|cconv| cconv.name == "__stdcall" || cconv.name == "__cdecl")
     }
 }
 
