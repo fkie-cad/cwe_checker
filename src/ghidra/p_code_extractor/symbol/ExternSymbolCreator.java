@@ -101,6 +101,7 @@ public class ExternSymbolCreator {
                     extSym.setNoReturn(func.hasNoReturn());
                     extSym.setArguments(createArguments(func));
                     extSym.setCallingConvention(HelperFunctions.funcMan.getDefaultCallingConvention().toString());
+                    extSym.setHasVarArgs(func.hasVarArgs());
                 }
                 if(!func.isExternal()) {
                     extSym.getAddresses().add(func.getEntryPoint().toString());

@@ -1,6 +1,6 @@
 use super::{ByteSize, CastOpType, Expression, Variable};
-use crate::prelude::*;
 use crate::utils::log::LogMessage;
+use crate::{pcode::DatatypeProperties, prelude::*};
 use std::collections::HashSet;
 
 mod builder;
@@ -346,6 +346,8 @@ pub struct ExternSymbol {
     pub return_values: Vec<Arg>,
     /// If set to `true`, the function is assumed to never return to its caller when called.
     pub no_return: bool,
+    /// If the function has a variable number of parameters, this flag is set to `true`.
+    pub has_var_args: bool,
 }
 
 impl ExternSymbol {
@@ -444,6 +446,8 @@ pub struct Project {
     pub stack_pointer_register: Variable,
     /// The known calling conventions that may be used for calls to extern functions.
     pub calling_conventions: Vec<CallingConvention>,
+    /// Contains the properties of C data types. (e.g. size)
+    pub datatype_properties: DatatypeProperties,
 }
 
 impl Project {
@@ -635,6 +639,23 @@ mod tests {
                 parameters: vec![Arg::mock_register("RDI")],
                 return_values: vec![Arg::mock_register("RAX")],
                 no_return: false,
+                has_var_args: false,
+            }
+        }
+    }
+
+    impl DatatypeProperties {
+        pub fn mock() -> DatatypeProperties {
+            DatatypeProperties {
+                char_size: ByteSize::new(1),
+                double_size: ByteSize::new(8),
+                float_size: ByteSize::new(4),
+                integer_size: ByteSize::new(4),
+                long_double_size: ByteSize::new(8),
+                long_long_size: ByteSize::new(8),
+                long_size: ByteSize::new(4),
+                pointer_size: ByteSize::new(4),
+                short_size: ByteSize::new(2),
             }
         }
     }
@@ -649,6 +670,7 @@ mod tests {
                 cpu_architecture: "x86_64".to_string(),
                 stack_pointer_register: Variable::mock("RSP", 8u64),
                 calling_conventions: Vec::new(),
+                datatype_properties: DatatypeProperties::mock(),
             }
         }
     }

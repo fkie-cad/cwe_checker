@@ -35,6 +35,7 @@ impl ExternSymbol {
             parameters: vec![Arg::mock_register("RDI"), Arg::mock_register("RSI")],
             return_values: vec![Arg::mock_register("RAX")],
             no_return: false,
+            has_var_args: true,
         }
     }
 }

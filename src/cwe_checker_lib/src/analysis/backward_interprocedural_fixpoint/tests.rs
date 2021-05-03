@@ -1,4 +1,4 @@
-use crate::intermediate_representation::*;
+use crate::{intermediate_representation::*, pcode::DatatypeProperties};
 
 use super::{create_computation, mock_context, NodeValue};
 
@@ -147,6 +147,7 @@ fn backward_fixpoint() {
             is_temp: false,
         },
         calling_conventions: Vec::new(),
+        datatype_properties: DatatypeProperties::mock(),
     };
 
     let mock_con = Context::new(&project);

@@ -371,6 +371,29 @@ pub struct RegisterProperties {
     pub size: ByteSize,
 }
 
+/// Properties of data types such as size.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
+pub struct DatatypeProperties {
+    /// Holds the size of the char type
+    pub char_size: ByteSize,
+    /// Holds the size of the double type
+    pub double_size: ByteSize,
+    /// Holds the size of the float type
+    pub float_size: ByteSize,
+    /// Holds the size of the integer type
+    pub integer_size: ByteSize,
+    /// Holds the size of the long double type
+    pub long_double_size: ByteSize,
+    /// Holds the size of the long long type
+    pub long_long_size: ByteSize,
+    /// Holds the size of the long type
+    pub long_size: ByteSize,
+    /// Holds the size of the pointer type
+    pub pointer_size: ByteSize,
+    /// Holds the size of the short type
+    pub short_size: ByteSize,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

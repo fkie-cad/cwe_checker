@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use super::{Expression, ExpressionType, RegisterProperties, Variable};
+use super::{DatatypeProperties, Expression, ExpressionType, RegisterProperties, Variable};
 use crate::intermediate_representation::Arg as IrArg;
 use crate::intermediate_representation::Blk as IrBlk;
 use crate::intermediate_representation::ByteSize;
@@ -387,6 +387,8 @@ pub struct ExternSymbol {
     pub arguments: Vec<Arg>,
     /// If the function is assumed to never return to the caller, this flag is set to `true`.
     pub no_return: bool,
+    /// If the function has a variable number of parameters, this flag is set to `true`.
+    pub has_var_args: bool,
 }
 
 impl From<ExternSymbol> for IrExternSymbol {
@@ -431,6 +433,7 @@ impl From<ExternSymbol> for IrExternSymbol {
             parameters,
             return_values,
             no_return: symbol.no_return,
+            has_var_args: symbol.has_var_args,
         }
     }
 }
@@ -525,6 +528,8 @@ pub struct Project {
     pub register_properties: Vec<RegisterProperties>,
     /// Information about known calling conventions for the given CPU architecture.
     pub register_calling_convention: Vec<CallingConvention>,
+    /// Contains the properties of C data types. (e.g. size)
+    pub datatype_properties: DatatypeProperties,
 }
 
 impl Project {
@@ -642,6 +647,7 @@ impl Project {
                 .into_iter()
                 .map(|cconv| cconv.into())
                 .collect(),
+            datatype_properties: self.datatype_properties,
         }
     }
 }

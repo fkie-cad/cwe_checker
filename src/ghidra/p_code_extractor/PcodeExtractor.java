@@ -260,6 +260,7 @@ public class PcodeExtractor extends GhidraScript {
             System.out.println(e);
         }
         project.setRegisterProperties(HelperFunctions.getRegisterList());
+        project.setDatatypeProperties(HelperFunctions.createDatatypeProperties());
 
         return project;
     }
