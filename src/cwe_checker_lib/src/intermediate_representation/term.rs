@@ -1,6 +1,6 @@
-use super::{ByteSize, CastOpType, Expression, Variable};
+use super::{ByteSize, CastOpType, DatatypeProperties, Expression, Variable};
+use crate::prelude::*;
 use crate::utils::log::LogMessage;
-use crate::{pcode::DatatypeProperties, prelude::*};
 use std::collections::HashSet;
 
 mod builder;

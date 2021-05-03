@@ -1,10 +1,11 @@
 use std::collections::{HashMap, HashSet};
 
-use super::{DatatypeProperties, Expression, ExpressionType, RegisterProperties, Variable};
+use super::{Expression, ExpressionType, RegisterProperties, Variable};
 use crate::intermediate_representation::Arg as IrArg;
 use crate::intermediate_representation::Blk as IrBlk;
 use crate::intermediate_representation::ByteSize;
 use crate::intermediate_representation::CallingConvention as IrCallingConvention;
+use crate::intermediate_representation::DatatypeProperties;
 use crate::intermediate_representation::Def as IrDef;
 use crate::intermediate_representation::Expression as IrExpression;
 use crate::intermediate_representation::ExternSymbol as IrExternSymbol;

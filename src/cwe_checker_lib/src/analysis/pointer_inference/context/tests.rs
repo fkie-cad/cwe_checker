@@ -1,4 +1,4 @@
-use crate::pcode::DatatypeProperties;
+use crate::intermediate_representation::DatatypeProperties;
 
 use super::*;
 use std::collections::HashSet;

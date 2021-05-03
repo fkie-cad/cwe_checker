@@ -1,4 +1,4 @@
-use crate::{intermediate_representation::*, pcode::DatatypeProperties};
+use crate::intermediate_representation::*;
 
 use super::{create_computation, mock_context, NodeValue};
 
