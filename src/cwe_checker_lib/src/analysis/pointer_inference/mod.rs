@@ -118,7 +118,17 @@ impl<'a> PointerInference<'a> {
                 if let Some(start_node_index) =
                     tid_to_graph_indices_map.get(&(block_tid, sub_tid.clone()))
                 {
-                    Some((sub_tid.clone(), *start_node_index))
+                    // We only add entry points that are also control flow graph roots
+                    if context
+                        .graph
+                        .neighbors_directed(*start_node_index, Direction::Incoming)
+                        .next()
+                        .is_none()
+                    {
+                        Some((sub_tid.clone(), *start_node_index))
+                    } else {
+                        None
+                    }
                 } else {
                     None
                 }

@@ -496,6 +496,25 @@ fn specialize_by_expression_results() {
         .specialize_by_expression_result(&Expression::var("RAX"), Bitvector::from_i64(-20).into());
     assert!(x.is_err());
 
+    let mut state = base_state.clone();
+    let abstract_id = AbstractIdentifier::new(
+        Tid::new("heap_obj"),
+        AbstractLocation::from_var(&register("RAX")).unwrap(),
+    );
+    state.set_register(
+        &register("RAX"),
+        PointerDomain::new(abstract_id.clone(), IntervalDomain::mock(0, 50)).into(),
+    );
+    let x = state.specialize_by_expression_result(
+        &Expression::var("RAX"),
+        PointerDomain::new(abstract_id.clone(), IntervalDomain::mock(20, 70)).into(),
+    );
+    assert!(x.is_ok());
+    assert_eq!(
+        state.get_register(&register("RAX")),
+        PointerDomain::new(abstract_id, IntervalDomain::mock(20, 50)).into()
+    );
+
     // Expr = Const
     let mut state = base_state.clone();
     let x = state.specialize_by_expression_result(
