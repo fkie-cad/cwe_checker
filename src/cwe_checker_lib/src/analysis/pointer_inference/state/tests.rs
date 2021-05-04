@@ -299,6 +299,7 @@ fn clear_parameters_on_the_stack_on_extern_calls() {
         parameters: vec![stack_param],
         return_values: Vec::new(),
         no_return: false,
+        has_var_args: false,
     };
     // check the value before
     let pointer = PointerDomain::new(new_id("time0", "RSP"), bv(-12)).into();
