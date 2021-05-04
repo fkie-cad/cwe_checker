@@ -1,5 +1,6 @@
 package term;
 
+import bil.DatatypeProperties;
 import bil.RegisterProperties;
 import bil.Variable;
 import internal.RegisterConvention;
@@ -19,15 +20,24 @@ public class Project {
     private String cpuArch;
     @SerializedName("register_calling_convention")
     private ArrayList<RegisterConvention> conventions;
+    @SerializedName("datatype_properties")
+    private DatatypeProperties datatype_properties;
 
     public Project() {
     }
 
-    public Project(Term<Program> program, String cpuArch, Variable stackPointerRegister, ArrayList<RegisterConvention> conventions) {
+    public Project(
+        Term<Program> program, 
+        String cpuArch,
+        Variable stackPointerRegister, 
+        ArrayList<RegisterConvention> conventions, 
+        DatatypeProperties datatype_properties
+    ) {
         this.setProgram(program);
         this.setCpuArch(cpuArch);
         this.setStackPointerRegister(stackPointerRegister);
         this.setRegisterConvention(conventions);
+        this.setDatatypeProperties(datatype_properties);
     }
 
     public Term<Program> getProgram() {
@@ -68,5 +78,13 @@ public class Project {
 
     public void setRegisterProperties(ArrayList<RegisterProperties> registerProperties) {
         this.registerProperties = registerProperties;
+    }
+
+    public DatatypeProperties getDatatypeProperties() {
+        return datatype_properties;
+    }
+
+    public void setDatatypeProperties(DatatypeProperties datatype_properties) {
+        this.datatype_properties = datatype_properties;
     }
 }

@@ -368,8 +368,20 @@ impl Expression {
             is_temp: false,
         }));
 
-        // Build PIECE as PIECE(lhs:PIECE(lhs:higher subpiece, rhs:sub register), rhs:lower subpiece)
-        if sub_register.lsb > ByteSize::new(0) {
+        if sub_register.lsb > ByteSize::new(0) && sub_register.lsb + sub_register.size == base_size
+        {
+            // Build PIECE as PIECE(lhs: sub_register, rhs: low subpiece)
+            *self = Expression::BinOp {
+                op: BinOpType::Piece,
+                lhs: Box::new(self.clone()),
+                rhs: Box::new(Expression::Subpiece {
+                    low_byte: ByteSize::new(0),
+                    size: sub_lsb,
+                    arg: base_subpiece,
+                }),
+            }
+        } else if sub_register.lsb > ByteSize::new(0) {
+            // Build PIECE as PIECE(lhs:PIECE(lhs:higher subpiece, rhs:sub register), rhs:lower subpiece)
             *self = Expression::BinOp {
                 op: BinOpType::Piece,
                 lhs: Box::new(Expression::BinOp {
@@ -387,9 +399,8 @@ impl Expression {
                     arg: base_subpiece,
                 }),
             }
-        }
-        // Build PIECE as PIECE(lhs: high subpiece, rhs: sub register)
-        else {
+        } else {
+            // Build PIECE as PIECE(lhs: high subpiece, rhs: sub register)
             *self = Expression::BinOp {
                 op: BinOpType::Piece,
                 lhs: Box::new(Expression::Subpiece {

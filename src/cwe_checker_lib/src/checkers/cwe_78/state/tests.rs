@@ -6,7 +6,7 @@ use crate::{
 
 use super::*;
 
-fn extern_symbol(name: &str, return_args: Vec<Arg>) -> ExternSymbol {
+fn extern_symbol(name: &str, return_args: Vec<Arg>, has_var_args: bool) -> ExternSymbol {
     ExternSymbol {
         tid: Tid::new(name.to_string()),
         addresses: vec![],
@@ -15,6 +15,7 @@ fn extern_symbol(name: &str, return_args: Vec<Arg>) -> ExternSymbol {
         parameters: Vec::new(),
         return_values: return_args,
         no_return: false,
+        has_var_args,
     }
 }
 
@@ -27,7 +28,7 @@ impl State {
         let arg = Arg::Register(Variable::mock("RAX", 8 as u64));
         let pi_state =
             PointerInferenceState::new(&Variable::mock("RSP", 8 as u64), Tid::new("func"));
-        let symbol = extern_symbol("system", vec![arg]);
+        let symbol = extern_symbol("system", vec![arg], false);
         let current_sub = Sub::mock("current");
         let mut state = State::new(
             &symbol,

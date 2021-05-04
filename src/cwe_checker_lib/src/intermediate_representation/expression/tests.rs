@@ -208,6 +208,26 @@ fn piecing_expressions_together() {
         .piece_two_expressions_together(&setup.rax_register, &setup.higher_byte_register);
     assert_eq!(expr, expected_expr);
     assert_eq!(higher_byte_exp, expected_higher_byte_expr);
+
+    let higher_half_rax = RegisterProperties {
+        register: "upper_RAX_half".to_string(),
+        base_register: "RAX".to_string(),
+        lsb: ByteSize::new(4),
+        size: ByteSize::new(4),
+    };
+    let mut expression = Expression::Const(Bitvector::from_u32(42));
+
+    let expected_output = Expression::BinOp {
+        op: BinOpType::Piece,
+        lhs: Box::new(expression.clone()),
+        rhs: Box::new(Expression::Subpiece {
+            low_byte: ByteSize(0),
+            size: ByteSize::new(4),
+            arg: Box::new(setup.rax_variable.clone()),
+        }),
+    };
+    expression.piece_two_expressions_together(&setup.rax_register, &higher_half_rax);
+    assert_eq!(expression, expected_output);
 }
 
 #[test]

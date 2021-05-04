@@ -90,7 +90,18 @@ impl Setup {
                             "unaffected_register": [],
                             "killed_by_call_register": []
                         }
-                    ]
+                    ],
+                    "datatype_properties": {
+                        "char_size": 1,
+                        "double_size": 8,
+                        "float_size": 4,
+                        "integer_size": 4,
+                        "long_double_size": 8,
+                        "long_long_size": 8,
+                        "long_size": 4,
+                        "pointer_size": 4,
+                        "short_size": 2
+                    }
                 }
                 "#,
             )
@@ -581,7 +592,8 @@ fn extern_symbol_deserialization() {
                     "intent": "OUTPUT"
                   }
                 ],
-                "no_return": false
+                "no_return": false,
+                "has_var_args": false
             }
             "#,
     )
