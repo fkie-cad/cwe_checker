@@ -1,11 +1,9 @@
+use std::collections::BTreeMap;
+
 use petgraph::graph::NodeIndex;
 use regex::Regex;
 
-use crate::{
-    abstract_domain::{DataDomain, IntervalDomain, TryToBitvec},
-    analysis::interprocedural_fixpoint_generic::NodeValue,
-    intermediate_representation::{Arg, ExternSymbol},
-};
+use crate::{abstract_domain::{DataDomain, IntervalDomain, TryToBitvec}, analysis::interprocedural_fixpoint_generic::NodeValue, intermediate_representation::{Arg, ByteSize, CallingConvention, ExternSymbol}};
 use crate::{
     analysis::pointer_inference::State as PointerInferenceState, checkers::cwe_476::Taint,
 };
@@ -101,7 +99,7 @@ impl<'a> Context<'a> {
         {
             if self.is_relevant_string_function_call(string_symbol, pi_state, &mut new_state) {
                 let mut parameters = string_symbol.parameters.clone();
-                if self.has_variable_number_of_parameters(string_symbol) {
+                if string_symbol.has_var_args {
                     parameters
                         .append(&mut self.get_variable_number_parameters(pi_state, string_symbol));
                 }
@@ -169,15 +167,8 @@ impl<'a> Context<'a> {
         &self,
         pi_state: &PointerInferenceState,
         extern_symbol: &ExternSymbol,
+        format_string_index: usize,
     ) -> String {
-        let format_string_index = match extern_symbol.name.as_str() {
-            "scanf" => 0,
-            "sscanf" => 1,
-            "sprintf" => 1,
-            "snprintf" => 2,
-            _ => panic!("Invalid function."),
-        };
-
         if let Some(format_string) = extern_symbol.parameters.get(format_string_index) {
             if let Ok(address) = pi_state.eval_parameter_arg(
                 format_string,
@@ -225,30 +216,71 @@ impl<'a> Context<'a> {
 
     /// Parses the format string parameters using a regex, determines their data types,
     /// and calculates their positions (register or memory).
-    pub fn _parse_format_string_parameters(&self, format_string: &str) -> Vec<String> {
-        let re = Regex::new(r#"(%\d{0,2}[c,C,d,i,o,u,x,X,e,E,f,F,g,G,a,A,n,p,s,S,Z])"#)
+    pub fn parse_format_string_parameters(
+        &self,
+        format_string: &str,
+    ) -> BTreeMap<String, ByteSize> {
+        let re = Regex::new(r#"%\d{0,2}([c,C,d,i,o,u,x,X,e,E,f,F,g,G,a,A,n,p,s,S])"#)
             .expect("No valid regex!");
 
         re.captures_iter(format_string)
-            .map(|cap| cap[0].to_string())
+            .map(|cap| {
+                (
+                    cap[1].to_string(),
+                    self.map_format_specifier_to_bytesize(cap[1].to_string()),
+                )
+            })
             .collect()
     }
 
-    /// Determines whether a function has a variable number of parameters.
-    pub fn has_variable_number_of_parameters(&self, extern_symbol: &ExternSymbol) -> bool {
-        self.symbol_maps
-            .variable_parameter_symbol_map
-            .contains_key(&extern_symbol.tid)
+    /// Maps a given format specifier to the bytesize of its corresponding data type.
+    pub fn map_format_specifier_to_bytesize(&self, specifier: String) -> ByteSize {
+        match specifier.as_str() {
+            "d" | "i" | "o" | "x" | "X" | "u" | "c" | "C" => {
+                self.project.datatype_properties.integer_size
+            }
+            "f" | "F" | "e" | "E" | "a" | "A" | "g" | "G" => {
+                self.project.datatype_properties.double_size
+            }
+            "s" | "S" | "n" | "p" => self.project.datatype_properties.pointer_size,
+            _ => panic!("Unknown format specifier."),
+        }
     }
 
-    /// Returns a vector of detected variable parameters.
+    /// Returns an argument vector of detected variable parameters.
     pub fn get_variable_number_parameters(
         &self,
         pi_state: &PointerInferenceState,
         extern_symbol: &ExternSymbol,
     ) -> Vec<Arg> {
+        let format_string_index = match self
+            .symbol_maps
+            .format_string_index
+            .get(&extern_symbol.name)
+        {
+            Some(index) => *index,
+            None => panic!("External Symbol does not contain a format string parameter."),
+        };
+        let format_string =
+            self.get_input_format_string(pi_state, extern_symbol, format_string_index);
+        self.detect_parameter_locations(
+            self.parse_format_string_parameters(format_string.as_str()),
+            extern_symbol.get_calling_convention(self.project),
+            format_string_index,
+        )
+    }
+
+    /// Calculates the register and stack positions of format string parameters.
+    /// The parameters are then returned as an argument vector for later tainting.
+    pub fn detect_parameter_locations(
+        &self,
+        _parameters: BTreeMap<String, ByteSize>,
+        calling_convention: &CallingConvention,
+        _format_string_index: usize,
+    ) -> Vec<Arg> {
+        // Note that floats get their own parameter registers (e.g. XMM0)
         let var_args: Vec<Arg> = Vec::new();
-        let _format_string = self.get_input_format_string(pi_state, extern_symbol);
+
         var_args
     }
 }

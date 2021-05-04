@@ -15,13 +15,13 @@
       "__isoc99_scanf",
       "sscanf"
     ],
-    "variable_parameter_symbols": [
-      "sprintf",
-      "snprintf",
-      "scanf",
-      "__isoc99_scanf",
-      "sscanf"
-    ]
+    "format_string_index": {
+      "sprintf": 1,
+      "snprintf": 2,
+      "scanf": 0,
+      "__isoc99_scanf": 0,
+      "sscanf": 1
+    }
   },
   "CWE190": {
     "symbols": [

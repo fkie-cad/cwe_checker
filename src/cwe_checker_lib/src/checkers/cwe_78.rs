@@ -40,7 +40,7 @@
 //! - Missing Taints due to lost track of pointer targets
 //! - Non tracked function parameters cause incomplete taints that could miss possible dangerous inputs
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::{
     analysis::{
@@ -80,8 +80,9 @@ pub struct Config {
     string_symbols: Vec<String>,
     /// The names of the user input symbols
     user_input_symbols: Vec<String>,
-    /// The names of the variable parameter symbols
-    variable_parameter_symbols: Vec<String>,
+    /// Contains the index of the format string parameter
+    /// for external symbols.
+    format_string_index: BTreeMap<String, usize>,
 }
 
 /// This check searches for system calls and sets their parameters as taint source if available.
@@ -219,11 +220,13 @@ fn get_entry_sub_to_entry_node_map(
 ///     - Maps the TID of an extern symbol that take input from the user to the corresponding extern symbol struct.
 /// - extern_symbol_map:
 ///     - Maps the TID of an extern symbol to the extern symbol struct.
+/// - format_string_index:
+///     - Maps a symbol name to the index of its format string parameter.
 pub struct SymbolMaps<'a> {
     string_symbol_map: HashMap<Tid, &'a ExternSymbol>,
     user_input_symbol_map: HashMap<Tid, &'a ExternSymbol>,
     extern_symbol_map: HashMap<Tid, &'a ExternSymbol>,
-    variable_parameter_symbol_map: HashMap<Tid, &'a ExternSymbol>,
+    format_string_index: HashMap<String, usize>,
 }
 
 impl<'a> SymbolMaps<'a> {
@@ -232,6 +235,10 @@ impl<'a> SymbolMaps<'a> {
         let mut extern_symbol_map = HashMap::new();
         for symbol in project.program.term.extern_symbols.iter() {
             extern_symbol_map.insert(symbol.tid.clone(), symbol);
+        }
+        let mut format_string_index: HashMap<String, usize> = HashMap::new();
+        for (symbol, index) in config.format_string_index.iter() {
+            format_string_index.insert(symbol.clone(), index.clone());
         }
         SymbolMaps {
             string_symbol_map: crate::utils::symbol_utils::get_symbol_map(
@@ -243,10 +250,7 @@ impl<'a> SymbolMaps<'a> {
                 &config.user_input_symbols[..],
             ),
             extern_symbol_map,
-            variable_parameter_symbol_map: crate::utils::symbol_utils::get_symbol_map(
-                project,
-                &config.variable_parameter_symbols[..],
-            ),
+            format_string_index,
         }
     }
 }

@@ -111,7 +111,6 @@ impl<'a> Context<'a> {
         project: &'a Project,
         string_symbols: HashMap<Tid, &'a ExternSymbol>,
         user_input_symbols: HashMap<Tid, &'a ExternSymbol>,
-        variable_parameter_symbols: HashMap<Tid, &'a ExternSymbol>,
         pi_results: &'a PointerInferenceComputation<'a>,
         mem_image: &'a RuntimeMemoryImage,
     ) -> Self {
@@ -158,7 +157,7 @@ impl<'a> Context<'a> {
             string_symbol_map: string_symbols,
             user_input_symbol_map: user_input_symbols,
             extern_symbol_map,
-            variable_parameter_symbol_map: variable_parameter_symbols,
+            format_string_index: HashMap::new(),
         };
 
         Context::new(
@@ -184,7 +183,6 @@ fn setting_taint_source() {
     let mem_image = RuntimeMemoryImage::mock();
     let mut context = Context::mock(
         &setup.project,
-        HashMap::new(),
         HashMap::new(),
         HashMap::new(),
         &pi_results,
@@ -224,7 +222,6 @@ fn adding_temporary_callee_saved_register_taints_to_mem_taints() {
         &setup.project,
         HashMap::new(),
         HashMap::new(),
-        HashMap::new(),
         &pi_results,
         &mem_image,
     );
@@ -261,7 +258,6 @@ fn first_param_pointing_to_memory_taint() {
         &setup.project,
         HashMap::new(),
         HashMap::new(),
-        HashMap::new(),
         &pi_results,
         &mem_image,
     );
@@ -295,7 +291,6 @@ fn creating_pi_def_map() {
 
     let context = Context::mock(
         &setup.project,
-        HashMap::new(),
         HashMap::new(),
         HashMap::new(),
         &pi_results,
@@ -345,7 +340,6 @@ fn getting_blk_start_node_if_last_def() {
         &setup.project,
         HashMap::new(),
         HashMap::new(),
-        HashMap::new(),
         &pi_results,
         &mem_image,
     );
@@ -382,7 +376,6 @@ fn getting_source_node() {
         &setup.project,
         HashMap::new(),
         HashMap::new(),
-        HashMap::new(),
         &pi_results,
         &mem_image,
     );
@@ -416,7 +409,6 @@ fn updating_target_state_for_callsite() {
 
     let context = Context::mock(
         &setup.project,
-        HashMap::new(),
         HashMap::new(),
         HashMap::new(),
         &pi_results,
@@ -502,7 +494,6 @@ fn handling_assign_and_load() {
         &setup.project,
         HashMap::new(),
         HashMap::new(),
-        HashMap::new(),
         &pi_results,
         &mem_image,
     );
@@ -584,7 +575,6 @@ fn updating_def() {
 
     let context = Context::mock(
         &setup.project,
-        HashMap::new(),
         HashMap::new(),
         HashMap::new(),
         &pi_results,
@@ -675,7 +665,6 @@ fn updating_jumpsite() {
         &setup.project,
         HashMap::new(),
         HashMap::new(),
-        HashMap::new(),
         &pi_results,
         &mem_image,
     );
@@ -727,7 +716,6 @@ fn updating_callsite() {
 
     let context = Context::mock(
         &setup.project,
-        HashMap::new(),
         HashMap::new(),
         HashMap::new(),
         &pi_results,
@@ -828,7 +816,6 @@ fn splitting_call_stub() {
         &setup.project,
         HashMap::new(),
         HashMap::new(),
-        HashMap::new(),
         &pi_results,
         &mem_image,
     );
@@ -879,7 +866,6 @@ fn splitting_return_stub() {
 
     let context = Context::mock(
         &setup.project,
-        HashMap::new(),
         HashMap::new(),
         HashMap::new(),
         &pi_results,
@@ -947,7 +933,6 @@ fn updating_call_stub() {
         &setup.project,
         string_symbols,
         HashMap::new(),
-        HashMap::new(),
         &pi_results,
         &mem_image,
     );
@@ -998,7 +983,6 @@ fn specializing_conditional() {
 
     let context = Context::mock(
         &setup.project,
-        HashMap::new(),
         HashMap::new(),
         HashMap::new(),
         &pi_results,

@@ -41,7 +41,6 @@ fn tainting_generic_extern_symbol_parameters() {
         &setup.project,
         string_syms,
         HashMap::new(),
-        HashMap::new(),
         &pi_results,
         &mem_image,
     );
@@ -133,7 +132,6 @@ fn tainting_extern_string_symbol_parameters() {
         &setup.project,
         HashMap::new(),
         HashMap::new(),
-        HashMap::new(),
         &pi_results,
         &mem_image,
     );
@@ -189,7 +187,6 @@ fn tainting_function_arguments() {
         &setup.project,
         HashMap::new(),
         HashMap::new(),
-        HashMap::new(),
         &pi_results,
         &mem_image,
     );
@@ -240,7 +237,6 @@ fn test_is_string_symbol() {
         &setup.project,
         string_symbol_map,
         HashMap::new(),
-        HashMap::new(),
         &pi_results,
         &mem_image,
     );
@@ -266,7 +262,6 @@ fn test_is_user_input_symbol() {
         &setup.project,
         HashMap::new(),
         user_input_symbol_map,
-        HashMap::new(),
         &pi_results,
         &mem_image,
     );
@@ -296,7 +291,6 @@ fn test_get_input_format_string() {
         &setup.project,
         HashMap::new(),
         HashMap::new(),
-        HashMap::new(),
         &pi_results,
         &mem_image,
     );
@@ -309,7 +303,7 @@ fn test_get_input_format_string() {
 
     assert_eq!(
         "Hello World",
-        context.get_input_format_string(&setup.pi_state, &sprintf_symbol)
+        context.get_input_format_string(&setup.pi_state, &sprintf_symbol, 1)
     );
 }
 
@@ -324,7 +318,6 @@ fn test_parse_format_string_destination_and_return_content() {
     sprintf_symbol.addresses = vec!["3002".to_string()];
     let context = Context::mock(
         &setup.project,
-        HashMap::new(),
         HashMap::new(),
         HashMap::new(),
         &pi_results,
@@ -354,31 +347,6 @@ fn test_parse_format_string_destination_and_return_content() {
         "Hello World",
         context.parse_format_string_destination_and_return_content(string_address)
     );
-}
-
-#[test]
-fn test_has_variable_number_of_parameters() {
-    let setup = Setup::new();
-    let mem_image = RuntimeMemoryImage::mock();
-    let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
-    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
-    pi_results.compute();
-    let sprintf_symbol = ExternSymbol::mock_string();
-    let mut variable_parameter_symbols: HashMap<Tid, &ExternSymbol> = HashMap::new();
-    variable_parameter_symbols.insert(Tid::new("sprintf"), &sprintf_symbol);
-    let mut memcpy_symbol = ExternSymbol::mock();
-    memcpy_symbol.tid = Tid::new("memcpy");
-    let context = Context::mock(
-        &setup.project,
-        HashMap::new(),
-        HashMap::new(),
-        variable_parameter_symbols,
-        &pi_results,
-        &mem_image,
-    );
-
-    assert!(context.has_variable_number_of_parameters(&sprintf_symbol));
-    assert!(!context.has_variable_number_of_parameters(&memcpy_symbol));
 }
 
 #[test]
