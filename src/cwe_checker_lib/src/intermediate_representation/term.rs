@@ -444,6 +444,9 @@ pub struct Project {
     pub stack_pointer_register: Variable,
     /// The known calling conventions that may be used for calls to extern functions.
     pub calling_conventions: Vec<CallingConvention>,
+    /// A list of all known physical registers for the CPU architecture.
+    /// Does only contain base registers, i.e. sub registers of other registers are not contained.
+    pub register_list: Vec<Variable>,
 }
 
 impl Project {
@@ -559,10 +562,13 @@ impl Project {
     /// Passes:
     /// - Replace trivial expressions like `a XOR a` with their result.
     /// - Replace jumps to nonexisting TIDs with jumps to an artificial sink target in the CFG.
+    /// - Remove dead register assignments
     #[must_use]
     pub fn normalize(&mut self) -> Vec<LogMessage> {
         self.substitute_trivial_expressions();
-        self.remove_references_to_nonexisting_tids()
+        let logs = self.remove_references_to_nonexisting_tids();
+        crate::analysis::dead_variable_elimination::remove_dead_var_assignments(self);
+        logs
     }
 }
 
@@ -641,6 +647,10 @@ mod tests {
 
     impl Project {
         pub fn mock_empty() -> Project {
+            let register_list = vec!["RAX", "RCX", "RDX", "RBX", "RSP", "RBP", "RSI", "RDI"]
+                .into_iter()
+                .map(|name| Variable::mock(name, ByteSize::new(8)))
+                .collect();
             Project {
                 program: Term {
                     tid: Tid::new("program_tid"),
@@ -649,6 +659,7 @@ mod tests {
                 cpu_architecture: "x86_64".to_string(),
                 stack_pointer_register: Variable::mock("RSP", 8u64),
                 calling_conventions: Vec::new(),
+                register_list,
             }
         }
     }
