@@ -254,7 +254,6 @@ public class PcodeExtractor extends GhidraScript {
         try {
             HashMap<String, RegisterConvention> conventions = new HashMap<String, RegisterConvention>();
             ParseCspecContent.parseSpecs(currentProgram, conventions);
-            addParameterRegister(conventions);
             project.setRegisterConvention(new ArrayList<RegisterConvention>(conventions.values()));
         } catch (FileNotFoundException e) {
             System.out.println(e);
