@@ -642,6 +642,17 @@ impl Project {
                 });
             }
         }
+        let register_list = self
+            .register_properties
+            .iter()
+            .filter_map(|reg| {
+                if reg.register == reg.base_register {
+                    Some(reg.into())
+                } else {
+                    None
+                }
+            })
+            .collect();
         IrProject {
             program,
             cpu_architecture: self.cpu_architecture,
@@ -651,6 +662,7 @@ impl Project {
                 .into_iter()
                 .map(|cconv| cconv.into())
                 .collect(),
+            register_list,
             datatype_properties: self.datatype_properties,
         }
     }

@@ -371,6 +371,17 @@ pub struct RegisterProperties {
     pub size: ByteSize,
 }
 
+impl From<&RegisterProperties> for IrVariable {
+    /// Create a variable representing the same register as the given `register_prop`.
+    fn from(register_prop: &RegisterProperties) -> IrVariable {
+        IrVariable {
+            name: register_prop.register.clone(),
+            size: register_prop.size,
+            is_temp: false,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

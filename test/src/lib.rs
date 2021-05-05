@@ -229,7 +229,6 @@ mod tests {
         let mut error_log = Vec::new();
         let mut tests = all_test_cases("cwe_119", "Memory");
 
-        mark_skipped(&mut tests, "aarch64", "clang"); // TODO: Check reason for failure!
         mark_skipped(&mut tests, "mips64", "gcc"); // TODO: Check reason for failure!
         mark_skipped(&mut tests, "mips64el", "gcc"); // TODO: Check reason for failure!
         mark_skipped(&mut tests, "mips", "clang"); // TODO: Check reason for failure!
