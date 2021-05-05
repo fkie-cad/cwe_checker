@@ -297,10 +297,9 @@ impl State {
         pi_state_option: Option<&PointerInferenceState>,
     ) -> bool {
         if let Some(calling_conv) = project.get_standard_calling_convention() {
-            self.check_register_list_for_taint(
-                &calling_conv.parameter_register[..],
-                pi_state_option,
-            )
+            let mut all_parameters = calling_conv.integer_parameter_register.clone();
+            all_parameters.append(&mut calling_conv.float_parameter_register.clone());
+            self.check_register_list_for_taint(&all_parameters, pi_state_option)
         } else {
             // No standard calling convention found. Assume everything may be parameters or referenced by parameters.
             !self.is_empty()

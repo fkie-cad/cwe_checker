@@ -84,7 +84,8 @@ fn mock_project() -> (Project, Config) {
     };
     let cconv = CallingConvention {
         name: "default".to_string(),
-        parameter_register: vec!["RDX".to_string()],
+        integer_parameter_register: vec!["RDX".to_string()],
+        float_parameter_register: vec!["XMM0".to_string()],
         return_register: vec!["RDX".to_string()],
         callee_saved_register: vec!["callee_saved_reg".to_string()],
     };

@@ -85,7 +85,8 @@ impl Setup {
                     "register_calling_convention": [
                         {
                             "calling_convention": "default",
-                            "parameter_register": [],
+                            "integer_parameter_register": [],
+                            "float_parameter_register": [],
                             "return_register": [],
                             "unaffected_register": [],
                             "killed_by_call_register": []

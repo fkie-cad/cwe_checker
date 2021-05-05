@@ -385,8 +385,12 @@ impl State {
     /// we approximate the parameters with all parameter registers of the standard calling convention of the project.
     pub fn remove_non_parameter_taints_for_generic_function(&mut self, project: &Project) {
         if let Some(calling_conv) = project.get_standard_calling_convention() {
-            let register_names: HashSet<String> =
-                calling_conv.parameter_register.iter().cloned().collect();
+            let register_names: HashSet<String> = calling_conv
+                .integer_parameter_register
+                .iter()
+                .chain(calling_conv.float_parameter_register.iter())
+                .cloned()
+                .collect();
             let taints = self.register_taint.clone();
             for (register, _) in taints.iter() {
                 if register_names.get(&register.name).is_none() {
