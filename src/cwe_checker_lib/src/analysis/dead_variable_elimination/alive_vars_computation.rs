@@ -13,9 +13,7 @@ pub fn update_alive_vars_by_def(alive_variables: &mut HashSet<Variable>, def: &T
                 for input_var in value.input_vars() {
                     alive_variables.insert(input_var.clone());
                 }
-            } else {
-                // The inputs of a dead store do not change the set of alive variables.
-            }
+            } // The else-case is a dead store whose inputs do not change the set of alive variables.
         }
         Def::Load { var, address } => {
             alive_variables.remove(var);
