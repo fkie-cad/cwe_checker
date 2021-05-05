@@ -41,21 +41,41 @@ impl From<Variable> for IrExpression {
     fn from(pcode_var: Variable) -> IrExpression {
         match (&pcode_var.name, &pcode_var.value) {
             (Some(_name), None) => IrExpression::Var(pcode_var.into()),
-            (None, Some(_hex_value)) => IrExpression::Const(pcode_var.parse_to_bitvector()),
+            (None, Some(_hex_value)) => IrExpression::Const(pcode_var.parse_const_to_bitvector()),
             _ => panic!("Conversion failed:\n{:?}", pcode_var),
         }
     }
 }
 
 impl Variable {
-    /// Parses a variable representing a concrete value or a concrete address to a bitvector containing the value or address.
-    pub fn parse_to_bitvector(&self) -> Bitvector {
-        match (&self.value, &self.address) {
-            (Some(hex_value), None) | (None, Some(hex_value)) => {
+    /// Parses a variable representing a concrete value to a bitvector containing the value.
+    pub fn parse_const_to_bitvector(&self) -> Bitvector {
+        match &self.value {
+            Some(hex_value) => {
                 let mut bitvector = Bitvector::from_str_radix(16, hex_value).unwrap();
                 match bitvector.width().cmp(&self.size.into()) {
                     std::cmp::Ordering::Greater => bitvector.truncate(self.size).unwrap(),
                     std::cmp::Ordering::Less => bitvector.zero_extend(self.size).unwrap(),
+                    std::cmp::Ordering::Equal => (),
+                }
+                bitvector
+            }
+            _ => panic!(),
+        }
+    }
+
+    /// Parses a variable representing an address to a pointer-sized bitvector containing the address.
+    pub fn parse_address_to_bitvector(&self, generic_pointer_size: ByteSize) -> Bitvector {
+        match &self.address {
+            Some(hex_value) => {
+                let mut bitvector = Bitvector::from_str_radix(16, hex_value).unwrap();
+                match bitvector.width().cmp(&generic_pointer_size.into()) {
+                    std::cmp::Ordering::Greater => {
+                        bitvector.truncate(generic_pointer_size).unwrap()
+                    }
+                    std::cmp::Ordering::Less => {
+                        bitvector.zero_extend(generic_pointer_size).unwrap()
+                    }
                     std::cmp::Ordering::Equal => (),
                 }
                 bitvector
@@ -426,24 +446,36 @@ mod tests {
             size: ByteSize::new(8),
             is_virtual: false,
         };
-        assert_eq!(var.parse_to_bitvector(), Bitvector::from_u64(0));
+        assert_eq!(var.parse_const_to_bitvector(), Bitvector::from_u64(0));
         var.value = Some("0010f".to_string());
-        assert_eq!(var.parse_to_bitvector(), Bitvector::from_u64(271));
+        assert_eq!(var.parse_const_to_bitvector(), Bitvector::from_u64(271));
         var.value = Some("1ff".to_string());
         var.size = ByteSize::new(1);
-        assert_eq!(var.parse_to_bitvector(), Bitvector::from_u8(255));
+        assert_eq!(var.parse_const_to_bitvector(), Bitvector::from_u8(255));
         var.size = ByteSize::new(16);
-        assert_eq!(var.parse_to_bitvector(), Bitvector::from_u128(511));
+        assert_eq!(var.parse_const_to_bitvector(), Bitvector::from_u128(511));
 
         var.value = Some("00_ffffffffffffffff_ffffffffffffffff".to_string());
         var.size = ByteSize::new(16);
-        assert_eq!(var.parse_to_bitvector(), Bitvector::from_i128(-1));
+        assert_eq!(var.parse_const_to_bitvector(), Bitvector::from_i128(-1));
         var.size = ByteSize::new(10);
         assert_eq!(
-            var.parse_to_bitvector(),
+            var.parse_const_to_bitvector(),
             Bitvector::from_i128(-1)
                 .into_truncate(ByteSize::new(10))
                 .unwrap()
+        );
+
+        let var = Variable {
+            name: None,
+            value: None,
+            address: Some("000010f".to_string()),
+            size: ByteSize::new(1), // Note that this size is not the size of a pointer!
+            is_virtual: false,
+        };
+        assert_eq!(
+            var.parse_address_to_bitvector(ByteSize::new(8)),
+            Bitvector::from_u64(271)
         );
     }
 }

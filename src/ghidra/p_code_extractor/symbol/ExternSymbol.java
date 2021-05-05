@@ -21,12 +21,22 @@ public class ExternSymbol {
     private ArrayList<Arg> arguments;
     @SerializedName("no_return")
     private Boolean noReturn;
+    @SerializedName("has_var_args")
+    private Boolean hasVarArgs;
 
     public ExternSymbol() {
         this.setAddresses(new ArrayList<String>());
     }
 
-    public ExternSymbol(Tid tid, ArrayList<String> addresses, String name, String callingConvention, ArrayList<Arg> arguments, Boolean noReturn) {
+    public ExternSymbol(
+        Tid tid, 
+        ArrayList<String> addresses, 
+        String name, 
+        String callingConvention, 
+        ArrayList<Arg> arguments, 
+        Boolean noReturn, 
+        Boolean hasVarArgs
+    ) {
         this.setTid(tid);
         this.setAddresses(addresses);
         this.setName(name);
@@ -81,5 +91,13 @@ public class ExternSymbol {
 
     public void setNoReturn(Boolean noReturn) {
         this.noReturn = noReturn;
+    }
+
+    public Boolean getHasVarArgs() {
+        return hasVarArgs;
+    }
+
+    public void setHasVarArgs(Boolean hasVarArgs) {
+        this.hasVarArgs = hasVarArgs;
     }
 }

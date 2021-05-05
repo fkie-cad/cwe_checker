@@ -148,6 +148,7 @@ fn backward_fixpoint() {
         },
         calling_conventions: Vec::new(),
         register_list: Vec::new(),
+        datatype_properties: DatatypeProperties::mock(),
     };
 
     let mock_con = Context::new(&project);

@@ -410,6 +410,7 @@ mod tests {
                 parameters: Vec::new(),
                 return_values: vec![arg1, arg2],
                 no_return: false,
+                has_var_args: false,
             };
             let state = State::new(&symbol, &register("RSP"), Some(&pi_state));
             (state, pi_state)

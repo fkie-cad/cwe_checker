@@ -214,11 +214,16 @@ public class PcodeExtractor extends GhidraScript {
      */
     protected Boolean iteratePcode() {
         int numberOfPcodeOps = PcodeBlockData.ops.length;
+        int previousPcodeIndex = 0;
         Boolean intraInstructionJumpOccured = false;
         PcodeBlockData.pcodeIndex = 0;
         for(PcodeOp op : PcodeBlockData.ops) {
             PcodeBlockData.pcodeOp = op;
             String mnemonic = PcodeBlockData.pcodeOp.getMnemonic();
+            if (previousPcodeIndex < PcodeBlockData.pcodeIndex -1) {
+                numberOfPcodeOps++;
+            }
+            previousPcodeIndex = PcodeBlockData.pcodeIndex;
             if (JumpProcessing.jumps.contains(mnemonic) || PcodeBlockData.pcodeOp.getOpcode() == PcodeOp.UNIMPLEMENTED) {
                 intraInstructionJumpOccured = JumpProcessing.processJump(mnemonic, numberOfPcodeOps);
             } else {
@@ -255,6 +260,7 @@ public class PcodeExtractor extends GhidraScript {
             System.out.println(e);
         }
         project.setRegisterProperties(HelperFunctions.getRegisterList());
+        project.setDatatypeProperties(HelperFunctions.createDatatypeProperties());
 
         return project;
     }

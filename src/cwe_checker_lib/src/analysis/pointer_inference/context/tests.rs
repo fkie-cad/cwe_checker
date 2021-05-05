@@ -1,3 +1,5 @@
+use crate::intermediate_representation::DatatypeProperties;
+
 use super::*;
 use std::collections::HashSet;
 
@@ -22,6 +24,7 @@ fn mock_extern_symbol(name: &str) -> ExternSymbol {
         parameters: vec![arg.clone()],
         return_values: vec![arg],
         no_return: false,
+        has_var_args: false,
     }
 }
 
@@ -96,6 +99,7 @@ fn mock_project() -> (Project, Config) {
             stack_pointer_register: register("RSP"),
             calling_conventions: vec![cconv],
             register_list,
+            datatype_properties: DatatypeProperties::mock(),
         },
         Config {
             allocation_symbols: vec!["malloc".into()],
