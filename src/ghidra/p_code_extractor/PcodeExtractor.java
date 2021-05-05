@@ -254,7 +254,7 @@ public class PcodeExtractor extends GhidraScript {
         try {
             HashMap<String, RegisterConvention> conventions = new HashMap<String, RegisterConvention>();
             ParseCspecContent.parseSpecs(currentProgram, conventions);
-            // addParameterRegister(conventions);
+            addParameterRegister(conventions);
             project.setRegisterConvention(new ArrayList<RegisterConvention>(conventions.values()));
         } catch (FileNotFoundException e) {
             System.out.println(e);
@@ -264,23 +264,6 @@ public class PcodeExtractor extends GhidraScript {
 
         return project;
     }
-
-
-    /**
-     * Adds parameter register to the RegisterCallingConvention object
-     * protected void addParameterRegister(HashMap<String, RegisterConvention> conventions) {
-        PrototypeModel[] models = currentProgram.getCompilerSpec().getCallingConventions();
-        for(PrototypeModel model : models) {
-            String cconv = model.getName();
-            if(conventions.get(cconv) != null) {
-                ArrayList<String> parameters = conventions.get(cconv).getParameter();
-                for(VariableStorage storage : model.getPotentialInputRegisterStorage(currentProgram)) {
-                    parameters.add(storage.getRegister().getName());
-                }
-            }
-        }
-    }
-     */
 
 
     /**
