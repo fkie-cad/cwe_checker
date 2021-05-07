@@ -345,6 +345,24 @@ impl State {
                 (Data::Value(old_value), Data::Value(result_value)) => {
                     self.set_register(var, old_value.intersect(&result_value)?.into())
                 }
+                (Data::Pointer(old_pointer), Data::Pointer(result_pointer)) => {
+                    let mut specialized_targets = BTreeMap::new();
+                    for (id, offset) in result_pointer.targets() {
+                        if let Some(old_offset) = old_pointer.targets().get(id) {
+                            if let Ok(specialized_offset) = old_offset.intersect(offset) {
+                                specialized_targets.insert(id.clone(), specialized_offset);
+                            }
+                        }
+                    }
+                    if !specialized_targets.is_empty() {
+                        self.set_register(
+                            var,
+                            PointerDomain::with_targets(specialized_targets).into(),
+                        );
+                    } else {
+                        return Err(anyhow!("Pointer with no targets is unsatisfiable"));
+                    }
+                }
                 (Data::Top(_), result) => self.set_register(var, result),
                 _ => (),
             }
@@ -421,25 +439,21 @@ impl State {
     ) -> Result<(), Error> {
         match op {
             BinOpType::IntAdd => {
-                if let Ok(bitvec) = self.eval(lhs).try_to_bitvec() {
-                    let intermediate_result = result.clone() - bitvec.into();
-                    self.specialize_by_expression_result(rhs, intermediate_result)?;
-                }
-                if let Ok(bitvec) = self.eval(rhs).try_to_bitvec() {
-                    let intermediate_result = result - bitvec.into();
-                    self.specialize_by_expression_result(lhs, intermediate_result)?;
-                }
+                let intermediate_result = result.clone() - self.eval(lhs);
+                self.specialize_by_expression_result(rhs, intermediate_result)?;
+
+                let intermediate_result = result - self.eval(rhs);
+                self.specialize_by_expression_result(lhs, intermediate_result)?;
+
                 return Ok(());
             }
             BinOpType::IntSub => {
-                if let Ok(bitvec) = self.eval(lhs).try_to_bitvec() {
-                    let intermediate_result: Data = Data::from(bitvec) - result.clone();
-                    self.specialize_by_expression_result(rhs, intermediate_result)?;
-                }
-                if let Ok(bitvec) = self.eval(rhs).try_to_bitvec() {
-                    let intermediate_result = result + bitvec.into();
-                    self.specialize_by_expression_result(lhs, intermediate_result)?;
-                }
+                let intermediate_result: Data = self.eval(lhs) - result.clone();
+                self.specialize_by_expression_result(rhs, intermediate_result)?;
+
+                let intermediate_result = result + self.eval(rhs);
+                self.specialize_by_expression_result(lhs, intermediate_result)?;
+
                 return Ok(());
             }
             _ => (),

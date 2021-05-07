@@ -267,10 +267,10 @@ public class ParseCspecContent {
         RegisterConvention convention = new RegisterConvention();
         if(name.equals("default_proto")) {
             parser.start();
-            getUnaffectedKilledByCallAndOutput(parser, convention);
+            getCconvRegister(parser, convention);
             parser.end();
         } else if(name.equals("prototype")) {
-            getUnaffectedKilledByCallAndOutput(parser, convention);
+            getCconvRegister(parser, convention);
         }
 
         // Using the hashmap this way will simplify the addition of parameter registers which are not parsed here
@@ -286,17 +286,19 @@ public class ParseCspecContent {
      * 
      * Sets the convention's unaffected, killed by call and return registers as well as the calling convention
      */
-    public static void getUnaffectedKilledByCallAndOutput(XmlPullParser parser, RegisterConvention convention) {
+    public static void getCconvRegister(XmlPullParser parser, RegisterConvention convention) {
         XmlElement protoElement = parser.start();
         String cconv = protoElement.getAttribute("name");
         convention.setCconv(cconv);
         while(parser.peek().isStart()) {
-            XmlElement registers = parser.peek();
-            if(registers.getName().equals("unaffected")) {
+            XmlElement entries = parser.peek();
+            if(entries.getName().equals("input")) {
+                parseInput(parser, convention);
+            } else if(entries.getName().equals("unaffected")) {
                 convention.setUnaffected(getRegisters(parser));
-            } else if (registers.getName().equals("killedbycall")) {
+            } else if (entries.getName().equals("killedbycall")) {
                 convention.setKilledByCall(getRegisters(parser));
-            } else if (registers.getName().equals("output")) {
+            } else if (entries.getName().equals("output")) {
                 convention.setReturn(parseOutput(parser));
             } else {
                 discardSubTree(parser);
@@ -305,6 +307,55 @@ public class ParseCspecContent {
         parser.end(protoElement);
     }
 
+    /**
+     * 
+     * @param parser: parser for .cspec file
+     * @param convention: convention object for later serialization
+     * 
+     * Parses the parameter registers for an external symbol.
+     * Differentiates between integer and float registers.
+     */
+    public static void parseInput(XmlPullParser parser, RegisterConvention convention) {
+        ArrayList<String> integerRegisters = new ArrayList<String>();
+        ArrayList<String> floatRegisters = new ArrayList<String>(); 
+        parser.start("input");
+        while(parser.peek().isStart()) {
+            XmlElement pentry = parser.peek();
+            parser.start("pentry");
+            XmlElement entry = parser.peek();
+            if(entry.getName().equals("register")) {
+                parser.start("register");
+                if(isFloatRegister(pentry)) {
+                    floatRegisters.add(entry.getAttribute("name"));
+                } else {
+                    integerRegisters.add(entry.getAttribute("name"));
+                }
+                parser.end();
+            } else {
+                discardSubTree(parser);
+            }
+            parser.end();
+        }
+        parser.end();
+
+        convention.setFloatParameter(floatRegisters);
+        convention.setIntegerParameter(integerRegisters);
+    }
+
+    /**
+     * 
+     * @param pentry: Parameter register entry
+     * @return: indicates whether the current entry is a float register.
+     */
+    public static Boolean isFloatRegister(XmlElement pentry) {
+        if(pentry.hasAttribute("metatype")) {
+            if(pentry.getAttribute("metatype").equals("float")) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     /**
      * 

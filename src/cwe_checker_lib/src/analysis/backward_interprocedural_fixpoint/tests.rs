@@ -140,13 +140,15 @@ fn mock_program() -> Term<Program> {
 fn backward_fixpoint() {
     let project = Project {
         program: mock_program(),
-        cpu_architecture: String::from("x86"),
+        cpu_architecture: String::from("x86_64"),
         stack_pointer_register: Variable {
             name: String::from("RSP"),
             size: ByteSize::new(8),
             is_temp: false,
         },
         calling_conventions: Vec::new(),
+        register_list: Vec::new(),
+        datatype_properties: DatatypeProperties::mock(),
     };
 
     let mock_con = Context::new(&project);

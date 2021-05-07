@@ -5,6 +5,7 @@ use crate::intermediate_representation::Arg as IrArg;
 use crate::intermediate_representation::Blk as IrBlk;
 use crate::intermediate_representation::ByteSize;
 use crate::intermediate_representation::CallingConvention as IrCallingConvention;
+use crate::intermediate_representation::DatatypeProperties;
 use crate::intermediate_representation::Def as IrDef;
 use crate::intermediate_representation::Expression as IrExpression;
 use crate::intermediate_representation::ExternSymbol as IrExternSymbol;
@@ -387,6 +388,8 @@ pub struct ExternSymbol {
     pub arguments: Vec<Arg>,
     /// If the function is assumed to never return to the caller, this flag is set to `true`.
     pub no_return: bool,
+    /// If the function has a variable number of parameters, this flag is set to `true`.
+    pub has_var_args: bool,
 }
 
 impl From<ExternSymbol> for IrExternSymbol {
@@ -431,6 +434,7 @@ impl From<ExternSymbol> for IrExternSymbol {
             parameters,
             return_values,
             no_return: symbol.no_return,
+            has_var_args: symbol.has_var_args,
         }
     }
 }
@@ -491,8 +495,10 @@ pub struct CallingConvention {
     /// The name of the calling convention.
     #[serde(rename = "calling_convention")]
     pub name: String,
-    /// Possible parameter registers.
-    parameter_register: Vec<String>,
+    /// Possible integer parameter registers.
+    integer_parameter_register: Vec<String>,
+    /// Possible float parameter registers.
+    float_parameter_register: Vec<String>,
     /// Possible return registers.
     return_register: Vec<String>,
     /// Callee-saved registers.
@@ -505,7 +511,8 @@ impl From<CallingConvention> for IrCallingConvention {
     fn from(cconv: CallingConvention) -> IrCallingConvention {
         IrCallingConvention {
             name: cconv.name,
-            parameter_register: cconv.parameter_register,
+            integer_parameter_register: cconv.integer_parameter_register,
+            float_parameter_register: cconv.float_parameter_register,
             return_register: cconv.return_register,
             callee_saved_register: cconv.unaffected_register,
         }
@@ -525,6 +532,8 @@ pub struct Project {
     pub register_properties: Vec<RegisterProperties>,
     /// Information about known calling conventions for the given CPU architecture.
     pub register_calling_convention: Vec<CallingConvention>,
+    /// Contains the properties of C data types. (e.g. size)
+    pub datatype_properties: DatatypeProperties,
 }
 
 impl Project {
@@ -633,6 +642,17 @@ impl Project {
                 });
             }
         }
+        let register_list = self
+            .register_properties
+            .iter()
+            .filter_map(|reg| {
+                if reg.register == reg.base_register {
+                    Some(reg.into())
+                } else {
+                    None
+                }
+            })
+            .collect();
         IrProject {
             program,
             cpu_architecture: self.cpu_architecture,
@@ -642,6 +662,8 @@ impl Project {
                 .into_iter()
                 .map(|cconv| cconv.into())
                 .collect(),
+            register_list,
+            datatype_properties: self.datatype_properties,
         }
     }
 }

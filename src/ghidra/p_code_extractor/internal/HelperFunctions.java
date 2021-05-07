@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import bil.DatatypeProperties;
 import bil.RegisterProperties;
 import bil.Variable;
 import ghidra.program.model.address.Address;
@@ -16,6 +17,7 @@ import ghidra.program.model.listing.FunctionManager;
 import ghidra.program.model.pcode.PcodeOp;
 import ghidra.program.model.pcode.Varnode;
 import ghidra.program.model.symbol.SymbolTable;
+import ghidra.program.model.data.DataOrganization;
 import ghidra.program.util.VarnodeContext;
 import ghidra.util.task.TaskMonitor;
 import term.*;
@@ -33,6 +35,26 @@ public final class HelperFunctions {
         throw new UnsupportedOperationException();
     }
 
+    /**
+     * @return new DatatypeProperties
+     * 
+     * Creates the datatype sizes from the Compiler Specifications.
+     */
+    public static DatatypeProperties createDatatypeProperties() {
+        DataOrganization dataOrga = ghidraProgram.getDataTypeManager().getDataOrganization();
+
+        return new DatatypeProperties(
+            dataOrga.getCharSize(),
+            dataOrga.getDoubleSize(),
+            dataOrga.getFloatSize(),
+            dataOrga.getIntegerSize(),
+            dataOrga.getLongDoubleSize(),
+            dataOrga.getLongLongSize(),
+            dataOrga.getLongSize(),
+            dataOrga.getPointerSize(),
+            dataOrga.getShortSize()
+        );
+    }
 
     /**
      * 

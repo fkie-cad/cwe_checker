@@ -1,4 +1,4 @@
-use super::{ByteSize, CastOpType, Expression, Variable};
+use super::{ByteSize, CastOpType, DatatypeProperties, Expression, Variable};
 use crate::prelude::*;
 use crate::utils::log::LogMessage;
 use std::collections::HashSet;
@@ -346,6 +346,8 @@ pub struct ExternSymbol {
     pub return_values: Vec<Arg>,
     /// If set to `true`, the function is assumed to never return to its caller when called.
     pub no_return: bool,
+    /// If the function has a variable number of parameters, this flag is set to `true`.
+    pub has_var_args: bool,
 }
 
 impl ExternSymbol {
@@ -421,8 +423,10 @@ pub struct CallingConvention {
     /// The name of the calling convention
     #[serde(rename = "calling_convention")]
     pub name: String,
-    /// A list of possible parameter register
-    pub parameter_register: Vec<String>,
+    /// Possible integer parameter registers.
+    pub integer_parameter_register: Vec<String>,
+    /// Possible float parameter registers.
+    pub float_parameter_register: Vec<String>,
     /// A list of possible return register
     pub return_register: Vec<String>,
     /// A list of callee-saved register,
@@ -444,6 +448,11 @@ pub struct Project {
     pub stack_pointer_register: Variable,
     /// The known calling conventions that may be used for calls to extern functions.
     pub calling_conventions: Vec<CallingConvention>,
+    /// A list of all known physical registers for the CPU architecture.
+    /// Does only contain base registers, i.e. sub registers of other registers are not contained.
+    pub register_list: Vec<Variable>,
+    /// Contains the properties of C data types. (e.g. size)
+    pub datatype_properties: DatatypeProperties,
 }
 
 impl Project {
@@ -456,7 +465,7 @@ impl Project {
     pub fn get_standard_calling_convention(&self) -> Option<&CallingConvention> {
         self.calling_conventions
             .iter()
-            .find(|cconv| cconv.name == "__stdcall")
+            .find(|cconv| cconv.name == "__stdcall" || cconv.name == "__cdecl")
     }
 }
 
@@ -559,10 +568,13 @@ impl Project {
     /// Passes:
     /// - Replace trivial expressions like `a XOR a` with their result.
     /// - Replace jumps to nonexisting TIDs with jumps to an artificial sink target in the CFG.
+    /// - Remove dead register assignments
     #[must_use]
     pub fn normalize(&mut self) -> Vec<LogMessage> {
         self.substitute_trivial_expressions();
-        self.remove_references_to_nonexisting_tids()
+        let logs = self.remove_references_to_nonexisting_tids();
+        crate::analysis::dead_variable_elimination::remove_dead_var_assignments(self);
+        logs
     }
 }
 
@@ -612,7 +624,8 @@ mod tests {
         pub fn mock() -> CallingConvention {
             CallingConvention {
                 name: "__stdcall".to_string(), // so that the mock is useable as standard calling convention in tests
-                parameter_register: vec!["RDI".to_string()],
+                integer_parameter_register: vec!["RDI".to_string()],
+                float_parameter_register: vec!["XMMO".to_string()],
                 return_register: vec!["RAX".to_string()],
                 callee_saved_register: vec!["RBP".to_string()],
             }
@@ -635,12 +648,33 @@ mod tests {
                 parameters: vec![Arg::mock_register("RDI")],
                 return_values: vec![Arg::mock_register("RAX")],
                 no_return: false,
+                has_var_args: false,
+            }
+        }
+    }
+
+    impl DatatypeProperties {
+        pub fn mock() -> DatatypeProperties {
+            DatatypeProperties {
+                char_size: ByteSize::new(1),
+                double_size: ByteSize::new(8),
+                float_size: ByteSize::new(4),
+                integer_size: ByteSize::new(4),
+                long_double_size: ByteSize::new(8),
+                long_long_size: ByteSize::new(8),
+                long_size: ByteSize::new(4),
+                pointer_size: ByteSize::new(4),
+                short_size: ByteSize::new(2),
             }
         }
     }
 
     impl Project {
         pub fn mock_empty() -> Project {
+            let register_list = vec!["RAX", "RCX", "RDX", "RBX", "RSP", "RBP", "RSI", "RDI"]
+                .into_iter()
+                .map(|name| Variable::mock(name, ByteSize::new(8)))
+                .collect();
             Project {
                 program: Term {
                     tid: Tid::new("program_tid"),
@@ -649,6 +683,8 @@ mod tests {
                 cpu_architecture: "x86_64".to_string(),
                 stack_pointer_register: Variable::mock("RSP", 8u64),
                 calling_conventions: Vec::new(),
+                register_list,
+                datatype_properties: DatatypeProperties::mock(),
             }
         }
     }
