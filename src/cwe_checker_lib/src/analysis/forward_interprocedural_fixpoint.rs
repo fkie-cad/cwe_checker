@@ -187,15 +187,14 @@ impl<'a, T: Context<'a>> GeneralFPContext for GeneralizedContext<'a, T> {
                         _ => panic!("Malformed Control flow graph"),
                     };
                     let return_from_jmp = &return_from_block.term.jmps[0];
-                    match self.context.update_return(
-                        interprocedural_flow.as_ref(),
-                        call_stub.as_ref(),
-                        call_term,
-                        return_from_jmp,
-                    ) {
-                        Some(val) => Some(NodeValue::Value(val)),
-                        None => None,
-                    }
+                    self.context
+                        .update_return(
+                            interprocedural_flow.as_ref(),
+                            call_stub.as_ref(),
+                            call_term,
+                            return_from_jmp,
+                        )
+                        .map(NodeValue::Value)
                 }
             },
             Edge::ExternCallStub(call) => self
