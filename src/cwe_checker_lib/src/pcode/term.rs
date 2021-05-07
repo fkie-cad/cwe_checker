@@ -558,8 +558,13 @@ impl ExternSymbol {
             calling_convention: self.calling_convention,
             parameters,
             return_values,
+<<<<<<< HEAD
             no_return: self.no_return,
             has_var_args: self.has_var_args,
+=======
+            no_return: symbol.no_return,
+            has_var_args: symbol.has_var_args,
+>>>>>>> origin merge
         }
     }
 }
@@ -793,7 +798,11 @@ impl Project {
                 .map(|cconv| cconv.into())
                 .collect(),
             register_list,
+<<<<<<< HEAD
             datatype_properties: self.datatype_properties.clone(),
+=======
+            datatype_properties: self.datatype_properties,
+>>>>>>> origin merge
         }
     }
 }

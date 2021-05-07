@@ -509,7 +509,11 @@ fn specialize_by_expression_results() {
         PointerDomain::new(abstract_id.clone(), IntervalDomain::mock(0, 50)).into(),
     );
     let x = state.specialize_by_expression_result(
+<<<<<<< HEAD
         &Expression::var("RAX", 8),
+=======
+        &Expression::var("RAX"),
+>>>>>>> origin merge
         PointerDomain::new(abstract_id.clone(), IntervalDomain::mock(20, 70)).into(),
     );
     assert!(x.is_ok());
@@ -1068,6 +1072,7 @@ fn out_of_bounds_access_recognition() {
     state.set_register(&Variable::mock("RAX", 8), address);
     assert!(!state.contains_out_of_bounds_mem_access(&load_def.term, &global_data));
 }
+<<<<<<< HEAD
 
 #[test]
 fn specialize_pointer_comparison() {
@@ -1099,3 +1104,5 @@ fn specialize_pointer_comparison() {
         .is_ok());
     assert_eq!(state.get_register(&register("RAX")), specialized_pointer);
 }
+=======
+>>>>>>> origin merge
