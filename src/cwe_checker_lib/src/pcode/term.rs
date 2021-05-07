@@ -558,13 +558,8 @@ impl ExternSymbol {
             calling_convention: self.calling_convention,
             parameters,
             return_values,
-<<<<<<< HEAD
             no_return: self.no_return,
             has_var_args: self.has_var_args,
-=======
-            no_return: symbol.no_return,
-            has_var_args: symbol.has_var_args,
->>>>>>> origin merge
         }
     }
 }
@@ -787,23 +782,19 @@ impl Project {
                 }
             })
             .collect();
-        IrProject {
-            program,
-            cpu_architecture: self.cpu_architecture,
-            stack_pointer_register: self.stack_pointer_register.into(),
-            calling_conventions: self
-                .register_calling_convention
-                .clone()
-                .into_iter()
-                .map(|cconv| cconv.into())
-                .collect(),
-            register_list,
-<<<<<<< HEAD
-            datatype_properties: self.datatype_properties.clone(),
-=======
-            datatype_properties: self.datatype_properties,
->>>>>>> origin merge
-        }
+            IrProject {
+                program,
+                cpu_architecture: self.cpu_architecture,
+                stack_pointer_register: self.stack_pointer_register.into(),
+                calling_conventions: self
+                    .register_calling_convention
+                    .clone()
+                    .into_iter()
+                    .map(|cconv| cconv.into())
+                    .collect(),
+                register_list,
+                datatype_properties: self.datatype_properties.clone(),
+            }
     }
 }
 
