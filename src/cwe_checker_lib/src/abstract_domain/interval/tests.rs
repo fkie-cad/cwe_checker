@@ -231,6 +231,35 @@ fn subpiece() {
 }
 
 #[test]
+fn piece() {
+    let higher_half = IntervalDomain::mock_i8_with_bounds(None, 0, 0, None);
+    let lower_half = IntervalDomain::mock_i8_with_bounds(Some(0), 3, 5, Some(10));
+    let result = higher_half.piece(&lower_half).sign_extend(ByteSize::new(8));
+    assert_eq!(
+        result,
+        IntervalDomain::mock_with_bounds(Some(0), 3, 5, Some(10))
+    );
+    let higher_half = IntervalDomain::mock_i8_with_bounds(None, 0, 0, None);
+    let lower_half = IntervalDomain::mock_i8_with_bounds(Some(-1), 3, 5, Some(10));
+    let result = higher_half.piece(&lower_half).sign_extend(ByteSize::new(8));
+    assert_eq!(
+        result,
+        IntervalDomain::mock_with_bounds(None, 3, 5, Some(10))
+    );
+    let higher_half = IntervalDomain::mock_i8_with_bounds(Some(-30), 1, 2, Some(30));
+    let lower_half = IntervalDomain::mock_i8_with_bounds(Some(0), 3, 5, Some(10));
+    let result = higher_half.piece(&lower_half).sign_extend(ByteSize::new(8));
+    assert_eq!(
+        result,
+        IntervalDomain::mock_with_bounds(None, 259, 517, None)
+    );
+    let higher_half = IntervalDomain::mock_i8_with_bounds(None, 0, 1, None);
+    let lower_half = IntervalDomain::mock_i8_with_bounds(Some(-10), -5, 5, Some(10));
+    let result = higher_half.piece(&lower_half).sign_extend(ByteSize::new(8));
+    assert_eq!(result, IntervalDomain::mock_with_bounds(None, 0, 511, None));
+}
+
+#[test]
 fn un_op() {
     // Int2Comp
     let mut val = IntervalDomain::mock_with_bounds(None, -3, 5, Some(10));

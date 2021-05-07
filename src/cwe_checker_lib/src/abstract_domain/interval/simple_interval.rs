@@ -139,6 +139,29 @@ impl Interval {
         self
     }
 
+    /// Piece two intervals together, where `self` contains the most signifcant bytes
+    /// and `other` contains the least significant bytes of the resulting values.
+    pub fn piece(&self, other: &Interval) -> Self {
+        if other.start.sign_bit().to_bool() && !other.end.sign_bit().to_bool() {
+            // The `other` interval contains both -1 and 0.
+            Interval {
+                start: self
+                    .start
+                    .bin_op(BinOpType::Piece, &Bitvector::zero(other.start.width()))
+                    .unwrap(),
+                end: self
+                    .end
+                    .bin_op(BinOpType::Piece, &(-Bitvector::one(other.end.width())))
+                    .unwrap(),
+            }
+        } else {
+            Interval {
+                start: self.start.bin_op(BinOpType::Piece, &other.start).unwrap(),
+                end: self.end.bin_op(BinOpType::Piece, &other.end).unwrap(),
+            }
+        }
+    }
+
     /// Take the 2's complement of values in the interval.
     pub fn int_2_comp(self) -> Self {
         if self

@@ -298,18 +298,30 @@ impl IntervalDomain {
         let truncated_interval = self.interval.clone().subpiece_lower(size);
         let mut lower_bound = None;
         if let Some(bound) = self.widening_lower_bound {
-            if (self.interval.start - &bound).checked_ult(&max_length).unwrap() {
+            if (self.interval.start - &bound)
+                .checked_ult(&max_length)
+                .unwrap()
+            {
                 let truncated_bound = bound.subpiece(ByteSize::new(0), size);
-                if truncated_bound.checked_slt(&truncated_interval.start).unwrap() {
+                if truncated_bound
+                    .checked_slt(&truncated_interval.start)
+                    .unwrap()
+                {
                     lower_bound = Some(truncated_bound);
                 }
             }
         }
         let mut upper_bound = None;
         if let Some(bound) = self.widening_upper_bound {
-            if (bound.clone() - &self.interval.end).checked_ult(&max_length).unwrap() {
+            if (bound.clone() - &self.interval.end)
+                .checked_ult(&max_length)
+                .unwrap()
+            {
                 let truncated_bound = bound.subpiece(ByteSize::new(0), size);
-                if truncated_bound.checked_sgt(&truncated_interval.end).unwrap() {
+                if truncated_bound
+                    .checked_sgt(&truncated_interval.end)
+                    .unwrap()
+                {
                     upper_bound = Some(truncated_bound);
                 }
             }
@@ -319,6 +331,39 @@ impl IntervalDomain {
             widening_lower_bound: lower_bound,
             widening_upper_bound: upper_bound,
             widening_delay: self.widening_delay,
+        }
+    }
+
+    /// Piece two interval domains together, where `self` contains the most signifcant bytes
+    /// and `other` contains the least significant bytes of the resulting values.
+    ///
+    /// The result retains the widening bounds of `other` if self contains only one value.
+    /// Else the result has no widening bounds.
+    fn piece(&self, other: &IntervalDomain) -> IntervalDomain {
+        let pieced_interval = self.interval.piece(&other.interval);
+        let mut lower_bound = None;
+        let mut upper_bound = None;
+        let mut widening_delay = 0;
+        if let Ok(upper_piece) = self.try_to_bitvec() {
+            if let Some(bound) = &other.widening_lower_bound {
+                let pieced_bound = upper_piece.bin_op(BinOpType::Piece, bound).unwrap();
+                if pieced_bound.checked_slt(&pieced_interval.start).unwrap() {
+                    lower_bound = Some(pieced_bound);
+                }
+            }
+            if let Some(bound) = &other.widening_upper_bound {
+                let pieced_bound = upper_piece.bin_op(BinOpType::Piece, bound).unwrap();
+                if pieced_bound.checked_sgt(&pieced_interval.end).unwrap() {
+                    upper_bound = Some(pieced_bound);
+                }
+            }
+            widening_delay = other.widening_delay;
+        }
+        IntervalDomain {
+            interval: self.interval.piece(&other.interval),
+            widening_lower_bound: lower_bound,
+            widening_upper_bound: upper_bound,
+            widening_delay,
         }
     }
 }
@@ -466,7 +511,7 @@ impl RegisterDomain for IntervalDomain {
     fn bin_op(&self, op: BinOpType, rhs: &Self) -> Self {
         use BinOpType::*;
         match op {
-            Piece | IntEqual | IntNotEqual | IntLess | IntSLess | IntLessEqual | IntSLessEqual
+            IntEqual | IntNotEqual | IntLess | IntSLess | IntLessEqual | IntSLessEqual
             | IntCarry | IntSCarry | IntSBorrow | IntAnd | IntOr | IntXOr | IntRight
             | IntSRight | IntDiv | IntSDiv | IntRem | IntSRem | BoolAnd | BoolOr | BoolXOr
             | FloatEqual | FloatNotEqual | FloatLess | FloatLessEqual | FloatAdd | FloatSub
@@ -489,6 +534,7 @@ impl RegisterDomain for IntervalDomain {
                     widening_delay: std::cmp::max(self.widening_delay, rhs.widening_delay),
                 }
             }
+            Piece => self.piece(rhs),
             IntAdd => self.add(rhs),
             IntSub => self.sub(rhs),
             IntMult => self.signed_mul(rhs),
