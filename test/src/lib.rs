@@ -237,7 +237,7 @@ mod tests {
 
         mark_skipped(&mut tests, "x86", "gcc"); // Loss of stack register value since we do not track pointer alignment yet.
         mark_skipped(&mut tests, "x86", "clang"); // A second unrelated instance is found in "__do_global_ctors_aux".
-        
+
         mark_compiler_skipped(&mut tests, "mingw32-gcc"); // TODO: Check reason for failure!
 
         for test_case in tests {
