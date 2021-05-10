@@ -229,15 +229,15 @@ mod tests {
         let mut error_log = Vec::new();
         let mut tests = all_test_cases("cwe_119", "Memory");
 
-        mark_skipped(&mut tests, "mips", "clang"); // TODO: Check reason for failure!
-        mark_skipped(&mut tests, "mipsel", "clang"); // TODO: Check reason for failure!
+        mark_architecture_skipped(&mut tests, "mips"); // A second unrelated instance is found in "__do_global_ctors_aux".
+        mark_architecture_skipped(&mut tests, "mipsel"); // A second unrelated instance is found in "__do_global_ctors_aux".
 
         mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
         mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.
 
         mark_skipped(&mut tests, "x86", "gcc"); // Loss of stack register value since we do not track pointer alignment yet.
-
-        mark_skipped(&mut tests, "x86", "clang"); // TODO: Check reason for failure!
+        mark_skipped(&mut tests, "x86", "clang"); // A second unrelated instance is found in "__do_global_ctors_aux".
+        
         mark_compiler_skipped(&mut tests, "mingw32-gcc"); // TODO: Check reason for failure!
 
         for test_case in tests {
