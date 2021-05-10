@@ -49,6 +49,14 @@ pub struct AbstractObjectInfo {
     type_: Option<ObjectType>,
     /// The actual content of the memory object
     memory: MemRegion<Data>,
+    /// The smallest index still contained in the memory region.
+    /// A `Top` value represents an unknown bound.
+    /// The bound is not enforced, i.e. reading and writing to indices violating the bound is still allowed.
+    lower_index_bound: BitvectorDomain,
+    /// The largest index still contained in the memory region.
+    /// A `Top` value represents an unknown bound.
+    /// The bound is not enforced, i.e. reading and writing to indices violating the bound is still allowed.
+    upper_index_bound: BitvectorDomain,
 }
 
 impl AbstractObjectInfo {
@@ -60,6 +68,56 @@ impl AbstractObjectInfo {
             state: Some(ObjectState::Alive),
             type_: Some(type_),
             memory: MemRegion::new(address_bytesize),
+            lower_index_bound: BitvectorDomain::Top(address_bytesize),
+            upper_index_bound: BitvectorDomain::Top(address_bytesize),
+        }
+    }
+
+    /// Set the lower index bound that is still considered to be contained in the abstract object.
+    pub fn set_lower_index_bound(&mut self, lower_bound: BitvectorDomain) {
+        self.lower_index_bound = lower_bound;
+    }
+
+    /// Set the upper index bound that is still considered to be contained in the abstract object.
+    pub fn set_upper_index_bound(&mut self, upper_bound: BitvectorDomain) {
+        self.upper_index_bound = upper_bound;
+    }
+
+    /// Check whether a memory access to the abstract object at the given offset
+    /// and with the given size of the accessed value is contained in the bounds of the memory object.
+    /// If `offset` contains more than one possible index value,
+    /// then only return `true` if the access is contained in the abstract object for all possible offset values.
+    pub fn access_contained_in_bounds(&self, offset: &ValueDomain, size: ByteSize) -> bool {
+        if let Ok(offset_interval) = offset.try_to_interval() {
+            if let Ok(lower_bound) = self.lower_index_bound.try_to_bitvec() {
+                if lower_bound.checked_sgt(&offset_interval.start).unwrap() {
+                    return false;
+                }
+            }
+            if let Ok(upper_bound) = self.upper_index_bound.try_to_bitvec() {
+                let mut size_as_bitvec = Bitvector::from_u64(u64::from(size));
+                match offset.bytesize().cmp(&size_as_bitvec.bytesize()) {
+                    std::cmp::Ordering::Less => size_as_bitvec.truncate(offset.bytesize()).unwrap(),
+                    std::cmp::Ordering::Greater => {
+                        size_as_bitvec.sign_extend(offset.bytesize()).unwrap()
+                    }
+                    std::cmp::Ordering::Equal => (),
+                }
+                let max_index = if let Some(val) = offset_interval
+                    .end
+                    .signed_add_overflow_checked(&size_as_bitvec)
+                {
+                    val - &Bitvector::one(offset.bytesize().into())
+                } else {
+                    return false; // The max index already causes an integer overflow
+                };
+                if upper_bound.checked_slt(&max_index).unwrap() {
+                    return false;
+                }
+            }
+            true
+        } else {
+            false
         }
     }
 
@@ -245,6 +303,8 @@ impl AbstractDomain for AbstractObjectInfo {
             state: same_or_none(&self.state, &other.state),
             type_: same_or_none(&self.type_, &other.type_),
             memory: self.memory.merge(&other.memory),
+            lower_index_bound: self.lower_index_bound.merge(&other.lower_index_bound),
+            upper_index_bound: self.upper_index_bound.merge(&other.upper_index_bound),
         }
     }
 
@@ -270,6 +330,14 @@ impl AbstractObjectInfo {
             (
                 "type".to_string(),
                 serde_json::Value::String(format!("{:?}", self.type_)),
+            ),
+            (
+                "lower_index_bound".to_string(),
+                serde_json::Value::String(format!("{}", self.lower_index_bound)),
+            ),
+            (
+                "upper_index_bound".to_string(),
+                serde_json::Value::String(format!("{}", self.upper_index_bound)),
             ),
         ];
         let memory = self
@@ -322,6 +390,8 @@ mod tests {
             state: Some(ObjectState::Alive),
             type_: Some(ObjectType::Heap),
             memory: MemRegion::new(ByteSize::new(8)),
+            lower_index_bound: Bitvector::from_u64(0).into(),
+            upper_index_bound: Bitvector::from_u64(99).into(),
         };
         AbstractObject(Arc::new(obj_info))
     }
@@ -441,5 +511,14 @@ mod tests {
                 .into_iter()
                 .collect()
         );
+    }
+
+    #[test]
+    fn access_contained_in_bounds() {
+        let object = new_abstract_object();
+        assert!(object.access_contained_in_bounds(&IntervalDomain::mock(0, 99), ByteSize::new(1)));
+        assert!(!object.access_contained_in_bounds(&IntervalDomain::mock(-1, -1), ByteSize::new(8)));
+        assert!(object.access_contained_in_bounds(&IntervalDomain::mock(92, 92), ByteSize::new(8)));
+        assert!(!object.access_contained_in_bounds(&IntervalDomain::mock(93, 93), ByteSize::new(8)));
     }
 }

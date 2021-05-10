@@ -78,9 +78,9 @@ def which(pgm):
 
 
 def optimize(filename):
-    optimize_me = []
+    optimize_me = ["cwe_119.c"]
     if filename in optimize_me:
-        return ' -O3'
+        return ' -O1'
     else:
         return ' -O0'
 

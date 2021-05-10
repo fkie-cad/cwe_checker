@@ -495,8 +495,10 @@ pub struct CallingConvention {
     /// The name of the calling convention.
     #[serde(rename = "calling_convention")]
     pub name: String,
-    /// Possible parameter registers.
-    parameter_register: Vec<String>,
+    /// Possible integer parameter registers.
+    integer_parameter_register: Vec<String>,
+    /// Possible float parameter registers.
+    float_parameter_register: Vec<String>,
     /// Possible return registers.
     return_register: Vec<String>,
     /// Callee-saved registers.
@@ -509,7 +511,8 @@ impl From<CallingConvention> for IrCallingConvention {
     fn from(cconv: CallingConvention) -> IrCallingConvention {
         IrCallingConvention {
             name: cconv.name,
-            parameter_register: cconv.parameter_register,
+            integer_parameter_register: cconv.integer_parameter_register,
+            float_parameter_register: cconv.float_parameter_register,
             return_register: cconv.return_register,
             callee_saved_register: cconv.unaffected_register,
         }
@@ -639,6 +642,17 @@ impl Project {
                 });
             }
         }
+        let register_list = self
+            .register_properties
+            .iter()
+            .filter_map(|reg| {
+                if reg.register == reg.base_register {
+                    Some(reg.into())
+                } else {
+                    None
+                }
+            })
+            .collect();
         IrProject {
             program,
             cpu_architecture: self.cpu_architecture,
@@ -648,6 +662,7 @@ impl Project {
                 .into_iter()
                 .map(|cconv| cconv.into())
                 .collect(),
+            register_list,
             datatype_properties: self.datatype_properties,
         }
     }

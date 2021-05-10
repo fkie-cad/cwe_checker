@@ -257,6 +257,60 @@ impl State {
         }
     }
 
+    /// Returns `true` if the given `Def` is a load or store instruction
+    /// which may access a memory object outside its bounds.
+    pub fn contains_out_of_bounds_mem_access(
+        &self,
+        def: &Def,
+        global_data: &RuntimeMemoryImage,
+    ) -> bool {
+        let (raw_address, size) = match def {
+            Def::Load { address, var } => (self.eval(address), var.size),
+            Def::Store { address, value } => (self.eval(address), value.bytesize()),
+            _ => return false,
+        };
+        if self.is_stack_pointer_with_nonnegative_offset(&raw_address) {
+            // Access to a parameter or the return address of the function
+            return false;
+        }
+        let address = self.adjust_pointer_for_read(&raw_address);
+        self.memory
+            .is_out_of_bounds_mem_access(&address, size, global_data)
+    }
+
+    /// Returns `true` if `data` is a pointer pointing outside of the bounds of a memory buffer.
+    /// Does not check whether `data` may represent an out-of-bounds access to global memory,
+    /// since this function assumes that all absolute values are not pointers.
+    pub fn pointer_contains_out_of_bounds_target(
+        &self,
+        data: &Data,
+        global_data: &RuntimeMemoryImage,
+    ) -> bool {
+        let data = self.adjust_pointer_for_read(data);
+        matches!(data, Data::Pointer(_))
+            && self
+                .memory
+                .is_out_of_bounds_mem_access(&data, ByteSize::new(1), global_data)
+    }
+
+    /// Return `true` if `data` is a pointer to the current stack frame with a constant positive address,
+    /// i.e. if it accesses a stack parameter (or the return-to address for x86) of the current function.
+    pub fn is_stack_pointer_with_nonnegative_offset(&self, data: &Data) -> bool {
+        if let Data::Pointer(pointer) = data {
+            if pointer.targets().len() == 1 {
+                let (target, offset) = pointer.targets().iter().next().unwrap();
+                if *target == self.stack_id {
+                    if let Ok(offset_val) = offset.try_to_offset() {
+                        if offset_val >= 0 {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        false
+    }
+
     /// If  the given address is a positive stack offset and `self.caller_stack_ids` is non-empty,
     /// i.e. it is an access to the caller stack, return the offset.
     ///

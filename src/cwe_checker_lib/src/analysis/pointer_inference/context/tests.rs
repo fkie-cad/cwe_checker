@@ -84,16 +84,22 @@ fn mock_project() -> (Project, Config) {
     };
     let cconv = CallingConvention {
         name: "default".to_string(),
-        parameter_register: vec!["RDX".to_string()],
+        integer_parameter_register: vec!["RDX".to_string()],
+        float_parameter_register: vec!["XMM0".to_string()],
         return_register: vec!["RDX".to_string()],
         callee_saved_register: vec!["callee_saved_reg".to_string()],
     };
+    let register_list = vec!["RAX", "RCX", "RDX", "RBX", "RSP", "RBP", "RSI", "RDI"]
+        .into_iter()
+        .map(|name| Variable::mock(name, ByteSize::new(8)))
+        .collect();
     (
         Project {
             program: program_term,
             cpu_architecture: "x86_64".to_string(),
             stack_pointer_register: register("RSP"),
             calling_conventions: vec![cconv],
+            register_list,
             datatype_properties: DatatypeProperties::mock(),
         },
         Config {

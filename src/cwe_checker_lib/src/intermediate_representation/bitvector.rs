@@ -37,6 +37,9 @@ pub trait BitvectorExtended: Sized {
     /// Returns an error for bitvectors larger than 8 bytes,
     /// since multiplication for them is not yet implemented in the [`apint`] crate.
     fn signed_mult_with_overflow_flag(&self, rhs: &Self) -> Result<(Self, bool), Error>;
+
+    /// Return the size in bytes of the bitvector.
+    fn bytesize(&self) -> ByteSize;
 }
 
 impl BitvectorExtended for Bitvector {
@@ -260,6 +263,11 @@ impl BitvectorExtended for Bitvector {
                 Ok((result, false))
             }
         }
+    }
+
+    /// Return the size in bytes of the bitvector.
+    fn bytesize(&self) -> ByteSize {
+        self.width().into()
     }
 }
 

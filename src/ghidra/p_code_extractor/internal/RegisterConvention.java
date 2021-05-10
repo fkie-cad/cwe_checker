@@ -1,4 +1,3 @@
-
 package internal;
 
 import java.util.ArrayList;
@@ -9,8 +8,10 @@ public class RegisterConvention {
 
     @SerializedName("calling_convention")
     private String cconv;
-    @SerializedName("parameter_register")
-    private ArrayList<String> parameter;
+    @SerializedName("integer_parameter_register")
+    private ArrayList<String> integerParameter;
+    @SerializedName("float_parameter_register")
+    private ArrayList<String> floatParameter;
     @SerializedName("return_register")
     private ArrayList<String> return_;
     @SerializedName("unaffected_register")
@@ -19,15 +20,24 @@ public class RegisterConvention {
     private ArrayList<String> killedByCall;
 
     public RegisterConvention() {
-        this.setParameter(new ArrayList<String>());
+        this.setIntegerParameter(new ArrayList<String>());
+        this.setFloatParameter(new ArrayList<String>());
         this.setReturn(new ArrayList<String>());
         this.setUnaffected(new ArrayList<String>());
         this.setKilledByCall(new ArrayList<String>());
     }
 
-    public RegisterConvention(String cconv, ArrayList<String> parameter, ArrayList<String> return_, ArrayList<String> unaffected, ArrayList<String> killedByCall) {
+    public RegisterConvention(
+        String cconv, 
+        ArrayList<String> integerParameter, 
+        ArrayList<String> floatParameter, 
+        ArrayList<String> return_, 
+        ArrayList<String> unaffected, 
+        ArrayList<String> killedByCall
+    ) {
         this.setCconv(cconv);
-        this.setParameter(parameter);
+        this.setIntegerParameter(integerParameter);
+        this.setFloatParameter(floatParameter);
         this.setReturn(return_);
         this.setUnaffected(unaffected);
         this.setKilledByCall(killedByCall);
@@ -41,12 +51,20 @@ public class RegisterConvention {
         this.cconv = cconv;
     }
 
-    public ArrayList<String> getParameter() {
-        return parameter;
+    public ArrayList<String> getIntegerParameter() {
+        return integerParameter;
     }
 
-    public void setParameter(ArrayList<String> parameter) {
-        this.parameter = parameter;
+    public void setIntegerParameter(ArrayList<String> integerParameter) {
+        this.integerParameter = integerParameter;
+    }
+
+    public ArrayList<String> getFloatParameter() {
+        return floatParameter;
+    }
+
+    public void setFloatParameter(ArrayList<String> floatParameter) {
+        this.floatParameter = floatParameter;
     }
 
     public ArrayList<String> getReturn() {
