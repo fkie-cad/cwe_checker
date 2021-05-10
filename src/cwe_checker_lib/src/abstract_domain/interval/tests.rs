@@ -187,7 +187,7 @@ fn subpiece() {
     let subpieced_val = val.subpiece(ByteSize::new(0), ByteSize::new(1));
     assert_eq!(
         subpieced_val,
-        IntervalDomain::mock_i8_with_bounds(None, -3, 5, None)
+        IntervalDomain::mock_i8_with_bounds(None, -3, 5, Some(10))
     );
     let val = IntervalDomain::mock_with_bounds(Some(-30), 2, 5, Some(10));
     let subpieced_val = val.subpiece(ByteSize::new(0), ByteSize::new(1));
@@ -199,20 +199,64 @@ fn subpiece() {
     let subpieced_val = val.subpiece(ByteSize::new(0), ByteSize::new(1));
     assert_eq!(
         subpieced_val,
-        IntervalDomain::mock_i8_with_bounds(None, 2, 5, None)
+        IntervalDomain::mock_i8_with_bounds(None, 2, 5, Some(10))
     );
     let val = IntervalDomain::mock_with_bounds(Some(-30), 2, 567, Some(777));
     let subpieced_val = val.subpiece(ByteSize::new(0), ByteSize::new(1));
     assert_eq!(subpieced_val, IntervalDomain::new_top(ByteSize::new(1)));
-    let val = IntervalDomain::mock_with_bounds(Some(-30), 2, 3, Some(777));
-    let subpieced_val = val.subpiece(ByteSize::new(1), ByteSize::new(1));
-    assert_eq!(subpieced_val, IntervalDomain::new_top(ByteSize::new(1)));
-    let val = IntervalDomain::mock_with_bounds(Some(-30), 512, 512, Some(777));
+    let val = IntervalDomain::mock_with_bounds(Some(-30), 2, 3, Some(1024));
     let subpieced_val = val.subpiece(ByteSize::new(1), ByteSize::new(1));
     assert_eq!(
         subpieced_val,
-        IntervalDomain::mock_i8_with_bounds(None, 2, 2, None)
+        IntervalDomain::mock_i8_with_bounds(Some(-1), 0, 0, Some(4))
     );
+    let val = IntervalDomain::mock_with_bounds(Some(-30), 512, 512, Some(1025));
+    let subpieced_val = val.subpiece(ByteSize::new(1), ByteSize::new(1));
+    assert_eq!(
+        subpieced_val,
+        IntervalDomain::mock_i8_with_bounds(Some(-1), 2, 2, Some(4))
+    );
+    let val = IntervalDomain::mock_with_bounds(Some(-30), 120, 130, Some(1024));
+    let subpieced_val = val.subpiece(ByteSize::new(0), ByteSize::new(1));
+    assert_eq!(subpieced_val, IntervalDomain::new_top(ByteSize::new(1)));
+    let val = IntervalDomain::mock_with_bounds(Some(-30), 250, 260, Some(1024));
+    let subpieced_val = val.subpiece(ByteSize::new(0), ByteSize::new(1));
+    assert_eq!(subpieced_val, IntervalDomain::mock_i8(-6, 4));
+    let val = IntervalDomain::mock_with_bounds(Some(110), 376, 376, Some(390));
+    let subpieced_val = val.subpiece(ByteSize::new(0), ByteSize::new(1));
+    assert_eq!(
+        subpieced_val,
+        IntervalDomain::mock_i8_with_bounds(None, 120, 120, None)
+    );
+}
+
+#[test]
+fn piece() {
+    let higher_half = IntervalDomain::mock_i8_with_bounds(None, 0, 0, None);
+    let lower_half = IntervalDomain::mock_i8_with_bounds(Some(0), 3, 5, Some(10));
+    let result = higher_half.piece(&lower_half).sign_extend(ByteSize::new(8));
+    assert_eq!(
+        result,
+        IntervalDomain::mock_with_bounds(Some(0), 3, 5, Some(10))
+    );
+    let higher_half = IntervalDomain::mock_i8_with_bounds(None, 0, 0, None);
+    let lower_half = IntervalDomain::mock_i8_with_bounds(Some(-1), 3, 5, Some(10));
+    let result = higher_half.piece(&lower_half).sign_extend(ByteSize::new(8));
+    assert_eq!(
+        result,
+        IntervalDomain::mock_with_bounds(None, 3, 5, Some(10))
+    );
+    let higher_half = IntervalDomain::mock_i8_with_bounds(Some(-30), 1, 2, Some(30));
+    let lower_half = IntervalDomain::mock_i8_with_bounds(Some(0), 3, 5, Some(10));
+    let result = higher_half.piece(&lower_half).sign_extend(ByteSize::new(8));
+    assert_eq!(
+        result,
+        IntervalDomain::mock_with_bounds(None, 259, 517, None)
+    );
+    let higher_half = IntervalDomain::mock_i8_with_bounds(None, 0, 1, None);
+    let lower_half = IntervalDomain::mock_i8_with_bounds(Some(-10), -5, 5, Some(10));
+    let result = higher_half.piece(&lower_half).sign_extend(ByteSize::new(8));
+    assert_eq!(result, IntervalDomain::mock_with_bounds(None, 0, 511, None));
 }
 
 #[test]
