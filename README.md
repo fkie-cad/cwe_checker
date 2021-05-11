@@ -3,8 +3,8 @@
 </p>
 
 # cwe_checker #
-[![Codacy Badge](https://api.codacy.com/project/badge/Grade/9dbf158110de427d893b40ba397b94bc)](https://www.codacy.com/app/weidenba/cwe_checker?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=fkie-cad/cwe_checker&amp;utm_campaign=Badge_Grade)
-[![Build Status](https://travis-ci.com/fkie-cad/cwe_checker.svg?branch=master)](https://travis-ci.com/fkie-cad/cwe_checker)
+![Acceptance tests](https://github.com/fkie-cad/cwe_checker/actions/workflows/acceptance-tests.yml/badge.svg)
+![Unit tests](https://github.com/fkie-cad/cwe_checker/actions/workflows/unit-tests.yml/badge.svg)
 ![Docker-Pulls](https://img.shields.io/docker/pulls/fkiecad/cwe_checker.svg)
 [![Documentation](https://img.shields.io/badge/doc-stable-green.svg)](https://fkie-cad.github.io/cwe_checker/doc/html/cwe_checker/index.html)
 
