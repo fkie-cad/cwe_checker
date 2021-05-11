@@ -123,37 +123,35 @@ pub fn check_cwe(
         if let Edge::ExternCallStub(jmp) = edge.weight() {
             if let Jmp::Call { target, .. } = &jmp.term {
                 if let Some(symbol) = system_symbols.get(target) {
-                    if jmp.tid.address == "0000c790" {
-                        let node = edge.source();
-                        let current_sub = match general_context.get_pi_graph()[node] {
-                            Node::BlkEnd(_blk, sub) => sub,
-                            _ => panic!(),
+                    let node = edge.source();
+                    let current_sub = match general_context.get_pi_graph()[node] {
+                        Node::BlkEnd(_blk, sub) => sub,
+                        _ => panic!(),
+                    };
+                    let mut context = general_context.clone();
+                    context.set_taint_source(jmp, &symbol.name, current_sub);
+                    let pi_state_at_taint_source =
+                        match pointer_inference_results.get_node_value(node) {
+                            Some(NodeValue::Value(val)) => Some(val.clone()),
+                            _ => None,
                         };
-                        let mut context = general_context.clone();
-                        context.set_taint_source(jmp, &symbol.name, current_sub);
-                        let pi_state_at_taint_source =
-                            match pointer_inference_results.get_node_value(node) {
-                                Some(NodeValue::Value(val)) => Some(val.clone()),
-                                _ => None,
-                            };
-                        let mut computation = create_computation(context.clone(), None);
-                        computation.set_node_value(
-                            node,
-                            NodeValue::Value(State::new(
-                                symbol,
-                                &project.stack_pointer_register,
-                                pi_state_at_taint_source.as_ref(),
-                                current_sub,
-                            )),
-                        );
-                        computation.compute_with_max_steps(100);
+                    let mut computation = create_computation(context.clone(), None);
+                    computation.set_node_value(
+                        node,
+                        NodeValue::Value(State::new(
+                            symbol,
+                            &project.stack_pointer_register,
+                            pi_state_at_taint_source.as_ref(),
+                            current_sub,
+                        )),
+                    );
+                    computation.compute_with_max_steps(100);
 
-                        for (sub_name, node_index) in entry_sub_to_entry_node_map.iter() {
-                            if let Some(node_weight) = computation.get_node_value(*node_index) {
-                                let state = node_weight.unwrap_value();
-                                if !state.is_empty() {
-                                    context.generate_cwe_warning(sub_name);
-                                }
+                    for (sub_name, node_index) in entry_sub_to_entry_node_map.iter() {
+                        if let Some(node_weight) = computation.get_node_value(*node_index) {
+                            let state = node_weight.unwrap_value();
+                            if !state.is_empty() {
+                                context.generate_cwe_warning(sub_name);
                             }
                         }
                     }
