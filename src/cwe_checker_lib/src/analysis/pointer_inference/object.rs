@@ -44,7 +44,7 @@ pub struct AbstractObjectInfo {
     /// Tracks whether this may represent more than one actual memory object.
     pub is_unique: bool,
     /// Is the object alive or already destroyed
-    state: Option<ObjectState>,
+    state: ObjectState,
     /// Is the object a stack frame or a heap object
     type_: Option<ObjectType>,
     /// The actual content of the memory object
@@ -65,7 +65,7 @@ impl AbstractObjectInfo {
         AbstractObjectInfo {
             pointer_targets: BTreeSet::new(),
             is_unique: true,
-            state: Some(ObjectState::Alive),
+            state: ObjectState::Alive,
             type_: Some(type_),
             memory: MemRegion::new(address_bytesize),
             lower_index_bound: BitvectorDomain::Top(address_bytesize),
@@ -208,12 +208,12 @@ impl AbstractObjectInfo {
     }
 
     /// If `self.is_unique==true`, set the state of the object. Else merge the new state with the old.
-    pub fn set_state(&mut self, new_state: Option<ObjectState>) {
+    pub fn set_state(&mut self, new_state: ObjectState) {
         if self.is_unique {
             self.state = new_state;
-        } else if self.state != new_state {
-            self.state = None;
-        } // else don't change the state
+        } else {
+            self.state = self.state.merge(new_state);
+        }
     }
 
     /// Remove the provided IDs from the target lists of all pointers in the memory object.
@@ -231,7 +231,7 @@ impl AbstractObjectInfo {
     }
 
     /// Get the state of the memory object.
-    pub fn get_state(&self) -> Option<ObjectState> {
+    pub fn get_state(&self) -> ObjectState {
         self.state
     }
 
@@ -254,20 +254,24 @@ impl AbstractObjectInfo {
     /// or the memory object may not be a heap object.
     pub fn mark_as_freed(&mut self) -> Result<(), Error> {
         if self.type_ != Some(ObjectType::Heap) {
-            self.set_state(Some(ObjectState::Dangling));
+            self.set_state(ObjectState::Flagged);
             return Err(anyhow!("Free operation on possibly non-heap memory object"));
         }
         match (self.is_unique, self.state) {
-            (true, Some(ObjectState::Alive)) => {
-                self.state = Some(ObjectState::Dangling);
+            (true, ObjectState::Alive) | (true, ObjectState::Flagged) => {
+                self.state = ObjectState::Dangling;
                 Ok(())
             }
-            (true, _) | (false, Some(ObjectState::Dangling)) => {
-                self.state = Some(ObjectState::Dangling);
+            (false, ObjectState::Flagged) => {
+                self.state = ObjectState::Unknown;
+                Ok(())
+            }
+            (true, _) | (false, ObjectState::Dangling) => {
+                self.state = ObjectState::Flagged;
                 Err(anyhow!("Object may already have been freed"))
             }
             (false, _) => {
-                self.state = None;
+                self.state = ObjectState::Unknown;
                 Ok(())
             }
         }
@@ -278,14 +282,18 @@ impl AbstractObjectInfo {
     /// or if the object may not be a heap object.
     pub fn mark_as_maybe_freed(&mut self) -> Result<(), Error> {
         if self.type_ != Some(ObjectType::Heap) {
-            self.set_state(Some(ObjectState::Dangling));
+            self.set_state(ObjectState::Flagged);
             return Err(anyhow!("Free operation on possibly non-heap memory object"));
         }
-        if self.state != Some(ObjectState::Dangling) {
-            self.state = None;
-            Ok(())
-        } else {
-            Err(anyhow!("Object may already have been freed"))
+        match self.state {
+            ObjectState::Dangling => {
+                self.state = ObjectState::Flagged;
+                Err(anyhow!("Object may already have been freed"))
+            }
+            _ => {
+                self.state = ObjectState::Unknown;
+                Ok(())
+            }
         }
     }
 }
@@ -300,7 +308,7 @@ impl AbstractDomain for AbstractObjectInfo {
                 .cloned()
                 .collect(),
             is_unique: self.is_unique && other.is_unique,
-            state: same_or_none(&self.state, &other.state),
+            state: self.state.merge(other.state),
             type_: same_or_none(&self.type_, &other.type_),
             memory: self.memory.merge(&other.memory),
             lower_index_bound: self.lower_index_bound.merge(&other.lower_index_bound),
@@ -377,6 +385,26 @@ pub enum ObjectState {
     Alive,
     /// The object is dangling, i.e. the memory has been freed already.
     Dangling,
+    /// The state of the object is unknown (due to merging different object states).
+    Unknown,
+    /// The object was referenced in an "use-after-free" or "double-free" CWE-warning.
+    /// This state is meant to be temporary to prevent obvious subsequent CWE-warning with the same root cause.
+    Flagged,
+}
+
+impl ObjectState {
+    /// Merge two object states.
+    /// If one of the two states is `Flagged`, then the resulting state is the other object state.
+    pub fn merge(self, other: Self) -> Self {
+        use ObjectState::*;
+        match (self, other) {
+            (Flagged, state) | (state, Flagged) => state,
+            (Unknown, _) | (_, Unknown) => Unknown,
+            (Alive, Alive) => Alive,
+            (Dangling, Dangling) => Dangling,
+            (Alive, Dangling) | (Dangling, Alive) => Unknown,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -387,7 +415,7 @@ mod tests {
         let obj_info = AbstractObjectInfo {
             pointer_targets: BTreeSet::new(),
             is_unique: true,
-            state: Some(ObjectState::Alive),
+            state: ObjectState::Alive,
             type_: Some(ObjectType::Heap),
             memory: MemRegion::new(ByteSize::new(8)),
             lower_index_bound: Bitvector::from_u64(0).into(),
