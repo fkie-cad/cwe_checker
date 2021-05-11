@@ -259,6 +259,113 @@ impl IntervalDomain {
         min.checked_sle(&self.interval.start).unwrap()
             && max.checked_sge(&self.interval.end).unwrap()
     }
+
+    /// Truncate the bitvectors in the interval domain
+    /// by removing the least significant bytes lower than the `low_byte` from them.
+    ///
+    /// The widening delay also is right shifted by the corresponding number of bits.
+    fn subpiece_higher(self, low_byte: ByteSize) -> Self {
+        let old_size = self.bytesize();
+        let interval = self.interval.subpiece_higher(low_byte);
+        let mut lower_bound = None;
+        if let Some(bound) = self.widening_lower_bound {
+            let bound = bound.subpiece(low_byte, old_size - low_byte);
+            if bound.checked_slt(&interval.start).unwrap() {
+                lower_bound = Some(bound);
+            }
+        }
+        let mut upper_bound = None;
+        if let Some(bound) = self.widening_upper_bound {
+            let bound = bound.subpiece(low_byte, old_size - low_byte);
+            if bound.checked_sgt(&interval.end).unwrap() {
+                upper_bound = Some(bound);
+            }
+        }
+        IntervalDomain {
+            interval,
+            widening_lower_bound: lower_bound,
+            widening_upper_bound: upper_bound,
+            widening_delay: self.widening_delay >> low_byte.as_bit_length(),
+        }
+    }
+
+    /// Truncate the bitvectors in the interval to `size`,
+    /// i.e. the most significant bytes (higher than `size`) are removed from all values.
+    fn subpiece_lower(self, size: ByteSize) -> Self {
+        let max_length = Bitvector::unsigned_max_value(size.into())
+            .into_zero_extend(self.bytesize())
+            .unwrap();
+        let truncated_interval = self.interval.clone().subpiece_lower(size);
+        let mut lower_bound = None;
+        if let Some(bound) = self.widening_lower_bound {
+            if (self.interval.start - &bound)
+                .checked_ult(&max_length)
+                .unwrap()
+            {
+                let truncated_bound = bound.subpiece(ByteSize::new(0), size);
+                if truncated_bound
+                    .checked_slt(&truncated_interval.start)
+                    .unwrap()
+                {
+                    lower_bound = Some(truncated_bound);
+                }
+            }
+        }
+        let mut upper_bound = None;
+        if let Some(bound) = self.widening_upper_bound {
+            if (bound.clone() - &self.interval.end)
+                .checked_ult(&max_length)
+                .unwrap()
+            {
+                let truncated_bound = bound.subpiece(ByteSize::new(0), size);
+                if truncated_bound
+                    .checked_sgt(&truncated_interval.end)
+                    .unwrap()
+                {
+                    upper_bound = Some(truncated_bound);
+                }
+            }
+        }
+        IntervalDomain {
+            interval: truncated_interval,
+            widening_lower_bound: lower_bound,
+            widening_upper_bound: upper_bound,
+            widening_delay: self.widening_delay,
+        }
+    }
+
+    /// Piece two interval domains together, where `self` contains the most signifcant bytes
+    /// and `other` contains the least significant bytes of the resulting values.
+    ///
+    /// The result retains the widening bounds of `other` if self contains only one value.
+    /// Else the result has no widening bounds.
+    fn piece(&self, other: &IntervalDomain) -> IntervalDomain {
+        let pieced_interval = self.interval.piece(&other.interval);
+        let mut lower_bound = None;
+        let mut upper_bound = None;
+        let mut widening_delay = 0;
+        if let Ok(upper_piece) = self.try_to_bitvec() {
+            if let Some(bound) = &other.widening_lower_bound {
+                let pieced_bound = upper_piece.bin_op(BinOpType::Piece, bound).unwrap();
+                if pieced_bound.checked_slt(&pieced_interval.start).unwrap() {
+                    lower_bound = Some(pieced_bound);
+                }
+            }
+            if let Some(bound) = &other.widening_upper_bound {
+                let pieced_bound = upper_piece.bin_op(BinOpType::Piece, bound).unwrap();
+                if pieced_bound.checked_sgt(&pieced_interval.end).unwrap() {
+                    upper_bound = Some(pieced_bound);
+                }
+            }
+            widening_delay = other.widening_delay;
+        }
+        IntervalDomain {
+            interval: self.interval.piece(&other.interval),
+            widening_lower_bound: lower_bound,
+            widening_upper_bound: upper_bound,
+            widening_delay,
+        }
+    }
 }
 
 impl SpecializeByConditional for IntervalDomain {
@@ -404,7 +511,7 @@ impl RegisterDomain for IntervalDomain {
     fn bin_op(&self, op: BinOpType, rhs: &Self) -> Self {
         use BinOpType::*;
         match op {
-            Piece | IntEqual | IntNotEqual | IntLess | IntSLess | IntLessEqual | IntSLessEqual
+            IntEqual | IntNotEqual | IntLess | IntSLess | IntLessEqual | IntSLessEqual
             | IntCarry | IntSCarry | IntSBorrow | IntAnd | IntOr | IntXOr | IntRight
             | IntSRight | IntDiv | IntSDiv | IntRem | IntSRem | BoolAnd | BoolOr | BoolXOr
             | FloatEqual | FloatNotEqual | FloatLess | FloatLessEqual | FloatAdd | FloatSub
@@ -427,6 +534,7 @@ impl RegisterDomain for IntervalDomain {
                     widening_delay: std::cmp::max(self.widening_delay, rhs.widening_delay),
                 }
             }
+            Piece => self.piece(rhs),
             IntAdd => self.add(rhs),
             IntSub => self.sub(rhs),
             IntMult => self.signed_mul(rhs),
@@ -482,35 +590,15 @@ impl RegisterDomain for IntervalDomain {
     }
 
     /// Take a sub-bitvector of the values in the interval domain.
-    ///
-    /// If `low_byte` is not zero, the result will generally be not exact.
     fn subpiece(&self, low_byte: ByteSize, size: ByteSize) -> Self {
-        let new_interval = self.interval.clone().subpiece(low_byte, size);
-        let (mut new_lower_bound, mut new_upper_bound) = (None, None);
-        if low_byte == ByteSize::new(0) {
-            if let (Some(lower_bound), Some(upper_bound)) =
-                (&self.widening_lower_bound, &self.widening_upper_bound)
-            {
-                let new_min = Bitvector::signed_min_value(size.into())
-                    .into_sign_extend(self.bytesize())
-                    .unwrap();
-                let new_max = Bitvector::signed_max_value(size.into())
-                    .into_sign_extend(self.bytesize())
-                    .unwrap();
-                if lower_bound.checked_sge(&new_min).unwrap()
-                    && upper_bound.checked_sle(&new_max).unwrap()
-                {
-                    new_lower_bound = Some(lower_bound.clone().into_truncate(size).unwrap());
-                    new_upper_bound = Some(upper_bound.clone().into_truncate(size).unwrap());
-                }
-            }
+        let mut interval_domain = self.clone();
+        if low_byte != ByteSize::new(0) {
+            interval_domain = interval_domain.subpiece_higher(low_byte);
         }
-        IntervalDomain {
-            interval: new_interval,
-            widening_lower_bound: new_lower_bound,
-            widening_upper_bound: new_upper_bound,
-            widening_delay: self.widening_delay,
+        if interval_domain.bytesize() > size {
+            interval_domain = interval_domain.subpiece_lower(size);
         }
+        interval_domain
     }
 
     /// Compute the result of a cast operation on the interval domain.

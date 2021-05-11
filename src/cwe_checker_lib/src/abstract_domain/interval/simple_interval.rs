@@ -97,31 +97,68 @@ impl Interval {
         }
     }
 
+    /// Truncate the bitvectors in the interval
+    /// by removing the least significant bytes lower than the `low_byte` from them.
+    pub fn subpiece_higher(self, low_byte: ByteSize) -> Self {
+        Interval {
+            start: self.start.subpiece(low_byte, self.bytesize() - low_byte),
+            end: self.end.subpiece(low_byte, self.bytesize() - low_byte),
+        }
+    }
+
+    /// Truncate the bitvectors in the interval to `size`,
+    /// i.e. the most significant bytes (higher than `size`) are removed from all values.
+    pub fn subpiece_lower(self, size: ByteSize) -> Self {
+        let length = self.length();
+        if !length.is_zero()
+            && length
+                .checked_ule(
+                    &Bitvector::unsigned_max_value(size.into())
+                        .into_zero_extend(self.bytesize())
+                        .unwrap(),
+                )
+                .unwrap()
+        {
+            let start = self.start.into_truncate(size).unwrap();
+            let end = self.end.into_truncate(size).unwrap();
+            if start.checked_sle(&end).unwrap() {
+                return Interval { start, end };
+            }
+        }
+        Self::new_top(size)
+    }
+
     /// Take a subpiece of the bitvectors.
-    ///
-    /// The function only tries to be exact if the interval contains exactly one value
-    /// or if the `low_byte` is zero.
-    pub fn subpiece(self, low_byte: ByteSize, size: ByteSize) -> Self {
-        if self.start == self.end {
-            self.start.subpiece(low_byte, size).into()
-        } else if low_byte == ByteSize::new(0) {
-            let new_min = Bitvector::signed_min_value(size.into())
-                .into_sign_extend(self.bytesize())
-                .unwrap();
-            let new_max = Bitvector::signed_max_value(size.into())
-                .into_sign_extend(self.bytesize())
-                .unwrap();
-            if self.start.checked_sge(&new_min).unwrap() && self.end.checked_sle(&new_max).unwrap()
-            {
-                Interval {
-                    start: self.start.into_truncate(size).unwrap(),
-                    end: self.end.into_truncate(size).unwrap(),
-                }
-            } else {
-                Interval::new_top(size)
+    pub fn subpiece(mut self, low_byte: ByteSize, size: ByteSize) -> Self {
+        if low_byte != ByteSize::new(0) {
+            self = self.subpiece_higher(low_byte);
+        }
+        if self.bytesize() > size {
+            self = self.subpiece_lower(size);
+        }
+        self
+    }
+
+    /// Piece two intervals together, where `self` contains the most signifcant bytes
+    /// and `other` contains the least significant bytes of the resulting values.
+    pub fn piece(&self, other: &Interval) -> Self {
+        if other.start.sign_bit().to_bool() && !other.end.sign_bit().to_bool() {
+            // The `other` interval contains both -1 and 0.
+            Interval {
+                start: self
+                    .start
+                    .bin_op(BinOpType::Piece, &Bitvector::zero(other.start.width()))
+                    .unwrap(),
+                end: self
+                    .end
+                    .bin_op(BinOpType::Piece, &(-Bitvector::one(other.end.width())))
+                    .unwrap(),
             }
         } else {
-            Interval::new_top(size)
+            Interval {
+                start: self.start.bin_op(BinOpType::Piece, &other.start).unwrap(),
+                end: self.end.bin_op(BinOpType::Piece, &other.end).unwrap(),
+            }
         }
     }
 

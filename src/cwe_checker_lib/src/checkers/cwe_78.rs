@@ -207,11 +207,9 @@ fn get_entry_sub_to_entry_node_map(
     entry_sub_to_entry_blocks_map
         .into_iter()
         .filter_map(|((sub_tid, name), block_tid)| {
-            if let Some(start_node_index) = tid_to_graph_indices_map.get(&(block_tid, sub_tid)) {
-                Some((name, *start_node_index))
-            } else {
-                None
-            }
+            tid_to_graph_indices_map
+                .get(&(block_tid, sub_tid))
+                .map(|start_node_index| (name, *start_node_index))
         })
         .collect()
 }
