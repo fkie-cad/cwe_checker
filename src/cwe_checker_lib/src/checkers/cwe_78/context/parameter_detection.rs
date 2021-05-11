@@ -1,9 +1,11 @@
-use std::collections::BTreeMap;
-
 use petgraph::graph::NodeIndex;
 use regex::Regex;
 
-use crate::{abstract_domain::{DataDomain, IntervalDomain, TryToBitvec}, analysis::interprocedural_fixpoint_generic::NodeValue, intermediate_representation::{Arg, ByteSize, CallingConvention, ExternSymbol}};
+use crate::{
+    abstract_domain::{DataDomain, IntervalDomain, TryToBitvec},
+    analysis::interprocedural_fixpoint_generic::NodeValue,
+    intermediate_representation::{Arg, ByteSize, CallingConvention, ExternSymbol, Variable},
+};
 use crate::{
     analysis::pointer_inference::State as PointerInferenceState, checkers::cwe_476::Taint,
 };
@@ -84,6 +86,8 @@ impl<'a> Context<'a> {
     /// This function taints the registers and stack positions of the parameter pointers for string functions
     /// such as sprintf, snprintf, etc.
     /// The size parameter is ignored if available (e.g. snprintf, strncat etc.)
+    /// If the string function has a variable amount of parameters, the fixed parameters are overwritten
+    /// as they only represented the destination of the incoming variable parameters.
     pub fn taint_extern_string_symbol_parameters(
         &self,
         state: &State,
@@ -100,8 +104,7 @@ impl<'a> Context<'a> {
             if self.is_relevant_string_function_call(string_symbol, pi_state, &mut new_state) {
                 let mut parameters = string_symbol.parameters.clone();
                 if string_symbol.has_var_args {
-                    parameters
-                        .append(&mut self.get_variable_number_parameters(pi_state, string_symbol));
+                    parameters = self.get_variable_number_parameters(pi_state, string_symbol);
                 }
                 self.taint_function_parameters(&mut new_state, pi_state, parameters);
             }
@@ -216,10 +219,7 @@ impl<'a> Context<'a> {
 
     /// Parses the format string parameters using a regex, determines their data types,
     /// and calculates their positions (register or memory).
-    pub fn parse_format_string_parameters(
-        &self,
-        format_string: &str,
-    ) -> BTreeMap<String, ByteSize> {
+    pub fn parse_format_string_parameters(&self, format_string: &str) -> Vec<(String, ByteSize)> {
         let re = Regex::new(r#"%\d{0,2}([c,C,d,i,o,u,x,X,e,E,f,F,g,G,a,A,n,p,s,S])"#)
             .expect("No valid regex!");
 
@@ -235,19 +235,22 @@ impl<'a> Context<'a> {
 
     /// Maps a given format specifier to the bytesize of its corresponding data type.
     pub fn map_format_specifier_to_bytesize(&self, specifier: String) -> ByteSize {
-        match specifier.as_str() {
-            "d" | "i" | "o" | "x" | "X" | "u" | "c" | "C" => {
-                self.project.datatype_properties.integer_size
-            }
-            "f" | "F" | "e" | "E" | "a" | "A" | "g" | "G" => {
-                self.project.datatype_properties.double_size
-            }
-            "s" | "S" | "n" | "p" => self.project.datatype_properties.pointer_size,
-            _ => panic!("Unknown format specifier."),
+        if Context::is_integer(&specifier) {
+            return self.project.datatype_properties.integer_size;
         }
+
+        if Context::is_float(&specifier) {
+            return self.project.datatype_properties.double_size;
+        }
+
+        if Context::is_pointer(&specifier) {
+            return self.project.datatype_properties.pointer_size;
+        }
+
+        panic!("Unknown format specifier.")
     }
 
-    /// Returns an argument vector of detected variable parameters.
+    /// Returns an argument vector of detected variable parameters if they are of type string.
     pub fn get_variable_number_parameters(
         &self,
         pi_state: &PointerInferenceState,
@@ -263,25 +266,103 @@ impl<'a> Context<'a> {
         };
         let format_string =
             self.get_input_format_string(pi_state, extern_symbol, format_string_index);
-        self.detect_parameter_locations(
-            self.parse_format_string_parameters(format_string.as_str()),
-            extern_symbol.get_calling_convention(self.project),
-            format_string_index,
-        )
+        let parameters = self.parse_format_string_parameters(format_string.as_str());
+        if parameters
+            .iter()
+            .any(|(specifier, _)| Context::is_string(specifier))
+        {
+            return self.calculate_parameter_locations(
+                parameters,
+                extern_symbol.get_calling_convention(self.project),
+                format_string_index,
+            );
+        }
+
+        vec![]
     }
 
     /// Calculates the register and stack positions of format string parameters.
     /// The parameters are then returned as an argument vector for later tainting.
-    pub fn detect_parameter_locations(
+    pub fn calculate_parameter_locations(
         &self,
-        _parameters: BTreeMap<String, ByteSize>,
+        parameters: Vec<(String, ByteSize)>,
         calling_convention: &CallingConvention,
-        _format_string_index: usize,
+        format_string_index: usize,
     ) -> Vec<Arg> {
-        // Note that floats get their own parameter registers (e.g. XMM0)
-        let var_args: Vec<Arg> = Vec::new();
+        let mut var_args: Vec<Arg> = Vec::new();
+        // The number of the remaining integer argument registers are calculated
+        // from the format string position since it is the last fixed argument.
+        let mut integer_arg_register_count =
+            calling_convention.integer_parameter_register.len() - (format_string_index + 1);
+        let mut float_arg_register_count = calling_convention.float_parameter_register.len();
+        let mut stack_offset: i64 = 0;
+
+        for (type_name, size) in parameters.iter() {
+            if Context::is_integer(type_name) || Context::is_pointer(type_name) {
+                if integer_arg_register_count > 0 {
+                    if Context::is_string(type_name) {
+                        let register_name = calling_convention.integer_parameter_register
+                            [calling_convention.integer_parameter_register.len()
+                                - integer_arg_register_count]
+                            .clone();
+                        var_args.push(Context::create_string_register_arg(
+                            self.project.get_pointer_bytesize(),
+                            register_name,
+                        ));
+                    }
+                    integer_arg_register_count -= 1;
+                } else {
+                    if Context::is_string(type_name) {
+                        var_args.push(Context::create_string_stack_arg(*size, stack_offset));
+                    }
+                    stack_offset += u64::from(*size) as i64
+                }
+            } else if float_arg_register_count > 0 {
+                float_arg_register_count -= 1;
+            } else {
+                stack_offset += u64::from(*size) as i64;
+            }
+        }
 
         var_args
+    }
+
+    /// Creates a string stack parameter given a size and stack offset.
+    pub fn create_string_stack_arg(size: ByteSize, stack_offset: i64) -> Arg {
+        Arg::Stack {
+            offset: stack_offset,
+            size,
+        }
+    }
+
+    /// Creates a string register parameter given a register name.
+    pub fn create_string_register_arg(size: ByteSize, register_name: String) -> Arg {
+        Arg::Register(Variable {
+            name: register_name,
+            size,
+            is_temp: false,
+        })
+    }
+
+    /// Checks whether the format specifier is of type int.
+    pub fn is_integer(specifier: &str) -> bool {
+        matches!(specifier, "d" | "i" | "o" | "x" | "X" | "u" | "c" | "C")
+    }
+
+    /// Checks whether the format specifier is of type pointer.
+    pub fn is_pointer(specifier: &str) -> bool {
+        matches!(specifier, "s" | "S" | "n" | "p")
+    }
+
+    /// Checks whether the format specifier is of type float.
+    pub fn is_float(specifier: &str) -> bool {
+        matches!(specifier, "f" | "F" | "e" | "E" | "a" | "A" | "g" | "G")
+    }
+
+    /// Checks whether the format specifier is a string pointer
+    /// or a string.
+    pub fn is_string(specifier: &str) -> bool {
+        matches!(specifier, "s" | "S")
     }
 }
 

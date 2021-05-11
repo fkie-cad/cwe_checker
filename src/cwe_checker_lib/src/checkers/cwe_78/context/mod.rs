@@ -142,6 +142,13 @@ impl<'a> Context<'a> {
                 self.add_temporary_callee_saved_register_taints_to_mem_taints(pi_state, state);
 
             if state.address_points_to_taint(address.clone(), pi_state) {
+                if let Some(standard_cconv) = self.project.get_standard_calling_convention() {
+                    state.remove_callee_saved_taint_if_destination_parameter(
+                        &address,
+                        pi_state,
+                        standard_cconv,
+                    );
+                }
                 state.remove_mem_taint_at_target(&address);
                 points_to_memory_taint = true;
             }

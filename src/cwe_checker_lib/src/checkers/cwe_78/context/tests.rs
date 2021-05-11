@@ -74,9 +74,15 @@ impl Setup {
             Variable::mock("RDI", 8 as u64),
             Expression::var("RBP").plus_const(-8),
         );
+        let def3 = Def::assign(
+            "def3",
+            Variable::mock("RSI", 8 as u64),
+            Expression::Const(Bitvector::from_str_radix(16, "3002").unwrap()),
+        );
         let jump = Jmp::call("call_string", "sprintf", Some("block2"));
         block1.term.defs.push(def1);
         block1.term.defs.push(def2);
+        block1.term.defs.push(def3);
         block1.term.jmps.push(jump.clone());
         sub.term.blocks.push(block1);
         sub.term.blocks.push(block2);
@@ -111,6 +117,7 @@ impl<'a> Context<'a> {
         project: &'a Project,
         string_symbols: HashMap<Tid, &'a ExternSymbol>,
         user_input_symbols: HashMap<Tid, &'a ExternSymbol>,
+        format_string_index: HashMap<String, usize>,
         pi_results: &'a PointerInferenceComputation<'a>,
         mem_image: &'a RuntimeMemoryImage,
     ) -> Self {
@@ -157,7 +164,7 @@ impl<'a> Context<'a> {
             string_symbol_map: string_symbols,
             user_input_symbol_map: user_input_symbols,
             extern_symbol_map,
-            format_string_index: HashMap::new(),
+            format_string_index,
         };
 
         Context::new(
@@ -183,6 +190,7 @@ fn setting_taint_source() {
     let mem_image = RuntimeMemoryImage::mock();
     let mut context = Context::mock(
         &setup.project,
+        HashMap::new(),
         HashMap::new(),
         HashMap::new(),
         &pi_results,
@@ -222,6 +230,7 @@ fn adding_temporary_callee_saved_register_taints_to_mem_taints() {
         &setup.project,
         HashMap::new(),
         HashMap::new(),
+        HashMap::new(),
         &pi_results,
         &mem_image,
     );
@@ -258,6 +267,7 @@ fn first_param_pointing_to_memory_taint() {
         &setup.project,
         HashMap::new(),
         HashMap::new(),
+        HashMap::new(),
         &pi_results,
         &mem_image,
     );
@@ -278,9 +288,11 @@ fn first_param_pointing_to_memory_taint() {
 #[test]
 fn creating_pi_def_map() {
     let setup = Setup::new();
+    let rsi_reg = Variable::mock("RSI", 8 as u64);
     let rdi_reg = Variable::mock("RDI", 8 as u64);
     let def1 = Tid::new("def1");
     let def2 = Tid::new("def2");
+    let def3 = Tid::new("def3");
 
     let stack_id = setup.pi_state.stack_id.clone();
 
@@ -293,6 +305,7 @@ fn creating_pi_def_map() {
         &setup.project,
         HashMap::new(),
         HashMap::new(),
+        HashMap::new(),
         &pi_results,
         &mem_image,
     );
@@ -300,18 +313,18 @@ fn creating_pi_def_map() {
     let start_node = context
         .block_maps
         .block_start_last_def_map
-        .get(&(def2.clone(), current_sub.tid.clone()))
+        .get(&(def3.clone(), current_sub.tid.clone()))
         .unwrap();
 
     let pi_def_map = context.create_pi_def_map(start_node.clone()).unwrap();
 
     for (def_tid, pi_state) in pi_def_map.iter() {
         if *def_tid == def1 {
-            assert_eq!(pi_state.get_register(&rdi_reg), Data::new_top(rdi_reg.size));
+            assert_eq!(pi_state.get_register(&rsi_reg), Data::new_top(rsi_reg.size));
         } else if *def_tid == def2 {
             assert_eq!(
                 pi_state.get_register(&rdi_reg),
-                Data::Pointer(PointerDomain::new(stack_id.clone(), bv(-8)))
+                Data::Pointer(PointerDomain::new(stack_id.clone(), bv(-8))),
             );
         }
     }
@@ -331,6 +344,12 @@ fn getting_blk_start_node_if_last_def() {
         Expression::var("RBP").plus_const(-8),
     );
 
+    let def3 = Def::assign(
+        "def3",
+        Variable::mock("RDI", 8 as u64),
+        Expression::Const(Bitvector::from_str_radix(16, "3002").unwrap()),
+    );
+
     let mem_image = RuntimeMemoryImage::mock();
     let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
     let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
@@ -338,6 +357,7 @@ fn getting_blk_start_node_if_last_def() {
 
     let context = Context::mock(
         &setup.project,
+        HashMap::new(),
         HashMap::new(),
         HashMap::new(),
         &pi_results,
@@ -349,7 +369,7 @@ fn getting_blk_start_node_if_last_def() {
     let start_node = context
         .block_maps
         .block_start_last_def_map
-        .get(&(def2.tid.clone(), current_sub.tid.clone()))
+        .get(&(def3.tid.clone(), current_sub.tid.clone()))
         .unwrap();
 
     assert_eq!(
@@ -358,6 +378,10 @@ fn getting_blk_start_node_if_last_def() {
     );
     assert_eq!(
         context.get_blk_start_node_if_last_def(&setup.state, &def2),
+        None
+    );
+    assert_eq!(
+        context.get_blk_start_node_if_last_def(&setup.state, &def3),
         Some(start_node.clone())
     );
 }
@@ -374,6 +398,7 @@ fn getting_source_node() {
 
     let context = Context::mock(
         &setup.project,
+        HashMap::new(),
         HashMap::new(),
         HashMap::new(),
         &pi_results,
@@ -409,6 +434,7 @@ fn updating_target_state_for_callsite() {
 
     let context = Context::mock(
         &setup.project,
+        HashMap::new(),
         HashMap::new(),
         HashMap::new(),
         &pi_results,
@@ -494,6 +520,7 @@ fn handling_assign_and_load() {
         &setup.project,
         HashMap::new(),
         HashMap::new(),
+        HashMap::new(),
         &pi_results,
         &mem_image,
     );
@@ -575,6 +602,7 @@ fn updating_def() {
 
     let context = Context::mock(
         &setup.project,
+        HashMap::new(),
         HashMap::new(),
         HashMap::new(),
         &pi_results,
@@ -665,6 +693,7 @@ fn updating_jumpsite() {
         &setup.project,
         HashMap::new(),
         HashMap::new(),
+        HashMap::new(),
         &pi_results,
         &mem_image,
     );
@@ -716,6 +745,7 @@ fn updating_callsite() {
 
     let context = Context::mock(
         &setup.project,
+        HashMap::new(),
         HashMap::new(),
         HashMap::new(),
         &pi_results,
@@ -816,6 +846,7 @@ fn splitting_call_stub() {
         &setup.project,
         HashMap::new(),
         HashMap::new(),
+        HashMap::new(),
         &pi_results,
         &mem_image,
     );
@@ -866,6 +897,7 @@ fn splitting_return_stub() {
 
     let context = Context::mock(
         &setup.project,
+        HashMap::new(),
         HashMap::new(),
         HashMap::new(),
         &pi_results,
@@ -928,11 +960,14 @@ fn updating_call_stub() {
     let mut string_symbols: HashMap<Tid, &ExternSymbol> = HashMap::new();
     let sprintf = &ExternSymbol::mock_string();
     string_symbols.insert(Tid::new("sprintf"), sprintf);
+    let mut format_string_index: HashMap<String, usize> = HashMap::new();
+    format_string_index.insert("sprintf".to_string(), 1);
 
     let context = Context::mock(
         &setup.project,
         string_symbols,
         HashMap::new(),
+        format_string_index,
         &pi_results,
         &mem_image,
     );
@@ -949,14 +984,8 @@ fn updating_call_stub() {
         new_state.address_points_to_taint(setup.base_eight_offset, &setup.pi_state),
         false
     );
-    assert_eq!(
-        new_state.get_register_taint(&rdi_reg),
-        Some(&Taint::Tainted(rdi_reg.size))
-    );
-    assert_eq!(
-        new_state.get_register_taint(&rsi_reg),
-        Some(&Taint::Tainted(rsi_reg.size))
-    );
+    assert_eq!(new_state.get_register_taint(&rdi_reg), None,);
+    assert_eq!(new_state.get_register_taint(&rsi_reg), None,);
     assert_eq!(
         new_state.get_register_taint(&rbp_reg),
         Some(&Taint::Tainted(rbp_reg.size))
@@ -983,6 +1012,7 @@ fn specializing_conditional() {
 
     let context = Context::mock(
         &setup.project,
+        HashMap::new(),
         HashMap::new(),
         HashMap::new(),
         &pi_results,

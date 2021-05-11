@@ -190,6 +190,14 @@ impl RuntimeMemoryImage {
         Err(anyhow!("Address is not a valid global memory address."))
     }
 
+    /// Checks whether the constant is a global memory address.
+    pub fn is_global_memory_address(&self, constant: &Bitvector) -> bool {
+        if self.read(constant, constant.bytesize()).is_ok() {
+            return true;
+        }
+        false
+    }
+
     /// Checks whether the memory content at the input address is
     /// an address to another memory position and returns the address in memory.
     pub fn parse_address_if_recursive(
@@ -199,16 +207,16 @@ impl RuntimeMemoryImage {
     ) -> Result<Bitvector, Error> {
         match self.read(address, arch_size) {
             Ok(Some(recursive_address)) => {
-                if let Ok(_) = self.read(&recursive_address, arch_size) {
-                    return Ok(recursive_address);
+                if self.read(&recursive_address, arch_size).is_ok() {
+                    Ok(recursive_address)
                 } else {
-                    return Ok(address.clone());
+                    Ok(address.clone())
                 }
             }
             Ok(None) => Err(anyhow!(
                 "Writeable address does not guarantee correct content."
             )),
-            Err(e) => Err(e),
+            Err(_) => Ok(address.clone()),
         }
     }
 
@@ -335,6 +343,17 @@ pub mod tests {
                     MemorySegment {
                         bytes: [0x02, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00].to_vec(),
                         base_address: 0x4000,
+                        read_flag: true,
+                        write_flag: false,
+                        execute_flag: false,
+                    },
+                    MemorySegment {
+                        bytes: [
+                            0x2f, 0x64, 0x65, 0x76, 0x2f, 0x73, 0x64, 0x25, 0x63, 0x25, 0x64, 0x00,
+                            0x63, 0x61, 0x74, 0x20, 0x25, 0x73, 0x00,
+                        ]
+                        .to_vec(),
+                        base_address: 0x5000,
                         read_flag: true,
                         write_flag: false,
                         execute_flag: false,

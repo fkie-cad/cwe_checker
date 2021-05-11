@@ -1,7 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    abstract_domain::{AbstractDomain, AbstractIdentifier, MemRegion, SizedDomain, TryToBitvec},
+    abstract_domain::{
+        AbstractDomain, AbstractIdentifier, DataDomain, IntervalDomain, MemRegion, SizedDomain,
+        TryToBitvec,
+    },
     analysis::pointer_inference::{Data, State as PointerInferenceState},
     checkers::cwe_476::Taint,
     intermediate_representation::{
@@ -213,15 +216,16 @@ impl State {
         constant: Bitvector,
         pointer_byte_size: ByteSize,
     ) {
-        if let Ok(parsed_address) =
-            runtime_memory_image.parse_address_if_recursive(&constant, pointer_byte_size)
-        {
-            match runtime_memory_image.read_string_until_null_terminator(&parsed_address) {
-                Ok(format_string) => {
-                    self.string_constants.insert(format_string.to_string());
+        if runtime_memory_image.is_global_memory_address(&constant) {
+            if let Ok(parsed_address) =
+                runtime_memory_image.parse_address_if_recursive(&constant, pointer_byte_size)
+            {
+                match runtime_memory_image.read_string_until_null_terminator(&parsed_address) {
+                    Ok(format_string) => {
+                        self.string_constants.insert(format_string.to_string());
+                    }
+                    Err(e) => panic!("{}", e),
                 }
-                // TODO: Log here instead of panic
-                Err(e) => panic!("{}", e),
             }
         }
     }
@@ -242,7 +246,7 @@ impl State {
             Expression::Const(constant) => self.evaluate_constant(
                 runtime_memory_image,
                 constant.clone(),
-                stack_pointer_register.size.clone(),
+                stack_pointer_register.size,
             ),
             Expression::Var(var) => self.taint_variable_input(var, stack_pointer_register, def_tid),
             Expression::BinOp { .. } => {
@@ -299,11 +303,10 @@ impl State {
         runtime_memory_image: &RuntimeMemoryImage,
     ) {
         match expr {
-            // TODO: Distinguish integer constants from global addresses in evaluate constant
             Expression::Const(constant) => self.evaluate_constant(
                 runtime_memory_image,
                 constant.clone(),
-                stack_pointer_register.size.clone(),
+                stack_pointer_register.size,
             ),
             Expression::Var(var) => self.taint_variable_input(var, stack_pointer_register, def_tid),
             Expression::BinOp { lhs, rhs, .. } => {
@@ -442,6 +445,20 @@ impl State {
                 if register_names.get(&register.name).is_none() {
                     self.register_taint.remove(&register);
                 }
+            }
+        }
+    }
+
+    pub fn remove_callee_saved_taint_if_destination_parameter(
+        &mut self,
+        destination_address: &DataDomain<IntervalDomain>,
+        pi_state: &PointerInferenceState,
+        standard_cconv: &CallingConvention,
+    ) {
+        for (var, _) in self.get_callee_saved_register_taints(standard_cconv).iter() {
+            let callee_saved_address = pi_state.eval(&Expression::Var(var.clone()));
+            if callee_saved_address == *destination_address {
+                self.remove_register_taint(var);
             }
         }
     }
