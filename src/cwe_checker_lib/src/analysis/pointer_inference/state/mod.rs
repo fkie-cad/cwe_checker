@@ -525,6 +525,8 @@ impl State {
                             if let Ok(bitvec) = self.eval(rhs).try_to_bitvec() {
                                 self.specialize_by_expression_result(lhs, bitvec.into())?;
                             }
+                            // Also specialize cases of pointer comparisons
+                            self.specialize_pointer_comparison(&BinOpType::IntEqual, lhs, rhs)?;
                             Ok(())
                         }
                         (BinOpType::IntEqual, false) | (BinOpType::IntNotEqual, true) => {
@@ -537,6 +539,8 @@ impl State {
                                 let new_result = self.eval(lhs).add_not_equal_bound(&bitvec)?;
                                 self.specialize_by_expression_result(lhs, new_result)?;
                             }
+                            // Also specialize cases of pointer comparisons
+                            self.specialize_pointer_comparison(&BinOpType::IntNotEqual, lhs, rhs)?;
                             Ok(())
                         }
                         _ => panic!(),
@@ -581,6 +585,60 @@ impl State {
         } else {
             Ok(())
         }
+    }
+
+    /// If both `lhs` and `rhs` evaluate to pointers and `op` is a comparison operator that evaluates to `true`,
+    /// specialize the input pointers accordingly.
+    ///
+    /// Note that the current implementation only specializes for `==` and `!=` operators
+    /// and only if the pointers point to the same unique memory object.
+    fn specialize_pointer_comparison(
+        &mut self,
+        op: &BinOpType,
+        lhs: &Expression,
+        rhs: &Expression,
+    ) -> Result<(), Error> {
+        if let (Data::Pointer(lhs_pointer), Data::Pointer(rhs_pointer)) =
+            (self.eval(lhs), self.eval(rhs))
+        {
+            match (
+                lhs_pointer.unwrap_if_unique_target(),
+                rhs_pointer.unwrap_if_unique_target(),
+            ) {
+                (Some((lhs_id, lhs_offset)), Some((rhs_id, rhs_offset))) if lhs_id == rhs_id => {
+                    if !(self.memory.is_unique_object(lhs_id)?) {
+                        // Since the pointers may or may not point to different instances referenced by the same ID we cannot compare them.
+                        return Ok(());
+                    }
+                    if *op == BinOpType::IntEqual {
+                        let specialized_offset = lhs_offset.intersect(rhs_offset)?;
+                        let specialized_domain: Data =
+                            PointerDomain::new(lhs_id.clone(), specialized_offset).into();
+                        self.specialize_by_expression_result(lhs, specialized_domain.clone())?;
+                        self.specialize_by_expression_result(rhs, specialized_domain)?;
+                    } else if *op == BinOpType::IntNotEqual {
+                        if let Ok(rhs_offset_bitvec) = rhs_offset.try_to_bitvec() {
+                            let new_lhs_offset =
+                                lhs_offset.clone().add_not_equal_bound(&rhs_offset_bitvec)?;
+                            self.specialize_by_expression_result(
+                                lhs,
+                                PointerDomain::new(lhs_id.clone(), new_lhs_offset).into(),
+                            )?;
+                        }
+                        if let Ok(lhs_offset_bitvec) = lhs_offset.try_to_bitvec() {
+                            let new_rhs_offset =
+                                rhs_offset.clone().add_not_equal_bound(&lhs_offset_bitvec)?;
+                            self.specialize_by_expression_result(
+                                rhs,
+                                PointerDomain::new(rhs_id.clone(), new_rhs_offset).into(),
+                            )?;
+                        }
+                    }
+                }
+                _ => (), // Other cases not handled, since it depends on the meaning of pointer IDs, which may change in the future.
+            }
+        }
+        Ok(())
     }
 
     /// Try to restrict the input variables of the given comparison operation

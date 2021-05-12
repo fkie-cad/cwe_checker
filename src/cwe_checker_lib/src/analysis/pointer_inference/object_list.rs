@@ -363,8 +363,8 @@ impl AbstractObjectList {
         }
     }
 
-    // Return the object type of a memory object.
-    // Returns an error if no object with the given ID is contained in the object list.
+    /// Return the object type of a memory object.
+    /// Returns an error if no object with the given ID is contained in the object list.
     pub fn get_object_type(
         &self,
         object_id: &AbstractIdentifier,
@@ -372,6 +372,16 @@ impl AbstractObjectList {
         match self.objects.get(object_id) {
             Some((object, _)) => Ok(object.get_object_type()),
             None => Err(()),
+        }
+    }
+
+    /// Returns `true` if the object corresponding to the given ID represents an unique object
+    /// and `false` if it may represent more than one object (e.g. several array elements).
+    /// Returns an error if the ID is not contained in the object list.
+    pub fn is_unique_object(&self, object_id: &AbstractIdentifier) -> Result<bool, Error> {
+        match self.objects.get(object_id) {
+            Some((object, _)) => Ok(object.is_unique),
+            None => Err(anyhow!("Object ID not contained in object list.")),
         }
     }
 }
