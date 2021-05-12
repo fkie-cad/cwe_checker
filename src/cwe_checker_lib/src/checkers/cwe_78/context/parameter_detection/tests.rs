@@ -248,32 +248,6 @@ fn test_is_string_symbol() {
 }
 
 #[test]
-fn test_is_user_input_symbol() {
-    let setup = Setup::new();
-    let mem_image = RuntimeMemoryImage::mock();
-    let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
-    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
-    pi_results.compute();
-    let mut user_input_symbol_map: HashMap<Tid, &ExternSymbol> = HashMap::new();
-    let mut scanf_symbol = ExternSymbol::mock();
-    scanf_symbol.tid = Tid::new("scanf");
-    let mut memcpy_symbol = ExternSymbol::mock();
-    memcpy_symbol.tid = Tid::new("memcpy");
-    user_input_symbol_map.insert(Tid::new("scanf"), &scanf_symbol);
-    let context = Context::mock(
-        &setup.project,
-        HashMap::new(),
-        user_input_symbol_map,
-        HashMap::new(),
-        &pi_results,
-        &mem_image,
-    );
-
-    assert!(context.is_user_input_symbol(&scanf_symbol));
-    assert!(!context.is_user_input_symbol(&memcpy_symbol));
-}
-
-#[test]
 fn test_get_return_registers_from_symbol() {
     assert_eq!(
         vec!["RAX"],

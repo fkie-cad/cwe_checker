@@ -23,8 +23,6 @@ impl<'a> Context<'a> {
     ) -> State {
         if self.is_string_symbol(symbol) {
             return self.taint_extern_string_symbol_parameters(state, symbol, call_source_node);
-        } else if self.is_user_input_symbol(symbol) {
-            return self.taint_user_input_symbol_parameters(state, symbol);
         }
 
         self.taint_other_extern_symbol_parameters(state, call_source_node, symbol)
@@ -38,16 +36,8 @@ impl<'a> Context<'a> {
             .is_some()
     }
 
-    /// Checks whether the current symbol is a user input symbol as defined in the symbol configuration.
-    pub fn is_user_input_symbol(&self, symbol: &ExternSymbol) -> bool {
-        self.symbol_maps
-            .user_input_symbol_map
-            .get(&symbol.tid)
-            .is_some()
-    }
-
     /// Taints the parameters of a non string related extern symbol if it is relevant to the taint analysis.
-    /// To determine whether the symbol is relevant, it is checked if either the arch's return register is tainted
+    /// To determine whether the symbol is relevant, it is checked if either the arch's return registers are tainted
     pub fn taint_other_extern_symbol_parameters(
         &self,
         state: &State,
@@ -85,9 +75,9 @@ impl<'a> Context<'a> {
 
     /// This function taints the registers and stack positions of the parameter pointers for string functions
     /// such as sprintf, snprintf, etc.
-    /// The size parameter is ignored if available (e.g. snprintf, strncat etc.)
+    /// The size parameter is ignored if available (e.g. snprintf, strncat etc.).
     /// If the string function has a variable amount of parameters, the fixed parameters are overwritten
-    /// as they only represented the destination of the incoming variable parameters.
+    /// as they only represent the destination of the incoming variable parameters.
     pub fn taint_extern_string_symbol_parameters(
         &self,
         state: &State,
@@ -126,20 +116,6 @@ impl<'a> Context<'a> {
         } else {
             panic!("Missing parameters for string related function!");
         }
-    }
-
-    /// Taints the input parameter of user input symbols.
-    /// In case of a *scanf* call, no taint is added since the input can be arbitrary.
-    /// However, the format string is analysed to avoid false positives. (e.g. pure integer input
-    /// does not trigger a cwe warning)
-    /// In case of a *sscanf* call, the source string pointer parameter is tainted, if one of the tainted
-    /// return values is a string.
-    pub fn taint_user_input_symbol_parameters(
-        &self,
-        state: &State,
-        _user_input_symbol: &ExternSymbol,
-    ) -> State {
-        state.clone()
     }
 
     /// Taints register and stack function arguments.

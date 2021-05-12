@@ -449,6 +449,8 @@ impl State {
         }
     }
 
+    /// Removes the taint of a callee saved register if it was identified as the return target of
+    /// a string symbol.
     pub fn remove_callee_saved_taint_if_destination_parameter(
         &mut self,
         destination_address: &DataDomain<IntervalDomain>,

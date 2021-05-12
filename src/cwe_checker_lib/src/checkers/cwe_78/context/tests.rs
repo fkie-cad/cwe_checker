@@ -162,7 +162,7 @@ impl<'a> Context<'a> {
 
         let symbol_maps: SymbolMaps = SymbolMaps {
             string_symbol_map: string_symbols,
-            user_input_symbol_map: user_input_symbols,
+            _user_input_symbol_map: user_input_symbols,
             extern_symbol_map,
             format_string_index,
         };
