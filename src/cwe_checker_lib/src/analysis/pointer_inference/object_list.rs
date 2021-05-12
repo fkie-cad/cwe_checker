@@ -375,7 +375,7 @@ impl AbstractObjectList {
         }
     }
 
-    /// Returns `true` if the object corresponding the given ID represents an unique object
+    /// Returns `true` if the object corresponding to the given ID represents an unique object
     /// and `false` if it may represent more than one object (e.g. several array elements).
     /// Returns an error if the ID is not contained in the object list.
     pub fn is_unique_object(&self, object_id: &AbstractIdentifier) -> Result<bool, Error> {
