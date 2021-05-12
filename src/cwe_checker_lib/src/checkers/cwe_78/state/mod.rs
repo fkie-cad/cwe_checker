@@ -239,10 +239,9 @@ impl State {
     ) {
         self.remove_register_taint(result);
         match expression {
-            Expression::Const(constant) => self.evaluate_constant(
-                runtime_memory_image,
-                constant.clone(),
-            ),
+            Expression::Const(constant) => {
+                self.evaluate_constant(runtime_memory_image, constant.clone())
+            }
             Expression::Var(var) => self.taint_variable_input(var, stack_pointer_register, def_tid),
             Expression::BinOp { .. } => {
                 if let Some(pid_map) = self.pi_def_map.as_ref() {
@@ -298,10 +297,9 @@ impl State {
         runtime_memory_image: &RuntimeMemoryImage,
     ) {
         match expr {
-            Expression::Const(constant) => self.evaluate_constant(
-                runtime_memory_image,
-                constant.clone(),
-            ),
+            Expression::Const(constant) => {
+                self.evaluate_constant(runtime_memory_image, constant.clone())
+            }
             Expression::Var(var) => self.taint_variable_input(var, stack_pointer_register, def_tid),
             Expression::BinOp { lhs, rhs, .. } => {
                 self.taint_def_input_register(
