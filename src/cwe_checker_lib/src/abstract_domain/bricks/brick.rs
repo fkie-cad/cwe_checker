@@ -19,6 +19,12 @@ pub struct Brick {
     max: u32,
 }
 
+impl Default for Brick {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Brick {
     /// Creates a new instance of the Brick struct.
     pub fn new() -> Self {
