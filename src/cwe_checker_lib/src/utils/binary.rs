@@ -198,28 +198,6 @@ impl RuntimeMemoryImage {
         false
     }
 
-    /// Checks whether the memory content at the input address is
-    /// an address to another memory position and returns the address in memory.
-    pub fn parse_address_if_recursive(
-        &self,
-        address: &Bitvector,
-        arch_size: ByteSize,
-    ) -> Result<Bitvector, Error> {
-        match self.read(address, arch_size) {
-            Ok(Some(recursive_address)) => {
-                if self.read(&recursive_address, arch_size).is_ok() {
-                    Ok(recursive_address)
-                } else {
-                    Ok(address.clone())
-                }
-            }
-            Ok(None) => Err(anyhow!(
-                "Writeable address does not guarantee correct content."
-            )),
-            Err(_) => Ok(address.clone()),
-        }
-    }
-
     /// Check whether all addresses in the given interval point to a readable segment in the runtime memory image.
     ///
     /// Returns an error if the address interval intersects more than one memory segment

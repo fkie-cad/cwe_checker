@@ -174,16 +174,9 @@ impl<'a> Context<'a> {
         address: DataDomain<IntervalDomain>,
     ) -> String {
         if let Ok(address_vector) = address.try_to_bitvec() {
-            let parsed_address = match self
-                .runtime_memory_image
-                .parse_address_if_recursive(&address_vector, self.project.get_pointer_bytesize())
-            {
-                Ok(addr) => addr,
-                Err(e) => panic!("{}", e),
-            };
             match self
                 .runtime_memory_image
-                .read_string_until_null_terminator(&parsed_address)
+                .read_string_until_null_terminator(&address_vector)
             {
                 Ok(format_string) => format_string.to_string(),
                 Err(e) => panic!("{}", e),

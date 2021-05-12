@@ -214,18 +214,14 @@ impl State {
         &mut self,
         runtime_memory_image: &RuntimeMemoryImage,
         constant: Bitvector,
-        pointer_byte_size: ByteSize,
     ) {
         if runtime_memory_image.is_global_memory_address(&constant) {
-            if let Ok(parsed_address) =
-                runtime_memory_image.parse_address_if_recursive(&constant, pointer_byte_size)
-            {
-                match runtime_memory_image.read_string_until_null_terminator(&parsed_address) {
-                    Ok(format_string) => {
-                        self.string_constants.insert(format_string.to_string());
-                    }
-                    Err(e) => panic!("{}", e),
+            match runtime_memory_image.read_string_until_null_terminator(&constant) {
+                Ok(format_string) => {
+                    self.string_constants.insert(format_string.to_string());
                 }
+                // TODO: Change to log
+                Err(e) => panic!("{}", e),
             }
         }
     }
@@ -246,7 +242,6 @@ impl State {
             Expression::Const(constant) => self.evaluate_constant(
                 runtime_memory_image,
                 constant.clone(),
-                stack_pointer_register.size,
             ),
             Expression::Var(var) => self.taint_variable_input(var, stack_pointer_register, def_tid),
             Expression::BinOp { .. } => {
@@ -306,7 +301,6 @@ impl State {
             Expression::Const(constant) => self.evaluate_constant(
                 runtime_memory_image,
                 constant.clone(),
-                stack_pointer_register.size,
             ),
             Expression::Var(var) => self.taint_variable_input(var, stack_pointer_register, def_tid),
             Expression::BinOp { lhs, rhs, .. } => {
