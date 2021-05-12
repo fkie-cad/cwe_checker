@@ -34,7 +34,9 @@ mod widening;
 /// It represents the composition of a string through sub sequences.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub enum BricksDomain {
+    /// The *Top* value represents an invalid sequence.
     Top,
+    /// This values represents a sequence of string subsequences.
     Value(Vec<BrickDomain>),
 }
 
@@ -193,7 +195,11 @@ impl AbstractDomain for BricksDomain {
             Self::Top
         } else {
             let merged = self.widen(other);
-            merged.normalize()
+            if !merged.is_top() {
+                return merged.normalize();
+            }
+
+            merged
         }
     }
 
@@ -215,11 +221,12 @@ impl HasTop for BricksDomain {
 ///
 /// e.g. \[{"mo", "de"}\]^{1,2} represents the following set of strings:
 /// {mo, de, momo, dede, mode, demo}.
-/// The *Top* value represents the powerset over the alphabet
-/// of allowed characters with a minimum of 0 and a maximum of positive infinity.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub enum BrickDomain {
+    /// The *Top* value represents the powerset over the alphabet
+    /// of allowed characters with a minimum of 0 and a maximum of positive infinity.
     Top,
+    /// The set of character sequences as well as the minimum and maximum of the sum of their occurrences.
     Value(Brick),
 }
 
