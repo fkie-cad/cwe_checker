@@ -198,16 +198,15 @@ impl<'a, T: Context<'a>> GeneralFPContext for GeneralizedContext<'a, T> {
                         _ => panic!("Malformed Control flow graph"),
                     };
                     let call_term = &call_block.term.jmps[0];
-                    match self.context.update_callsite(
-                        interprocedural_flow.as_ref(),
-                        call_stub.as_ref(),
-                        caller_sub,
-                        call_term,
-                        return_term,
-                    ) {
-                        Some(val) => Some(NodeValue::Value(val)),
-                        None => None,
-                    }
+                    self.context
+                        .update_callsite(
+                            interprocedural_flow.as_ref(),
+                            call_stub.as_ref(),
+                            caller_sub,
+                            call_term,
+                            return_term,
+                        )
+                        .map(NodeValue::Value)
                 }
             },
             Edge::ExternCallStub(call) => self

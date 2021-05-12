@@ -286,7 +286,7 @@ impl<'a> Context<'a> {
     /// Check all parameter registers of a call for dangling pointers and report possible use-after-frees.
     fn check_parameter_register_for_dangling_pointer(
         &self,
-        state: &State,
+        state: &mut State,
         call: &Term<Jmp>,
         extern_symbol: &ExternSymbol,
     ) {
@@ -298,6 +298,9 @@ impl<'a> Context<'a> {
             ) {
                 Ok(value) => {
                     if state.memory.is_dangling_pointer(&value, true) {
+                        state
+                            .memory
+                            .mark_dangling_pointer_targets_as_flagged(&value);
                         let warning = CweWarning {
                             name: "CWE416".to_string(),
                             version: VERSION.to_string(),
