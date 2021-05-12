@@ -2,6 +2,12 @@
 ====
 
 -   Switched default backend to Ghidra (PR #128)
+-   Handle global memory accesses during analysis (PRs #131, #133)
+-   Improvements to the Docker image (PR #134)
+-   Add OS Command Injection Check (PRs #130, #154, #167)
+-   Remove deprecated BAP backend (PRs #148, #149, #150)
+-   Implement abstract interval domain (PRs #152, #158, #166)
+-   Add Buffer Overflow checks (PRs #159, #174)
 
 0.4 (2021-01)
 ====
