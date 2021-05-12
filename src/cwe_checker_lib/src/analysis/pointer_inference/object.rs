@@ -388,7 +388,7 @@ pub enum ObjectState {
     /// The state of the object is unknown (due to merging different object states).
     Unknown,
     /// The object was referenced in an "use-after-free" or "double-free" CWE-warning.
-    /// This state is meant to be temporary to prevent obvious subsequent CWE-warning with the same root cause.
+    /// This state is meant to be temporary to prevent obvious subsequent CWE-warnings with the same root cause.
     Flagged,
 }
 
