@@ -300,18 +300,6 @@ fn test_parse_format_string_destination_and_return_content() {
         &mem_image,
     );
 
-    // Test Case 1: Global Memory location contains pointer to another global memory location.
-    let pointer_address_vector = Bitvector::from_str_radix(16, "4000").unwrap();
-    let pointer_address = DataDomain::Value(IntervalDomain::new(
-        pointer_address_vector.clone(),
-        pointer_address_vector,
-    ));
-
-    assert_eq!(
-        "Hello World",
-        context.parse_format_string_destination_and_return_content(pointer_address)
-    );
-
     // Test Case 2: Global memory location contains string itself.
     let string_address_vector = Bitvector::from_str_radix(16, "3002").unwrap();
     let string_address = DataDomain::Value(IntervalDomain::new(
