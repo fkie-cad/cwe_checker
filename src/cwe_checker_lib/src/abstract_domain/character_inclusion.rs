@@ -2,7 +2,7 @@
 //!
 //! This domain considers the characters of a string and distinguishes
 //! between two scenarios which are stored in different HashSets.
-//! - The first set contains characters that are certainly contained in 
+//! - The first set contains characters that are certainly contained in
 //!   the string.
 //! - The second set contains characters that may be in the string.
 //!
@@ -10,7 +10,7 @@
 //! Furthermore, the CI domain does not preserve information about the order of characters.
 //! The *Top* value of the CI domain stands for an empty set of certainly
 //! contained characters and the whole alphabet of allowed characters for the possibly contained characters.
-//! 
+//!
 //! The following presents an example which shows how the CI domain works:
 //!  1. When a string is assigned to the CI domain its unique characters are stored in both
 //!    sets. e.g. "Hello, World!" => ({H,e,l,o,',',' ',W,o,r,d}, {H,e,l,o,',',' ',W,o,r,d})
@@ -33,7 +33,10 @@ use super::{AbstractDomain, HasTop};
 /// contained characters and the whole alphabet of allowed characters for the possibly contained characters.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub enum CharacterInclusionDomain {
+    /// The *Top* value stands for an empty set of certainly contained characters and
+    /// the whole alphabet of allowed characters for the possibly contained characters.
     Top,
+    /// The set of certainly contained characters and a set of possibly contained characters
     Value((HashSet<char>, HashSet<char>)),
 }
 

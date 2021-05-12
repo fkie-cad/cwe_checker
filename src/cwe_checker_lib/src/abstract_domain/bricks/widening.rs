@@ -6,7 +6,10 @@
 //! A merge is processed without widening when none of the thresholds are exceeded.
 
 use std::{
-    cmp::{max, min},
+    cmp::{
+        max, min,
+        Ordering::{Equal, Greater, Less},
+    },
     collections::BTreeSet,
 };
 
@@ -32,10 +35,15 @@ impl BricksDomain {
 
         let mut new_self = self.clone();
         let mut new_other = other.clone();
-        if self_num_of_bricks < other_num_of_bricks {
-            new_self = self.pad_list(other);
-        } else if other_num_of_bricks < self_num_of_bricks {
-            new_other = other.pad_list(self);
+
+        match self_num_of_bricks.cmp(&other_num_of_bricks) {
+            Less => {
+                new_self = self.pad_list(other);
+            }
+            Greater => {
+                new_other = other.pad_list(self);
+            }
+            Equal => (),
         }
 
         if !new_self.is_less_or_equal(other) && !new_other.is_less_or_equal(self)
@@ -64,11 +72,8 @@ impl BricksDomain {
 
     /// Checks whether all bricks of the BricksDomain are *Top* values.
     /// If so, the BricksDomain itself is converted into a *Top* value.
-    pub fn all_bricks_are_top(bricks: &Vec<BrickDomain>) -> bool {
-        bricks.iter().all(|brick| match brick {
-            BrickDomain::Top => true,
-            _ => false,
-        })
+    pub fn all_bricks_are_top(bricks: &[BrickDomain]) -> bool {
+        bricks.iter().all(|brick| matches!(brick, BrickDomain::Top))
     }
 
     /// Checks whether the current BricksDomain is less or equal than the other BricksDomain
