@@ -44,20 +44,20 @@ impl AbstractObjectList {
     }
 
     /// Check the state of a memory object at a given address.
-    /// Returns True if at least one of the targets of the pointer is dangling.
-    /// If `report_none_states` is `true`,
+    /// Returns `true` if at least one of the targets of the pointer is dangling.
+    /// If `report_unknown_states` is `true`,
     /// then objects with unknown states get reported if they are unique.
     /// I.e. objects representing more than one actual object (e.g. an array of object) will not get reported,
-    /// even if their state is unknown and `report_none_states` is `true`.
-    pub fn is_dangling_pointer(&self, address: &Data, report_none_states: bool) -> bool {
+    /// even if their state is unknown and `report_unknown_states` is `true`.
+    pub fn is_dangling_pointer(&self, address: &Data, report_unknown_states: bool) -> bool {
         match address {
             Data::Value(_) | Data::Top(_) => (),
             Data::Pointer(pointer) => {
                 for id in pointer.ids() {
                     let (object, _offset_id) = self.objects.get(id).unwrap();
-                    match (report_none_states, object.get_state()) {
-                        (_, Some(ObjectState::Dangling)) => return true,
-                        (true, None) => {
+                    match (report_unknown_states, object.get_state()) {
+                        (_, ObjectState::Dangling) => return true,
+                        (true, ObjectState::Unknown) => {
                             if object.is_unique {
                                 return true;
                             }
@@ -69,6 +69,23 @@ impl AbstractObjectList {
         }
         // No dangling pointer found
         false
+    }
+
+    /// Mark all memory objects targeted by the given `address` pointer,
+    /// whose state is either dangling or unknown,
+    /// as flagged.
+    pub fn mark_dangling_pointer_targets_as_flagged(&mut self, address: &Data) {
+        if let Data::Pointer(pointer) = address {
+            for id in pointer.ids() {
+                let (object, _) = self.objects.get_mut(id).unwrap();
+                if matches!(
+                    object.get_state(),
+                    ObjectState::Unknown | ObjectState::Dangling
+                ) {
+                    object.set_state(ObjectState::Flagged);
+                }
+            }
+        }
     }
 
     /// Check whether a memory access at the given address (and accessing `size` many bytes)
@@ -578,7 +595,7 @@ mod tests {
                 .unwrap()
                 .0
                 .get_state(),
-            Some(crate::analysis::pointer_inference::object::ObjectState::Alive)
+            crate::analysis::pointer_inference::object::ObjectState::Alive
         );
         other_obj_list
             .mark_mem_object_as_freed(&modified_heap_pointer)
@@ -591,7 +608,7 @@ mod tests {
                 .unwrap()
                 .0
                 .get_state(),
-            Some(crate::analysis::pointer_inference::object::ObjectState::Dangling)
+            crate::analysis::pointer_inference::object::ObjectState::Dangling
         );
     }
 

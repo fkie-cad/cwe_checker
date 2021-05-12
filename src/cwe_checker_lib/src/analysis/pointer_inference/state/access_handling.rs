@@ -247,11 +247,19 @@ impl State {
         }
     }
 
-    /// Check if an expression contains a use-after-free
-    pub fn contains_access_of_dangling_memory(&self, def: &Def) -> bool {
+    /// Check if an expression contains a use-after-free.
+    /// If yes, mark the corresponding memory objects as flagged.
+    pub fn contains_access_of_dangling_memory(&mut self, def: &Def) -> bool {
         match def {
             Def::Load { address, .. } | Def::Store { address, .. } => {
-                self.memory.is_dangling_pointer(&self.eval(address), true)
+                let address_value = self.eval(address);
+                if self.memory.is_dangling_pointer(&address_value, true) {
+                    self.memory
+                        .mark_dangling_pointer_targets_as_flagged(&address_value);
+                    true
+                } else {
+                    false
+                }
             }
             _ => false,
         }
