@@ -175,13 +175,27 @@ impl RuntimeMemoryImage {
             if address >= segment.base_address
                 && address <= segment.base_address + segment.bytes.len() as u64
             {
-                let index = (address - segment.base_address) as usize;
-                let c_str = std::ffi::CStr::from_bytes_with_nul(&segment.bytes[index..])?;
-                return Ok(c_str.to_str()?);
+                let start_index = (address - segment.base_address) as usize;
+                if let Some(end_index) = segment.bytes[start_index..].iter().position(|&b| b == 0) {
+                    let c_str = std::ffi::CStr::from_bytes_with_nul(
+                        &segment.bytes[start_index..start_index + end_index + 1],
+                    )?;
+                    return Ok(c_str.to_str()?);
+                } else {
+                    return Err(anyhow!("Not a valid string in memory."));
+                }
             }
         }
 
         Err(anyhow!("Address is not a valid global memory address."))
+    }
+
+    /// Checks whether the constant is a global memory address.
+    pub fn is_global_memory_address(&self, constant: &Bitvector) -> bool {
+        if self.read(constant, constant.bytesize()).is_ok() {
+            return true;
+        }
+        false
     }
 
     /// Check whether all addresses in the given interval point to a readable segment in the runtime memory image.
@@ -300,6 +314,24 @@ pub mod tests {
                         ]
                         .to_vec(),
                         base_address: 0x3000,
+                        read_flag: true,
+                        write_flag: false,
+                        execute_flag: false,
+                    },
+                    MemorySegment {
+                        bytes: [0x02, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00].to_vec(),
+                        base_address: 0x4000,
+                        read_flag: true,
+                        write_flag: false,
+                        execute_flag: false,
+                    },
+                    MemorySegment {
+                        bytes: [
+                            0x2f, 0x64, 0x65, 0x76, 0x2f, 0x73, 0x64, 0x25, 0x63, 0x25, 0x64, 0x00,
+                            0x63, 0x61, 0x74, 0x20, 0x25, 0x73, 0x00,
+                        ]
+                        .to_vec(),
+                        base_address: 0x5000,
                         read_flag: true,
                         write_flag: false,
                         execute_flag: false,

@@ -72,14 +72,17 @@ pub static CWE_MODULE: CweModule = CweModule {
 };
 
 /// The configuration struct
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct Config {
     /// The names of the system call symbols
     system_symbols: Vec<String>,
     /// The names of the string manipulating symbols
     string_symbols: Vec<String>,
-    /// The name of the user input symbols
+    /// The names of the user input symbols
     user_input_symbols: Vec<String>,
+    /// Contains the index of the format string parameter
+    /// for external symbols.
+    format_string_index: HashMap<String, usize>,
 }
 
 /// This check searches for system calls and sets their parameters as taint source if available.
@@ -215,10 +218,13 @@ fn get_entry_sub_to_entry_node_map(
 ///     - Maps the TID of an extern symbol that take input from the user to the corresponding extern symbol struct.
 /// - extern_symbol_map:
 ///     - Maps the TID of an extern symbol to the extern symbol struct.
+/// - format_string_index:
+///     - Maps a symbol name to the index of its format string parameter.
 pub struct SymbolMaps<'a> {
     string_symbol_map: HashMap<Tid, &'a ExternSymbol>,
-    user_input_symbol_map: HashMap<Tid, &'a ExternSymbol>,
+    _user_input_symbol_map: HashMap<Tid, &'a ExternSymbol>,
     extern_symbol_map: HashMap<Tid, &'a ExternSymbol>,
+    format_string_index: HashMap<String, usize>,
 }
 
 impl<'a> SymbolMaps<'a> {
@@ -233,11 +239,12 @@ impl<'a> SymbolMaps<'a> {
                 project,
                 &config.string_symbols[..],
             ),
-            user_input_symbol_map: crate::utils::symbol_utils::get_symbol_map(
+            _user_input_symbol_map: crate::utils::symbol_utils::get_symbol_map(
                 project,
                 &config.user_input_symbols[..],
             ),
             extern_symbol_map,
+            format_string_index: config.format_string_index.clone(),
         }
     }
 }
