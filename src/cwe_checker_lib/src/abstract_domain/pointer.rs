@@ -122,6 +122,15 @@ impl<T: RegisterDomain> PointerDomain<T> {
     pub fn ids(&self) -> std::collections::btree_map::Keys<AbstractIdentifier, T> {
         self.0.keys()
     }
+
+    /// Return the target and offset of the pointer if it points to an unique ID.
+    pub fn unwrap_if_unique_target(&self) -> Option<(&AbstractIdentifier, &T)> {
+        if self.0.len() == 1 {
+            return self.0.iter().next();
+        } else {
+            None
+        }
+    }
 }
 
 impl<T: RegisterDomain + Display> PointerDomain<T> {

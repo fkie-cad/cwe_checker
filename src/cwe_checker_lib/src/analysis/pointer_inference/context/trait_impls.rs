@@ -16,8 +16,9 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
 
     /// Update the state according to the effects of the given `Def` term.
     fn update_def(&self, state: &Self::Value, def: &Term<Def>) -> Option<Self::Value> {
+        let mut new_state = state.clone();
         // first check for use-after-frees
-        if state.contains_access_of_dangling_memory(&def.term) {
+        if new_state.contains_access_of_dangling_memory(&def.term) {
             let warning = CweWarning {
                 name: "CWE416".to_string(),
                 version: VERSION.to_string(),
@@ -65,7 +66,6 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
 
         match &def.term {
             Def::Store { address, value } => {
-                let mut new_state = state.clone();
                 self.log_debug(
                     new_state.handle_store(address, value, self.runtime_memory_image),
                     Some(&def.tid),
@@ -73,12 +73,10 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
                 Some(new_state)
             }
             Def::Assign { var, value } => {
-                let mut new_state = state.clone();
                 new_state.handle_register_assign(var, value);
                 Some(new_state)
             }
             Def::Load { var, address } => {
-                let mut new_state = state.clone();
                 self.log_debug(
                     new_state.handle_load(var, address, &self.runtime_memory_image),
                     Some(&def.tid),
@@ -308,13 +306,23 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
         if let Some(extern_symbol) = self.extern_symbol_map.get(call_target) {
             // Generate a CWE-message if some argument is an out-of-bounds pointer.
             self.check_parameter_register_for_out_of_bounds_pointer(state, call, extern_symbol);
+            // Check parameter for possible use-after-frees (except for possible double frees, which are handled later)
+            if !self
+                .deallocation_symbols
+                .iter()
+                .any(|free_like_fn| free_like_fn == extern_symbol.name.as_str())
+            {
+                self.check_parameter_register_for_dangling_pointer(
+                    &mut new_state,
+                    call,
+                    extern_symbol,
+                );
+            }
             // Clear non-callee-saved registers from the state.
             let cconv = extern_symbol.get_calling_convention(&self.project);
             new_state.clear_non_callee_saved_register(&cconv.callee_saved_register[..]);
             // Adjust stack register value (for x86 architecture).
             self.adjust_stack_register_on_extern_call(state, &mut new_state);
-            // Check parameter for possible use-after-frees
-            self.check_parameter_register_for_dangling_pointer(state, call, extern_symbol);
 
             match extern_symbol.name.as_str() {
                 malloc_like_fn if self.allocation_symbols.iter().any(|x| x == malloc_like_fn) => {
