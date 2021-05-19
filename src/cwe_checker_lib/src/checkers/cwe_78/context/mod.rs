@@ -10,7 +10,6 @@ use crate::{
     abstract_domain::{AbstractDomain, DataDomain, IntervalDomain},
     analysis::{
         forward_interprocedural_fixpoint::Context as PiContext, graph::Graph,
-        interprocedural_fixpoint_generic::NodeValue,
         pointer_inference::PointerInference as PointerInferenceComputation,
         pointer_inference::State as PointerInferenceState,
     },
@@ -18,6 +17,8 @@ use crate::{
     intermediate_representation::*,
     utils::{binary::RuntimeMemoryImage, log::CweWarning},
 };
+
+pub mod parameter_detection;
 
 #[derive(Clone)]
 pub struct Context<'a> {
@@ -123,63 +124,6 @@ impl<'a> Context<'a> {
         self.pointer_inference_results.get_graph()
     }
 
-    /// This function taints the registers and stack positions of the parameter pointers for string functions
-    /// such as sprintf, snprintf, etc.
-    /// The size parameter is ignored if available (e.g. snprintf, strncat etc.)
-    pub fn taint_string_function_parameters(
-        &self,
-        state: &State,
-        string_symbol: &ExternSymbol,
-        call_source_node: NodeIndex,
-    ) -> State {
-        let mut new_state = state.clone();
-
-        if let Some(NodeValue::Value(pi_state)) = self
-            .pointer_inference_results
-            .get_node_value(call_source_node)
-        {
-            // Check whether the parameter points to a tainted memory target
-            // Since the first parameter of these string functions is also the return parameter,
-            // this will serve as an indicator whether the function call is relevant to the taint analysis.
-            let relevant_fuction_call = if let Some(param) = string_symbol.parameters.get(0) {
-                self.first_param_points_to_memory_taint(pi_state, &mut new_state, param)
-            } else {
-                panic!("Missing parameters for string related function!");
-            };
-            if relevant_fuction_call {
-                self.taint_function_arguments(
-                    &mut new_state,
-                    pi_state,
-                    string_symbol.parameters.clone(),
-                );
-            }
-        }
-        new_state
-    }
-
-    /// Taints register and stack function arguments.
-    pub fn taint_function_arguments(
-        &self,
-        state: &mut State,
-        pi_state: &PointerInferenceState,
-        parameters: Vec<Arg>,
-    ) {
-        for parameter in parameters.iter() {
-            match parameter {
-                Arg::Register(var) => state.set_register_taint(var, Taint::Tainted(var.size)),
-                Arg::Stack { size, .. } => {
-                    if let Ok(address) = pi_state.eval_parameter_arg(
-                        parameter,
-                        &self.project.stack_pointer_register,
-                        self.runtime_memory_image,
-                    ) {
-                        state.save_taint_to_memory(&address, Taint::Tainted(*size))
-                    }
-                }
-            }
-        }
-    }
-
     /// Checks whether the firt parameter of a string related function points to a taint.
     /// If so, removes the taint at the target memory.
     pub fn first_param_points_to_memory_taint(
@@ -198,6 +142,13 @@ impl<'a> Context<'a> {
                 self.add_temporary_callee_saved_register_taints_to_mem_taints(pi_state, state);
 
             if state.address_points_to_taint(address.clone(), pi_state) {
+                if let Some(standard_cconv) = self.project.get_standard_calling_convention() {
+                    state.remove_callee_saved_taint_if_destination_parameter(
+                        &address,
+                        pi_state,
+                        standard_cconv,
+                    );
+                }
                 state.remove_mem_taint_at_target(&address);
                 points_to_memory_taint = true;
             }
@@ -232,68 +183,6 @@ impl<'a> Context<'a> {
         }
 
         temp_mem_taints
-    }
-
-    /// This function taints the registers and stack positions of the parameter pointers of external functions
-    /// If the function is one of the specified string functions, the processing of the call is transferred to
-    /// the string function processor
-    pub fn taint_generic_function_parameters_and_remove_non_callee_saved(
-        &self,
-        state: &State,
-        symbol: &ExternSymbol,
-        call_source_node: NodeIndex,
-    ) -> State {
-        let mut new_state = state.clone();
-        // Check if the extern symbol is a string symbol, since the return register is not tainted for these.
-        // Instead, is has to be checked whether the first function parameter points to a tainted memory address
-        if self
-            .symbol_maps
-            .string_symbol_map
-            .get(&symbol.tid)
-            .is_some()
-        {
-            new_state.remove_non_callee_saved_taint(symbol.get_calling_convention(self.project));
-            new_state = self.taint_string_function_parameters(&new_state, symbol, call_source_node);
-        } else {
-            // Check whether the return register is tainted before the call
-            // If so, taint the parameter registers and memory addresses of possible stack parameters
-            let return_registers = symbol
-                .return_values
-                .iter()
-                .filter_map(|ret| match ret {
-                    Arg::Register(var) => Some(var.name.clone()),
-                    _ => None,
-                })
-                .collect::<Vec<String>>();
-            if new_state.check_return_registers_for_taint(return_registers) {
-                new_state
-                    .remove_non_callee_saved_taint(symbol.get_calling_convention(self.project));
-                // TODO: Parameter detection since targets of input parameters are the return locations
-                // Taint memory for string inputs
-                if self
-                    .symbol_maps
-                    .user_input_symbol_map
-                    .get(&symbol.tid)
-                    .is_some()
-                {
-                    self.generate_cwe_warning(
-                        &new_state.get_current_sub().as_ref().unwrap().term.name,
-                    );
-                }
-                if let Some(NodeValue::Value(pi_state)) = self
-                    .pointer_inference_results
-                    .get_node_value(call_source_node)
-                {
-                    self.taint_function_arguments(
-                        &mut new_state,
-                        pi_state,
-                        symbol.parameters.clone(),
-                    );
-                }
-            }
-        }
-
-        new_state
     }
 
     /// Checks whether the current def term is the last def term
@@ -372,6 +261,7 @@ impl<'a> Context<'a> {
                     var,
                     input,
                     &self.project.stack_pointer_register,
+                    self.runtime_memory_image,
                 )
             }
         }
@@ -456,6 +346,7 @@ impl<'a> crate::analysis::backward_interprocedural_fixpoint::Context<'a> for Con
                 address,
                 value,
                 &self.project.stack_pointer_register,
+                self.runtime_memory_image,
             ),
         }
 
@@ -572,7 +463,7 @@ impl<'a> crate::analysis::backward_interprocedural_fixpoint::Context<'a> for Con
             Jmp::Call { target, .. } => {
                 let source_node = self.get_source_node(&new_state, &call.tid);
                 if let Some(extern_symbol) = self.symbol_maps.extern_symbol_map.get(target) {
-                    new_state = self.taint_generic_function_parameters_and_remove_non_callee_saved(
+                    new_state = self.taint_generic_extern_symbol_parameters(
                         &new_state,
                         extern_symbol,
                         source_node,

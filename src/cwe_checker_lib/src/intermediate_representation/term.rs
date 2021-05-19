@@ -630,6 +630,19 @@ mod tests {
                 callee_saved_register: vec!["RBP".to_string()],
             }
         }
+
+        pub fn mock_with_parameter_registers(
+            integer_parameter_register: Vec<String>,
+            float_parameter_register: Vec<String>,
+        ) -> CallingConvention {
+            CallingConvention {
+                name: "__stdcall".to_string(), // so that the mock is useable as standard calling convention in tests
+                integer_parameter_register,
+                float_parameter_register,
+                return_register: vec!["RAX".to_string()],
+                callee_saved_register: vec!["RBP".to_string()],
+            }
+        }
     }
 
     impl Arg {

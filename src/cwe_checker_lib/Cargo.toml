@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 apint = "0.2"
+regex = "1.4.5"
 serde = {version = "1.0", features = ["derive", "rc"]}
 serde_json = "1.0"
 serde_yaml = "0.8"

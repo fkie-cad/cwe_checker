@@ -21,12 +21,12 @@ fn mock_block(tid: &str) -> Term<Blk> {
     }
 }
 
-fn bv(value: i64) -> ValueDomain {
+pub fn bv(value: i64) -> ValueDomain {
     ValueDomain::from(Bitvector::from_i64(value))
 }
 
 impl ExternSymbol {
-    fn mock_string() -> Self {
+    pub fn mock_string() -> Self {
         ExternSymbol {
             tid: Tid::new("sprintf"),
             addresses: vec!["UNKNOWN".to_string()],
@@ -39,18 +39,18 @@ impl ExternSymbol {
         }
     }
 }
-struct Setup {
-    project: Project,
-    state: State,
-    pi_state: PointerInferenceState,
-    string_sym: ExternSymbol,
-    taint_source: Term<Jmp>,
-    base_eight_offset: DataDomain<ValueDomain>,
-    base_sixteen_offset: DataDomain<ValueDomain>,
+pub struct Setup {
+    pub project: Project,
+    pub state: State,
+    pub pi_state: PointerInferenceState,
+    pub string_sym: ExternSymbol,
+    pub taint_source: Term<Jmp>,
+    pub base_eight_offset: DataDomain<ValueDomain>,
+    pub base_sixteen_offset: DataDomain<ValueDomain>,
 }
 
 impl Setup {
-    fn new() -> Self {
+    pub fn new() -> Self {
         let (state, pi_state) = State::mock_with_pi_state();
         let stack_id = pi_state.stack_id.clone();
         let taint_source = Term {
@@ -74,9 +74,15 @@ impl Setup {
             Variable::mock("RDI", 8 as u64),
             Expression::var("RBP").plus_const(-8),
         );
+        let def3 = Def::assign(
+            "def3",
+            Variable::mock("RSI", 8 as u64),
+            Expression::Const(Bitvector::from_str_radix(16, "3002").unwrap()),
+        );
         let jump = Jmp::call("call_string", "sprintf", Some("block2"));
         block1.term.defs.push(def1);
         block1.term.defs.push(def2);
+        block1.term.defs.push(def3);
         block1.term.jmps.push(jump.clone());
         sub.term.blocks.push(block1);
         sub.term.blocks.push(block2);
@@ -107,9 +113,11 @@ impl Setup {
 }
 
 impl<'a> Context<'a> {
-    fn mock(
+    pub fn mock(
         project: &'a Project,
         string_symbols: HashMap<Tid, &'a ExternSymbol>,
+        user_input_symbols: HashMap<Tid, &'a ExternSymbol>,
+        format_string_index: HashMap<String, usize>,
         pi_results: &'a PointerInferenceComputation<'a>,
         mem_image: &'a RuntimeMemoryImage,
     ) -> Self {
@@ -154,8 +162,9 @@ impl<'a> Context<'a> {
 
         let symbol_maps: SymbolMaps = SymbolMaps {
             string_symbol_map: string_symbols,
-            user_input_symbol_map: HashMap::new(),
+            _user_input_symbol_map: user_input_symbols,
             extern_symbol_map,
+            format_string_index,
         };
 
         Context::new(
@@ -179,116 +188,19 @@ fn setting_taint_source() {
     let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
     let pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     let mem_image = RuntimeMemoryImage::mock();
-    let mut context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
+    let mut context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
 
     context.set_taint_source(&setup.taint_source, &String::from("system"), &current_sub);
     assert_eq!(context.taint_source, Some(&setup.taint_source));
     assert_eq!(context.taint_source_name, Some(String::from("system")));
     assert_eq!(context.taint_source_sub, Some(&current_sub));
-}
-
-#[test]
-fn tainting_string_function_parameters() {
-    let mut setup = Setup::new();
-    let rbp_reg = Variable::mock("RBP", 8 as u64); // callee saved -> will point to RSP
-    let rdi_reg = Variable::mock("RDI", 8 as u64); // parameter 1 -> will point to RBP - 8
-    let rsi_reg = Variable::mock("RSI", 8 as u64); // parameter 2
-
-    setup
-        .state
-        .set_register_taint(&rbp_reg, Taint::Tainted(rbp_reg.size));
-
-    setup
-        .state
-        .save_taint_to_memory(&setup.base_eight_offset, Taint::Tainted(ByteSize::new(8)));
-    setup
-        .state
-        .save_taint_to_memory(&setup.base_sixteen_offset, Taint::Tainted(ByteSize::new(8)));
-
-    let mem_image = RuntimeMemoryImage::mock();
-    let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
-    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
-    pi_results.compute();
-
-    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
-    let node_id = context
-        .block_maps
-        .jmp_to_blk_end_node_map
-        .get(&(Tid::new("call_string"), Tid::new("func")))
-        .unwrap();
-
-    let new_state =
-        context.taint_string_function_parameters(&setup.state, &setup.string_sym, *node_id);
-
-    assert_eq!(
-        new_state.address_points_to_taint(setup.base_sixteen_offset, &setup.pi_state),
-        true
-    );
-    assert_eq!(
-        new_state.address_points_to_taint(setup.base_eight_offset, &setup.pi_state),
-        false
-    );
-    assert_eq!(
-        new_state.get_register_taint(&rdi_reg),
-        Some(&Taint::Tainted(rdi_reg.size))
-    );
-    assert_eq!(
-        new_state.get_register_taint(&rsi_reg),
-        Some(&Taint::Tainted(rsi_reg.size))
-    );
-    assert_eq!(
-        new_state.get_register_taint(&rbp_reg),
-        Some(&Taint::Tainted(rbp_reg.size))
-    );
-}
-
-#[test]
-fn tainting_function_arguments() {
-    let mut setup = Setup::new();
-    let rdi_reg = Variable::mock("RDI", 8);
-    let args = vec![
-        Arg::Register(rdi_reg.clone()),
-        Arg::Stack {
-            offset: 24,
-            size: ByteSize::from(8),
-        },
-    ];
-
-    let mem_image = RuntimeMemoryImage::mock();
-    let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
-    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
-    pi_results.compute();
-
-    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
-
-    setup
-        .pi_state
-        .write_to_address(
-            &Expression::BinOp {
-                op: BinOpType::IntAdd,
-                lhs: Box::new(Expression::Var(Variable {
-                    name: String::from("RSP"),
-                    size: ByteSize::new(8),
-                    is_temp: false,
-                })),
-                rhs: Box::new(Expression::Const(Bitvector::from_u64(24))),
-            },
-            &Data::Pointer(PointerDomain::new(setup.pi_state.stack_id.clone(), bv(32))),
-            context.runtime_memory_image,
-        )
-        .expect("Failed to write to address.");
-
-    context.taint_function_arguments(&mut setup.state, &setup.pi_state, args);
-
-    assert_eq!(
-        setup.state.get_register_taint(&rdi_reg),
-        Some(&Taint::Tainted(rdi_reg.size))
-    );
-
-    assert!(setup.state.address_points_to_taint(
-        Data::Pointer(PointerDomain::new(setup.pi_state.stack_id.clone(), bv(32))),
-        &setup.pi_state
-    ));
 }
 
 #[test]
@@ -314,7 +226,14 @@ fn adding_temporary_callee_saved_register_taints_to_mem_taints() {
     let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
-    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
+    let context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
 
     let result = context.add_temporary_callee_saved_register_taints_to_mem_taints(
         &setup.pi_state,
@@ -344,7 +263,14 @@ fn first_param_pointing_to_memory_taint() {
     let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
-    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
+    let context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
 
     let arg = Arg::Register(rdi_reg);
     assert_eq!(
@@ -360,99 +286,13 @@ fn first_param_pointing_to_memory_taint() {
 }
 
 #[test]
-fn tainting_generic_function_parameters_and_removing_non_callee_saved() {
-    let mut setup = Setup::new();
-    let r9_reg = Variable::mock("R9", 8 as u64);
-    let rbp_reg = Variable::mock("RBP", 8 as u64);
-    let rdi_reg = Variable::mock("RDI", 8 as u64);
-    let rsi_reg = Variable::mock("RSI", 8 as u64);
-    let rax_reg = Variable::mock("RAX", 8 as u64);
-
-    let mem_image = RuntimeMemoryImage::mock();
-    let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
-    let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
-    pi_results.compute();
-
-    setup
-        .state
-        .save_taint_to_memory(&setup.base_eight_offset, Taint::Tainted(ByteSize::new(8)));
-    setup
-        .state
-        .set_register_taint(&rbp_reg, Taint::Tainted(rbp_reg.size));
-    setup
-        .state
-        .set_register_taint(&r9_reg, Taint::Tainted(r9_reg.size));
-
-    let mut string_syms: HashMap<Tid, &ExternSymbol> = HashMap::new();
-    string_syms.insert(Tid::new("sprintf"), &setup.string_sym);
-    let context = Context::mock(&setup.project, string_syms, &pi_results, &mem_image);
-    let node_id = context
-        .block_maps
-        .jmp_to_blk_end_node_map
-        .get(&(Tid::new("call_string"), Tid::new("func")))
-        .unwrap();
-
-    // Test Case 1: String Symbol
-    let mut new_state = context.taint_generic_function_parameters_and_remove_non_callee_saved(
-        &setup.state,
-        &ExternSymbol::mock_string(),
-        node_id.clone(),
-    );
-
-    // Parameter
-    assert_eq!(
-        new_state.get_register_taint(&rdi_reg),
-        Some(&Taint::Tainted(rdi_reg.size))
-    );
-    assert_eq!(
-        new_state.get_register_taint(&rsi_reg),
-        Some(&Taint::Tainted(rsi_reg.size))
-    );
-    // Callee Saved
-    assert_eq!(
-        new_state.get_register_taint(&rbp_reg),
-        Some(&Taint::Tainted(rbp_reg.size))
-    );
-    // Non Callee Saved
-    assert_eq!(new_state.get_register_taint(&r9_reg), None);
-    assert_eq!(new_state.get_register_taint(&rax_reg), None);
-
-    new_state.remove_all_register_taints();
-    new_state.set_register_taint(&rbp_reg, Taint::Tainted(rbp_reg.size));
-    new_state.set_register_taint(&r9_reg, Taint::Tainted(r9_reg.size));
-    new_state.set_register_taint(&rax_reg, Taint::Tainted(rax_reg.size));
-
-    // Test Case 2: Other Extern Symbol
-    new_state = context.taint_generic_function_parameters_and_remove_non_callee_saved(
-        &new_state,
-        &ExternSymbol::mock(),
-        node_id.clone(),
-    );
-
-    // Parameter
-    assert_eq!(
-        new_state.get_register_taint(&rdi_reg),
-        Some(&Taint::Tainted(rdi_reg.size))
-    );
-    // Callee Saved
-    assert_eq!(
-        new_state.get_register_taint(&rbp_reg),
-        Some(&Taint::Tainted(rbp_reg.size))
-    );
-    // Non Callee Saved
-    assert_eq!(new_state.get_register_taint(&r9_reg), None);
-    assert_eq!(new_state.get_register_taint(&rax_reg), None);
-    assert_eq!(new_state.get_register_taint(&rsi_reg), None);
-
-    // TODO: add test for scanf when parameter detection is implemented
-}
-
-#[test]
 fn creating_pi_def_map() {
     let setup = Setup::new();
+    let rsi_reg = Variable::mock("RSI", 8 as u64);
     let rdi_reg = Variable::mock("RDI", 8 as u64);
     let def1 = Tid::new("def1");
     let def2 = Tid::new("def2");
+    let def3 = Tid::new("def3");
 
     let stack_id = setup.pi_state.stack_id.clone();
 
@@ -461,23 +301,30 @@ fn creating_pi_def_map() {
     let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
-    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
+    let context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
     let current_sub = setup.project.program.term.subs.get(0).unwrap();
     let start_node = context
         .block_maps
         .block_start_last_def_map
-        .get(&(def2.clone(), current_sub.tid.clone()))
+        .get(&(def3.clone(), current_sub.tid.clone()))
         .unwrap();
 
     let pi_def_map = context.create_pi_def_map(start_node.clone()).unwrap();
 
     for (def_tid, pi_state) in pi_def_map.iter() {
         if *def_tid == def1 {
-            assert_eq!(pi_state.get_register(&rdi_reg), Data::new_top(rdi_reg.size));
+            assert_eq!(pi_state.get_register(&rsi_reg), Data::new_top(rsi_reg.size));
         } else if *def_tid == def2 {
             assert_eq!(
                 pi_state.get_register(&rdi_reg),
-                Data::Pointer(PointerDomain::new(stack_id.clone(), bv(-8)))
+                Data::Pointer(PointerDomain::new(stack_id.clone(), bv(-8))),
             );
         }
     }
@@ -497,19 +344,32 @@ fn getting_blk_start_node_if_last_def() {
         Expression::var("RBP").plus_const(-8),
     );
 
+    let def3 = Def::assign(
+        "def3",
+        Variable::mock("RDI", 8 as u64),
+        Expression::Const(Bitvector::from_str_radix(16, "3002").unwrap()),
+    );
+
     let mem_image = RuntimeMemoryImage::mock();
     let graph = crate::analysis::graph::get_program_cfg(&setup.project.program, HashSet::new());
     let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
-    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
+    let context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
     let current_sub = setup.project.program.term.subs.get(0).unwrap();
     setup.state.set_current_sub(current_sub);
 
     let start_node = context
         .block_maps
         .block_start_last_def_map
-        .get(&(def2.tid.clone(), current_sub.tid.clone()))
+        .get(&(def3.tid.clone(), current_sub.tid.clone()))
         .unwrap();
 
     assert_eq!(
@@ -518,6 +378,10 @@ fn getting_blk_start_node_if_last_def() {
     );
     assert_eq!(
         context.get_blk_start_node_if_last_def(&setup.state, &def2),
+        None
+    );
+    assert_eq!(
+        context.get_blk_start_node_if_last_def(&setup.state, &def3),
         Some(start_node.clone())
     );
 }
@@ -532,7 +396,14 @@ fn getting_source_node() {
     let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
-    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
+    let context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
     let current_sub = setup.project.program.term.subs.get(0).unwrap();
     setup.state.set_current_sub(current_sub);
 
@@ -561,7 +432,14 @@ fn updating_target_state_for_callsite() {
     let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
-    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
+    let context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
 
     let mut return_state = setup.state.clone();
 
@@ -638,7 +516,14 @@ fn handling_assign_and_load() {
     let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
-    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
+    let context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
     let current_sub = setup.project.program.term.subs.get(0).unwrap();
     setup.state.set_current_sub(current_sub);
 
@@ -715,7 +600,14 @@ fn updating_def() {
     let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
-    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
+    let context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
     let current_sub = setup.project.program.term.subs.get(0).unwrap();
     setup.state.set_current_sub(current_sub);
 
@@ -797,7 +689,14 @@ fn updating_jumpsite() {
     let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
-    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
+    let context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
 
     let mut new_state = context
         .update_jumpsite(
@@ -844,7 +743,14 @@ fn updating_callsite() {
     let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
-    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
+    let context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
 
     // Test Case: No return state
     assert_eq!(
@@ -936,7 +842,14 @@ fn splitting_call_stub() {
     let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
-    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
+    let context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
 
     let mut new_state = context.split_call_stub(&setup.state).unwrap();
 
@@ -982,7 +895,14 @@ fn splitting_return_stub() {
     let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
-    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
+    let context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
 
     // Set pi_state to check for memory pointers
     let mut new_state = context
@@ -1040,8 +960,17 @@ fn updating_call_stub() {
     let mut string_symbols: HashMap<Tid, &ExternSymbol> = HashMap::new();
     let sprintf = &ExternSymbol::mock_string();
     string_symbols.insert(Tid::new("sprintf"), sprintf);
+    let mut format_string_index: HashMap<String, usize> = HashMap::new();
+    format_string_index.insert("sprintf".to_string(), 1);
 
-    let context = Context::mock(&setup.project, string_symbols, &pi_results, &mem_image);
+    let context = Context::mock(
+        &setup.project,
+        string_symbols,
+        HashMap::new(),
+        format_string_index,
+        &pi_results,
+        &mem_image,
+    );
     let current_sub = Sub::mock("func");
     setup.state.set_current_sub(&current_sub);
 
@@ -1055,14 +984,8 @@ fn updating_call_stub() {
         new_state.address_points_to_taint(setup.base_eight_offset, &setup.pi_state),
         false
     );
-    assert_eq!(
-        new_state.get_register_taint(&rdi_reg),
-        Some(&Taint::Tainted(rdi_reg.size))
-    );
-    assert_eq!(
-        new_state.get_register_taint(&rsi_reg),
-        Some(&Taint::Tainted(rsi_reg.size))
-    );
+    assert_eq!(new_state.get_register_taint(&rdi_reg), None,);
+    assert_eq!(new_state.get_register_taint(&rsi_reg), None,);
     assert_eq!(
         new_state.get_register_taint(&rbp_reg),
         Some(&Taint::Tainted(rbp_reg.size))
@@ -1087,7 +1010,14 @@ fn specializing_conditional() {
     let mut pi_results = PointerInferenceComputation::mock(&setup.project, &mem_image, &graph);
     pi_results.compute();
 
-    let context = Context::mock(&setup.project, HashMap::new(), &pi_results, &mem_image);
+    let context = Context::mock(
+        &setup.project,
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        &pi_results,
+        &mem_image,
+    );
 
     let mut new_state = context.split_call_stub(&setup.state).unwrap();
 
