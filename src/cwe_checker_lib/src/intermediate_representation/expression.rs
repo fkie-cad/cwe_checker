@@ -198,6 +198,27 @@ impl Expression {
         }
     }
 
+    /// Substitute every occurence of `input_var` in `self` with the given `replace_with_expression`.
+    pub fn substitute_input_var(
+        &mut self,
+        input_var: &Variable,
+        replace_with_expression: &Expression,
+    ) {
+        use Expression::*;
+        match self {
+            Const(_) | Unknown { .. } => (),
+            Var(var) if var == input_var => *self = replace_with_expression.clone(),
+            Var(_) => (),
+            Subpiece { arg, .. } | Cast { arg, .. } | UnOp { arg, .. } => {
+                arg.substitute_input_var(input_var, replace_with_expression);
+            }
+            BinOp { lhs, rhs, .. } => {
+                lhs.substitute_input_var(input_var, replace_with_expression);
+                rhs.substitute_input_var(input_var, replace_with_expression);
+            }
+        }
+    }
+
     /// This function checks for sub registers in pcode instruction and casts them into
     /// SUBPIECE expressions with the base register as argument. It also checks whether
     /// the given Term<Def> has a output sub register and if so, casts it into its
