@@ -38,12 +38,37 @@ impl ExternSymbol {
             has_var_args: true,
         }
     }
+
+    pub fn mock_scanf() -> Self {
+        ExternSymbol {
+            tid: Tid::new("scanf"),
+            addresses: vec!["UNKNOWN".to_string()],
+            name: "scanf".to_string(),
+            calling_convention: Some("__stdcall".to_string()),
+            parameters: vec![Arg::mock_register("RDI")],
+            return_values: vec![Arg::mock_register("RAX")],
+            no_return: false,
+            has_var_args: true,
+        }
+    }
+
+    pub fn mock_sscanf() -> Self {
+        ExternSymbol {
+            tid: Tid::new("sscanf"),
+            addresses: vec!["UNKNOWN".to_string()],
+            name: "sscanf".to_string(),
+            calling_convention: Some("__stdcall".to_string()),
+            parameters: vec![Arg::mock_register("RDI"), Arg::mock_register("RSI")],
+            return_values: vec![Arg::mock_register("RAX")],
+            no_return: false,
+            has_var_args: true,
+        }
+    }
 }
 pub struct Setup {
     pub project: Project,
     pub state: State,
     pub pi_state: PointerInferenceState,
-    pub string_sym: ExternSymbol,
     pub taint_source: Term<Jmp>,
     pub base_eight_offset: DataDomain<ValueDomain>,
     pub base_sixteen_offset: DataDomain<ValueDomain>,
@@ -104,7 +129,6 @@ impl Setup {
             project,
             state,
             pi_state,
-            string_sym: ExternSymbol::mock_string(),
             taint_source,
             base_eight_offset: Data::Pointer(PointerDomain::new(stack_id.clone(), bv(-8))),
             base_sixteen_offset: Data::Pointer(PointerDomain::new(stack_id.clone(), bv(-16))),
@@ -162,7 +186,7 @@ impl<'a> Context<'a> {
 
         let symbol_maps: SymbolMaps = SymbolMaps {
             string_symbol_map: string_symbols,
-            _user_input_symbol_map: user_input_symbols,
+            user_input_symbol_map: user_input_symbols,
             extern_symbol_map,
             format_string_index,
         };

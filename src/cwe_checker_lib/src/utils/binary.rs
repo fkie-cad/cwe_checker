@@ -325,6 +325,7 @@ pub mod tests {
                         write_flag: false,
                         execute_flag: false,
                     },
+                    // Contains strings: '/dev/sd%c%d' and 'cat %s'
                     MemorySegment {
                         bytes: [
                             0x2f, 0x64, 0x65, 0x76, 0x2f, 0x73, 0x64, 0x25, 0x63, 0x25, 0x64, 0x00,
