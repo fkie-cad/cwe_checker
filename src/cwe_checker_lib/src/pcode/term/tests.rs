@@ -600,7 +600,11 @@ fn extern_symbol_deserialization() {
             "#,
     )
     .unwrap();
-    let _: IrExternSymbol = symbol.into_ir_symbol(&setup.project);
+    let _: IrExternSymbol = symbol.into_ir_symbol(
+        &setup.project.register_calling_convention,
+        &setup.project.stack_pointer_register,
+        &setup.project.cpu_architecture,
+    );
 }
 
 #[test]
@@ -623,7 +627,12 @@ fn program_deserialization() {
             "#,
     )
     .unwrap();
-    let _: IrProgram = program_term.term.into_ir_program(10000, &setup.project);
+    let _: IrProgram = program_term.term.into_ir_program(
+        10000,
+        &setup.project.register_calling_convention,
+        &setup.project.stack_pointer_register,
+        &setup.project.cpu_architecture,
+    );
 }
 
 #[test]

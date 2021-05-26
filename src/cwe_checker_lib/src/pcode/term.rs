@@ -397,20 +397,25 @@ impl ExternSymbol {
     /// Artificially creates format string arguments as they are not detected by Ghidra.
     /// For scanf calls, the format string parameter is added to the function signature.
     /// For sscanf calls, the source and format string parameters are added to the function signature.
-    fn create_format_string_args_for_scanf_and_sscanf(&mut self, project: &Project) {
+    fn create_format_string_args_for_scanf_and_sscanf(
+        &mut self,
+        conventions: &[CallingConvention],
+        stack_pointer: &Variable,
+        cpu_arch: &str,
+    ) {
         let mut args: Vec<Arg> = Vec::new();
-        if project.cpu_architecture == "x86_32" {
-            args.push(ExternSymbol::create_stack_arg(project, 0));
+        if cpu_arch == "x86_32" {
+            args.push(ExternSymbol::create_stack_arg(stack_pointer, 0));
             if self.name == "sscanf" || self.name == "__isoc99_sscanf" {
                 args.push(ExternSymbol::create_stack_arg(
-                    project,
-                    project.stack_pointer_register.size.as_bit_length(),
+                    stack_pointer,
+                    stack_pointer.size.as_bit_length(),
                 ));
             }
         } else {
-            args.push(self.create_register_arg(project, 0));
+            args.push(self.create_register_arg(0, conventions, stack_pointer));
             if self.name == "sscanf" || self.name == "__isoc99_sscanf" {
-                args.push(self.create_register_arg(project, 1));
+                args.push(self.create_register_arg(1, conventions, stack_pointer));
             }
         }
 
@@ -418,9 +423,13 @@ impl ExternSymbol {
     }
 
     /// Matches the symbol's calling convention name and returns the desired integer parameter by index.
-    fn get_symbol_parameter_by_index(&self, project: &Project, index: usize) -> Option<String> {
+    fn get_symbol_parameter_by_index(
+        &self,
+        conventions: &[CallingConvention],
+        index: usize,
+    ) -> Option<String> {
         if let Some(cconv) = self.calling_convention.clone() {
-            for convention in project.register_calling_convention.iter() {
+            for convention in conventions.iter() {
                 if convention.name == cconv {
                     return Some(
                         convention
@@ -439,7 +448,7 @@ impl ExternSymbol {
     /// Creates a stack argument for scanf or sscanf calls.
     /// The address differs for both calls since the format string parameter is
     /// at a different position.
-    fn create_stack_arg(project: &Project, address: usize) -> Arg {
+    fn create_stack_arg(stack_pointer: &Variable, address: usize) -> Arg {
         Arg {
             var: None,
             location: Some(Expression {
@@ -447,12 +456,12 @@ impl ExternSymbol {
                 input0: Some(Variable {
                     name: None,
                     value: None,
-                    address: Some(
-                        address
-                            .to_string()
-                            .repeat(project.stack_pointer_register.size.as_bit_length()),
-                    ),
-                    size: project.stack_pointer_register.size,
+                    address: Some(format!(
+                        "{:0width$x}",
+                        address,
+                        width = stack_pointer.size.as_bit_length()
+                    )),
+                    size: stack_pointer.size,
                     is_virtual: false,
                 }),
                 input1: None,
@@ -464,13 +473,18 @@ impl ExternSymbol {
 
     /// Creates a register argument for scanf and sscanf calls.
     /// The format string index is different for each call.
-    fn create_register_arg(&self, project: &Project, index: usize) -> Arg {
+    fn create_register_arg(
+        &self,
+        index: usize,
+        conventions: &[CallingConvention],
+        stack_pointer: &Variable,
+    ) -> Arg {
         Arg {
             var: Some(Variable {
-                name: self.get_symbol_parameter_by_index(project, index),
+                name: self.get_symbol_parameter_by_index(conventions, index),
                 value: None,
                 address: None,
-                size: project.stack_pointer_register.size,
+                size: stack_pointer.size,
                 is_virtual: false,
             }),
             location: None,
@@ -487,12 +501,21 @@ impl ExternSymbol {
     }
 
     /// Convert an extern symbol parsed from Ghidra to the internally used IR.
-    fn into_ir_symbol(self, project: &Project) -> IrExternSymbol {
+    fn into_ir_symbol(
+        self,
+        conventions: &[CallingConvention],
+        stack_pointer: &Variable,
+        cpu_arch: &str,
+    ) -> IrExternSymbol {
         let mut symbol = self.clone();
         let mut parameters = Vec::new();
         let mut return_values = Vec::new();
-        if symbol.is_scanf_or_sscanf() {
-            symbol.create_format_string_args_for_scanf_and_sscanf(project);
+        if symbol.is_scanf_or_sscanf() && symbol.arguments.is_empty() {
+            symbol.create_format_string_args_for_scanf_and_sscanf(
+                conventions,
+                stack_pointer,
+                cpu_arch,
+            );
         }
         for arg in symbol.arguments.iter() {
             let ir_arg = if let Some(var) = arg.var.clone() {
@@ -524,10 +547,10 @@ impl ExternSymbol {
             }
         }
         IrExternSymbol {
-            tid: self.tid.clone(),
-            addresses: self.addresses.clone(),
-            name: self.name.clone(),
-            calling_convention: self.calling_convention.clone(),
+            tid: self.tid,
+            addresses: self.addresses,
+            name: self.name,
+            calling_convention: self.calling_convention,
             parameters,
             return_values,
             no_return: self.no_return,
@@ -560,16 +583,22 @@ impl Program {
     /// It is needed to detect whether Ghidra added a constant offset to all addresses of the memory address.
     /// E.g. if the `binary_base_address` is 0 for shared object files,
     /// Ghidra adds an offset so that the memory image does not actually start at address 0.
-    pub fn into_ir_program(self, binary_base_address: u64, project: &Project) -> IrProgram {
+    pub fn into_ir_program(
+        self,
+        binary_base_address: u64,
+        conventions: &[CallingConvention],
+        stack_pointer: &Variable,
+        cpu_arch: &str,
+    ) -> IrProgram {
         let subs = self
             .subs
             .into_iter()
-            .map(|sub| sub.into_ir_sub_term(project.stack_pointer_register.size))
+            .map(|sub| sub.into_ir_sub_term(stack_pointer.size))
             .collect();
         let extern_symbols = self
             .extern_symbols
             .into_iter()
-            .map(|symbol| symbol.into_ir_symbol(&project))
+            .map(|symbol| symbol.into_ir_symbol(conventions, stack_pointer, cpu_arch))
             .collect();
         let address_base_offset =
             u64::from_str_radix(&self.image_base, 16).unwrap() - binary_base_address;
@@ -636,12 +665,13 @@ impl Project {
     /// according to the program headers of the binary.
     pub fn into_ir_project(self, binary_base_address: u64) -> IrProject {
         let mut program: Term<IrProgram> = Term {
-            tid: self.program.tid.clone(),
-            term: self
-                .program
-                .term
-                .clone()
-                .into_ir_program(binary_base_address, &self),
+            tid: self.program.tid,
+            term: self.program.term.into_ir_program(
+                binary_base_address,
+                &self.register_calling_convention,
+                &self.stack_pointer_register,
+                &self.cpu_architecture,
+            ),
         };
         let register_map: HashMap<&String, &RegisterProperties> = self
             .register_properties
@@ -749,8 +779,8 @@ impl Project {
             .collect();
         IrProject {
             program,
-            cpu_architecture: self.cpu_architecture.clone(),
-            stack_pointer_register: self.stack_pointer_register.clone().into(),
+            cpu_architecture: self.cpu_architecture,
+            stack_pointer_register: self.stack_pointer_register.into(),
             calling_conventions: self
                 .register_calling_convention
                 .clone()
