@@ -560,6 +560,7 @@ fn sub_deserialization() {
 
 #[test]
 fn extern_symbol_deserialization() {
+    let setup = Setup::new();
     let symbol: ExternSymbol = serde_json::from_str(
         r#"
             {
@@ -599,11 +600,16 @@ fn extern_symbol_deserialization() {
             "#,
     )
     .unwrap();
-    let _: IrExternSymbol = symbol.into();
+    let _: IrExternSymbol = symbol.into_ir_symbol(
+        &setup.project.register_calling_convention,
+        &setup.project.stack_pointer_register,
+        &setup.project.cpu_architecture,
+    );
 }
 
 #[test]
 fn program_deserialization() {
+    let setup = Setup::new();
     let program_term: Term<Program> = serde_json::from_str(
         r#"
             {
@@ -621,7 +627,12 @@ fn program_deserialization() {
             "#,
     )
     .unwrap();
-    let _: IrProgram = program_term.term.into_ir_program(10000, ByteSize::new(8));
+    let _: IrProgram = program_term.term.into_ir_program(
+        10000,
+        &setup.project.register_calling_convention,
+        &setup.project.stack_pointer_register,
+        &setup.project.cpu_architecture,
+    );
 }
 
 #[test]

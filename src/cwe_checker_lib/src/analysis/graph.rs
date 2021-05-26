@@ -100,6 +100,18 @@ impl<'a> Node<'a> {
             }
         }
     }
+
+    /// Get the sub corresponding to the node for `BlkStart` and `BlkEnd` nodes.
+    /// panics if called on a `CallReturn` node.
+    pub fn get_sub(&self) -> &'a Term<Sub> {
+        use Node::*;
+        match self {
+            BlkStart(_blk, sub) | BlkEnd(_blk, sub) => sub,
+            CallSource { .. } | CallReturn { .. } => {
+                panic!("get_sub() is undefined for CallReturn and CallSource nodes")
+            }
+        }
+    }
 }
 
 impl<'a> std::fmt::Display for Node<'a> {

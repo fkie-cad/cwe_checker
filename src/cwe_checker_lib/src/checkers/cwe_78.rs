@@ -222,7 +222,7 @@ fn get_entry_sub_to_entry_node_map(
 ///     - Maps a symbol name to the index of its format string parameter.
 pub struct SymbolMaps<'a> {
     string_symbol_map: HashMap<Tid, &'a ExternSymbol>,
-    _user_input_symbol_map: HashMap<Tid, &'a ExternSymbol>,
+    user_input_symbol_map: HashMap<Tid, &'a ExternSymbol>,
     extern_symbol_map: HashMap<Tid, &'a ExternSymbol>,
     format_string_index: HashMap<String, usize>,
 }
@@ -239,7 +239,7 @@ impl<'a> SymbolMaps<'a> {
                 project,
                 &config.string_symbols[..],
             ),
-            _user_input_symbol_map: crate::utils::symbol_utils::get_symbol_map(
+            user_input_symbol_map: crate::utils::symbol_utils::get_symbol_map(
                 project,
                 &config.user_input_symbols[..],
             ),

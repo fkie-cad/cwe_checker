@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::usize;
 
 use super::{Expression, ExpressionType, RegisterProperties, Variable};
 use crate::intermediate_representation::Arg as IrArg;
@@ -392,15 +393,139 @@ pub struct ExternSymbol {
     pub has_var_args: bool,
 }
 
-impl From<ExternSymbol> for IrExternSymbol {
+impl ExternSymbol {
+    /// Artificially creates format string arguments as they are not detected by Ghidra.
+    /// For scanf calls, the format string parameter is added to the function signature.
+    /// For sscanf calls, the source and format string parameters are added to the function signature.
+    fn create_format_string_args_for_scanf_and_sscanf(
+        &mut self,
+        conventions: &[CallingConvention],
+        stack_pointer: &Variable,
+        cpu_arch: &str,
+    ) {
+        let mut args: Vec<Arg> = Vec::new();
+        if cpu_arch == "x86_32" {
+            args.push(ExternSymbol::create_stack_arg(stack_pointer, 0));
+            if self.name == "sscanf" || self.name == "__isoc99_sscanf" {
+                args.push(ExternSymbol::create_stack_arg(
+                    stack_pointer,
+                    stack_pointer.size.as_bit_length(),
+                ));
+            }
+        } else {
+            args.push(self.create_register_arg(0, conventions, stack_pointer));
+            if self.name == "sscanf" || self.name == "__isoc99_sscanf" {
+                args.push(self.create_register_arg(1, conventions, stack_pointer));
+            }
+        }
+
+        self.arguments.append(&mut args);
+    }
+
+    /// Matches the symbol's calling convention name and returns the desired integer parameter by index.
+    fn get_symbol_parameter_by_index(
+        &self,
+        conventions: &[CallingConvention],
+        index: usize,
+    ) -> Option<String> {
+        if let Some(cconv) = self.calling_convention.clone() {
+            for convention in conventions.iter() {
+                if convention.name == cconv {
+                    return Some(
+                        convention
+                            .integer_parameter_register
+                            .get(index)
+                            .unwrap()
+                            .clone(),
+                    );
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Creates a stack argument for scanf or sscanf calls.
+    /// The address differs for both calls since the format string parameter is
+    /// at a different position.
+    fn create_stack_arg(stack_pointer: &Variable, address: usize) -> Arg {
+        Arg {
+            var: None,
+            location: Some(Expression {
+                mnemonic: ExpressionType::LOAD,
+                input0: Some(Variable {
+                    name: None,
+                    value: None,
+                    address: Some(format!(
+                        "{:0width$x}",
+                        address,
+                        width = stack_pointer.size.as_bit_length()
+                    )),
+                    size: stack_pointer.size,
+                    is_virtual: false,
+                }),
+                input1: None,
+                input2: None,
+            }),
+            intent: ArgIntent::INPUT,
+        }
+    }
+
+    /// Creates a register argument for scanf and sscanf calls.
+    /// The format string index is different for each call.
+    fn create_register_arg(
+        &self,
+        index: usize,
+        conventions: &[CallingConvention],
+        stack_pointer: &Variable,
+    ) -> Arg {
+        Arg {
+            var: Some(Variable {
+                name: self.get_symbol_parameter_by_index(conventions, index),
+                value: None,
+                address: None,
+                size: stack_pointer.size,
+                is_virtual: false,
+            }),
+            location: None,
+            intent: ArgIntent::INPUT,
+        }
+    }
+
+    /// Matches the symbols name with either scanf or sscanf.
+    fn is_scanf_or_sscanf(&self) -> bool {
+        matches!(
+            self.name.as_str(),
+            "scanf" | "sscanf" | "__isoc99_scanf" | "__isoc99_sscanf"
+        )
+    }
+
     /// Convert an extern symbol parsed from Ghidra to the internally used IR.
-    fn from(symbol: ExternSymbol) -> IrExternSymbol {
+    fn into_ir_symbol(
+        self,
+        conventions: &[CallingConvention],
+        stack_pointer: &Variable,
+        cpu_arch: &str,
+    ) -> IrExternSymbol {
+        let mut symbol = self.clone();
         let mut parameters = Vec::new();
         let mut return_values = Vec::new();
-        for arg in symbol.arguments {
-            let ir_arg = if let Some(var) = arg.var {
+        let input_args: Vec<&Arg> = symbol
+            .arguments
+            .iter()
+            .filter(|arg| matches!(arg.intent, ArgIntent::INPUT))
+            .collect();
+        if symbol.is_scanf_or_sscanf() && input_args.is_empty() {
+            symbol.create_format_string_args_for_scanf_and_sscanf(
+                conventions,
+                stack_pointer,
+                cpu_arch,
+            );
+        }
+        for arg in symbol.arguments.iter() {
+            let ir_arg = if let Some(var) = arg.var.clone() {
                 IrArg::Register(var.into())
-            } else if let Some(expr) = arg.location {
+            } else if let Some(expr) = arg.location.clone() {
                 if expr.mnemonic == ExpressionType::LOAD {
                     IrArg::Stack {
                         offset: i64::from_str_radix(
@@ -427,14 +552,14 @@ impl From<ExternSymbol> for IrExternSymbol {
             }
         }
         IrExternSymbol {
-            tid: symbol.tid,
-            addresses: symbol.addresses,
-            name: symbol.name,
-            calling_convention: symbol.calling_convention,
+            tid: self.tid,
+            addresses: self.addresses,
+            name: self.name,
+            calling_convention: self.calling_convention,
             parameters,
             return_values,
-            no_return: symbol.no_return,
-            has_var_args: symbol.has_var_args,
+            no_return: self.no_return,
+            has_var_args: self.has_var_args,
         }
     }
 }
@@ -466,17 +591,19 @@ impl Program {
     pub fn into_ir_program(
         self,
         binary_base_address: u64,
-        generic_pointer_size: ByteSize,
+        conventions: &[CallingConvention],
+        stack_pointer: &Variable,
+        cpu_arch: &str,
     ) -> IrProgram {
         let subs = self
             .subs
             .into_iter()
-            .map(|sub| sub.into_ir_sub_term(generic_pointer_size))
+            .map(|sub| sub.into_ir_sub_term(stack_pointer.size))
             .collect();
         let extern_symbols = self
             .extern_symbols
             .into_iter()
-            .map(|symbol| symbol.into())
+            .map(|symbol| symbol.into_ir_symbol(conventions, stack_pointer, cpu_arch))
             .collect();
         let address_base_offset =
             u64::from_str_radix(&self.image_base, 16).unwrap() - binary_base_address;
@@ -544,10 +671,12 @@ impl Project {
     pub fn into_ir_project(self, binary_base_address: u64) -> IrProject {
         let mut program: Term<IrProgram> = Term {
             tid: self.program.tid,
-            term: self
-                .program
-                .term
-                .into_ir_program(binary_base_address, self.stack_pointer_register.size),
+            term: self.program.term.into_ir_program(
+                binary_base_address,
+                &self.register_calling_convention,
+                &self.stack_pointer_register,
+                &self.cpu_architecture,
+            ),
         };
         let register_map: HashMap<&String, &RegisterProperties> = self
             .register_properties
@@ -659,11 +788,12 @@ impl Project {
             stack_pointer_register: self.stack_pointer_register.into(),
             calling_conventions: self
                 .register_calling_convention
+                .clone()
                 .into_iter()
                 .map(|cconv| cconv.into())
                 .collect(),
             register_list,
-            datatype_properties: self.datatype_properties,
+            datatype_properties: self.datatype_properties.clone(),
         }
     }
 }

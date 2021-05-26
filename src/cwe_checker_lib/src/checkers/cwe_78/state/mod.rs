@@ -187,6 +187,16 @@ impl State {
         self.register_taint.iter()
     }
 
+    /// Remove all memory taints
+    pub fn remove_all_memory_taints(&mut self) {
+        self.memory_taint = HashMap::new();
+    }
+
+    /// Remove all register taints
+    pub fn remove_all_register_taints(&mut self) {
+        self.register_taint = HashMap::new();
+    }
+
     /// Gets the callee saved taints from the register taints.
     pub fn get_callee_saved_register_taints(
         &self,
