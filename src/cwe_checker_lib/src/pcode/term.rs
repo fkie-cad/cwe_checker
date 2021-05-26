@@ -510,7 +510,12 @@ impl ExternSymbol {
         let mut symbol = self.clone();
         let mut parameters = Vec::new();
         let mut return_values = Vec::new();
-        if symbol.is_scanf_or_sscanf() && symbol.arguments.is_empty() {
+        let input_args: Vec<&Arg> = symbol
+            .arguments
+            .iter()
+            .filter(|arg| matches!(arg.intent, ArgIntent::INPUT))
+            .collect();
+        if symbol.is_scanf_or_sscanf() && input_args.is_empty() {
             symbol.create_format_string_args_for_scanf_and_sscanf(
                 conventions,
                 stack_pointer,
