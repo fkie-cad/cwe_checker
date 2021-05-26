@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::usize;
 
 use super::{Expression, ExpressionType, RegisterProperties, Variable};
 use crate::intermediate_representation::Arg as IrArg;
@@ -392,15 +393,111 @@ pub struct ExternSymbol {
     pub has_var_args: bool,
 }
 
-impl From<ExternSymbol> for IrExternSymbol {
+impl ExternSymbol {
+    /// Artificially creates format string arguments as they are not detected by Ghidra.
+    /// For scanf calls, the format string parameter is added to the function signature.
+    /// For sscanf calls, the source and format string parameters are added to the function signature.
+    fn create_format_string_args_for_scanf_and_sscanf(&mut self, project: &Project) {
+        let mut args: Vec<Arg> = Vec::new();
+        if project.cpu_architecture == "x86_32" {
+            args.push(ExternSymbol::create_stack_arg(project, 0));
+            if self.name == "sscanf" || self.name == "__isoc99_sscanf" {
+                args.push(ExternSymbol::create_stack_arg(
+                    project,
+                    project.stack_pointer_register.size.as_bit_length(),
+                ));
+            }
+        } else {
+            args.push(self.create_register_arg(project, 0));
+            if self.name == "sscanf" || self.name == "__isoc99_sscanf" {
+                args.push(self.create_register_arg(project, 1));
+            }
+        }
+
+        self.arguments.append(&mut args);
+    }
+
+    /// Matches the symbol's calling convention name and returns the desired integer parameter by index.
+    fn get_symbol_parameter_by_index(&self, project: &Project, index: usize) -> Option<String> {
+        if let Some(cconv) = self.calling_convention.clone() {
+            for convention in project.register_calling_convention.iter() {
+                if convention.name == cconv {
+                    return Some(
+                        convention
+                            .integer_parameter_register
+                            .get(index)
+                            .unwrap()
+                            .clone(),
+                    );
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Creates a stack argument for scanf or sscanf calls.
+    /// The address differs for both calls since the format string parameter is
+    /// at a different position.
+    fn create_stack_arg(project: &Project, address: usize) -> Arg {
+        Arg {
+            var: None,
+            location: Some(Expression {
+                mnemonic: ExpressionType::LOAD,
+                input0: Some(Variable {
+                    name: None,
+                    value: None,
+                    address: Some(
+                        address
+                            .to_string()
+                            .repeat(project.stack_pointer_register.size.as_bit_length()),
+                    ),
+                    size: project.stack_pointer_register.size,
+                    is_virtual: false,
+                }),
+                input1: None,
+                input2: None,
+            }),
+            intent: ArgIntent::INPUT,
+        }
+    }
+
+    /// Creates a register argument for scanf and sscanf calls.
+    /// The format string index is different for each call.
+    fn create_register_arg(&self, project: &Project, index: usize) -> Arg {
+        Arg {
+            var: Some(Variable {
+                name: self.get_symbol_parameter_by_index(project, index),
+                value: None,
+                address: None,
+                size: project.stack_pointer_register.size,
+                is_virtual: false,
+            }),
+            location: None,
+            intent: ArgIntent::INPUT,
+        }
+    }
+
+    /// Matches the symbols name with either scanf or sscanf.
+    fn is_scanf_or_sscanf(&self) -> bool {
+        matches!(
+            self.name.as_str(),
+            "scanf" | "sscanf" | "__isoc99_scanf" | "__isoc99_sscanf"
+        )
+    }
+
     /// Convert an extern symbol parsed from Ghidra to the internally used IR.
-    fn from(symbol: ExternSymbol) -> IrExternSymbol {
+    fn into_ir_symbol(self, project: &Project) -> IrExternSymbol {
+        let mut symbol = self.clone();
         let mut parameters = Vec::new();
         let mut return_values = Vec::new();
-        for arg in symbol.arguments {
-            let ir_arg = if let Some(var) = arg.var {
+        if symbol.is_scanf_or_sscanf() {
+            symbol.create_format_string_args_for_scanf_and_sscanf(project);
+        }
+        for arg in symbol.arguments.iter() {
+            let ir_arg = if let Some(var) = arg.var.clone() {
                 IrArg::Register(var.into())
-            } else if let Some(expr) = arg.location {
+            } else if let Some(expr) = arg.location.clone() {
                 if expr.mnemonic == ExpressionType::LOAD {
                     IrArg::Stack {
                         offset: i64::from_str_radix(
@@ -427,14 +524,14 @@ impl From<ExternSymbol> for IrExternSymbol {
             }
         }
         IrExternSymbol {
-            tid: symbol.tid,
-            addresses: symbol.addresses,
-            name: symbol.name,
-            calling_convention: symbol.calling_convention,
+            tid: self.tid.clone(),
+            addresses: self.addresses.clone(),
+            name: self.name.clone(),
+            calling_convention: self.calling_convention.clone(),
             parameters,
             return_values,
-            no_return: symbol.no_return,
-            has_var_args: symbol.has_var_args,
+            no_return: self.no_return,
+            has_var_args: self.has_var_args,
         }
     }
 }
@@ -463,20 +560,16 @@ impl Program {
     /// It is needed to detect whether Ghidra added a constant offset to all addresses of the memory address.
     /// E.g. if the `binary_base_address` is 0 for shared object files,
     /// Ghidra adds an offset so that the memory image does not actually start at address 0.
-    pub fn into_ir_program(
-        self,
-        binary_base_address: u64,
-        generic_pointer_size: ByteSize,
-    ) -> IrProgram {
+    pub fn into_ir_program(self, binary_base_address: u64, project: &Project) -> IrProgram {
         let subs = self
             .subs
             .into_iter()
-            .map(|sub| sub.into_ir_sub_term(generic_pointer_size))
+            .map(|sub| sub.into_ir_sub_term(project.stack_pointer_register.size))
             .collect();
         let extern_symbols = self
             .extern_symbols
             .into_iter()
-            .map(|symbol| symbol.into())
+            .map(|symbol| symbol.into_ir_symbol(&project))
             .collect();
         let address_base_offset =
             u64::from_str_radix(&self.image_base, 16).unwrap() - binary_base_address;
@@ -543,11 +636,12 @@ impl Project {
     /// according to the program headers of the binary.
     pub fn into_ir_project(self, binary_base_address: u64) -> IrProject {
         let mut program: Term<IrProgram> = Term {
-            tid: self.program.tid,
+            tid: self.program.tid.clone(),
             term: self
                 .program
                 .term
-                .into_ir_program(binary_base_address, self.stack_pointer_register.size),
+                .clone()
+                .into_ir_program(binary_base_address, &self),
         };
         let register_map: HashMap<&String, &RegisterProperties> = self
             .register_properties
@@ -655,15 +749,16 @@ impl Project {
             .collect();
         IrProject {
             program,
-            cpu_architecture: self.cpu_architecture,
-            stack_pointer_register: self.stack_pointer_register.into(),
+            cpu_architecture: self.cpu_architecture.clone(),
+            stack_pointer_register: self.stack_pointer_register.clone().into(),
             calling_conventions: self
                 .register_calling_convention
+                .clone()
                 .into_iter()
                 .map(|cconv| cconv.into())
                 .collect(),
             register_list,
-            datatype_properties: self.datatype_properties,
+            datatype_properties: self.datatype_properties.clone(),
         }
     }
 }

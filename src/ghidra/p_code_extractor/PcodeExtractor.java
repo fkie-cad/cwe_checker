@@ -50,7 +50,7 @@ public class PcodeExtractor extends GhidraScript {
         TermCreator.symTab = currentProgram.getSymbolTable();
         Term<Program> program = TermCreator.createProgramTerm();
         Project project = createProject(program);
-        ExternSymbolCreator.createExternalSymbolMap(TermCreator.symTab, project);
+        ExternSymbolCreator.createExternalSymbolMap(TermCreator.symTab);
         program = iterateFunctions(simpleBM, listing, program);
         program.getTerm().setExternSymbols(new ArrayList<ExternSymbol>(ExternSymbolCreator.externalSymbolMap.values()));
 

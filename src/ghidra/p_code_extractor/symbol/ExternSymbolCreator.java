@@ -7,11 +7,9 @@ import java.util.Map;
 import bil.Expression;
 import bil.Variable;
 import internal.HelperFunctions;
-import internal.RegisterConvention;
 import internal.TermCreator;
 import term.Arg;
 import term.Tid;
-import term.Project;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.listing.Function;
 import ghidra.program.model.listing.FunctionManager;
@@ -35,7 +33,7 @@ public class ExternSymbolCreator {
      * 
      * Creates a map of external symbols to add to the program term
      */
-    public static void createExternalSymbolMap(SymbolTable symTab, Project project) {
+    public static void createExternalSymbolMap(SymbolTable symTab) {
         HashMap<String, ArrayList<Function>> symbolMap = new HashMap<String, ArrayList<Function>>();
         HelperFunctions.funcMan.getExternalFunctions().forEach(func -> {
             ArrayList<Function> thunkFuncs = new ArrayList<Function>();
@@ -49,7 +47,7 @@ public class ExternSymbolCreator {
             }
         });
 
-        createExternalSymbols(symbolMap, project);
+        createExternalSymbols(symbolMap);
     }
 
 
@@ -93,7 +91,7 @@ public class ExternSymbolCreator {
      * 
      * Creates external symbol map with an unique TID, a calling convention and argument objects.
      */
-    public static void createExternalSymbols(HashMap<String, ArrayList<Function>> symbolMap, Project project) {
+    public static void createExternalSymbols(HashMap<String, ArrayList<Function>> symbolMap) {
         for(Map.Entry<String, ArrayList<Function>> functions : symbolMap.entrySet()) {
             ExternSymbol extSym = new ExternSymbol();
             extSym.setName(functions.getKey());
@@ -101,7 +99,7 @@ public class ExternSymbolCreator {
                 if(HelperFunctions.sameSymbolNameNotCallingCurrentSymbol(func)) {
                     extSym.setTid(new Tid(String.format("sub_%s", func.getEntryPoint().toString()), func.getEntryPoint().toString()));
                     extSym.setNoReturn(func.hasNoReturn());
-                    extSym.setArguments(createArguments(func, project));
+                    extSym.setArguments(createArguments(func));
                     extSym.setCallingConvention(HelperFunctions.funcMan.getDefaultCallingConvention().toString());
                     extSym.setHasVarArgs(func.hasVarArgs());
                 }
@@ -162,18 +160,11 @@ public class ExternSymbolCreator {
      * 
      * Creates Arguments for the ExternSymbol object.
      */
-    public static ArrayList<Arg> createArguments(Function func, Project project) {
+    public static ArrayList<Arg> createArguments(Function func) {
         ArrayList<Arg> args = new ArrayList<Arg>();
-        if (isScanf(func) || isSscanf(func)) {
-            Arg arg = addArgForScanfAndSscanf(func, project);
-            if (arg != null) {
-                args.add(arg);
-            }
-        } else {
-            Parameter[] params = func.getParameters();
-            for (Parameter param : params) {
-                args.add(specifyArg(param));
-            }
+        Parameter[] params = func.getParameters();
+        for (Parameter param : params) {
+            args.add(specifyArg(param));
         }
         if (!HelperFunctions.hasVoidReturn(func)) {
             for(Varnode node : func.getReturn().getVariableStorage().getVarnodes()) {
@@ -182,72 +173,5 @@ public class ExternSymbolCreator {
         }
 
         return args;
-    }
-
-    /**
-     * 
-     * @param func: function that is checked for the name.
-     * @return: true if function is either scanf or sscanf.
-     * 
-     * Returns if function is either scanf or sscanf.
-     */
-    public static Boolean isScanf(Function func) {
-        if (func.getName().equals("scanf") || func.getName().equals("__isoc99_scanf")) {
-                return true;
-            }
-        
-        return false;
-    }
-
-    /**
-     * 
-     * @param func: function that is checked for the name.
-     * @return: true if function is scanf.
-     * 
-     * Returns if function is sscanf.
-     */
-    public static Boolean isSscanf(Function func) {
-        if (func.getName().equals("sscanf") || func.getName().equals("__isoc99_sscanf")) {
-            return true;
-        }
-
-        return false;
-    }
-
-    public static Arg addArgForScanfAndSscanf(Function func, Project project) {
-        for(RegisterConvention conv : project.getRegisterConvention()) {
-            if (conv.getCconv().equals(func.getDefaultCallingConventionName())) {
-                if (project.getCpuArch().equals("x86_32")) {
-                    Variable stack_var = new Variable();
-                    if (isSscanf(func)) {
-                        // Get the second stack parameter. Multiply the stack pointer size by two since both
-                        // parameters are string pointer.
-                        stack_var.setAddress(String.valueOf(project.getStackPointerRegister().getSize()*2));
-                    } else {
-                        stack_var.setAddress(String.valueOf(project.getStackPointerRegister().getSize()));
-                    }
-                    stack_var.setIsVirtual(false);
-                    return new Arg(
-                        new Expression("LOAD", stack_var),
-                        "INPUT"
-                    );
-                }
-                int parameter_index = 0;
-                if(isSscanf(func)) {
-                    parameter_index = 1;
-                }
-
-                return new Arg(
-                     new Variable(
-                        conv.getIntegerParameter().get(parameter_index), 
-                        project.getStackPointerRegister().getSize(), 
-                        false
-                    ), 
-                    "INPUT"
-                );
-            }
-        }
-
-        return null;
     }
 }
