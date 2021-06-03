@@ -1,13 +1,17 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    abstract_domain::{AbstractDomain, AbstractIdentifier, MemRegion, SizedDomain, TryToBitvec},
+    abstract_domain::{
+        AbstractDomain, AbstractIdentifier, DataDomain, IntervalDomain, MemRegion, SizedDomain,
+        TryToBitvec,
+    },
     analysis::pointer_inference::{Data, State as PointerInferenceState},
     checkers::cwe_476::Taint,
     intermediate_representation::{
         Arg, CallingConvention, Expression, ExternSymbol, Project, Sub, Variable,
     },
     prelude::*,
+    utils::binary::RuntimeMemoryImage,
 };
 
 #[derive(Serialize, Deserialize, Debug, Eq, Clone)]
@@ -17,7 +21,7 @@ pub struct State {
     /// The Taint contained in memory objects
     memory_taint: HashMap<AbstractIdentifier, MemRegion<Taint>>,
     /// The set of addresses in the binary where string constants reside
-    string_constants: HashSet<Bitvector>,
+    string_constants: HashSet<String>,
     /// A map from Def Tids to their corresponding pointer inference state.
     /// The pointer inference states are calculated in a forward manner
     /// from the BlkStart node when entering a BlkEnd node through a jump.
@@ -183,6 +187,16 @@ impl State {
         self.register_taint.iter()
     }
 
+    /// Remove all memory taints
+    pub fn remove_all_memory_taints(&mut self) {
+        self.memory_taint = HashMap::new();
+    }
+
+    /// Remove all register taints
+    pub fn remove_all_register_taints(&mut self) {
+        self.register_taint = HashMap::new();
+    }
+
     /// Gets the callee saved taints from the register taints.
     pub fn get_callee_saved_register_taints(
         &self,
@@ -206,10 +220,20 @@ impl State {
     }
 
     /// Gets the string constant saved at the given address and saves it to the string constants field.
-    pub fn evaluate_constant(&mut self, constant: Bitvector) {
-        // TODO: check whether the constant is a valid memory address in the binary
-        // If so, get the string constant at that memory address and save it in the state
-        self.string_constants.insert(constant);
+    pub fn evaluate_constant(
+        &mut self,
+        runtime_memory_image: &RuntimeMemoryImage,
+        constant: Bitvector,
+    ) {
+        if runtime_memory_image.is_global_memory_address(&constant) {
+            match runtime_memory_image.read_string_until_null_terminator(&constant) {
+                Ok(format_string) => {
+                    self.string_constants.insert(format_string.to_string());
+                }
+                // TODO: Change to log
+                Err(e) => panic!("{}", e),
+            }
+        }
     }
 
     /// Taints input registers and evaluates constant memory addresses for simple assignments
@@ -221,10 +245,13 @@ impl State {
         result: &Variable,
         expression: &Expression,
         stack_pointer_register: &Variable,
+        runtime_memory_image: &RuntimeMemoryImage,
     ) {
         self.remove_register_taint(result);
         match expression {
-            Expression::Const(constant) => self.evaluate_constant(constant.clone()),
+            Expression::Const(constant) => {
+                self.evaluate_constant(runtime_memory_image, constant.clone())
+            }
             Expression::Var(var) => self.taint_variable_input(var, stack_pointer_register, def_tid),
             Expression::BinOp { .. } => {
                 if let Some(pid_map) = self.pi_def_map.as_ref() {
@@ -236,9 +263,12 @@ impl State {
             }
             Expression::UnOp { arg, .. }
             | Expression::Cast { arg, .. }
-            | Expression::Subpiece { arg, .. } => {
-                self.taint_def_input_register(arg, stack_pointer_register, def_tid)
-            }
+            | Expression::Subpiece { arg, .. } => self.taint_def_input_register(
+                arg,
+                stack_pointer_register,
+                def_tid,
+                runtime_memory_image,
+            ),
             _ => (),
         }
     }
@@ -250,12 +280,18 @@ impl State {
         target: &Expression,
         value: &Expression,
         stack_pointer_register: &Variable,
+        runtime_memory_image: &RuntimeMemoryImage,
     ) {
         if let Some(pid_map) = self.pi_def_map.as_ref() {
             if let Some(pi_state) = pid_map.get(def_tid) {
                 let address = pi_state.eval(target);
                 if self.address_points_to_taint(address.clone(), &pi_state) {
-                    self.taint_def_input_register(value, stack_pointer_register, def_tid);
+                    self.taint_def_input_register(
+                        value,
+                        stack_pointer_register,
+                        def_tid,
+                        runtime_memory_image,
+                    );
                     self.remove_mem_taint_at_target(&address);
                 }
             }
@@ -268,20 +304,35 @@ impl State {
         expr: &Expression,
         stack_pointer_register: &Variable,
         def_tid: &Tid,
+        runtime_memory_image: &RuntimeMemoryImage,
     ) {
         match expr {
-            // TODO: Distinguish integer constants from global addresses in evaluate constant
-            Expression::Const(constant) => self.evaluate_constant(constant.clone()),
+            Expression::Const(constant) => {
+                self.evaluate_constant(runtime_memory_image, constant.clone())
+            }
             Expression::Var(var) => self.taint_variable_input(var, stack_pointer_register, def_tid),
             Expression::BinOp { lhs, rhs, .. } => {
-                self.taint_def_input_register(lhs, stack_pointer_register, def_tid);
-                self.taint_def_input_register(rhs, stack_pointer_register, def_tid);
+                self.taint_def_input_register(
+                    lhs,
+                    stack_pointer_register,
+                    def_tid,
+                    runtime_memory_image,
+                );
+                self.taint_def_input_register(
+                    rhs,
+                    stack_pointer_register,
+                    def_tid,
+                    runtime_memory_image,
+                );
             }
             Expression::UnOp { arg, .. }
             | Expression::Cast { arg, .. }
-            | Expression::Subpiece { arg, .. } => {
-                self.taint_def_input_register(arg, stack_pointer_register, def_tid)
-            }
+            | Expression::Subpiece { arg, .. } => self.taint_def_input_register(
+                arg,
+                stack_pointer_register,
+                def_tid,
+                runtime_memory_image,
+            ),
             _ => (),
         }
     }
@@ -396,6 +447,22 @@ impl State {
                 if register_names.get(&register.name).is_none() {
                     self.register_taint.remove(&register);
                 }
+            }
+        }
+    }
+
+    /// Removes the taint of a callee saved register if it was identified as the return target of
+    /// a string symbol.
+    pub fn remove_callee_saved_taint_if_destination_parameter(
+        &mut self,
+        destination_address: &DataDomain<IntervalDomain>,
+        pi_state: &PointerInferenceState,
+        standard_cconv: &CallingConvention,
+    ) {
+        for (var, _) in self.get_callee_saved_register_taints(standard_cconv).iter() {
+            let callee_saved_address = pi_state.eval(&Expression::Var(var.clone()));
+            if callee_saved_address == *destination_address {
+                self.remove_register_taint(var);
             }
         }
     }

@@ -515,5 +515,10 @@ mod tests {
             let (log_sender, _) = crossbeam_channel::unbounded();
             PointerInference::new(project, mem_image, graph, config, log_sender)
         }
+
+        pub fn set_node_value(&mut self, node_value: State, node_index: NodeIndex) {
+            self.computation
+                .set_node_value(node_index, NodeValue::Value(node_value));
+        }
     }
 }
