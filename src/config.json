@@ -25,6 +25,25 @@
       "__isoc99_sscanf": 1
     }
   },
+  "CWE134": {
+    "format_string_symbols": [
+      "sprintf",
+      "snprintf",
+      "printf",
+      "scanf",
+      "__isoc99_scanf",
+      "sscanf",
+      "__isoc99_sscanf"
+    ],
+    "format_string_index": {
+      "sprintf": 1,
+      "snprintf": 2,
+      "scanf": 0,
+      "__isoc99_scanf": 0,
+      "sscanf": 1,
+      "__isoc99_sscanf": 1
+    }
+  },
   "CWE190": {
     "symbols": [
       "xmalloc",
