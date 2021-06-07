@@ -122,6 +122,28 @@ impl Term<Def> {
             _ => None,
         }
     }
+
+    /// Substitute every occurence of `input_var` in the address and value expressions
+    /// with `replace_with_expression`.
+    /// Does not change the target variable of assignment- and load-instructions.
+    pub fn substitute_input_var(
+        &mut self,
+        input_var: &Variable,
+        replace_with_expression: &Expression,
+    ) {
+        match &mut self.term {
+            Def::Assign { var: _, value } => {
+                value.substitute_input_var(input_var, replace_with_expression)
+            }
+            Def::Load { var: _, address } => {
+                address.substitute_input_var(input_var, replace_with_expression)
+            }
+            Def::Store { address, value } => {
+                address.substitute_input_var(input_var, replace_with_expression);
+                value.substitute_input_var(input_var, replace_with_expression);
+            }
+        }
+    }
 }
 
 /// A `Jmp` instruction affects the control flow of a program, i.e. it may change the instruction pointer.
@@ -293,6 +315,125 @@ impl Term<Blk> {
         } else {
             Err(logs)
         }
+    }
+
+    /// Wherever possible, substitute input variables of expressions
+    /// with the input expression that defines the input variable.
+    ///
+    /// Note that substitution is only possible
+    /// if the input variables of the input expression itself did not change since the definition of said variable.
+    ///
+    /// The expression propagation allows the [`Project::substitute_trivial_expressions`] normalization pass
+    /// to further simplify the generated expressions
+    /// and allows more dead stores to be removed during [dead variable elimination](`crate::analysis::dead_variable_elimination`).
+    pub fn propagate_input_expressions(&mut self) {
+        let mut insertable_expressions = Vec::new();
+        for def in self.term.defs.iter_mut() {
+            match &mut def.term {
+                Def::Assign {
+                    var,
+                    value: expression,
+                } => {
+                    // insert known input expressions
+                    for (input_var, input_expr) in insertable_expressions.iter() {
+                        expression.substitute_input_var(input_var, input_expr);
+                    }
+                    // expressions dependent on the assigned variable are no longer insertable
+                    insertable_expressions.retain(|(input_var, input_expr)| {
+                        input_var != var && !input_expr.input_vars().into_iter().any(|x| x == var)
+                    });
+                    // If the value of the assigned variable does not depend on the former value of the variable,
+                    // then it is insertable for future expressions.
+                    if !expression.input_vars().into_iter().any(|x| x == var) {
+                        insertable_expressions.push((var.clone(), expression.clone()));
+                    }
+                }
+                Def::Load {
+                    var,
+                    address: expression,
+                } => {
+                    // insert known input expressions
+                    for (input_var, input_expr) in insertable_expressions.iter() {
+                        expression.substitute_input_var(input_var, input_expr);
+                    }
+                    // expressions dependent on the assigned variable are no longer insertable
+                    insertable_expressions.retain(|(input_var, input_expr)| {
+                        input_var != var && !input_expr.input_vars().into_iter().any(|x| x == var)
+                    });
+                }
+                Def::Store { address, value } => {
+                    // insert known input expressions
+                    for (input_var, input_expr) in insertable_expressions.iter() {
+                        address.substitute_input_var(input_var, input_expr);
+                        value.substitute_input_var(input_var, input_expr);
+                    }
+                }
+            }
+        }
+        for jump in self.term.jmps.iter_mut() {
+            match &mut jump.term {
+                Jmp::Branch(_) | Jmp::Call { .. } | Jmp::CallOther { .. } => (),
+                Jmp::BranchInd(expr)
+                | Jmp::CBranch {
+                    condition: expr, ..
+                }
+                | Jmp::CallInd { target: expr, .. }
+                | Jmp::Return(expr) => {
+                    // insert known input expressions
+                    for (input_var, input_expr) in insertable_expressions.iter() {
+                        expr.substitute_input_var(input_var, input_expr);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Merge subsequent assignments to the same variable to a single assignment to that variable.
+    ///
+    /// The value expressions of merged assignments can often be simplified later on
+    /// in the [`Project::substitute_trivial_expressions`] normalization pass.
+    pub fn merge_def_assignments_to_same_var(&mut self) {
+        let mut new_defs = Vec::new();
+        let mut last_def_opt = None;
+        for def in self.term.defs.iter() {
+            if let Def::Assign {
+                var: current_var, ..
+            } = &def.term
+            {
+                if let Some(Term {
+                    term:
+                        Def::Assign {
+                            var: last_var,
+                            value: last_value,
+                        },
+                    ..
+                }) = &last_def_opt
+                {
+                    if current_var == last_var {
+                        let mut substituted_def = def.clone();
+                        substituted_def.substitute_input_var(last_var, last_value);
+                        last_def_opt = Some(substituted_def);
+                    } else {
+                        new_defs.push(last_def_opt.unwrap());
+                        last_def_opt = Some(def.clone());
+                    }
+                } else if last_def_opt.is_some() {
+                    panic!(); // Only assign-defs should be saved in last_def.
+                } else {
+                    last_def_opt = Some(def.clone());
+                }
+            } else {
+                if let Some(last_def) = last_def_opt {
+                    new_defs.push(last_def);
+                }
+                new_defs.push(def.clone());
+                last_def_opt = None;
+            }
+        }
+        if let Some(last_def) = last_def_opt {
+            new_defs.push(last_def);
+        }
+        self.term.defs = new_defs;
     }
 }
 
@@ -563,14 +704,29 @@ impl Project {
         log_messages
     }
 
+    /// Propagate input expressions along variable assignments.
+    ///
+    /// The propagation only occurs inside basic blocks
+    /// but not across basic block boundaries.
+    fn propagate_input_expressions(&mut self) {
+        for sub in self.program.term.subs.iter_mut() {
+            for block in sub.term.blocks.iter_mut() {
+                block.merge_def_assignments_to_same_var();
+                block.propagate_input_expressions();
+            }
+        }
+    }
+
     /// Run some normalization passes over the project.
     ///
     /// Passes:
+    /// - Propagate input expressions along variable assignments.
     /// - Replace trivial expressions like `a XOR a` with their result.
     /// - Replace jumps to nonexisting TIDs with jumps to an artificial sink target in the CFG.
     /// - Remove dead register assignments
     #[must_use]
     pub fn normalize(&mut self) -> Vec<LogMessage> {
+        self.propagate_input_expressions();
         self.substitute_trivial_expressions();
         let logs = self.remove_references_to_nonexisting_tids();
         crate::analysis::dead_variable_elimination::remove_dead_var_assignments(self);
@@ -801,5 +957,72 @@ mod tests {
             non_zero_extend_def.check_for_zero_extension(String::from("RAX"), String::from("EAX")),
             None
         );
+    }
+
+    #[test]
+    fn expression_propagation() {
+        use crate::intermediate_representation::UnOpType;
+        let defs = vec![
+            Def::assign(
+                "tid_1",
+                Variable::mock("X", 8),
+                Expression::var("Y").un_op(UnOpType::IntNegate),
+            ),
+            Def::assign(
+                "tid_2",
+                Variable::mock("Y", 8),
+                Expression::var("X").plus(Expression::var("Y")),
+            ),
+            Def::assign(
+                "tid_3",
+                Variable::mock("X", 8),
+                Expression::var("X").un_op(UnOpType::IntNegate),
+            ),
+            Def::assign(
+                "tid_4",
+                Variable::mock("Y", 8),
+                Expression::var("Y").un_op(UnOpType::IntNegate),
+            ),
+            Def::assign(
+                "tid_5",
+                Variable::mock("Y", 8),
+                Expression::var("X").plus(Expression::var("Y")),
+            ),
+        ];
+        let mut block = Term {
+            tid: Tid::new("block"),
+            term: Blk {
+                defs,
+                jmps: Vec::new(),
+                indirect_jmp_targets: Vec::new(),
+            },
+        };
+        block.merge_def_assignments_to_same_var();
+        block.propagate_input_expressions();
+        let result_defs = vec![
+            Def::assign(
+                "tid_1",
+                Variable::mock("X", 8),
+                Expression::var("Y").un_op(UnOpType::IntNegate),
+            ),
+            Def::assign(
+                "tid_2",
+                Variable::mock("Y", 8),
+                Expression::var("Y")
+                    .un_op(UnOpType::IntNegate)
+                    .plus(Expression::var("Y")),
+            ),
+            Def::assign(
+                "tid_3",
+                Variable::mock("X", 8),
+                Expression::var("X").un_op(UnOpType::IntNegate),
+            ),
+            Def::assign(
+                "tid_5",
+                Variable::mock("Y", 8),
+                Expression::var("X").plus(Expression::var("Y").un_op(UnOpType::IntNegate)),
+            ),
+        ];
+        assert_eq!(block.term.defs, result_defs);
     }
 }

@@ -15,6 +15,7 @@ struct Setup<'a> {
     int_sub_subpiece_expr: Expression,
     eax_variable: Expression,
     rax_variable: Expression,
+    rcx_variable: Expression,
 }
 
 impl<'a> Setup<'a> {
@@ -99,6 +100,11 @@ impl<'a> Setup<'a> {
                 size: ByteSize::new(8),
                 is_temp: false,
             }),
+            rcx_variable: Expression::Var(Variable {
+                name: String::from("RCX"),
+                size: ByteSize::new(8),
+                is_temp: false,
+            }),
         }
     }
 }
@@ -123,6 +129,122 @@ fn trivial_expression_substitution() {
     };
     expr.substitute_trivial_operations();
     assert_eq!(expr, setup.rax_variable);
+
+    let sub_expr = Expression::BinOp {
+        lhs: Box::new(setup.rax_variable.clone()),
+        op: BinOpType::IntSub,
+        rhs: Box::new(setup.rcx_variable.clone()),
+    };
+    let mut expr = Expression::BinOp {
+        op: BinOpType::IntEqual,
+        lhs: Box::new(Expression::Const(Bitvector::zero(ByteSize::new(1).into()))),
+        rhs: Box::new(sub_expr.clone()),
+    };
+    expr.substitute_trivial_operations();
+    assert_eq!(
+        expr,
+        Expression::BinOp {
+            lhs: Box::new(setup.rax_variable.clone()),
+            op: BinOpType::IntEqual,
+            rhs: Box::new(setup.rcx_variable.clone()),
+        }
+    );
+    let mut expr = Expression::BinOp {
+        op: BinOpType::IntNotEqual,
+        lhs: Box::new(sub_expr.clone()),
+        rhs: Box::new(Expression::Const(Bitvector::zero(ByteSize::new(1).into()))),
+    };
+    expr.substitute_trivial_operations();
+    assert_eq!(
+        expr,
+        Expression::BinOp {
+            lhs: Box::new(setup.rax_variable.clone()),
+            op: BinOpType::IntNotEqual,
+            rhs: Box::new(setup.rcx_variable.clone()),
+        }
+    );
+
+    let mut expr = Expression::BinOp {
+        lhs: Box::new(Expression::BinOp {
+            lhs: Box::new(setup.rax_variable.clone()),
+            op: BinOpType::IntLess,
+            rhs: Box::new(setup.rcx_variable.clone()),
+        }),
+        op: BinOpType::BoolOr,
+        rhs: Box::new(Expression::BinOp {
+            lhs: Box::new(setup.rax_variable.clone()),
+            op: BinOpType::IntEqual,
+            rhs: Box::new(setup.rcx_variable.clone()),
+        }),
+    };
+    expr.substitute_trivial_operations();
+    assert_eq!(
+        expr,
+        Expression::BinOp {
+            lhs: Box::new(setup.rax_variable.clone()),
+            op: BinOpType::IntLessEqual,
+            rhs: Box::new(setup.rcx_variable.clone()),
+        }
+    );
+
+    let mut expr = Expression::Subpiece {
+        low_byte: ByteSize::new(0),
+        size: ByteSize::new(4),
+        arg: Box::new(Expression::Cast {
+            op: CastOpType::IntSExt,
+            size: ByteSize::new(8),
+            arg: Box::new(Expression::Var(Variable::mock("EAX", 4))),
+        }),
+    };
+    expr.substitute_trivial_operations();
+    assert_eq!(expr, Expression::Var(Variable::mock("EAX", 4)));
+    let mut expr = Expression::Subpiece {
+        low_byte: ByteSize::new(4),
+        size: ByteSize::new(4),
+        arg: Box::new(Expression::BinOp {
+            op: BinOpType::Piece,
+            lhs: Box::new(Expression::Var(Variable::mock("EAX", 4))),
+            rhs: Box::new(Expression::Var(Variable::mock("EBX", 4))),
+        }),
+    };
+    expr.substitute_trivial_operations();
+    assert_eq!(expr, Expression::Var(Variable::mock("EAX", 4)));
+    let mut expr = Expression::Subpiece {
+        low_byte: ByteSize::new(0),
+        size: ByteSize::new(4),
+        arg: Box::new(Expression::Subpiece {
+            low_byte: ByteSize::new(2),
+            size: ByteSize::new(6),
+            arg: Box::new(Expression::Var(Variable::mock("RAX", 8))),
+        }),
+    };
+    expr.substitute_trivial_operations();
+    assert_eq!(
+        expr,
+        Expression::Subpiece {
+            low_byte: ByteSize::new(2),
+            size: ByteSize::new(4),
+            arg: Box::new(Expression::Var(Variable::mock("RAX", 8))),
+        }
+    );
+
+    let mut expr = Expression::UnOp {
+        op: UnOpType::BoolNegate,
+        arg: Box::new(Expression::BinOp {
+            lhs: Box::new(setup.rax_variable.clone()),
+            op: BinOpType::IntLess,
+            rhs: Box::new(setup.rcx_variable.clone()),
+        }),
+    };
+    expr.substitute_trivial_operations();
+    assert_eq!(
+        expr,
+        Expression::BinOp {
+            lhs: Box::new(setup.rcx_variable.clone()),
+            op: BinOpType::IntLessEqual,
+            rhs: Box::new(setup.rax_variable.clone()),
+        }
+    );
 }
 
 #[test]
