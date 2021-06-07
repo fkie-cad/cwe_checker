@@ -1,5 +1,4 @@
 use super::*;
-use std::collections::HashSet;
 
 impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
     type Value = State;
