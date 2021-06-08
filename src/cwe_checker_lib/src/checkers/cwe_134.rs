@@ -98,6 +98,8 @@ pub fn check_cwe(
                         &project.stack_pointer_register,
                     );
 
+                    println!("LOCATION: {:?}", location);
+
                     if matches!(
                         location,
                         StringLocation::GlobalWriteable | StringLocation::NonGlobal
@@ -145,10 +147,9 @@ fn locate_format_string(
 
                     return StringLocation::GlobalReadable;
                 }
-
-                return StringLocation::NonGlobal;
             }
         }
+        return StringLocation::NonGlobal;
     }
 
     StringLocation::Unknown
