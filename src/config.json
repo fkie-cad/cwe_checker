@@ -38,6 +38,7 @@
     "format_string_index": {
       "sprintf": 1,
       "snprintf": 2,
+      "printf": 0,
       "scanf": 0,
       "__isoc99_scanf": 0,
       "sscanf": 1,
