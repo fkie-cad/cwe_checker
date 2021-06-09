@@ -66,10 +66,6 @@ impl State {
 
         None
     }
-
-    pub fn remove_all_register_taints(&mut self) {
-        self.register_taint = HashMap::new();
-    }
 }
 
 struct Setup {

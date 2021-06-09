@@ -1,5 +1,4 @@
 use super::*;
-use std::collections::HashSet;
 
 impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
     type Value = State;
@@ -346,52 +345,18 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
     /// Update the state with the knowledge that some conditional evaluated to true or false.
     fn specialize_conditional(
         &self,
-        value: &State,
+        state: &State,
         condition: &Expression,
-        block_before_condition: &Term<Blk>,
+        _block_before_condition: &Term<Blk>,
         is_true: bool,
     ) -> Option<State> {
-        let mut specialized_state = value.clone();
+        let mut specialized_state = state.clone();
         if specialized_state
             .specialize_by_expression_result(condition, Bitvector::from_u8(is_true as u8).into())
             .is_err()
         {
             // State is unsatisfiable
             return None;
-        }
-        let mut modified_vars: HashSet<Variable> = HashSet::new();
-        for def in block_before_condition.term.defs.iter().rev() {
-            match &def.term {
-                Def::Store { .. } => (),
-                Def::Load { var, .. } => {
-                    modified_vars.insert(var.clone());
-                }
-                Def::Assign {
-                    var,
-                    value: input_expr,
-                } => {
-                    if !modified_vars.contains(var) {
-                        // Register is not modified again between the `Def` and the end of the block.
-                        modified_vars.insert(var.clone());
-                        if input_expr
-                            .input_vars()
-                            .into_iter()
-                            .find(|input_var| modified_vars.contains(input_var))
-                            .is_none()
-                        {
-                            // Values of input registers did not change between the `Def` and the end of the block.
-                            let expr_result = specialized_state.get_register(var);
-                            if specialized_state
-                                .specialize_by_expression_result(input_expr, expr_result.clone())
-                                .is_err()
-                            {
-                                // State is unsatisfiable
-                                return None;
-                            }
-                        }
-                    }
-                }
-            }
         }
         Some(specialized_state)
     }
