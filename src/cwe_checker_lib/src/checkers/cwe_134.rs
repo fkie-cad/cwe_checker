@@ -98,8 +98,6 @@ pub fn check_cwe(
                         &project.stack_pointer_register,
                     );
 
-                    println!("LOCATION: {:?}", location);
-
                     if matches!(
                         location,
                         StringLocation::GlobalWriteable | StringLocation::NonGlobal
