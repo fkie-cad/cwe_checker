@@ -9,18 +9,6 @@ use crate::{
     intermediate_representation::{Expression, Variable},
 };
 
-// TODO: change actual mock function for blocks to receive a TID parameter and then remove this function
-fn mock_block(tid: &str) -> Term<Blk> {
-    Term {
-        tid: Tid::new(tid),
-        term: Blk {
-            defs: Vec::new(),
-            jmps: Vec::new(),
-            indirect_jmp_targets: Vec::new(),
-        },
-    }
-}
-
 pub fn bv(value: i64) -> ValueDomain {
     ValueDomain::from(Bitvector::from_i64(value))
 }
@@ -87,8 +75,8 @@ impl Setup {
         };
         let mut project = Project::mock_empty();
         let mut sub = Sub::mock("func");
-        let mut block1 = mock_block("block1");
-        let block2 = mock_block("block2");
+        let mut block1 = Blk::mock_with_tid("block1");
+        let block2 = Blk::mock_with_tid("block2");
         let def1 = Def::assign(
             "def1",
             Variable::mock("RBP", 8 as u64),

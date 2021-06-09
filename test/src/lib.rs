@@ -256,6 +256,29 @@ mod tests {
 
     #[test]
     #[ignore]
+    fn cwe_134() {
+        let mut error_log = Vec::new();
+        let mut tests = all_test_cases("cwe_134", "CWE134");
+
+        mark_architecture_skipped(&mut tests, "ppc64"); // TODO: Check reason for failure!
+        mark_skipped(&mut tests, "ppc64le", "clang"); // TODO: Check reason for failure!
+
+        mark_compiler_skipped(&mut tests, "mingw32-gcc"); // TODO: Check reason for failure!
+
+        for test_case in tests {
+            let num_expected_occurences = 1;
+            if let Err(error) = test_case.run_test("[CWE134]", num_expected_occurences) {
+                error_log.push((test_case.get_filepath(), error));
+            }
+        }
+        if !error_log.is_empty() {
+            print_errors(error_log);
+            panic!();
+        }
+    }
+
+    #[test]
+    #[ignore]
     fn cwe_190() {
         let mut error_log = Vec::new();
         let mut tests = all_test_cases("cwe_190", "CWE190");

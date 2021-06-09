@@ -84,6 +84,7 @@ Source code documentation can be built with `make documentation`. For the stable
 
 So far the following analyses are implemented:
 -   [CWE-78](https://cwe.mitre.org/data/definitions/78.html): OS Command Injection (currently disabled on standard runs)
+-   [CWE-134](https://cwe.mitre.org/data/definitions/134.html): Use of Externally-Controlled Format String
 -   [CWE-119](https://cwe.mitre.org/data/definitions/119.html) and its variants [CWE-125](https://cwe.mitre.org/data/definitions/125.html) and [CWE-787](https://cwe.mitre.org/data/definitions/787.html): Buffer Overflow
 -   [CWE-190](https://cwe.mitre.org/data/definitions/190.html): Integer Overflow or Wraparound
 -   [CWE-215](https://cwe.mitre.org/data/definitions/215.html): Information Exposure Through Debug Information

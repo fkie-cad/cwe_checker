@@ -751,6 +751,17 @@ mod tests {
                 },
             }
         }
+
+        pub fn mock_with_tid(tid: &str) -> Term<Blk> {
+            Term {
+                tid: Tid::new(tid),
+                term: Blk {
+                    defs: Vec::new(),
+                    jmps: Vec::new(),
+                    indirect_jmp_targets: Vec::new(),
+                },
+            }
+        }
     }
 
     impl Sub {
