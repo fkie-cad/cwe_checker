@@ -277,7 +277,6 @@ fn get_project_from_ghidra(file_path: &Path, binary: &[u8]) -> (Project, Vec<Log
             }
         };
 
-        println!("{}", String::from_utf8(output.stdout.clone()).unwrap());
         if !output.status.success() {
             match output.status.code() {
                 Some(code) => {
