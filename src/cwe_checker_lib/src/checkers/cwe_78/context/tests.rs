@@ -9,19 +9,6 @@ use crate::{
     intermediate_representation::{Expression, Variable},
 };
 
-impl Blk {
-    pub fn mock_with_tid(tid: &str) -> Term<Blk> {
-        Term {
-            tid: Tid::new(tid),
-            term: Blk {
-                defs: Vec::new(),
-                jmps: Vec::new(),
-                indirect_jmp_targets: Vec::new(),
-            },
-        }
-    }
-}
-
 pub fn bv(value: i64) -> ValueDomain {
     ValueDomain::from(Bitvector::from_i64(value))
 }

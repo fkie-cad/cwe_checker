@@ -18,10 +18,7 @@
 //! ## False Positives
 //!
 //! - The input was externally provided on purpose and originates from a trusted source.
-//!
-//! ## False Negatives
-//!
-//! - A pointer target could be lost but the format string was externally provided.
+//! - A pointer target could be lost but the format string was not externally provided.
 
 use std::collections::HashMap;
 
@@ -51,8 +48,9 @@ pub static CWE_MODULE: CweModule = CweModule {
 /// The configuration struct
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct Config {
-    /// The names of the system call symbols
+    /// The names of the system call symbols.
     format_string_symbols: Vec<String>,
+    /// The index of the format string paramater of the symbol.
     format_string_index: HashMap<String, usize>,
 }
 
