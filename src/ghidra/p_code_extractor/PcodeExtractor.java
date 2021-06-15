@@ -58,6 +58,7 @@ public class PcodeExtractor extends GhidraScript {
         Serializer ser = new Serializer(project, jsonPath);
         ser.serializeProject();
 
+        println("Pcode was successfully extracted!");
     }
 
 
