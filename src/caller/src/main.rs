@@ -284,8 +284,7 @@ fn get_project_from_ghidra(file_path: &Path, binary: &[u8]) -> (Project, Vec<Log
                     let error_message: String = standard_out
                         .lines()
                         .rev()
-                        .map(|s| s.to_string())
-                        .collect::<Vec<String>>()[..2]
+                        .collect::<Vec<&str>>()[..2]
                         .join("\n");
                     eprintln!("{}", error_message);
                     std::process::exit(101);
