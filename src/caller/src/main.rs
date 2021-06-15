@@ -277,12 +277,24 @@ fn get_project_from_ghidra(file_path: &Path, binary: &[u8]) -> (Project, Vec<Log
             }
         };
 
-        if !String::from_utf8(output.stdout.clone())
-            .unwrap()
-            .contains("Pcode was successfully extracted!")
-        {
-            eprintln!("Execution of Ghidra plugin failed: Process was terminated.");
-            std::process::exit(101);
+        match String::from_utf8(output.stdout.clone()) {
+            Ok(standard_out) => {
+                if !standard_out.contains("Pcode was successfully extracted!") {
+                    eprintln!("Execution of Ghidra plugin failed: Process was terminated.");
+                    let error_message: String = standard_out
+                        .lines()
+                        .rev()
+                        .map(|s| s.to_string())
+                        .collect::<Vec<String>>()[..2]
+                        .join("\n");
+                    eprintln!("{}", error_message);
+                    std::process::exit(101);
+                }
+            }
+            Err(_) => {
+                eprintln!("Execution of Ghidra plugin failed: Process was terminated.");
+                std::process::exit(101);
+            }
         }
 
         if !output.status.success() {
