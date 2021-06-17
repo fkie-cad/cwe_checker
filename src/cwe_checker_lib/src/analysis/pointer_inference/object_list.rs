@@ -536,7 +536,7 @@ mod tests {
             merged
                 .get_value(&Data::Pointer(pointer.clone()), ByteSize::new(8))
                 .unwrap(),
-            Data::Value(ValueDomain::new_top(ByteSize::new(8)))
+            Data::Value(IntervalDomain::mock(3, 42).with_stride(39))
         );
         assert_eq!(
             merged

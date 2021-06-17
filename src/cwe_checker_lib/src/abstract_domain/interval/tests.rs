@@ -38,7 +38,17 @@ impl IntervalDomain {
     /// Set the widening delay to the interval length
     /// to simulate that `self` was just widened.
     pub fn as_freshly_widened(mut self) -> Self {
-        self.widening_delay = self.interval.length().try_to_u64().unwrap();
+        self.widening_delay = (self.interval.end.clone() - &self.interval.start)
+            .try_to_u64()
+            .unwrap();
+        self
+    }
+
+    /// Set the stride of the interval.
+    /// also rounds down the interval end to be contained in the same residue class as the interval start.
+    pub fn with_stride(mut self, stride: u64) -> Self {
+        self.interval.stride = stride;
+        self.interval.adjust_end_to_value_in_stride();
         self
     }
 }
@@ -62,7 +72,7 @@ fn signed_merge() {
     let b = IntervalDomain::mock_with_bounds(None, 3, 3, Some(5));
     assert_eq!(
         a.merge(&b),
-        IntervalDomain::mock_with_bounds(None, -3, 5, None).as_freshly_widened()
+        IntervalDomain::mock_with_bounds(Some(-3), 1, 3, Some(5)).with_stride(2)
     );
     let a = IntervalDomain::mock_with_bounds(None, 1, 5, None);
     let b = IntervalDomain::mock_with_bounds(None, -1, -1, Some(5));
@@ -110,7 +120,7 @@ fn signed_merge() {
     let update = IntervalDomain::mock_with_bounds(Some(-3), -2, 3, None);
     var = var.merge(&update);
     let mut expected_result = IntervalDomain::mock_with_bounds(None, -3, 3, None);
-    expected_result.widening_delay = 6;
+    expected_result.widening_delay = 5; // The last update does not cause widening
     assert_eq!(var, expected_result);
 }
 
@@ -411,6 +421,14 @@ fn add_signed_bounds() {
         .clone()
         .add_signed_less_equal_bound(&Bitvector::from_i64(-20));
     assert!(x.is_err());
+    let x = IntervalDomain::mock(0, 10)
+        .with_stride(10)
+        .add_signed_less_equal_bound(&Bitvector::from_i64(15));
+    assert_eq!(x.unwrap(), IntervalDomain::mock(0, 10).with_stride(10));
+    let x = IntervalDomain::mock(0, 10)
+        .with_stride(10)
+        .add_signed_less_equal_bound(&Bitvector::from_i64(5));
+    assert_eq!(x.unwrap(), IntervalDomain::mock(0, 0));
 
     //signed_greater_equal
     let x = interval
@@ -431,6 +449,14 @@ fn add_signed_bounds() {
         x.unwrap(),
         IntervalDomain::mock_with_bounds(Some(-20), -10, 10, Some(100))
     );
+    let x = IntervalDomain::mock(0, 10)
+        .with_stride(10)
+        .add_signed_greater_equal_bound(&Bitvector::from_i64(-5));
+    assert_eq!(x.unwrap(), IntervalDomain::mock(0, 10).with_stride(10));
+    let x = IntervalDomain::mock(0, 10)
+        .with_stride(10)
+        .add_signed_greater_equal_bound(&Bitvector::from_i64(5));
+    assert_eq!(x.unwrap(), IntervalDomain::mock(10, 10));
 }
 
 #[test]
@@ -587,4 +613,45 @@ fn float_nan_bytesize() {
     let result = top_value.un_op(UnOpType::FloatNaN);
     assert!(result.is_top());
     assert_eq!(result.bytesize(), ByteSize::new(1));
+}
+
+#[test]
+fn stride_rounding() {
+    let interval = Interval::mock(3, 13).with_stride(10);
+    assert_eq!(
+        Bitvector::from_i64(5)
+            .round_up_to_stride_of(&interval)
+            .unwrap(),
+        Bitvector::from_i64(13)
+    );
+    assert_eq!(
+        Bitvector::from_i64(5)
+            .round_down_to_stride_of(&interval)
+            .unwrap(),
+        Bitvector::from_i64(3)
+    );
+    assert_eq!(
+        Bitvector::from_i64(-277)
+            .round_up_to_stride_of(&interval)
+            .unwrap(),
+        Bitvector::from_i64(-277)
+    );
+    assert_eq!(
+        Bitvector::from_i64(-277)
+            .round_down_to_stride_of(&interval)
+            .unwrap(),
+        Bitvector::from_i64(-277)
+    );
+
+    let interval = Interval::mock_i8(100, 110).with_stride(10);
+    assert_eq!(
+        Bitvector::from_i8(-123)
+            .round_up_to_stride_of(&interval)
+            .unwrap(),
+        Bitvector::from_i8(-120)
+    );
+    assert_eq!(
+        Bitvector::from_i8(-123).round_down_to_stride_of(&interval),
+        None
+    );
 }

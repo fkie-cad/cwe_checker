@@ -17,6 +17,7 @@ crossbeam-channel = "0.4"
 derive_more = "0.99"
 directories = "3.0"
 goblin = "0.2"
+gcd = "2.0"
 
 [lib]
 name = "cwe_checker_lib"

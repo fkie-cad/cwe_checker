@@ -11,13 +11,18 @@ pub use simple_interval::*;
 
 mod bin_ops;
 
-/// An abstract domain representing values in an interval range.
+/// An abstract domain representing values in a interval range with strides and widening hints.
 ///
 /// The interval bounds are signed integers,
 /// i.e. the domain looses precision if tasked to represent large unsigned integers.
+/// The interval has a stride,
+/// i.e. all values represented by the interval are contained in the same residue class modulo the stride
+/// as the interval bounds.
 ///
 /// The domain also contains widening hints to faciliate fast and exact widening for simple loop counter variables.
 /// See the [`IntervalDomain::signed_merge_and_widen`] method for details on the widening strategy.
+/// Note that the widening hints may not respect the stride,
+/// i.e. they may be contained in different residue classes than the interval bounds.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct IntervalDomain {
     /// The underlying interval.
@@ -47,10 +52,10 @@ impl IntervalDomain {
     /// Create a new interval domain with the given bounds.
     ///
     /// Both `start` and `end` are inclusive, i.e. contained in the interval.
-    /// The widening hints are set to `None`.
+    /// The widening hints are set to `None` and the stride is set to 1 if `start != end`.
     pub fn new(start: Bitvector, end: Bitvector) -> Self {
         IntervalDomain {
-            interval: Interval::new(start, end),
+            interval: Interval::new(start, end, 1),
             widening_upper_bound: None,
             widening_lower_bound: None,
             widening_delay: 0,
@@ -68,13 +73,17 @@ impl IntervalDomain {
     /// Otherwise keep the old lower bound.
     pub fn update_widening_lower_bound(&mut self, bound: &Option<Bitvector>) {
         if let Some(bound_value) = bound {
+            let bound_value = match bound_value.clone().round_up_to_stride_of(&self.interval) {
+                Some(bound) => bound,
+                None => return,
+            };
             if bound_value.checked_slt(&self.interval.start).unwrap() {
                 if let Some(ref previous_bound) = self.widening_lower_bound {
                     if bound_value.checked_sgt(previous_bound).unwrap() {
-                        self.widening_lower_bound = Some(bound_value.clone());
+                        self.widening_lower_bound = Some(bound_value);
                     }
                 } else {
-                    self.widening_lower_bound = Some(bound_value.clone());
+                    self.widening_lower_bound = Some(bound_value);
                 }
             }
         }
@@ -85,13 +94,17 @@ impl IntervalDomain {
     /// Otherwise keep the old upper bound.
     pub fn update_widening_upper_bound(&mut self, bound: &Option<Bitvector>) {
         if let Some(bound_value) = bound {
+            let bound_value = match bound_value.clone().round_down_to_stride_of(&self.interval) {
+                Some(bound) => bound,
+                None => return,
+            };
             if bound_value.checked_sgt(&self.interval.end).unwrap() {
                 if let Some(ref previous_bound) = self.widening_upper_bound {
                     if bound_value.checked_slt(previous_bound).unwrap() {
-                        self.widening_upper_bound = Some(bound_value.clone());
+                        self.widening_upper_bound = Some(bound_value);
                     }
                 } else {
-                    self.widening_upper_bound = Some(bound_value.clone());
+                    self.widening_upper_bound = Some(bound_value);
                 }
             }
         }
@@ -125,7 +138,8 @@ impl IntervalDomain {
     /// ### When to widen
     ///
     /// If the merged interval equals one of the input intervals as value sets, do not perform widening.
-    /// Else widening is performed if and only if the length of the interval is greater than `widening_delay + 2`.
+    /// Else widening is performed if and only if
+    /// the length of the interval is greater than the widening delay plus the stride of the interval.
     ///
     /// ### How to widen
     ///
@@ -137,16 +151,24 @@ impl IntervalDomain {
     /// After that the `widening_delay` is set to the length of the resulting interval.
     pub fn signed_merge_and_widen(&self, other: &IntervalDomain) -> IntervalDomain {
         let mut merged_domain = self.signed_merge(other);
-        if merged_domain.equal_as_value_sets(self) || merged_domain.equal_as_value_sets(other) {
-            // Do not widen if the value set itself is already contained in either `self` or `other`.
+        if merged_domain.equal_as_value_sets(self)
+            || merged_domain.equal_as_value_sets(other)
+            || merged_domain.is_top()
+        {
+            // Do not widen if the value set itself is already contained in either `self` or `other`
+            // or if the domain is already unconstrained.
             return merged_domain;
         }
-        if let Ok(length) = merged_domain.interval.length().try_to_u64() {
-            if length <= merged_domain.widening_delay + 2 {
-                // Do not widen for already unconstrained intervals (case length() returning zero)
-                // or if the interval length is not larger than `widening_delay + 2`.
-                // FIXME: `widening_delay + 2` may overflow.
-                // But such a large delay is probably incorrect anyway, so this should not cause unnecessary widenings.
+        if let Ok(length) =
+            (merged_domain.interval.end.clone() - &merged_domain.interval.start).try_to_u64()
+        {
+            let widening_threshold = std::cmp::max(
+                merged_domain.widening_delay + 1,
+                merged_domain.widening_delay + merged_domain.interval.stride,
+            );
+            if length <= widening_threshold {
+                // Do not widen below the widening threshold.
+                // NOTE: The widening threshold may overflow. In this case we do perform widening.
                 return merged_domain;
             }
         }
@@ -156,18 +178,22 @@ impl IntervalDomain {
         {
             // widen to the lower bound
             merged_domain.interval.start = merged_domain.widening_lower_bound.unwrap();
+            merged_domain.interval.adjust_start_to_value_in_stride();
             merged_domain.widening_lower_bound = None;
             has_been_widened = true;
         }
         if self.interval.end != other.interval.end && merged_domain.widening_upper_bound.is_some() {
             // widen to the upper bound
             merged_domain.interval.end = merged_domain.widening_upper_bound.unwrap();
+            merged_domain.interval.adjust_end_to_value_in_stride();
             merged_domain.widening_upper_bound = None;
             has_been_widened = true;
         }
         if has_been_widened {
-            merged_domain.widening_delay =
-                merged_domain.interval.length().try_to_u64().unwrap_or(0);
+            merged_domain.widening_delay = (merged_domain.interval.end.clone()
+                - &merged_domain.interval.start)
+                .try_to_u64()
+                .unwrap_or(0);
             merged_domain
         } else {
             // No widening bounds could be used for widening, so we have to widen to the `Top` value.
@@ -213,6 +239,7 @@ impl IntervalDomain {
             interval: Interval {
                 start: self.interval.start.clone().into_sign_extend(width).unwrap(),
                 end: self.interval.end.clone().into_sign_extend(width).unwrap(),
+                stride: self.interval.stride,
             },
             widening_lower_bound: self
                 .widening_lower_bound
@@ -236,7 +263,10 @@ impl IntervalDomain {
         intersected_domain.widening_delay =
             std::cmp::max(self.widening_delay, other.widening_delay);
 
-        if let Ok(interval_length) = intersected_domain.interval.length().try_to_u64() {
+        if let Ok(interval_length) = (intersected_domain.interval.end.clone()
+            - &intersected_domain.interval.start)
+            .try_to_u64()
+        {
             intersected_domain.widening_delay =
                 std::cmp::min(intersected_domain.widening_delay, interval_length);
         }
@@ -370,22 +400,27 @@ impl IntervalDomain {
 
 impl SpecializeByConditional for IntervalDomain {
     fn add_signed_less_equal_bound(mut self, bound: &Bitvector) -> Result<Self, Error> {
+        let bound = match bound.clone().round_down_to_stride_of(&self.interval) {
+            Some(bound) => bound,
+            None => return Err(anyhow!("Empty interval")),
+        };
         if let Some(old_upper_bound) = &self.widening_upper_bound {
-            if old_upper_bound.checked_sle(bound).unwrap() {
+            if old_upper_bound.checked_sle(&bound).unwrap() {
                 return Ok(self);
-            } else if self.interval.end.checked_slt(bound).unwrap() {
-                self.widening_upper_bound = Some(bound.clone());
+            } else if self.interval.end.checked_slt(&bound).unwrap() {
+                self.widening_upper_bound = Some(bound);
                 return Ok(self);
             } else {
                 self.widening_upper_bound = None;
             }
-        } else if self.interval.end.checked_slt(bound).unwrap() {
-            self.widening_upper_bound = Some(bound.clone());
+        } else if self.interval.end.checked_slt(&bound).unwrap() {
+            self.widening_upper_bound = Some(bound);
             return Ok(self);
         }
         // we already know that the bound is less equal to `self.interval.end`
-        if self.interval.start.checked_sle(bound).unwrap() {
-            self.interval.end = bound.clone();
+        if self.interval.start.checked_sle(&bound).unwrap() {
+            self.interval.end = bound;
+            self.interval.adjust_end_to_value_in_stride();
             Ok(self)
         } else {
             Err(anyhow!("Empty interval"))
@@ -393,22 +428,27 @@ impl SpecializeByConditional for IntervalDomain {
     }
 
     fn add_signed_greater_equal_bound(mut self, bound: &Bitvector) -> Result<Self, Error> {
+        let bound = match bound.clone().round_up_to_stride_of(&self.interval) {
+            Some(bound) => bound,
+            None => return Err(anyhow!("Empty interval")),
+        };
         if let Some(old_lower_bound) = &self.widening_lower_bound {
-            if old_lower_bound.checked_sge(bound).unwrap() {
+            if old_lower_bound.checked_sge(&bound).unwrap() {
                 return Ok(self);
-            } else if self.interval.start.checked_sgt(bound).unwrap() {
-                self.widening_lower_bound = Some(bound.clone());
+            } else if self.interval.start.checked_sgt(&bound).unwrap() {
+                self.widening_lower_bound = Some(bound);
                 return Ok(self);
             } else {
                 self.widening_lower_bound = None;
             }
-        } else if self.interval.start.checked_sgt(bound).unwrap() {
-            self.widening_lower_bound = Some(bound.clone());
+        } else if self.interval.start.checked_sgt(&bound).unwrap() {
+            self.widening_lower_bound = Some(bound);
             return Ok(self);
         }
         // we already know that the bound is greater equal to `self.interval.start`
-        if self.interval.end.checked_sge(bound).unwrap() {
-            self.interval.start = bound.clone();
+        if self.interval.end.checked_sge(&bound).unwrap() {
+            self.interval.start = bound;
+            self.interval.adjust_start_to_value_in_stride();
             Ok(self)
         } else {
             Err(anyhow!("Empty interval"))
@@ -451,11 +491,13 @@ impl SpecializeByConditional for IntervalDomain {
             self.add_signed_greater_equal_bound(&(bound + &Bitvector::one(bound.width())))
         } else if self.interval.start == *bound {
             self.interval.start += &Bitvector::one(bound.width());
+            self.interval.adjust_start_to_value_in_stride();
             Ok(self)
         } else if self.interval.end.checked_slt(bound).unwrap() {
             self.add_signed_less_equal_bound(&(bound - &Bitvector::one(bound.width())))
         } else if self.interval.end == *bound {
             self.interval.end -= &Bitvector::one(bound.width());
+            self.interval.adjust_end_to_value_in_stride();
             Ok(self)
         } else {
             Ok(self)
@@ -488,6 +530,7 @@ impl SizedDomain for IntervalDomain {
             interval: Interval {
                 start: Bitvector::signed_min_value(bytesize.into()),
                 end: Bitvector::signed_max_value(bytesize.into()),
+                stride: 1,
             },
             widening_lower_bound: None,
             widening_upper_bound: None,
@@ -707,12 +750,50 @@ impl Display for IntervalDomain {
             let end_int = apint::Int::from(self.interval.end.clone());
             write!(
                 f,
-                "[0x{:016x}, 0x{:016x}]:i{}",
+                "[0x{:016x},<stride {:x}>, 0x{:016x}]:i{}",
                 start_int,
+                self.interval.stride,
                 end_int,
                 self.bytesize().as_bit_length()
             )
         }
+    }
+}
+
+/// Trait for adjusting a bitvector to the stride of an interval.
+trait StrideRounding: Sized {
+    /// Round `self` up to the nearest value that adheres to the stride of `interval`.
+    fn round_up_to_stride_of(self, interval: &Interval) -> Option<Self>;
+
+    /// Round `self` down to the nearest value that adheres to the stride of `interval`.
+    fn round_down_to_stride_of(self, interval: &Interval) -> Option<Self>;
+}
+
+impl StrideRounding for Bitvector {
+    /// Round `self` up to the nearest value that adheres to the stride of `interval`.
+    /// Returns `None` if rounding would result in an integer overflow.
+    fn round_up_to_stride_of(self, interval: &Interval) -> Option<Self> {
+        if interval.stride == 0 || interval.bytesize() > ByteSize::new(8) {
+            return Some(self);
+        }
+        let diff = interval.start.try_to_i128().unwrap() - self.try_to_i128().unwrap();
+        let diff = diff % interval.stride as i128;
+        let diff = (diff + interval.stride as i128) % interval.stride as i128;
+        let diff = Bitvector::from_u64(diff as u64).into_resize_unsigned(interval.bytesize());
+        self.signed_add_overflow_checked(&diff)
+    }
+
+    /// Round `self` down to the nearest value that adheres to the stride of `interval`.
+    /// Returns `None` if rounding would result in an integer overflow.
+    fn round_down_to_stride_of(self, interval: &Interval) -> Option<Self> {
+        if interval.stride == 0 || interval.bytesize() > ByteSize::new(8) {
+            return Some(self);
+        }
+        let diff = self.try_to_i128().unwrap() - interval.end.try_to_i128().unwrap();
+        let diff = diff % interval.stride as i128;
+        let diff = (diff + interval.stride as i128) % interval.stride as i128;
+        let diff = Bitvector::from_u64(diff as u64).into_resize_unsigned(interval.bytesize());
+        self.signed_sub_overflow_checked(&diff)
     }
 }
 
