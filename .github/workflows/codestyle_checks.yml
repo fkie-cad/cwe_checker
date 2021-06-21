@@ -36,4 +36,4 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: -- -D clippy::all
+          args: -- -D clippy::all -D missing_docs
