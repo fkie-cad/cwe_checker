@@ -2,6 +2,8 @@
 
 use std::collections::HashMap;
 
+use crate::prelude::*;
+
 use regex::Regex;
 
 use crate::{
@@ -33,40 +35,46 @@ pub fn get_input_format_string(
     format_string_index: usize,
     stack_pointer_register: &Variable,
     runtime_memory_image: &RuntimeMemoryImage,
-) -> String {
+) -> Result<String, Error> {
     if let Some(format_string) = extern_symbol.parameters.get(format_string_index) {
-        if let Ok(address) = pi_state.eval_parameter_arg(
+        if let Ok(DataDomain::Value(address)) = pi_state.eval_parameter_arg(
             format_string,
             &stack_pointer_register,
             runtime_memory_image,
         ) {
-            parse_format_string_destination_and_return_content(address, runtime_memory_image)
-        } else {
-            panic!("Could not parse target address of format string pointer.");
+            return parse_format_string_destination_and_return_content(
+                address,
+                runtime_memory_image,
+            );
         }
-    } else {
-        panic!(
-            "No format string parameter at specified index {} for function {}",
-            format_string_index, extern_symbol.name
-        );
+
+        return Err(anyhow!("Format string not in global memory."));
     }
+
+    Err(anyhow!(
+        "No format string parameter at specified index {} for function {}",
+        format_string_index,
+        extern_symbol.name
+    ))
 }
 
 /// Parses the destiniation address of the format string.
 /// It checks whether the address points to another pointer in memory.
 /// If so, it will use the target address of that pointer read the format string from memory.
 pub fn parse_format_string_destination_and_return_content(
-    address: DataDomain<IntervalDomain>,
+    address: IntervalDomain,
     runtime_memory_image: &RuntimeMemoryImage,
-) -> String {
+) -> Result<String, Error> {
     if let Ok(address_vector) = address.try_to_bitvec() {
-        match runtime_memory_image.read_string_until_null_terminator(&address_vector) {
-            Ok(format_string) => format_string.to_string(),
-            Err(e) => panic!("{}", e),
-        }
-    } else {
-        panic!("Could not translate format string address to bitvector.");
+        return match runtime_memory_image.read_string_until_null_terminator(&address_vector) {
+            Ok(format_string) => Ok(format_string.to_string()),
+            Err(e) => Err(anyhow!("{}", e)),
+        };
     }
+
+    Err(anyhow!(
+        "Could not translate format string address to bitvector."
+    ))
 }
 
 /// Parses the format string parameters using a regex, determines their data types,
@@ -115,30 +123,39 @@ pub fn get_variable_number_parameters(
     extern_symbol: &ExternSymbol,
     format_string_index_map: &HashMap<String, usize>,
     runtime_memory_image: &RuntimeMemoryImage,
-) -> Vec<Arg> {
+) -> Result<Vec<Arg>, Error> {
     let format_string_index = match format_string_index_map.get(&extern_symbol.name) {
         Some(index) => *index,
         None => panic!("External Symbol does not contain a format string parameter."),
     };
-    let format_string = get_input_format_string(
+
+    let format_string_results = get_input_format_string(
         pi_state,
         extern_symbol,
         format_string_index,
         &project.stack_pointer_register,
         runtime_memory_image,
     );
-    let parameters =
-        parse_format_string_parameters(format_string.as_str(), &project.datatype_properties);
-    if parameters.iter().any(|(specifier, _)| is_string(specifier)) {
-        return calculate_parameter_locations(
-            project,
-            parameters,
-            extern_symbol.get_calling_convention(project),
-            format_string_index,
-        );
+
+    if let Ok(format_string) = format_string_results {
+        let parameters =
+            parse_format_string_parameters(format_string.as_str(), &project.datatype_properties);
+        if parameters.iter().any(|(specifier, _)| is_string(specifier)) {
+            return Ok(calculate_parameter_locations(
+                project,
+                parameters,
+                extern_symbol.get_calling_convention(project),
+                format_string_index,
+            ));
+        }
+
+        return Ok(vec![]);
     }
 
-    vec![]
+    Err(anyhow!(
+        "Could not parse variable parameters: {}",
+        format_string_results.unwrap_err()
+    ))
 }
 
 /// Calculates the register and stack positions of format string parameters.
