@@ -103,7 +103,7 @@ impl<'a> Context<'a> {
                     }
                 }
             }
-            // TODO: Log errors that came up during the parameter parsing. 
+            // TODO: Log errors that came up during the parameter parsing.
         }
         new_state
     }
