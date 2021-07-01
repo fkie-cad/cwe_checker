@@ -782,6 +782,7 @@ impl Project {
                 }
             })
             .collect();
+<<<<<<< HEAD
             IrProject {
                 program,
                 cpu_architecture: self.cpu_architecture,
@@ -795,6 +796,21 @@ impl Project {
                 register_list,
                 datatype_properties: self.datatype_properties.clone(),
             }
+=======
+        IrProject {
+            program,
+            cpu_architecture: self.cpu_architecture,
+            stack_pointer_register: self.stack_pointer_register.into(),
+            calling_conventions: self
+                .register_calling_convention
+                .clone()
+                .into_iter()
+                .map(|cconv| cconv.into())
+                .collect(),
+            register_list,
+            datatype_properties: self.datatype_properties,
+        }
+>>>>>>> conflict fixes
     }
 }
 
