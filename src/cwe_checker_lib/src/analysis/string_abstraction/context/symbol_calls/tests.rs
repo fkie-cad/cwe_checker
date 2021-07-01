@@ -8,7 +8,7 @@ use crate::analysis::forward_interprocedural_fixpoint::Context as _;
 use crate::analysis::pointer_inference::PointerInference as PointerInferenceComputation;
 use crate::analysis::string_abstraction::state::State;
 use crate::analysis::string_abstraction::tests::mock_project::*;
-use crate::intermediate_representation::{Def, ExternSymbol, Project};
+use crate::intermediate_representation::{ExternSymbol, Project};
 use crate::{
     abstract_domain::{AbstractIdentifier, AbstractLocation},
     intermediate_representation::{Arg, ByteSize, Tid, Variable},
