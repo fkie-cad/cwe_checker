@@ -14,6 +14,12 @@ impl Expression {
         Expression::Const(Bitvector::from_i64(value))
     }
 
+    /// Shortcut for creating a constant expression from an i32 value
+    #[cfg(test)]
+    pub fn const_from_i32(value: i32) -> Expression {
+        Expression::Const(Bitvector::from_i32(value))
+    }
+
     /// Shortcut for creating a constant expression from an apint value (e.g. copy of global address)
     #[cfg(test)]
     pub fn const_from_apint(value: ApInt) -> Expression {
@@ -22,10 +28,10 @@ impl Expression {
 
     /// Shortcut for creating a variable expression
     #[cfg(test)]
-    pub fn var(name: &str) -> Expression {
+    pub fn var(name: impl ToString, size_in_bytes: impl Into<ByteSize>) -> Expression {
         Expression::Var(Variable {
-            name: name.into(),
-            size: ByteSize::new(8),
+            name: name.to_string(),
+            size: size_in_bytes.into(),
             is_temp: false,
         })
     }

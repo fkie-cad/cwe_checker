@@ -813,8 +813,8 @@ mod tests {
     }
 
     impl Arg {
-        pub fn mock_register(name: impl ToString) -> Arg {
-            Arg::Register(Variable::mock(name.to_string(), ByteSize::new(8)))
+        pub fn mock_register(name: impl ToString, size_in_bytes: impl Into<ByteSize>) -> Arg {
+            Arg::Register(Variable::mock(name.to_string(), size_in_bytes))
         }
     }
 
@@ -825,8 +825,8 @@ mod tests {
                 addresses: vec!["UNKNOWN".to_string()],
                 name: "mock_symbol".to_string(),
                 calling_convention: Some("__stdcall".to_string()),
-                parameters: vec![Arg::mock_register("RDI")],
-                return_values: vec![Arg::mock_register("RAX")],
+                parameters: vec![Arg::mock_register("RDI", 8)],
+                return_values: vec![Arg::mock_register("RAX", 8)],
                 no_return: false,
                 has_var_args: false,
             }
@@ -977,27 +977,27 @@ mod tests {
             Def::assign(
                 "tid_1",
                 Variable::mock("X", 8),
-                Expression::var("Y").un_op(UnOpType::IntNegate),
+                Expression::var("Y", 8).un_op(UnOpType::IntNegate),
             ),
             Def::assign(
                 "tid_2",
                 Variable::mock("Y", 8),
-                Expression::var("X").plus(Expression::var("Y")),
+                Expression::var("X", 8).plus(Expression::var("Y", 8)),
             ),
             Def::assign(
                 "tid_3",
                 Variable::mock("X", 8),
-                Expression::var("X").un_op(UnOpType::IntNegate),
+                Expression::var("X", 8).un_op(UnOpType::IntNegate),
             ),
             Def::assign(
                 "tid_4",
                 Variable::mock("Y", 8),
-                Expression::var("Y").un_op(UnOpType::IntNegate),
+                Expression::var("Y", 8).un_op(UnOpType::IntNegate),
             ),
             Def::assign(
                 "tid_5",
                 Variable::mock("Y", 8),
-                Expression::var("X").plus(Expression::var("Y")),
+                Expression::var("X", 8).plus(Expression::var("Y", 8)),
             ),
         ];
         let mut block = Term {
@@ -1014,24 +1014,24 @@ mod tests {
             Def::assign(
                 "tid_1",
                 Variable::mock("X", 8),
-                Expression::var("Y").un_op(UnOpType::IntNegate),
+                Expression::var("Y", 8).un_op(UnOpType::IntNegate),
             ),
             Def::assign(
                 "tid_2",
                 Variable::mock("Y", 8),
-                Expression::var("Y")
+                Expression::var("Y", 8)
                     .un_op(UnOpType::IntNegate)
-                    .plus(Expression::var("Y")),
+                    .plus(Expression::var("Y", 8)),
             ),
             Def::assign(
                 "tid_3",
                 Variable::mock("X", 8),
-                Expression::var("X").un_op(UnOpType::IntNegate),
+                Expression::var("X", 8).un_op(UnOpType::IntNegate),
             ),
             Def::assign(
                 "tid_5",
                 Variable::mock("Y", 8),
-                Expression::var("X").plus(Expression::var("Y").un_op(UnOpType::IntNegate)),
+                Expression::var("X", 8).plus(Expression::var("Y", 8).un_op(UnOpType::IntNegate)),
             ),
         ];
         assert_eq!(block.term.defs, result_defs);

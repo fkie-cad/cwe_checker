@@ -20,8 +20,8 @@ impl ExternSymbol {
             addresses: vec!["UNKNOWN".to_string()],
             name: "sprintf".to_string(),
             calling_convention: Some("__stdcall".to_string()),
-            parameters: vec![Arg::mock_register("RDI"), Arg::mock_register("RSI")],
-            return_values: vec![Arg::mock_register("RAX")],
+            parameters: vec![Arg::mock_register("RDI", 8), Arg::mock_register("RSI", 8)],
+            return_values: vec![Arg::mock_register("RAX", 8)],
             no_return: false,
             has_var_args: true,
         }
@@ -33,8 +33,8 @@ impl ExternSymbol {
             addresses: vec!["UNKNOWN".to_string()],
             name: "scanf".to_string(),
             calling_convention: Some("__stdcall".to_string()),
-            parameters: vec![Arg::mock_register("RDI")],
-            return_values: vec![Arg::mock_register("RAX")],
+            parameters: vec![Arg::mock_register("RDI", 8)],
+            return_values: vec![Arg::mock_register("RAX", 8)],
             no_return: false,
             has_var_args: true,
         }
@@ -46,8 +46,8 @@ impl ExternSymbol {
             addresses: vec!["UNKNOWN".to_string()],
             name: "sscanf".to_string(),
             calling_convention: Some("__stdcall".to_string()),
-            parameters: vec![Arg::mock_register("RDI"), Arg::mock_register("RSI")],
-            return_values: vec![Arg::mock_register("RAX")],
+            parameters: vec![Arg::mock_register("RDI", 8), Arg::mock_register("RSI", 8)],
+            return_values: vec![Arg::mock_register("RAX", 8)],
             no_return: false,
             has_var_args: true,
         }
@@ -80,12 +80,12 @@ impl Setup {
         let def1 = Def::assign(
             "def1",
             Variable::mock("RBP", 8 as u64),
-            Expression::var("RSP"),
+            Expression::var("RSP", 8),
         );
         let def2 = Def::assign(
             "def2",
             Variable::mock("RDI", 8 as u64),
-            Expression::var("RBP").plus_const(-8),
+            Expression::var("RBP", 8).plus_const(-8),
         );
         let def3 = Def::assign(
             "def3",
@@ -348,12 +348,12 @@ fn getting_blk_start_node_if_last_def() {
     let def1 = Def::assign(
         "def1",
         Variable::mock("RBP", 8 as u64),
-        Expression::var("RSP"),
+        Expression::var("RSP", 8),
     );
     let def2 = Def::assign(
         "def2",
         Variable::mock("RDI", 8 as u64),
-        Expression::var("RBP").plus_const(-8),
+        Expression::var("RBP", 8).plus_const(-8),
     );
 
     let def3 = Def::assign(
@@ -507,17 +507,17 @@ fn handling_assign_and_load() {
     let mock_assign_register = Def::assign(
         "assign",
         Variable::mock("R9", 8 as u64),
-        Expression::var("RDI"),
+        Expression::var("RDI", 8),
     );
     let mock_assign_stack = Def::assign(
         "stack_assign",
         Variable::mock("R9", 8 as u64),
-        Expression::var("RSP"),
+        Expression::var("RSP", 8),
     );
     let mock_load = Def::load(
         "load",
         Variable::mock("R9", 8 as u64),
-        Expression::var("RDI"),
+        Expression::var("RDI", 8),
     );
     let mut pi_map: HashMap<Tid, PointerInferenceState> = HashMap::new();
 
@@ -590,19 +590,19 @@ fn updating_def() {
     let mock_assign_register = Def::assign(
         "assign",
         Variable::mock("R9", 8 as u64),
-        Expression::var("RDI"),
+        Expression::var("RDI", 8),
     );
     let mock_assign_stack = Def::assign(
         "stack_assign",
         Variable::mock("R9", 8 as u64),
-        Expression::var("RSP"),
+        Expression::var("RSP", 8),
     );
     let mock_load = Def::load(
         "load",
         Variable::mock("R9", 8 as u64),
-        Expression::var("RDI"),
+        Expression::var("RDI", 8),
     );
-    let mock_store = Def::store("store", Expression::var("R9"), Expression::var("RDI"));
+    let mock_store = Def::store("store", Expression::var("R9", 8), Expression::var("RDI", 8));
     let mut pi_map: HashMap<Tid, PointerInferenceState> = HashMap::new();
 
     let stack_id = setup.pi_state.stack_id.clone();
