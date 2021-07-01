@@ -50,6 +50,13 @@ impl CharacterInclusionDomain {
     }
 }
 
+impl From<String> for CharacterInclusionDomain {
+    fn from(string: String) -> Self {
+        let characters: HashSet<char> = string.chars().collect();
+        CharacterInclusionDomain::Value((characters.clone(), characters))
+    }
+}
+
 impl AbstractDomain for CharacterInclusionDomain {
     /// Merge two values; Takes the intersection of the certainly contained characters
     /// and the union of the possibly contained characters.

@@ -22,6 +22,8 @@
 //!  - the *sequence threshold* which  overapproximates the number of string sequences in a brick by forcing a *Top* value.
 //!  - the *length threshold* which  overapproximates the number of bricks in the BricksDomain and forces a *Top* value.
 
+use std::collections::BTreeSet;
+
 use super::{AbstractDomain, HasTop};
 use crate::prelude::*;
 
@@ -231,6 +233,18 @@ pub enum BrickDomain {
 }
 
 impl BrickDomain {
+    /// Returns a new instance of the Brick Domain
+    pub fn new(string: String) -> Self {
+        let mut new_brick = Brick::new();
+        let mut sequence: BTreeSet<String> = BTreeSet::new();
+        sequence.insert(string.to_string());
+        new_brick.set_sequence(sequence);
+        new_brick.set_min(1);
+        new_brick.set_max(1);
+
+        BrickDomain::Value(new_brick)
+    }
+
     /// Returns an empty string brick
     fn get_empty_brick_domain() -> Self {
         BrickDomain::Value(Brick::new())
@@ -242,6 +256,13 @@ impl BrickDomain {
             BrickDomain::Value(brick) => brick.clone(),
             _ => panic!("Unexpected Brick Domain type."),
         }
+    }
+}
+
+impl From<String> for BricksDomain {
+    /// Returns a new instance of the Bricks Domain
+    fn from(string: String) -> Self {
+        BricksDomain::Value(vec![BrickDomain::new(string)])
     }
 }
 

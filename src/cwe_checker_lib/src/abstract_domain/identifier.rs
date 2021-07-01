@@ -89,6 +89,23 @@ impl AbstractLocation {
             variable.size,
         ))
     }
+
+    /// Creates an abstract location from a stack position.
+    /// It creates an abstract memory location using the stack pointer
+    /// and an offset.
+    pub fn from_stack(
+        stack_pointer_register: &Variable,
+        size: &ByteSize,
+        offset: &i64,
+    ) -> Result<AbstractLocation, Error> {
+        Ok(AbstractLocation::Pointer(
+            stack_pointer_register.name.clone(),
+            AbstractMemoryLocation::Location {
+                offset: offset.clone() as isize,
+                size: size.as_bit_length(),
+            },
+        ))
+    }
 }
 
 /// An abstract memory location is either an offset from the given location, where the actual value can be found,

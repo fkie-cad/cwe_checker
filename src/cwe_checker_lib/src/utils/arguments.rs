@@ -4,13 +4,9 @@ use std::collections::HashMap;
 
 use regex::Regex;
 
-use crate::{
-    abstract_domain::{DataDomain, IntervalDomain, TryToBitvec},
-    analysis::pointer_inference::State as PointerInferenceState,
-    intermediate_representation::{
+use crate::{abstract_domain::{DataDomain, IntervalDomain, TryToBitvec}, analysis::pointer_inference::State as PointerInferenceState, intermediate_representation::{
         Arg, ByteSize, CallingConvention, DatatypeProperties, ExternSymbol, Project, Variable,
-    },
-};
+    }};
 
 use super::binary::RuntimeMemoryImage;
 
@@ -35,7 +31,7 @@ pub fn get_input_format_string(
     runtime_memory_image: &RuntimeMemoryImage,
 ) -> String {
     if let Some(format_string) = extern_symbol.parameters.get(format_string_index) {
-        if let Ok(address) = pi_state.eval_parameter_arg(
+        if let Ok(DataDomain::Value(address)) = pi_state.eval_parameter_arg(
             format_string,
             &stack_pointer_register,
             runtime_memory_image,
@@ -56,7 +52,7 @@ pub fn get_input_format_string(
 /// It checks whether the address points to another pointer in memory.
 /// If so, it will use the target address of that pointer read the format string from memory.
 pub fn parse_format_string_destination_and_return_content(
-    address: DataDomain<IntervalDomain>,
+    address: IntervalDomain,
     runtime_memory_image: &RuntimeMemoryImage,
 ) -> String {
     if let Ok(address_vector) = address.try_to_bitvec() {

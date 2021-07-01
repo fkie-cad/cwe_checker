@@ -307,6 +307,7 @@ pub mod tests {
                         write_flag: true,
                         execute_flag: false,
                     },
+                    // Contains string: 'Hello World' starting at the third byte.
                     MemorySegment {
                         bytes: [
                             0x01, 0x02, 0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x57, 0x6f, 0x72, 0x6c,
@@ -333,6 +334,30 @@ pub mod tests {
                         ]
                         .to_vec(),
                         base_address: 0x5000,
+                        read_flag: true,
+                        write_flag: false,
+                        execute_flag: false,
+                    },
+                    // Contains string: 'cat %s %s %s %s' starting at the first byte.
+                    MemorySegment {
+                        bytes: [
+                            0x63, 0x61, 0x74, 0x20, 0x25, 0x73, 0x20, 0x25, 0x73, 0x20, 0x25, 0x73,
+                            0x20, 0x25, 0x73, 0x00,
+                        ]
+                        .to_vec(),
+                        base_address: 0x6000,
+                        read_flag: true,
+                        write_flag: false,
+                        execute_flag: false,
+                    },
+                    // Contains string: 'str1 str2 str3 str4'
+                    MemorySegment {
+                        bytes: [
+                            0x73, 0x74, 0x72, 0x31, 0x20, 0x73, 0x74, 0x72, 0x32, 0x20, 0x73, 0x74,
+                            0x72, 0x33, 0x20, 0x73, 0x74, 0x72, 0x34, 0x00,
+                        ]
+                        .to_vec(),
+                        base_address: 0x7000,
                         read_flag: true,
                         write_flag: false,
                         execute_flag: false,

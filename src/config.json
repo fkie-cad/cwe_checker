@@ -233,5 +233,32 @@
     "deallocation_symbols": [
       "free"
     ]
+  },
+  "AbstractStrings": {
+    "string_symbols": [
+      "printf",
+      "sprintf",
+      "snprintf",
+      "strcat",
+      "strncat",
+      "scanf",
+      "__isoc99_scanf",
+      "sscanf",
+      "__isoc99_sscanf",
+      "strstr",
+      "strcpy",
+      "strncpy",
+      "strlen",
+      "fgets"
+    ],
+    "format_string_index": {
+      "printf": 0,
+      "sprintf": 1,
+      "snprintf": 2,
+      "scanf": 0,
+      "__isoc99_scanf": 0,
+      "sscanf": 1,
+      "__isoc99_sscanf": 1
+    }
   }
 }

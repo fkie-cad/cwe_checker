@@ -486,7 +486,7 @@ fn specialize_by_expression_results() {
     // Expr = Var(RAX)
     let mut state = base_state.clone();
     let x = state
-        .specialize_by_expression_result(&Expression::var("RAX"), Bitvector::from_i64(7).into());
+        .specialize_by_expression_result(&Expression::var("RAX", 8), Bitvector::from_i64(7).into());
     assert!(x.is_ok());
     assert_eq!(
         state.get_register(&register("RAX")),
@@ -494,7 +494,7 @@ fn specialize_by_expression_results() {
     );
     let mut state = base_state.clone();
     let x = state
-        .specialize_by_expression_result(&Expression::var("RAX"), Bitvector::from_i64(-20).into());
+        .specialize_by_expression_result(&Expression::var("RAX", 8), Bitvector::from_i64(-20).into());
     assert!(x.is_err());
 
     let mut state = base_state.clone();
@@ -507,7 +507,7 @@ fn specialize_by_expression_results() {
         PointerDomain::new(abstract_id.clone(), IntervalDomain::mock(0, 50)).into(),
     );
     let x = state.specialize_by_expression_result(
-        &Expression::var("RAX"),
+        &Expression::var("RAX", 8),
         PointerDomain::new(abstract_id.clone(), IntervalDomain::mock(20, 70)).into(),
     );
     assert!(x.is_ok());
@@ -533,7 +533,7 @@ fn specialize_by_expression_results() {
     // Expr = -Var(RAX)
     let mut state = base_state.clone();
     let x = state.specialize_by_expression_result(
-        &Expression::var("RAX").un_op(UnOpType::Int2Comp),
+        &Expression::var("RAX", 8).un_op(UnOpType::Int2Comp),
         Bitvector::from_i64(-7).into(),
     );
     assert!(x.is_ok());
@@ -597,7 +597,7 @@ fn specialize_by_binop() {
     // Expr = RAX + Const
     let mut state = base_state.clone();
     let x = state.specialize_by_expression_result(
-        &Expression::var("RAX").plus_const(20),
+        &Expression::var("RAX", 8).plus_const(20),
         IntervalDomain::mock(5, 7).into(),
     );
     assert!(x.is_ok());
@@ -609,7 +609,7 @@ fn specialize_by_binop() {
     // Expr = RAX - Const
     let mut state = base_state.clone();
     let x = state.specialize_by_expression_result(
-        &Expression::var("RAX").minus_const(20),
+        &Expression::var("RAX", 8).minus_const(20),
         Bitvector::from_i64(5).into(),
     );
     assert!(x.is_ok());
@@ -622,7 +622,7 @@ fn specialize_by_binop() {
     let mut state = base_state.clone();
     let x = state.specialize_by_expression_result(
         &Expression::BinOp {
-            lhs: Box::new(Expression::var("RAX")),
+            lhs: Box::new(Expression::var("RAX", 8)),
             op: BinOpType::IntXOr,
             rhs: Box::new(Expression::const_from_i64(3)),
         },
@@ -638,9 +638,9 @@ fn specialize_by_binop() {
     let mut state = base_state.clone();
     let x = state.specialize_by_expression_result(
         &Expression::BinOp {
-            lhs: Box::new(Expression::var("RAX")),
+            lhs: Box::new(Expression::var("RAX", 8)),
             op: BinOpType::IntOr,
-            rhs: Box::new(Expression::var("RBX")),
+            rhs: Box::new(Expression::var("RBX", 8)),
         },
         Bitvector::from_i64(0).into(),
     );
@@ -657,7 +657,7 @@ fn specialize_by_binop() {
     let mut state = base_state.clone();
     let x = state.specialize_by_expression_result(
         &Expression::BinOp {
-            lhs: Box::new(Expression::var("RAX")),
+            lhs: Box::new(Expression::var("RAX", 8)),
             op: BinOpType::IntOr,
             rhs: Box::new(Expression::const_from_i64(0)),
         },
@@ -717,7 +717,7 @@ fn specialize_by_equality_comparison() {
         &Expression::BinOp {
             lhs: Box::new(Expression::const_from_i64(23)),
             op: BinOpType::IntEqual,
-            rhs: Box::new(Expression::var("RAX")),
+            rhs: Box::new(Expression::var("RAX", 8)),
         },
         Bitvector::from_u8(1).into(),
     );
@@ -731,7 +731,7 @@ fn specialize_by_equality_comparison() {
         &Expression::BinOp {
             lhs: Box::new(Expression::const_from_i64(23)),
             op: BinOpType::IntNotEqual,
-            rhs: Box::new(Expression::var("RAX")),
+            rhs: Box::new(Expression::var("RAX", 8)),
         },
         Bitvector::from_u8(0).into(),
     );
@@ -748,7 +748,7 @@ fn specialize_by_equality_comparison() {
         &Expression::BinOp {
             lhs: Box::new(Expression::const_from_i64(23)),
             op: BinOpType::IntNotEqual,
-            rhs: Box::new(Expression::var("RAX")),
+            rhs: Box::new(Expression::var("RAX", 8)),
         },
         Bitvector::from_u8(1).into(),
     );
@@ -758,7 +758,7 @@ fn specialize_by_equality_comparison() {
         &Expression::BinOp {
             lhs: Box::new(Expression::const_from_i64(100)),
             op: BinOpType::IntEqual,
-            rhs: Box::new(Expression::var("RAX")),
+            rhs: Box::new(Expression::var("RAX", 8)),
         },
         Bitvector::from_u8(0).into(),
     );
