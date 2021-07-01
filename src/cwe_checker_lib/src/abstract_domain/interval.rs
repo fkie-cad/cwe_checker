@@ -11,7 +11,7 @@ pub use simple_interval::*;
 
 mod bin_ops;
 
-/// An abstract domain representing values in a interval range with strides and widening hints.
+/// An abstract domain representing values in an interval range with strides and widening hints.
 ///
 /// The interval bounds are signed integers,
 /// i.e. the domain looses precision if tasked to represent large unsigned integers.
