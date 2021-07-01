@@ -74,30 +74,36 @@ impl<'a> Context<'a> {
             .pointer_inference_results
             .get_node_value(call_source_node)
         {
-            let parameters = arguments::get_variable_number_parameters(
+            if let Ok(parameters) = arguments::get_variable_number_parameters(
                 self.project,
                 pi_state,
                 user_input_symbol,
                 &self.symbol_maps.format_string_index,
                 self.runtime_memory_image,
-            );
-            if !parameters.is_empty() {
-                match user_input_symbol.name.as_str() {
-                    "scanf" | "__isoc99_scanf" => {
-                        self.process_scanf(call_source_node, &mut new_state, pi_state, parameters)
-                    }
-                    "sscanf" | "__isoc99_sscanf" => {
-                        let source_string_register = user_input_symbol.parameters.get(0).unwrap();
-                        self.process_sscanf(
+            ) {
+                if !parameters.is_empty() {
+                    match user_input_symbol.name.as_str() {
+                        "scanf" | "__isoc99_scanf" => self.process_scanf(
+                            call_source_node,
                             &mut new_state,
                             pi_state,
                             parameters,
-                            source_string_register,
-                        )
+                        ),
+                        "sscanf" | "__isoc99_sscanf" => {
+                            let source_string_register =
+                                user_input_symbol.parameters.get(0).unwrap();
+                            self.process_sscanf(
+                                &mut new_state,
+                                pi_state,
+                                parameters,
+                                source_string_register,
+                            )
+                        }
+                        _ => panic!("Invalid user input symbol."),
                     }
-                    _ => panic!("Invalid user input symbol."),
                 }
             }
+            // TODO: Log errors that came up during the parameter parsing.
         }
         new_state
     }
@@ -222,13 +228,18 @@ impl<'a> Context<'a> {
             if self.is_relevant_string_function_call(string_symbol, pi_state, &mut new_state) {
                 let mut parameters = string_symbol.parameters.clone();
                 if string_symbol.has_var_args {
-                    parameters = arguments::get_variable_number_parameters(
+                    if let Ok(args) = arguments::get_variable_number_parameters(
                         self.project,
                         pi_state,
                         string_symbol,
                         &self.symbol_maps.format_string_index,
                         self.runtime_memory_image,
-                    );
+                    ) {
+                        parameters = args;
+                    } else {
+                        // TODO: Log errors that came up during the parameter parsing.
+                        parameters = vec![]
+                    }
                 }
                 self.taint_function_parameters(&mut new_state, pi_state, parameters);
             }

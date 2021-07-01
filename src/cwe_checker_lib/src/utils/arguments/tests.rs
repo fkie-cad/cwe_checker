@@ -43,6 +43,7 @@ fn test_get_variable_number_parameters() {
             &format_string_index_map,
             &mem_image,
         )
+        .unwrap()
     );
 
     output.push(Arg::Stack {
@@ -65,6 +66,7 @@ fn test_get_variable_number_parameters() {
             &format_string_index_map,
             &mem_image,
         )
+        .unwrap()
     );
 }
 
@@ -89,6 +91,7 @@ fn test_get_input_format_string() {
             &Variable::mock("RSP", 8 as u64),
             &mem_image
         )
+        .unwrap()
     );
 }
 
@@ -96,14 +99,18 @@ fn test_get_input_format_string() {
 fn test_parse_format_string_destination_and_return_content() {
     let mem_image = RuntimeMemoryImage::mock();
     let string_address_vector = Bitvector::from_str_radix(16, "3002").unwrap();
+<<<<<<< HEAD
     let string_address = IntervalDomain::new(
         string_address_vector.clone(),
         string_address_vector,
     );
+=======
+    let string_address = IntervalDomain::new(string_address_vector.clone(), string_address_vector);
+>>>>>>> 58c258ec439263c76ba6bf10e26c6d34f796b116
 
     assert_eq!(
         "Hello World",
-        parse_format_string_destination_and_return_content(string_address, &mem_image)
+        parse_format_string_destination_and_return_content(string_address, &mem_image).unwrap()
     );
 }
 

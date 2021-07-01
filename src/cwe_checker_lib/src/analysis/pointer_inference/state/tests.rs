@@ -493,8 +493,10 @@ fn specialize_by_expression_results() {
         Bitvector::from_i64(7).into()
     );
     let mut state = base_state.clone();
-    let x = state
-        .specialize_by_expression_result(&Expression::var("RAX", 8), Bitvector::from_i64(-20).into());
+    let x = state.specialize_by_expression_result(
+        &Expression::var("RAX", 8),
+        Bitvector::from_i64(-20).into(),
+    );
     assert!(x.is_err());
 
     let mut state = base_state.clone();

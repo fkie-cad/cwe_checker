@@ -143,7 +143,7 @@ fn run_with_ghidra(args: CmdlineArgs) {
         &project,
     );
 
-    let modules_depending_on_pointer_inference = vec!["CWE78", "CWE476", "Memory"];
+    let modules_depending_on_pointer_inference = vec!["CWE78", "CWE134", "CWE476", "Memory"];
     let pointer_inference_results = if modules
         .iter()
         .any(|module| modules_depending_on_pointer_inference.contains(&module.name))
@@ -276,6 +276,22 @@ fn get_project_from_ghidra(file_path: &Path, binary: &[u8]) -> (Project, Vec<Log
                 std::process::exit(101);
             }
         };
+
+        match String::from_utf8(output.stdout.clone()) {
+            Ok(standard_out) => {
+                if !standard_out.contains("Pcode was successfully extracted!") {
+                    eprintln!("Execution of Ghidra plugin failed: Process was terminated.");
+                    let error_message: String =
+                        standard_out.lines().rev().collect::<Vec<&str>>()[..2].join("\n");
+                    eprintln!("{}", error_message);
+                    std::process::exit(101);
+                }
+            }
+            Err(_) => {
+                eprintln!("Execution of Ghidra plugin failed: Process was terminated.");
+                std::process::exit(101);
+            }
+        }
 
         if !output.status.success() {
             match output.status.code() {
