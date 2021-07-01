@@ -196,7 +196,7 @@ pub mod tests {
         let def1 = Def::assign(
             "def2",
             Variable::mock("RDI", 8 as u64),
-            Expression::var("RBP").plus_const(8),
+            Expression::var("RBP", 8).plus_const(8),
         );
         let def2 = Def::assign(
             "def3",
