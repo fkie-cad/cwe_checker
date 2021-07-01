@@ -834,12 +834,11 @@ impl Project {
         for sub in self.program.term.subs.iter_mut() {
             if !sub.term.blocks.is_empty()
                 && sub.tid.address != sub.term.blocks[0].tid.address
-                && sub
+                && !sub
                     .term
                     .blocks
                     .iter()
-                    .find(|block| block.tid.address == sub.tid.address)
-                    .is_none()
+                    .any(|block| block.tid.address == sub.tid.address)
             {
                 log_messages.push(LogMessage::new_error(format!(
                     "Starting block of function {} ({}) not found.",
