@@ -99,14 +99,7 @@ fn test_get_input_format_string() {
 fn test_parse_format_string_destination_and_return_content() {
     let mem_image = RuntimeMemoryImage::mock();
     let string_address_vector = Bitvector::from_str_radix(16, "3002").unwrap();
-<<<<<<< HEAD
-    let string_address = IntervalDomain::new(
-        string_address_vector.clone(),
-        string_address_vector,
-    );
-=======
     let string_address = IntervalDomain::new(string_address_vector.clone(), string_address_vector);
->>>>>>> 58c258ec439263c76ba6bf10e26c6d34f796b116
 
     assert_eq!(
         "Hello World",

@@ -64,42 +64,43 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String>> Context<'a, T> {
     ) -> State<T> {
         let mut new_state = state.clone();
         if let Some(pi_state) = state.get_pointer_inference_state() {
-            let return_values = get_variable_number_parameters(
+            if let Ok(return_values) = get_variable_number_parameters(
                 self.project,
                 pi_state,
                 extern_symbol,
                 &*self.format_string_index_map,
                 self.runtime_memory_image,
-            );
-            for argument in return_values.iter() {
-                let abstract_id = self.get_abstract_id_for_function_parameter(argument, call_tid);
-                match argument {
-                    Arg::Register(var) => {
-                        if let DataDomain::Pointer(pointer) = pi_state.get_register(var) {
-                            Context::add_new_string_abstract_domain(
-                                &mut new_state,
-                                pi_state,
-                                pointer,
-                                abstract_id,
-                                None,
-                                true,
-                            );
+            ) {
+                for argument in return_values.iter() {
+                    let abstract_id = self.get_abstract_id_for_function_parameter(argument, call_tid);
+                    match argument {
+                        Arg::Register(var) => {
+                            if let DataDomain::Pointer(pointer) = pi_state.get_register(var) {
+                                Context::add_new_string_abstract_domain(
+                                    &mut new_state,
+                                    pi_state,
+                                    pointer,
+                                    abstract_id,
+                                    None,
+                                    true,
+                                );
+                            }
                         }
-                    }
-                    Arg::Stack { .. } => {
-                        if let Ok(DataDomain::Pointer(pointer)) = pi_state.eval_parameter_arg(
-                            argument,
-                            &self.project.stack_pointer_register,
-                            self.runtime_memory_image,
-                        ) {
-                            Context::add_new_string_abstract_domain(
-                                &mut new_state,
-                                pi_state,
-                                pointer,
-                                abstract_id,
-                                None,
-                                true,
-                            );
+                        Arg::Stack { .. } => {
+                            if let Ok(DataDomain::Pointer(pointer)) = pi_state.eval_parameter_arg(
+                                argument,
+                                &self.project.stack_pointer_register,
+                                self.runtime_memory_image,
+                            ) {
+                                Context::add_new_string_abstract_domain(
+                                    &mut new_state,
+                                    pi_state,
+                                    pointer,
+                                    abstract_id,
+                                    None,
+                                    true,
+                                );
+                            }
                         }
                     }
                 }
@@ -153,25 +154,28 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String>> Context<'a, T> {
                     .format_string_index_map
                     .get(&extern_symbol.name)
                     .unwrap();
-                let input_format_string = get_input_format_string(
+                if let Ok(input_format_string) = get_input_format_string(
                     pi_state,
                     extern_symbol,
                     *format_string_index,
                     &self.project.stack_pointer_register,
                     self.runtime_memory_image,
-                );
-                let var_args = get_variable_number_parameters(
-                    self.project,
-                    pi_state,
-                    extern_symbol,
-                    &*self.format_string_index_map,
-                    self.runtime_memory_image,
-                );
-                let input_strings =
-                    self.get_string_constant_parameter_if_available(var_args, pi_state);
-                let processed_string = self
-                    .insert_string_constants_into_format_string(input_format_string, input_strings);
-                let abstract_id = self.get_abstract_id_for_function_parameter(return_arg, call_tid);
+                ) {
+                    let mut processed_string = input_format_string.clone();
+                    if let Ok(var_args) = get_variable_number_parameters(
+                        self.project,
+                        pi_state,
+                        extern_symbol,
+                        &*self.format_string_index_map,
+                        self.runtime_memory_image,
+                    ) {
+                        let input_strings =
+                            self.get_string_constant_parameter_if_available(var_args, pi_state);
+                        processed_string = self
+                            .insert_string_constants_into_format_string(input_format_string, input_strings);
+                    }
+
+                    let abstract_id = self.get_abstract_id_for_function_parameter(return_arg, call_tid);
 
                 let return_destination =
                     self.get_return_destination_from_first_input_parameter(pi_state, return_arg);
@@ -184,6 +188,7 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String>> Context<'a, T> {
                     Some(processed_string),
                     false,
                 );
+                }
             }
         }
 
