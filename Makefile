@@ -17,7 +17,10 @@ endif
 
 test:
 	cargo test
-	cd test/artificial_samples; scons; cd ../..
+	if [ ! -d "test/artificial_samples/build" ]; then \
+		echo "Acceptance test binaries not found. Please see test/artificial_samples/Readme.md for build instructions."; \
+		exit -1; \
+	fi
 	cargo test --no-fail-fast -p acceptance_tests_ghidra -- --show-output --ignored
 
 compile_test_files:
