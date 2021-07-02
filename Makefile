@@ -39,7 +39,7 @@ uninstall:
 	cargo uninstall cwe_checker
 
 documentation:
-	cargo doc --open
+	cargo doc --open --no-deps
 
 docker:
 	make clean
