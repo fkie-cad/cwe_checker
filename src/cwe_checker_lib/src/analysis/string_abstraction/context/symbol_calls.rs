@@ -1,3 +1,9 @@
+use std::collections::HashMap;
+
+use crate::prelude::*;
+
+use anyhow::Error;
+use itertools::izip;
 use petgraph::graph::NodeIndex;
 
 use crate::abstract_domain::{
@@ -6,7 +12,10 @@ use crate::abstract_domain::{
 };
 use crate::analysis::pointer_inference::State as PointerInferenceState;
 use crate::intermediate_representation::{Arg, Bitvector, Tid};
-use crate::utils::arguments::{get_input_format_string, get_variable_number_parameters};
+use crate::utils::arguments::{
+    get_input_format_string, get_variable_number_parameters, is_string,
+    parse_format_string_parameters,
+};
 use crate::{abstract_domain::AbstractDomain, intermediate_representation::ExternSymbol};
 
 use super::super::state::State;
@@ -42,8 +51,9 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String>> Context<'a, T> {
         call_tid: &Tid,
     ) -> State<T> {
         match extern_symbol.name.as_str() {
-            "scanf" | "__isoc99_scanf" | "sscanf" | "__isoc99_sscanf" => {
-                self.handle_scanf_and_sscanf_calls(state, extern_symbol, call_tid)
+            "scanf" | "__isoc99_scanf" => self.handle_scanf_calls(state, extern_symbol, call_tid),
+            "sscanf" | "__isoc99_sscanf" => {
+                self.handle_sscanf_calls(state, extern_symbol, call_tid)
             }
             "sprintf" | "snprintf" => {
                 self.handle_sprintf_and_snprintf_calls(state, extern_symbol, call_tid)
@@ -54,9 +64,9 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String>> Context<'a, T> {
         }
     }
 
-    /// Handles the detection of string parameters to scanf and sscanf calls.
+    /// Handles the detection of string parameters to scanf calls.
     /// Adds new string abstract domains to the current state.
-    pub fn handle_scanf_and_sscanf_calls(
+    pub fn handle_scanf_calls(
         &self,
         state: &State<T>,
         extern_symbol: &ExternSymbol,
@@ -64,6 +74,7 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String>> Context<'a, T> {
     ) -> State<T> {
         let mut new_state = state.clone();
         if let Some(pi_state) = state.get_pointer_inference_state() {
+            // Check whether the format string parameters can be parsed.
             if let Ok(return_values) = get_variable_number_parameters(
                 self.project,
                 pi_state,
@@ -71,36 +82,92 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String>> Context<'a, T> {
                 &*self.format_string_index_map,
                 self.runtime_memory_image,
             ) {
-                for argument in return_values.iter() {
-                    let abstract_id = self.get_abstract_id_for_function_parameter(argument, call_tid);
-                    match argument {
-                        Arg::Register(var) => {
-                            if let DataDomain::Pointer(pointer) = pi_state.get_register(var) {
-                                Context::add_new_string_abstract_domain(
-                                    &mut new_state,
-                                    pi_state,
-                                    pointer,
-                                    abstract_id,
-                                    None,
-                                    true,
-                                );
-                            }
-                        }
-                        Arg::Stack { .. } => {
-                            if let Ok(DataDomain::Pointer(pointer)) = pi_state.eval_parameter_arg(
-                                argument,
-                                &self.project.stack_pointer_register,
-                                self.runtime_memory_image,
-                            ) {
-                                Context::add_new_string_abstract_domain(
-                                    &mut new_state,
-                                    pi_state,
-                                    pointer,
-                                    abstract_id,
-                                    None,
-                                    true,
-                                );
-                            }
+                self.create_abstract_domain_entries_for_function_arguments(
+                    pi_state,
+                    &mut new_state,
+                    call_tid,
+                    return_values.into_iter().map(|arg| (arg, None)).collect(),
+                );
+            }
+        }
+
+        new_state
+    }
+
+    pub fn create_abstract_domain_entries_for_function_arguments(
+        &self,
+        pi_state: &PointerInferenceState,
+        state: &mut State<T>,
+        call_tid: &Tid,
+        arg_to_value_map: HashMap<Arg, Option<String>>,
+    ) {
+        for (argument, value) in arg_to_value_map.into_iter() {
+            let abstract_id = self.get_abstract_id_for_function_parameter(&argument, call_tid);
+            match argument {
+                Arg::Register(var) => {
+                    if let DataDomain::Pointer(pointer) = pi_state.get_register(&var) {
+                        Context::add_new_string_abstract_domain(
+                            state,
+                            pi_state,
+                            pointer,
+                            abstract_id,
+                            value,
+                        );
+                    }
+                }
+                Arg::Stack { .. } => {
+                    if let Ok(DataDomain::Pointer(pointer)) = pi_state.eval_parameter_arg(
+                        &argument,
+                        &self.project.stack_pointer_register,
+                        self.runtime_memory_image,
+                    ) {
+                        Context::add_new_string_abstract_domain(
+                            state,
+                            pi_state,
+                            pointer,
+                            abstract_id,
+                            value,
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn handle_sscanf_calls(
+        &self,
+        state: &State<T>,
+        extern_symbol: &ExternSymbol,
+        call_tid: &Tid,
+    ) -> State<T> {
+        let mut new_state = state.clone();
+        if let Some(pi_state) = state.get_pointer_inference_state() {
+            if let Some(arg) = extern_symbol.parameters.get(0) {
+                if let Ok(DataDomain::Value(address)) = pi_state.eval_parameter_arg(
+                    arg,
+                    &self.project.stack_pointer_register,
+                    self.runtime_memory_image,
+                ) {
+                    if let Ok(source_string) =
+                        self.runtime_memory_image.read_string_until_null_terminator(
+                            &address
+                                .try_to_bitvec()
+                                .expect("Could not translate interval address to bitvector."),
+                        )
+                    {
+                        if let Ok(source_return_string_map) = self
+                            .map_source_string_parameters_to_return_arguments(
+                                pi_state,
+                                extern_symbol,
+                                source_string,
+                            )
+                        {
+                            self.create_abstract_domain_entries_for_function_arguments(
+                                pi_state,
+                                &mut new_state,
+                                call_tid,
+                                source_return_string_map,
+                            );
                         }
                     }
                 }
@@ -108,6 +175,54 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String>> Context<'a, T> {
         }
 
         new_state
+    }
+
+    pub fn map_source_string_parameters_to_return_arguments(
+        &self,
+        pi_state: &PointerInferenceState,
+        extern_symbol: &ExternSymbol,
+        source_string: &str,
+    ) -> Result<HashMap<Arg, Option<String>>, Error> {
+        if let Ok(string_parameters) = get_variable_number_parameters(
+            self.project,
+            pi_state,
+            extern_symbol,
+            &*self.format_string_index_map,
+            self.runtime_memory_image,
+        ) {
+            let format_string = get_input_format_string(
+                pi_state,
+                extern_symbol,
+                *self.format_string_index_map.get("sscanf").unwrap(),
+                &self.project.stack_pointer_register,
+                self.runtime_memory_image,
+            )
+            .unwrap();
+            let all_parameters: Vec<String> = parse_format_string_parameters(
+                format_string.as_str(),
+                &self.project.datatype_properties,
+            )
+            .into_iter()
+            .map(|(param, _)| param)
+            .collect();
+
+            let return_values: Vec<String> =
+                source_string.split(" ").map(|s| s.to_string()).collect();
+
+            let string_values: Vec<Option<String>> = izip!(all_parameters, return_values)
+                .filter_map(|(id, value)| {
+                    if is_string(&id) {
+                        Some(Some(value))
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+            return Ok(izip!(string_parameters, string_values).collect());
+        }
+
+        Err(anyhow!("Could not map source string to return parameters."))
     }
 
     /// Takes the pointer target if there is only one and checks whether the target
@@ -119,17 +234,14 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String>> Context<'a, T> {
         pointer: PointerDomain<IntervalDomain>,
         abstract_id: AbstractIdentifier,
         domain_input_string: Option<String>,
-        is_top: bool,
     ) {
         if pointer.targets().len() == 1 {
             let (target, offset) = pointer.targets().iter().next().unwrap();
             if *target == pi_state.stack_id {
-                if is_top {
-                    state.add_string_top_value(abstract_id.clone());
+                if let Some(string) = domain_input_string {
+                    state.add_string_domain(abstract_id.clone(), string)
                 } else {
-                    if let Some(string) = domain_input_string {
-                        state.add_string_domain(abstract_id.clone(), string)
-                    }
+                    state.add_string_top_value(abstract_id.clone());
                 }
                 state.add_new_offset_to_string_entry(offset.try_to_bitvec().unwrap(), abstract_id);
             }
@@ -171,23 +283,25 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String>> Context<'a, T> {
                     ) {
                         let input_strings =
                             self.get_string_constant_parameter_if_available(var_args, pi_state);
-                        processed_string = self
-                            .insert_string_constants_into_format_string(input_format_string, input_strings);
+                        processed_string = Context::<T>::insert_string_constants_into_format_string(
+                            input_format_string,
+                            input_strings,
+                        );
                     }
 
-                    let abstract_id = self.get_abstract_id_for_function_parameter(return_arg, call_tid);
+                    let abstract_id =
+                        self.get_abstract_id_for_function_parameter(return_arg, call_tid);
 
-                let return_destination =
-                    self.get_return_destination_from_first_input_parameter(pi_state, return_arg);
+                    let return_destination = self
+                        .get_return_destination_from_first_input_parameter(pi_state, return_arg);
 
-                Context::add_new_string_abstract_domain(
-                    &mut new_state,
-                    pi_state,
-                    return_destination,
-                    abstract_id,
-                    Some(processed_string),
-                    false,
-                );
+                    Context::add_new_string_abstract_domain(
+                        &mut new_state,
+                        pi_state,
+                        return_destination,
+                        abstract_id,
+                        Some(processed_string),
+                    );
                 }
             }
         }
@@ -218,6 +332,7 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String>> Context<'a, T> {
     /// Takes parameters parsed from an input format string and checks
     /// whether they point to global string constants.
     /// If so, they are returned in a string vector.
+    /// If not, the format string specifier is returned.
     pub fn get_string_constant_parameter_if_available(
         &self,
         var_args: Vec<Arg>,
@@ -248,7 +363,6 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String>> Context<'a, T> {
     }
 
     pub fn insert_string_constants_into_format_string(
-        &self,
         format_string: String,
         input_strings: Vec<String>,
     ) -> String {

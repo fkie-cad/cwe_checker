@@ -6,9 +6,13 @@ use crate::prelude::*;
 
 use regex::Regex;
 
-use crate::{abstract_domain::{DataDomain, IntervalDomain, TryToBitvec}, analysis::pointer_inference::State as PointerInferenceState, intermediate_representation::{
+use crate::{
+    abstract_domain::{DataDomain, IntervalDomain, TryToBitvec},
+    analysis::pointer_inference::State as PointerInferenceState,
+    intermediate_representation::{
         Arg, ByteSize, CallingConvention, DatatypeProperties, ExternSymbol, Project, Variable,
-    }};
+    },
+};
 
 use super::binary::RuntimeMemoryImage;
 

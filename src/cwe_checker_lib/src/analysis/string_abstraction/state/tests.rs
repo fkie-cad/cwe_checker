@@ -29,4 +29,15 @@ impl<T: AbstractDomain + HasTop + Eq + From<String>> State<T> {
     pub fn get_strings(&self) -> &HashMap<AbstractIdentifier, T> {
         &self.strings
     }
+
+    pub fn set_all_maps_empty(&mut self) {
+        self.strings = HashMap::new();
+        self.stack_offset_to_pointer_map = HashMap::new();
+        self.stack_offset_to_string_map = HashMap::new();
+        self.variable_to_pointer_map = HashMap::new();
+    }
+
+    pub fn get_stack_offset_to_string_map(&self) -> &HashMap<Bitvector, AbstractIdentifier> {
+        &self.stack_offset_to_string_map
+    }
 }

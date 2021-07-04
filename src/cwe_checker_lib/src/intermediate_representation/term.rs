@@ -843,7 +843,7 @@ mod tests {
                 long_double_size: ByteSize::new(8),
                 long_long_size: ByteSize::new(8),
                 long_size: ByteSize::new(4),
-                pointer_size: ByteSize::new(4),
+                pointer_size: ByteSize::new(8),
                 short_size: ByteSize::new(2),
             }
         }

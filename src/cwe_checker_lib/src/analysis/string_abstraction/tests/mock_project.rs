@@ -135,7 +135,7 @@ fn mock_defs_for_sprintf(format_known: bool, blk_num: usize) -> Vec<Term<Def>> {
     if format_known {
         defs.push(setup.format_string_constant(&format!("def_3_blk_{}", blk_num), "r1"));
     } else {
-        defs.push(setup.pointer_plus_offset(&format!("def_3_blk_{}", blk_num), "r1", "r11", 4));
+        defs.push(setup.pointer_minus_offset(&format!("def_3_blk_{}", blk_num), "r1", "r11", 0x62));
     }
 
     defs.push(setup.string_input_constant(&format!("def_4_blk_{}", blk_num), "r2", 0x3002));
