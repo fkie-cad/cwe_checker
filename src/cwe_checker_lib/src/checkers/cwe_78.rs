@@ -16,12 +16,13 @@
 //! where 'char *dest' will contain the return value)
 //!
 //! For instance:
-//!     ...
-//!     MOV RAX, qword ptr [RBP + local_10]
-//!     MOV RDI, RAX                        // RDI is the first input parameter for the strcat call and it points to [RBP + local_10]
-//!     CALL strcat
-//!     MOV RAX, qword ptr [RBP + local_10] // In the backwards analysis [RBP + local_10] will be tainted and it contains the return value
-//!     ...
+//!
+//! ```
+//! MOV RAX, qword ptr [RBP + local_10]
+//! MOV RDI, RAX                        // RDI is the first input parameter for the strcat call and it points to [RBP + local_10]
+//! CALL strcat
+//! MOV RAX, qword ptr [RBP + local_10] // In the backwards analysis [RBP + local_10] will be tainted and it contains the return value
+//! ```
 //!
 //! ### Symbols configurable in config.json
 //!
@@ -250,11 +251,12 @@ impl<'a> SymbolMaps<'a> {
 }
 
 /// - block_first_def_set:
-///       - A set containing a given [`Def`] as the first `Def` of the block.
+///       - A set containing a given [`Def`](crate::intermediate_representation::Def) as the first `Def` of the block.
 ///       The keys are of the form `(Def-TID, Current-Sub-TID)`
 ///       to distinguish the nodes for blocks contained in more than one function.
 /// - block_start_last_def_map:
-///       - A map to get the node index of the `BlkStart` node containing a given [`Def`] as the last `Def` of the block.
+///       - A map to get the node index of the `BlkStart` node
+///       containing a given [`Def`](crate::intermediate_representation::Def) as the last `Def` of the block.
 ///       The keys are of the form `(Def-TID, Current-Sub-TID)`
 ///       to distinguish the nodes for blocks contained in more than one function.
 /// - jmp_to_blk_end_node_map:
