@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["cwe_checker_lib"] = [{"text":"impl <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/default/trait.Default.html\" title=\"trait core::default::Default\">Default</a> for <a class=\"struct\" href=\"cwe_checker_lib/utils/log/struct.CweWarning.html\" title=\"struct cwe_checker_lib::utils::log::CweWarning\">CweWarning</a>","synthetic":false,"types":["cwe_checker_lib::utils::log::CweWarning"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

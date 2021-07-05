@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["check_cwe","Run the check."]],"static":[["CWE_MODULE","The module name and version"]],"struct":[["Config","The configuration struct contains the list of functions that are assumed to be used to correctly drop priviledges after a `chroot` call."]]});

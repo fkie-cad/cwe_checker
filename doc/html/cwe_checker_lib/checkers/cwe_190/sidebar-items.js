@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["check_cwe","Run the CWE check. For each call to one of the symbols configured in config.json we check whether the block containing the call also contains a multiplication instruction."]],"static":[["CWE_MODULE","The module name and version"]],"struct":[["Config","The configuration struct. The `symbols` are extern function names."]]});

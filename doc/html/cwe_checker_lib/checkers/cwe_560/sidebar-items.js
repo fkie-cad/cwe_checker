@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["check_cwe","Execute the CWE check."]],"static":[["CWE_MODULE","The module name and version"],["UPPER_BOUND_CORRECT_CHMOD_ARG_VALUE","An upper bound for the value of a chmod-style argument."],["UPPER_BOUND_CORRECT_UMASK_ARG_VALUE","An upper bound for the value of a presumably correct umask argument."]]});

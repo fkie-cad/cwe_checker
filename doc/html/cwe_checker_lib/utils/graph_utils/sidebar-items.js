@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["is_sink_call_reachable_from_source_call","Check whether a call to the `sink_symbol` is reachable from the given `source_node` through a path of intraprocedural edges in the control flow graph."]]});

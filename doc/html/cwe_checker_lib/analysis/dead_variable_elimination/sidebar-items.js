@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["compute_alive_vars","Compute alive variables by means of an intraprocedural fixpoint computation. Returns a map that assigns to each basic block `Tid` the set of all variables that are alive at the end of the basic block."],["remove_dead_var_assignments","Remove all dead assignments from all basic blocks in the given `project`."]]});

@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["check_cwe","Run the check."]],"static":[["CWE_MODULE","The module name and version"]]});

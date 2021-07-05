@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["RuntimeMemoryImage","A representation of the runtime image of a binary after being loaded into memory by the loader."]]});

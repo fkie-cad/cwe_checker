@@ -1,0 +1,40 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Creating and computing generic fixpoint computations."><meta name="keywords" content="rust, rustlang, rust-lang, fixpoint"><title>cwe_checker_lib::analysis::fixpoint - Rust</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../favicon.svg">
+<link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png">
+<link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../../cwe_checker_lib/index.html'><div class='logo-container rust-logo'><img src='../../../rust-logo.png' alt='logo'></div></a><p class="location">Module fixpoint</p><div class="sidebar-elems"><div class="block items"><ul><li><a href="#structs">Structs</a></li><li><a href="#traits">Traits</a></li></ul></div><p class="location"><a href="../../index.html">cwe_checker_lib</a>::<wbr><a href="../index.html">analysis</a></p><div id="sidebar-vars" data-name="fixpoint" data-ty="mod" data-relpath="../"></div><script defer src="../sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
+                <a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class="fqn"><span class="in-band">Module <a href="../../index.html">cwe_checker_lib</a>::<wbr><a href="../index.html">analysis</a>::<wbr><a class="mod" href="">fixpoint</a><button id="copy-path" onclick="copy_path(this)">⎘</button></span><span class="out-of-band"><span id="render-detail"><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span><a class="srclink" href="../../../src/cwe_checker_lib/analysis/fixpoint.rs.html#1-293" title="goto source code">[src]</a></span></h1><div class="docblock"><p>Creating and computing generic fixpoint computations.</p>
+<p>For general information on dataflow analysis using fixpoint algorithms see <a href="https://en.wikipedia.org/wiki/Data-flow_analysis">Wikipedia</a>.</p>
+<h1 id="general-implementation-notes" class="section-header"><a href="#general-implementation-notes">General implementation notes</a></h1>
+<p>A fixpoint problem is defined as a graph where:</p>
+<ul>
+<li>Each node <code>n</code> gets assigned a value <code>val(n)</code> where the set of all values forms a partially ordered set.</li>
+<li>Each edge <code>e</code> defines a rule <code>e:value -&gt; value</code> how to compute the value at the end node given the value at the start node of the edge.</li>
+</ul>
+<p>A fixpoint is reached if an assignment of values to all nodes of the graph is found
+so that for all edges <code>e(val(start_node)) &lt;= val(end_node)</code> holds.
+Usually one wants to find the smallest fixpoint,
+i.e. a fixpoint such that for each node <code>n</code> the value <code>val(n)</code> is as small as possible (with respect to the partial order)
+but also not less than a given starting value.</p>
+<p>As in the <code>graph</code> module, nodes are assumed to represent points in time,
+whereas edges represent state transitions or (artificial) information flow channels.
+In particular, only edges have transition functions and not nodes.</p>
+<p>In the current implementation edge transition functions are also allowed to return <code>None</code>
+to indicate that no information flows through the edge.
+For example, an analysis can use this to indicate edges that are never taken
+and thus prevent dead code to affect the analysis.</p>
+<h1 id="how-to-compute-the-solution-to-a-fixpoint-problem" class="section-header"><a href="#how-to-compute-the-solution-to-a-fixpoint-problem">How to compute the solution to a fixpoint problem</a></h1>
+<p>To create a fixpoint computation one needs an object implementing the <code>Context</code> trait.
+This object contains all information necessary to compute fixpoints,
+like the graph or how to compute transition functions,
+but not the actual starting values of a fixpoint computation.
+With it, create a <code>Computation</code> object and then modify the node values through the object
+to match the intended starting conditions of the fixpoint computation.
+The <code>Computation</code> object also contains methods to actually run the fixpoint computation after the starting values are set
+and methods to retrieve the results of the computation.</p>
+</div><h2 id="structs" class="section-header"><a href="#structs">Structs</a></h2>
+<table><tr class="module-item"><td><a class="struct" href="struct.Computation.html" title="cwe_checker_lib::analysis::fixpoint::Computation struct">Computation</a></td><td class="docblock-short"><p>The computation struct contains an intermediate result of a fixpoint computation
+and provides methods for continuing the fixpoint computation
+or extracting the (intermediate or final) results.</p>
+</td></tr></table><h2 id="traits" class="section-header"><a href="#traits">Traits</a></h2>
+<table><tr class="module-item"><td><a class="trait" href="trait.Context.html" title="cwe_checker_lib::analysis::fixpoint::Context trait">Context</a></td><td class="docblock-short"><p>The context of a fixpoint computation.</p>
+</td></tr></table></section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="cwe_checker_lib" data-search-index-js="../../../search-index.js" data-search-js="../../../search.js"></div>
+    <script src="../../../main.js"></script></body></html>

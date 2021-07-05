@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["Edge","The edge type of an interprocedural fixpoint graph."],["Node","The node type of an interprocedural control flow graph"]],"fn":[["get_program_cfg","Build the interprocedural control flow graph for a program term."]],"type":[["Graph","The graph type of an interprocedural control flow graph"]]});

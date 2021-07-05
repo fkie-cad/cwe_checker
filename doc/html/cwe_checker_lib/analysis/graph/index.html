@@ -1,0 +1,56 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Generate control flow graphs out of a program term."><meta name="keywords" content="rust, rustlang, rust-lang, graph"><title>cwe_checker_lib::analysis::graph - Rust</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../favicon.svg">
+<link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png">
+<link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../../cwe_checker_lib/index.html'><div class='logo-container rust-logo'><img src='../../../rust-logo.png' alt='logo'></div></a><p class="location">Module graph</p><div class="sidebar-elems"><div class="block items"><ul><li><a href="#enums">Enums</a></li><li><a href="#functions">Functions</a></li><li><a href="#types">Type Definitions</a></li></ul></div><p class="location"><a href="../../index.html">cwe_checker_lib</a>::<wbr><a href="../index.html">analysis</a></p><div id="sidebar-vars" data-name="graph" data-ty="mod" data-relpath="../"></div><script defer src="../sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
+                <a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class="fqn"><span class="in-band">Module <a href="../../index.html">cwe_checker_lib</a>::<wbr><a href="../index.html">analysis</a>::<wbr><a class="mod" href="">graph</a><button id="copy-path" onclick="copy_path(this)">⎘</button></span><span class="out-of-band"><span id="render-detail"><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span><a class="srclink" href="../../../src/cwe_checker_lib/analysis/graph.rs.html#1-631" title="goto source code">[src]</a></span></h1><div class="docblock"><p>Generate control flow graphs out of a program term.</p>
+<p>The generated graphs follow some basic principles:</p>
+<ul>
+<li><strong>Nodes</strong> denote specific (abstract) points in time during program execution,
+i.e. information does not change on a node.
+So a basic block itself is not a node,
+but the points in time before and after execution of the basic block can be nodes.</li>
+<li><strong>Edges</strong> denote either transitions between the points in time of their start and end nodes during program execution
+or they denote (artificial) information flow between nodes. See the <code>CRCallStub</code> edges of interprocedural control flow graphs
+for an example of an edge that is only meant for information flow and not actual control flow.</li>
+</ul>
+<h1 id="general-assumptions" class="section-header"><a href="#general-assumptions">General assumptions</a></h1>
+<p>The graph construction algorithm assumes
+that each basic block of the program term ends with zero, one or two jump instructions.
+In the case of two jump instructions the first one is a conditional jump
+and the second one is an unconditional jump.
+Conditional calls are not supported.
+Missing jump instructions are supported to indicate incomplete information about the control flow,
+i.e. points where the control flow reconstruction failed.
+These points are converted to dead ends in the control flow graphs.</p>
+<h1 id="interprocedural-control-flow-graph" class="section-header"><a href="#interprocedural-control-flow-graph">Interprocedural control flow graph</a></h1>
+<p>The function <a href="fn.get_program_cfg.html"><code>get_program_cfg</code></a> builds an interprocedural control flow graph out of a program term as follows:</p>
+<ul>
+<li>Each basic block (<a href="../../../../../doc/images/node_edge.png"><code>image</code></a>) is converted into two nodes, <em>BlkStart</em> and <em>BlkEnd</em>,
+and a <em>block</em> edge from <em>BlkStart</em> to <em>BlkEnd</em>.</li>
+<li>Jumps and calls inside the program are converted to <em>Jump</em> or <em>Call</em> edges from the <em>BlkEnd</em> node of their source
+to the <em>BlkStart</em> node of their target (which is the first block of the target function in case of calls).</li>
+<li>Calls to library functions (<a href="../../../../../doc/images/extern_calls.png"><code>image</code></a>) outside the program are converted to <em>ExternCallStub</em> edges
+from the <em>BlkEnd</em> node of the callsite to the <em>BlkStart</em> node of the basic block the call returns to
+(if the call returns at all).</li>
+<li>Right now indirect calls are handled as if they were extern calls, i.e. an <em>ExternCallStub</em> edge is added.
+This behaviour will change in the future, when better indirect call handling is implemented.</li>
+<li>For each in-program call (<a href="../../../../../doc/images/internal_function_call.png"><code>image</code></a>) and corresponding return jump two nodes and four edges are generated:
+<ul>
+<li>An artificial node <em>CallReturn</em> and node <em>CallSource</em></li>
+<li>A <em>CRCallStub</em> edge from the <em>BlkEnd</em> node of the callsite to <em>CallReturn</em></li>
+<li>A <em>CRReturnStub</em> edge from the <em>BlkEnd</em> node of the returning from block to <em>CallReturn</em></li>
+<li>A <em>ReturnCombine</em> edge from <em>CallReturn</em> to the <em>BlkStart</em> node of the returned to block.</li>
+<li>A <em>CallCombine</em> edge from the <em>BlkEnd</em> node to the <em>CallSource</em> node.</li>
+</ul>
+</li>
+</ul>
+<p>The artificial <em>CallReturn</em> nodes enable enriching the information flowing through a return edge
+with information recovered from the corresponding callsite during a fixpoint computation.</p>
+</div><h2 id="enums" class="section-header"><a href="#enums">Enums</a></h2>
+<table><tr class="module-item"><td><a class="enum" href="enum.Edge.html" title="cwe_checker_lib::analysis::graph::Edge enum">Edge</a></td><td class="docblock-short"><p>The edge type of an interprocedural fixpoint graph.</p>
+</td></tr><tr class="module-item"><td><a class="enum" href="enum.Node.html" title="cwe_checker_lib::analysis::graph::Node enum">Node</a></td><td class="docblock-short"><p>The node type of an interprocedural control flow graph</p>
+</td></tr></table><h2 id="functions" class="section-header"><a href="#functions">Functions</a></h2>
+<table><tr class="module-item"><td><a class="fn" href="fn.get_program_cfg.html" title="cwe_checker_lib::analysis::graph::get_program_cfg fn">get_program_cfg</a></td><td class="docblock-short"><p>Build the interprocedural control flow graph for a program term.</p>
+</td></tr></table><h2 id="types" class="section-header"><a href="#types">Type Definitions</a></h2>
+<table><tr class="module-item"><td><a class="type" href="type.Graph.html" title="cwe_checker_lib::analysis::graph::Graph type">Graph</a></td><td class="docblock-short"><p>The graph type of an interprocedural control flow graph</p>
+</td></tr></table></section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="cwe_checker_lib" data-search-index-js="../../../search-index.js" data-search-js="../../../search.js"></div>
+    <script src="../../../main.js"></script></body></html>
