@@ -36,7 +36,7 @@ fn test_get_variable_number_parameters() {
     let mut output: Vec<Arg> = Vec::new();
     assert_eq!(
         output,
-        get_variable_number_parameters(
+        get_variable_parameters(
             &project,
             &pi_state,
             &sprintf_symbol,
@@ -49,6 +49,7 @@ fn test_get_variable_number_parameters() {
     output.push(Arg::Stack {
         offset: 0,
         size: ByteSize::new(8),
+        data_type: None,
     });
 
     let global_address = Bitvector::from_str_radix(16, "500c").unwrap();
@@ -59,7 +60,7 @@ fn test_get_variable_number_parameters() {
 
     assert_eq!(
         output,
-        get_variable_number_parameters(
+        get_variable_parameters(
             &project,
             &pi_state,
             &sprintf_symbol,
@@ -187,7 +188,10 @@ fn test_calculate_parameter_locations() {
     parameters.push(("f".to_string(), ByteSize::new(8)));
     parameters.push(("s".to_string(), ByteSize::new(4)));
 
-    let mut expected_args = vec![Arg::Register(Variable::mock("R9", ByteSize::new(8)))];
+    let mut expected_args = vec![Arg::Register {
+        var: Variable::mock("R9", ByteSize::new(8)),
+        data_type: None,
+    }];
 
     // Test Case 1: The string parameter is still written in the R9 register since 'f' is contained in the float register.
     assert_eq!(
@@ -199,6 +203,7 @@ fn test_calculate_parameter_locations() {
     expected_args.push(Arg::Stack {
         offset: 0,
         size: ByteSize::new(4),
+        data_type: None,
     });
 
     // Test Case 2: A second string parameter does not fit into the registers anymore and is written into the stack.
@@ -214,6 +219,7 @@ fn test_create_string_stack_arg() {
         Arg::Stack {
             size: ByteSize::new(8),
             offset: 8,
+            data_type: None,
         },
         create_string_stack_arg(ByteSize::new(8), 8),
     )
@@ -222,7 +228,10 @@ fn test_create_string_stack_arg() {
 #[test]
 fn test_create_string_register_arg() {
     assert_eq!(
-        Arg::Register(Variable::mock("R9", ByteSize::new(8))),
+        Arg::Register {
+            var: Variable::mock("R9", ByteSize::new(8)),
+            data_type: None
+        },
         create_string_register_arg(ByteSize::new(8), "R9".to_string()),
     );
 }

@@ -22,7 +22,7 @@ pub fn get_return_registers_from_symbol(symbol: &ExternSymbol) -> Vec<String> {
         .return_values
         .iter()
         .filter_map(|ret| match ret {
-            Arg::Register(var) => Some(var.name.clone()),
+            Arg::Register { var, .. } => Some(var.name.clone()),
             _ => None,
         })
         .collect::<Vec<String>>()
@@ -117,7 +117,7 @@ pub fn map_format_specifier_to_bytesize(
 }
 
 /// Returns an argument vector of detected variable parameters if they are of type string.
-pub fn get_variable_number_parameters(
+pub fn get_variable_parameters(
     project: &Project,
     pi_state: &PointerInferenceState,
     extern_symbol: &ExternSymbol,
@@ -209,16 +209,20 @@ pub fn create_string_stack_arg(size: ByteSize, stack_offset: i64) -> Arg {
     Arg::Stack {
         offset: stack_offset,
         size,
+        data_type: None,
     }
 }
 
 /// Creates a string register parameter given a register name.
 pub fn create_string_register_arg(size: ByteSize, register_name: String) -> Arg {
-    Arg::Register(Variable {
-        name: register_name,
-        size,
-        is_temp: false,
-    })
+    Arg::Register {
+        var: Variable {
+            name: register_name,
+            size,
+            is_temp: false,
+        },
+        data_type: None,
+    }
 }
 
 /// Checks whether the format specifier is of type int.

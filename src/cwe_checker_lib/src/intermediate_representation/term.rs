@@ -1,4 +1,4 @@
-use super::{ByteSize, CastOpType, DatatypeProperties, Expression, Variable};
+use super::{ByteSize, CastOpType, Datatype, DatatypeProperties, Expression, Variable};
 use crate::prelude::*;
 use crate::utils::log::LogMessage;
 use std::collections::HashSet;
@@ -455,7 +455,12 @@ pub struct Sub {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub enum Arg {
     /// The argument is passed in the given register
-    Register(Variable),
+    Register {
+        /// The variable object representing the register.
+        var: Variable,
+        /// An optional data type indicator.
+        data_type: Option<Datatype>,
+    },
     /// The argument is passed on the stack.
     /// It is positioned at the given offset (in bytes) relative to the stack pointer on function entry
     /// and has the given size.
@@ -465,6 +470,8 @@ pub enum Arg {
         offset: i64,
         /// The size in bytes of the argument.
         size: ByteSize,
+        /// An optional data type indicator.
+        data_type: Option<Datatype>,
     },
 }
 
@@ -497,7 +504,7 @@ impl ExternSymbol {
     pub fn get_unique_return_register(&self) -> Result<&Variable, Error> {
         if self.return_values.len() == 1 {
             match self.return_values[0] {
-                Arg::Register(ref var) => Ok(var),
+                Arg::Register { ref var, .. } => Ok(var),
                 Arg::Stack { .. } => Err(anyhow!("Return value is passed on the stack")),
             }
         } else {
@@ -814,7 +821,10 @@ mod tests {
 
     impl Arg {
         pub fn mock_register(name: impl ToString, size_in_bytes: impl Into<ByteSize>) -> Arg {
-            Arg::Register(Variable::mock(name.to_string(), size_in_bytes))
+            Arg::Register {
+                var: Variable::mock(name.to_string(), size_in_bytes),
+                data_type: None,
+            }
         }
     }
 

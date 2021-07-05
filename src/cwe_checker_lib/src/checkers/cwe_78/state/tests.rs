@@ -25,7 +25,10 @@ fn bv(value: i64) -> ValueDomain {
 
 impl State {
     pub fn mock_with_pi_state() -> (State, PointerInferenceState) {
-        let arg = Arg::Register(Variable::mock("RAX", 8 as u64));
+        let arg = Arg::Register {
+            var: Variable::mock("RAX", 8 as u64),
+            data_type: None,
+        };
         let pi_state =
             PointerInferenceState::new(&Variable::mock("RSP", 8 as u64), Tid::new("func"));
         let symbol = extern_symbol("system", vec![arg], false);
