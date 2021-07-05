@@ -17,7 +17,7 @@
 //!
 //! For instance:
 //!
-//! ```
+//! ```txt
 //! MOV RAX, qword ptr [RBP + local_10]
 //! MOV RDI, RAX                        // RDI is the first input parameter for the strcat call and it points to [RBP + local_10]
 //! CALL strcat
