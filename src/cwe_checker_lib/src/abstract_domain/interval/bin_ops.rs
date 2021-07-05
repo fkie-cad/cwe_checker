@@ -5,9 +5,7 @@ impl IntervalDomain {
     /// if one adds a value from `self` to a value from `rhs`.
     pub fn add(&self, rhs: &Self) -> Self {
         let mut interval: IntervalDomain = self.interval.add(&rhs.interval).into();
-        if interval.is_top() {
-            interval
-        } else {
+        if !interval.is_top() {
             interval.widening_delay = std::cmp::max(self.widening_delay, rhs.widening_delay);
             interval.update_widening_lower_bound(
                 &self
@@ -31,17 +29,15 @@ impl IntervalDomain {
                     .as_ref()
                     .and_then(|bound| bound.signed_add_overflow_checked(&self.interval.end)),
             );
-            interval
         }
+        interval
     }
 
     /// Compute the interval of possible results
     /// if one subtracts a value in `rhs` from a value in `self`.
     pub fn sub(&self, rhs: &Self) -> Self {
         let mut interval: IntervalDomain = self.interval.sub(&rhs.interval).into();
-        if interval.is_top() {
-            interval
-        } else {
+        if !interval.is_top() {
             interval.widening_delay = std::cmp::max(self.widening_delay, rhs.widening_delay);
             interval.update_widening_lower_bound(
                 &self
@@ -65,8 +61,8 @@ impl IntervalDomain {
                     .as_ref()
                     .and_then(|bound| self.interval.end.signed_sub_overflow_checked(bound)),
             );
-            interval
         }
+        interval
     }
 
     /// Compute the interval of possible results

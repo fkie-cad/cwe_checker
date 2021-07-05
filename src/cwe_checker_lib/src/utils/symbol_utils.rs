@@ -30,11 +30,7 @@ pub fn get_calls_to_symbols<'a, 'b>(
         for jmp in blk.term.jmps.iter() {
             if let Jmp::Call { target: dst, .. } = &jmp.term {
                 if symbols.contains_key(dst) {
-                    calls.push((
-                        sub.term.name.as_str(),
-                        &jmp.tid,
-                        symbols.get(dst).clone().unwrap(),
-                    ));
+                    calls.push((sub.term.name.as_str(), &jmp.tid, symbols.get(dst).unwrap()));
                 }
             }
         }
