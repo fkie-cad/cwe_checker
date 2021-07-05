@@ -159,7 +159,7 @@ impl TryToInterval for BitvectorDomain {
     /// If the domain represents an absolute value, return it as an interval of length one.
     fn try_to_interval(&self) -> Result<Interval, Error> {
         match self {
-            BitvectorDomain::Value(val) => Ok(Interval::new(val.clone(), val.clone())),
+            BitvectorDomain::Value(val) => Ok(val.clone().into()),
             BitvectorDomain::Top(_) => Err(anyhow!("Value is Top")),
         }
     }

@@ -189,7 +189,9 @@ pub fn print_all_messages(
             + "\n"
     };
     if let Some(file_path) = out_path {
-        std::fs::write(file_path, output).unwrap();
+        std::fs::write(file_path, output).unwrap_or_else(|error| {
+            panic!("Writing to output path {} failed: {}", file_path, error)
+        });
     } else {
         print!("{}", output);
     }
