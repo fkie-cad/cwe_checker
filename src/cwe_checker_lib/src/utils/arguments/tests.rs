@@ -219,7 +219,7 @@ fn test_create_string_stack_arg() {
         Arg::Stack {
             size: ByteSize::new(8),
             offset: 8,
-            data_type: None,
+            data_type: Some(Datatype::Pointer),
         },
         create_string_stack_arg(ByteSize::new(8), 8),
     )
@@ -230,7 +230,7 @@ fn test_create_string_register_arg() {
     assert_eq!(
         Arg::Register {
             var: Variable::mock("R9", ByteSize::new(8)),
-            data_type: None
+            data_type: Some(Datatype::Pointer),
         },
         create_string_register_arg(ByteSize::new(8), "R9".to_string()),
     );
