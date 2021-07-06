@@ -1,6 +1,6 @@
 [package]
 name = "cwe_checker"
-version = "0.5.0"
+version = "0.6.0-dev"
 authors = ["Enkelmann <nils-edvin.enkelmann@fkie.fraunhofer.de>"]
 edition = "2018"
 
