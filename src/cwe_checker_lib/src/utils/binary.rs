@@ -307,6 +307,7 @@ pub mod tests {
                         write_flag: true,
                         execute_flag: false,
                     },
+                    // Contains the Hello World string at byte 3002.
                     MemorySegment {
                         bytes: [
                             0x01, 0x02, 0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x57, 0x6f, 0x72, 0x6c,
