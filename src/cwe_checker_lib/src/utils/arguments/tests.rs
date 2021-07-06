@@ -49,7 +49,7 @@ fn test_get_variable_number_parameters() {
     output.push(Arg::Stack {
         offset: 0,
         size: ByteSize::new(8),
-        data_type: None,
+        data_type: Some(Datatype::Pointer),
     });
 
     let global_address = Bitvector::from_str_radix(16, "500c").unwrap();
@@ -190,7 +190,7 @@ fn test_calculate_parameter_locations() {
 
     let mut expected_args = vec![Arg::Register {
         var: Variable::mock("R9", ByteSize::new(8)),
-        data_type: None,
+        data_type: Some(Datatype::Pointer),
     }];
 
     // Test Case 1: The string parameter is still written in the R9 register since 'f' is contained in the float register.
@@ -203,7 +203,7 @@ fn test_calculate_parameter_locations() {
     expected_args.push(Arg::Stack {
         offset: 0,
         size: ByteSize::new(4),
-        data_type: None,
+        data_type: Some(Datatype::Pointer),
     });
 
     // Test Case 2: A second string parameter does not fit into the registers anymore and is written into the stack.
