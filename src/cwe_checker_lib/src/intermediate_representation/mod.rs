@@ -110,6 +110,29 @@ pub struct DatatypeProperties {
     pub short_size: ByteSize,
 }
 
+/// C/C++ data types.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
+pub enum Datatype {
+    /// C char data type
+    Char,
+    /// C double data type
+    Double,
+    /// C float data type
+    Float,
+    /// C integer data type
+    Integer,
+    /// C long double data type
+    LongDouble,
+    /// C long long data type
+    LongLong,
+    /// C long data type
+    Long,
+    /// C pointer data type
+    Pointer,
+    /// C short data type
+    Short,
+}
+
 #[cfg(test)]
 mod tests {
     use apint::BitWidth;

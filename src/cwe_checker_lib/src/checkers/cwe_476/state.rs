@@ -92,12 +92,12 @@ impl State {
         };
         for return_arg in taint_source.return_values.iter() {
             match return_arg {
-                Arg::Register(var) => {
+                Arg::Register { var, .. } => {
                     state
                         .register_taint
                         .insert(var.clone(), Taint::Tainted(var.size));
                 }
-                Arg::Stack { offset, size } => {
+                Arg::Stack { offset, size, .. } => {
                     if let Some(pi_state) = pi_state {
                         let address_exp =
                             Expression::Var(stack_pointer_register.clone()).plus_const(*offset);
@@ -395,10 +395,14 @@ mod tests {
         }
 
         pub fn mock_with_pi_state() -> (State, PointerInferenceState) {
-            let arg1 = Arg::Register(register("RAX"));
+            let arg1 = Arg::Register {
+                var: register("RAX"),
+                data_type: None,
+            };
             let arg2 = Arg::Stack {
                 offset: 0,
                 size: ByteSize::new(8),
+                data_type: None,
             };
             let pi_state = PointerInferenceState::new(&register("RSP"), Tid::new("func"));
             let symbol = ExternSymbol {

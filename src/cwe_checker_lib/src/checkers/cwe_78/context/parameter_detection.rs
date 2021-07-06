@@ -74,7 +74,7 @@ impl<'a> Context<'a> {
             .pointer_inference_results
             .get_node_value(call_source_node)
         {
-            if let Ok(parameters) = arguments::get_variable_number_parameters(
+            if let Ok(parameters) = arguments::get_variable_parameters(
                 self.project,
                 pi_state,
                 user_input_symbol,
@@ -228,7 +228,7 @@ impl<'a> Context<'a> {
             if self.is_relevant_string_function_call(string_symbol, pi_state, &mut new_state) {
                 let mut parameters = string_symbol.parameters.clone();
                 if string_symbol.has_var_args {
-                    if let Ok(args) = arguments::get_variable_number_parameters(
+                    if let Ok(args) = arguments::get_variable_parameters(
                         self.project,
                         pi_state,
                         string_symbol,
@@ -272,7 +272,9 @@ impl<'a> Context<'a> {
     ) {
         for parameter in parameters.iter() {
             match parameter {
-                Arg::Register(var) => state.set_register_taint(var, Taint::Tainted(var.size)),
+                Arg::Register { var, .. } => {
+                    state.set_register_taint(var, Taint::Tainted(var.size))
+                }
                 Arg::Stack { size, .. } => {
                     if let Ok(address) = pi_state.eval_parameter_arg(
                         parameter,

@@ -108,12 +108,12 @@ impl State {
         };
         for parameter in taint_source.parameters.iter() {
             match parameter {
-                Arg::Register(var) => {
+                Arg::Register { var, .. } => {
                     state
                         .register_taint
                         .insert(var.clone(), Taint::Tainted(var.size));
                 }
-                Arg::Stack { offset, size } => {
+                Arg::Stack { offset, size, .. } => {
                     if let Some(pi_state) = pi_state {
                         let address_exp =
                             Expression::Var(stack_pointer_register.clone()).plus_const(*offset);

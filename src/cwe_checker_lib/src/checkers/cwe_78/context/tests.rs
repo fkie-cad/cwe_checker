@@ -284,7 +284,10 @@ fn first_param_pointing_to_memory_taint() {
         &mem_image,
     );
 
-    let arg = Arg::Register(rdi_reg);
+    let arg = Arg::Register {
+        var: rdi_reg,
+        data_type: None,
+    };
     assert_eq!(
         context.first_param_points_to_memory_taint(&setup.pi_state, &mut setup.state, &arg),
         true

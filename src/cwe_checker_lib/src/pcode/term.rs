@@ -524,7 +524,10 @@ impl ExternSymbol {
         }
         for arg in symbol.arguments.iter() {
             let ir_arg = if let Some(var) = arg.var.clone() {
-                IrArg::Register(var.into())
+                IrArg::Register {
+                    var: var.into(),
+                    data_type: None,
+                }
             } else if let Some(expr) = arg.location.clone() {
                 if expr.mnemonic == ExpressionType::LOAD {
                     IrArg::Stack {
@@ -539,6 +542,7 @@ impl ExternSymbol {
                         )
                         .unwrap(),
                         size: expr.input0.unwrap().size,
+                        data_type: None,
                     }
                 } else {
                     panic!()

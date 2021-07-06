@@ -290,6 +290,7 @@ fn clear_parameters_on_the_stack_on_extern_calls() {
     let stack_param = Arg::Stack {
         offset: 8,
         size: ByteSize::new(8),
+        data_type: None,
     };
     let extern_symbol = ExternSymbol {
         tid: Tid::new("symbol"),

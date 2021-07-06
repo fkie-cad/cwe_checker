@@ -246,6 +246,7 @@ fn processing_scanf() {
     let string_arg = Arg::Stack {
         offset: 0,
         size: ByteSize::new(8),
+        data_type: None,
     };
 
     let (cwe_sender, cwe_receiver) = crossbeam_channel::unbounded::<CweWarning>();
@@ -307,6 +308,7 @@ fn processing_sscanf() {
     let string_arg = Arg::Stack {
         offset: 0,
         size: ByteSize::new(8),
+        data_type: None,
     };
 
     let mem_image = RuntimeMemoryImage::mock();
@@ -352,7 +354,10 @@ fn processing_sscanf() {
         &mut setup.state,
         &setup.pi_state,
         vec![string_arg],
-        &Arg::Register(rdi_reg),
+        &Arg::Register {
+            var: rdi_reg,
+            data_type: None,
+        },
     );
 
     assert!(setup
@@ -368,10 +373,14 @@ fn tainting_function_arguments() {
     let mut setup = Setup::new();
     let rdi_reg = Variable::mock("RDI", 8);
     let args = vec![
-        Arg::Register(rdi_reg.clone()),
+        Arg::Register {
+            var: rdi_reg.clone(),
+            data_type: None,
+        },
         Arg::Stack {
             offset: 24,
             size: ByteSize::from(8),
+            data_type: None,
         },
     ];
 

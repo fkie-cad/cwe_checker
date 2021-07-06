@@ -238,8 +238,8 @@ impl State {
         global_memory: &RuntimeMemoryImage,
     ) -> Result<Data, Error> {
         match parameter {
-            Arg::Register(var) => Ok(self.eval(&Expression::Var(var.clone()))),
-            Arg::Stack { offset, size } => self.load_value(
+            Arg::Register { var, .. } => Ok(self.eval(&Expression::Var(var.clone()))),
+            Arg::Stack { offset, size, .. } => self.load_value(
                 &Expression::Var(stack_pointer.clone()).plus_const(*offset),
                 *size,
                 global_memory,
