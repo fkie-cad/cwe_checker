@@ -163,7 +163,7 @@ impl From<String> for Datatype {
             | "A" | "g" | "G" => Datatype::Double,
             "li" | "ld" | "lu" => Datatype::Long,
             "lli" | "lld" | "llu" => Datatype::LongLong,
-            "Lg" | "Le" | "La" | "LF" | "LG" | "LE" | "LA" => Datatype::LongDouble,
+            "Lf" | "Lg" | "Le" | "La" | "LF" | "LG" | "LE" | "LA" => Datatype::LongDouble,
             _ => panic!("Invalid data type specifier from format string."),
         }
     }
