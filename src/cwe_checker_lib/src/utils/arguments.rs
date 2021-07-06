@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use crate::prelude::*;
+use crate::{intermediate_representation::Datatype, prelude::*};
 
 use regex::Regex;
 
@@ -209,7 +209,7 @@ pub fn create_string_stack_arg(size: ByteSize, stack_offset: i64) -> Arg {
     Arg::Stack {
         offset: stack_offset,
         size,
-        data_type: None,
+        data_type: Some(Datatype::Pointer),
     }
 }
 
@@ -221,7 +221,7 @@ pub fn create_string_register_arg(size: ByteSize, register_name: String) -> Arg 
             size,
             is_temp: false,
         },
-        data_type: None,
+        data_type: Some(Datatype::Pointer),
     }
 }
 
