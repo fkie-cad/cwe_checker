@@ -947,6 +947,10 @@ fn splitting_return_stub() {
 #[test]
 fn updating_call_stub() {
     let mut setup = Setup::new();
+    setup.project.calling_conventions = vec![CallingConvention::mock_with_parameter_registers(
+        vec!["RDI".to_string(), "RSI".to_string()],
+        vec!["XMM0".to_string()],
+    )];
     let r9_reg = Variable::mock("R9", 8 as u64); // non callee saved
     let rbp_reg = Variable::mock("RBP", 8 as u64);
     let rdi_reg = Variable::mock("RDI", 8 as u64);

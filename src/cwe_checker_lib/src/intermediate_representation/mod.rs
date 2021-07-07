@@ -110,6 +110,23 @@ pub struct DatatypeProperties {
     pub short_size: ByteSize,
 }
 
+impl DatatypeProperties {
+    /// Matches a given data type with its size from the properties struct.
+    pub fn get_size_from_data_type(&self, data_type: Datatype) -> ByteSize {
+        match data_type {
+            Datatype::Char => self.char_size,
+            Datatype::Double => self.double_size,
+            Datatype::Float => self.float_size,
+            Datatype::Integer => self.integer_size,
+            Datatype::LongDouble => self.long_double_size,
+            Datatype::LongLong => self.long_long_size,
+            Datatype::Long => self.long_size,
+            Datatype::Pointer => self.pointer_size,
+            Datatype::Short => self.short_size,
+        }
+    }
+}
+
 /// C/C++ data types.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub enum Datatype {
@@ -131,6 +148,25 @@ pub enum Datatype {
     Pointer,
     /// C short data type
     Short,
+}
+
+impl From<String> for Datatype {
+    /// The purpose of this conversion is to locate parameters to variadic functions.
+    /// Therefore, char types are mapped to integer types since they undergo the default
+    /// argument promotion. (e.g. 1 byte char -> 4 byte integer)
+    /// The same holds for all float types that are promoted to doubles. (e.g. 8 byte float -> 16 byte double)
+    fn from(specifier: String) -> Self {
+        match specifier.as_str() {
+            "c" | "C" | "d" | "i" | "u" | "o" | "x" | "X" | "hi" | "hd" | "hu" => Datatype::Integer,
+            "s" | "S" | "n" | "p" => Datatype::Pointer,
+            "lf" | "lg" | "le" | "la" | "lF" | "lG" | "lE" | "lA" | "f" | "F" | "e" | "E" | "a"
+            | "A" | "g" | "G" => Datatype::Double,
+            "li" | "ld" | "lu" => Datatype::Long,
+            "lli" | "lld" | "llu" => Datatype::LongLong,
+            "Lf" | "Lg" | "Le" | "La" | "LF" | "LG" | "LE" | "LA" => Datatype::LongDouble,
+            _ => panic!("Invalid data type specifier from format string."),
+        }
+    }
 }
 
 #[cfg(test)]
