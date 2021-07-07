@@ -475,6 +475,16 @@ pub enum Arg {
     },
 }
 
+impl Arg {
+    /// Returns the data type field of an Arg object.
+    pub fn get_data_type(&self) -> Option<Datatype> {
+        match self {
+            Arg::Register { data_type, .. } => data_type.clone(),
+            Arg::Stack { data_type, .. } => data_type.clone(),
+        }
+    }
+}
+
 /// An extern symbol represents a funtion that is dynamically linked from another binary.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct ExternSymbol {

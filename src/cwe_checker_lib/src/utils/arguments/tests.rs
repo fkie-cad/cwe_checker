@@ -37,7 +37,7 @@ fn test_get_variable_parameters() {
     output.push(Arg::Stack {
         offset: 0,
         size: ByteSize::new(4),
-        data_type: Some(Datatype::Integer),
+        data_type: Some(Datatype::Char),
     });
 
     output.push(Arg::Stack {
