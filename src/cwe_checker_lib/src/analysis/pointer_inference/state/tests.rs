@@ -290,6 +290,7 @@ fn clear_parameters_on_the_stack_on_extern_calls() {
     let stack_param = Arg::Stack {
         offset: 8,
         size: ByteSize::new(8),
+        data_type: None,
     };
     let extern_symbol = ExternSymbol {
         tid: Tid::new("symbol"),
@@ -509,7 +510,7 @@ fn specialize_by_expression_results() {
         PointerDomain::new(abstract_id.clone(), IntervalDomain::mock(0, 50)).into(),
     );
     let x = state.specialize_by_expression_result(
-        &Expression::var("RAX"),
+        &Expression::var("RAX", 8),
         PointerDomain::new(abstract_id.clone(), IntervalDomain::mock(20, 70)).into(),
     );
     assert!(x.is_ok());

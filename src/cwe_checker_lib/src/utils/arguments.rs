@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use crate::prelude::*;
+use crate::{intermediate_representation::Datatype, prelude::*};
 
 use regex::Regex;
 
@@ -22,7 +22,7 @@ pub fn get_return_registers_from_symbol(symbol: &ExternSymbol) -> Vec<String> {
         .return_values
         .iter()
         .filter_map(|ret| match ret {
-            Arg::Register(var) => Some(var.name.clone()),
+            Arg::Register { var, .. } => Some(var.name.clone()),
             _ => None,
         })
         .collect::<Vec<String>>()
@@ -82,42 +82,39 @@ pub fn parse_format_string_destination_and_return_content(
 pub fn parse_format_string_parameters(
     format_string: &str,
     datatype_properties: &DatatypeProperties,
-) -> Vec<(String, ByteSize)> {
-    let re = Regex::new(r#"%\d{0,2}([c,C,d,i,o,u,x,X,e,E,f,F,g,G,a,A,n,p,s,S])"#)
+) -> Result<Vec<(Datatype, ByteSize)>, Error> {
+    let re = Regex::new(r#"%\d{0,2}(([c,C,d,i,o,u,x,X,e,E,f,F,g,G,a,A,n,p,s,S])|(hi|hd|hu|li|ld|lu|lli|lld|llu|lf|lg|le|la|lF|lG|lE|lA|Lf|Lg|Le|La|LF|LG|LE|LA))"#)
         .expect("No valid regex!");
 
-    re.captures_iter(format_string)
+    let datatype_map: Vec<(Datatype, ByteSize)> = re
+        .captures_iter(format_string)
         .map(|cap| {
+            let data_type = Datatype::from(cap[1].to_string());
             (
-                cap[1].to_string(),
-                map_format_specifier_to_bytesize(datatype_properties, cap[1].to_string()),
+                data_type.clone(),
+                datatype_properties.get_size_from_data_type(data_type),
             )
         })
-        .collect()
-}
+        .collect();
 
-/// Maps a given format specifier to the bytesize of its corresponding data type.
-pub fn map_format_specifier_to_bytesize(
-    datatype_properties: &DatatypeProperties,
-    specifier: String,
-) -> ByteSize {
-    if is_integer(&specifier) {
-        return datatype_properties.integer_size;
+    let data_type_not_yet_parsable = datatype_map.iter().any(|(data_type, _)| {
+        matches!(
+            data_type,
+            Datatype::Long | Datatype::LongLong | Datatype::LongDouble
+        )
+    });
+
+    if data_type_not_yet_parsable {
+        return Err(anyhow!(
+            "Data types: long, long long and long double, cannot be parsed yet."
+        ));
     }
 
-    if is_float(&specifier) {
-        return datatype_properties.double_size;
-    }
-
-    if is_pointer(&specifier) {
-        return datatype_properties.pointer_size;
-    }
-
-    panic!("Unknown format specifier.")
+    Ok(datatype_map)
 }
 
 /// Returns an argument vector of detected variable parameters if they are of type string.
-pub fn get_variable_number_parameters(
+pub fn get_variable_parameters(
     project: &Project,
     pi_state: &PointerInferenceState,
     extern_symbol: &ExternSymbol,
@@ -137,19 +134,16 @@ pub fn get_variable_number_parameters(
         runtime_memory_image,
     );
 
-    if let Ok(format_string) = format_string_results {
-        let parameters =
-            parse_format_string_parameters(format_string.as_str(), &project.datatype_properties);
-        if parameters.iter().any(|(specifier, _)| is_string(specifier)) {
+    if let Ok(format_string) = format_string_results.as_ref() {
+        if let Ok(parameters) =
+            parse_format_string_parameters(format_string, &project.datatype_properties)
+        {
             return Ok(calculate_parameter_locations(
-                project,
                 parameters,
                 extern_symbol.get_calling_convention(project),
                 format_string_index,
             ));
         }
-
-        return Ok(vec![]);
     }
 
     Err(anyhow!(
@@ -161,8 +155,7 @@ pub fn get_variable_number_parameters(
 /// Calculates the register and stack positions of format string parameters.
 /// The parameters are then returned as an argument vector for later tainting.
 pub fn calculate_parameter_locations(
-    project: &Project,
-    parameters: Vec<(String, ByteSize)>,
+    parameters: Vec<(Datatype, ByteSize)>,
     calling_convention: &CallingConvention,
     format_string_index: usize,
 ) -> Vec<Arg> {
@@ -174,72 +167,64 @@ pub fn calculate_parameter_locations(
     let mut float_arg_register_count = calling_convention.float_parameter_register.len();
     let mut stack_offset: i64 = 0;
 
-    for (type_name, size) in parameters.iter() {
-        if is_integer(type_name) || is_pointer(type_name) {
-            if integer_arg_register_count > 0 {
-                if is_string(type_name) {
+    for (data_type, size) in parameters.iter() {
+        match data_type {
+            Datatype::Integer | Datatype::Pointer => {
+                if integer_arg_register_count > 0 {
                     let register_name = calling_convention.integer_parameter_register
                         [calling_convention.integer_parameter_register.len()
                             - integer_arg_register_count]
                         .clone();
-                    var_args.push(create_string_register_arg(
-                        project.get_pointer_bytesize(),
-                        register_name,
-                    ));
+
+                    var_args.push(create_register_arg(*size, register_name, data_type.clone()));
+
+                    integer_arg_register_count -= 1;
+                } else {
+                    var_args.push(create_stack_arg(*size, stack_offset, data_type.clone()));
+                    stack_offset += u64::from(*size) as i64
                 }
-                integer_arg_register_count -= 1;
-            } else {
-                if is_string(type_name) {
-                    var_args.push(create_string_stack_arg(*size, stack_offset));
-                }
-                stack_offset += u64::from(*size) as i64
             }
-        } else if float_arg_register_count > 0 {
-            float_arg_register_count -= 1;
-        } else {
-            stack_offset += u64::from(*size) as i64;
+            Datatype::Double => {
+                if float_arg_register_count > 0 {
+                    let register_name = calling_convention.float_parameter_register
+                        [calling_convention.float_parameter_register.len()
+                            - float_arg_register_count]
+                        .clone();
+
+                    var_args.push(create_register_arg(*size, register_name, data_type.clone()));
+
+                    float_arg_register_count -= 1;
+                } else {
+                    var_args.push(create_stack_arg(*size, stack_offset, data_type.clone()));
+                    stack_offset += u64::from(*size) as i64
+                }
+            }
+            _ => panic!("Invalid data type specifier from format string."),
         }
     }
 
     var_args
 }
 
-/// Creates a string stack parameter given a size and stack offset.
-pub fn create_string_stack_arg(size: ByteSize, stack_offset: i64) -> Arg {
+/// Creates a stack parameter given a size, stack offset and data type.
+pub fn create_stack_arg(size: ByteSize, stack_offset: i64, data_type: Datatype) -> Arg {
     Arg::Stack {
         offset: stack_offset,
         size,
+        data_type: Some(data_type),
     }
 }
 
-/// Creates a string register parameter given a register name.
-pub fn create_string_register_arg(size: ByteSize, register_name: String) -> Arg {
-    Arg::Register(Variable {
-        name: register_name,
-        size,
-        is_temp: false,
-    })
-}
-
-/// Checks whether the format specifier is of type int.
-pub fn is_integer(specifier: &str) -> bool {
-    matches!(specifier, "d" | "i" | "o" | "x" | "X" | "u" | "c" | "C")
-}
-
-/// Checks whether the format specifier is of type pointer.
-pub fn is_pointer(specifier: &str) -> bool {
-    matches!(specifier, "s" | "S" | "n" | "p")
-}
-
-/// Checks whether the format specifier is of type float.
-pub fn is_float(specifier: &str) -> bool {
-    matches!(specifier, "f" | "F" | "e" | "E" | "a" | "A" | "g" | "G")
-}
-
-/// Checks whether the format specifier is a string pointer
-/// or a string.
-pub fn is_string(specifier: &str) -> bool {
-    matches!(specifier, "s" | "S")
+/// Creates a register parameter given a size, register name and data type.
+pub fn create_register_arg(size: ByteSize, register_name: String, data_type: Datatype) -> Arg {
+    Arg::Register {
+        var: Variable {
+            name: register_name,
+            size,
+            is_temp: false,
+        },
+        data_type: Some(data_type),
+    }
 }
 
 #[cfg(test)]

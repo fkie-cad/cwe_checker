@@ -305,6 +305,18 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
         if let Some(extern_symbol) = self.extern_symbol_map.get(call_target) {
             // Generate a CWE-message if some argument is an out-of-bounds pointer.
             self.check_parameter_register_for_out_of_bounds_pointer(state, call, extern_symbol);
+            // Check parameter for possible use-after-frees (except for possible double frees, which are handled later)
+            if !self
+                .deallocation_symbols
+                .iter()
+                .any(|free_like_fn| free_like_fn == extern_symbol.name.as_str())
+            {
+                self.check_parameter_register_for_dangling_pointer(
+                    &mut new_state,
+                    call,
+                    extern_symbol,
+                );
+            }
             // Clear non-callee-saved registers from the state.
             let cconv = extern_symbol.get_calling_convention(&self.project);
             new_state.clear_non_callee_saved_register(&cconv.callee_saved_register[..]);

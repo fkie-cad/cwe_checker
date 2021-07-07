@@ -15,7 +15,10 @@ fn new_id(time: &str, reg_name: &str) -> AbstractIdentifier {
 }
 
 fn mock_extern_symbol(name: &str) -> ExternSymbol {
-    let arg = Arg::Register(register("RDX"));
+    let arg = Arg::Register {
+        var: register("RDX"),
+        data_type: None,
+    };
     ExternSymbol {
         tid: Tid::new("extern_".to_string() + name),
         addresses: vec![],

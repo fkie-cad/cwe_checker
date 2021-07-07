@@ -71,6 +71,23 @@ impl AbstractObjectList {
         false
     }
 
+    /// Mark all memory objects targeted by the given `address` pointer,
+    /// whose state is either dangling or unknown,
+    /// as flagged.
+    pub fn mark_dangling_pointer_targets_as_flagged(&mut self, address: &Data) {
+        if let Data::Pointer(pointer) = address {
+            for id in pointer.ids() {
+                let (object, _) = self.objects.get_mut(id).unwrap();
+                if matches!(
+                    object.get_state(),
+                    ObjectState::Unknown | ObjectState::Dangling
+                ) {
+                    object.set_state(ObjectState::Flagged);
+                }
+            }
+        }
+    }
+
     /// Check whether a memory access at the given address (and accessing `size` many bytes)
     /// may be an out-of-bounds memory access.
     ///
@@ -519,7 +536,7 @@ mod tests {
             merged
                 .get_value(&Data::Pointer(pointer.clone()), ByteSize::new(8))
                 .unwrap(),
-            Data::Value(ValueDomain::new_top(ByteSize::new(8)))
+            Data::Value(IntervalDomain::mock(3, 42).with_stride(39))
         );
         assert_eq!(
             merged

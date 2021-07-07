@@ -95,8 +95,8 @@ impl State {
         let mut result_log = Ok(());
         for arg in &extern_call.parameters {
             match arg {
-                Arg::Register(_) => (),
-                Arg::Stack { offset, size } => {
+                Arg::Register { .. } => (),
+                Arg::Stack { offset, size, .. } => {
                     let data_top = Data::new_top(*size);
                     let location_expression =
                         Expression::Var(stack_pointer_register.clone()).plus_const(*offset);

@@ -461,7 +461,7 @@ mod tests {
         object.merge_value(new_data(23), &bv(-12));
         assert_eq!(
             object.get_value(Bitvector::from_i64(-12), ByteSize::new(8)),
-            Data::Value(ValueDomain::new_top(ByteSize::new(8)))
+            Data::Value(IntervalDomain::mock(4, 23).with_stride(19))
         );
 
         let mut other_object = new_abstract_object();
