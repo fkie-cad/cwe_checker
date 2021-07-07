@@ -10,6 +10,12 @@ pub type Bitvector = apint::ApInt;
 /// A trait to extend the bitvector type with useful helper functions
 /// that are not contained in the [`apint`] crate.
 pub trait BitvectorExtended: Sized {
+    /// Resize `self` to the target byte size by either zero extending or truncating `self`.
+    fn into_resize_unsigned(self, size: ByteSize) -> Self;
+
+    /// Resize `self` to the target byte size by either sign extending or truncating `self`.
+    fn into_resize_signed(self, size: ByteSize) -> Self;
+
     /// Perform a cast operation on the bitvector.
     /// Returns an error for non-implemented cast operations (currently all float-related casts).
     fn cast(&self, kind: CastOpType, width: ByteSize) -> Result<Self, Error>;
@@ -268,6 +274,24 @@ impl BitvectorExtended for Bitvector {
     /// Return the size in bytes of the bitvector.
     fn bytesize(&self) -> ByteSize {
         self.width().into()
+    }
+
+    /// Resize `self` to the target byte size by either zero extending or truncating `self`.
+    fn into_resize_unsigned(self, size: ByteSize) -> Self {
+        if self.width() < size.into() {
+            self.into_zero_extend(size).unwrap()
+        } else {
+            self.into_truncate(size).unwrap()
+        }
+    }
+
+    /// Resize `self` to the target byte size by either sign extending or truncating `self`.
+    fn into_resize_signed(self, size: ByteSize) -> Self {
+        if self.width() < size.into() {
+            self.into_sign_extend(size).unwrap()
+        } else {
+            self.into_truncate(size).unwrap()
+        }
     }
 }
 

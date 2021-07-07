@@ -184,7 +184,7 @@ impl<'a> Context<'a> {
     ) -> bool {
         // First check for taint directly in parameter registers (we don't need a pointer inference state for that)
         for parameter in extern_symbol.parameters.iter() {
-            if let Arg::Register(var) = parameter {
+            if let Arg::Register { var, .. } = parameter {
                 if state.eval(&Expression::Var(var.clone())).is_tainted() {
                     return true;
                 }
@@ -196,13 +196,13 @@ impl<'a> Context<'a> {
             // Check stack parameters and collect referenced memory object that need to be checked for taint.
             for parameter in extern_symbol.parameters.iter() {
                 match parameter {
-                    Arg::Register(var) => {
+                    Arg::Register { var, .. } => {
                         let data = pi_state.eval(&Expression::Var(var.clone()));
                         if state.check_if_address_points_to_taint(data, pi_state) {
                             return true;
                         }
                     }
-                    Arg::Stack { offset, size } => {
+                    Arg::Stack { offset, size, .. } => {
                         let stack_address = pi_state.eval(
                             &Expression::Var(self.project.stack_pointer_register.clone())
                                 .plus_const(*offset),

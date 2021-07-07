@@ -53,19 +53,18 @@ impl CharacterInclusionDomain {
 impl DomainInsertion for CharacterInclusionDomain {
     fn insert_string_domain(&self, string_domain: &Self) -> CharacterInclusionDomain {
         match self {
-            CharacterInclusionDomain::Value((self_certain, self_possible)) => {
-                match string_domain {
-                    CharacterInclusionDomain::Value((other_certain, other_possible)) => {
-                        CharacterInclusionDomain::Value((self_certain.union(other_certain.clone()), self_possible.union(other_possible.clone())))
-                    }
-                    CharacterInclusionDomain::Top => {
-                        CharacterInclusionDomain::Value((self_certain.clone(), CharacterSet::Top))
-                    }
+            CharacterInclusionDomain::Value((self_certain, self_possible)) => match string_domain {
+                CharacterInclusionDomain::Value((other_certain, other_possible)) => {
+                    CharacterInclusionDomain::Value((
+                        self_certain.union(other_certain.clone()),
+                        self_possible.union(other_possible.clone()),
+                    ))
                 }
-            }
-            CharacterInclusionDomain::Top => {
-                CharacterInclusionDomain::Top
-            }
+                CharacterInclusionDomain::Top => {
+                    CharacterInclusionDomain::Value((self_certain.clone(), CharacterSet::Top))
+                }
+            },
+            CharacterInclusionDomain::Top => CharacterInclusionDomain::Top,
         }
     }
 }
@@ -73,7 +72,10 @@ impl DomainInsertion for CharacterInclusionDomain {
 impl From<String> for CharacterInclusionDomain {
     fn from(string: String) -> Self {
         let characters: HashSet<char> = string.chars().collect();
-        CharacterInclusionDomain::Value((CharacterSet::Value(characters.clone()), CharacterSet::Value(characters)))
+        CharacterInclusionDomain::Value((
+            CharacterSet::Value(characters.clone()),
+            CharacterSet::Value(characters),
+        ))
     }
 }
 
@@ -122,7 +124,7 @@ impl CharacterSet {
         }
     }
 
-    /// Takes the intersection of two character sets. 
+    /// Takes the intersection of two character sets.
     /// None of the sets should be *Top* since otherwise
     /// the whole CharacterInclusionDomain would be *Top*
     /// which is checked beforehand.
@@ -130,7 +132,12 @@ impl CharacterSet {
         if self.is_top() || other.is_top() {
             panic!("Unexpected Top Value for CharacterSet intersection.")
         }
-        CharacterSet::Value(self.unwrap_value().intersection(&other.unwrap_value()).cloned().collect())
+        CharacterSet::Value(
+            self.unwrap_value()
+                .intersection(&other.unwrap_value())
+                .cloned()
+                .collect(),
+        )
     }
 
     /// Takes the union of two character sets.
@@ -141,7 +148,12 @@ impl CharacterSet {
             return CharacterSet::Top;
         }
 
-        CharacterSet::Value(self.unwrap_value().union(&other.unwrap_value()).cloned().collect())
+        CharacterSet::Value(
+            self.unwrap_value()
+                .union(&other.unwrap_value())
+                .cloned()
+                .collect(),
+        )
     }
 
     /// Check if the value is *Top*.
@@ -176,7 +188,10 @@ mod tests {
 
         assert_eq!(
             first.merge(&second),
-            CharacterInclusionDomain::Value((CharacterSet::Value(HashSet::new()), possible_set.clone()))
+            CharacterInclusionDomain::Value((
+                CharacterSet::Value(HashSet::new()),
+                possible_set.clone()
+            ))
         );
         assert_eq!(
             third.merge(&second),

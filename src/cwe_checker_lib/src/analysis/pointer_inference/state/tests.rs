@@ -290,6 +290,7 @@ fn clear_parameters_on_the_stack_on_extern_calls() {
     let stack_param = Arg::Stack {
         offset: 8,
         size: ByteSize::new(8),
+        data_type: None,
     };
     let extern_symbol = ExternSymbol {
         tid: Tid::new("symbol"),
@@ -1067,4 +1068,35 @@ fn out_of_bounds_access_recognition() {
     let address = PointerDomain::new(state.stack_id.clone(), Bitvector::from_u64(8).into()).into();
     state.set_register(&Variable::mock("RAX", 8), address);
     assert!(!state.contains_out_of_bounds_mem_access(&load_def.term, &global_data));
+}
+
+#[test]
+fn specialize_pointer_comparison() {
+    let mut state = State::new(&register("RSP"), Tid::new("func_tid"));
+    let interval = IntervalDomain::mock(-5, 10);
+    state.set_register(
+        &register("RAX"),
+        PointerDomain::new(new_id("func_tid", "RSP"), interval.into()).into(),
+    );
+    let interval = IntervalDomain::mock(20, 20);
+    state.set_register(
+        &register("RBX"),
+        PointerDomain::new(new_id("func_tid", "RSP"), interval.into()).into(),
+    );
+    let expression = Expression::BinOp {
+        op: BinOpType::IntEqual,
+        lhs: Box::new(Expression::Var(register("RAX"))),
+        rhs: Box::new(Expression::Var(register("RBX"))),
+    };
+    assert!(state
+        .clone()
+        .specialize_by_expression_result(&expression, Bitvector::from_i8(1).into())
+        .is_err());
+    let specialized_interval = IntervalDomain::mock_with_bounds(None, -5, 10, Some(19));
+    let specialized_pointer =
+        PointerDomain::new(new_id("func_tid", "RSP"), specialized_interval.into()).into();
+    assert!(state
+        .specialize_by_expression_result(&expression, Bitvector::from_i8(0).into())
+        .is_ok());
+    assert_eq!(state.get_register(&register("RAX")), specialized_pointer);
 }

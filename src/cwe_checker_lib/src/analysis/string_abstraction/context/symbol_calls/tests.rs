@@ -99,7 +99,7 @@ fn mock_string_symbol_map(project: &Project) -> HashMap<Tid, &ExternSymbol> {
 fn test_get_abstract_id_for_function_parameter_from_register() {
     let call_tid = Tid::new("call");
     let rdi_reg = Variable::mock("r0", 4);
-    let arg = Arg::Register(rdi_reg.clone());
+    let arg = Arg::Register{var: rdi_reg.clone(), data_type: None};
 
     let project = mock_project_with_intraprocedural_control_flow(vec![], "");
     let mem_image = RuntimeMemoryImage::mock();
@@ -129,6 +129,7 @@ fn test_get_abstract_id_for_function_parameter_from_stack() {
     let arg = Arg::Stack {
         offset: 8,
         size: ByteSize::new(8),
+        data_type: None,
     };
 
     let project = mock_project_with_intraprocedural_control_flow(vec![], "");
@@ -278,10 +279,11 @@ fn test_create_abstract_domain_entries_for_function_arguments_with_known_values(
 
     let mut arg_to_value_map: HashMap<Arg, Option<String>> = HashMap::new();
 
-    let register_arg = Arg::Register(r2_reg.clone());
+    let register_arg = Arg::Register{var: r2_reg.clone(), data_type: None};;
     let stack_arg = Arg::Stack {
         offset: 0,
         size: ByteSize::new(4),
+        data_type: None,
     };
     arg_to_value_map.insert(register_arg, Some("a".to_string()));
     arg_to_value_map.insert(stack_arg, Some("b".to_string()));
@@ -360,10 +362,11 @@ fn test_create_abstract_domain_entries_for_function_arguments_with_unknown_value
     let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
     let mut arg_to_value_map: HashMap<Arg, Option<String>> = HashMap::new();
-    let register_arg = Arg::Register(r1_reg.clone());
+    let register_arg = Arg::Register{var: r1_reg.clone(), data_type: None};
     let stack_arg = Arg::Stack {
         offset: 0,
         size: ByteSize::new(4),
+        data_type: None,
     };
     arg_to_value_map.insert(register_arg, None);
     arg_to_value_map.insert(stack_arg, None);
@@ -603,15 +606,17 @@ fn test_handle_sscanf_calls_known_source_known_format() {
 #[test]
 fn test_map_source_string_parameters_to_return_arguments() {
     let sscanf_symbol = ExternSymbol::mock_sscanf_symbol_arm();
-    let r2_arg = Arg::Register(Variable::mock("r2", 4));
-    let r3_arg = Arg::Register(Variable::mock("r3", 4));
+    let r2_arg = Arg::Register{var: Variable::mock("r2", 4), data_type: None};
+    let r3_arg = Arg::Register{var: Variable::mock("r3", 4), data_type: None};
     let stack_arg_1 = Arg::Stack {
         offset: 0,
         size: ByteSize::new(4),
+        data_type: None,
     };
     let stack_arg_2 = Arg::Stack {
         offset: 4,
         size: ByteSize::new(4),
+        data_type: None,
     };
 
     let project = mock_project_with_intraprocedural_control_flow(
@@ -782,7 +787,7 @@ fn test_get_return_destination_from_first_input_parameter() {
 
     let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
-    let return_arg = Arg::Register(Variable::mock("r0", 4));
+    let return_arg = Arg::Register{var: Variable::mock("r0", 4), data_type: None};
 
     let pointer = setup
         .context

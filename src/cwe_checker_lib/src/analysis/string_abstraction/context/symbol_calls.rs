@@ -11,9 +11,9 @@ use crate::abstract_domain::{
     TryToBitvec,
 };
 use crate::analysis::pointer_inference::State as PointerInferenceState;
-use crate::intermediate_representation::{Arg, Bitvector, Tid};
+use crate::intermediate_representation::{Arg, Bitvector, Datatype, Tid};
 use crate::utils::arguments::{
-    get_input_format_string, get_variable_number_parameters, is_string,
+    get_input_format_string, get_variable_parameters,
     parse_format_string_parameters,
 };
 use crate::{abstract_domain::AbstractDomain, intermediate_representation::ExternSymbol};
@@ -29,10 +29,10 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String>> Context<'a, T> {
         call_tid: &Tid,
     ) -> AbstractIdentifier {
         match arg {
-            Arg::Register(var) => {
+            Arg::Register{var, ..} => {
                 AbstractIdentifier::new(call_tid.clone(), AbstractLocation::from_var(var).unwrap())
             }
-            Arg::Stack { offset, size } => AbstractIdentifier::new(
+            Arg::Stack { offset, size, data_type } => AbstractIdentifier::new(
                 call_tid.clone(),
                 AbstractLocation::from_stack(&self.project.stack_pointer_register, size, offset)
                     .unwrap(),
@@ -75,7 +75,7 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String>> Context<'a, T> {
         let mut new_state = state.clone();
         if let Some(pi_state) = state.get_pointer_inference_state() {
             // Check whether the format string parameters can be parsed.
-            if let Ok(return_values) = get_variable_number_parameters(
+            if let Ok(return_values) = get_variable_parameters(
                 self.project,
                 pi_state,
                 extern_symbol,
@@ -104,7 +104,7 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String>> Context<'a, T> {
         for (argument, value) in arg_to_value_map.into_iter() {
             let abstract_id = self.get_abstract_id_for_function_parameter(&argument, call_tid);
             match argument {
-                Arg::Register(var) => {
+                Arg::Register{var, ..} => {
                     if let DataDomain::Pointer(pointer) = pi_state.get_register(&var) {
                         Context::add_new_string_abstract_domain(
                             state,
@@ -183,7 +183,7 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String>> Context<'a, T> {
         extern_symbol: &ExternSymbol,
         source_string: &str,
     ) -> Result<HashMap<Arg, Option<String>>, Error> {
-        if let Ok(string_parameters) = get_variable_number_parameters(
+        if let Ok(string_parameters) = get_variable_parameters(
             self.project,
             pi_state,
             extern_symbol,
@@ -198,20 +198,21 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String>> Context<'a, T> {
                 self.runtime_memory_image,
             )
             .unwrap();
-            let all_parameters: Vec<String> = parse_format_string_parameters(
+            let all_parameters: Vec<Datatype> = parse_format_string_parameters(
                 format_string.as_str(),
                 &self.project.datatype_properties,
             )
+            .unwrap()
             .into_iter()
-            .map(|(param, _)| param)
+            .map(|(data_type, _)| data_type)
             .collect();
 
             let return_values: Vec<String> =
                 source_string.split(" ").map(|s| s.to_string()).collect();
 
             let string_values: Vec<Option<String>> = izip!(all_parameters, return_values)
-                .filter_map(|(id, value)| {
-                    if is_string(&id) {
+                .filter_map(|(data_type, value)| {
+                    if matches!(data_type, Datatype::Pointer) {
                         Some(Some(value))
                     } else {
                         None
@@ -274,7 +275,7 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String>> Context<'a, T> {
                     self.runtime_memory_image,
                 ) {
                     let mut processed_string = input_format_string.clone();
-                    if let Ok(var_args) = get_variable_number_parameters(
+                    if let Ok(var_args) = get_variable_parameters(
                         self.project,
                         pi_state,
                         extern_symbol,
@@ -320,7 +321,7 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String>> Context<'a, T> {
         return_arg: &Arg,
     ) -> PointerDomain<IntervalDomain> {
         let return_destination = match return_arg {
-            Arg::Register(var) => pi_state.get_register(var),
+            Arg::Register{var, ..} => pi_state.get_register(var),
             Arg::Stack { offset, .. } => DataDomain::Pointer(PointerDomain::new(
                 pi_state.stack_id.clone(),
                 IntervalDomain::from(Bitvector::from_i64(*offset)),

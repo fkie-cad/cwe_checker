@@ -3,7 +3,7 @@ use petgraph::graph::NodeIndex;
 use crate::abstract_domain::{DataDomain, IntervalDomain, PointerDomain};
 use crate::analysis::pointer_inference::{Data, PointerInference as PointerInferenceComputation};
 use crate::intermediate_representation::{
-    Arg, BinOpType, Bitvector, ByteSize, Expression, ExternSymbol, Tid, Variable,
+    Arg, BinOpType, Bitvector, ByteSize, CallingConvention, Expression, ExternSymbol, Tid, Variable,
 };
 use crate::utils::binary::RuntimeMemoryImage;
 use crate::{checkers::cwe_476::Taint, utils::log::CweWarning};
@@ -22,6 +22,10 @@ impl<'a> Context<'a> {
 #[test]
 fn tainting_generic_extern_symbol_parameters() {
     let mut setup = Setup::new();
+    setup.project.calling_conventions = vec![CallingConvention::mock_with_parameter_registers(
+        vec!["RDI".to_string(), "RSI".to_string()],
+        vec!["XMM0".to_string()],
+    )];
     let r9_reg = Variable::mock("R9", 8 as u64);
     let rbp_reg = Variable::mock("RBP", 8 as u64);
     let rdi_reg = Variable::mock("RDI", 8 as u64);
@@ -112,6 +116,10 @@ fn tainting_generic_extern_symbol_parameters() {
 #[test]
 fn tainting_extern_string_symbol_parameters() {
     let mut setup = Setup::new();
+    setup.project.calling_conventions = vec![CallingConvention::mock_with_parameter_registers(
+        vec!["RDI".to_string(), "RSI".to_string()],
+        vec!["XMM0".to_string()],
+    )];
     let rbp_reg = Variable::mock("RBP", 8 as u64); // callee saved -> will point to RSP
     let rdi_reg = Variable::mock("RDI", 8 as u64); // parameter 1 -> will point to RBP - 8
     let rsi_reg = Variable::mock("RSI", 8 as u64); // parameter 2
@@ -246,6 +254,7 @@ fn processing_scanf() {
     let string_arg = Arg::Stack {
         offset: 0,
         size: ByteSize::new(8),
+        data_type: None,
     };
 
     let (cwe_sender, cwe_receiver) = crossbeam_channel::unbounded::<CweWarning>();
@@ -307,6 +316,7 @@ fn processing_sscanf() {
     let string_arg = Arg::Stack {
         offset: 0,
         size: ByteSize::new(8),
+        data_type: None,
     };
 
     let mem_image = RuntimeMemoryImage::mock();
@@ -352,7 +362,10 @@ fn processing_sscanf() {
         &mut setup.state,
         &setup.pi_state,
         vec![string_arg],
-        &Arg::Register(rdi_reg),
+        &Arg::Register {
+            var: rdi_reg,
+            data_type: None,
+        },
     );
 
     assert!(setup
@@ -368,10 +381,14 @@ fn tainting_function_arguments() {
     let mut setup = Setup::new();
     let rdi_reg = Variable::mock("RDI", 8);
     let args = vec![
-        Arg::Register(rdi_reg.clone()),
+        Arg::Register {
+            var: rdi_reg.clone(),
+            data_type: None,
+        },
         Arg::Stack {
             offset: 24,
             size: ByteSize::from(8),
+            data_type: None,
         },
     ];
 

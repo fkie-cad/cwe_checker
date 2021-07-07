@@ -6,20 +6,15 @@
 ![Acceptance tests](https://github.com/fkie-cad/cwe_checker/actions/workflows/acceptance-tests.yml/badge.svg)
 ![Unit tests](https://github.com/fkie-cad/cwe_checker/actions/workflows/unit-tests.yml/badge.svg)
 ![Docker-Pulls](https://img.shields.io/docker/pulls/fkiecad/cwe_checker.svg)
-[![Documentation](https://img.shields.io/badge/doc-stable-green.svg)](https://fkie-cad.github.io/cwe_checker/doc/html/cwe_checker/index.html)
-
-**NOTE:** We recently changed our default analysis backend from BAP to the newer Ghidra backend.
-The switch causes some changes in both the command line interface and the docker image interface.
-Be sure to update your scripts accordingly!
-Alternatively, the stable version still uses the old interface.
+[![Documentation](https://img.shields.io/badge/doc-stable-green.svg)](https://fkie-cad.github.io/cwe_checker/index.html)
 
 ## What is cwe_checker? ##
-*cwe_checker* is a suite of checks to detect common bug classes such as use of dangerous functions and simple integer overflows.
+cwe_checker is a suite of checks to detect common bug classes such as use of dangerous functions and simple integer overflows.
 These bug classes are formally known as [Common Weakness Enumerations](https://cwe.mitre.org/) (CWEs).
 Its main goal is to aid analysts to quickly find vulnerable code paths.
 
 Its main focus are ELF binaries that are commonly found on Linux and Unix operating systems.
-The *cwe_checker* uses [Ghidra](https://ghidra-sre.org/) to disassemble binaries into one common intermediate representation
+The cwe_checker uses [Ghidra](https://ghidra-sre.org/) to disassemble binaries into one common intermediate representation
 and implements its own analyses on this IR.
 Hence, the analyses can be run on all CPU architectures that Ghidra can disassemble,
 which makes the *cwe_checker* a valuable tool for firmware analysis.
@@ -30,7 +25,7 @@ The following arguments should convince you to give *cwe_checker* a try:
 -  it is extensible due to its plugin-based architecture
 -  it is configureable, e.g. apply analyses to new APIs
 -  view results annotated in Ghidra
--  *cwe_checker* can be integrated as a plugin into [FACT](https://github.com/fkie-cad/FACT_core)
+-  cwe_checker can be integrated as a plugin into [FACT](https://github.com/fkie-cad/FACT_core)
 
 <p align="center">
     <img src="doc/images/example_usage.png" alt="Usage Example" width="80%" height="80%"/>
@@ -52,7 +47,7 @@ The following dependencies must be installed in order to build and install the *
 -   [Rust](https://www.rust-lang.org) >= 1.49
 -   [Ghidra](https://ghidra-sre.org/) >= 9.2
 
-Run `make all GHIDRA_PATH=path/to/ghidra_folder` (with the correct path to the local Ghidra installation inserted) to compile and install the *cwe_checker*.
+Run `make all GHIDRA_PATH=/path/to/ghidra_folder` (with the correct path to the local Ghidra installation inserted) to compile and install the cwe_checker.
 
 ## Usage ##
 
@@ -72,20 +67,20 @@ You can adjust the behavior of most checks via a configuration file located at `
 If you modify it, add the command line flag `--config=src/config.json` to tell the *cwe_checker* to use the modified file.
 For information about other available command line flags you can pass the `--help` flag to the *cwe_checker*.
 
-If you use the stable version, you can also look at the [online documentation](https://fkie-cad.github.io/cwe_checker/doc/html/cwe_checker/index.html) for more information.
+If you use the stable version, you can also look at the [online documentation](https://fkie-cad.github.io/cwe_checker/index.html) for more information.
 
 ## Documentation and Tests ##
 
 The test binaries for our test suite can be built with `make compile_test_files` (needs Docker to be installed!). The test suite can then be run with `make test`.
 
-Source code documentation can be built with `make documentation`. For the stable version, the documentation can be found [here](https://fkie-cad.github.io/cwe_checker/doc/html/cwe_checker/index.html).
+Source code documentation can be built with `make documentation`. For the stable version, the documentation can be found [here](https://fkie-cad.github.io/cwe_checker/index.html).
 
 ## Implemented Checks <a name=checks></a> ##
 
 So far the following analyses are implemented:
 -   [CWE-78](https://cwe.mitre.org/data/definitions/78.html): OS Command Injection (currently disabled on standard runs)
--   [CWE-134](https://cwe.mitre.org/data/definitions/134.html): Use of Externally-Controlled Format String
 -   [CWE-119](https://cwe.mitre.org/data/definitions/119.html) and its variants [CWE-125](https://cwe.mitre.org/data/definitions/125.html) and [CWE-787](https://cwe.mitre.org/data/definitions/787.html): Buffer Overflow
+-   [CWE-134](https://cwe.mitre.org/data/definitions/134.html): Use of Externally-Controlled Format String
 -   [CWE-190](https://cwe.mitre.org/data/definitions/190.html): Integer Overflow or Wraparound
 -   [CWE-215](https://cwe.mitre.org/data/definitions/215.html): Information Exposure Through Debug Information
 -   [CWE-243](https://cwe.mitre.org/data/definitions/243.html): Creation of chroot Jail Without Changing Working Directory
@@ -100,13 +95,13 @@ So far the following analyses are implemented:
 -   [CWE-676](https://cwe.mitre.org/data/definitions/676.html): Use of Potentially Dangerous Function
 -   [CWE-782](https://cwe.mitre.org/data/definitions/782.html): Exposed IOCTL with Insufficient Access Control
 
-Please note that some of the above analyses only are partially implemented at the moment.
-Furthermore, false positives are to be expected due to shortcuts and the nature of static analysis as well as over-approximation.
+Please note that some of the above analyses are only partially implemented at the moment.
+Furthermore, both false positives and false negatives are to be expected due to shortcuts and the nature of static analysis as well as over-approximation.
 
 ## Integration into other tools ##
 
-*cwe_checker* comes with a script for Ghidra,
-which parses the output of the *cwe_checker* and annotates the found CWEs in the disassembler for easier manual analysis.
+cwe_checker comes with a script for Ghidra,
+which parses the output of the cwe_checker and annotates the found CWEs in the disassembler for easier manual analysis.
 The script is located at `ghidra_plugin/cwe_checker_ghidra_plugin.py`, usage instructions are contained in the file.
 
 <p align="center">
@@ -115,7 +110,7 @@ The script is located at `ghidra_plugin/cwe_checker_ghidra_plugin.py`, usage ins
 
 ## How does cwe_checker work internally? ##
 
-Building the documentation using `cargo doc --open --document-private-items` will give you more information about the internal structure of the *cwe_checker*.
+Building the documentation using `cargo doc --open --document-private-items` will give you more information about the internal structure of the cwe_checker.
 However, the best documentation is still the source code itself.
 If you have questions, be sure to ask them on our [discussions page](https://github.com/fkie-cad/cwe_checker/discussions)!
 We are constantly striving to improve extensibility and documentation and your questions will help us to achieve that!
@@ -125,7 +120,7 @@ We presented cwe_checker at the following conferences so far:
 -   [Pass The SALT 2019](https://2019.pass-the-salt.org/talks/74.html) ([slides](doc/slides/cwe_checker_pts19.pdf))
 -   [Black Hat USA 2019](https://www.blackhat.com/us-19/arsenal/schedule/index.html#cwe_checker-hunting-binary-code-vulnerabilities-across-cpu-architectures-16782) ([slides](doc/slides/cwe_checker_BlackHatUSA2019.pdf))
 
-### Contribute ###
+## Contribute ##
 
 Contributions are always welcome. Just fork it and open a pull request!
 
@@ -135,7 +130,7 @@ This project is partly financed by [German Federal Office for Information Securi
 
 A special thanks goes out to the BAP community (especially the official gitter) for answering questions and discussing solutions.
 
-## License
+## License ##
 ```
     Copyright (C) 2018 -       Fraunhofer FKIE  (firmware-security@fkie.fraunhofer.de)
 

@@ -15,7 +15,7 @@ fn test_get_return_registers_from_symbol() {
 }
 
 #[test]
-fn test_get_variable_number_parameters() {
+fn test_get_variable_parameters() {
     let mem_image = RuntimeMemoryImage::mock();
     let mut pi_state = mock_pi_state();
     let sprintf_symbol = ExternSymbol::mock_string();
@@ -34,9 +34,20 @@ fn test_get_variable_number_parameters() {
     project.calling_conventions = vec![cconv];
 
     let mut output: Vec<Arg> = Vec::new();
+    output.push(Arg::Stack {
+        offset: 0,
+        size: ByteSize::new(4),
+        data_type: Some(Datatype::Integer),
+    });
+
+    output.push(Arg::Stack {
+        offset: 4,
+        size: ByteSize::new(4),
+        data_type: Some(Datatype::Integer),
+    });
     assert_eq!(
         output,
-        get_variable_number_parameters(
+        get_variable_parameters(
             &project,
             &pi_state,
             &sprintf_symbol,
@@ -46,10 +57,11 @@ fn test_get_variable_number_parameters() {
         .unwrap()
     );
 
-    output.push(Arg::Stack {
+    output = vec![Arg::Stack {
         offset: 0,
         size: ByteSize::new(8),
-    });
+        data_type: Some(Datatype::Pointer),
+    }];
 
     let global_address = Bitvector::from_str_radix(16, "500c").unwrap();
     pi_state.set_register(
@@ -59,7 +71,7 @@ fn test_get_variable_number_parameters() {
 
     assert_eq!(
         output,
-        get_variable_number_parameters(
+        get_variable_parameters(
             &project,
             &pi_state,
             &sprintf_symbol,
@@ -114,64 +126,58 @@ fn test_parse_format_string_parameters() {
         "ifconfig eth0 add 3ffe:501:ffff:101:2%02x:%02xff:fe%02x:%02x%02x/64",
         "/dev/sd%c%d",
         "%s: Unable to open \'%s\', errno=%d\n",
+        "%s %lli",
     ];
     let properties = DatatypeProperties::mock();
-    let expected_outputs: Vec<Vec<(String, ByteSize)>> = vec![
+    let expected_outputs: Vec<Vec<(Datatype, ByteSize)>> = vec![
         vec![
-            ("s".to_string(), properties.pointer_size),
-            ("s".to_string(), properties.pointer_size),
-            ("s".to_string(), properties.pointer_size),
+            (Datatype::from("s".to_string()), properties.pointer_size),
+            (Datatype::from("s".to_string()), properties.pointer_size),
+            (Datatype::from("s".to_string()), properties.pointer_size),
         ],
         vec![
-            ("x".to_string(), properties.integer_size),
-            ("x".to_string(), properties.integer_size),
-            ("x".to_string(), properties.integer_size),
-            ("x".to_string(), properties.integer_size),
-            ("x".to_string(), properties.integer_size),
+            (Datatype::from("x".to_string()), properties.integer_size),
+            (Datatype::from("x".to_string()), properties.integer_size),
+            (Datatype::from("x".to_string()), properties.integer_size),
+            (Datatype::from("x".to_string()), properties.integer_size),
+            (Datatype::from("x".to_string()), properties.integer_size),
         ],
         vec![
-            ("c".to_string(), properties.integer_size),
-            ("d".to_string(), properties.integer_size),
+            (Datatype::from("c".to_string()), properties.integer_size),
+            (Datatype::from("d".to_string()), properties.integer_size),
         ],
         vec![
-            ("s".to_string(), properties.pointer_size),
-            ("s".to_string(), properties.pointer_size),
-            ("d".to_string(), properties.integer_size),
+            (Datatype::from("s".to_string()), properties.pointer_size),
+            (Datatype::from("s".to_string()), properties.pointer_size),
+            (Datatype::from("d".to_string()), properties.integer_size),
+        ],
+        vec![
+            (Datatype::from("s".to_string()), properties.pointer_size),
+            (Datatype::from("lli".to_string()), properties.pointer_size),
         ],
     ];
 
-    for (case, output) in test_cases.into_iter().zip(expected_outputs.into_iter()) {
-        assert_eq!(output, parse_format_string_parameters(case, &properties));
+    for (index, (case, output)) in test_cases
+        .into_iter()
+        .zip(expected_outputs.into_iter())
+        .enumerate()
+    {
+        if index == 4 {
+            assert_ne!(
+                output,
+                parse_format_string_parameters(case, &properties).unwrap_or(vec![])
+            );
+        } else {
+            assert_eq!(
+                output,
+                parse_format_string_parameters(case, &properties).unwrap()
+            );
+        }
     }
 }
 
 #[test]
-fn test_map_format_specifier_to_bytesize() {
-    let properties = DatatypeProperties::mock();
-    assert_eq!(
-        ByteSize::new(8),
-        map_format_specifier_to_bytesize(&properties, "s".to_string())
-    );
-    assert_eq!(
-        ByteSize::new(8),
-        map_format_specifier_to_bytesize(&properties, "f".to_string())
-    );
-    assert_eq!(
-        ByteSize::new(4),
-        map_format_specifier_to_bytesize(&properties, "d".to_string())
-    );
-}
-
-#[test]
-#[should_panic]
-fn test_map_invalid_format_specifier_to_bytesize() {
-    let properties = DatatypeProperties::mock();
-    map_format_specifier_to_bytesize(&properties, "w".to_string());
-}
-
-#[test]
 fn test_calculate_parameter_locations() {
-    let project = Project::mock_empty();
     let cconv = CallingConvention::mock_with_parameter_registers(
         vec![
             "RDI".to_string(),
@@ -182,77 +188,65 @@ fn test_calculate_parameter_locations() {
         vec!["XMM0".to_string()],
     );
     let format_string_index: usize = 1;
-    let mut parameters: Vec<(String, ByteSize)> = Vec::new();
-    parameters.push(("d".to_string(), ByteSize::new(4)));
-    parameters.push(("f".to_string(), ByteSize::new(8)));
-    parameters.push(("s".to_string(), ByteSize::new(4)));
+    let mut parameters: Vec<(Datatype, ByteSize)> = Vec::new();
+    parameters.push(("d".to_string().into(), ByteSize::new(8)));
+    parameters.push(("f".to_string().into(), ByteSize::new(16)));
+    parameters.push(("s".to_string().into(), ByteSize::new(8)));
 
-    let mut expected_args = vec![Arg::Register(Variable::mock("R9", ByteSize::new(8)))];
+    let mut expected_args = vec![
+        Arg::Register {
+            var: Variable::mock("R8", ByteSize::new(8)),
+            data_type: Some(Datatype::Integer),
+        },
+        Arg::Register {
+            var: Variable::mock("XMM0", ByteSize::new(16)),
+            data_type: Some(Datatype::Double),
+        },
+        Arg::Register {
+            var: Variable::mock("R9", ByteSize::new(8)),
+            data_type: Some(Datatype::Pointer),
+        },
+    ];
 
     // Test Case 1: The string parameter is still written in the R9 register since 'f' is contained in the float register.
     assert_eq!(
         expected_args,
-        calculate_parameter_locations(&project, parameters.clone(), &cconv, format_string_index)
+        calculate_parameter_locations(parameters.clone(), &cconv, format_string_index)
     );
 
-    parameters.push(("s".to_string(), ByteSize::new(4)));
+    parameters.push(("s".to_string().into(), ByteSize::new(8)));
     expected_args.push(Arg::Stack {
         offset: 0,
-        size: ByteSize::new(4),
+        size: ByteSize::new(8),
+        data_type: Some(Datatype::Pointer),
     });
 
     // Test Case 2: A second string parameter does not fit into the registers anymore and is written into the stack.
     assert_eq!(
         expected_args,
-        calculate_parameter_locations(&project, parameters, &cconv, format_string_index)
+        calculate_parameter_locations(parameters, &cconv, format_string_index)
     );
 }
 
 #[test]
-fn test_create_string_stack_arg() {
+fn test_create_stack_arg() {
     assert_eq!(
         Arg::Stack {
             size: ByteSize::new(8),
             offset: 8,
+            data_type: Some(Datatype::Pointer),
         },
-        create_string_stack_arg(ByteSize::new(8), 8),
+        create_stack_arg(ByteSize::new(8), 8, Datatype::Pointer),
     )
 }
 
 #[test]
-fn test_create_string_register_arg() {
+fn test_create_register_arg() {
     assert_eq!(
-        Arg::Register(Variable::mock("R9", ByteSize::new(8))),
-        create_string_register_arg(ByteSize::new(8), "R9".to_string()),
+        Arg::Register {
+            var: Variable::mock("R9", ByteSize::new(8)),
+            data_type: Some(Datatype::Pointer),
+        },
+        create_register_arg(ByteSize::new(8), "R9".to_string(), Datatype::Pointer),
     );
-}
-
-#[test]
-fn test_is_integer() {
-    assert!(is_integer("d"));
-    assert!(is_integer("i"));
-    assert!(!is_integer("f"));
-}
-
-#[test]
-fn test_is_pointer() {
-    assert!(is_pointer("s"));
-    assert!(is_pointer("S"));
-    assert!(is_pointer("n"));
-    assert!(is_pointer("p"));
-    assert!(!is_pointer("g"));
-}
-
-#[test]
-fn test_is_string() {
-    assert!(is_string("s"));
-    assert!(is_string("S"));
-    assert!(!is_string("g"));
-}
-
-#[test]
-fn test_is_float() {
-    assert!(is_float("f"));
-    assert!(is_float("A"));
-    assert!(!is_float("s"));
 }

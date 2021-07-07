@@ -1,13 +1,15 @@
-0.5-dev
+0.5 (2021-07)
 ====
 
 -   Switched default backend to Ghidra (PR #128)
 -   Handle global memory accesses during analysis (PRs #131, #133)
 -   Improvements to the Docker image (PR #134)
--   Add OS Command Injection Check (PRs #130, #154, #167)
+-   Add OS Command Injection Check (PRs #130, #154, #167, #182, #184, #187)
 -   Remove deprecated BAP backend (PRs #148, #149, #150)
--   Implement abstract interval domain (PRs #152, #158, #166)
+-   Implement abstract strided interval domain (PRs #152, #158, #166, #189)
 -   Add Buffer Overflow checks (PRs #159, #174)
+-   Prevent duplication of warnings in CWE-415 and CWE-416 checks (#183)
+-   Implement expression propagation to improve disassembler output (#185)
 
 0.4 (2021-01)
 ====
