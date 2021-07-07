@@ -32,7 +32,7 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String>> Context<'a, T> {
             Arg::Register{var, ..} => {
                 AbstractIdentifier::new(call_tid.clone(), AbstractLocation::from_var(var).unwrap())
             }
-            Arg::Stack { offset, size, data_type } => AbstractIdentifier::new(
+            Arg::Stack { offset, size, .. } => AbstractIdentifier::new(
                 call_tid.clone(),
                 AbstractLocation::from_stack(&self.project.stack_pointer_register, size, offset)
                     .unwrap(),
@@ -345,37 +345,52 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String>> Context<'a, T> {
     ) -> Vec<String> {
         let mut string_constants: Vec<String> = Vec::new();
         for arg in var_args.iter() {
-            if let Ok(DataDomain::Value(address)) = pi_state.eval_parameter_arg(
-                arg,
-                &self.project.stack_pointer_register,
-                self.runtime_memory_image,
-            ) {
-                if let Ok(string) = self.runtime_memory_image.read_string_until_null_terminator(
-                    &address
-                        .try_to_bitvec()
-                        .expect("Could not translate interval address to bitvector."),
+            if Context::<T>::is_string_arg(arg) {
+                if let Ok(DataDomain::Value(address)) = pi_state.eval_parameter_arg(
+                    arg,
+                    &self.project.stack_pointer_register,
+                    self.runtime_memory_image,
                 ) {
-                    string_constants.push(string.to_string());
+                    if let Ok(string) = self.runtime_memory_image.read_string_until_null_terminator(
+                        &address
+                            .try_to_bitvec()
+                            .expect("Could not translate interval address to bitvector."),
+                    ) {
+                        string_constants.push(string.to_string());
+                    } else {
+                        string_constants.push("%s".to_string());
+                    }
                 } else {
                     string_constants.push("%s".to_string());
                 }
-            } else {
-                string_constants.push("%s".to_string());
             }
         }
 
         string_constants
     }
 
+    /// Checks whether an argument is of type string.
+    pub fn is_string_arg(arg: &Arg) -> bool {
+        let data_type = match arg {
+            Arg::Register {data_type, ..} => data_type.clone().unwrap(),
+            Arg::Stack {data_type, ..} => data_type.clone().unwrap(),
+        };
+
+        match data_type {
+            Datatype::Pointer => true,
+            _ => false,
+        }
+    }
+
     pub fn insert_string_constants_into_format_string(
         format_string: String,
         input_strings: Vec<String>,
     ) -> String {
-        let mut insert_string = input_strings.clone();
+        let mut insert_strings = input_strings.clone();
         let parted: Vec<String> = format_string.split("%s").map(|s| s.to_string()).collect();
-        insert_string.resize_with(parted.len(), || "".to_string());
+        insert_strings.resize_with(parted.len(), || "".to_string());
         let sub_string_pairs: Vec<(&String, &String)> =
-            parted.iter().zip(insert_string.iter()).collect();
+            parted.iter().zip(insert_strings.iter()).collect();
 
         sub_string_pairs
             .into_iter()
