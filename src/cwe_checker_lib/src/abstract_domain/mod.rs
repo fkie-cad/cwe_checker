@@ -28,6 +28,9 @@ pub use bricks::*;
 mod character_inclusion;
 pub use character_inclusion::*;
 
+mod strings;
+pub use strings::*;
+
 /// The main trait describing an abstract domain.
 ///
 /// Each abstract domain is partially ordered.

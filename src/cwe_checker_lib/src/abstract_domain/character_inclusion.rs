@@ -23,7 +23,7 @@ use std::collections::HashSet;
 
 use crate::prelude::*;
 
-use super::{AbstractDomain, HasTop};
+use super::{AbstractDomain, DomainInsertion, HasTop};
 
 /// The `CharacterInclusionDomain` is a abstract domain describing the characters a string certainly has.
 /// and the characters a string may have.
@@ -37,16 +37,43 @@ pub enum CharacterInclusionDomain {
     /// the whole alphabet of allowed characters for the possibly contained characters.
     Top,
     /// The set of certainly contained characters and a set of possibly contained characters
-    Value((HashSet<char>, HashSet<char>)),
+    Value((CharacterSet, CharacterSet)),
 }
 
 impl CharacterInclusionDomain {
     /// Unwraps the values from the Character Inclusion Domain
-    pub fn unwrap_value(&self) -> (HashSet<char>, HashSet<char>) {
+    pub fn unwrap_value(&self) -> (CharacterSet, CharacterSet) {
         match self {
             CharacterInclusionDomain::Value(value) => value.clone(),
             _ => panic!("Unexpected Character Inclusion type."),
         }
+    }
+}
+
+impl DomainInsertion for CharacterInclusionDomain {
+    fn insert_string_domain(&self, string_domain: &Self) -> CharacterInclusionDomain {
+        match self {
+            CharacterInclusionDomain::Value((self_certain, self_possible)) => {
+                match string_domain {
+                    CharacterInclusionDomain::Value((other_certain, other_possible)) => {
+                        CharacterInclusionDomain::Value((self_certain.union(other_certain.clone()), self_possible.union(other_possible.clone())))
+                    }
+                    CharacterInclusionDomain::Top => {
+                        CharacterInclusionDomain::Value((self_certain.clone(), CharacterSet::Top))
+                    }
+                }
+            }
+            CharacterInclusionDomain::Top => {
+                CharacterInclusionDomain::Top
+            }
+        }
+    }
+}
+
+impl From<String> for CharacterInclusionDomain {
+    fn from(string: String) -> Self {
+        let characters: HashSet<char> = string.chars().collect();
+        CharacterInclusionDomain::Value((CharacterSet::Value(characters.clone()), CharacterSet::Value(characters)))
     }
 }
 
@@ -61,8 +88,8 @@ impl AbstractDomain for CharacterInclusionDomain {
             let (self_certain, self_possible) = self.unwrap_value();
             let (other_certain, other_possible) = other.unwrap_value();
             Self::Value((
-                self_certain.intersection(&other_certain).cloned().collect(),
-                self_possible.union(&other_possible).cloned().collect(),
+                self_certain.intersection(other_certain),
+                self_possible.union(other_possible),
             ))
         }
     }
@@ -80,12 +107,62 @@ impl HasTop for CharacterInclusionDomain {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+pub enum CharacterSet {
+    Top,
+    Value(HashSet<char>),
+}
+
+impl CharacterSet {
+    /// Unwraps the values from the CharacterSet
+    pub fn unwrap_value(&self) -> HashSet<char> {
+        match self {
+            CharacterSet::Value(value) => value.clone(),
+            _ => panic!("Unexpected CharacterSet type."),
+        }
+    }
+
+    /// Takes the intersection of two character sets. 
+    /// None of the sets should be *Top* since otherwise
+    /// the whole CharacterInclusionDomain would be *Top*
+    /// which is checked beforehand.
+    pub fn intersection(&self, other: Self) -> Self {
+        if self.is_top() || other.is_top() {
+            panic!("Unexpected Top Value for CharacterSet intersection.")
+        }
+        CharacterSet::Value(self.unwrap_value().intersection(&other.unwrap_value()).cloned().collect())
+    }
+
+    /// Takes the union of two character sets.
+    /// If either of them is *Top* the union is *Top*.
+    /// Otherwise the standard set union is taken.
+    pub fn union(&self, other: Self) -> Self {
+        if self.is_top() || other.is_top() {
+            return CharacterSet::Top;
+        }
+
+        CharacterSet::Value(self.unwrap_value().union(&other.unwrap_value()).cloned().collect())
+    }
+
+    /// Check if the value is *Top*.
+    fn is_top(&self) -> bool {
+        matches!(self, Self::Top)
+    }
+}
+
+impl HasTop for CharacterSet {
+    /// Return a *Top* value
+    fn top(&self) -> Self {
+        CharacterSet::Top
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn ci(concrete: &str) -> CharacterInclusionDomain {
-        let abstract_set: HashSet<char> = concrete.chars().into_iter().collect();
+        let abstract_set = CharacterSet::Value(concrete.chars().into_iter().collect());
         CharacterInclusionDomain::Value((abstract_set.clone(), abstract_set.clone()))
     }
 
@@ -94,12 +171,12 @@ mod tests {
         let first = ci("abc");
         let second = ci("def");
         let third = ci("dabc");
-        let possible_set: HashSet<char> = "abcdef".chars().into_iter().collect();
-        let certain_set: HashSet<char> = "d".chars().into_iter().collect();
+        let possible_set = CharacterSet::Value("abcdef".chars().into_iter().collect());
+        let certain_set = CharacterSet::Value("d".chars().into_iter().collect());
 
         assert_eq!(
             first.merge(&second),
-            CharacterInclusionDomain::Value((HashSet::new(), possible_set.clone()))
+            CharacterInclusionDomain::Value((CharacterSet::Value(HashSet::new()), possible_set.clone()))
         );
         assert_eq!(
             third.merge(&second),
