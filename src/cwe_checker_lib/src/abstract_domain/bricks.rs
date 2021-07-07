@@ -24,7 +24,7 @@
 
 use std::collections::BTreeSet;
 
-use super::{AbstractDomain, HasTop};
+use super::{AbstractDomain, DomainInsertion, HasTop};
 use crate::prelude::*;
 
 mod brick;
@@ -187,6 +187,12 @@ impl BricksDomain {
             BricksDomain::Value(bricks) => bricks.clone(),
             _ => panic!("Unexpected Brick Domain type."),
         }
+    }
+}
+
+impl DomainInsertion for BricksDomain {
+    fn insert_string_domain(&self, string_domain: &Self) -> Self {
+        todo!()
     }
 }
 

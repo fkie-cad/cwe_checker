@@ -309,6 +309,10 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String>> Context<'a, T> {
         new_state
     }
 
+    pub fn strip_format_string() -> String {
+        todo!()
+    }
+
     /// Takes the first parameter of a string function that returns its target.
     pub fn get_return_destination_from_first_input_parameter(
         &self,

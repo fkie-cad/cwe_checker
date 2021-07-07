@@ -106,7 +106,7 @@ fn mock_defs_for_sprintf(format_known: bool, blk_num: usize) -> Vec<Term<Def>> {
     /*
         r11 = INT_ADD sp, 4:4
 
-        r12 = INT_ADD sp, 32:4
+        r12 = COPY 0x3002:4
 
         r0 = INT_SUB r11, 0x58:4   // Destination string pointer
 
@@ -114,21 +114,21 @@ fn mock_defs_for_sprintf(format_known: bool, blk_num: usize) -> Vec<Term<Def>> {
         OR
         r1 = INT_SUB r11, 0x62:4   // Variable format string
 
-        r2 = COPY 0x3002:4    // Constant string input 'Hello World'
+        r2 = INT_ADD sp, 24:4    // Constant string input 'Hello World'
 
         r3 = INT_ADD sp, 16:4      // Variable input in register
 
-        $U1050:4 = INT_ADD sp, 0:4 // First variable input on stack
+        $U1050:4 = INT_ADD sp, 0:4   // String constant pointer on stack
         STORE ram($U1050:4), r12
 
-        r12 = INT_ADD r12, 4:4
+        r12 = INT_ADD r11, 0x66:4
 
         $U1050:4 = INT_ADD sp, 4:4 // Second variable input on stack
         STORE ram($U1050:4), r12
     */
 
     defs.push(setup.pointer_plus_offset(&format!("def_0_blk_{}", blk_num), "r11", "sp", 4));
-    defs.push(setup.pointer_plus_offset(&format!("def_1_blk_{}", blk_num), "r12", "sp", 32));
+    defs.push(setup.string_input_constant(&format!("def_1_blk_{}", blk_num), "r12", 0x3002));
 
     defs.push(setup.pointer_minus_offset(&format!("def_2_blk_{}", blk_num), "r0", "r11", 0x58));
 
@@ -138,7 +138,7 @@ fn mock_defs_for_sprintf(format_known: bool, blk_num: usize) -> Vec<Term<Def>> {
         defs.push(setup.pointer_minus_offset(&format!("def_3_blk_{}", blk_num), "r1", "r11", 0x62));
     }
 
-    defs.push(setup.string_input_constant(&format!("def_4_blk_{}", blk_num), "r2", 0x3002));
+    defs.push(setup.pointer_plus_offset(&format!("def_4_blk_{}", blk_num), "r2", "sp", 24));
 
     defs.push(setup.pointer_plus_offset(&format!("def_5_blk_{}", blk_num), "r3", "sp", 16));
 
@@ -154,7 +154,7 @@ fn mock_defs_for_sprintf(format_known: bool, blk_num: usize) -> Vec<Term<Def>> {
         "r12",
     ));
 
-    defs.push(setup.pointer_plus_offset(&format!("def_8_blk_{}", blk_num), "r12", "r12", 4));
+    defs.push(setup.pointer_plus_offset(&format!("def_8_blk_{}", blk_num), "r12", "r11", 0x66));
 
     defs.push(setup.pointer_plus_offset_to_temp_var(
         &format!("def_9_blk_{}", blk_num),
