@@ -90,10 +90,15 @@ pub fn parse_format_string_parameters(
         .captures_iter(format_string)
         .map(|cap| {
             let data_type = Datatype::from(cap[1].to_string());
-            (
-                data_type.clone(),
-                datatype_properties.get_size_from_data_type(data_type),
-            )
+            let size = {
+                // Considers argument promotion for char type
+                if matches!(data_type, Datatype::Char) {
+                    datatype_properties.get_size_from_data_type(Datatype::Integer)
+                } else {
+                    datatype_properties.get_size_from_data_type(data_type.clone())
+                }
+            };
+            (data_type, size)
         })
         .collect();
 
@@ -169,7 +174,7 @@ pub fn calculate_parameter_locations(
 
     for (data_type, size) in parameters.iter() {
         match data_type {
-            Datatype::Integer | Datatype::Pointer => {
+            Datatype::Integer | Datatype::Pointer | Datatype::Char => {
                 if integer_arg_register_count > 0 {
                     let register_name = calling_convention.integer_parameter_register
                         [calling_convention.integer_parameter_register.len()

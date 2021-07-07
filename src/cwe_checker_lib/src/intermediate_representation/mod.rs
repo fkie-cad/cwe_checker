@@ -152,13 +152,14 @@ pub enum Datatype {
 
 impl From<String> for Datatype {
     /// The purpose of this conversion is to locate parameters to variadic functions.
-    /// Therefore, char types are mapped to integer types since they undergo the default
+    /// Therefore, char types have to be mapped to the integer size since they undergo the default
     /// argument promotion. (e.g. 1 byte char -> 4 byte integer)
     /// The same holds for all float types that are promoted to doubles. (e.g. 8 byte float -> 16 byte double)
     fn from(specifier: String) -> Self {
         match specifier.as_str() {
-            "c" | "C" | "d" | "i" | "u" | "o" | "x" | "X" | "hi" | "hd" | "hu" => Datatype::Integer,
-            "s" | "S" | "n" | "p" => Datatype::Pointer,
+            "c" | "C" => Datatype::Char,
+            "d" | "i" | "u" | "o" | "p" | "x" | "X" | "hi" | "hd" | "hu" => Datatype::Integer,
+            "s" | "S" | "n" => Datatype::Pointer,
             "lf" | "lg" | "le" | "la" | "lF" | "lG" | "lE" | "lA" | "f" | "F" | "e" | "E" | "a"
             | "A" | "g" | "G" => Datatype::Double,
             "li" | "ld" | "lu" => Datatype::Long,
