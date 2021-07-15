@@ -4,7 +4,7 @@
 use std::collections::BTreeMap;
 
 use crate::{
-    abstract_domain::{AbstractDomain, HasTop},
+    abstract_domain::{AbstractDomain, DomainInsertion, HasTop},
     prelude::*,
     utils::log::{CweWarning, LogMessage, LogThreadMsg},
     AnalysisResults,
@@ -36,7 +36,7 @@ pub struct Config {
 }
 
 /// A wrapper struct for the string abstraction computation object.
-pub struct StringAbstraction<'a, T: AbstractDomain + HasTop + Eq + From<String>> {
+pub struct StringAbstraction<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> {
     computation: Computation<GeneralizedContext<'a, Context<'a, T>>>,
     log_collector: crossbeam_channel::Sender<LogThreadMsg>,
     /// The log messages and CWE warnings that have been generated during the string abstraction analysis.

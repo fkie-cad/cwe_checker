@@ -1,17 +1,19 @@
 use std::collections::{HashMap, HashSet};
 
 use petgraph::graph::NodeIndex;
+use regex::{Match, Regex};
 
 use super::Context;
 use crate::abstract_domain::{
-    AbstractDomain, CharacterInclusionDomain, HasTop, IntervalDomain, PointerDomain,
+    AbstractDomain, CharacterInclusionDomain, CharacterSet, DataDomain, DomainInsertion, HasTop,
+    IntervalDomain, PointerDomain,
 };
 use crate::analysis::forward_interprocedural_fixpoint::Context as _;
 use crate::analysis::pointer_inference::PointerInference as PointerInferenceComputation;
 use crate::analysis::pointer_inference::State as PiState;
 use crate::analysis::string_abstraction::state::State;
 use crate::analysis::string_abstraction::tests::mock_project::*;
-use crate::intermediate_representation::{Bitvector, ExternSymbol, Project, Sub};
+use crate::intermediate_representation::{Bitvector, Datatype, ExternSymbol, Project, Sub};
 use crate::{
     abstract_domain::{AbstractIdentifier, AbstractLocation},
     intermediate_representation::{Arg, ByteSize, Tid, Variable},
@@ -96,72 +98,10 @@ fn mock_string_symbol_map(project: &Project) -> HashMap<Tid, &ExternSymbol> {
 }
 
 #[test]
-fn test_get_abstract_id_for_function_parameter_from_register() {
-    let call_tid = Tid::new("call");
-    let rdi_reg = Variable::mock("r0", 4);
-    let arg = Arg::Register{var: rdi_reg.clone(), data_type: None};
-
-    let project = mock_project_with_intraprocedural_control_flow(vec![], "");
-    let mem_image = RuntimeMemoryImage::mock();
-    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
-    let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
-    pi_results.compute();
-
-    let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
-
-    let expected_id = AbstractIdentifier::new(
-        call_tid.clone(),
-        AbstractLocation::from_var(&rdi_reg).unwrap(),
-    );
-
-    assert_eq!(
-        expected_id,
-        setup
-            .context
-            .get_abstract_id_for_function_parameter(&arg, &call_tid)
-    );
-}
-
-#[test]
-fn test_get_abstract_id_for_function_parameter_from_stack() {
-    let call_tid = Tid::new("call");
-    let sp_reg = Variable::mock("sp", 4);
-    let arg = Arg::Stack {
-        offset: 8,
-        size: ByteSize::new(8),
-        data_type: None,
-    };
-
-    let project = mock_project_with_intraprocedural_control_flow(vec![], "");
-    let mem_image = RuntimeMemoryImage::mock();
-    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
-    let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
-    pi_results.compute();
-
-    let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
-
-    let expected_id = AbstractIdentifier::new(
-        call_tid.clone(),
-        AbstractLocation::from_stack(&sp_reg, &ByteSize::new(8), &8).unwrap(),
-    );
-
-    assert_eq!(
-        expected_id,
-        setup
-            .context
-            .get_abstract_id_for_function_parameter(&arg, &call_tid)
-    );
-}
-
-#[test]
 fn test_handle_string_symbol_calls() {}
 
 #[test]
 fn test_handle_scanf_calls() {
-    let call_tid = Tid::new("func_sprintf_0");
-    let r1_reg = Variable::mock("r1", 4);
-    let r2_reg = Variable::mock("r2", 4);
-    let r3_reg = Variable::mock("r3", 4);
     let scanf_symbol = ExternSymbol::mock_scanf_symbol_arm();
 
     let project = mock_project_with_intraprocedural_control_flow(
@@ -175,94 +115,77 @@ fn test_handle_scanf_calls() {
 
     let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
-    let new_state =
-        setup
-            .context
-            .handle_scanf_calls(&setup.state_before_call, &scanf_symbol, &call_tid);
-
-    let expected_r1_abstract_id = AbstractIdentifier::new(
-        call_tid.clone(),
-        AbstractLocation::from_var(&r1_reg).unwrap(),
-    );
-
-    let expected_r2_abstract_id = AbstractIdentifier::new(
-        call_tid.clone(),
-        AbstractLocation::from_var(&r2_reg).unwrap(),
-    );
-
-    let expected_r3_abstract_id = AbstractIdentifier::new(
-        call_tid.clone(),
-        AbstractLocation::from_var(&r3_reg).unwrap(),
-    );
-
-    let expected_stack_abstract_id = AbstractIdentifier::new(
-        call_tid,
-        AbstractLocation::from_stack(&Variable::mock("sp", 4), &ByteSize::new(4), &0).unwrap(),
-    );
+    let new_state = setup
+        .context
+        .handle_scanf_calls(&setup.state_before_call, &scanf_symbol);
 
     let top_value = CharacterInclusionDomain::from("".to_string()).top();
 
-    assert_eq!(
-        *new_state
-            .get_strings()
-            .get(&expected_r1_abstract_id)
-            .unwrap(),
-        top_value
+    let stack_id = AbstractIdentifier::new(
+        Tid::new("func"),
+        AbstractLocation::from_var(&Variable::mock("sp", 4)).unwrap(),
     );
+
+    assert!(new_state
+        .get_unassigned_return_pointer()
+        .contains(&PointerDomain::new(
+            stack_id.clone(),
+            Bitvector::from_i32(-0x74).into(),
+        )));
+
+    assert!(new_state
+        .get_unassigned_return_pointer()
+        .contains(&PointerDomain::new(
+            stack_id.clone(),
+            Bitvector::from_i32(-0x5e).into(),
+        )));
+
+    assert!(new_state
+        .get_unassigned_return_pointer()
+        .contains(&PointerDomain::new(
+            stack_id.clone(),
+            Bitvector::from_i32(-0x4c).into(),
+        )));
+
+    assert!(new_state
+        .get_unassigned_return_pointer()
+        .contains(&PointerDomain::new(
+            stack_id.clone(),
+            Bitvector::from_i32(-0x38).into(),
+        )));
+
     assert_eq!(
         *new_state
-            .get_strings()
-            .get(&expected_r2_abstract_id)
+            .get_stack_offset_to_string_map()
+            .get(&(-0x74 as i64))
             .unwrap(),
-        top_value
-    );
-    assert_eq!(
-        *new_state
-            .get_strings()
-            .get(&expected_r3_abstract_id)
-            .unwrap(),
-        top_value
-    );
-    assert_eq!(
-        *new_state
-            .get_strings()
-            .get(&expected_stack_abstract_id)
-            .unwrap(),
-        top_value
+        top_value,
     );
     assert_eq!(
         *new_state
             .get_stack_offset_to_string_map()
-            .get(&Bitvector::from_i32(-0x74))
+            .get(&(-0x5e as i64))
             .unwrap(),
-        expected_r1_abstract_id
+        top_value,
     );
     assert_eq!(
         *new_state
             .get_stack_offset_to_string_map()
-            .get(&Bitvector::from_i32(-0x5e))
+            .get(&(-0x4c as i64))
             .unwrap(),
-        expected_r2_abstract_id
+        top_value,
     );
     assert_eq!(
         *new_state
             .get_stack_offset_to_string_map()
-            .get(&Bitvector::from_i32(-0x4c))
+            .get(&(-0x38 as i64))
             .unwrap(),
-        expected_r3_abstract_id
-    );
-    assert_eq!(
-        *new_state
-            .get_stack_offset_to_string_map()
-            .get(&Bitvector::from_i32(-0x38))
-            .unwrap(),
-        expected_stack_abstract_id
+        top_value,
     );
 }
 
 #[test]
-fn test_create_abstract_domain_entries_for_function_arguments_with_known_values() {
-    let call_tid = Tid::new("func_sprintf_0");
+fn test_create_abstract_domain_entries_for_function_return_values_with_known_values() {
     let r2_reg = Variable::mock("r2", 4);
     let sscanf_symbol = ExternSymbol::mock_sscanf_symbol_arm();
 
@@ -277,9 +200,17 @@ fn test_create_abstract_domain_entries_for_function_arguments_with_known_values(
 
     let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
+    let stack_id = AbstractIdentifier::new(
+        Tid::new("func"),
+        AbstractLocation::from_var(&Variable::mock("sp", 4)).unwrap(),
+    );
+
     let mut arg_to_value_map: HashMap<Arg, Option<String>> = HashMap::new();
 
-    let register_arg = Arg::Register{var: r2_reg.clone(), data_type: None};;
+    let register_arg = Arg::Register {
+        var: r2_reg.clone(),
+        data_type: None,
+    };
     let stack_arg = Arg::Stack {
         offset: 0,
         size: ByteSize::new(4),
@@ -290,28 +221,17 @@ fn test_create_abstract_domain_entries_for_function_arguments_with_known_values(
 
     setup
         .context
-        .create_abstract_domain_entries_for_function_arguments(
+        .create_abstract_domain_entries_for_function_return_values(
             &setup.pi_state_before_symbol_call,
             &mut setup.state_before_call,
-            &call_tid,
             arg_to_value_map,
         );
-
-    let expected_r2_abstract_id = AbstractIdentifier::new(
-        call_tid.clone(),
-        AbstractLocation::from_var(&r2_reg).unwrap(),
-    );
-
-    let expected_stack_abstract_id = AbstractIdentifier::new(
-        call_tid,
-        AbstractLocation::from_stack(&Variable::mock("sp", 4), &ByteSize::new(4), &0).unwrap(),
-    );
 
     assert_eq!(
         *setup
             .state_before_call
-            .get_strings()
-            .get(&expected_r2_abstract_id)
+            .get_stack_offset_to_string_map()
+            .get(&(-0x7c as i64))
             .unwrap(),
         CharacterInclusionDomain::from("a".to_string())
     );
@@ -320,38 +240,92 @@ fn test_create_abstract_domain_entries_for_function_arguments_with_known_values(
         *setup
             .state_before_call
             .get_stack_offset_to_string_map()
-            .get(&Bitvector::from_i32(-0x7c))
-            .unwrap(),
-        expected_r2_abstract_id
-    );
-
-    assert_eq!(
-        *setup
-            .state_before_call
-            .get_strings()
-            .get(&expected_stack_abstract_id)
+            .get(&(-0x92 as i64))
             .unwrap(),
         CharacterInclusionDomain::from("b".to_string())
     );
 
-    assert_eq!(
-        *setup
-            .state_before_call
-            .get_stack_offset_to_string_map()
-            .get(&Bitvector::from_i32(-0x92))
-            .unwrap(),
-        expected_stack_abstract_id
+    assert!(setup
+        .state_before_call
+        .get_unassigned_return_pointer()
+        .contains(&PointerDomain::new(
+            stack_id.clone(),
+            Bitvector::from_i32(-0x7c).into(),
+        )));
+
+    assert!(setup
+        .state_before_call
+        .get_unassigned_return_pointer()
+        .contains(&PointerDomain::new(
+            stack_id.clone(),
+            Bitvector::from_i32(-0x92).into(),
+        )));
+}
+
+#[test]
+fn test_add_new_string_abstract_domain() {
+    let sprintf_symbol = ExternSymbol::mock_sprintf_symbol_arm();
+
+    let project = mock_project_with_intraprocedural_control_flow(
+        vec![(sprintf_symbol.clone(), vec![true])],
+        "func",
     );
+    let mem_image = RuntimeMemoryImage::mock();
+    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
+    pi_results.compute();
+
+    let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
+
+    let mut state = State::mock_with_default_pi_state(Sub::mock("func"));
+
+    let stack_id = AbstractIdentifier::new(
+        Tid::new("func"),
+        AbstractLocation::from_var(&Variable::mock("sp", 4)).unwrap(),
+    );
+    let stack_pointer = PointerDomain::new(
+        stack_id.clone(),
+        Bitvector::zero(apint::BitWidth::from(4)).into(),
+    );
+
+    Context::<CharacterInclusionDomain>::add_new_string_abstract_domain(
+        &mut state,
+        &setup.pi_state_before_symbol_call,
+        &stack_pointer,
+        CharacterInclusionDomain::from("Hello World".to_string()),
+    );
+
+    assert!(state.get_stack_offset_to_string_map().contains_key(&0));
+
+    state.set_all_maps_empty();
+
+    let heap_id = AbstractIdentifier::new(
+        Tid::new("func"),
+        AbstractLocation::from_var(&Variable::mock("r5", 4)).unwrap(),
+    );
+
+    let heap_pointer = PointerDomain::new(
+        heap_id.clone(),
+        Bitvector::zero(apint::BitWidth::from(4)).into(),
+    );
+
+    Context::<CharacterInclusionDomain>::add_new_string_abstract_domain(
+        &mut state,
+        &setup.pi_state_before_symbol_call,
+        &heap_pointer,
+        CharacterInclusionDomain::Top,
+    );
+
+    assert!(state.get_heap_to_string_map().contains_key(&heap_id));
 }
 
 #[test]
 fn test_create_abstract_domain_entries_for_function_arguments_with_unknown_values() {
-    let call_tid = Tid::new("func_sprintf_0");
     let r1_reg = Variable::mock("r1", 4);
     let scanf_symbol = ExternSymbol::mock_scanf_symbol_arm();
 
     let project = mock_project_with_intraprocedural_control_flow(
-        vec![(scanf_symbol.clone(), vec![true])],
+        vec![(scanf_symbol.clone(), vec![false])],
         "func",
     );
     let mem_image = RuntimeMemoryImage::mock();
@@ -361,8 +335,16 @@ fn test_create_abstract_domain_entries_for_function_arguments_with_unknown_value
 
     let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
+    let stack_id = AbstractIdentifier::new(
+        Tid::new("func"),
+        AbstractLocation::from_var(&Variable::mock("sp", 4)).unwrap(),
+    );
+
     let mut arg_to_value_map: HashMap<Arg, Option<String>> = HashMap::new();
-    let register_arg = Arg::Register{var: r1_reg.clone(), data_type: None};
+    let register_arg = Arg::Register {
+        var: r1_reg.clone(),
+        data_type: None,
+    };
     let stack_arg = Arg::Stack {
         offset: 0,
         size: ByteSize::new(4),
@@ -373,250 +355,67 @@ fn test_create_abstract_domain_entries_for_function_arguments_with_unknown_value
 
     setup
         .context
-        .create_abstract_domain_entries_for_function_arguments(
+        .create_abstract_domain_entries_for_function_return_values(
             &setup.pi_state_before_symbol_call,
             &mut setup.state_before_call,
-            &call_tid,
             arg_to_value_map,
         );
 
-    let expected_r1_abstract_id = AbstractIdentifier::new(
-        call_tid.clone(),
-        AbstractLocation::from_var(&r1_reg).unwrap(),
-    );
-
-    let expected_stack_abstract_id = AbstractIdentifier::new(
-        call_tid,
-        AbstractLocation::from_stack(&Variable::mock("sp", 4), &ByteSize::new(4), &0).unwrap(),
-    );
-
     assert_eq!(
         *setup
             .state_before_call
-            .get_strings()
-            .get(&expected_r1_abstract_id)
+            .get_stack_offset_to_string_map()
+            .get(&(-0x74 as i64))
             .unwrap(),
-        CharacterInclusionDomain::from("".to_string()).top()
+        CharacterInclusionDomain::Top
     );
 
     assert_eq!(
         *setup
             .state_before_call
             .get_stack_offset_to_string_map()
-            .get(&Bitvector::from_i32(-0x74))
+            .get(&(-0x38 as i64))
             .unwrap(),
-        expected_r1_abstract_id
+        CharacterInclusionDomain::Top
     );
 
-    assert_eq!(
-        *setup
-            .state_before_call
-            .get_strings()
-            .get(&expected_stack_abstract_id)
-            .unwrap(),
-        CharacterInclusionDomain::from("".to_string()).top()
-    );
+    assert!(setup
+        .state_before_call
+        .get_unassigned_return_pointer()
+        .contains(&PointerDomain::new(
+            stack_id.clone(),
+            Bitvector::from_i32(-0x74).into(),
+        )));
 
-    assert_eq!(
-        *setup
-            .state_before_call
-            .get_stack_offset_to_string_map()
-            .get(&Bitvector::from_i32(-0x38))
-            .unwrap(),
-        expected_stack_abstract_id
-    );
-}
-
-#[test]
-fn test_handle_sscanf_calls_unknown_source_unknown_format() {
-    let call_tid = Tid::new("func_sprintf_0");
-    let sscanf_symbol = ExternSymbol::mock_sscanf_symbol_arm();
-
-    let project = mock_project_with_intraprocedural_control_flow(
-        vec![(sscanf_symbol.clone(), vec![false, false])],
-        "func",
-    );
-    let mem_image = RuntimeMemoryImage::mock();
-    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
-    let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
-    pi_results.compute();
-
-    let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
-
-    let new_state =
-        setup
-            .context
-            .handle_sscanf_calls(&setup.state_before_call, &sscanf_symbol, &call_tid);
-
-    assert!(new_state.get_strings().is_empty());
-    assert!(new_state.get_stack_offset_to_string_map().is_empty());
-}
-
-#[test]
-fn test_handle_sscanf_calls_known_source_unknown_format() {
-    let call_tid = Tid::new("func_sprintf_0");
-    let sscanf_symbol = ExternSymbol::mock_sscanf_symbol_arm();
-
-    let project = mock_project_with_intraprocedural_control_flow(
-        vec![(sscanf_symbol.clone(), vec![true, false])],
-        "func",
-    );
-    let mem_image = RuntimeMemoryImage::mock();
-    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
-    let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
-    pi_results.compute();
-
-    let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
-
-    let new_state =
-        setup
-            .context
-            .handle_sscanf_calls(&setup.state_before_call, &sscanf_symbol, &call_tid);
-
-    assert!(new_state.get_strings().is_empty());
-    assert!(new_state.get_stack_offset_to_string_map().is_empty());
-}
-
-#[test]
-fn test_handle_sscanf_calls_unknown_source_known_format() {
-    let call_tid = Tid::new("func_sprintf_0");
-    let sscanf_symbol = ExternSymbol::mock_sscanf_symbol_arm();
-
-    let project = mock_project_with_intraprocedural_control_flow(
-        vec![(sscanf_symbol.clone(), vec![false, true])],
-        "func",
-    );
-    let mem_image = RuntimeMemoryImage::mock();
-    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
-    let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
-    pi_results.compute();
-
-    let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
-
-    let new_state =
-        setup
-            .context
-            .handle_sscanf_calls(&setup.state_before_call, &sscanf_symbol, &call_tid);
-
-    assert!(new_state.get_strings().is_empty());
-    assert!(new_state.get_stack_offset_to_string_map().is_empty());
-}
-
-#[test]
-fn test_handle_sscanf_calls_known_source_known_format() {
-    let call_tid = Tid::new("func_sprintf_0");
-    let sscanf_symbol = ExternSymbol::mock_sscanf_symbol_arm();
-    let r2_reg = Variable::mock("r2", 4);
-    let r3_reg = Variable::mock("r3", 4);
-
-    let project = mock_project_with_intraprocedural_control_flow(
-        vec![(sscanf_symbol.clone(), vec![true, true])],
-        "func",
-    );
-    let mem_image = RuntimeMemoryImage::mock();
-    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
-    let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
-    pi_results.compute();
-
-    let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
-
-    let expected_r2_abstract_id = AbstractIdentifier::new(
-        call_tid.clone(),
-        AbstractLocation::from_var(&r2_reg).unwrap(),
-    );
-
-    let expected_r3_abstract_id = AbstractIdentifier::new(
-        call_tid.clone(),
-        AbstractLocation::from_var(&r3_reg).unwrap(),
-    );
-
-    let expected_stack_1_abstract_id = AbstractIdentifier::new(
-        call_tid.clone(),
-        AbstractLocation::from_stack(&Variable::mock("sp", 4), &ByteSize::new(4), &0).unwrap(),
-    );
-
-    let expected_stack_2_abstract_id = AbstractIdentifier::new(
-        call_tid.clone(),
-        AbstractLocation::from_stack(&Variable::mock("sp", 4), &ByteSize::new(4), &4).unwrap(),
-    );
-
-    let new_state =
-        setup
-            .context
-            .handle_sscanf_calls(&setup.state_before_call, &sscanf_symbol, &call_tid);
-
-    assert_eq!(
-        *new_state
-            .get_strings()
-            .get(&expected_r2_abstract_id)
-            .unwrap(),
-        CharacterInclusionDomain::from("str1".to_string())
-    );
-    assert_eq!(
-        *new_state
-            .get_strings()
-            .get(&expected_r3_abstract_id)
-            .unwrap(),
-        CharacterInclusionDomain::from("str2".to_string())
-    );
-    assert_eq!(
-        *new_state
-            .get_strings()
-            .get(&expected_stack_1_abstract_id)
-            .unwrap(),
-        CharacterInclusionDomain::from("str3".to_string())
-    );
-    assert_eq!(
-        *new_state
-            .get_strings()
-            .get(&expected_stack_2_abstract_id)
-            .unwrap(),
-        CharacterInclusionDomain::from("str4".to_string())
-    );
-    assert_eq!(
-        *new_state
-            .get_stack_offset_to_string_map()
-            .get(&Bitvector::from_i32(-0x7c))
-            .unwrap(),
-        expected_r2_abstract_id
-    );
-    assert_eq!(
-        *new_state
-            .get_stack_offset_to_string_map()
-            .get(&Bitvector::from_i32(-0x68))
-            .unwrap(),
-        expected_r3_abstract_id
-    );
-    assert_eq!(
-        *new_state
-            .get_stack_offset_to_string_map()
-            .get(&Bitvector::from_i32(-0x92))
-            .unwrap(),
-        expected_stack_1_abstract_id
-    );
-    assert_eq!(
-        *new_state
-            .get_stack_offset_to_string_map()
-            .get(&Bitvector::from_i32(-0x84))
-            .unwrap(),
-        expected_stack_2_abstract_id
-    );
+    assert!(setup
+        .state_before_call
+        .get_unassigned_return_pointer()
+        .contains(&PointerDomain::new(
+            stack_id.clone(),
+            Bitvector::from_i32(-0x38).into(),
+        )));
 }
 
 #[test]
 fn test_map_source_string_parameters_to_return_arguments() {
     let sscanf_symbol = ExternSymbol::mock_sscanf_symbol_arm();
-    let r2_arg = Arg::Register{var: Variable::mock("r2", 4), data_type: None};
-    let r3_arg = Arg::Register{var: Variable::mock("r3", 4), data_type: None};
+    let r2_arg = Arg::Register {
+        var: Variable::mock("r2", 4),
+        data_type: Some(Datatype::Pointer),
+    };
+    let r3_arg = Arg::Register {
+        var: Variable::mock("r3", 4),
+        data_type: Some(Datatype::Pointer),
+    };
     let stack_arg_1 = Arg::Stack {
         offset: 0,
         size: ByteSize::new(4),
-        data_type: None,
+        data_type: Some(Datatype::Pointer),
     };
     let stack_arg_2 = Arg::Stack {
         offset: 4,
         size: ByteSize::new(4),
-        data_type: None,
+        data_type: Some(Datatype::Pointer),
     };
 
     let project = mock_project_with_intraprocedural_control_flow(
@@ -654,13 +453,11 @@ fn test_map_source_string_parameters_to_return_arguments() {
 }
 
 #[test]
-fn test_add_new_string_abstract_domain() {
-    let call_tid = Tid::new("func_sprintf_0");
-    let r2_reg = Variable::mock("r2", 4);
-    let sprintf_symbol = ExternSymbol::mock_sprintf_symbol_arm();
+fn test_handle_sscanf_calls_unknown_source_unknown_format() {
+    let sscanf_symbol = ExternSymbol::mock_sscanf_symbol_arm();
 
     let project = mock_project_with_intraprocedural_control_flow(
-        vec![(sprintf_symbol.clone(), vec![true])],
+        vec![(sscanf_symbol.clone(), vec![false, false])],
         "func",
     );
     let mem_image = RuntimeMemoryImage::mock();
@@ -670,53 +467,176 @@ fn test_add_new_string_abstract_domain() {
 
     let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
-    let mut state = State::mock_with_default_pi_state(Sub::mock("func"));
+    let new_state = setup
+        .context
+        .handle_sscanf_calls(&setup.state_before_call, &sscanf_symbol);
 
-    let abstract_id =
-        AbstractIdentifier::new(call_tid, AbstractLocation::from_var(&r2_reg).unwrap());
+    assert!(new_state.get_stack_offset_to_string_map().is_empty());
+    assert!(new_state.get_unassigned_return_pointer().is_empty());
+}
+
+#[test]
+fn test_handle_sscanf_calls_known_source_unknown_format() {
+    let sscanf_symbol = ExternSymbol::mock_sscanf_symbol_arm();
+
+    let project = mock_project_with_intraprocedural_control_flow(
+        vec![(sscanf_symbol.clone(), vec![true, false])],
+        "func",
+    );
+    let mem_image = RuntimeMemoryImage::mock();
+    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
+    pi_results.compute();
+
+    let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
+
+    let new_state = setup
+        .context
+        .handle_sscanf_calls(&setup.state_before_call, &sscanf_symbol);
+
+    assert!(new_state.get_unassigned_return_pointer().is_empty());
+    assert!(new_state.get_stack_offset_to_string_map().is_empty());
+}
+
+#[test]
+fn test_handle_sscanf_calls_unknown_source_known_format() {
+    let sscanf_symbol = ExternSymbol::mock_sscanf_symbol_arm();
+
+    let project = mock_project_with_intraprocedural_control_flow(
+        vec![(sscanf_symbol.clone(), vec![false, true])],
+        "func",
+    );
+    let mem_image = RuntimeMemoryImage::mock();
+    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
+    pi_results.compute();
+
+    let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
     let stack_id = AbstractIdentifier::new(
         Tid::new("func"),
         AbstractLocation::from_var(&Variable::mock("sp", 4)).unwrap(),
     );
-    let pointer = PointerDomain::new(
-        stack_id.clone(),
-        Bitvector::zero(apint::BitWidth::from(4)).into(),
-    );
 
-    Context::<CharacterInclusionDomain>::add_new_string_abstract_domain(
-        &mut state,
-        &setup.pi_state_before_symbol_call,
-        pointer.clone(),
-        abstract_id.clone(),
-        Some("Hello World".to_string()),
+    let new_state = setup
+        .context
+        .handle_sscanf_calls(&setup.state_before_call, &sscanf_symbol);
+
+    assert_eq!(
+        *new_state
+            .get_stack_offset_to_string_map()
+            .get(&(-0x7c as i64))
+            .unwrap(),
+        CharacterInclusionDomain::Top
     );
 
     assert_eq!(
-        *state.get_strings().get(&abstract_id).unwrap(),
-        CharacterInclusionDomain::from("Hello World".to_string())
+        *new_state
+            .get_stack_offset_to_string_map()
+            .get(&(-0x92 as i64))
+            .unwrap(),
+        CharacterInclusionDomain::Top
     );
 
-    state.set_all_maps_empty();
+    assert!(new_state
+        .get_unassigned_return_pointer()
+        .contains(&PointerDomain::new(
+            stack_id.clone(),
+            Bitvector::from_i32(-0x7c).into(),
+        )));
 
-    Context::<CharacterInclusionDomain>::add_new_string_abstract_domain(
-        &mut state,
-        &setup.pi_state_before_symbol_call,
-        pointer,
-        abstract_id.clone(),
-        None,
-    );
-
-    assert_eq!(
-        *state.get_strings().get(&abstract_id).unwrap(),
-        CharacterInclusionDomain::from("".to_string()).top()
-    );
+    assert!(new_state
+        .get_unassigned_return_pointer()
+        .contains(&PointerDomain::new(
+            stack_id.clone(),
+            Bitvector::from_i32(-0x92).into(),
+        )));
 }
 
 #[test]
-fn test_handle_sprintf_and_snprintf_calls_known_format_string() {
-    let call_tid = Tid::new("func_sprintf_0");
-    let r0_reg = Variable::mock("r0", 4);
+fn test_handle_sscanf_calls_known_source_known_format() {
+    let sscanf_symbol = ExternSymbol::mock_sscanf_symbol_arm();
+
+    let project = mock_project_with_intraprocedural_control_flow(
+        vec![(sscanf_symbol.clone(), vec![true, true])],
+        "func",
+    );
+    let mem_image = RuntimeMemoryImage::mock();
+    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
+    pi_results.compute();
+
+    let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
+
+    let stack_id = AbstractIdentifier::new(
+        Tid::new("func"),
+        AbstractLocation::from_var(&Variable::mock("sp", 4)).unwrap(),
+    );
+
+    let new_state = setup
+        .context
+        .handle_sscanf_calls(&setup.state_before_call, &sscanf_symbol);
+
+    assert_eq!(
+        *new_state
+            .get_stack_offset_to_string_map()
+            .get(&(-0x7c as i64))
+            .unwrap(),
+        CharacterInclusionDomain::from("str1".to_string())
+    );
+    assert_eq!(
+        *new_state
+            .get_stack_offset_to_string_map()
+            .get(&(-0x68 as i64))
+            .unwrap(),
+        CharacterInclusionDomain::from("str2".to_string())
+    );
+    assert_eq!(
+        *new_state
+            .get_stack_offset_to_string_map()
+            .get(&(-0x92 as i64))
+            .unwrap(),
+        CharacterInclusionDomain::from("str3".to_string())
+    );
+    assert_eq!(
+        *new_state
+            .get_stack_offset_to_string_map()
+            .get(&(-0x84 as i64))
+            .unwrap(),
+        CharacterInclusionDomain::from("str4".to_string())
+    );
+
+    assert!(new_state
+        .get_unassigned_return_pointer()
+        .contains(&PointerDomain::new(
+            stack_id.clone(),
+            Bitvector::from_i32(-0x7c).into(),
+        )));
+
+    assert!(new_state
+        .get_unassigned_return_pointer()
+        .contains(&PointerDomain::new(
+            stack_id.clone(),
+            Bitvector::from_i32(-0x68).into(),
+        )));
+
+    assert!(new_state
+        .get_unassigned_return_pointer()
+        .contains(&PointerDomain::new(
+            stack_id.clone(),
+            Bitvector::from_i32(-0x92).into(),
+        )));
+
+    assert!(new_state
+        .get_unassigned_return_pointer()
+        .contains(&PointerDomain::new(
+            stack_id.clone(),
+            Bitvector::from_i32(-0x84).into(),
+        )));
+}
+
+#[test]
+fn test_create_string_domain_for_sprintf_snprintf() {
     let sprintf_symbol = ExternSymbol::mock_sprintf_symbol_arm();
 
     let project = mock_project_with_intraprocedural_control_flow(
@@ -730,27 +650,351 @@ fn test_handle_sprintf_and_snprintf_calls_known_format_string() {
 
     let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
-    let new_state = setup.context.handle_sprintf_and_snprintf_calls(
-        &setup.state_before_call,
-        &sprintf_symbol,
-        &call_tid,
+    let expected_domain = CharacterInclusionDomain::Value((
+        CharacterSet::Value(
+            vec!['t', 'o', 'W', 'a', 'c', 'l', ' ', 'd', 'r', 'e', 'H']
+                .into_iter()
+                .collect(),
+        ),
+        CharacterSet::Top,
+    ));
+
+    assert_eq!(
+        expected_domain,
+        setup.context.create_string_domain_for_sprintf_snprintf(
+            &setup.pi_state_before_symbol_call,
+            &setup.state_before_call,
+            &sprintf_symbol,
+            "cat %s %s %s %s".to_string()
+        )
+    );
+}
+
+#[test]
+fn test_create_string_domain_and_insert_approximations_for_format_specifier() {
+    let sprintf_symbol = ExternSymbol::mock_sprintf_symbol_arm();
+    let r2_reg = Variable::mock("r2", 4);
+
+    let project = mock_project_with_intraprocedural_control_flow(
+        vec![(sprintf_symbol.clone(), vec![true])],
+        "func",
+    );
+    let mem_image = RuntimeMemoryImage::mock();
+    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
+    pi_results.compute();
+
+    let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
+
+    // Test Case 1: No constants were inserted and no format specifiers were found.
+    assert_eq!(
+        CharacterInclusionDomain::Top,
+        setup
+            .context
+            .create_string_domain_and_insert_approximations_for_format_specifier(
+                &setup.state_before_call,
+                vec![],
+                "".to_string(),
+                false,
+                &setup.pi_state_before_symbol_call
+            )
     );
 
-    let expected_abstract_id =
-        AbstractIdentifier::new(call_tid, AbstractLocation::from_var(&r0_reg).unwrap());
-
-    let expected_domain = CharacterInclusionDomain::from("cat Hello World %s %s %s".to_string());
-
-    assert!(!new_state.get_strings().is_empty());
+    // Test Case 2: Constants were inserted and no further format specifiers were found.
     assert_eq!(
-        *new_state.get_strings().get(&expected_abstract_id).unwrap(),
-        expected_domain
+        CharacterInclusionDomain::from("a".to_string()),
+        setup
+            .context
+            .create_string_domain_and_insert_approximations_for_format_specifier(
+                &setup.state_before_call,
+                vec![],
+                "a".to_string(),
+                true,
+                &setup.pi_state_before_symbol_call
+            )
+    );
+
+    // Test Case 3: Format specifiers were found.
+    let expected_domain = CharacterInclusionDomain::Value((
+        CharacterSet::Value(vec!['c', 'a', 't', ' ', 'x'].into_iter().collect()),
+        CharacterSet::Value(
+            vec![
+                'c', 'a', 't', ' ', 'x', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '-',
+            ]
+            .into_iter()
+            .collect(),
+        ),
+    ));
+
+    let args = vec![Arg::mock_register("r2", 4), Arg::mock_register("r3", 4)];
+
+    setup
+        .state_before_call
+        .add_new_stack_offset_to_string_entry(0, CharacterInclusionDomain::from("x".to_string()));
+
+    let stack_id = AbstractIdentifier::new(
+        Tid::new("func"),
+        AbstractLocation::from_var(&Variable::mock("sp", 4)).unwrap(),
+    );
+
+    let domain_pointer: PointerDomain<IntervalDomain> =
+        PointerDomain::new(stack_id.clone(), Bitvector::from_i32(0).into());
+
+    setup
+        .pi_state_before_symbol_call
+        .set_register(&r2_reg, DataDomain::Pointer(domain_pointer));
+
+    assert_eq!(
+        expected_domain,
+        setup
+            .context
+            .create_string_domain_and_insert_approximations_for_format_specifier(
+                &setup.state_before_call,
+                args,
+                "cat %s %d".to_string(),
+                true,
+                &setup.pi_state_before_symbol_call
+            )
+    );
+}
+
+#[test]
+fn test_insert_datatype_dependent_domains() {
+    let sprintf_symbol = ExternSymbol::mock_sprintf_symbol_arm();
+    let r3_reg = Variable::mock("r3", 4);
+
+    let project = mock_project_with_intraprocedural_control_flow(
+        vec![(sprintf_symbol.clone(), vec![true])],
+        "func",
+    );
+    let mem_image = RuntimeMemoryImage::mock();
+    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
+    pi_results.compute();
+
+    let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
+
+    let mut split_string: Vec<CharacterInclusionDomain> = Vec::new();
+    let re = Regex::new(r#"%\d{0,2}([c,C,d,i,o,u,x,X,e,E,f,F,g,G,a,A,n,p,s,S]|hi|hd|hu|li|ld|lu|lli|lld|llu|lf|lg|le|la|lF|lG|lE|lA|Lf|Lg|Le|La|LF|LG|LE|LA)"#)
+        .expect("No valid regex!");
+    let (string_specifier, integer_specifier, float_specifier, char_specifier) =
+        match &re.find_iter("%s %d %f %c").collect::<Vec<Match>>()[..] {
+            &[string, integer, float, character] => (string, integer, float, character),
+            _ => panic!("Unexpected format specifier number."),
+        };
+
+    let arg = Arg::mock_register("r3", 4);
+
+    // Test Case 1: String domain without tracked domains.
+    setup.context.insert_datatype_dependent_domains(
+        &mut split_string,
+        string_specifier,
+        &setup.pi_state_before_symbol_call,
+        &setup.state_before_call,
+        arg.clone(),
+    );
+
+    assert_eq!(
+        CharacterInclusionDomain::create_pointer_value_domain(),
+        *split_string.get(0).unwrap(),
+    );
+
+    // Test Case 2: Integer domain.
+    setup.context.insert_datatype_dependent_domains(
+        &mut split_string,
+        integer_specifier,
+        &setup.pi_state_before_symbol_call,
+        &setup.state_before_call,
+        arg.clone(),
+    );
+
+    assert_eq!(
+        CharacterInclusionDomain::create_integer_domain(),
+        *split_string.get(1).unwrap(),
+    );
+
+    // Test Case 3: Float domain.
+    setup.context.insert_datatype_dependent_domains(
+        &mut split_string,
+        float_specifier,
+        &setup.pi_state_before_symbol_call,
+        &setup.state_before_call,
+        arg.clone(),
+    );
+
+    assert_eq!(
+        CharacterInclusionDomain::create_float_value_domain(),
+        *split_string.get(2).unwrap(),
+    );
+
+    // Test Case 4: Char domain.
+    setup.context.insert_datatype_dependent_domains(
+        &mut split_string,
+        char_specifier,
+        &setup.pi_state_before_symbol_call,
+        &setup.state_before_call,
+        arg.clone(),
+    );
+
+    assert_eq!(
+        CharacterInclusionDomain::create_char_domain(),
+        *split_string.get(3).unwrap(),
+    );
+
+    // Test Case 5: String Domain with tracked domain on stack.
+    setup
+        .state_before_call
+        .add_new_stack_offset_to_string_entry(0, CharacterInclusionDomain::from("a".to_string()));
+
+    let stack_id = AbstractIdentifier::new(
+        Tid::new("func"),
+        AbstractLocation::from_var(&Variable::mock("sp", 4)).unwrap(),
+    );
+
+    let domain_pointer: PointerDomain<IntervalDomain> =
+        PointerDomain::new(stack_id.clone(), Bitvector::from_i32(0).into());
+
+    setup
+        .pi_state_before_symbol_call
+        .set_register(&r3_reg, DataDomain::Pointer(domain_pointer));
+
+    setup.context.insert_datatype_dependent_domains(
+        &mut split_string,
+        string_specifier,
+        &setup.pi_state_before_symbol_call,
+        &setup.state_before_call,
+        arg,
+    );
+
+    assert_eq!(
+        CharacterInclusionDomain::from("a".to_string()),
+        *split_string.get(4).unwrap(),
+    );
+}
+
+#[test]
+fn test_merge_domains_from_multiple_pointer_targets() {
+    let sprintf_symbol = ExternSymbol::mock_sprintf_symbol_arm();
+
+    let project = mock_project_with_intraprocedural_control_flow(
+        vec![(sprintf_symbol.clone(), vec![true])],
+        "func",
+    );
+    let mem_image = RuntimeMemoryImage::mock();
+    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
+    pi_results.compute();
+
+    let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
+
+    let stack_id = AbstractIdentifier::new(
+        Tid::new("func"),
+        AbstractLocation::from_var(&Variable::mock("sp", 4)).unwrap(),
+    );
+
+    let heap_id = AbstractIdentifier::new(
+        Tid::new("func"),
+        AbstractLocation::from_var(&Variable::mock("r5", 4)).unwrap(),
+    );
+
+    let mut domain_pointer: PointerDomain<IntervalDomain> =
+        PointerDomain::new(stack_id.clone(), Bitvector::from_i32(0).into());
+
+    // Test Case 1: Single stack pointer with single target and no domain.
+    let returned_domain =
+        Context::<CharacterInclusionDomain>::merge_domains_from_multiple_pointer_targets(
+            &setup.state_before_call,
+            &setup.pi_state_before_symbol_call,
+            &domain_pointer,
+        );
+
+    assert_eq!(CharacterInclusionDomain::Top, returned_domain);
+
+    // Test Case 2: Single stack pointer with a domain.
+    setup
+        .state_before_call
+        .add_new_stack_offset_to_string_entry(0, CharacterInclusionDomain::from("a".to_string()));
+    let returned_domain =
+        Context::<CharacterInclusionDomain>::merge_domains_from_multiple_pointer_targets(
+            &setup.state_before_call,
+            &setup.pi_state_before_symbol_call,
+            &domain_pointer,
+        );
+
+    assert_eq!(
+        CharacterInclusionDomain::from("a".to_string()),
+        returned_domain
+    );
+
+    // Test Case 3: Stack and Heap pointer with two targets and only one points to a domain.
+    domain_pointer.add_target(heap_id.clone(), Bitvector::from_i32(0).into());
+    let returned_domain =
+        Context::<CharacterInclusionDomain>::merge_domains_from_multiple_pointer_targets(
+            &setup.state_before_call,
+            &setup.pi_state_before_symbol_call,
+            &domain_pointer,
+        );
+
+    assert_eq!(CharacterInclusionDomain::Top, returned_domain);
+
+    // Test Case 4: Stack and Heap pointer with two targets and both point to different domains.
+    setup
+        .state_before_call
+        .add_new_heap_to_string_entry(heap_id, CharacterInclusionDomain::from("b".to_string()));
+    let returned_domain =
+        Context::<CharacterInclusionDomain>::merge_domains_from_multiple_pointer_targets(
+            &setup.state_before_call,
+            &setup.pi_state_before_symbol_call,
+            &domain_pointer,
+        );
+
+    let expected_domain = CharacterInclusionDomain::Value((
+        CharacterSet::Value(vec![].into_iter().collect()),
+        CharacterSet::Value(vec!['a', 'b'].into_iter().collect()),
+    ));
+
+    assert_eq!(expected_domain, returned_domain);
+}
+
+#[test]
+fn test_handle_sprintf_and_snprintf_calls_known_format_string() {
+    let sprintf_symbol = ExternSymbol::mock_sprintf_symbol_arm();
+
+    let project = mock_project_with_intraprocedural_control_flow(
+        vec![(sprintf_symbol.clone(), vec![true])],
+        "func",
+    );
+    let mem_image = RuntimeMemoryImage::mock();
+    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
+    pi_results.compute();
+
+    let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
+
+    let new_state = setup
+        .context
+        .handle_sprintf_and_snprintf_calls(&setup.state_before_call, &sprintf_symbol);
+
+    let expected_domain = CharacterInclusionDomain::Value((
+        CharacterSet::Value(
+            vec!['t', 'o', 'W', 'a', 'c', 'l', ' ', 'd', 'r', 'e', 'H']
+                .into_iter()
+                .collect(),
+        ),
+        CharacterSet::Top,
+    ));
+
+    assert_eq!(
+        *new_state
+            .get_stack_offset_to_string_map()
+            .get(&(-0x54 as i64))
+            .unwrap(),
+        expected_domain,
     );
 }
 
 #[test]
 fn test_handle_sprintf_and_snprintf_calls_unknown_format_string() {
-    let call_tid = Tid::new("func_sprintf_0");
     let sprintf_symbol = ExternSymbol::mock_sprintf_symbol_arm();
 
     let project = mock_project_with_intraprocedural_control_flow(
@@ -764,85 +1008,296 @@ fn test_handle_sprintf_and_snprintf_calls_unknown_format_string() {
 
     let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
-    let new_state = setup.context.handle_sprintf_and_snprintf_calls(
-        &setup.state_before_call,
-        &sprintf_symbol,
-        &call_tid,
-    );
-
-    assert!(new_state.get_strings().is_empty());
-}
-
-#[test]
-fn test_get_return_destination_from_first_input_parameter() {
-    let sprintf_symbol = ExternSymbol::mock_sprintf_symbol_arm();
-    let project = mock_project_with_intraprocedural_control_flow(
-        vec![(sprintf_symbol.clone(), vec![false])],
-        "func",
-    );
-    let mem_image = RuntimeMemoryImage::mock();
-    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
-    let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
-    pi_results.compute();
-
-    let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
-
-    let return_arg = Arg::Register{var: Variable::mock("r0", 4), data_type: None};
-
-    let pointer = setup
+    let new_state = setup
         .context
-        .get_return_destination_from_first_input_parameter(
-            &setup.pi_state_before_symbol_call,
-            &return_arg,
-        );
-    let expected_pointer: PointerDomain<IntervalDomain> = PointerDomain::new(
-        AbstractIdentifier::new(
-            Tid::new("func"),
-            AbstractLocation::Register("sp".to_string(), ByteSize::new(4)),
-        ),
-        IntervalDomain::new(Bitvector::from_i32(-0x54), Bitvector::from_i32(-0x54)),
-    );
-
-    assert_eq!(expected_pointer, pointer);
-}
-
-#[test]
-fn test_get_string_constant_parameter_if_available() {
-    let sprintf_symbol = ExternSymbol::mock_sprintf_symbol_arm();
-    let project = mock_project_with_intraprocedural_control_flow(
-        vec![(sprintf_symbol.clone(), vec![true])],
-        "func",
-    );
-    let mem_image = RuntimeMemoryImage::mock();
-    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
-    let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
-    pi_results.compute();
-
-    let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
-
-    let var_args = vec![Arg::mock_register("r2", 4), Arg::mock_register("r3", 4)];
-    let string_constants = setup
-        .context
-        .get_string_constant_parameter_if_available(var_args, &setup.pi_state_before_symbol_call);
+        .handle_sprintf_and_snprintf_calls(&setup.state_before_call, &sprintf_symbol);
 
     assert_eq!(
-        vec!["Hello World".to_string(), "%s".to_string()],
-        string_constants
+        CharacterInclusionDomain::Top,
+        *new_state
+            .get_stack_offset_to_string_map()
+            .get(&(-0x54 as i64))
+            .unwrap()
     );
 }
 
 #[test]
-fn test_insert_string_constants_into_format_string() {
-    let string = Context::<CharacterInclusionDomain>::insert_string_constants_into_format_string(
-        "cat %s".to_string(),
-        vec!["Hello World".to_string()],
+fn test_insert_constant_values_into_format_string() {
+    let project = mock_project_with_intraprocedural_control_flow(
+        vec![(ExternSymbol::mock_sprintf_symbol_arm(), vec![false])],
+        "func",
+    );
+    let mem_image = RuntimeMemoryImage::mock();
+    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
+    pi_results.compute();
+
+    let r2_reg = Variable::mock("r2", 4);
+    let r3_reg = Variable::mock("r3", 4);
+    let sp_reg = Variable::mock("sp", 4);
+
+    let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
+
+    let mut arg_vec: Vec<Arg> = vec![
+        Arg::Register {
+            var: Variable::mock("r2", 4),
+            data_type: Some(Datatype::Pointer),
+        },
+        Arg::Register {
+            var: Variable::mock("r3", 4),
+            data_type: Some(Datatype::Integer),
+        },
+        Arg::Stack {
+            offset: 0,
+            size: ByteSize::new(4),
+            data_type: Some(Datatype::Char),
+        },
+    ];
+
+    // Stores a pointer to the string "Hello World" in register r2.
+    setup.pi_state_before_symbol_call.set_register(
+        &r2_reg,
+        DataDomain::Value(IntervalDomain::new(
+            Bitvector::from_u32(0x3002),
+            Bitvector::from_u32(0x3002),
+        )),
     );
 
-    assert_eq!("cat Hello World", string);
+    // Stores the integer 2 in the register r3.
+    setup.pi_state_before_symbol_call.set_register(
+        &r3_reg,
+        DataDomain::Value(IntervalDomain::new(
+            Bitvector::from_u32(2),
+            Bitvector::from_u32(2),
+        )),
+    );
+
+    // Stores the char 'B' on the stack at offset 0.
+    setup
+        .pi_state_before_symbol_call
+        .store_value(
+            &DataDomain::Pointer(PointerDomain::new(
+                AbstractIdentifier::new(
+                    Tid::new("func"),
+                    AbstractLocation::from_var(&sp_reg).unwrap(),
+                ),
+                IntervalDomain::new(Bitvector::from_u32(0), Bitvector::from_u32(0)),
+            )),
+            &DataDomain::Value(IntervalDomain::new(
+                Bitvector::from_u32(0x42),
+                Bitvector::from_u32(0x42),
+            )),
+            &mem_image,
+        )
+        .unwrap();
+
+    assert_eq!(
+        "cat Hello World, 2, B".to_string(),
+        setup.context.insert_constant_values_into_format_string(
+            "cat %s, %d, %c".to_string(),
+            &mut arg_vec,
+            &setup.pi_state_before_symbol_call
+        )
+    );
+
+    assert!(arg_vec.is_empty());
 }
 
 #[test]
-fn test_handle_strcat_and_strncat_calls() {}
+fn test_insert_constant_integer_into_format_string() {
+    let string_with_insertion =
+        Context::<CharacterInclusionDomain>::insert_constant_integer_into_format_string(
+            "cat %s %d %f".to_string(),
+            IntervalDomain::new(Bitvector::from_u32(2), Bitvector::from_u32(2)),
+        );
+
+    assert_eq!("cat %s 2 %f".to_string(), string_with_insertion);
+}
 
 #[test]
-fn test_handle_printf_calls() {}
+fn test_insert_constant_char_into_format_string() {
+    let project = mock_project_with_intraprocedural_control_flow(
+        vec![(ExternSymbol::mock_sprintf_symbol_arm(), vec![false])],
+        "func",
+    );
+    let mem_image = RuntimeMemoryImage::mock();
+    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
+    pi_results.compute();
+
+    let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
+
+    // Test Case 1: Char is given as a hex constant in a register or stack position
+    let string_with_insertion = setup.context.insert_constant_char_into_format_string(
+        "cat %s %c %f".to_string(),
+        IntervalDomain::new(Bitvector::from_u32(0x42), Bitvector::from_u32(0x42)),
+    );
+
+    assert_eq!("cat %s B %f".to_string(), string_with_insertion);
+
+    // Test Case 2: Char is contained in the binary's read-only memory.
+    let string_with_insertion = setup.context.insert_constant_char_into_format_string(
+        "cat %s %c %f".to_string(),
+        IntervalDomain::new(Bitvector::from_u32(0x3002), Bitvector::from_u32(0x3002)),
+    );
+
+    assert_eq!("cat %s H %f".to_string(), string_with_insertion);
+}
+
+#[test]
+fn test_insert_constant_string_into_format_string() {
+    let project = mock_project_with_intraprocedural_control_flow(
+        vec![(ExternSymbol::mock_sprintf_symbol_arm(), vec![false])],
+        "func",
+    );
+    let mem_image = RuntimeMemoryImage::mock();
+    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
+    pi_results.compute();
+
+    let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
+
+    // Test Case 1: String contained in read-only memory.
+    let string_with_insertion = setup.context.insert_constant_string_into_format_string(
+        "cat %s %c %f".to_string(),
+        IntervalDomain::new(Bitvector::from_u32(0x3002), Bitvector::from_u32(0x3002)),
+    );
+
+    assert_eq!("cat Hello World %c %f".to_string(), string_with_insertion);
+}
+
+#[test]
+fn test_handle_strcat_and_strncat_calls_with_known_second_input() {
+    let strcat_symbol = ExternSymbol::mock_strcat_symbol_arm();
+    let project = mock_project_with_intraprocedural_control_flow(
+        vec![(strcat_symbol.clone(), vec![true])],
+        "func",
+    );
+    let mem_image = RuntimeMemoryImage::mock();
+    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
+    pi_results.compute();
+
+    let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
+
+    let expected_domain = CharacterInclusionDomain::Value((
+        CharacterSet::Value(
+            vec!['s', 't', 'r', ' ', '1', '2', '3', '4']
+                .into_iter()
+                .collect(),
+        ),
+        CharacterSet::Top,
+    ));
+
+    let new_state = setup
+        .context
+        .handle_strcat_and_strncat_calls(&setup.state_before_call, &strcat_symbol);
+
+    assert_eq!(
+        expected_domain,
+        *new_state
+            .get_stack_offset_to_string_map()
+            .get(&(-0x3c as i64))
+            .unwrap()
+    );
+}
+
+#[test]
+fn test_handle_strcat_and_strncat_calls_with_unknown_second_input() {
+    let strcat_symbol = ExternSymbol::mock_strcat_symbol_arm();
+    let project = mock_project_with_intraprocedural_control_flow(
+        vec![(strcat_symbol.clone(), vec![false])],
+        "func",
+    );
+    let mem_image = RuntimeMemoryImage::mock();
+    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
+    pi_results.compute();
+
+    let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
+
+    // Test Case 1: No string domain is tracked for the second input.
+    let new_state = setup
+        .context
+        .handle_strcat_and_strncat_calls(&setup.state_before_call, &strcat_symbol);
+
+    assert_eq!(
+        CharacterInclusionDomain::Top,
+        *new_state
+            .get_stack_offset_to_string_map()
+            .get(&(-0x3c as i64))
+            .unwrap()
+    );
+
+    // Test Case 2: A string domain is tracked for the second input.
+    let expected_domain = CharacterInclusionDomain::Value((
+        CharacterSet::Value(vec!['a'].into_iter().collect()),
+        CharacterSet::Top,
+    ));
+
+    setup
+        .state_before_call
+        .add_new_stack_offset_to_string_entry(
+            0x28,
+            CharacterInclusionDomain::from("a".to_string()),
+        );
+
+    let new_state = setup
+        .context
+        .handle_strcat_and_strncat_calls(&setup.state_before_call, &strcat_symbol);
+
+    assert_eq!(
+        expected_domain,
+        *new_state
+            .get_stack_offset_to_string_map()
+            .get(&(-0x3c as i64))
+            .unwrap()
+    );
+}
+
+#[test]
+fn test_handle_free() {
+    let free_symbol = ExternSymbol::mock_free_symbol_arm();
+    let malloc_symbol = ExternSymbol::mock_malloc_symbol_arm();
+    let r0_reg = Variable::mock("r0", 4);
+    let project = mock_project_with_intraprocedural_control_flow(
+        vec![
+            (malloc_symbol.clone(), vec![]),
+            (free_symbol.clone(), vec![]),
+        ],
+        "func",
+    );
+
+    let extern_subs: HashSet<Tid> = vec![malloc_symbol.tid, free_symbol.clone().tid]
+        .into_iter()
+        .collect();
+    let mem_image = RuntimeMemoryImage::mock();
+    let graph = crate::analysis::graph::get_program_cfg(&project.program, extern_subs);
+    let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
+    pi_results.compute();
+
+    let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
+
+    let object_id = AbstractIdentifier::new(
+        Tid::new("func_malloc_0"),
+        AbstractLocation::from_var(&r0_reg).unwrap(),
+    );
+
+    setup
+        .state_before_call
+        .add_new_heap_to_string_entry(object_id.clone(), CharacterInclusionDomain::Top);
+
+    setup.state_before_call.set_pointer_inference_state(Some(
+        pi_results
+            .get_node_value(NodeIndex::new(2))
+            .unwrap()
+            .unwrap_value()
+            .clone(),
+    ));
+
+    let new_state = setup
+        .context
+        .handle_free(&setup.state_before_call, &free_symbol);
+
+    assert!(!new_state.get_heap_to_string_map().contains_key(&object_id));
+}

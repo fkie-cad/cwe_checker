@@ -1,8 +1,7 @@
-use std::collections::HashMap;
-
-use apint::BitWidth;
+use std::collections::{HashMap, HashSet};
 
 use crate::abstract_domain::HasTop;
+use crate::intermediate_representation::{ExternSymbol, Project};
 use crate::{abstract_domain::IntervalDomain, prelude::*};
 use crate::{
     abstract_domain::{AbstractDomain, AbstractIdentifier, AbstractLocation, PointerDomain},
@@ -14,18 +13,21 @@ use crate::{
 /// Contains all information known about the state of a program at a specific point of time.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct State<T: AbstractDomain + Eq> {
-    /// Tracks strings that lie directly on the stack.
-    /// Maps the stack offset to the abstract identifier of the string.
-    stack_offset_to_string_map: HashMap<Bitvector, AbstractIdentifier>,
-    /// Tracks pointers to strings that have been stored on the stack.
-    /// Maps the offset on the stack to the corresponding pointer domain.
-    stack_offset_to_pointer_map: HashMap<Bitvector, PointerDomain<IntervalDomain>>,
-    /// Maps a register to a pointer which points to an abstract identifier.
-    /// The abstract identifier identifies the abstract string.
+    /// Keeps track of pointers that are returned by external calls
+    /// where the location is temporarily unknown.
+    unassigned_return_pointer: HashSet<PointerDomain<IntervalDomain>>,
+    /// Maps registers to pointer which point to abstract string domains.
     variable_to_pointer_map: HashMap<Variable, PointerDomain<IntervalDomain>>,
-    /// Maps the abstract identifier of an memory object to the corresponding string abstract domain
+    /// Maps stack offsets to pointers that have been stored on the stack
+    /// These pointers point to abstract string domains.
+    stack_offset_to_pointer_map: HashMap<i64, PointerDomain<IntervalDomain>>,
+    /// Tracks strings that lie directly on the stack.
+    /// Maps the stack offset to the abstract string domain.
+    stack_offset_to_string_map: HashMap<i64, T>,
+    /// Maps the heap abstract identifier of an memory object to the corresponding string abstract domain
     /// representing its content.
-    strings: HashMap<AbstractIdentifier, T>,
+    /// For simplicity reasons it is assumed that a heap object only represents one string at offset 0.
+    heap_to_string_map: HashMap<AbstractIdentifier, T>,
     /// Holds the currently analyzed subroutine term
     current_sub: Option<Term<Sub>>,
     /// The state of the pointer inference analysis.
@@ -39,16 +41,14 @@ pub struct State<T: AbstractDomain + Eq> {
 
 impl<T: AbstractDomain + Eq> AbstractDomain for State<T> {
     /// Merges two states.
-    /// For each abstract identifier that is in both 'strings' fields,
-    /// the string domains are merged.
-    /// If the one state has an Abstract Identifier that is not in the other,
-    /// it is added to the 'strings' map.
     fn merge(&self, other: &Self) -> Self {
-        let mut stack_offset_to_string_map = self.stack_offset_to_string_map.clone();
-        let mut stack_offset_to_pointer_map = self.stack_offset_to_pointer_map.clone();
+        let unassigned_return_pointer = self
+            .unassigned_return_pointer
+            .union(&other.unassigned_return_pointer)
+            .cloned()
+            .collect();
 
-        let mut variable_to_pointer_map: HashMap<Variable, PointerDomain<IntervalDomain>> =
-            self.variable_to_pointer_map.clone();
+        let mut variable_to_pointer_map = self.variable_to_pointer_map.clone();
 
         for (var, other_pointer) in other.variable_to_pointer_map.iter() {
             if let Some(pointer) = self.variable_to_pointer_map.get(var) {
@@ -58,21 +58,43 @@ impl<T: AbstractDomain + Eq> AbstractDomain for State<T> {
             }
         }
 
-        let mut strings: HashMap<AbstractIdentifier, T> = self.strings.clone();
+        let mut stack_offset_to_pointer_map = self.stack_offset_to_pointer_map.clone();
 
-        for (tid, other_abstract_string) in other.strings.iter() {
-            if let Some(abstract_string) = strings.get_mut(tid) {
-                abstract_string.merge(other_abstract_string);
+        for (offset, other_pointer) in other.stack_offset_to_pointer_map.iter() {
+            if let Some(pointer) = self.stack_offset_to_pointer_map.get(offset) {
+                stack_offset_to_pointer_map.insert(offset.clone(), pointer.merge(other_pointer));
             } else {
-                strings.insert(tid.clone(), other_abstract_string.clone());
+                stack_offset_to_pointer_map.insert(offset.clone(), other_pointer.clone());
+            }
+        }
+
+        let mut stack_offset_to_string_map = self.stack_offset_to_string_map.clone();
+
+        for (offset, other_string_domain) in other.stack_offset_to_string_map.iter() {
+            if let Some(string_domain) = self.stack_offset_to_string_map.get(offset) {
+                stack_offset_to_string_map
+                    .insert(offset.clone(), string_domain.merge(other_string_domain));
+            } else {
+                stack_offset_to_string_map.insert(offset.clone(), other_string_domain.clone());
+            }
+        }
+
+        let mut heap_to_string_map = self.heap_to_string_map.clone();
+
+        for (id, other_string_domain) in other.heap_to_string_map.iter() {
+            if let Some(string_domain) = self.heap_to_string_map.get(id) {
+                heap_to_string_map.insert(id.clone(), string_domain.merge(other_string_domain));
+            } else {
+                heap_to_string_map.insert(id.clone(), other_string_domain.clone());
             }
         }
 
         State {
-            stack_offset_to_string_map,
-            stack_offset_to_pointer_map,
+            unassigned_return_pointer,
             variable_to_pointer_map,
-            strings,
+            stack_offset_to_pointer_map,
+            stack_offset_to_string_map,
+            heap_to_string_map,
             current_sub: self.current_sub.clone(),
             pointer_inference_state: None,
         }
@@ -85,33 +107,44 @@ impl<T: AbstractDomain + Eq> AbstractDomain for State<T> {
 }
 
 impl<T: AbstractDomain + HasTop + Eq + From<String>> State<T> {
-    /// Adds a new offset to string entry to the map.
-    pub fn add_new_offset_to_string_entry(
-        &mut self,
-        offset: Bitvector,
-        identifier: AbstractIdentifier,
-    ) {
-        self.stack_offset_to_string_map.insert(offset, identifier);
+    /// Adds a return pointer to the unassigned return pointer set.
+    pub fn add_unassigned_return_pointer(&mut self, pointer: PointerDomain<IntervalDomain>) {
+        self.unassigned_return_pointer.insert(pointer);
     }
 
-    /// Adds a new offset to pointer entry to the map.
-    pub fn add_new_offset_to_pointer_entry(
+    /// Adds a new variable to pointer entry to the map.
+    pub fn add_new_variable_to_pointer_entry(
         &mut self,
-        offset: Bitvector,
+        variable: Variable,
         pointer: PointerDomain<IntervalDomain>,
     ) {
-        self.stack_offset_to_pointer_map.insert(offset, pointer);
+        self.variable_to_pointer_map.insert(variable, pointer);
     }
 
-    /// Adds the top value of a domain to the strings map.
-    pub fn add_string_top_value(&mut self, abstract_id: AbstractIdentifier) {
-        let generic_string_top_value = T::from("".to_string()).top();
-        self.strings.insert(abstract_id, generic_string_top_value);
+    /// Adds a new offset to string entry to the map.
+    pub fn add_new_stack_offset_to_string_entry(&mut self, offset: i64, string_domain: T) {
+        self.stack_offset_to_string_map
+            .insert(offset, string_domain);
     }
 
-    /// Adds a new entry to the strings container.
-    pub fn add_string_domain(&mut self, abstract_id: AbstractIdentifier, string: String) {
-        self.strings.insert(abstract_id, T::from(string));
+    /// Adds a new heap id to string entry to the map.
+    pub fn add_new_heap_to_string_entry(&mut self, heap_id: AbstractIdentifier, string_domain: T) {
+        self.heap_to_string_map.insert(heap_id, string_domain);
+    }
+
+    /// Removes a string from the heap to string map for the given abstract id.
+    pub fn remove_heap_to_string_entry(&mut self, heap_id: &AbstractIdentifier) {
+        self.heap_to_string_map.remove(heap_id);
+    }
+
+    /// Returns a reference to the stack offset to string map.
+    pub fn get_stack_offset_to_string_map(&self) -> &HashMap<i64, T> {
+        &self.stack_offset_to_string_map
+    }
+
+    /// Returns a reference to the heap to string map.
+    pub fn get_heap_to_string_map(&self) -> &HashMap<AbstractIdentifier, T> {
+        &self.heap_to_string_map
     }
 
     /// Gets the current subroutine since the analysis is interprocedural.
@@ -145,6 +178,7 @@ impl<T: AbstractDomain + HasTop + Eq + From<String>> State<T> {
                 Ok(string) => {
                     if let Ok(abstract_location) = AbstractLocation::from_var(output) {
                         let abstract_id = AbstractIdentifier::new(tid, abstract_location);
+                        /*
                         self.strings
                             .insert(abstract_id.clone(), T::from(string.to_string()));
                         self.variable_to_pointer_map.insert(
@@ -155,7 +189,7 @@ impl<T: AbstractDomain + HasTop + Eq + From<String>> State<T> {
                                     BitWidth::new(output.size.as_bit_length()).unwrap(),
                                 )),
                             ),
-                        );
+                        ); */
                     }
                 }
                 // TODO: Change to log
@@ -187,6 +221,23 @@ impl<T: AbstractDomain + HasTop + Eq + From<String>> State<T> {
             Expression::BinOp { op, lhs, rhs } => {}
             _ => (),
         }
+    }
+
+    /// Removes all non callee saved register entries from the variable to pointer map.
+    pub fn remove_non_callee_saved_pointer_entries(
+        &mut self,
+        project: &Project,
+        extern_symbol: &ExternSymbol,
+    ) {
+        let cconv = extern_symbol.get_calling_convention(project);
+        let mut filtered_map = self.variable_to_pointer_map.clone();
+        for (register, _) in self.variable_to_pointer_map.clone().iter() {
+            if !cconv.callee_saved_register.contains(&register.name) {
+                filtered_map.remove(register);
+            }
+        }
+
+        self.variable_to_pointer_map = filtered_map;
     }
 }
 

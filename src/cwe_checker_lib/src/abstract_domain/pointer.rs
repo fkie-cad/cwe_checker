@@ -12,7 +12,7 @@ use std::fmt::Display;
 ///
 /// A `PointerDomain` value always has at least one target.
 /// Trying to create a pointer without targets should always lead to panics.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct PointerDomain<T: RegisterDomain>(BTreeMap<AbstractIdentifier, T>);
 
 impl<T: RegisterDomain> AbstractDomain for PointerDomain<T> {

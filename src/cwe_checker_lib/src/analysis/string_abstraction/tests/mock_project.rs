@@ -114,11 +114,11 @@ fn mock_defs_for_sprintf(format_known: bool, blk_num: usize) -> Vec<Term<Def>> {
         OR
         r1 = INT_SUB r11, 0x62:4   // Variable format string
 
-        r2 = INT_ADD sp, 24:4    // Constant string input 'Hello World'
+        r2 = INT_ADD sp, 24:4    // Variable input in register
 
         r3 = INT_ADD sp, 16:4      // Variable input in register
 
-        $U1050:4 = INT_ADD sp, 0:4   // String constant pointer on stack
+        $U1050:4 = INT_ADD sp, 0:4    // Constant string input 'Hello World' on stack
         STORE ram($U1050:4), r12
 
         r12 = INT_ADD r11, 0x66:4
@@ -311,102 +311,48 @@ fn mock_defs_for_sscanf(source_known: bool, format_known: bool, blk_num: usize) 
     defs
 }
 
-fn mock_defs_for_strcat(
-    first_input_known: bool,
-    second_input_known: bool,
-    blk_num: usize,
-) -> Vec<Term<Def>> {
+fn mock_defs_for_strcat(second_input_known: bool, blk_num: usize) -> Vec<Term<Def>> {
     let setup = Setup::new();
     let mut defs: Vec<Term<Def>> = Vec::new();
 
     /*
-        r1 = LOAD ram(0x7000)
-        r0 = LOAD ram(0x3002)
-
-        OR
-
         r11 = INT_ADD sp, 4:4
 
-        $U1070 = INT_ADD r11, 0xffffffccc:4
-        r3 = LOAD ram($U1070)
-
-        r3 = INT_ADD r3, 4:4
-
-            $U1050 = INT_ADD r3, 0:4
-            r1 = LOAD ram($U1050)
-
-            r0 = LOAD ram(0x3002)
-
-            OR
-
-            $U1050 = INT_ADD r3, 0:4
-            r0 = LOAD ram($U1050)
+        r0 = INT_SUB r11, 40:4,
 
             r1 = LOAD ram(0x7000)
 
             OR
 
-            $U1050 = INT_ADD r3, 0:4
-            r1 = LOAD ram($U1050)
-
-            r0 = INT_SUB r11, 40:4
+            r1 = INT_ADD r11, 0x24:4
     */
 
-    if first_input_known && second_input_known {
-        defs.push(setup.string_input_constant(&format!("def_0_blk_{}", blk_num), "r1", 0x7000));
-        defs.push(setup.string_input_constant(&format!("def_1_blk_{}", blk_num), "r0", 0x3002));
+    defs.push(setup.pointer_plus_offset(&format!("def_0_blk_{}", blk_num), "r11", "sp", 4));
+
+    defs.push(setup.pointer_minus_offset(&format!("def_1_blk_{}", blk_num), "r0", "r11", 0x40));
+
+    if second_input_known {
+        defs.push(setup.string_input_constant(&format!("def_2_blk_{}", blk_num), "r1", 0x7000));
     } else {
-        defs.push(setup.pointer_plus_offset(&format!("def_0_blk_{}", blk_num), "r11", "sp", 4));
-
-        defs.push(setup.pointer_plus_offset_to_temp_var(
-            &format!("def_1_blk_{}", blk_num),
-            "$U1070",
-            "r11",
-            0xffffffccc,
-        ));
-        defs.push(setup.load_var_content_from_temp_var(
-            &format!("def_2_blk_{}", blk_num),
-            "r3",
-            "$U1070",
-        ));
-
-        defs.push(setup.pointer_plus_offset(&format!("def_3_blk_{}", blk_num), "r3", "r3", 4));
-
-        defs.push(setup.pointer_plus_offset_to_temp_var(
-            &format!("def_4_blk_{}", blk_num),
-            "$U1050",
-            "r3",
-            0,
-        ));
-
-        if first_input_known {
-            defs.push(setup.load_var_content_from_temp_var(
-                &format!("def_5_blk_{}", blk_num),
-                "r1",
-                "$U1050",
-            ));
-            defs.push(setup.string_input_constant(&format!("def_6_blk_{}", blk_num), "r0", 0x3002));
-        } else if second_input_known {
-            defs.push(setup.load_var_content_from_temp_var(
-                &format!("def_5_blk_{}", blk_num),
-                "r0",
-                "$U1050",
-            ));
-            defs.push(setup.string_input_constant(&format!("def_6_blk_{}", blk_num), "r1", 0x7000));
-        } else {
-            defs.push(setup.load_var_content_from_temp_var(
-                &format!("def_5_blk_{}", blk_num),
-                "r1",
-                "$U1050",
-            ));
-            defs.push(setup.pointer_minus_offset(
-                &format!("def_6_blk_{}", blk_num),
-                "r0",
-                "r11",
-                0x40,
-            ));
-        }
+        defs.push(setup.pointer_plus_offset(&format!("def_3_blk_{}", blk_num), "r1", "r11", 0x24));
     }
+
+    defs
+}
+
+fn mock_defs_for_free(_blk_num: usize) -> Vec<Term<Def>> {
+    vec![]
+}
+
+fn mock_defs_for_malloc(blk_num: usize) -> Vec<Term<Def>> {
+    let setup = Setup::new();
+    let mut defs: Vec<Term<Def>> = Vec::new();
+
+    /*
+        r0 = COPY 0xf
+    */
+
+    defs.push(setup.string_input_constant(&format!("def_0_blk_{}", blk_num), "r0", 0xf));
 
     defs
 }
@@ -458,6 +404,32 @@ impl ExternSymbol {
             name: "strcat".to_string(),
             calling_convention: Some("__stdcall".to_string()),
             parameters: vec![Arg::mock_register("r0", 4), Arg::mock_register("r1", 4)],
+            return_values: vec![Arg::mock_register("r0", 4)],
+            no_return: false,
+            has_var_args: false,
+        }
+    }
+
+    pub fn mock_free_symbol_arm() -> ExternSymbol {
+        ExternSymbol {
+            tid: Tid::new("free"),
+            addresses: vec!["UNKNOWN".to_string()],
+            name: "free".to_string(),
+            calling_convention: Some("__stdcall".to_string()),
+            parameters: vec![Arg::mock_register("r0", 4)],
+            return_values: vec![],
+            no_return: true,
+            has_var_args: false,
+        }
+    }
+
+    pub fn mock_malloc_symbol_arm() -> ExternSymbol {
+        ExternSymbol {
+            tid: Tid::new("malloc"),
+            addresses: vec!["UNKNOWN".to_string()],
+            name: "malloc".to_string(),
+            calling_convention: Some("__stdcall".to_string()),
+            parameters: vec![Arg::mock_register("r0", 4)],
             return_values: vec![Arg::mock_register("r0", 4)],
             no_return: false,
             has_var_args: false,
@@ -525,7 +497,9 @@ fn mock_block_with_function_call(
         "sprintf" => mock_defs_for_sprintf(*config.get(0).unwrap(), blk_num),
         "scanf" => mock_defs_for_scanf(*config.get(0).unwrap(), blk_num),
         "sscanf" => mock_defs_for_sscanf(*config.get(0).unwrap(), *config.get(1).unwrap(), blk_num),
-        "strcat" => mock_defs_for_strcat(*config.get(0).unwrap(), *config.get(1).unwrap(), blk_num),
+        "strcat" => mock_defs_for_strcat(*config.get(0).unwrap(), blk_num),
+        "free" => mock_defs_for_free(blk_num),
+        "malloc" => mock_defs_for_malloc(blk_num),
         _ => panic!("Invalid symbol name for def mock"),
     };
     blk.term.defs = defs;
@@ -542,9 +516,6 @@ fn mock_sub_with_name_and_symbol_calls(
     let mut last_blk_num = 0;
 
     for (blk_num, (symbol, config)) in symbols.iter().enumerate() {
-        if config.is_empty() {
-            panic!("Missing config for mocking symbol.")
-        }
         sub.term.blocks.push(mock_block_with_function_call(
             &sub.term.name,
             &symbol.name,
@@ -584,6 +555,12 @@ pub fn mock_project_with_intraprocedural_control_flow(
     program
         .extern_symbols
         .push(ExternSymbol::mock_strcat_symbol_arm());
+    program
+        .extern_symbols
+        .push(ExternSymbol::mock_free_symbol_arm());
+    program
+        .extern_symbols
+        .push(ExternSymbol::mock_malloc_symbol_arm());
     program.entry_points.push(Tid::new(sub_name));
 
     let register_list = ["r0", "r1", "r2", "r3", "r11", "sp"]

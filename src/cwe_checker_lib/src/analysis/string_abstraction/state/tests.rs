@@ -6,10 +6,11 @@ impl<T: AbstractDomain + HasTop + Eq + From<String>> State<T> {
         let pi_state =
             PointerInferenceState::new(&Variable::mock("sp", 4 as u64), current_sub.tid.clone());
         State {
-            stack_offset_to_string_map: HashMap::new(),
-            stack_offset_to_pointer_map: HashMap::new(),
+            unassigned_return_pointer: HashSet::new(),
             variable_to_pointer_map: HashMap::new(),
-            strings: HashMap::new(),
+            stack_offset_to_pointer_map: HashMap::new(),
+            stack_offset_to_string_map: HashMap::new(),
+            heap_to_string_map: HashMap::new(),
             current_sub: Some(current_sub),
             pointer_inference_state: Some(pi_state),
         }
@@ -17,27 +18,25 @@ impl<T: AbstractDomain + HasTop + Eq + From<String>> State<T> {
 
     pub fn mock_with_given_pi_state(current_sub: Term<Sub>, pi_state: PiState) -> Self {
         State {
-            stack_offset_to_string_map: HashMap::new(),
-            stack_offset_to_pointer_map: HashMap::new(),
+            unassigned_return_pointer: HashSet::new(),
             variable_to_pointer_map: HashMap::new(),
-            strings: HashMap::new(),
+            stack_offset_to_pointer_map: HashMap::new(),
+            stack_offset_to_string_map: HashMap::new(),
+            heap_to_string_map: HashMap::new(),
             current_sub: Some(current_sub),
             pointer_inference_state: Some(pi_state),
         }
     }
 
-    pub fn get_strings(&self) -> &HashMap<AbstractIdentifier, T> {
-        &self.strings
-    }
-
     pub fn set_all_maps_empty(&mut self) {
-        self.strings = HashMap::new();
+        self.unassigned_return_pointer = HashSet::new();
+        self.heap_to_string_map = HashMap::new();
         self.stack_offset_to_pointer_map = HashMap::new();
         self.stack_offset_to_string_map = HashMap::new();
         self.variable_to_pointer_map = HashMap::new();
     }
 
-    pub fn get_stack_offset_to_string_map(&self) -> &HashMap<Bitvector, AbstractIdentifier> {
-        &self.stack_offset_to_string_map
+    pub fn get_unassigned_return_pointer(&self) -> &HashSet<PointerDomain<IntervalDomain>> {
+        &self.unassigned_return_pointer
     }
 }

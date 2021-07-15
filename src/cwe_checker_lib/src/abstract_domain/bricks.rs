@@ -191,8 +191,31 @@ impl BricksDomain {
 }
 
 impl DomainInsertion for BricksDomain {
-    fn insert_string_domain(&self, string_domain: &Self) -> Self {
+    fn append_string_domain(&self, _string_domain: &Self) -> Self {
         todo!()
+    }
+
+    /// Returns *Top* since no assumption about the order of characters
+    /// nor the length of the sequence can be made.
+    fn create_float_value_domain() -> Self {
+        BricksDomain::Top
+    }
+
+    fn create_char_domain() -> Self {
+        BricksDomain::Top
+    }
+
+    fn create_integer_domain() -> Self {
+        BricksDomain::Top
+    }
+
+    fn create_pointer_value_domain() -> Self {
+        BricksDomain::Top
+    }
+
+    /// Creates a top value of the domain.
+    fn create_top_value_domain() -> Self {
+        BricksDomain::Top
     }
 }
 

@@ -1,12 +1,12 @@
 use crate::{
-    abstract_domain::{AbstractDomain, HasTop},
+    abstract_domain::{AbstractDomain, DomainInsertion, HasTop},
     analysis::string_abstraction::state::State,
     intermediate_representation::{Blk, Def, Expression, Jmp, Term},
 };
 
 use super::Context;
 
-impl<'a, T: AbstractDomain + HasTop + Eq + From<String>>
+impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>>
     crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Context<'a, T>
 {
     type Value = State<T>;
@@ -78,12 +78,7 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String>>
                 let source_node = self.get_source_node(&state, &call.tid);
                 if self.extern_symbol_map.get(target).is_some() {
                     if let Some(string_symbol) = self.string_symbol_map.get(target) {
-                        new_state = self.handle_string_symbol_calls(
-                            string_symbol,
-                            &source_node,
-                            &state,
-                            &call.tid,
-                        );
+                        new_state = self.handle_string_symbol_calls(string_symbol, &state);
                     }
                 } else {
                     panic!("Extern symbol not found.");

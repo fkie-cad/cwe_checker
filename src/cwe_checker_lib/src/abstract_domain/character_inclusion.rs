@@ -51,7 +51,7 @@ impl CharacterInclusionDomain {
 }
 
 impl DomainInsertion for CharacterInclusionDomain {
-    fn insert_string_domain(&self, string_domain: &Self) -> CharacterInclusionDomain {
+    fn append_string_domain(&self, string_domain: &Self) -> CharacterInclusionDomain {
         match self {
             CharacterInclusionDomain::Value((self_certain, self_possible)) => match string_domain {
                 CharacterInclusionDomain::Value((other_certain, other_possible)) => {
@@ -64,8 +64,49 @@ impl DomainInsertion for CharacterInclusionDomain {
                     CharacterInclusionDomain::Value((self_certain.clone(), CharacterSet::Top))
                 }
             },
-            CharacterInclusionDomain::Top => CharacterInclusionDomain::Top,
+            CharacterInclusionDomain::Top => match string_domain {
+                CharacterInclusionDomain::Value((other_certain, _)) => {
+                    CharacterInclusionDomain::Value((other_certain.clone(), CharacterSet::Top))
+                }
+                CharacterInclusionDomain::Top => CharacterInclusionDomain::Top,
+            },
         }
+    }
+
+    fn create_float_value_domain() -> Self {
+        let float_character_set: HashSet<char> = vec![
+            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '-', 'a', 'i', 'n', 'f',
+        ]
+        .into_iter()
+        .collect();
+        CharacterInclusionDomain::Value((
+            CharacterSet::Value(vec![].into_iter().collect()),
+            CharacterSet::Value(float_character_set),
+        ))
+    }
+
+    fn create_char_domain() -> Self {
+        CharacterInclusionDomain::Top
+    }
+
+    fn create_integer_domain() -> Self {
+        let integer_character_set: HashSet<char> =
+            vec!['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '-']
+                .into_iter()
+                .collect();
+        CharacterInclusionDomain::Value((
+            CharacterSet::Value(vec![].into_iter().collect()),
+            CharacterSet::Value(integer_character_set),
+        ))
+    }
+
+    fn create_pointer_value_domain() -> Self {
+        CharacterInclusionDomain::Top
+    }
+
+    /// Creates a top value of the domain.
+    fn create_top_value_domain() -> Self {
+        CharacterInclusionDomain::Top
     }
 }
 
