@@ -7,6 +7,56 @@ use goblin::elf;
 use goblin::pe;
 use goblin::Object;
 
+/// Contains all information parsed out of the bare metal configuration JSON file.
+///
+/// The content is information that is necessary for handling bare metal binaries
+/// and that the cwe_checker cannot automatically deduce from the binary itself.
+///
+/// When handling bare metal binaries
+/// we assume that the corresponding MCU uses a very simple memory layout
+/// consisting of exactly one region of non-volatile (flash) memory
+/// and exactly one region of volatile memory (RAM).
+/// Furthermore, we assume that the binary itself is just a dump of the non-volatile memory region.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
+pub struct BareMetalConfig {
+    /// The CPU type.
+    ///
+    /// The string has to match the `processor_id` that Ghidra uses for the specific CPU type,
+    /// as it is forwarded to Ghidra to identify the CPU.
+    pub processor_id: String,
+    /// The base address of the non-volatile memory (usually flash memory) used by the chip.
+    /// The string is parsed as a hexadecimal number.
+    ///
+    /// We assume that the size of the non-volatile memory equals the size of the input binary.
+    /// In other words, we assume
+    /// that the input binary is a complete dump of the contents of the non-volatile memory of the chip.
+    pub flash_base_address: String,
+    /// The base address of the volatile memory (RAM) used by the chip.
+    /// The string is parsed as a hexadecimal number.
+    pub ram_base_address: String,
+    /// The size of the volatile memory (RAM) used by the chip.
+    /// The string is parsed as a hexadecimal number.
+    ///
+    /// If the exact size is unknown, then one can try to use an upper approximation instead.
+    pub ram_size: String,
+}
+
+impl BareMetalConfig {
+    /// Return the base address of the binary as an integer.
+    pub fn parse_binary_base_address(&self) -> u64 {
+        parse_hex_string_to_u64(&self.flash_base_address)
+            .expect("Parsing of the binary base address failed.")
+    }
+}
+
+/// A helper function to parse a hex string to an integer.
+fn parse_hex_string_to_u64(mut string: &str) -> Result<u64, Error> {
+    if string.starts_with("0x") {
+        string = &string[2..]
+    }
+    Ok(u64::from_str_radix(string, 16)?)
+}
+
 /// A representation of the runtime image of a binary after being loaded into memory by the loader.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct RuntimeMemoryImage {
@@ -67,6 +117,31 @@ impl MemorySegment {
             execute_flag: (section_header.characteristics & 0x20000000) != 0,
         }
     }
+
+    /// Generate a segment with the given `base_address` and content given by `binary`.
+    /// The segment is readable, writeable and executable, its size equals the size of `binary`.
+    pub fn from_bare_metal_file(binary: &[u8], base_address: u64) -> MemorySegment {
+        MemorySegment {
+            bytes: binary.to_vec(),
+            base_address,
+            read_flag: true,
+            write_flag: true,
+            execute_flag: true,
+        }
+    }
+
+    /// Generate a segment with the given base address and size.
+    /// The segment is readable and writeable, but not executable.
+    /// The content is set to a vector of zeroes.
+    pub fn new_bare_metal_ram_segment(base_address: u64, size: u64) -> MemorySegment {
+        MemorySegment {
+            bytes: vec![0; size as usize],
+            base_address,
+            read_flag: true,
+            write_flag: true,
+            execute_flag: false,
+        }
+    }
 }
 
 impl RuntimeMemoryImage {
@@ -112,6 +187,49 @@ impl RuntimeMemoryImage {
             }
             _ => Err(anyhow!("Object type not supported.")),
         }
+    }
+
+    /// Generate a runtime memory image for a bare metal binary.
+    ///
+    /// The generated runtime memory image contains:
+    /// * one memory region corresponding to non-volatile memory
+    /// * one memory region corresponding to volatile memory (RAM)
+    ///
+    /// See [`BareMetalConfig`] for more information about the assumed memory layout for bare metal binaries.
+    pub fn new_from_bare_metal(
+        binary: &[u8],
+        bare_metal_config: &BareMetalConfig,
+    ) -> Result<Self, Error> {
+        let processor_id_parts: Vec<&str> = bare_metal_config.processor_id.split(':').collect();
+        if processor_id_parts.len() < 3 {
+            return Err(anyhow!("Could not parse processor ID."));
+        }
+        let is_little_endian = match processor_id_parts[1] {
+            "LE" => true,
+            "BE" => false,
+            _ => return Err(anyhow!("Could not parse endianness of the processor ID.")),
+        };
+        let flash_base_address = parse_hex_string_to_u64(&bare_metal_config.flash_base_address)?;
+        let ram_base_address = parse_hex_string_to_u64(&bare_metal_config.ram_base_address)?;
+        let ram_size = parse_hex_string_to_u64(&bare_metal_config.ram_size)?;
+        // Check that the whole binary is contained in addressable space.
+        let address_bit_length = processor_id_parts[2].parse::<u64>()?;
+        match flash_base_address.checked_add(binary.len() as u64) {
+            Some(max_address) => {
+                if (max_address >> address_bit_length) != 0 {
+                    return Err(anyhow!("Binary too large for given base address"));
+                }
+            }
+            None => return Err(anyhow!("Binary too large for given base address")),
+        }
+
+        Ok(RuntimeMemoryImage {
+            memory_segments: vec![
+                MemorySegment::from_bare_metal_file(binary, flash_base_address),
+                MemorySegment::new_bare_metal_ram_segment(ram_base_address, ram_size),
+            ],
+            is_little_endian,
+        })
     }
 
     /// Return whether values in the memory image should be interpreted in little-endian
