@@ -170,6 +170,38 @@ mod tests {
 
     #[test]
     #[ignore]
+    fn bare_metal() {
+        let filepath = "bare_metal_samples/test_sample.bin";
+        let output = Command::new("cwe_checker")
+            .arg(filepath)
+            .arg("--partial")
+            .arg("Memory")
+            .arg("--quiet")
+            .arg("--bare-metal-config")
+            .arg("../bare_metal/stm32f407vg.json")
+            .output()
+            .unwrap();
+        let num_cwes = String::from_utf8(output.stdout)
+            .unwrap()
+            .lines()
+            .filter(|line| line.starts_with("[CWE125]"))
+            .count();
+        // We check the number of found CWEs only approximately
+        // so that this check does not fail on minor result changes.
+        // The results are not yet reliable enough for a stricter check.
+        if num_cwes >= 1 && num_cwes <= 10 {
+            println!("{} \t {}", filepath, "[OK]".green());
+        } else {
+            println!("{} \t {}", filepath, "[FAILED]".red());
+            panic!(
+                "Expected occurrences: Between 1 and 10. Found: {}",
+                num_cwes
+            );
+        }
+    }
+
+    #[test]
+    #[ignore]
     fn cwe_78() {
         let mut error_log = Vec::new();
         let mut tests = all_test_cases("cwe_78", "CWE78");

@@ -69,6 +69,16 @@ For information about other available command line flags you can pass the `--hel
 
 If you use the stable version, you can also look at the [online documentation](https://fkie-cad.github.io/cwe_checker/index.html) for more information.
 
+### For Bare-Metal Binaries ###
+
+The cwe_checker offers experimental support for analyzing bare-metal binaries.
+For that one needs to provide a bare metal configuration file via the `--bare-metal-config` command line option.
+An example for such a configuration file can be found at `bare_metal/stm32f407vg.json`
+(which was created and tested for an STM32F407VG MCU).
+
+For more information build and read the documentation locally via `make documentation`.
+Note that this analysis mode is not yet included in the stable version of the cwe_checker.
+
 ## Documentation and Tests ##
 
 The test binaries for our test suite can be built with `make compile_test_files` (needs Docker to be installed!). The test suite can then be run with `make test`.

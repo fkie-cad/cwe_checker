@@ -30,6 +30,17 @@ through the `--config` command line option.
 Start by taking a look at the standard configuration file located at `src/config.json`
 and read the [check-specific documentation](crate::checkers) for more details about each field in the configuration file.
 
+## For bare-metal binaries
+
+The cwe_checker offers experimental support for analyzing bare-metal binaries.
+For that one needs to provide a bare metal configuration file via the `--bare-metal-config` command line option.
+An example for such a configuration file can be found at `bare_metal/stm32f407vg.json`
+(which was created and tested for an STM32F407VG MCU).
+
+For more information on the necessary fields of the configuration file
+and the assumed memory model when analyzing bare metal binaries
+see the [configuration struct documentation](crate::utils::binary::BareMetalConfig).
+
 # Integration into other tools
 
 ### Integration into Ghidra
