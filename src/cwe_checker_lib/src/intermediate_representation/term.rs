@@ -281,7 +281,7 @@ pub struct Blk {
     pub jmps: Vec<Term<Jmp>>,
     /// If the basic block contains an indirect jump,
     /// this field contains possible jump target addresses for the jump.
-    pub indirect_jmp_targets: Vec<String>,
+    pub indirect_jmp_targets: Vec<Tid>,
 }
 
 impl Term<Blk> {
@@ -296,15 +296,12 @@ impl Term<Blk> {
             .term
             .indirect_jmp_targets
             .iter()
-            .filter_map(|target_address| {
-                if known_block_tids
-                    .get(&Tid::blk_id_at_address(&target_address))
-                    .is_some()
-                {
-                    Some(target_address.to_string())
+            .filter_map(|target| {
+                if known_block_tids.get(&target).is_some() {
+                    Some(target.clone())
                 } else {
                     let error_msg =
-                        format!("Indirect jump target at {} does not exist", target_address);
+                        format!("Indirect jump target at {} does not exist", target.address);
                     logs.push(LogMessage::new_error(error_msg).location(self.tid.clone()));
                     None
                 }

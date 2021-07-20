@@ -218,6 +218,10 @@ impl Blk {
                 term: jmp_term.term.into(),
             })
             .collect();
+        let indirect_jmp_targets = indirect_jmp_targets
+            .into_iter()
+            .map(|address| Tid::blk_id_at_address(&address))
+            .collect();
         IrBlk {
             defs,
             jmps,
