@@ -10,13 +10,13 @@ regex = "1.4.5"
 serde = {version = "1.0", features = ["derive", "rc"]}
 serde_json = "1.0"
 serde_yaml = "0.8"
-petgraph = { version = "0.5", features = ["default", "serde-1"] }
+petgraph = { version = "0.6", features = ["default", "serde-1"] }
 fnv = "1.0" # a faster hash function for small keys like integers
 anyhow = "1.0" # for easy error types
-crossbeam-channel = "0.4"
+crossbeam-channel = "0.5.1"
 derive_more = "0.99"
 directories = "3.0"
-goblin = "0.2"
+goblin = "0.4.2"
 gcd = "2.0"
 
 [lib]
