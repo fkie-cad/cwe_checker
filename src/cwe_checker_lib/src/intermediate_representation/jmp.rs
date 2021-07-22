@@ -1,7 +1,5 @@
 use super::Expression;
 use crate::prelude::*;
-use crate::utils::log::LogMessage;
-use std::collections::HashSet;
 
 /// A `Jmp` instruction affects the control flow of a program, i.e. it may change the instruction pointer.
 /// With the exception of `CallOther`, it has no other side effects.
@@ -59,87 +57,4 @@ pub enum Jmp {
         /// where the disassembler assumes that execution will continue after handling of the side effect.
         return_: Option<Tid>,
     },
-}
-
-impl Term<Jmp> {
-    /// If the jump is intraprocedural, return its target TID.
-    /// If the jump is a call, return the TID of the return target.
-    fn get_intraprocedural_target_or_return_block_tid(&self) -> Option<Tid> {
-        match &self.term {
-            Jmp::BranchInd(_) | Jmp::Return(_) => None,
-            Jmp::Branch(tid) => Some(tid.clone()),
-            Jmp::CBranch { target, .. } => Some(target.clone()),
-            Jmp::Call { return_, .. }
-            | Jmp::CallInd { return_, .. }
-            | Jmp::CallOther { return_, .. } => return_.as_ref().cloned(),
-        }
-    }
-
-    /// If the TID of a jump target or return target is not contained in `known_tids`
-    /// replace it with a dummy TID and return an error message.
-    fn retarget_nonexisting_jump_targets_to_dummy_tid(
-        &mut self,
-        known_tids: &HashSet<Tid>,
-        dummy_sub_tid: &Tid,
-        dummy_blk_tid: &Tid,
-    ) -> Result<(), LogMessage> {
-        use Jmp::*;
-        match &mut self.term {
-            BranchInd(_) => (),
-            Branch(tid) | CBranch { target: tid, .. } if known_tids.get(tid).is_none() => {
-                let error_msg = format!("Jump target at {} does not exist", tid.address);
-                let error_log = LogMessage::new_error(error_msg).location(self.tid.clone());
-                *tid = dummy_blk_tid.clone();
-                return Err(error_log);
-            }
-            Call { target, return_ } if known_tids.get(target).is_none() => {
-                let error_msg = format!("Call target at {} does not exist", target.address);
-                let error_log = LogMessage::new_error(error_msg).location(self.tid.clone());
-                *target = dummy_sub_tid.clone();
-                *return_ = None;
-                return Err(error_log);
-            }
-            Call {
-                return_: Some(return_tid),
-                ..
-            }
-            | CallInd {
-                return_: Some(return_tid),
-                ..
-            }
-            | CallOther {
-                return_: Some(return_tid),
-                ..
-            } if known_tids.get(return_tid).is_none() => {
-                let error_msg = format!("Return target at {} does not exist", return_tid.address);
-                let error_log = LogMessage::new_error(error_msg).location(self.tid.clone());
-                *return_tid = dummy_blk_tid.clone();
-                return Err(error_log);
-            }
-            _ => (),
-        }
-        Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn retarget_nonexisting_jumps() {
-        let mut jmp_term = Term {
-            tid: Tid::new("jmp"),
-            term: Jmp::Branch(Tid::new("nonexisting_target")),
-        };
-        assert_eq!(jmp_term.term, Jmp::Branch(Tid::new("nonexisting_target")));
-        assert!(jmp_term
-            .retarget_nonexisting_jump_targets_to_dummy_tid(
-                &HashSet::new(),
-                &Tid::new("dummy_sub"),
-                &Tid::new("dummy_blk")
-            )
-            .is_err());
-        assert_eq!(jmp_term.term, Jmp::Branch(Tid::new("dummy_blk")));
-    }
 }
