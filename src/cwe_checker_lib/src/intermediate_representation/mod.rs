@@ -18,6 +18,18 @@ mod expression;
 pub use expression::*;
 mod term;
 pub use term::*;
+mod def;
+pub use def::*;
+mod jmp;
+pub use jmp::*;
+mod blk;
+pub use blk::*;
+mod sub;
+pub use sub::*;
+mod program;
+pub use program::*;
+mod project;
+pub use project::*;
 
 /// An unsigned number of bytes.
 ///
@@ -172,9 +184,24 @@ impl From<String> for Datatype {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use apint::BitWidth;
 
-    use super::*;
+    impl DatatypeProperties {
+        pub fn mock() -> DatatypeProperties {
+            DatatypeProperties {
+                char_size: ByteSize::new(1),
+                double_size: ByteSize::new(8),
+                float_size: ByteSize::new(4),
+                integer_size: ByteSize::new(4),
+                long_double_size: ByteSize::new(8),
+                long_long_size: ByteSize::new(8),
+                long_size: ByteSize::new(4),
+                pointer_size: ByteSize::new(8),
+                short_size: ByteSize::new(2),
+            }
+        }
+    }
 
     #[test]
     fn check_bit_to_byte_conversion() {
