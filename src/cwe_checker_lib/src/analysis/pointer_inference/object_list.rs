@@ -309,7 +309,7 @@ impl AbstractObjectList {
                 }
             }
         } else if let Some(id) = ids.get(0) {
-            if let Err(error) = self.objects.get_mut(&id).unwrap().0.mark_as_freed() {
+            if let Err(error) = self.objects.get_mut(id).unwrap().0.mark_as_freed() {
                 possible_double_free_ids.push((id.clone(), error));
             }
         }

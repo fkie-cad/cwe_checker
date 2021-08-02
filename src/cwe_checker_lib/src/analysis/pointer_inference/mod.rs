@@ -360,7 +360,7 @@ impl<'a> PointerInference<'a> {
                             for jmp in block.term.jmps.iter() {
                                 match &jmp.term {
                                     Jmp::BranchInd(target_expr) => {
-                                        let address = state.eval(&target_expr);
+                                        let address = state.eval(target_expr);
                                         println!(
                                             "{}: Indirect jump to {}",
                                             jmp.tid,
@@ -368,7 +368,7 @@ impl<'a> PointerInference<'a> {
                                         );
                                     }
                                     Jmp::CallInd { target, return_ } => {
-                                        let address = state.eval(&target);
+                                        let address = state.eval(target);
                                         println!(
                                             "{}: Indirect call to {}. HasReturn: {}",
                                             jmp.tid,

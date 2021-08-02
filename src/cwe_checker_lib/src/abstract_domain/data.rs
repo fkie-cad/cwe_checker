@@ -67,7 +67,7 @@ impl<T: RegisterDomain> DataDomain<T> {
         new_id: &AbstractIdentifier,
         offset_adjustment: &T,
     ) {
-        if let Some(old_offset) = self.relative_values.get(&old_id) {
+        if let Some(old_offset) = self.relative_values.get(old_id) {
             let new_offset = old_offset.bin_op(BinOpType::IntAdd, offset_adjustment);
             self.relative_values.remove(old_id);
             self.relative_values.insert(new_id.clone(), new_offset);

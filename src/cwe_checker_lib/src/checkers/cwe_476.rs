@@ -88,7 +88,7 @@ pub fn check_cwe(
     let general_context = Context::new(
         project,
         analysis_results.runtime_memory_image,
-        &pointer_inference_results,
+        pointer_inference_results,
         cwe_sender,
     );
 

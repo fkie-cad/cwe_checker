@@ -197,8 +197,8 @@ impl AbstractObjectInfo {
             elem.replace_abstract_id(old_id, new_id, offset_adjustment);
         }
         self.memory.clear_top_values();
-        if self.pointer_targets.get(&old_id).is_some() {
-            self.pointer_targets.remove(&old_id);
+        if self.pointer_targets.get(old_id).is_some() {
+            self.pointer_targets.remove(old_id);
             self.pointer_targets.insert(new_id.clone());
         }
     }

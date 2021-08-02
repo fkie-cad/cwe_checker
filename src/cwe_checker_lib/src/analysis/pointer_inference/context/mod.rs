@@ -173,7 +173,7 @@ impl<'a> Context<'a> {
         extern_symbol: &ExternSymbol,
     ) -> State {
         let address_bytesize = self.project.get_pointer_bytesize();
-        let object_size = self.get_allocation_size_of_alloc_call(&state, extern_symbol);
+        let object_size = self.get_allocation_size_of_alloc_call(state, extern_symbol);
 
         match extern_symbol.get_unique_return_register() {
             Ok(return_register) => {
@@ -225,7 +225,7 @@ impl<'a> Context<'a> {
                 let parameter_value = state.eval_parameter_arg(
                     parameter,
                     &self.project.stack_pointer_register,
-                    &self.runtime_memory_image,
+                    self.runtime_memory_image,
                 );
                 match parameter_value {
                     Ok(memory_object_pointer) => {
@@ -277,7 +277,7 @@ impl<'a> Context<'a> {
             match state.eval_parameter_arg(
                 parameter,
                 &self.project.stack_pointer_register,
-                &self.runtime_memory_image,
+                self.runtime_memory_image,
             ) {
                 Ok(value) => {
                     if state.memory.is_dangling_pointer(&value, true) {
@@ -323,7 +323,7 @@ impl<'a> Context<'a> {
             match state.eval_parameter_arg(
                 parameter,
                 &self.project.stack_pointer_register,
-                &self.runtime_memory_image,
+                self.runtime_memory_image,
             ) {
                 Ok(data) => {
                     if state.pointer_contains_out_of_bounds_target(&data, self.runtime_memory_image)
@@ -408,7 +408,7 @@ impl<'a> Context<'a> {
             ),
             Some(&call.tid),
         );
-        let calling_conv = extern_symbol.get_calling_convention(&self.project);
+        let calling_conv = extern_symbol.get_calling_convention(self.project);
         let mut possible_referenced_ids = BTreeSet::new();
         if extern_symbol.parameters.is_empty() && extern_symbol.return_values.is_empty() {
             // We assume here that we do not know the parameters and approximate them by all possible parameter registers.
@@ -428,7 +428,7 @@ impl<'a> Context<'a> {
                 if let Ok(data) = state.eval_parameter_arg(
                     parameter,
                     &self.project.stack_pointer_register,
-                    &self.runtime_memory_image,
+                    self.runtime_memory_image,
                 ) {
                     possible_referenced_ids.extend(data.referenced_ids().cloned());
                 }

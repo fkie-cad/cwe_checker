@@ -216,7 +216,7 @@ impl<'a> Context<'a> {
                         if let Ok(stack_param) = pi_state.eval_parameter_arg(
                             parameter,
                             &self.project.stack_pointer_register,
-                            &self.runtime_memory_image,
+                            self.runtime_memory_image,
                         ) {
                             if state.check_if_address_points_to_taint(stack_param, pi_state) {
                                 return true;

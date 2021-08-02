@@ -281,7 +281,7 @@ impl State {
         if let Some(pid_map) = self.pi_def_map.as_ref() {
             if let Some(pi_state) = pid_map.get(def_tid) {
                 let address = pi_state.eval(target);
-                if self.address_points_to_taint(address.clone(), &pi_state) {
+                if self.address_points_to_taint(address.clone(), pi_state) {
                     self.taint_def_input_register(
                         value,
                         stack_pointer_register,
@@ -384,7 +384,7 @@ impl State {
 
     /// Return true if the memory object with the given ID contains a tainted value.
     pub fn check_mem_id_for_taint(&self, id: &AbstractIdentifier) -> bool {
-        if let Some(mem_object) = self.memory_taint.get(&id) {
+        if let Some(mem_object) = self.memory_taint.get(id) {
             for elem in mem_object.values() {
                 if elem.is_tainted() {
                     return true;
@@ -436,7 +436,7 @@ impl State {
             let taints = self.register_taint.clone();
             for (register, _) in taints.iter() {
                 if register_names.get(&register.name).is_none() {
-                    self.register_taint.remove(&register);
+                    self.register_taint.remove(register);
                 }
             }
         }

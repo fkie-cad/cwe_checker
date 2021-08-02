@@ -38,7 +38,7 @@ pub fn get_input_format_string(
 ) -> Result<String, Error> {
     if let Some(format_string) = extern_symbol.parameters.get(format_string_index) {
         if let Ok(Some(address)) = pi_state
-            .eval_parameter_arg(format_string, &stack_pointer_register, runtime_memory_image)
+            .eval_parameter_arg(format_string, stack_pointer_register, runtime_memory_image)
             .as_ref()
             .map(|param| param.get_if_absolute_value())
         {

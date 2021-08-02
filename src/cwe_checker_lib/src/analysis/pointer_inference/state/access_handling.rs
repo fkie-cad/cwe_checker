@@ -207,7 +207,7 @@ impl State {
     pub fn eval(&self, expression: &Expression) -> Data {
         use Expression::*;
         match expression {
-            Var(variable) => self.get_register(&variable),
+            Var(variable) => self.get_register(variable),
             Const(bitvector) => bitvector.clone().into(),
             BinOp { op, lhs, rhs } => {
                 if *op == BinOpType::IntXOr && lhs == rhs {

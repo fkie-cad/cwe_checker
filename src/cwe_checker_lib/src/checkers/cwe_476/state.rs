@@ -208,7 +208,7 @@ impl State {
 
     /// Return true if the memory object with the given ID contains a tainted value.
     pub fn check_mem_id_for_taint(&self, id: &AbstractIdentifier) -> bool {
-        if let Some(mem_object) = self.memory_taint.get(&id) {
+        if let Some(mem_object) = self.memory_taint.get(id) {
             for elem in mem_object.values() {
                 if elem.is_tainted() {
                     return true;
