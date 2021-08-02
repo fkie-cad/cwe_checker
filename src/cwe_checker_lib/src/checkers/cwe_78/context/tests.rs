@@ -4,7 +4,7 @@ use super::*;
 
 use crate::analysis::{backward_interprocedural_fixpoint::Context as BackwardContext, graph::Node};
 use crate::{
-    abstract_domain::{DataDomain, PointerDomain, SizedDomain},
+    abstract_domain::{DataDomain, SizedDomain},
     analysis::pointer_inference::{Data, State as PointerInferenceState, ValueDomain},
     intermediate_representation::{Expression, Variable},
 };
@@ -118,8 +118,8 @@ impl Setup {
             state,
             pi_state,
             taint_source,
-            base_eight_offset: Data::Pointer(PointerDomain::new(stack_id.clone(), bv(-8))),
-            base_sixteen_offset: Data::Pointer(PointerDomain::new(stack_id.clone(), bv(-16))),
+            base_eight_offset: Data::from_target(stack_id.clone(), bv(-8)),
+            base_sixteen_offset: Data::from_target(stack_id.clone(), bv(-16)),
         }
     }
 }
@@ -339,7 +339,7 @@ fn creating_pi_def_map() {
         } else if *def_tid == def2 {
             assert_eq!(
                 pi_state.get_register(&rdi_reg),
-                Data::Pointer(PointerDomain::new(stack_id.clone(), bv(-8))),
+                Data::from_target(stack_id.clone(), bv(-8)),
             );
         }
     }
@@ -568,10 +568,8 @@ fn handling_assign_and_load() {
     new_state = context.update_def(&new_state, &mock_assign_stack).unwrap();
     assert_eq!(new_state.get_register_taint(&r9_reg), None);
     assert_eq!(
-        new_state.address_points_to_taint(
-            Data::Pointer(PointerDomain::new(stack_id.clone(), bv(0))),
-            &setup.pi_state
-        ),
+        new_state
+            .address_points_to_taint(Data::from_target(stack_id.clone(), bv(0)), &setup.pi_state),
         true
     );
 
@@ -653,10 +651,8 @@ fn updating_def() {
     new_state = context.update_def(&new_state, &mock_assign_stack).unwrap();
     assert_eq!(new_state.get_register_taint(&r9_reg), None);
     assert_eq!(
-        new_state.address_points_to_taint(
-            Data::Pointer(PointerDomain::new(stack_id.clone(), bv(0))),
-            &setup.pi_state
-        ),
+        new_state
+            .address_points_to_taint(Data::from_target(stack_id.clone(), bv(0)), &setup.pi_state),
         true
     );
 

@@ -7,7 +7,7 @@ use crate::{intermediate_representation::Datatype, prelude::*};
 use regex::Regex;
 
 use crate::{
-    abstract_domain::{DataDomain, IntervalDomain, TryToBitvec},
+    abstract_domain::{IntervalDomain, TryToBitvec},
     analysis::pointer_inference::State as PointerInferenceState,
     intermediate_representation::{
         Arg, ByteSize, CallingConvention, DatatypeProperties, ExternSymbol, Project, Variable,
@@ -37,13 +37,13 @@ pub fn get_input_format_string(
     runtime_memory_image: &RuntimeMemoryImage,
 ) -> Result<String, Error> {
     if let Some(format_string) = extern_symbol.parameters.get(format_string_index) {
-        if let Ok(DataDomain::Value(address)) = pi_state.eval_parameter_arg(
-            format_string,
-            &stack_pointer_register,
-            runtime_memory_image,
-        ) {
+        if let Ok(Some(address)) = pi_state
+            .eval_parameter_arg(format_string, &stack_pointer_register, runtime_memory_image)
+            .as_ref()
+            .map(|param| param.get_if_absolute_value())
+        {
             return parse_format_string_destination_and_return_content(
-                address,
+                address.clone(),
                 runtime_memory_image,
             );
         }

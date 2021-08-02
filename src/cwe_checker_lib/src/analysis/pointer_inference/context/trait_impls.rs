@@ -158,11 +158,10 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
             // At the beginning of a function this is the only known pointer to the new stack frame.
             callee_state.set_register(
                 &self.project.stack_pointer_register,
-                PointerDomain::new(
+                Data::from_target(
                     callee_stack_id.clone(),
                     Bitvector::zero(apint::BitWidth::from(address_bytesize)).into(),
-                )
-                .into(),
+                ),
             );
             // set the list of caller stack ids to only this caller id
             callee_state.caller_stack_ids = BTreeSet::new();

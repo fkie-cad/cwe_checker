@@ -131,9 +131,7 @@ impl AbstractObjectInfo {
     /// If the abstract object is not unique (i.e. may represent more than one actual object),
     /// merge the old value at the given offset with the new value.
     pub fn set_value(&mut self, value: Data, offset: &ValueDomain) -> Result<(), Error> {
-        if let Data::Pointer(ref pointer) = value {
-            self.pointer_targets.extend(pointer.ids().cloned());
-        };
+        self.pointer_targets.extend(value.referenced_ids().cloned());
         if let Ok(concrete_offset) = offset.try_to_bitvec() {
             if self.is_unique {
                 self.memory.add(value, concrete_offset);
@@ -155,9 +153,7 @@ impl AbstractObjectInfo {
 
     /// Merge `value` at position `offset` with the value currently saved at that position.
     pub fn merge_value(&mut self, value: Data, offset: &ValueDomain) {
-        if let Data::Pointer(ref pointer) = value {
-            self.pointer_targets.extend(pointer.ids().cloned());
-        };
+        self.pointer_targets.extend(value.referenced_ids().cloned());
         if let Ok(concrete_offset) = offset.try_to_bitvec() {
             let merged_value = self
                 .memory
@@ -184,7 +180,7 @@ impl AbstractObjectInfo {
     pub fn get_referenced_ids_underapproximation(&self) -> BTreeSet<AbstractIdentifier> {
         let mut referenced_ids = BTreeSet::new();
         for data in self.memory.values() {
-            referenced_ids.append(&mut data.referenced_ids())
+            referenced_ids.extend(data.referenced_ids().cloned())
         }
         referenced_ids
     }
@@ -218,6 +214,8 @@ impl AbstractObjectInfo {
 
     /// Remove the provided IDs from the target lists of all pointers in the memory object.
     /// Also remove them from the pointer_targets list.
+    ///
+    /// If this operation would produce an empty value, it replaces it with a `Top` value instead.
     pub fn remove_ids(&mut self, ids_to_remove: &BTreeSet<AbstractIdentifier>) {
         self.pointer_targets = self
             .pointer_targets
@@ -226,6 +224,9 @@ impl AbstractObjectInfo {
             .collect();
         for value in self.memory.values_mut() {
             value.remove_ids(ids_to_remove);
+            if value.is_empty() {
+                *value = value.top();
+            }
         }
         self.memory.clear_top_values(); // In case the previous operation left *Top* values in the memory struct.
     }
@@ -425,7 +426,7 @@ mod tests {
     }
 
     fn new_data(number: i64) -> Data {
-        Data::Value(bv(number))
+        bv(number).into()
     }
 
     fn bv(number: i64) -> ValueDomain {
@@ -447,7 +448,7 @@ mod tests {
         object.set_value(three, &offset).unwrap();
         assert_eq!(
             object.get_value(Bitvector::from_i64(-16), ByteSize::new(8)),
-            Data::Top(ByteSize::new(8))
+            Data::new_top(ByteSize::new(8))
         );
         assert_eq!(
             object.get_value(Bitvector::from_i64(-15), ByteSize::new(8)),
@@ -456,12 +457,12 @@ mod tests {
         object.set_value(new_data(4), &bv(-12)).unwrap();
         assert_eq!(
             object.get_value(Bitvector::from_i64(-15), ByteSize::new(8)),
-            Data::Top(ByteSize::new(8))
+            Data::new_top(ByteSize::new(8))
         );
         object.merge_value(new_data(23), &bv(-12));
         assert_eq!(
             object.get_value(Bitvector::from_i64(-12), ByteSize::new(8)),
-            Data::Value(IntervalDomain::mock(4, 23).with_stride(19))
+            IntervalDomain::mock(4, 23).with_stride(19).into()
         );
 
         let mut other_object = new_abstract_object();
@@ -470,7 +471,7 @@ mod tests {
         let merged_object = object.merge(&other_object);
         assert_eq!(
             merged_object.get_value(Bitvector::from_i64(-12), ByteSize::new(8)),
-            Data::Top(ByteSize::new(8))
+            Data::new_top(ByteSize::new(8))
         );
         assert_eq!(
             merged_object.get_value(Bitvector::from_i64(0), ByteSize::new(8)),
@@ -486,8 +487,8 @@ mod tests {
         target_map.insert(new_id("time_1", "RAX"), bv(20));
         target_map.insert(new_id("time_234", "RAX"), bv(30));
         target_map.insert(new_id("time_1", "RBX"), bv(40));
-        let pointer = PointerDomain::with_targets(target_map.clone());
-        object.set_value(pointer.into(), &bv(-15)).unwrap();
+        let pointer = DataDomain::from_target_map(target_map.clone());
+        object.set_value(pointer, &bv(-15)).unwrap();
         assert_eq!(object.get_referenced_ids_overapproximation().len(), 3);
 
         object.replace_abstract_id(
@@ -496,10 +497,10 @@ mod tests {
             &bv(10),
         );
         target_map.remove(&new_id("time_1", "RAX"));
-        let modified_pointer = PointerDomain::with_targets(target_map);
+        let modified_pointer = DataDomain::from_target_map(target_map);
         assert_eq!(
             object.get_value(Bitvector::from_i64(-15), ByteSize::new(8)),
-            modified_pointer.into()
+            modified_pointer
         );
 
         object.replace_abstract_id(
@@ -510,10 +511,10 @@ mod tests {
         let mut target_map = BTreeMap::new();
         target_map.insert(new_id("time_234", "RAX"), bv(30));
         target_map.insert(new_id("time_234", "RBX"), bv(50));
-        let modified_pointer = PointerDomain::with_targets(target_map);
+        let modified_pointer = DataDomain::from_target_map(target_map);
         assert_eq!(
             object.get_value(Bitvector::from_i64(-15), ByteSize::new(8)),
-            modified_pointer.into()
+            modified_pointer
         );
     }
 
@@ -525,8 +526,8 @@ mod tests {
         target_map.insert(new_id("time_1", "RAX"), bv(20));
         target_map.insert(new_id("time_234", "RAX"), bv(30));
         target_map.insert(new_id("time_1", "RBX"), bv(40));
-        let pointer = PointerDomain::with_targets(target_map.clone());
-        object.set_value(pointer.into(), &bv(-15)).unwrap();
+        let pointer = DataDomain::from_target_map(target_map.clone());
+        object.set_value(pointer, &bv(-15)).unwrap();
         assert_eq!(object.get_referenced_ids_overapproximation().len(), 3);
 
         let ids_to_remove = vec![new_id("time_1", "RAX"), new_id("time_23", "RBX")]
