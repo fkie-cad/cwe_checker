@@ -10,9 +10,6 @@ pub use bitvector::*;
 mod identifier;
 pub use identifier::*;
 
-mod pointer;
-pub use pointer::*;
-
 mod data;
 pub use data::*;
 
