@@ -248,7 +248,7 @@ impl<T: RegisterDomain> DataDomain<T> {
                 .absolute_value
                 .as_ref()
                 .cloned()
-                .unwrap_or(T::new_top(self.bytesize()));
+                .unwrap_or_else(|| T::new_top(self.size));
             let mut result = self.subtract_offset(&offset);
             result.contains_top_values = result.contains_top_values || rhs.contains_top_values;
             result
@@ -374,35 +374,45 @@ impl<T: SpecializeByConditional + RegisterDomain> SpecializeByConditional for Da
     }
 
     fn intersect(self, other: &Self) -> Result<Self, Error> {
-        let relative_values = self
-            .relative_values
-            .iter()
-            .filter_map(|(id, offset)| {
-                other
+        let result = match (self.contains_top_values, other.contains_top_values) {
+            // If only one input value contains top elements, then the other input is the best approximation for the intersection.
+            (true, false) => other.clone(),
+            (false, true) => self,
+            // Else we can compute the intersection field-wise.
+            (true, true) | (false, false) => {
+                let relative_values = self
                     .relative_values
-                    .get(id)
-                    .map(|other_offset| {
-                        if let Ok(intersected_offset) = offset.clone().intersect(other_offset) {
-                            Some((id.clone(), intersected_offset))
-                        } else {
-                            None
-                        }
+                    .iter()
+                    .filter_map(|(id, offset)| {
+                        other
+                            .relative_values
+                            .get(id)
+                            .map(|other_offset| {
+                                if let Ok(intersected_offset) =
+                                    offset.clone().intersect(other_offset)
+                                {
+                                    Some((id.clone(), intersected_offset))
+                                } else {
+                                    None
+                                }
+                            })
+                            .flatten()
                     })
-                    .flatten()
-            })
-            .collect();
-        let absolute_value = if let (Some(value), Some(other_value)) =
-            (&self.absolute_value, &other.absolute_value)
-        {
-            value.clone().intersect(other_value).ok()
-        } else {
-            None
-        };
-        let result = DataDomain {
-            size: self.bytesize(),
-            relative_values,
-            absolute_value,
-            contains_top_values: self.contains_top_values && other.contains_top_values,
+                    .collect();
+                let absolute_value = if let (Some(value), Some(other_value)) =
+                    (&self.absolute_value, &other.absolute_value)
+                {
+                    value.clone().intersect(other_value).ok()
+                } else {
+                    None
+                };
+                DataDomain {
+                    size: self.bytesize(),
+                    relative_values,
+                    absolute_value,
+                    contains_top_values: self.contains_top_values && other.contains_top_values,
+                }
+            }
         };
         if result.is_empty() {
             Err(anyhow!("Domain is empty."))
@@ -542,7 +552,7 @@ impl<T: RegisterDomain> AbstractDomain for DataDomain<T> {
             relative_values
                 .entry(id.clone())
                 .and_modify(|offset| *offset = offset.merge(offset_other))
-                .or_insert(offset_other.clone());
+                .or_insert_with(|| offset_other.clone());
         }
         let absolute_value = match (&self.absolute_value, &other.absolute_value) {
             (Some(left), Some(right)) => Some(left.merge(right)),

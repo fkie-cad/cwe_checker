@@ -135,10 +135,10 @@ impl State {
         if let Some((mem_id, offset)) = address.get_if_unique_target() {
             if let Ok(position) = offset.try_to_bitvec() {
                 if let Some(mem_region) = self.memory_taint.get_mut(mem_id) {
-                    mem_region.add(taint, position.clone());
+                    mem_region.add(taint, position);
                 } else {
                     let mut mem_region = MemRegion::new(address.bytesize());
-                    mem_region.add(taint, position.clone());
+                    mem_region.add(taint, position);
                     self.memory_taint.insert(mem_id.clone(), mem_region);
                 }
             }

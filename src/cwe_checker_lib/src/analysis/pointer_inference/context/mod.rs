@@ -159,7 +159,7 @@ impl<'a> Context<'a> {
         object_size
             .get_if_absolute_value()
             .cloned()
-            .unwrap_or(ValueDomain::new_top(address_bytesize))
+            .unwrap_or_else(|| ValueDomain::new_top(address_bytesize))
     }
 
     /// Add a new abstract object and a pointer to it in the return register of an extern call.

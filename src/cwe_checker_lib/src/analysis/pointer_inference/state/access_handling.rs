@@ -119,12 +119,10 @@ impl State {
         let address = self.adjust_pointer_for_read(&self.eval(address));
         let mut result = if let Some(global_address) = address.get_absolute_value() {
             if let Ok(address_bitvector) = global_address.try_to_bitvec() {
-                if let Some(loaded_value) =
-                    global_memory.read(&address_bitvector, size).ok().flatten()
-                {
-                    loaded_value.into()
-                } else {
-                    Data::new_empty(size)
+                match global_memory.read(&address_bitvector, size) {
+                    Ok(Some(loaded_value)) => loaded_value.into(),
+                    Ok(None) => Data::new_top(size),
+                    Err(_) => Data::new_empty(size),
                 }
             } else if let Ok((start, end)) = global_address.try_to_offset_interval() {
                 if global_memory
