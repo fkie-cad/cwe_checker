@@ -131,7 +131,7 @@ impl Variable {
         match (&self.name, &self.value) {
             (None, Some(hex_value)) => {
                 assert!(u64::from(self.size) <= 8);
-                let val: u64 = u64::from_str_radix(&hex_value, 16).unwrap();
+                let val: u64 = u64::from_str_radix(hex_value, 16).unwrap();
                 val.into()
             }
             _ => panic!(),

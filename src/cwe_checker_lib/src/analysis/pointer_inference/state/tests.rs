@@ -39,31 +39,27 @@ fn state() {
     let global_memory = RuntimeMemoryImage::mock();
     let mut state = State::new(&register("RSP"), Tid::new("time0"));
     let stack_id = new_id("time0", "RSP");
-    let stack_addr = Data::Pointer(PointerDomain::new(stack_id.clone(), bv(8)));
+    let stack_addr = Data::from_target(stack_id.clone(), bv(8));
     state
-        .store_value(&stack_addr, &Data::Value(bv(42)), &global_memory)
+        .store_value(&stack_addr, &bv(42).into(), &global_memory)
         .unwrap();
     state.register.insert(register("RSP"), stack_addr.clone());
     assert_eq!(
         state
             .load_value(&Var(register("RSP")), ByteSize::new(8), &global_memory)
             .unwrap(),
-        Data::Value(bv(42))
+        bv(42).into()
     );
 
     let mut other_state = State::new(&register("RSP"), Tid::new("time0"));
-    state.register.insert(register("RAX"), Data::Value(bv(42)));
+    state.register.insert(register("RAX"), bv(42).into());
     other_state
         .register
         .insert(register("RSP"), stack_addr.clone());
-    other_state
-        .register
-        .insert(register("RAX"), Data::Value(bv(42)));
-    other_state
-        .register
-        .insert(register("RBX"), Data::Value(bv(35)));
+    other_state.register.insert(register("RAX"), bv(42).into());
+    other_state.register.insert(register("RBX"), bv(35).into());
     let merged_state = state.merge(&other_state);
-    assert_eq!(merged_state.register[&register("RAX")], Data::Value(bv(42)));
+    assert_eq!(merged_state.register[&register("RAX")], bv(42).into());
     assert_eq!(merged_state.register.get(&register("RBX")), None);
     assert_eq!(
         merged_state
@@ -81,62 +77,53 @@ fn state() {
     );
     state.caller_stack_ids.insert(new_id("time0", "caller"));
     state
-        .store_value(&stack_addr, &Data::Value(bv(15)), &global_memory)
+        .store_value(&stack_addr, &bv(15).into(), &global_memory)
         .unwrap();
     assert_eq!(
-        state
-            .memory
-            .get_value(
-                &Data::Pointer(PointerDomain::new(new_id("time0", "caller"), bv(8))),
-                ByteSize::new(8)
-            )
-            .unwrap(),
-        Data::Value(bv(15))
+        state.memory.get_value(
+            &Data::from_target(new_id("time0", "caller"), bv(8)),
+            ByteSize::new(8)
+        ),
+        bv(15).into()
     );
     assert_eq!(
         state
             .load_value(&Var(register("RSP")), ByteSize::new(8), &global_memory)
             .unwrap(),
-        Data::Value(bv(15))
+        bv(15).into()
     );
 
     // Test replace_abstract_id
-    let pointer = Data::Pointer(PointerDomain::new(stack_id.clone(), bv(-16)));
+    let pointer = Data::from_target(stack_id.clone(), bv(-16));
     state.register.insert(register("RSP"), pointer.clone());
     state
-        .store_value(&pointer, &Data::Value(bv(7)), &global_memory)
+        .store_value(&pointer, &bv(7).into(), &global_memory)
         .unwrap();
     assert_eq!(
         state
             .load_value(&Var(register("RSP")), ByteSize::new(8), &global_memory)
             .unwrap(),
-        Data::Value(bv(7))
+        bv(7).into()
     );
     state.replace_abstract_id(&stack_id, &new_id("time0", "callee"), &bv(-8));
     assert_eq!(
         state
             .load_value(&Var(register("RSP")), ByteSize::new(8), &global_memory)
             .unwrap(),
-        Data::Value(bv(7))
+        bv(7).into()
     );
     assert_eq!(
-        state
-            .memory
-            .get_value(
-                &Data::Pointer(PointerDomain::new(new_id("time0", "callee"), bv(-8))),
-                ByteSize::new(8)
-            )
-            .unwrap(),
-        Data::Value(bv(7))
+        state.memory.get_value(
+            &Data::from_target(new_id("time0", "callee"), bv(-8)),
+            ByteSize::new(8)
+        ),
+        bv(7).into()
     );
     assert_eq!(
-        state
-            .memory
-            .get_value(
-                &Data::Pointer(PointerDomain::new(new_id("time0", "callee"), bv(-16))),
-                ByteSize::new(8)
-            )
-            .unwrap(),
+        state.memory.get_value(
+            &Data::from_target(new_id("time0", "callee"), bv(-16)),
+            ByteSize::new(8)
+        ),
         Data::new_top(ByteSize::new(8))
     );
 
@@ -159,18 +146,18 @@ fn handle_store() {
     let stack_id = new_id("time0", "RSP");
     assert_eq!(
         state.eval(&Var(register("RSP"))),
-        Data::Pointer(PointerDomain::new(stack_id.clone(), bv(0)))
+        Data::from_target(stack_id.clone(), bv(0))
     );
 
     state.handle_register_assign(&register("RSP"), &reg_sub("RSP", 32));
     assert_eq!(
         state.eval(&Var(register("RSP"))),
-        Data::Pointer(PointerDomain::new(stack_id.clone(), bv(-32)))
+        Data::from_target(stack_id.clone(), bv(-32))
     );
     state.handle_register_assign(&register("RSP"), &reg_add("RSP", -8));
     assert_eq!(
         state.eval(&Var(register("RSP"))),
-        Data::Pointer(PointerDomain::new(stack_id.clone(), bv(-40)))
+        Data::from_target(stack_id.clone(), bv(-40))
     );
 
     state
@@ -245,19 +232,19 @@ fn handle_caller_stack_stores() {
         )
         .unwrap();
     // check that it was saved in all caller objects and not on the callee stack object
-    let pointer = PointerDomain::new(new_id("time0", "RSP"), bv(8)).into();
+    let pointer = Data::from_target(new_id("time0", "RSP"), bv(8));
     assert_eq!(
-        state.memory.get_value(&pointer, ByteSize::new(8)).unwrap(),
+        state.memory.get_value(&pointer, ByteSize::new(8)),
         Data::new_top(ByteSize::new(8))
     );
-    let pointer = PointerDomain::new(new_id("caller1", "RSP"), bv(8)).into();
+    let pointer = Data::from_target(new_id("caller1", "RSP"), bv(8));
     assert_eq!(
-        state.memory.get_value(&pointer, ByteSize::new(8)).unwrap(),
+        state.memory.get_value(&pointer, ByteSize::new(8)),
         bv(42).into()
     );
-    let pointer = PointerDomain::new(new_id("caller2", "RSP"), bv(8)).into();
+    let pointer = Data::from_target(new_id("caller2", "RSP"), bv(8));
     assert_eq!(
-        state.memory.get_value(&pointer, ByteSize::new(8)).unwrap(),
+        state.memory.get_value(&pointer, ByteSize::new(8)),
         bv(42).into()
     );
     // accessing through a positive stack register offset should yield the value of the caller stacks
@@ -276,7 +263,7 @@ fn clear_parameters_on_the_stack_on_extern_calls() {
     let mut state = State::new(&register("RSP"), Tid::new("time0"));
     state.register.insert(
         register("RSP"),
-        PointerDomain::new(new_id("time0", "RSP"), bv(-20)).into(),
+        Data::from_target(new_id("time0", "RSP"), bv(-20)),
     );
     // write something onto the stack
     state
@@ -303,9 +290,9 @@ fn clear_parameters_on_the_stack_on_extern_calls() {
         has_var_args: false,
     };
     // check the value before
-    let pointer = PointerDomain::new(new_id("time0", "RSP"), bv(-12)).into();
+    let pointer = Data::from_target(new_id("time0", "RSP"), bv(-12));
     assert_eq!(
-        state.memory.get_value(&pointer, ByteSize::new(8)).unwrap(),
+        state.memory.get_value(&pointer, ByteSize::new(8)),
         bv(42).into()
     );
     // clear stack parameter
@@ -314,7 +301,7 @@ fn clear_parameters_on_the_stack_on_extern_calls() {
         .unwrap();
     // check the value after
     assert_eq!(
-        state.memory.get_value(&pointer, ByteSize::new(8)).unwrap(),
+        state.memory.get_value(&pointer, ByteSize::new(8)),
         Data::new_top(ByteSize::new(8))
     );
 }
@@ -333,7 +320,7 @@ fn merge_callee_stack_to_caller_stack() {
     // check the state before merging to the caller stack
     assert_eq!(
         state.register.get(&register("RSP")).unwrap(),
-        &PointerDomain::new(new_id("callee", "RSP"), bv(0)).into()
+        &Data::from_target(new_id("callee", "RSP"), bv(0))
     );
     assert_eq!(state.memory.get_all_object_ids().len(), 2);
     // check state after merging to the caller stack
@@ -344,7 +331,7 @@ fn merge_callee_stack_to_caller_stack() {
     );
     assert_eq!(
         state.register.get(&register("RSP")).unwrap(),
-        &PointerDomain::new(new_id("callsite", "RSP"), bv(52)).into()
+        &Data::from_target(new_id("callsite", "RSP"), bv(52))
     );
     assert_eq!(state.memory.get_all_object_ids().len(), 1);
 }
@@ -378,10 +365,8 @@ fn reachable_ids_under_and_overapproximation() {
     let mut state = State::new(&register("RSP"), Tid::new("func_tid"));
     let stack_id = new_id("func_tid", "RSP");
     let heap_id = new_id("heap_obj", "RAX");
-    let stack_address: Data =
-        PointerDomain::new(stack_id.clone(), Bitvector::from_i64(-8).into()).into();
-    let heap_address: Data =
-        PointerDomain::new(heap_id.clone(), Bitvector::from_i64(0).into()).into();
+    let stack_address: Data = Data::from_target(stack_id.clone(), Bitvector::from_i64(-8).into());
+    let heap_address: Data = Data::from_target(heap_id.clone(), Bitvector::from_i64(0).into());
     // Add the heap object to the state, so that it can be recursively searched.
     state.memory.add_abstract_object(
         heap_id.clone(),
@@ -408,8 +393,8 @@ fn reachable_ids_under_and_overapproximation() {
     );
 
     let _ = state.store_value(
-        &PointerDomain::new(stack_id.clone(), ValueDomain::new_top(ByteSize::new(8))).into(),
-        &Data::Value(Bitvector::from_i64(42).into()),
+        &Data::from_target(stack_id.clone(), ValueDomain::new_top(ByteSize::new(8))),
+        &Bitvector::from_i64(42).into(),
         &global_memory,
     );
     assert_eq!(
@@ -435,12 +420,12 @@ fn global_mem_access() {
         state
             .load_value(&address_expr, ByteSize::new(4), &global_memory)
             .unwrap(),
-        DataDomain::Value(Bitvector::from_u32(0xb3b2b1b0).into()) // note that we read in little-endian byte order
+        Bitvector::from_u32(0xb3b2b1b0).into() // note that we read in little-endian byte order
     );
     assert!(state
         .write_to_address(
             &address_expr,
-            &DataDomain::Top(ByteSize::new(4)),
+            &DataDomain::new_top(ByteSize::new(4)),
             &global_memory
         )
         .is_err());
@@ -451,12 +436,12 @@ fn global_mem_access() {
         state
             .load_value(&address_expr, ByteSize::new(4), &global_memory)
             .unwrap(),
-        DataDomain::Top(ByteSize::new(4))
+        DataDomain::new_top(ByteSize::new(4))
     );
     assert!(state
         .write_to_address(
             &address_expr,
-            &DataDomain::Top(ByteSize::new(4)),
+            &DataDomain::new_top(ByteSize::new(4)),
             &global_memory
         )
         .is_ok());
@@ -469,7 +454,7 @@ fn global_mem_access() {
     assert!(state
         .write_to_address(
             &address_expr,
-            &DataDomain::Top(ByteSize::new(4)),
+            &DataDomain::new_top(ByteSize::new(4)),
             &global_memory
         )
         .is_err());
@@ -507,16 +492,16 @@ fn specialize_by_expression_results() {
     );
     state.set_register(
         &register("RAX"),
-        PointerDomain::new(abstract_id.clone(), IntervalDomain::mock(0, 50)).into(),
+        Data::from_target(abstract_id.clone(), IntervalDomain::mock(0, 50)),
     );
     let x = state.specialize_by_expression_result(
         &Expression::var("RAX", 8),
-        PointerDomain::new(abstract_id.clone(), IntervalDomain::mock(20, 70)).into(),
+        Data::from_target(abstract_id.clone(), IntervalDomain::mock(20, 70)),
     );
     assert!(x.is_ok());
     assert_eq!(
         state.get_register(&register("RAX")),
-        PointerDomain::new(abstract_id, IntervalDomain::mock(20, 50)).into()
+        Data::from_target(abstract_id, IntervalDomain::mock(20, 50))
     );
 
     // Expr = Const
@@ -1015,11 +1000,11 @@ fn specialize_by_unsigned_comparison_op() {
 #[test]
 fn stack_pointer_with_nonnegative_offset() {
     let state = State::new(&register("RSP"), Tid::new("func_tid"));
-    let pointer = PointerDomain::new(state.stack_id.clone(), Bitvector::from_i64(-1).into()).into();
+    let pointer = Data::from_target(state.stack_id.clone(), Bitvector::from_i64(-1).into());
     assert!(!state.is_stack_pointer_with_nonnegative_offset(&pointer));
-    let pointer = PointerDomain::new(state.stack_id.clone(), Bitvector::from_i64(5).into()).into();
+    let pointer = Data::from_target(state.stack_id.clone(), Bitvector::from_i64(5).into());
     assert!(state.is_stack_pointer_with_nonnegative_offset(&pointer));
-    let pointer = PointerDomain::new(state.stack_id.clone(), IntervalDomain::mock(2, 3)).into();
+    let pointer = Data::from_target(state.stack_id.clone(), IntervalDomain::mock(2, 3));
     assert!(!state.is_stack_pointer_with_nonnegative_offset(&pointer)); // The offset is not a constant
 }
 
@@ -1041,16 +1026,16 @@ fn out_of_bounds_access_recognition() {
         .memory
         .set_upper_index_bound(&heap_obj_id, &Bitvector::from_u64(7).into());
 
-    let pointer = PointerDomain::new(heap_obj_id.clone(), Bitvector::from_i64(-1).into()).into();
+    let pointer = Data::from_target(heap_obj_id.clone(), Bitvector::from_i64(-1).into());
     assert!(state.pointer_contains_out_of_bounds_target(&pointer, &global_data));
-    let pointer = PointerDomain::new(heap_obj_id.clone(), Bitvector::from_u64(0).into()).into();
+    let pointer = Data::from_target(heap_obj_id.clone(), Bitvector::from_u64(0).into());
     assert!(!state.pointer_contains_out_of_bounds_target(&pointer, &global_data));
-    let pointer = PointerDomain::new(heap_obj_id.clone(), Bitvector::from_u64(7).into()).into();
+    let pointer = Data::from_target(heap_obj_id.clone(), Bitvector::from_u64(7).into());
     assert!(!state.pointer_contains_out_of_bounds_target(&pointer, &global_data));
-    let pointer = PointerDomain::new(heap_obj_id.clone(), Bitvector::from_u64(8).into()).into();
+    let pointer = Data::from_target(heap_obj_id.clone(), Bitvector::from_u64(8).into());
     assert!(state.pointer_contains_out_of_bounds_target(&pointer, &global_data));
 
-    let address = PointerDomain::new(heap_obj_id.clone(), Bitvector::from_u64(0).into()).into();
+    let address = Data::from_target(heap_obj_id.clone(), Bitvector::from_u64(0).into());
     state.set_register(&Variable::mock("RAX", 8), address);
     let load_def = Def::load(
         "tid",
@@ -1059,13 +1044,13 @@ fn out_of_bounds_access_recognition() {
     );
     assert!(!state.contains_out_of_bounds_mem_access(&load_def.term, &global_data));
 
-    let address = PointerDomain::new(heap_obj_id.clone(), Bitvector::from_u64(0).into()).into();
+    let address = Data::from_target(heap_obj_id.clone(), Bitvector::from_u64(0).into());
     state.set_register(&Variable::mock("RAX", 8), address);
     assert!(!state.contains_out_of_bounds_mem_access(&load_def.term, &global_data));
-    let address = PointerDomain::new(heap_obj_id.clone(), Bitvector::from_u64(1).into()).into();
+    let address = Data::from_target(heap_obj_id.clone(), Bitvector::from_u64(1).into());
     state.set_register(&Variable::mock("RAX", 8), address);
     assert!(state.contains_out_of_bounds_mem_access(&load_def.term, &global_data));
-    let address = PointerDomain::new(state.stack_id.clone(), Bitvector::from_u64(8).into()).into();
+    let address = Data::from_target(state.stack_id.clone(), Bitvector::from_u64(8).into());
     state.set_register(&Variable::mock("RAX", 8), address);
     assert!(!state.contains_out_of_bounds_mem_access(&load_def.term, &global_data));
 }
@@ -1076,12 +1061,12 @@ fn specialize_pointer_comparison() {
     let interval = IntervalDomain::mock(-5, 10);
     state.set_register(
         &register("RAX"),
-        PointerDomain::new(new_id("func_tid", "RSP"), interval.into()).into(),
+        Data::from_target(new_id("func_tid", "RSP"), interval.into()),
     );
     let interval = IntervalDomain::mock(20, 20);
     state.set_register(
         &register("RBX"),
-        PointerDomain::new(new_id("func_tid", "RSP"), interval.into()).into(),
+        Data::from_target(new_id("func_tid", "RSP"), interval.into()),
     );
     let expression = Expression::BinOp {
         op: BinOpType::IntEqual,
@@ -1094,7 +1079,7 @@ fn specialize_pointer_comparison() {
         .is_err());
     let specialized_interval = IntervalDomain::mock_with_bounds(None, -5, 10, Some(19));
     let specialized_pointer =
-        PointerDomain::new(new_id("func_tid", "RSP"), specialized_interval.into()).into();
+        Data::from_target(new_id("func_tid", "RSP"), specialized_interval.into());
     assert!(state
         .specialize_by_expression_result(&expression, Bitvector::from_i8(0).into())
         .is_ok());

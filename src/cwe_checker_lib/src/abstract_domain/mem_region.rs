@@ -185,7 +185,7 @@ impl<T: AbstractDomain + SizedDomain + HasTop + std::fmt::Debug> MemRegionData<T
         for (pos_left, elem_left) in self.values.iter() {
             if let Some((_pos_right, elem_right)) = other.values.get_key_value(pos_left) {
                 if elem_left.bytesize() == elem_right.bytesize() {
-                    let merged_val = elem_left.merge(&elem_right);
+                    let merged_val = elem_left.merge(elem_right);
                     if !merged_val.is_top() {
                         // we discard top()-values, as they don't contain information
                         merged_values.insert(*pos_left, merged_val);

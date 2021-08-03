@@ -251,29 +251,6 @@ impl IntervalDomain {
         }
     }
 
-    /// Compute the intersection of two intervals.
-    /// Return an error if the intersection is empty.
-    pub fn intersect(&self, other: &Self) -> Result<Self, Error> {
-        let mut intersected_domain: IntervalDomain =
-            self.interval.signed_intersect(&other.interval)?.into();
-        intersected_domain.update_widening_lower_bound(&self.widening_lower_bound);
-        intersected_domain.update_widening_lower_bound(&other.widening_lower_bound);
-        intersected_domain.update_widening_upper_bound(&self.widening_upper_bound);
-        intersected_domain.update_widening_upper_bound(&other.widening_upper_bound);
-        intersected_domain.widening_delay =
-            std::cmp::max(self.widening_delay, other.widening_delay);
-
-        if let Ok(interval_length) = (intersected_domain.interval.end.clone()
-            - &intersected_domain.interval.start)
-            .try_to_u64()
-        {
-            intersected_domain.widening_delay =
-                std::cmp::min(intersected_domain.widening_delay, interval_length);
-        }
-
-        Ok(intersected_domain)
-    }
-
     /// Check whether all values in the interval are representable by bitvectors of the given `size`.
     /// Does not check whether this is also true for the widening hints.
     pub fn fits_into_size(&self, size: ByteSize) -> bool {
@@ -502,6 +479,29 @@ impl SpecializeByConditional for IntervalDomain {
         } else {
             Ok(self)
         }
+    }
+
+    /// Compute the intersection of two intervals.
+    /// Return an error if the intersection is empty.
+    fn intersect(self, other: &Self) -> Result<Self, Error> {
+        let mut intersected_domain: IntervalDomain =
+            self.interval.signed_intersect(&other.interval)?.into();
+        intersected_domain.update_widening_lower_bound(&self.widening_lower_bound);
+        intersected_domain.update_widening_lower_bound(&other.widening_lower_bound);
+        intersected_domain.update_widening_upper_bound(&self.widening_upper_bound);
+        intersected_domain.update_widening_upper_bound(&other.widening_upper_bound);
+        intersected_domain.widening_delay =
+            std::cmp::max(self.widening_delay, other.widening_delay);
+
+        if let Ok(interval_length) = (intersected_domain.interval.end.clone()
+            - &intersected_domain.interval.start)
+            .try_to_u64()
+        {
+            intersected_domain.widening_delay =
+                std::cmp::min(intersected_domain.widening_delay, interval_length);
+        }
+
+        Ok(intersected_domain)
     }
 }
 

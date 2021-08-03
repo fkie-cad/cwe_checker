@@ -48,11 +48,10 @@ impl State {
         let mut register: BTreeMap<Variable, Data> = BTreeMap::new();
         register.insert(
             stack_register.clone(),
-            PointerDomain::new(
+            Data::from_target(
                 stack_id.clone(),
                 Bitvector::zero(apint::BitWidth::from(stack_register.size)).into(),
-            )
-            .into(),
+            ),
         );
         State {
             register,
@@ -153,7 +152,7 @@ impl State {
         // get all referenced IDs
         let mut referenced_ids = BTreeSet::new();
         for (_reg_name, data) in self.register.iter() {
-            referenced_ids.append(&mut data.referenced_ids());
+            referenced_ids.extend(data.referenced_ids().cloned());
         }
         referenced_ids.insert(self.stack_id.clone());
         referenced_ids.append(&mut self.caller_stack_ids.clone());
@@ -239,7 +238,7 @@ impl State {
     /// an error with the list of possibly already freed objects is returned.
     pub fn mark_mem_object_as_freed(
         &mut self,
-        object_pointer: &PointerDomain<ValueDomain>,
+        object_pointer: &Data,
     ) -> Result<(), Vec<(AbstractIdentifier, Error)>> {
         self.memory.mark_mem_object_as_freed(object_pointer)
     }
@@ -263,6 +262,9 @@ impl State {
         ids_to_remove.remove(caller_id);
         for register_value in self.register.values_mut() {
             register_value.remove_ids(&ids_to_remove);
+            if register_value.is_empty() {
+                *register_value = register_value.top();
+            }
         }
         self.memory.remove_ids(&ids_to_remove);
         self.caller_stack_ids = BTreeSet::new();
@@ -341,31 +343,7 @@ impl State {
         result: Data,
     ) -> Result<(), Error> {
         if let Expression::Var(var) = expression {
-            match (self.eval(expression), result) {
-                (Data::Value(old_value), Data::Value(result_value)) => {
-                    self.set_register(var, old_value.intersect(&result_value)?.into())
-                }
-                (Data::Pointer(old_pointer), Data::Pointer(result_pointer)) => {
-                    let mut specialized_targets = BTreeMap::new();
-                    for (id, offset) in result_pointer.targets() {
-                        if let Some(old_offset) = old_pointer.targets().get(id) {
-                            if let Ok(specialized_offset) = old_offset.intersect(offset) {
-                                specialized_targets.insert(id.clone(), specialized_offset);
-                            }
-                        }
-                    }
-                    if !specialized_targets.is_empty() {
-                        self.set_register(
-                            var,
-                            PointerDomain::with_targets(specialized_targets).into(),
-                        );
-                    } else {
-                        return Err(anyhow!("Pointer with no targets is unsatisfiable"));
-                    }
-                }
-                (Data::Top(_), result) => self.set_register(var, result),
-                _ => (),
-            }
+            self.set_register(var, self.eval(expression).intersect(&result)?);
             Ok(())
         } else if let Expression::BinOp { op, lhs, rhs } = expression {
             self.specialize_by_binop_expression_result(op, lhs, rhs, result)
@@ -413,7 +391,7 @@ impl State {
                     arg,
                 } => {
                     if *low_byte == ByteSize::new(0) {
-                        if let Data::Value(arg_value) = self.eval(expression) {
+                        if let Some(arg_value) = self.eval(expression).get_if_absolute_value() {
                             if arg_value.fits_into_size(*size) {
                                 let intermediate_result =
                                     result.cast(CastOpType::IntSExt, arg.bytesize());
@@ -598,45 +576,42 @@ impl State {
         lhs: &Expression,
         rhs: &Expression,
     ) -> Result<(), Error> {
-        if let (Data::Pointer(lhs_pointer), Data::Pointer(rhs_pointer)) =
-            (self.eval(lhs), self.eval(rhs))
-        {
-            match (
-                lhs_pointer.unwrap_if_unique_target(),
-                rhs_pointer.unwrap_if_unique_target(),
-            ) {
-                (Some((lhs_id, lhs_offset)), Some((rhs_id, rhs_offset))) if lhs_id == rhs_id => {
-                    if !(self.memory.is_unique_object(lhs_id)?) {
-                        // Since the pointers may or may not point to different instances referenced by the same ID we cannot compare them.
-                        return Ok(());
+        let (lhs_pointer, rhs_pointer) = (self.eval(lhs), self.eval(rhs));
+        match (
+            lhs_pointer.get_if_unique_target(),
+            rhs_pointer.get_if_unique_target(),
+        ) {
+            (Some((lhs_id, lhs_offset)), Some((rhs_id, rhs_offset))) if lhs_id == rhs_id => {
+                if !(self.memory.is_unique_object(lhs_id)?) {
+                    // Since the pointers may or may not point to different instances referenced by the same ID we cannot compare them.
+                    return Ok(());
+                }
+                if *op == BinOpType::IntEqual {
+                    let specialized_offset = lhs_offset.clone().intersect(rhs_offset)?;
+                    let specialized_domain: Data =
+                        Data::from_target(lhs_id.clone(), specialized_offset);
+                    self.specialize_by_expression_result(lhs, specialized_domain.clone())?;
+                    self.specialize_by_expression_result(rhs, specialized_domain)?;
+                } else if *op == BinOpType::IntNotEqual {
+                    if let Ok(rhs_offset_bitvec) = rhs_offset.try_to_bitvec() {
+                        let new_lhs_offset =
+                            lhs_offset.clone().add_not_equal_bound(&rhs_offset_bitvec)?;
+                        self.specialize_by_expression_result(
+                            lhs,
+                            Data::from_target(lhs_id.clone(), new_lhs_offset),
+                        )?;
                     }
-                    if *op == BinOpType::IntEqual {
-                        let specialized_offset = lhs_offset.intersect(rhs_offset)?;
-                        let specialized_domain: Data =
-                            PointerDomain::new(lhs_id.clone(), specialized_offset).into();
-                        self.specialize_by_expression_result(lhs, specialized_domain.clone())?;
-                        self.specialize_by_expression_result(rhs, specialized_domain)?;
-                    } else if *op == BinOpType::IntNotEqual {
-                        if let Ok(rhs_offset_bitvec) = rhs_offset.try_to_bitvec() {
-                            let new_lhs_offset =
-                                lhs_offset.clone().add_not_equal_bound(&rhs_offset_bitvec)?;
-                            self.specialize_by_expression_result(
-                                lhs,
-                                PointerDomain::new(lhs_id.clone(), new_lhs_offset).into(),
-                            )?;
-                        }
-                        if let Ok(lhs_offset_bitvec) = lhs_offset.try_to_bitvec() {
-                            let new_rhs_offset =
-                                rhs_offset.clone().add_not_equal_bound(&lhs_offset_bitvec)?;
-                            self.specialize_by_expression_result(
-                                rhs,
-                                PointerDomain::new(rhs_id.clone(), new_rhs_offset).into(),
-                            )?;
-                        }
+                    if let Ok(lhs_offset_bitvec) = lhs_offset.try_to_bitvec() {
+                        let new_rhs_offset =
+                            rhs_offset.clone().add_not_equal_bound(&lhs_offset_bitvec)?;
+                        self.specialize_by_expression_result(
+                            rhs,
+                            Data::from_target(rhs_id.clone(), new_rhs_offset),
+                        )?;
                     }
                 }
-                _ => (), // Other cases not handled, since it depends on the meaning of pointer IDs, which may change in the future.
             }
+            _ => (), // Other cases not handled, since it depends on the meaning of pointer IDs, which may change in the future.
         }
         Ok(())
     }

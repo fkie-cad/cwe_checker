@@ -334,7 +334,7 @@ impl<'a> GraphBuilder<'a> {
                     }
                 } else {
                     let mut call_source_node: Option<NodeIndex> = None;
-                    if let Some((target_node, _)) = self.call_targets.get(&target) {
+                    if let Some((target_node, _)) = self.call_targets.get(target) {
                         let (target_block, target_sub) = match self.graph[*target_node] {
                             Node::BlkStart(target_block, target_sub) => (target_block, target_sub),
                             _ => panic!(),

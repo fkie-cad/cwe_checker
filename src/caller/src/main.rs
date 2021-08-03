@@ -137,7 +137,7 @@ fn run_with_ghidra(args: &CmdlineArgs) {
 
     // Generate the representation of the runtime memory image of the binary
     let mut runtime_memory_image = if let Some(bare_metal_config) = bare_metal_config_opt.as_ref() {
-        RuntimeMemoryImage::new_from_bare_metal(&binary, &bare_metal_config).unwrap_or_else(|err| {
+        RuntimeMemoryImage::new_from_bare_metal(&binary, bare_metal_config).unwrap_or_else(|err| {
             panic!("Error while generating runtime memory image: {}", err);
         })
     } else {

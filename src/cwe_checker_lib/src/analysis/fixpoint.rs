@@ -132,7 +132,7 @@ impl<T: Context> Computation<T> {
 
     /// Get the value of a node.
     pub fn get_node_value(&self, node: NodeIndex) -> Option<&T::NodeValue> {
-        if let Some(ref value) = self.node_values.get(&node) {
+        if let Some(value) = self.node_values.get(&node) {
             Some(value)
         } else {
             self.default_value.as_ref()

@@ -1,6 +1,6 @@
 use petgraph::graph::NodeIndex;
 
-use crate::abstract_domain::{DataDomain, IntervalDomain, PointerDomain};
+use crate::abstract_domain::IntervalDomain;
 use crate::analysis::pointer_inference::{Data, PointerInference as PointerInferenceComputation};
 use crate::intermediate_representation::{
     Arg, BinOpType, Bitvector, ByteSize, CallingConvention, Expression, ExternSymbol, Tid, Variable,
@@ -193,8 +193,7 @@ fn tainting_user_input_symbol_parameters() {
     format_string_index.insert("scanf".to_string(), 0);
 
     let global_address = Bitvector::from_str_radix(16, "500c").unwrap();
-    let string_address =
-        DataDomain::Value(IntervalDomain::new(global_address.clone(), global_address));
+    let string_address = IntervalDomain::new(global_address.clone(), global_address).into();
 
     let mut pi_result_state = pi_results
         .get_node_value(call_source_node)
@@ -217,7 +216,7 @@ fn tainting_user_input_symbol_parameters() {
                 })),
                 rhs: Box::new(Expression::Const(Bitvector::from_u64(0))),
             },
-            &Data::Pointer(PointerDomain::new(setup.pi_state.stack_id.clone(), bv(-8))),
+            &Data::from_target(setup.pi_state.stack_id.clone(), bv(-8)),
             &mem_image,
         )
         .expect("Failed to write to address.");
@@ -294,7 +293,7 @@ fn processing_scanf() {
                 })),
                 rhs: Box::new(Expression::Const(Bitvector::from_u64(0))),
             },
-            &Data::Pointer(PointerDomain::new(setup.pi_state.stack_id.clone(), bv(-8))),
+            &Data::from_target(setup.pi_state.stack_id.clone(), bv(-8)),
             context.runtime_memory_image,
         )
         .expect("Failed to write to address.");
@@ -349,7 +348,7 @@ fn processing_sscanf() {
                 })),
                 rhs: Box::new(Expression::Const(Bitvector::from_u64(0))),
             },
-            &Data::Pointer(PointerDomain::new(setup.pi_state.stack_id.clone(), bv(-8))),
+            &Data::from_target(setup.pi_state.stack_id.clone(), bv(-8)),
             context.runtime_memory_image,
         )
         .expect("Failed to write to address.");
@@ -418,7 +417,7 @@ fn tainting_function_arguments() {
                 })),
                 rhs: Box::new(Expression::Const(Bitvector::from_u64(24))),
             },
-            &Data::Pointer(PointerDomain::new(setup.pi_state.stack_id.clone(), bv(32))),
+            &Data::from_target(setup.pi_state.stack_id.clone(), bv(32)),
             context.runtime_memory_image,
         )
         .expect("Failed to write to address.");
@@ -431,7 +430,7 @@ fn tainting_function_arguments() {
     );
 
     assert!(setup.state.address_points_to_taint(
-        Data::Pointer(PointerDomain::new(setup.pi_state.stack_id.clone(), bv(32))),
+        Data::from_target(setup.pi_state.stack_id.clone(), bv(32)),
         &setup.pi_state
     ));
 }

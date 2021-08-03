@@ -50,20 +50,16 @@ impl AbstractObjectList {
     /// I.e. objects representing more than one actual object (e.g. an array of object) will not get reported,
     /// even if their state is unknown and `report_unknown_states` is `true`.
     pub fn is_dangling_pointer(&self, address: &Data, report_unknown_states: bool) -> bool {
-        match address {
-            Data::Value(_) | Data::Top(_) => (),
-            Data::Pointer(pointer) => {
-                for id in pointer.ids() {
-                    let (object, _offset_id) = self.objects.get(id).unwrap();
-                    match (report_unknown_states, object.get_state()) {
-                        (_, ObjectState::Dangling) => return true,
-                        (true, ObjectState::Unknown) => {
-                            if object.is_unique {
-                                return true;
-                            }
+        for id in address.referenced_ids() {
+            if let Some((object, _offset_id)) = self.objects.get(id) {
+                match (report_unknown_states, object.get_state()) {
+                    (_, ObjectState::Dangling) => return true,
+                    (true, ObjectState::Unknown) => {
+                        if object.is_unique {
+                            return true;
                         }
-                        _ => (),
                     }
+                    _ => (),
                 }
             }
         }
@@ -75,15 +71,13 @@ impl AbstractObjectList {
     /// whose state is either dangling or unknown,
     /// as flagged.
     pub fn mark_dangling_pointer_targets_as_flagged(&mut self, address: &Data) {
-        if let Data::Pointer(pointer) = address {
-            for id in pointer.ids() {
-                let (object, _) = self.objects.get_mut(id).unwrap();
-                if matches!(
-                    object.get_state(),
-                    ObjectState::Unknown | ObjectState::Dangling
-                ) {
-                    object.set_state(ObjectState::Flagged);
-                }
+        for id in address.referenced_ids() {
+            let (object, _) = self.objects.get_mut(id).unwrap();
+            if matches!(
+                object.get_state(),
+                ObjectState::Unknown | ObjectState::Dangling
+            ) {
+                object.set_state(ObjectState::Flagged);
             }
         }
     }
@@ -99,27 +93,26 @@ impl AbstractObjectList {
         size: ByteSize,
         global_data: &RuntimeMemoryImage,
     ) -> bool {
-        match address {
-            Data::Value(value) => {
-                if let Ok((start, end)) = value.try_to_offset_interval() {
-                    if start < 0 || end < start {
-                        return true;
-                    }
-                    return global_data
-                        .is_interval_readable(start as u64, end as u64 + u64::from(size) - 1)
-                        .is_err();
+        if let Some(value) = address.get_absolute_value() {
+            if let Ok((start, end)) = value.try_to_offset_interval() {
+                if start < 0 || end < start {
+                    return true;
+                }
+                if global_data
+                    .is_interval_readable(start as u64, end as u64 + u64::from(size) - 1)
+                    .is_err()
+                {
+                    return true;
                 }
             }
-            Data::Top(_) => (),
-            Data::Pointer(pointer) => {
-                for (id, offset) in pointer.targets() {
-                    let (object, base_offset) = self.objects.get(id).unwrap();
-                    let adjusted_offset = offset.clone() + base_offset.clone();
-                    if !adjusted_offset.is_top()
-                        && !object.access_contained_in_bounds(&adjusted_offset, size)
-                    {
-                        return true;
-                    }
+        }
+        for (id, offset) in address.get_relative_values() {
+            if let Some((object, base_offset)) = self.objects.get(id) {
+                let adjusted_offset = offset.clone() + base_offset.clone();
+                if !adjusted_offset.is_top()
+                    && !object.access_contained_in_bounds(&adjusted_offset, size)
+                {
+                    return true;
                 }
             }
         }
@@ -155,57 +148,53 @@ impl AbstractObjectList {
     /// Get the value at a given address.
     /// If the address is not unique, merge the value of all possible addresses.
     ///
-    /// Returns an error if the address is a `Data::Value`, i.e. not a pointer.
-    pub fn get_value(&self, address: &Data, size: ByteSize) -> Result<Data, Error> {
-        match address {
-            Data::Value(_) => Err(anyhow!("Load from non-pointer value")),
-            Data::Top(_) => Ok(Data::new_top(size)),
-            Data::Pointer(pointer) => {
-                let mut merged_value: Option<Data> = None;
-                for (id, offset_pointer_domain) in pointer.targets() {
-                    let (object, offset_identifier) = self.objects.get(id).unwrap();
-                    let offset = offset_pointer_domain.clone() + offset_identifier.clone();
-                    if let Ok(concrete_offset) = offset.try_to_bitvec() {
-                        let value = object.get_value(concrete_offset, size);
-                        merged_value = match merged_value {
-                            Some(accum) => Some(accum.merge(&value)),
-                            None => Some(value),
-                        };
-                    } else {
-                        merged_value = Some(Data::new_top(size));
-                        break;
-                    }
+    /// This function only checks for relative targets and not for absolute addresses.
+    /// If the address does not contain any relative targets an empty value is returned.
+    pub fn get_value(&self, address: &Data, size: ByteSize) -> Data {
+        let mut merged_value = Data::new_empty(size);
+        for (id, offset_pointer) in address.get_relative_values() {
+            if let Some((object, offset_identifier)) = self.objects.get(id) {
+                let offset = offset_pointer.clone() + offset_identifier.clone();
+                if let Ok(concrete_offset) = offset.try_to_bitvec() {
+                    let value = object.get_value(concrete_offset, size);
+                    merged_value = merged_value.merge(&value);
+                } else {
+                    merged_value.set_contains_top_flag();
                 }
-                merged_value.ok_or_else(|| panic!("Pointer without targets encountered."))
+            } else {
+                merged_value.set_contains_top_flag();
             }
         }
+        if address.contains_top() {
+            merged_value.set_contains_top_flag();
+        }
+        merged_value
     }
 
     /// Set the value at a given address.
     ///
     /// If the address has more than one target,
     /// we merge-write the value to all targets.
-    pub fn set_value(
-        &mut self,
-        pointer: PointerDomain<ValueDomain>,
-        value: Data,
-    ) -> Result<(), Error> {
-        let targets = pointer.targets();
-        assert!(!targets.is_empty());
-        if targets.len() == 1 {
-            let (id, pointer_offset) = targets.iter().next().unwrap();
-            let (object, id_offset) = self.objects.get_mut(id).unwrap();
-            let adjusted_offset = pointer_offset.clone() + id_offset.clone();
-            object.set_value(value, &adjusted_offset)
-        } else {
-            // There is more than one object that the pointer may write to.
-            // We merge-write to all possible targets
-            for (id, offset) in targets {
-                let (object, object_offset) = self.objects.get_mut(id).unwrap();
-                let adjusted_offset = offset.clone() + object_offset.clone();
-                object.merge_value(value.clone(), &adjusted_offset);
+    pub fn set_value(&mut self, pointer: Data, value: Data) -> Result<(), Error> {
+        let targets = pointer.get_relative_values();
+        match targets.len() {
+            0 => Ok(()),
+            1 => {
+                let (id, pointer_offset) = targets.iter().next().unwrap();
+                let (object, id_offset) = self.objects.get_mut(id).unwrap();
+                let adjusted_offset = pointer_offset.clone() + id_offset.clone();
+                object.set_value(value, &adjusted_offset)
             }
-            Ok(())
+            _ => {
+                // There is more than one object that the pointer may write to.
+                // We merge-write to all possible targets
+                for (id, offset) in targets {
+                    let (object, object_offset) = self.objects.get_mut(id).unwrap();
+                    let adjusted_offset = offset.clone() + object_offset.clone();
+                    object.merge_value(value.clone(), &adjusted_offset);
+                }
+                Ok(())
+            }
         }
     }
 
@@ -309,9 +298,9 @@ impl AbstractObjectList {
     /// Returns either a non-empty list of detected errors (like possible double frees) or `OK(())` if no errors were found.
     pub fn mark_mem_object_as_freed(
         &mut self,
-        object_pointer: &PointerDomain<ValueDomain>,
+        object_pointer: &Data,
     ) -> Result<(), Vec<(AbstractIdentifier, Error)>> {
-        let ids: Vec<AbstractIdentifier> = object_pointer.ids().cloned().collect();
+        let ids: Vec<AbstractIdentifier> = object_pointer.referenced_ids().cloned().collect();
         let mut possible_double_free_ids = Vec::new();
         if ids.len() > 1 {
             for id in ids {
@@ -320,11 +309,9 @@ impl AbstractObjectList {
                 }
             }
         } else if let Some(id) = ids.get(0) {
-            if let Err(error) = self.objects.get_mut(&id).unwrap().0.mark_as_freed() {
+            if let Err(error) = self.objects.get_mut(id).unwrap().0.mark_as_freed() {
                 possible_double_free_ids.push((id.clone(), error));
             }
-        } else {
-            panic!("Pointer without targets encountered")
         }
         if possible_double_free_ids.is_empty() {
             Ok(())
@@ -470,31 +457,25 @@ mod tests {
         assert_eq!(obj_list.objects.len(), 1);
         assert_eq!(obj_list.objects.values().next().unwrap().1, bv(0));
 
-        let pointer = PointerDomain::new(new_id("RSP".into()), bv(8));
-        obj_list
-            .set_value(pointer.clone(), Data::Value(bv(42)))
-            .unwrap();
+        let pointer = DataDomain::from_target(new_id("RSP".into()), bv(8));
+        obj_list.set_value(pointer.clone(), bv(42).into()).unwrap();
         assert_eq!(
-            obj_list
-                .get_value(&Data::Pointer(pointer.clone()), ByteSize::new(8))
-                .unwrap(),
-            Data::Value(bv(42))
+            obj_list.get_value(&pointer, ByteSize::new(8)),
+            bv(42).into()
         );
 
         let mut other_obj_list =
             AbstractObjectList::from_stack_id(new_id("RSP".into()), ByteSize::new(8));
-        let second_pointer = PointerDomain::new(new_id("RSP".into()), bv(-8));
+        let second_pointer = DataDomain::from_target(new_id("RSP".into()), bv(-8));
         other_obj_list
-            .set_value(pointer.clone(), Data::Value(bv(42)))
+            .set_value(pointer.clone(), bv(42).into())
             .unwrap();
         other_obj_list
-            .set_value(second_pointer.clone(), Data::Value(bv(35)))
+            .set_value(second_pointer.clone(), bv(35).into())
             .unwrap();
         assert_eq!(
-            other_obj_list
-                .get_value(&Data::Pointer(second_pointer.clone()), ByteSize::new(8))
-                .unwrap(),
-            Data::Value(bv(35))
+            other_obj_list.get_value(&second_pointer, ByteSize::new(8)),
+            bv(35).into()
         );
 
         other_obj_list.add_abstract_object(
@@ -503,51 +484,38 @@ mod tests {
             ObjectType::Heap,
             ByteSize::new(8),
         );
-        let heap_pointer = PointerDomain::new(new_id("RAX".into()), bv(8));
+        let heap_pointer = DataDomain::from_target(new_id("RAX".into()), bv(8));
         other_obj_list
-            .set_value(heap_pointer.clone(), Data::Value(bv(3)))
+            .set_value(heap_pointer.clone(), bv(3).into())
             .unwrap();
 
         let mut merged = obj_list.merge(&other_obj_list);
+        assert_eq!(merged.get_value(&pointer, ByteSize::new(8)), bv(42).into());
         assert_eq!(
-            merged
-                .get_value(&Data::Pointer(pointer.clone()), ByteSize::new(8))
-                .unwrap(),
-            Data::Value(bv(42))
-        );
-        assert_eq!(
-            merged
-                .get_value(&Data::Pointer(second_pointer.clone()), ByteSize::new(8))
-                .unwrap(),
+            merged.get_value(&second_pointer, ByteSize::new(8)),
             Data::new_top(ByteSize::new(8))
         );
         assert_eq!(
-            merged
-                .get_value(&Data::Pointer(heap_pointer.clone()), ByteSize::new(8))
-                .unwrap(),
-            Data::Value(bv(3))
+            merged.get_value(&heap_pointer, ByteSize::new(8)),
+            bv(3).into()
         );
         assert_eq!(merged.objects.len(), 2);
 
         merged
-            .set_value(pointer.merge(&heap_pointer), Data::Value(bv(3)))
+            .set_value(pointer.merge(&heap_pointer), bv(3).into())
             .unwrap();
         assert_eq!(
-            merged
-                .get_value(&Data::Pointer(pointer.clone()), ByteSize::new(8))
-                .unwrap(),
-            Data::Value(IntervalDomain::mock(3, 42).with_stride(39))
+            merged.get_value(&pointer, ByteSize::new(8)),
+            IntervalDomain::mock(3, 42).with_stride(39).into()
         );
         assert_eq!(
-            merged
-                .get_value(&Data::Pointer(heap_pointer.clone()), ByteSize::new(8))
-                .unwrap(),
-            Data::Value(bv(3))
+            merged.get_value(&heap_pointer, ByteSize::new(8)),
+            bv(3).into()
         );
         assert_eq!(merged.objects.len(), 2);
 
         other_obj_list
-            .set_value(pointer.clone(), Data::Pointer(heap_pointer.clone()))
+            .set_value(pointer.clone(), heap_pointer.clone())
             .unwrap();
         assert_eq!(
             other_obj_list
@@ -564,13 +532,11 @@ mod tests {
             new_id("RAX".into())
         );
 
-        let modified_heap_pointer = PointerDomain::new(new_id("ID2".into()), bv(8));
+        let modified_heap_pointer = DataDomain::from_target(new_id("ID2".into()), bv(8));
         other_obj_list.replace_abstract_id(&new_id("RAX".into()), &new_id("ID2".into()), &bv(0));
         assert_eq!(
-            other_obj_list
-                .get_value(&Data::Pointer(pointer.clone()), ByteSize::new(8))
-                .unwrap(),
-            Data::Pointer(modified_heap_pointer.clone())
+            other_obj_list.get_value(&pointer, ByteSize::new(8)),
+            modified_heap_pointer.clone()
         );
         assert_eq!(other_obj_list.objects.get(&new_id("RAX".into())), None);
         assert!(matches!(

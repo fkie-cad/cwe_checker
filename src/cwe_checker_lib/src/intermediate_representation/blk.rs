@@ -52,7 +52,7 @@ impl Term<Blk> {
             .indirect_jmp_targets
             .iter()
             .filter_map(|target| {
-                if known_block_tids.get(&target).is_some() {
+                if known_block_tids.get(target).is_some() {
                     Some(target.clone())
                 } else {
                     let error_msg =
