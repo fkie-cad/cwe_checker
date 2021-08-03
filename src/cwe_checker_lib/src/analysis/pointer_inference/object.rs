@@ -487,7 +487,7 @@ mod tests {
         target_map.insert(new_id("time_1", "RAX"), bv(20));
         target_map.insert(new_id("time_234", "RAX"), bv(30));
         target_map.insert(new_id("time_1", "RBX"), bv(40));
-        let pointer = DataDomain::from_target_map(target_map.clone());
+        let pointer = DataDomain::mock_from_target_map(target_map.clone());
         object.set_value(pointer, &bv(-15)).unwrap();
         assert_eq!(object.get_referenced_ids_overapproximation().len(), 3);
 
@@ -497,7 +497,7 @@ mod tests {
             &bv(10),
         );
         target_map.remove(&new_id("time_1", "RAX"));
-        let modified_pointer = DataDomain::from_target_map(target_map);
+        let modified_pointer = DataDomain::mock_from_target_map(target_map);
         assert_eq!(
             object.get_value(Bitvector::from_i64(-15), ByteSize::new(8)),
             modified_pointer
@@ -511,7 +511,7 @@ mod tests {
         let mut target_map = BTreeMap::new();
         target_map.insert(new_id("time_234", "RAX"), bv(30));
         target_map.insert(new_id("time_234", "RBX"), bv(50));
-        let modified_pointer = DataDomain::from_target_map(target_map);
+        let modified_pointer = DataDomain::mock_from_target_map(target_map);
         assert_eq!(
             object.get_value(Bitvector::from_i64(-15), ByteSize::new(8)),
             modified_pointer
@@ -526,7 +526,7 @@ mod tests {
         target_map.insert(new_id("time_1", "RAX"), bv(20));
         target_map.insert(new_id("time_234", "RAX"), bv(30));
         target_map.insert(new_id("time_1", "RBX"), bv(40));
-        let pointer = DataDomain::from_target_map(target_map.clone());
+        let pointer = DataDomain::mock_from_target_map(target_map.clone());
         object.set_value(pointer, &bv(-15)).unwrap();
         assert_eq!(object.get_referenced_ids_overapproximation().len(), 3);
 
