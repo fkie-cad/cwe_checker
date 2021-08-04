@@ -161,13 +161,18 @@ impl<'a> AnalysisResults<'a> {
 
     /// Compute the pointer inference analysis.
     /// The result gets returned, but not saved to the `AnalysisResults` struct itself.
-    pub fn compute_pointer_inference(&'a self, config: &serde_json::Value) -> PointerInference<'a> {
+    pub fn compute_pointer_inference(
+        &'a self,
+        config: &serde_json::Value,
+        print_stats: bool,
+    ) -> PointerInference<'a> {
         crate::analysis::pointer_inference::run(
             self.project,
             self.runtime_memory_image,
             self.control_flow_graph,
             serde_json::from_value(config.clone()).unwrap(),
             false,
+            print_stats,
         )
     }
 
