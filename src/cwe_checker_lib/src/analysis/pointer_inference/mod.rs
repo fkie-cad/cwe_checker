@@ -45,6 +45,7 @@ mod context;
 pub mod object;
 mod object_list;
 mod state;
+mod statistics;
 
 use context::Context;
 pub use state::State;
@@ -94,6 +95,7 @@ impl<'a> PointerInference<'a> {
         control_flow_graph: &'a Graph<'a>,
         config: Config,
         log_sender: crossbeam_channel::Sender<LogThreadMsg>,
+        print_stats: bool,
     ) -> PointerInference<'a> {
         let context = Context::new(
             project,
@@ -148,10 +150,12 @@ impl<'a> PointerInference<'a> {
             .collect();
         let mut fixpoint_computation =
             super::forward_interprocedural_fixpoint::create_computation(context, None);
-        let _ = log_sender.send(LogThreadMsg::Log(LogMessage::new_debug(format!(
-            "Pointer Inference: Adding {} entry points",
-            entry_sub_to_entry_node_map.len()
-        ))));
+        if print_stats {
+            let _ = log_sender.send(LogThreadMsg::Log(LogMessage::new_debug(format!(
+                "Pointer Inference: Adding {} entry points",
+                entry_sub_to_entry_node_map.len()
+            ))));
+        }
         for (sub_tid, start_node_index) in entry_sub_to_entry_node_map.into_iter() {
             fixpoint_computation.set_node_value(
                 start_node_index,
@@ -239,7 +243,12 @@ impl<'a> PointerInference<'a> {
     /// and do not have a state assigned to them yet, as additional entry points.
     ///
     /// If `only_cfg_roots` is set to `false`, then all function starts without a state are marked as roots.
-    fn add_speculative_entry_points(&mut self, project: &Project, only_cfg_roots: bool) {
+    fn add_speculative_entry_points(
+        &mut self,
+        project: &Project,
+        only_cfg_roots: bool,
+        print_stats: bool,
+    ) {
         // TODO: Refactor the fixpoint computation structs, so that the project reference can be extracted from them.
         let mut start_block_to_sub_map: HashMap<&Tid, &Term<Sub>> = HashMap::new();
         for sub in project.program.term.subs.iter() {
@@ -272,10 +281,12 @@ impl<'a> PointerInference<'a> {
                 }
             }
         }
-        self.log_debug(format!(
-            "Pointer Inference: Adding {} speculative entry points",
-            new_entry_points.len()
-        ));
+        if print_stats {
+            self.log_debug(format!(
+                "Pointer Inference: Adding {} speculative entry points",
+                new_entry_points.len()
+            ));
+        }
         for entry in new_entry_points {
             let sub_tid = start_block_to_sub_map
                 [&self.computation.get_graph()[entry].get_block().tid]
@@ -319,17 +330,23 @@ impl<'a> PointerInference<'a> {
     /// Compute the results of the pointer inference fixpoint algorithm.
     /// Successively adds more functions as possible entry points
     /// to increase code coverage.
-    pub fn compute_with_speculative_entry_points(&mut self, project: &Project) {
+    pub fn compute_with_speculative_entry_points(&mut self, project: &Project, print_stats: bool) {
         self.compute();
-        self.count_blocks_with_state();
+        if print_stats {
+            self.count_blocks_with_state();
+        }
         // Now compute again with speculative entry points added
-        self.add_speculative_entry_points(project, true);
+        self.add_speculative_entry_points(project, true, print_stats);
         self.compute();
-        self.count_blocks_with_state();
+        if print_stats {
+            self.count_blocks_with_state();
+        }
         // Now compute again with all missed functions as additional entry points
-        self.add_speculative_entry_points(project, false);
+        self.add_speculative_entry_points(project, false, print_stats);
         self.compute();
-        self.count_blocks_with_state();
+        if print_stats {
+            self.count_blocks_with_state();
+        }
 
         if !self.computation.has_stabilized() {
             let worklist_size = self.computation.get_worklist().len();
@@ -337,6 +354,9 @@ impl<'a> PointerInference<'a> {
                 "Pointer Inference: Fixpoint did not stabilize. Remaining worklist size: {}",
                 worklist_size
             ));
+        }
+        if print_stats {
+            statistics::compute_and_log_mem_access_stats(self);
         }
     }
 
@@ -438,6 +458,7 @@ pub fn run<'a>(
     control_flow_graph: &'a Graph<'a>,
     config: Config,
     print_debug: bool,
+    print_stats: bool,
 ) -> PointerInference<'a> {
     let logging_thread = LogThread::spawn(collect_all_logs);
 
@@ -447,9 +468,10 @@ pub fn run<'a>(
         control_flow_graph,
         config,
         logging_thread.get_msg_sender(),
+        print_stats,
     );
 
-    computation.compute_with_speculative_entry_points(project);
+    computation.compute_with_speculative_entry_points(project, print_stats);
 
     if print_debug {
         computation.print_compact_json();
@@ -513,7 +535,7 @@ mod tests {
                 deallocation_symbols: vec!["free".to_string()],
             };
             let (log_sender, _) = crossbeam_channel::unbounded();
-            PointerInference::new(project, mem_image, graph, config, log_sender)
+            PointerInference::new(project, mem_image, graph, config, log_sender, false)
         }
 
         pub fn set_node_value(&mut self, node_value: State, node_index: NodeIndex) {

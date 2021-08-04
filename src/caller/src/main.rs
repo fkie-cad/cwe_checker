@@ -46,6 +46,11 @@ struct CmdlineArgs {
     #[structopt(long, short)]
     quiet: bool,
 
+    /// Include various statistics in the debug log messages.
+    /// This can be helpful for assessing the analysis quality for the input binary.
+    #[structopt(long, conflicts_with("quiet"))]
+    statistics: bool,
+
     /// Path to a configuration file for analysis of bare metal binaries.
     ///
     /// If this option is set then the input binary is treated as a bare metal binary regardless of its format.
@@ -172,7 +177,7 @@ fn run_with_ghidra(args: &CmdlineArgs) {
         .iter()
         .any(|module| modules_depending_on_pointer_inference.contains(&module.name))
     {
-        Some(analysis_results.compute_pointer_inference(&config["Memory"]))
+        Some(analysis_results.compute_pointer_inference(&config["Memory"], args.statistics))
     } else {
         None
     };
@@ -189,6 +194,7 @@ fn run_with_ghidra(args: &CmdlineArgs) {
             &control_flow_graph,
             serde_json::from_value(config["Memory"].clone()).unwrap(),
             true,
+            false,
         );
         return;
     }
