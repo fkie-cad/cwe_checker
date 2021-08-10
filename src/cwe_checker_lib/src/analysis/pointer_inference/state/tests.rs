@@ -61,12 +61,10 @@ fn state() {
     let merged_state = state.merge(&other_state);
     assert_eq!(merged_state.register[&register("RAX")], bv(42).into());
     assert_eq!(merged_state.register.get(&register("RBX")), None);
-    assert_eq!(
-        merged_state
-            .load_value(&Var(register("RSP")), ByteSize::new(8), &global_memory)
-            .unwrap(),
-        Data::new_top(ByteSize::new(8))
-    );
+    assert!(merged_state
+        .load_value(&Var(register("RSP")), ByteSize::new(8), &global_memory)
+        .unwrap()
+        .contains_top());
 
     // Test pointer adjustment on reads
     state.memory.add_abstract_object(
