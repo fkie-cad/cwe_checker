@@ -491,10 +491,10 @@ mod tests {
 
         let mut merged = obj_list.merge(&other_obj_list);
         assert_eq!(merged.get_value(&pointer, ByteSize::new(8)), bv(42).into());
-        assert_eq!(
-            merged.get_value(&second_pointer, ByteSize::new(8)),
-            Data::new_top(ByteSize::new(8))
-        );
+
+        assert!(merged
+            .get_value(&second_pointer, ByteSize::new(8))
+            .contains_top());
         assert_eq!(
             merged.get_value(&heap_pointer, ByteSize::new(8)),
             bv(3).into()

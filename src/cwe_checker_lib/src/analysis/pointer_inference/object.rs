@@ -470,9 +470,14 @@ mod tests {
         other_object.set_value(new_data(0), &bv(0)).unwrap();
         let merged_object = object.merge(&other_object);
         assert_eq!(
-            merged_object.get_value(Bitvector::from_i64(-12), ByteSize::new(8)),
-            Data::new_top(ByteSize::new(8))
+            merged_object
+                .get_value(Bitvector::from_i64(-12), ByteSize::new(8))
+                .get_absolute_value(),
+            Some(&IntervalDomain::mock(4, 23).with_stride(19).into())
         );
+        assert!(merged_object
+            .get_value(Bitvector::from_i64(-12), ByteSize::new(8))
+            .contains_top());
         assert_eq!(
             merged_object.get_value(Bitvector::from_i64(0), ByteSize::new(8)),
             new_data(0)
