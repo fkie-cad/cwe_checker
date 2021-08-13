@@ -149,7 +149,7 @@ impl<'a> PointerInference<'a> {
             })
             .collect();
         let mut fixpoint_computation =
-            super::forward_interprocedural_fixpoint::create_computation(context, None);
+            super::forward_interprocedural_fixpoint::create_computation_with_alternate_worklist_order(context, None);
         if print_stats {
             let _ = log_sender.send(LogThreadMsg::Log(LogMessage::new_debug(format!(
                 "Pointer Inference: Adding {} entry points",
