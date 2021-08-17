@@ -64,6 +64,47 @@ impl<'a> Context<'a> {
         }
     }
 
+    /// Set the MIPS link register `t9` to the address of the callee TID.
+    ///
+    /// According to the System V ABI for MIPS the caller has to save the callee address in register `t9`
+    /// on a function call to position-independent code.
+    /// This function manually sets `t9` to the correct value
+    /// to mitigate cases where `t9` could not be correctly computed due to previous analysis errors.
+    fn set_mips_link_register(&self, state: &mut State, callee_tid: &Tid) {
+        let link_register = Variable {
+            name: "t9".into(),
+            size: self.project.stack_pointer_register.size,
+            is_temp: false,
+        };
+        let address = Bitvector::from_u64(u64::from_str_radix(&callee_tid.address, 16).unwrap())
+            .into_resize_unsigned(self.project.stack_pointer_register.size);
+        // FIXME: A better way would be to test whether the link register contains the correct value
+        // and only fix and log cases where it doesn't contain the correct value.
+        // Right now this is unfortunately the common case,
+        // so logging every case would generate too many log messages.
+        state.set_register(&link_register, address.into());
+    }
+
+    /// Return `true` if the all of the following properties hold:
+    /// * The CPU architecture is a MIPS variant and `var` is the MIPS global pointer register `gp`
+    /// * Loading the value at `address` into the register `var` would overwrite the value of `var` with a `Top` value.
+    fn is_mips_gp_load_to_top_value(
+        &self,
+        state: &State,
+        var: &Variable,
+        address: &Expression,
+    ) -> bool {
+        if self.project.cpu_architecture.contains("MIPS") && var.name == "gp" {
+            if let Ok(gp_val) = state.load_value(address, var.size, self.runtime_memory_image) {
+                gp_val.is_top()
+            } else {
+                true
+            }
+        } else {
+            false
+        }
+    }
+
     /// If `result` is an `Err`, log the error message as a debug message through the `log_collector` channel.
     pub fn log_debug(&self, result: Result<(), Error>, location: Option<&Tid>) {
         if let Err(err) = result {
