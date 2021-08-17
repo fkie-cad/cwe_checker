@@ -258,3 +258,20 @@ pub fn create_computation<'a, T: Context<'a>>(
     let generalized_problem = GeneralizedContext::new(problem);
     super::fixpoint::Computation::new(generalized_problem, default_value.map(NodeValue::Value))
 }
+
+/// Generate a new computation from the corresponding context and an optional default value for nodes.
+/// Uses the alternate worklist order when computing the fixpoint.
+///
+/// The alternate worklist order moves nodes with 10 or more incoming edges to the end of the priority queue.
+/// This can improve the convergence speed for these nodes in the fixpoint algorithm.
+/// Use if you encounter convergence problems for nodes with a lot of incoming edges.
+pub fn create_computation_with_alternate_worklist_order<'a, T: Context<'a>>(
+    problem: T,
+    default_value: Option<T::Value>,
+) -> super::fixpoint::Computation<GeneralizedContext<'a, T>> {
+    let generalized_problem = GeneralizedContext::new(problem);
+    super::fixpoint::Computation::new_with_alternate_worklist_order(
+        generalized_problem,
+        default_value.map(NodeValue::Value),
+    )
+}
