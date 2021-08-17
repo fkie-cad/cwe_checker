@@ -171,7 +171,7 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
             );
             // For MIPS architecture only: Ensure that the t9 register contains the address of the called function
             if self.project.cpu_architecture.contains("MIPS") {
-                callee_state
+                let _ = callee_state
                     .set_mips_link_register(callee_tid, self.project.stack_pointer_register.size);
             }
             // set the list of caller stack ids to only this caller id
