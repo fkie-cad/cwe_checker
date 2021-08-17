@@ -62,6 +62,27 @@ impl State {
         }
     }
 
+    /// Set the MIPS link register `t9` to the address of the callee TID.
+    ///
+    /// According to the System V ABI for MIPS the caller has to save the callee address in register `t9`
+    /// on a function call to position-independent code.
+    /// This function manually sets `t9` to the correct value
+    /// to mitigate cases where `t9` could not be correctly computed due to previous analysis errors.
+    pub fn set_mips_link_register(&mut self, callee_tid: &Tid, generic_pointer_size: ByteSize) {
+        let link_register = Variable {
+            name: "t9".into(),
+            size: generic_pointer_size,
+            is_temp: false,
+        };
+        let address = Bitvector::from_u64(u64::from_str_radix(&callee_tid.address, 16).unwrap())
+            .into_resize_unsigned(generic_pointer_size);
+        // FIXME: A better way would be to test whether the link register contains the correct value
+        // and only fix and log cases where it doesn't contain the correct value.
+        // Right now this is unfortunately the common case,
+        // so logging every case would generate too many log messages.
+        self.set_register(&link_register, address.into());
+    }
+
     /// Clear all non-callee-saved registers from the state.
     /// This automatically also removes all virtual registers.
     /// The parameter is a list of callee-saved register names.
