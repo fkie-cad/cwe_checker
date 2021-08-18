@@ -157,12 +157,14 @@ impl<'a> PointerInference<'a> {
             ))));
         }
         for (sub_tid, start_node_index) in entry_sub_to_entry_node_map.into_iter() {
+            let mut fn_entry_state = State::new(&project.stack_pointer_register, sub_tid.clone());
+            if project.cpu_architecture.contains("MIPS") {
+                let _ = fn_entry_state
+                    .set_mips_link_register(&sub_tid, project.stack_pointer_register.size);
+            }
             fixpoint_computation.set_node_value(
                 start_node_index,
-                super::interprocedural_fixpoint_generic::NodeValue::Value(State::new(
-                    &project.stack_pointer_register,
-                    sub_tid,
-                )),
+                super::interprocedural_fixpoint_generic::NodeValue::Value(fn_entry_state),
             );
         }
         PointerInference {
@@ -292,12 +294,14 @@ impl<'a> PointerInference<'a> {
                 [&self.computation.get_graph()[entry].get_block().tid]
                 .tid
                 .clone();
+            let mut fn_entry_state = State::new(&project.stack_pointer_register, sub_tid.clone());
+            if project.cpu_architecture.contains("MIPS") {
+                let _ = fn_entry_state
+                    .set_mips_link_register(&sub_tid, project.stack_pointer_register.size);
+            }
             self.computation.set_node_value(
                 entry,
-                super::interprocedural_fixpoint_generic::NodeValue::Value(State::new(
-                    &project.stack_pointer_register,
-                    sub_tid,
-                )),
+                super::interprocedural_fixpoint_generic::NodeValue::Value(fn_entry_state),
             );
         }
     }

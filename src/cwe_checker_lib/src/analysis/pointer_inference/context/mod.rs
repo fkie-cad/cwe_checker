@@ -64,6 +64,26 @@ impl<'a> Context<'a> {
         }
     }
 
+    /// Return `true` if the all of the following properties hold:
+    /// * The CPU architecture is a MIPS variant and `var` is the MIPS global pointer register `gp`
+    /// * Loading the value at `address` into the register `var` would overwrite the value of `var` with a `Top` value.
+    fn is_mips_gp_load_to_top_value(
+        &self,
+        state: &State,
+        var: &Variable,
+        address: &Expression,
+    ) -> bool {
+        if self.project.cpu_architecture.contains("MIPS") && var.name == "gp" {
+            if let Ok(gp_val) = state.load_value(address, var.size, self.runtime_memory_image) {
+                gp_val.is_top()
+            } else {
+                true
+            }
+        } else {
+            false
+        }
+    }
+
     /// If `result` is an `Err`, log the error message as a debug message through the `log_collector` channel.
     pub fn log_debug(&self, result: Result<(), Error>, location: Option<&Tid>) {
         if let Err(err) = result {
