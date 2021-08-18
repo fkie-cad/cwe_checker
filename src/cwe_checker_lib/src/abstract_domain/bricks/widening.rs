@@ -19,7 +19,7 @@ use super::{brick::Brick, BrickDomain, BricksDomain};
 
 pub const INTERVAL_THRESHOLD: usize = 8;
 pub const SEQUENCE_THRESHOLD: usize = 8;
-pub const LENGTH_THRESHOLD: usize = 8;
+pub const LENGTH_THRESHOLD: usize = 32;
 
 impl BricksDomain {
     /// The widen function of the BricksDomain widens the values during a merge.

@@ -1,5 +1,6 @@
-use regex::{Match, Regex};
+use regex::Regex;
 use std::collections::HashMap;
+use std::fmt::Debug;
 
 use crate::prelude::*;
 
@@ -7,7 +8,8 @@ use anyhow::Error;
 use itertools::izip;
 
 use crate::abstract_domain::{
-    DataDomain, DomainInsertion, HasTop, IntervalDomain, PointerDomain, TryToBitvec,
+    DataDomain, DomainInsertion, HasTop, IntervalDomain, PointerDomain,
+    TryToBitvec,
 };
 use crate::analysis::pointer_inference::State as PointerInferenceState;
 use crate::intermediate_representation::{Arg, Bitvector, Datatype};
@@ -19,7 +21,38 @@ use crate::{abstract_domain::AbstractDomain, intermediate_representation::Extern
 use super::super::state::State;
 use super::Context;
 
-impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Context<'a, T> {
+impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debug> Context<'a, T> {
+    /// Handles generic symbol calls by deleting all non callee saved pointer entries.
+    pub fn handle_generic_symbol_calls(
+        &self,
+        extern_symbol: &ExternSymbol,
+        state: &State<T>,
+    ) -> State<T> {
+        let mut new_state = state.clone();
+        new_state.remove_non_callee_saved_pointer_entries_for_external_symbol(
+            self.project,
+            extern_symbol,
+        );
+
+        new_state
+    }
+
+    pub fn handle_unknown_symbol_calls(&self, state: &mut State<T>) {
+        if let Some(standard_cconv) = self.project.get_standard_calling_convention() {
+            let mut filtered_map = state.get_variable_to_pointer_map().clone();
+            for (register, _) in state.get_variable_to_pointer_map().clone().iter() {
+                if !standard_cconv
+                    .callee_saved_register
+                    .contains(&register.name)
+                {
+                    filtered_map.remove(register);
+                }
+            }
+
+            state.set_variable_to_pointer_map(filtered_map);
+        }
+    }
+
     /// The output of a string symbol is added to the map of abstract strings.
     /// If the symbol returns a format string, the string is approximated
     /// as good as possible by checking the input parameters.
@@ -31,15 +64,135 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
         let mut new_state = match extern_symbol.name.as_str() {
             "scanf" | "__isoc99_scanf" => self.handle_scanf_calls(state, extern_symbol),
             "sscanf" | "__isoc99_sscanf" => self.handle_sscanf_calls(state, extern_symbol),
-            "sprintf" | "snprintf" => self.handle_sprintf_and_snprintf_calls(state, extern_symbol),
+            "sprintf" | "snprintf" | "vsprintf" | "vsnprintf" => {
+                self.handle_sprintf_and_snprintf_calls(state, extern_symbol)
+            }
             "strcat" | "strncat" => self.handle_strcat_and_strncat_calls(state, extern_symbol),
+            "memcpy" => self.handle_memcpy_calls(state, extern_symbol),
             "free" => self.handle_free(state, extern_symbol),
             _ => panic!("Unexpected Extern Symbol."),
         };
 
-        new_state.remove_non_callee_saved_pointer_entries(self.project, extern_symbol);
+        new_state.remove_non_callee_saved_pointer_entries_for_external_symbol(
+            self.project,
+            extern_symbol,
+        );
 
         new_state
+    }
+
+    /// Handles the detection of string parameters to memcpy calls.
+    pub fn handle_memcpy_calls(&self, state: &State<T>, extern_symbol: &ExternSymbol) -> State<T> {
+        let mut new_state = state.clone();
+        if let Some(pi_state) = state.get_pointer_inference_state() {
+            if let Some(return_arg) = extern_symbol.parameters.first() {
+                if let Ok(DataDomain::Pointer(return_pointer)) = pi_state.eval_parameter_arg(
+                    return_arg,
+                    &self.project.stack_pointer_register,
+                    self.runtime_memory_image,
+                ) {
+                    if let Some(input_arg) = extern_symbol.parameters.get(1) {
+                        if let Ok(input_value) = pi_state.eval_parameter_arg(
+                            input_arg,
+                            &self.project.stack_pointer_register,
+                            self.runtime_memory_image,
+                        ) {
+                            match input_value {
+                                DataDomain::Pointer(input_pointer) => {
+                                    // If both pointer domains contain more than one target add Top values for all return pointer targets
+                                    // as it is unknown which target is copied to which destination.
+                                    if return_pointer.targets().len() > 1
+                                        && input_pointer.targets().len() > 1
+                                    {
+                                        Context::<T>::add_new_string_abstract_domain(
+                                            &mut new_state,
+                                            pi_state,
+                                            &return_pointer,
+                                            T::create_top_value_domain(),
+                                        );
+                                    } else if input_pointer.targets().len() > 1 {
+                                        let copied_domain = Context::<T>::merge_domains_from_multiple_pointer_targets(&new_state, pi_state, &input_pointer);
+                                        Context::<T>::add_new_string_abstract_domain(
+                                            &mut new_state,
+                                            pi_state,
+                                            &return_pointer,
+                                            copied_domain,
+                                        );
+                                    } else {
+                                        if let Some(copied_domain) = self
+                                            .get_domain_from_single_pointer_target(
+                                                &new_state,
+                                                &input_pointer,
+                                                pi_state,
+                                            )
+                                        {
+                                            Context::<T>::add_new_string_abstract_domain(
+                                                &mut new_state,
+                                                pi_state,
+                                                &return_pointer,
+                                                copied_domain,
+                                            );
+                                        }
+                                    }
+                                }
+                                DataDomain::Value(data) => {
+                                    if let Ok(global_address) = data.try_to_bitvec() {
+                                        if let Ok(input_string) = self
+                                            .runtime_memory_image
+                                            .read_string_until_null_terminator(&global_address)
+                                        {
+                                            new_state.add_unassigned_return_pointer(
+                                                return_pointer.clone(),
+                                            );
+                                            Context::<T>::add_new_string_abstract_domain(
+                                                &mut new_state,
+                                                pi_state,
+                                                &return_pointer,
+                                                T::from(input_string.to_string()),
+                                            );
+                                        }
+                                    }
+                                }
+                                _ => (),
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        new_state
+    }
+
+    /// Returns a string domain for a single pointer target if there is one.
+    /// Panics if the pointer has more than one target.
+    pub fn get_domain_from_single_pointer_target(
+        &self,
+        state: &State<T>,
+        pointer: &PointerDomain<IntervalDomain>,
+        pi_state: &PointerInferenceState,
+    ) -> Option<T> {
+        if let Some((target, offset)) = pointer.unwrap_if_unique_target() {
+            if pi_state.caller_stack_ids.contains(target) || pi_state.stack_id == *target {
+                if let Ok(offset_value) = offset.try_to_offset() {
+                    if let Some(domain) = state.get_stack_offset_to_string_map().get(&offset_value)
+                    {
+                        return Some(domain.clone());
+                    }
+                }
+            } else {
+                if let Some(domain) = state.get_heap_to_string_map().get(&target) {
+                    return Some(domain.clone());
+                }
+            }
+        } else {
+            panic!(format!(
+                "Unexpected number of pointer targets: {}; Should be 1",
+                pointer.targets().len()
+            ));
+        }
+
+        None
     }
 
     /// Handles the detection of string parameters to scanf calls.
@@ -73,28 +226,35 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
         arg_to_value_map: HashMap<Arg, Option<String>>,
     ) {
         for (argument, value) in arg_to_value_map.into_iter() {
-            if let Ok(DataDomain::Pointer(return_pointer)) = pi_state.eval_parameter_arg(
-                &argument,
-                &self.project.stack_pointer_register,
-                self.runtime_memory_image,
-            ) {
-                if let Some(string) = value {
-                    Context::add_new_string_abstract_domain(
-                        state,
-                        pi_state,
-                        &return_pointer,
-                        T::from(string),
-                    );
-                } else {
-                    Context::add_new_string_abstract_domain(
-                        state,
-                        pi_state,
-                        &return_pointer,
-                        T::create_top_value_domain(),
-                    );
-                }
+            match argument.get_data_type().unwrap() {
+                Datatype::Pointer => {
+                    if let Ok(data) = pi_state.eval_parameter_arg(
+                        &argument,
+                        &self.project.stack_pointer_register,
+                        self.runtime_memory_image,
+                    ) {
+                        if let DataDomain::Pointer(return_pointer) = data {
+                            if let Some(string) = value {
+                                Context::add_new_string_abstract_domain(
+                                    state,
+                                    pi_state,
+                                    &return_pointer,
+                                    T::from(string),
+                                );
+                            } else {
+                                Context::add_new_string_abstract_domain(
+                                    state,
+                                    pi_state,
+                                    &return_pointer,
+                                    T::create_top_value_domain(),
+                                );
+                            }
 
-                state.add_unassigned_return_pointer(return_pointer);
+                            state.add_unassigned_return_pointer(return_pointer);
+                        }
+                    }
+                }
+                _ => (),
             }
         }
     }
@@ -262,9 +422,11 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
                             &mut new_state,
                             pi_state,
                             &return_pointer,
-                            T::from("".to_string()).top(),
+                            T::create_top_value_domain(),
                         );
                     }
+
+                    new_state.add_unassigned_return_pointer(return_pointer);
                 }
             }
         }
@@ -281,131 +443,206 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
         extern_symbol: &ExternSymbol,
         input_format_string: String,
     ) -> T {
-        let mut processed_string = input_format_string.clone();
-        let mut filtered_args: Vec<Arg> = vec![];
-        if let Ok(mut var_args) = get_variable_parameters(
+        if Context::<T>::no_specifiers(input_format_string.clone()) {
+            return T::from(input_format_string);
+        }
+        match get_variable_parameters(
             self.project,
             pi_state,
             extern_symbol,
             &*self.format_string_index_map,
             self.runtime_memory_image,
         ) {
-            // Insert constants into the format string if available and
-            // filter out all args that represent those constants.
-            processed_string = self.insert_constant_values_into_format_string(
-                processed_string,
-                &mut var_args,
-                pi_state,
-            );
+            Ok(var_args) => {
+                if var_args.is_empty() {
+                    return T::create_top_value_domain();
+                }
 
-            filtered_args = var_args;
+                self.create_string_domain_using_constants_and_sub_domains(
+                    input_format_string,
+                    &var_args,
+                    pi_state,
+                    state,
+                )
+            }
+            Err(_) => self.create_string_domain_using_data_type_approximations(input_format_string),
         }
-
-        self.create_string_domain_and_insert_approximations_for_format_specifier(
-            &state,
-            filtered_args,
-            processed_string.clone(),
-            processed_string == input_format_string,
-            pi_state,
-        )
     }
 
-    /// Splits a format string by its identifiers and keeps the delimiters.
-    /// During the split, string domains are created from the constant parts of the format string
-    /// and the remaining domains are approximated according to the datatype of the format specifier.
-    pub fn create_string_domain_and_insert_approximations_for_format_specifier(
+    /// Creates a domain from a format string where all specifiers are approximated according
+    /// to their data type. This ensures that, if there is a long data type, that the domain is
+    /// no returned as *Top*.
+    pub fn create_string_domain_using_data_type_approximations(&self, format_string: String) -> T {
+        let re = Regex::new(r#"%\d{0,2}([c,C,d,i,o,u,x,X,e,E,f,F,g,G,a,A,n,p,s,S]|hi|hd|hu|li|ld|lu|lli|lld|llu|lf|lg|le|la|lF|lG|lE|lA|Lf|Lg|Le|La|LF|LG|LE|LA)"#)
+            .expect("No valid regex!");
+
+        let mut domains: Vec<T> = Vec::new();
+        let mut last_specifier_end = 0;
+        for (index, specifier) in re.find_iter(&format_string).enumerate() {
+            if index == 0 {
+                if specifier.start() > 0 {
+                    domains.push(T::from(format_string[..specifier.start()].to_string()));
+                }
+            } else {
+                let between_specifiers =
+                    format_string[last_specifier_end..specifier.start()].to_string();
+                if between_specifiers != "" {
+                    domains.push(T::from(
+                        format_string[last_specifier_end..specifier.start()].to_string(),
+                    ));
+                }
+            }
+
+            let parsed_specifier = specifier
+                .as_str()
+                .trim_start_matches(&['%', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'][..])
+                .to_string();
+
+            domains.push(Context::<T>::approximate_string_domain_from_datatype(
+                parsed_specifier,
+            ));
+
+            last_specifier_end = specifier.end();
+        }
+
+        if last_specifier_end != format_string.len() {
+            domains.push(T::from(format_string[last_specifier_end..].to_string()));
+        }
+
+        let mut init_domain = domains.first().unwrap().clone();
+        domains.remove(0);
+        for remaining_domain in domains.iter() {
+            init_domain = init_domain.append_string_domain(remaining_domain);
+        }
+
+        init_domain
+    }
+
+    /// Checks whether the string has no format specifiers.
+    pub fn no_specifiers(format_string: String) -> bool {
+        let re = Regex::new(r#"%\d{0,2}([c,C,d,i,o,u,x,X,e,E,f,F,g,G,a,A,n,p,s,S]|hi|hd|hu|li|ld|lu|lli|lld|llu|lf|lg|le|la|lF|lG|lE|lA|Lf|Lg|Le|La|LF|LG|LE|LA)"#)
+            .expect("No valid regex!");
+
+        !re.is_match(&format_string)
+    }
+
+    /// Creates a string domain from found constants and sub domains.
+    pub fn create_string_domain_using_constants_and_sub_domains(
         &self,
-        state: &State<T>,
-        filtered_args: Vec<Arg>,
         format_string: String,
-        constants_inserted: bool,
+        var_args: &Vec<Arg>,
         pi_state: &PointerInferenceState,
+        state: &State<T>,
     ) -> T {
         let re = Regex::new(r#"%\d{0,2}([c,C,d,i,o,u,x,X,e,E,f,F,g,G,a,A,n,p,s,S]|hi|hd|hu|li|ld|lu|lli|lld|llu|lf|lg|le|la|lF|lG|lE|lA|Lf|Lg|Le|La|LF|LG|LE|LA)"#)
-        .expect("No valid regex!");
-        let mut split_string: Vec<T> = Vec::new();
-        let mut last_end_index = 0;
+            .expect("No valid regex!");
+        let mut domains: Vec<T> = Vec::new();
+        let mut last_specifier_end = 0;
         for (index, (specifier, arg)) in re
             .find_iter(&format_string.clone())
-            .zip(filtered_args)
+            .zip(var_args)
             .enumerate()
         {
-            // Create a domain for the first substring if the string does not start with a specifier.
-            if index == 0 && specifier.start() != 0 {
-                split_string.push(T::from(format_string[..specifier.start()].to_string()));
-            } else if index > 0 {
-                // Create a domain for the substring between two specifiers.
-                split_string.push(T::from(
-                    format_string[last_end_index + 1..specifier.start()].to_string(),
-                ));
+            if index == 0 {
+                if specifier.start() > 0 {
+                    domains.push(T::from(format_string[..specifier.start()].to_string()));
+                }
+            } else {
+                let between_specifiers =
+                    format_string[last_specifier_end..specifier.start()].to_string();
+                if between_specifiers != "" {
+                    domains.push(T::from(
+                        format_string[last_specifier_end..specifier.start()].to_string(),
+                    ));
+                }
             }
-
-            self.insert_datatype_dependent_domains(
-                &mut split_string,
-                specifier,
+            domains.push(self.fetch_constant_or_domain_for_format_specifier(
+                arg,
+                specifier.as_str().to_string(),
                 pi_state,
                 state,
-                arg,
-            );
-            last_end_index = specifier.end();
+            ));
+            last_specifier_end = specifier.end();
         }
 
-        // Return *Top* if no specifiers were detected and no constant insertions were made.
-        // If constant insertions were made, it is assumed that no more specifiers remain in the format string.
-        // Meaning, that all specifiers were replaced with constants.
-        if last_end_index == 0 {
-            if constants_inserted {
-                return T::from(format_string);
-            } else {
-                return T::create_top_value_domain();
-            }
+        if last_specifier_end != format_string.len() {
+            domains.push(T::from(format_string[last_specifier_end..].to_string()));
         }
 
-        // Create a domain for the substring after the last specifier if the string does not end on a specifier.
-        if last_end_index < format_string.len() - 1 {
-            split_string.push(T::from(format_string[last_end_index + 1..].to_string()));
+        let mut init_domain = domains.first().unwrap().clone();
+        domains.remove(0);
+        for remaining_domain in domains.iter() {
+            init_domain = init_domain.append_string_domain(remaining_domain);
         }
 
-        let mut complete_domain = split_string.first().unwrap().clone();
-        split_string.remove(0);
-        for domain in split_string.into_iter() {
-            complete_domain = complete_domain.append_string_domain(&domain);
-        }
-
-        complete_domain
+        init_domain
     }
 
-    /// Inserts domains dependent on the data type represented by the format specifier.
-    /// If the specifier represents a string, it is checked whether further string domains
-    /// for the particular string are tracked.
-    pub fn insert_datatype_dependent_domains(
+    /// Tries to fetch a constant or sub domain for the format specifier.
+    /// If no data is available, it approximates the sub domain corresponding to
+    /// the characters that can be contained in the data type.
+    pub fn fetch_constant_or_domain_for_format_specifier(
         &self,
-        split_string: &mut Vec<T>,
-        specifier: Match,
+        arg: &Arg,
+        specifier: String,
         pi_state: &PointerInferenceState,
         state: &State<T>,
-        arg: Arg,
-    ) {
-        if matches!(
-            Datatype::from(specifier.as_str()[1..].to_string()),
-            Datatype::Pointer
+    ) -> T {
+        if let Ok(data) = pi_state.eval_parameter_arg(
+            arg,
+            &self.project.stack_pointer_register,
+            self.runtime_memory_image,
         ) {
-            if let Ok(DataDomain::Pointer(pointer)) = pi_state.eval_parameter_arg(
-                &arg,
-                &self.project.stack_pointer_register,
-                self.runtime_memory_image,
-            ) {
-                split_string.push(Context::<T>::merge_domains_from_multiple_pointer_targets(
-                    state, pi_state, &pointer,
-                ));
-            } else {
-                split_string.push(T::create_top_value_domain());
+            match data {
+                DataDomain::Value(value) => {
+                    if let Ok(value_vector) = value.try_to_bitvec() {
+                        if let Some(data_type) = arg.get_data_type() {
+                            match data_type {
+                                Datatype::Char => {
+                                    if let Some(char_domain) =
+                                        self.get_constant_char_domain(value_vector)
+                                    {
+                                        return char_domain;
+                                    }
+                                }
+                                Datatype::Integer => {
+                                    if let Some(integer_domain) =
+                                        Context::<T>::get_constant_integer_domain(value_vector)
+                                    {
+                                        return integer_domain;
+                                    }
+                                }
+                                Datatype::Pointer => {
+                                    if let Some(string_domain) =
+                                        self.get_constant_string_domain(value_vector)
+                                    {
+                                        return string_domain;
+                                    }
+                                }
+                                _ => (),
+                            }
+                        }
+                    }
+                }
+                DataDomain::Pointer(pointer) => {
+                    if let Some(data_type) = arg.get_data_type() {
+                        if matches!(data_type, Datatype::Pointer) {
+                            return Context::<T>::merge_domains_from_multiple_pointer_targets(
+                                state, pi_state, &pointer,
+                            );
+                        }
+                    }
+                }
+                DataDomain::Top(_) => (),
             }
-        } else {
-            split_string.push(Context::<T>::approximate_string_domain_from_datatype(
-                specifier.as_str()[1..].to_string(),
-            ));
         }
+
+        let parsed_specifier = specifier
+            .as_str()
+            .trim_start_matches(&['%', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'][..])
+            .to_string();
+
+        Context::<T>::approximate_string_domain_from_datatype(parsed_specifier)
     }
 
     /// Merges domains from multiple pointer targets. The merged domain serves as input to a format string.
@@ -449,6 +686,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
         init_domain
     }
 
+    /// Calls the appropriate data type approximator.
     pub fn approximate_string_domain_from_datatype(specifier: String) -> T {
         match Datatype::from(specifier) {
             Datatype::Char => T::create_char_domain(),
@@ -461,98 +699,31 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
         }
     }
 
-    /// Inserts constant strings, integers and floats into a given format string.
-    pub fn insert_constant_values_into_format_string(
-        &self,
-        format_string: String,
-        var_args: &mut Vec<Arg>,
-        pi_state: &PointerInferenceState,
-    ) -> String {
-        let mut new_string = format_string.clone();
-        let arg_iter = var_args.clone();
-        let mut removal_counter = 0;
-        for (index, arg) in arg_iter.iter().enumerate() {
-            let old_string = new_string.clone();
-            if let Ok(DataDomain::Value(value)) = pi_state.eval_parameter_arg(
-                arg,
-                &self.project.stack_pointer_register,
-                self.runtime_memory_image,
-            ) {
-                match arg.get_data_type().unwrap() {
-                    Datatype::Integer => {
-                        new_string = Context::<T>::insert_constant_integer_into_format_string(
-                            new_string, value,
-                        );
-                    }
-                    Datatype::Pointer => {
-                        new_string =
-                            self.insert_constant_string_into_format_string(new_string, value);
-                    }
-                    Datatype::Char => {
-                        new_string =
-                            self.insert_constant_char_into_format_string(new_string, value);
-                    }
-                    _ => (),
-                }
-            }
-
-            if old_string != new_string {
-                var_args.remove(index - removal_counter);
-                removal_counter += 1;
-            }
-        }
-
-        new_string
-    }
-
     /// Inserts an integer constant into the format string.
-    pub fn insert_constant_integer_into_format_string(
-        format_string: String,
-        constant: IntervalDomain,
-    ) -> String {
-        let integer_pattern = Regex::new(r#"%\d{0,2}[d,i,u,o,p,x,X,hi,hd,hu]"#).unwrap();
-        let mut new_string = format_string.clone();
-        if let Ok(integer_value) = constant.try_to_bitvec() {
-            if let Ok(integer) = integer_value.try_to_i64() {
-                new_string = integer_pattern
-                    .replace(&new_string, integer.to_string())
-                    .to_string();
-            }
+    pub fn get_constant_integer_domain(constant: Bitvector) -> Option<T> {
+        if let Ok(integer) = constant.try_to_i64() {
+            return Some(T::from(integer.to_string()));
         }
 
-        new_string
+        None
     }
 
     /// Inserts a char constant into the format string.
-    pub fn insert_constant_char_into_format_string(
-        &self,
-        format_string: String,
-        constant: IntervalDomain,
-    ) -> String {
-        let char_pattern = Regex::new(r#"%\d{0,2}[c,C]"#).unwrap();
-        let mut new_string = format_string.clone();
+    pub fn get_constant_char_domain(&self, constant: Bitvector) -> Option<T> {
         if let Ok(Some(char_code)) = self.runtime_memory_image.read(
-            &constant
-                .try_to_bitvec()
-                .expect("Could not translate interval address to bitvector."),
+            &constant,
             self.project
                 .datatype_properties
                 .get_size_from_data_type(Datatype::Char),
         ) {
             if let Some(c_char) = Context::<T>::parse_bitvec_to_char(char_code) {
-                new_string = char_pattern
-                    .replace(&new_string, c_char.to_string())
-                    .to_string();
+                return Some(T::from(c_char.to_string()));
             }
-        } else if let Ok(char_code) = constant.try_to_bitvec() {
-            if let Some(c_char) = Context::<T>::parse_bitvec_to_char(char_code.clone()) {
-                new_string = char_pattern
-                    .replace(&new_string, c_char.to_string())
-                    .to_string();
-            }
+        } else if let Some(c_char) = Context::<T>::parse_bitvec_to_char(constant.clone()) {
+            return Some(T::from(c_char.to_string()));
         }
 
-        new_string
+        None
     }
 
     /// Parses a bitvector to a char if possible.
@@ -567,22 +738,17 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
     }
 
     /// Inserts a string constant into the format string.
-    pub fn insert_constant_string_into_format_string(
-        &self,
-        format_string: String,
-        constant: IntervalDomain,
-    ) -> String {
-        let string_pattern = Regex::new(r#"%\d{0,2}[s,S]"#).unwrap();
-        let mut new_string = format_string.clone();
-        if let Ok(string) = self.runtime_memory_image.read_string_until_null_terminator(
-            &constant
-                .try_to_bitvec()
-                .expect("Could not translate interval address to bitvector."),
-        ) {
-            new_string = string_pattern.replace(&new_string, string).to_string();
+    pub fn get_constant_string_domain(&self, constant: Bitvector) -> Option<T> {
+        if let Ok(string) = self
+            .runtime_memory_image
+            .read_string_until_null_terminator(&constant)
+        {
+            if string != "" {
+                return Some(T::from(string.to_string()));
+            }
         }
 
-        new_string
+        None
     }
 
     /// Handles the resulting string domain from strcat and strncat calls.
@@ -648,7 +814,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
                     if let Ok(return_register) = extern_symbol.get_unique_return_register() {
                         new_state.add_new_variable_to_pointer_entry(
                             return_register.clone(),
-                            return_pointer,
+                            DataDomain::Pointer(return_pointer),
                         );
                     } else {
                         new_state.add_unassigned_return_pointer(return_pointer);

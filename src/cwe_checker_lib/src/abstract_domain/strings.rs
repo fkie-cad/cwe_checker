@@ -11,4 +11,6 @@ pub trait DomainInsertion {
     fn create_pointer_value_domain() -> Self;
     /// Creates a top value of the currently used domain.
     fn create_top_value_domain() -> Self;
+    /// Creates an empty string domain.
+    fn create_empty_string_domain() -> Self;
 }

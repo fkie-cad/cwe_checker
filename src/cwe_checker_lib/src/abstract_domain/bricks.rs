@@ -22,7 +22,7 @@
 //!  - the *sequence threshold* which  overapproximates the number of string sequences in a brick by forcing a *Top* value.
 //!  - the *length threshold* which  overapproximates the number of bricks in the BricksDomain and forces a *Top* value.
 
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, fmt};
 
 use super::{AbstractDomain, DomainInsertion, HasTop};
 use crate::prelude::*;
@@ -34,7 +34,7 @@ mod widening;
 
 /// The BricksDomain contains a sorted list of single normalized BrickDomains.
 /// It represents the composition of a string through sub sequences.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub enum BricksDomain {
     /// The *Top* value represents an invalid sequence.
     Top,
@@ -167,8 +167,7 @@ impl BricksDomain {
                 new_list.push(short_list.get(0).unwrap().clone());
                 short_list.remove(0);
             } else if short_list.is_empty()
-                || short_list.get(0).unwrap().unwrap_value()
-                    != long_list.get(i).unwrap().unwrap_value()
+                || short_list.get(0).unwrap() != long_list.get(i).unwrap()
             {
                 new_list.push(BrickDomain::get_empty_brick_domain());
                 empty_bricks_added += 1;
@@ -190,23 +189,62 @@ impl BricksDomain {
     }
 }
 
+impl fmt::Debug for BricksDomain {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            BricksDomain::Top => write!(f, "Top"),
+            BricksDomain::Value(brick_domains) => {
+                write!(f, "Bricks: ")?;
+                for brick_domain in brick_domains.iter() {
+                    write!(f, "{:?} ", brick_domain)?;
+                }
+
+                Ok(())
+            }
+        }
+    }
+}
+
 impl DomainInsertion for BricksDomain {
-    fn append_string_domain(&self, _string_domain: &Self) -> Self {
-        todo!()
+    /// Appends new bricks to the current BricksDomain.
+    /// Used to insert format specifier in sprintf calls and for strcat call.
+    fn append_string_domain(&self, string_domain: &Self) -> Self {
+        match self {
+            BricksDomain::Top => match string_domain {
+                BricksDomain::Top => BricksDomain::Top,
+                BricksDomain::Value(bricks) => {
+                    let mut new_bricks = vec![BrickDomain::Top];
+                    new_bricks.append(&mut bricks.clone());
+                    BricksDomain::Value(new_bricks)
+                }
+            },
+            BricksDomain::Value(bricks) => match string_domain {
+                BricksDomain::Top => {
+                    let mut new_bricks = bricks.clone();
+                    new_bricks.push(BrickDomain::Top);
+                    BricksDomain::Value(new_bricks)
+                }
+                BricksDomain::Value(other_bricks) => {
+                    let mut new_bricks = bricks.clone();
+                    new_bricks.append(&mut other_bricks.clone());
+                    BricksDomain::Value(new_bricks)
+                }
+            },
+        }
     }
 
     /// Returns *Top* since no assumption about the order of characters
     /// nor the length of the sequence can be made.
     fn create_float_value_domain() -> Self {
-        BricksDomain::Top
+        BricksDomain::from("[float inserted]".to_string())
     }
 
     fn create_char_domain() -> Self {
-        BricksDomain::Top
+        BricksDomain::from("[char inserted]".to_string())
     }
 
     fn create_integer_domain() -> Self {
-        BricksDomain::Top
+        BricksDomain::from("[integer inserted]".to_string())
     }
 
     fn create_pointer_value_domain() -> Self {
@@ -217,6 +255,10 @@ impl DomainInsertion for BricksDomain {
     fn create_top_value_domain() -> Self {
         BricksDomain::Top
     }
+
+    fn create_empty_string_domain() -> Self {
+        BricksDomain::from("".to_string())
+    }
 }
 
 impl AbstractDomain for BricksDomain {
@@ -224,6 +266,8 @@ impl AbstractDomain for BricksDomain {
     fn merge(&self, other: &Self) -> Self {
         if self.is_top() || other.is_top() {
             Self::Top
+        } else if self == other {
+            self.clone()
         } else {
             let merged = self.widen(other);
             if !merged.is_top() {
@@ -252,7 +296,7 @@ impl HasTop for BricksDomain {
 ///
 /// e.g. \[{"mo", "de"}\]^{1,2} represents the following set of strings:
 /// {mo, de, momo, dede, mode, demo}.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub enum BrickDomain {
     /// The *Top* value represents the powerset over the alphabet
     /// of allowed characters with a minimum of 0 and a maximum of positive infinity.
@@ -310,6 +354,23 @@ impl AbstractDomain for BrickDomain {
     /// Check if the value is *Top*.
     fn is_top(&self) -> bool {
         matches!(self, Self::Top)
+    }
+}
+
+impl fmt::Debug for BrickDomain {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            BrickDomain::Top => write!(f, "[T]"),
+            BrickDomain::Value(brick) => {
+                write!(
+                    f,
+                    "{:?}^({},{})",
+                    brick.get_sequence(),
+                    brick.get_min(),
+                    brick.get_max(),
+                )
+            }
+        }
     }
 }
 

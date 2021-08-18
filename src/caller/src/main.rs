@@ -143,7 +143,8 @@ fn run_with_ghidra(args: CmdlineArgs) {
         &project,
     );
 
-    let modules_depending_on_pointer_inference = vec!["CWE78", "CWE134", "CWE476", "Memory"];
+    let modules_depending_on_pointer_inference =
+        vec!["CWE78", "CWE134", "CWE476", "Memory", "StringCheck"];
     let pointer_inference_results = if modules
         .iter()
         .any(|module| modules_depending_on_pointer_inference.contains(&module.name))
@@ -293,6 +294,7 @@ fn get_project_from_ghidra(file_path: &Path, binary: &[u8]) -> (Project, Vec<Log
             }
         }
 
+        println!("{}", String::from_utf8(output.stdout.clone()).unwrap());
         if !output.status.success() {
             match output.status.code() {
                 Some(code) => {

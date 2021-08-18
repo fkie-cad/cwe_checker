@@ -434,3 +434,50 @@ fn test_pad_list() {
 
     assert_eq!(new_list, expected_list);
 }
+
+#[test]
+fn test_append_string_domain() {
+    let bricks_one = BricksDomain::Value(vec![BrickDomain::Value(Brick::mock_brick(
+        vec!["cat ".to_string()],
+        1,
+        1,
+    ))]);
+    let bricks_two = BricksDomain::Value(vec![BrickDomain::Value(Brick::mock_brick(
+        vec!["bash.sh".to_string()],
+        1,
+        1,
+    ))]);
+    let top_bricks = BricksDomain::Top;
+
+    assert_eq!(
+        BricksDomain::Top,
+        top_bricks.append_string_domain(&top_bricks)
+    );
+
+    let expected_bricks = BricksDomain::Value(vec![
+        BrickDomain::Value(Brick::mock_brick(vec!["cat ".to_string()], 1, 1)),
+        BrickDomain::Top,
+    ]);
+    assert_eq!(
+        expected_bricks,
+        bricks_one.append_string_domain(&top_bricks)
+    );
+
+    let expected_bricks = BricksDomain::Value(vec![
+        BrickDomain::Top,
+        BrickDomain::Value(Brick::mock_brick(vec!["bash.sh".to_string()], 1, 1)),
+    ]);
+    assert_eq!(
+        expected_bricks,
+        top_bricks.append_string_domain(&bricks_two)
+    );
+
+    let expected_bricks = BricksDomain::Value(vec![
+        BrickDomain::Value(Brick::mock_brick(vec!["cat ".to_string()], 1, 1)),
+        BrickDomain::Value(Brick::mock_brick(vec!["bash.sh".to_string()], 1, 1)),
+    ]);
+    assert_eq!(
+        expected_bricks,
+        bricks_one.append_string_domain(&bricks_two)
+    );
+}

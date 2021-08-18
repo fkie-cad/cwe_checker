@@ -19,7 +19,7 @@
 //!  3. When two domains are merged, the intersection of the certain sets and the union of possible sets are taken.
 //!     e.g. ({H,e,l,o,',',' '}, {H,e,l,o,',',' '}) v ({W,o,r,l,d}, {W,o,r,l,d}) => ({l,o}, {H,e,l,o,',',' ',W,o,r,d})
 
-use std::collections::HashSet;
+use std::{collections::BTreeSet, fmt};
 
 use crate::prelude::*;
 
@@ -31,7 +31,7 @@ use super::{AbstractDomain, DomainInsertion, HasTop};
 /// The value comprises of a set of certainly contained characters and a set of possibly contained characters
 /// while the *Top* value does not get any data. However, the *Top* value stands for an empty set of certainly
 /// contained characters and the whole alphabet of allowed characters for the possibly contained characters.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub enum CharacterInclusionDomain {
     /// The *Top* value stands for an empty set of certainly contained characters and
     /// the whole alphabet of allowed characters for the possibly contained characters.
@@ -74,7 +74,7 @@ impl DomainInsertion for CharacterInclusionDomain {
     }
 
     fn create_float_value_domain() -> Self {
-        let float_character_set: HashSet<char> = vec![
+        let float_character_set: BTreeSet<char> = vec![
             '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '-', 'a', 'i', 'n', 'f',
         ]
         .into_iter()
@@ -90,7 +90,7 @@ impl DomainInsertion for CharacterInclusionDomain {
     }
 
     fn create_integer_domain() -> Self {
-        let integer_character_set: HashSet<char> =
+        let integer_character_set: BTreeSet<char> =
             vec!['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '-']
                 .into_iter()
                 .collect();
@@ -108,11 +108,15 @@ impl DomainInsertion for CharacterInclusionDomain {
     fn create_top_value_domain() -> Self {
         CharacterInclusionDomain::Top
     }
+
+    fn create_empty_string_domain() -> Self {
+        CharacterInclusionDomain::from("".to_string())
+    }
 }
 
 impl From<String> for CharacterInclusionDomain {
     fn from(string: String) -> Self {
-        let characters: HashSet<char> = string.chars().collect();
+        let characters: BTreeSet<char> = string.chars().collect();
         CharacterInclusionDomain::Value((
             CharacterSet::Value(characters.clone()),
             CharacterSet::Value(characters),
@@ -127,6 +131,8 @@ impl AbstractDomain for CharacterInclusionDomain {
     fn merge(&self, other: &Self) -> Self {
         if self.is_top() || other.is_top() {
             Self::Top
+        } else if self == other {
+            self.clone()
         } else {
             let (self_certain, self_possible) = self.unwrap_value();
             let (other_certain, other_possible) = other.unwrap_value();
@@ -150,15 +156,30 @@ impl HasTop for CharacterInclusionDomain {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+impl fmt::Debug for CharacterInclusionDomain {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CharacterInclusionDomain::Top => write!(f, "Top"),
+            CharacterInclusionDomain::Value((certain_set, possible_set)) => {
+                write!(
+                    f,
+                    "Certain: {:?}, Possible: {:?}",
+                    certain_set, possible_set
+                )
+            }
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub enum CharacterSet {
     Top,
-    Value(HashSet<char>),
+    Value(BTreeSet<char>),
 }
 
 impl CharacterSet {
     /// Unwraps the values from the CharacterSet
-    pub fn unwrap_value(&self) -> HashSet<char> {
+    pub fn unwrap_value(&self) -> BTreeSet<char> {
         match self {
             CharacterSet::Value(value) => value.clone(),
             _ => panic!("Unexpected CharacterSet type."),
@@ -210,6 +231,17 @@ impl HasTop for CharacterSet {
     }
 }
 
+impl fmt::Debug for CharacterSet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CharacterSet::Top => write!(f, "Top"),
+            CharacterSet::Value(char_set) => {
+                write!(f, "{:?}", char_set)
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -230,7 +262,7 @@ mod tests {
         assert_eq!(
             first.merge(&second),
             CharacterInclusionDomain::Value((
-                CharacterSet::Value(HashSet::new()),
+                CharacterSet::Value(BTreeSet::new()),
                 possible_set.clone()
             ))
         );

@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use crate::{
     abstract_domain::{AbstractDomain, DomainInsertion, HasTop},
     analysis::string_abstraction::state::State,
@@ -6,7 +8,7 @@ use crate::{
 
 use super::Context;
 
-impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>>
+impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debug>
     crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Context<'a, T>
 {
     type Value = State<T>;
@@ -23,22 +25,76 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>>
 
     fn update_def(&self, state: &State<T>, def: &Term<Def>) -> Option<State<T>> {
         let mut new_state = state.clone();
+        if state.get_pointer_inference_state().is_none() {
+            if self
+                .block_first_def_set
+                .contains(&(def.tid.clone(), state.get_current_sub().unwrap().tid))
+            {
+                if let Some(pi_state) = self.get_current_pointer_inference_state(state, &def.tid) {
+                    new_state.set_pointer_inference_state(Some(pi_state));
+                } else {
+                    println!("NO PI STATE at {}", def.tid.address);
+                    return None;
+                }
+            } else {
+                println!("NO PI STATE at {}", def.tid.address);
+                return None;
+            }
+        }
         self.update_pointer_inference_state(&mut new_state, def);
         match &def.term {
             Def::Assign {
                 var: output,
                 value: input,
+            } => {
+                new_state.handle_assign_and_load(
+                    output,
+                    input,
+                    self.runtime_memory_image,
+                    &self.block_first_def_set,
+                    true,
+                );
             }
-            | Def::Load {
+            Def::Load {
                 var: output,
                 address: input,
-                ..
             } => {
-                new_state.handle_assign_and_load(def, input, output, self.runtime_memory_image);
+                new_state.handle_assign_and_load(
+                    output,
+                    input,
+                    self.runtime_memory_image,
+                    &self.block_first_def_set,
+                    false,
+                );
             }
-            Def::Store { address, value } => (),
+            Def::Store { address, value } => new_state.handle_store(
+                address,
+                value,
+                self.runtime_memory_image,
+                &self.block_first_def_set,
+            ),
         }
 
+        /*if vec!["00011420"].contains(&def.tid.address.as_str()) {
+            println!("Strings on the stack after {}: ", def.tid.address);
+            for (offset, domain) in new_state.get_stack_offset_to_string_map().iter() {
+                println!("    Offset: {}, Domain: {:?}", offset, domain);
+            }
+            println!("Pointers in variables: ");
+            for (var, pointer) in new_state.get_variable_to_pointer_map().iter() {
+                println!("    Reg: {}, Pointer: {:?}", var.name, pointer);
+            }
+            println!("Pointers on the stack: ");
+            for (offset, pointer) in new_state.get_stack_offset_to_pointer_map().iter() {
+                println!("    Offset: {}, Pointer: {:?}", offset, pointer);
+            }
+            println!("Unassigned pointers: ");
+            for pointer in new_state.get_unassigned_return_pointer().iter() {
+                println!("    Pointer: {:?}", pointer);
+            }
+
+            println!("\n##################################################################################################\n");
+        }*/
         Some(new_state)
     }
 
@@ -49,44 +105,58 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>>
         _untaken_conditional: Option<&Term<Jmp>>,
         _target: &Term<Blk>,
     ) -> Option<State<T>> {
-        Some(state.clone())
+        let mut new_state = state.clone();
+        new_state.set_pointer_inference_state(None);
+        Some(new_state)
     }
 
     fn update_call(
         &self,
-        state: &State<T>,
-        call: &Term<Jmp>,
-        target: &crate::analysis::graph::Node,
+        _state: &State<T>,
+        _call: &Term<Jmp>,
+        _target: &crate::analysis::graph::Node,
     ) -> Option<State<T>> {
-        todo!()
+        None
     }
 
     fn update_return(
         &self,
-        state: Option<&State<T>>,
+        _state: Option<&State<T>>,
         state_before_call: Option<&State<T>>,
-        call_term: &Term<Jmp>,
-        return_term: &Term<Jmp>,
+        _call_term: &Term<Jmp>,
+        _return_term: &Term<Jmp>,
     ) -> Option<State<T>> {
-        todo!()
+        if let Some(state) = state_before_call {
+            let mut new_state = state.clone();
+            self.handle_unknown_symbol_calls(&mut new_state);
+            new_state.set_pointer_inference_state(None);
+            return Some(new_state);
+        }
+
+        None
     }
 
     fn update_call_stub(&self, state: &State<T>, call: &Term<Jmp>) -> Option<State<T>> {
         let mut new_state = state.clone();
         match &call.term {
-            Jmp::Call { target, .. } => {
-                let source_node = self.get_source_node(&state, &call.tid);
-                if self.extern_symbol_map.get(target).is_some() {
+            Jmp::Call { target, .. } => match self.extern_symbol_map.get(target) {
+                Some(symbol) => {
                     if let Some(string_symbol) = self.string_symbol_map.get(target) {
-                        new_state = self.handle_string_symbol_calls(string_symbol, &state);
+                        new_state = self.handle_string_symbol_calls(
+                            string_symbol,
+                            &new_state,
+                        );
+                    } else {
+                        new_state = self.handle_generic_symbol_calls(symbol, &new_state);
                     }
-                } else {
-                    panic!("Extern symbol not found.");
                 }
-            }
+                None => panic!("Extern symbol not found."),
+            },
+            Jmp::CallInd { .. } => self.handle_unknown_symbol_calls(&mut new_state),
             _ => panic!("Malformed control flow graph encountered."),
         }
 
+        new_state.set_pointer_inference_state(None);
         Some(new_state)
     }
 

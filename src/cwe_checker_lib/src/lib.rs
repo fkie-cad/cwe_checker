@@ -112,6 +112,7 @@ pub fn get_modules() -> Vec<&'static CweModule> {
         &crate::checkers::cwe_676::CWE_MODULE,
         &crate::checkers::cwe_782::CWE_MODULE,
         &crate::analysis::pointer_inference::CWE_MODULE,
+        &crate::checkers::string_check::CWE_MODULE,
     ]
 }
 

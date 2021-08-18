@@ -1,9 +1,13 @@
-use std::{collections::HashMap, marker::PhantomData, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    marker::PhantomData,
+    sync::Arc,
+};
 
 use petgraph::{graph::NodeIndex, visit::IntoNodeReferences};
 
 use crate::{
-    abstract_domain::{AbstractDomain, HasTop},
+    abstract_domain::{AbstractDomain, DomainInsertion, HasTop},
     analysis::{
         forward_interprocedural_fixpoint::Context as _, graph::Node,
         interprocedural_fixpoint_generic::NodeValue,
@@ -22,7 +26,7 @@ mod trait_impls;
 /// Contains all context information needed for the string abstract fixpoint computation.
 ///
 /// The struct also implements the `interprocedural_fixpoint::Context` trait to enable the fixpoint computation.
-pub struct Context<'a, T: AbstractDomain + HasTop + Eq + From<String>> {
+pub struct Context<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> {
     /// A reference to the `Project` object representing the binary
     pub project: &'a Project,
     /// The runtime memory image for reading global read-only variables.
@@ -42,19 +46,22 @@ pub struct Context<'a, T: AbstractDomain + HasTop + Eq + From<String>> {
     /// The keys are of the form `(Def-TID, Current-Sub-TID)`
     /// to distinguish the nodes for blocks contained in more than one function.
     pub block_start_node_map: Arc<HashMap<(Tid, Tid), NodeIndex>>,
+    /// A set containing a given [`Def`](crate::intermediate_representation::Def) as the first `Def` of the block.
+    /// The keys are of the form `(Def-TID, Current-Sub-TID)`
+    /// to distinguish the nodes for blocks contained in more than one function.
+    pub block_first_def_set: Arc<HashSet<(Tid, Tid)>>,
     /// A map to get the node index of the `BlkEnd` node containing a given [`Jmp`].
     /// The keys are of the form `(Jmp-TID, Current-Sub-TID)`
     /// to distinguish the nodes for blocks contained in more than one function.
     pub jmp_to_blk_end_node_map: Arc<HashMap<(Tid, Tid), NodeIndex>>,
     _phantom_string_domain: PhantomData<T>,
 }
-impl<'a, T: AbstractDomain + HasTop + Eq + From<String>> Context<'a, T> {
+impl<'a, T: AbstractDomain + HasTop + Eq + From<String> + DomainInsertion> Context<'a, T> {
     /// Create a new context object for a given project.
     pub fn new(
         project: &'a Project,
         runtime_memory_image: &'a RuntimeMemoryImage,
         pointer_inference_results: &'a PointerInferenceComputation<'a>,
-        block_start_node_map: Arc<HashMap<(Tid, Tid), NodeIndex>>,
         config: Config,
     ) -> Context<'a, T> {
         let string_symbol_map = Arc::new(crate::utils::symbol_utils::get_symbol_map(
@@ -66,10 +73,17 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String>> Context<'a, T> {
             extern_symbol_map.insert(symbol.tid.clone(), symbol);
         }
 
+        let mut block_start_node_map: HashMap<(Tid, Tid), NodeIndex> = HashMap::new();
+        let mut block_first_def_set = HashSet::new();
         let mut jmp_to_blk_end_node_map = HashMap::new();
         for (node_id, node) in pointer_inference_results.get_graph().node_references() {
             match node {
-                Node::BlkStart(_, _) => (),
+                Node::BlkStart(block, sub) => {
+                    if let Some(def) = block.term.defs.get(0) {
+                        block_start_node_map.insert((def.tid.clone(), sub.tid.clone()), node_id);
+                        block_first_def_set.insert((def.tid.clone(), sub.tid.clone()));
+                    }
+                }
                 Node::BlkEnd(block, sub) => {
                     for jmp in block.term.jmps.iter() {
                         jmp_to_blk_end_node_map.insert((jmp.tid.clone(), sub.tid.clone()), node_id);
@@ -86,13 +100,14 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String>> Context<'a, T> {
             format_string_index_map: Arc::new(config.format_string_index.into_iter().collect()),
             string_symbol_map,
             extern_symbol_map: Arc::new(extern_symbol_map),
-            block_start_node_map,
+            block_start_node_map: Arc::new(block_start_node_map),
+            block_first_def_set: Arc::new(block_first_def_set),
             jmp_to_blk_end_node_map: Arc::new(jmp_to_blk_end_node_map),
             _phantom_string_domain: PhantomData,
         }
     }
 
-    /// Get the current pointer inference state (if one can be found) for the given taint state.
+    /// Get the current pointer inference state (if one can be found) for the given state.
     fn get_current_pointer_inference_state(
         &self,
         state: &State<T>,
@@ -120,20 +135,6 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String>> Context<'a, T> {
             let pi_context = self.pointer_inference_results.get_context();
             let new_pi_state = pi_context.update_def(&pi_state, def);
             state.set_pointer_inference_state(new_pi_state);
-        }
-    }
-
-    /// Gets the BlkEnd node of an external function call
-    pub fn get_source_node(&self, state: &State<T>, call_source: &Tid) -> NodeIndex {
-        let blk_end_node_id = self.jmp_to_blk_end_node_map.get(&(
-            call_source.clone(),
-            state.get_current_sub().as_ref().unwrap().tid.clone(),
-        ));
-
-        if let Some(blk_end_node) = blk_end_node_id {
-            *blk_end_node
-        } else {
-            panic!("Malformed Control Flow Graph.");
         }
     }
 }
