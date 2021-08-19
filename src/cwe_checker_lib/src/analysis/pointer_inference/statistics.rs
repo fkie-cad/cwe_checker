@@ -33,7 +33,7 @@ impl MemAccessStats {
     fn print_general_stats(&self, log_collector: Sender<LogThreadMsg>) {
         let all_mem_ops = self.all_mem_ops as f64;
         let msg = format!(
-            "Pointer Inference: {} memory operations.\n\
+            "{} memory operations.\n\
             \t{:.2}% tracked,\n\
             \t{:.2}% partially tracked,\n\
             \t{:.2}% untracked,\n\
@@ -44,14 +44,14 @@ impl MemAccessStats {
             self.is_only_top as f64 / all_mem_ops * 100.,
             self.empty_errors as f64 / all_mem_ops * 100.,
         );
-        let log_msg = LogMessage::new_debug(msg);
+        let log_msg = LogMessage::new_info(msg).source("Pointer Inference");
         let _ = log_collector.send(LogThreadMsg::Log(log_msg));
     }
 
     fn print_tracked_mem_ops_stats(&self, log_collector: Sender<LogThreadMsg>) {
         let all_mem_ops = self.all_mem_ops as f64;
         let msg = format!(
-            "Pointer Inference: {} ({:.2}%) memory operations with exactly known target. Of these are\n\
+            "{} ({:.2}%) memory operations with exactly known target. Of these are\n\
             \t{:.2}% global memory access,\n\
             \t{:.2}% current stack access,\n\
             \t{:.2}% other (heap or stack) access,\n\
@@ -65,7 +65,7 @@ impl MemAccessStats {
             self.exact_target_with_exact_offset as f64 / self.ops_with_exact_target_known() as f64 * 100.,
             self.exact_target_with_top_offset as f64 / self.ops_with_exact_target_known() as f64 * 100.,
         );
-        let log_msg = LogMessage::new_debug(msg);
+        let log_msg = LogMessage::new_info(msg).source("Pointer Inference");
         let _ = log_collector.send(LogThreadMsg::Log(log_msg));
     }
 

@@ -5,7 +5,7 @@ extern crate cwe_checker_lib; // Needed for the docstring-link to work
 
 use cwe_checker_lib::analysis::graph;
 use cwe_checker_lib::utils::binary::{BareMetalConfig, RuntimeMemoryImage};
-use cwe_checker_lib::utils::log::print_all_messages;
+use cwe_checker_lib::utils::log::{LogLevel, print_all_messages};
 use cwe_checker_lib::utils::{get_ghidra_plugin_path, read_config_file};
 use cwe_checker_lib::AnalysisResults;
 use cwe_checker_lib::{intermediate_representation::Project, utils::log::LogMessage};
@@ -46,7 +46,11 @@ struct CmdlineArgs {
     #[structopt(long, short)]
     quiet: bool,
 
-    /// Include various statistics in the debug log messages.
+    /// Print additional debug log messages.
+    #[structopt(long, short, conflicts_with("quiet"))]
+    verbose: bool,
+
+    /// Include various statistics in the log messages.
     /// This can be helpful for assessing the analysis quality for the input binary.
     #[structopt(long, conflicts_with("quiet"))]
     statistics: bool,
@@ -210,6 +214,13 @@ fn run_with_ghidra(args: &CmdlineArgs) {
     // Print the results of the modules.
     if args.quiet {
         all_logs = Vec::new(); // Suppress all log messages since the `--quiet` flag is set.
+    } else {
+        if args.statistics {
+            cwe_checker_lib::utils::log::add_debug_log_statistics(&mut all_logs);
+        }
+        if !args.verbose {
+            all_logs.retain(|log_msg| log_msg.level != LogLevel::Debug);
+        }
     }
     print_all_messages(all_logs, all_cwes, args.out.as_deref(), args.json);
 }

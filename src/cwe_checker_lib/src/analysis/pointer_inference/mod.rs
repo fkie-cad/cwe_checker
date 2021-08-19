@@ -151,10 +151,13 @@ impl<'a> PointerInference<'a> {
         let mut fixpoint_computation =
             super::forward_interprocedural_fixpoint::create_computation_with_alternate_worklist_order(context, None);
         if print_stats {
-            let _ = log_sender.send(LogThreadMsg::Log(LogMessage::new_debug(format!(
-                "Pointer Inference: Adding {} entry points",
-                entry_sub_to_entry_node_map.len()
-            ))));
+            let _ = log_sender.send(LogThreadMsg::Log(
+                LogMessage::new_info(format!(
+                    "Adding {} entry points",
+                    entry_sub_to_entry_node_map.len()
+                ))
+                .source("Pointer Inference"),
+            ));
         }
         for (sub_tid, start_node_index) in entry_sub_to_entry_node_map.into_iter() {
             let mut fn_entry_state = State::new(&project.stack_pointer_register, sub_tid.clone());
@@ -284,8 +287,8 @@ impl<'a> PointerInference<'a> {
             }
         }
         if print_stats {
-            self.log_debug(format!(
-                "Pointer Inference: Adding {} speculative entry points",
+            self.log_info(format!(
+                "Adding {} speculative entry points",
                 new_entry_points.len()
             ));
         }
@@ -320,14 +323,14 @@ impl<'a> PointerInference<'a> {
                 }
             }
         }
-        self.log_debug(format!(
-            "Pointer Inference: Blocks with state: {} / {}",
+        self.log_info(format!(
+            "Blocks with state: {} / {}",
             stateful_blocks, all_blocks
         ));
     }
 
-    fn log_debug(&self, msg: impl Into<String>) {
-        let log_msg = LogMessage::new_debug(msg.into());
+    fn log_info(&self, msg: impl Into<String>) {
+        let log_msg = LogMessage::new_info(msg.into()).source("Pointer Inference");
         let _ = self.log_collector.send(LogThreadMsg::Log(log_msg));
     }
 
@@ -354,9 +357,9 @@ impl<'a> PointerInference<'a> {
 
         if !self.computation.has_stabilized() {
             let worklist_size = self.computation.get_worklist().len();
-            let _ = self.log_debug(format!(
-                "Pointer Inference: Fixpoint did not stabilize. Remaining worklist size: {}",
-                worklist_size
+            let _ = self.log_info(format!(
+                "Fixpoint did not stabilize. Remaining worklist size: {}",
+                worklist_size,
             ));
         }
         if print_stats {
