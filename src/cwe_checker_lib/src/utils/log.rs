@@ -222,8 +222,11 @@ pub fn add_debug_log_statistics(all_logs: &mut Vec<LogMessage>) {
         });
     }
     if general_debug_log_count > 0 {
-        all_logs.push(LogMessage{
-            text: format!("Logged {} general debug log messages.", general_debug_log_count),
+        all_logs.push(LogMessage {
+            text: format!(
+                "Logged {} general debug log messages.",
+                general_debug_log_count
+            ),
             level: LogLevel::Info,
             location: None,
             source: None,

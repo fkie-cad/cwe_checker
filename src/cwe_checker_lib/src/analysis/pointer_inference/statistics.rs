@@ -62,8 +62,10 @@ impl MemAccessStats {
             self.global_mem_access as f64 / self.ops_with_exact_target_known() as f64 * 100.,
             self.current_stack_access as f64 / self.ops_with_exact_target_known() as f64 * 100.,
             self.non_current_stack_access as f64 / self.ops_with_exact_target_known() as f64 * 100.,
-            self.exact_target_with_exact_offset as f64 / self.ops_with_exact_target_known() as f64 * 100.,
-            self.exact_target_with_top_offset as f64 / self.ops_with_exact_target_known() as f64 * 100.,
+            self.exact_target_with_exact_offset as f64 / self.ops_with_exact_target_known() as f64
+                * 100.,
+            self.exact_target_with_top_offset as f64 / self.ops_with_exact_target_known() as f64
+                * 100.,
         );
         let log_msg = LogMessage::new_info(msg).source("Pointer Inference");
         let _ = log_collector.send(LogThreadMsg::Log(log_msg));

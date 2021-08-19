@@ -5,7 +5,7 @@ extern crate cwe_checker_lib; // Needed for the docstring-link to work
 
 use cwe_checker_lib::analysis::graph;
 use cwe_checker_lib::utils::binary::{BareMetalConfig, RuntimeMemoryImage};
-use cwe_checker_lib::utils::log::{LogLevel, print_all_messages};
+use cwe_checker_lib::utils::log::{print_all_messages, LogLevel};
 use cwe_checker_lib::utils::{get_ghidra_plugin_path, read_config_file};
 use cwe_checker_lib::AnalysisResults;
 use cwe_checker_lib::{intermediate_representation::Project, utils::log::LogMessage};
