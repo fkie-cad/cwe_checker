@@ -39,7 +39,7 @@ use crate::{
 use petgraph::graph::NodeIndex;
 use petgraph::visit::IntoNodeReferences;
 use petgraph::Direction;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 mod context;
 pub mod object;
@@ -496,9 +496,9 @@ pub fn run<'a>(
 fn collect_all_logs(
     receiver: crossbeam_channel::Receiver<LogThreadMsg>,
 ) -> (Vec<LogMessage>, Vec<CweWarning>) {
-    let mut logs_with_address = HashMap::new();
+    let mut logs_with_address = BTreeMap::new();
     let mut general_logs = Vec::new();
-    let mut collected_cwes = HashMap::new();
+    let mut collected_cwes = BTreeMap::new();
 
     while let Ok(log_thread_msg) = receiver.recv() {
         match log_thread_msg {
@@ -523,7 +523,10 @@ fn collect_all_logs(
         .cloned()
         .chain(general_logs.into_iter())
         .collect();
-    let cwes = collected_cwes.drain().map(|(_key, value)| value).collect();
+    let cwes = collected_cwes
+        .into_iter()
+        .map(|(_key, value)| value)
+        .collect();
     (logs, cwes)
 }
 
