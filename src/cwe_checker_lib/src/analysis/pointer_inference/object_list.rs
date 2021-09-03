@@ -55,7 +55,7 @@ impl AbstractObjectList {
                 match (report_unknown_states, object.get_state()) {
                     (_, ObjectState::Dangling) => return true,
                     (true, ObjectState::Unknown) => {
-                        if object.is_unique {
+                        if object.is_unique() {
                             return true;
                         }
                     }
@@ -240,7 +240,7 @@ impl AbstractObjectList {
         let new_object = AbstractObject::new(type_, address_bytesize);
         if let Some((object, offset)) = self.objects.get_mut(&object_id) {
             // If the identifier already exists, we have to assume that more than one object may be referenced by this identifier.
-            object.is_unique = false;
+            object.mark_as_not_unique();
             *object = object.merge(&new_object);
             *offset = offset.merge(&initial_offset);
         } else {
@@ -384,7 +384,7 @@ impl AbstractObjectList {
     /// Returns an error if the ID is not contained in the object list.
     pub fn is_unique_object(&self, object_id: &AbstractIdentifier) -> Result<bool, Error> {
         match self.objects.get(object_id) {
-            Some((object, _)) => Ok(object.is_unique),
+            Some((object, _)) => Ok(object.is_unique()),
             None => Err(anyhow!("Object ID not contained in object list.")),
         }
     }

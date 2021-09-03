@@ -110,8 +110,10 @@ impl<T: AbstractDomain + SizedDomain + HasTop + std::fmt::Debug> MemRegion<T> {
     /// Clear all values that might be fully or partially overwritten if one writes a value with byte size `value_size`
     /// to an offset contained in the interval from `start` to `end` (both bounds included in the interval).
     ///
-    /// This represents the effect of writing an arbitrary value (with known byte size)
-    /// to an arbitrary offset contained in the interval.
+    /// This represents the effect of writing arbitrary values (with known byte size)
+    /// to arbitrary offsets contained in the interval.
+    /// Note that if only only wants to mark values in the interval as potentially overwritten without deleting them,
+    /// then one should use the [`MemRegion::mark_interval_values_as_top`] method instead.
     pub fn clear_offset_interval(&mut self, start: i64, end: i64, value_size: ByteSize) {
         let size = end - start + (u64::from(value_size) as i64);
         self.clear_interval(start, size);
@@ -247,6 +249,16 @@ impl<T: AbstractDomain + SizedDomain + HasTop + std::fmt::Debug> MemRegion<T> {
         }
     }
 
+    /// Emulate a write operation to an unknown offset by merging all values with `Top`
+    /// to indicate that they may have been overwritten
+    pub fn mark_all_values_as_top(&mut self) {
+        let inner = Arc::make_mut(&mut self.inner);
+        for value in inner.values.values_mut() {
+            *value = value.merge(&value.top());
+        }
+        self.clear_top_values();
+    }
+
     /// Merge two memory regions.
     ///
     /// Values at the same position and with the same size get merged via their merge function.
@@ -323,24 +335,8 @@ impl<T: AbstractDomain + SizedDomain + HasTop + std::fmt::Debug> MemRegion<T> {
     /// Remove all values representing the *Top* element from the internal value store,
     /// as these should not be saved in the internal representation.
     pub fn clear_top_values(&mut self) {
-        let indices_to_remove: Vec<i64> = self
-            .inner
-            .values
-            .iter()
-            .filter_map(
-                |(index, value)| {
-                    if value.is_top() {
-                        Some(*index)
-                    } else {
-                        None
-                    }
-                },
-            )
-            .collect();
         let inner = Arc::make_mut(&mut self.inner);
-        for index in indices_to_remove {
-            inner.values.remove(&index);
-        }
+        inner.values.retain(|_key, value| !value.is_top());
     }
 }
 

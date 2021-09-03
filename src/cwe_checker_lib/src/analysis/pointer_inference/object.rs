@@ -3,46 +3,34 @@
 use super::{Data, ValueDomain};
 use crate::abstract_domain::*;
 use crate::prelude::*;
-use derive_more::Deref;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
-use std::ops::DerefMut;
 use std::sync::Arc;
 
-/// A wrapper struct wrapping `AbstractObjectInfo` in an `Arc`.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Deref)]
-#[deref(forward)]
-pub struct AbstractObject(Arc<AbstractObjectInfo>);
-
-impl DerefMut for AbstractObject {
-    fn deref_mut(&mut self) -> &mut AbstractObjectInfo {
-        Arc::make_mut(&mut self.0)
-    }
-}
-
-impl AbstractObject {
-    /// Create a new abstract object with given object type and address bitsize.
-    pub fn new(type_: ObjectType, address_bytesize: ByteSize) -> AbstractObject {
-        AbstractObject(Arc::new(AbstractObjectInfo::new(type_, address_bytesize)))
-    }
-
-    /// Short-circuits the `AbstractObjectInfo::merge` function if `self==other`.
-    pub fn merge(&self, other: &Self) -> Self {
-        if self == other {
-            self.clone()
-        } else {
-            AbstractObject(Arc::new(self.0.merge(other)))
-        }
-    }
+/// An abstract object contains all knowledge tracked about a particular memory object.
+///
+/// In some cases one abstract object can represent more than one actual memory object.
+/// This happens for e.g. several memory objects allocated into an array,
+/// since we cannot represent every object separately without knowing the exact number of objects
+/// (which may be runtime dependent).
+///
+/// To allow cheap cloning of abstract objects, the actual data is wrapped in an `Arc`.
+///
+/// Examples of memory objects:
+/// * The stack frame of a function
+/// * A memory object allocated on the heap
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+pub struct AbstractObject {
+    inner: Arc<Inner>,
 }
 
 /// The abstract object info contains all information that we track for an abstract object.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
-pub struct AbstractObjectInfo {
+struct Inner {
     /// An upper approximation of all possible targets for which pointers may exist inside the memory region.
     pointer_targets: BTreeSet<AbstractIdentifier>,
     /// Tracks whether this may represent more than one actual memory object.
-    pub is_unique: bool,
+    is_unique: bool,
     /// Is the object alive or already destroyed
     state: ObjectState,
     /// Is the object a stack frame or a heap object
@@ -59,10 +47,42 @@ pub struct AbstractObjectInfo {
     upper_index_bound: BitvectorDomain,
 }
 
-impl AbstractObjectInfo {
-    /// Create a new abstract object with known object type and address bitsize
-    pub fn new(type_: ObjectType, address_bytesize: ByteSize) -> AbstractObjectInfo {
-        AbstractObjectInfo {
+/// An object is either a stack or a heap object.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy, PartialOrd, Ord)]
+pub enum ObjectType {
+    /// A stack object, i.e. the stack frame of a function.
+    Stack,
+    /// A memory object located on the heap.
+    Heap,
+}
+
+/// An object is either alive or dangling (because the memory was freed or a function return invalidated the stack frame).
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy, PartialOrd, Ord)]
+pub enum ObjectState {
+    /// The object is alive.
+    Alive,
+    /// The object is dangling, i.e. the memory has been freed already.
+    Dangling,
+    /// The state of the object is unknown (due to merging different object states).
+    Unknown,
+    /// The object was referenced in an "use-after-free" or "double-free" CWE-warning.
+    /// This state is meant to be temporary to prevent obvious subsequent CWE-warnings with the same root cause.
+    Flagged,
+}
+
+#[allow(clippy::from_over_into)]
+impl std::convert::Into<AbstractObject> for Inner {
+    fn into(self) -> AbstractObject {
+        AbstractObject {
+            inner: Arc::new(self),
+        }
+    }
+}
+
+impl AbstractObject {
+    /// Create a new abstract object with given object type and address bytesize.
+    pub fn new(type_: ObjectType, address_bytesize: ByteSize) -> AbstractObject {
+        let inner = Inner {
             pointer_targets: BTreeSet::new(),
             is_unique: true,
             state: ObjectState::Alive,
@@ -70,17 +90,32 @@ impl AbstractObjectInfo {
             memory: MemRegion::new(address_bytesize),
             lower_index_bound: BitvectorDomain::Top(address_bytesize),
             upper_index_bound: BitvectorDomain::Top(address_bytesize),
-        }
+        };
+        inner.into()
+    }
+
+    /// Returns `false` if the abstract object may represent more than one object,
+    /// e.g. for arrays of objects.
+    pub fn is_unique(&self) -> bool {
+        self.inner.is_unique
+    }
+
+    /// Mark the abstract object as possibly representing more than one actual memory object.
+    pub fn mark_as_not_unique(&mut self) {
+        let inner = Arc::make_mut(&mut self.inner);
+        inner.is_unique = false;
     }
 
     /// Set the lower index bound that is still considered to be contained in the abstract object.
     pub fn set_lower_index_bound(&mut self, lower_bound: BitvectorDomain) {
-        self.lower_index_bound = lower_bound;
+        let inner = Arc::make_mut(&mut self.inner);
+        inner.lower_index_bound = lower_bound;
     }
 
     /// Set the upper index bound that is still considered to be contained in the abstract object.
     pub fn set_upper_index_bound(&mut self, upper_bound: BitvectorDomain) {
-        self.upper_index_bound = upper_bound;
+        let inner = Arc::make_mut(&mut self.inner);
+        inner.upper_index_bound = upper_bound;
     }
 
     /// Check whether a memory access to the abstract object at the given offset
@@ -89,12 +124,12 @@ impl AbstractObjectInfo {
     /// then only return `true` if the access is contained in the abstract object for all possible offset values.
     pub fn access_contained_in_bounds(&self, offset: &ValueDomain, size: ByteSize) -> bool {
         if let Ok(offset_interval) = offset.try_to_interval() {
-            if let Ok(lower_bound) = self.lower_index_bound.try_to_bitvec() {
+            if let Ok(lower_bound) = self.inner.lower_index_bound.try_to_bitvec() {
                 if lower_bound.checked_sgt(&offset_interval.start).unwrap() {
                     return false;
                 }
             }
-            if let Ok(upper_bound) = self.upper_index_bound.try_to_bitvec() {
+            if let Ok(upper_bound) = self.inner.upper_index_bound.try_to_bitvec() {
                 let mut size_as_bitvec = Bitvector::from_u64(u64::from(size));
                 match offset.bytesize().cmp(&size_as_bitvec.bytesize()) {
                     std::cmp::Ordering::Less => size_as_bitvec.truncate(offset.bytesize()).unwrap(),
@@ -121,9 +156,9 @@ impl AbstractObjectInfo {
         }
     }
 
-    /// Read the value at the given offset of the given size (in bits, not bytes) inside the memory region.
+    /// Read the value at the given offset of the given size inside the memory region.
     pub fn get_value(&self, offset: Bitvector, bytesize: ByteSize) -> Data {
-        self.memory.get(offset, bytesize)
+        self.inner.memory.get(offset, bytesize)
     }
 
     /// Write a value at the given offset to the memory region.
@@ -131,47 +166,55 @@ impl AbstractObjectInfo {
     /// If the abstract object is not unique (i.e. may represent more than one actual object),
     /// merge the old value at the given offset with the new value.
     pub fn set_value(&mut self, value: Data, offset: &ValueDomain) -> Result<(), Error> {
-        self.pointer_targets.extend(value.referenced_ids().cloned());
+        let inner = Arc::make_mut(&mut self.inner);
+        inner
+            .pointer_targets
+            .extend(value.referenced_ids().cloned());
         if let Ok(concrete_offset) = offset.try_to_bitvec() {
-            if self.is_unique {
-                self.memory.add(value, concrete_offset);
+            if inner.is_unique {
+                inner.memory.add(value, concrete_offset);
             } else {
-                let merged_value = self
+                let merged_value = inner
                     .memory
                     .get(concrete_offset.clone(), value.bytesize())
                     .merge(&value);
-                self.memory.add(merged_value, concrete_offset);
+                inner.memory.add(merged_value, concrete_offset);
             };
         } else if let Ok((start, end)) = offset.try_to_offset_interval() {
-            self.memory
-                .clear_offset_interval(start, end, value.bytesize());
+            inner
+                .memory
+                .mark_interval_values_as_top(start, end, value.bytesize());
         } else {
-            self.memory = MemRegion::new(self.memory.get_address_bytesize());
+            inner.memory.mark_all_values_as_top();
         }
         Ok(())
     }
 
     /// Merge `value` at position `offset` with the value currently saved at that position.
     pub fn merge_value(&mut self, value: Data, offset: &ValueDomain) {
-        self.pointer_targets.extend(value.referenced_ids().cloned());
+        let inner = Arc::make_mut(&mut self.inner);
+        inner
+            .pointer_targets
+            .extend(value.referenced_ids().cloned());
         if let Ok(concrete_offset) = offset.try_to_bitvec() {
-            let merged_value = self
+            let merged_value = inner
                 .memory
                 .get(concrete_offset.clone(), value.bytesize())
                 .merge(&value);
-            self.memory.add(merged_value, concrete_offset);
+            inner.memory.add(merged_value, concrete_offset);
         } else if let Ok((start, end)) = offset.try_to_offset_interval() {
-            self.memory
-                .clear_offset_interval(start, end, value.bytesize());
+            inner
+                .memory
+                .mark_interval_values_as_top(start, end, value.bytesize());
         } else {
-            self.memory = MemRegion::new(self.memory.get_address_bytesize());
+            inner.memory.mark_all_values_as_top();
         }
     }
 
     /// Get all abstract IDs that the object may contain pointers to.
     /// This yields an overapproximation of possible pointer targets.
     pub fn get_referenced_ids_overapproximation(&self) -> &BTreeSet<AbstractIdentifier> {
-        &self.pointer_targets
+        &self.inner.pointer_targets
     }
 
     /// Get all abstract IDs for which the object contains pointers to.
@@ -179,7 +222,7 @@ impl AbstractObjectInfo {
     /// since the object may contain pointers that could not be tracked by the analysis.
     pub fn get_referenced_ids_underapproximation(&self) -> BTreeSet<AbstractIdentifier> {
         let mut referenced_ids = BTreeSet::new();
-        for data in self.memory.values() {
+        for data in self.inner.memory.values() {
             referenced_ids.extend(data.referenced_ids().cloned())
         }
         referenced_ids
@@ -193,22 +236,29 @@ impl AbstractObjectInfo {
         new_id: &AbstractIdentifier,
         offset_adjustment: &ValueDomain,
     ) {
-        for elem in self.memory.values_mut() {
+        let inner = Arc::make_mut(&mut self.inner);
+        for elem in inner.memory.values_mut() {
             elem.replace_abstract_id(old_id, new_id, offset_adjustment);
         }
-        self.memory.clear_top_values();
-        if self.pointer_targets.get(old_id).is_some() {
-            self.pointer_targets.remove(old_id);
-            self.pointer_targets.insert(new_id.clone());
+        inner.memory.clear_top_values();
+        if inner.pointer_targets.get(old_id).is_some() {
+            inner.pointer_targets.remove(old_id);
+            inner.pointer_targets.insert(new_id.clone());
         }
     }
 
-    /// If `self.is_unique==true`, set the state of the object. Else merge the new state with the old.
+    /// Get the state of the memory object.
+    pub fn get_state(&self) -> ObjectState {
+        self.inner.state
+    }
+
+    /// If `self.is_unique()==true`, set the state of the object. Else merge the new state with the old.
     pub fn set_state(&mut self, new_state: ObjectState) {
-        if self.is_unique {
-            self.state = new_state;
+        let inner = Arc::make_mut(&mut self.inner);
+        if inner.is_unique {
+            inner.state = new_state;
         } else {
-            self.state = self.state.merge(new_state);
+            inner.state = inner.state.merge(new_state);
         }
     }
 
@@ -217,36 +267,34 @@ impl AbstractObjectInfo {
     ///
     /// If this operation would produce an empty value, it replaces it with a `Top` value instead.
     pub fn remove_ids(&mut self, ids_to_remove: &BTreeSet<AbstractIdentifier>) {
-        self.pointer_targets = self
+        let inner = Arc::make_mut(&mut self.inner);
+        inner.pointer_targets = inner
             .pointer_targets
             .difference(ids_to_remove)
             .cloned()
             .collect();
-        for value in self.memory.values_mut() {
+        for value in inner.memory.values_mut() {
             value.remove_ids(ids_to_remove);
             if value.is_empty() {
                 *value = value.top();
             }
         }
-        self.memory.clear_top_values(); // In case the previous operation left *Top* values in the memory struct.
-    }
-
-    /// Get the state of the memory object.
-    pub fn get_state(&self) -> ObjectState {
-        self.state
+        inner.memory.clear_top_values(); // In case the previous operation left *Top* values in the memory struct.
     }
 
     /// Get the type of the memory object.
     pub fn get_object_type(&self) -> Option<ObjectType> {
-        self.type_
+        self.inner.type_
     }
 
-    /// Invalidates all memory and adds the `additional_targets` to the pointer targets.
+    /// Marks all memory as `Top` and adds the `additional_targets` to the pointer targets.
     /// Represents the effect of unknown write instructions to the object
     /// which may include writing pointers to targets from the `additional_targets` set to the object.
     pub fn assume_arbitrary_writes(&mut self, additional_targets: &BTreeSet<AbstractIdentifier>) {
-        self.memory = MemRegion::new(self.memory.get_address_bytesize());
-        self.pointer_targets
+        let inner = Arc::make_mut(&mut self.inner);
+        inner.memory.mark_all_values_as_top();
+        inner
+            .pointer_targets
             .extend(additional_targets.iter().cloned());
     }
 
@@ -254,25 +302,26 @@ impl AbstractObjectInfo {
     /// Returns an error if a possible double free is detected
     /// or the memory object may not be a heap object.
     pub fn mark_as_freed(&mut self) -> Result<(), Error> {
-        if self.type_ != Some(ObjectType::Heap) {
+        if self.inner.type_ != Some(ObjectType::Heap) {
             self.set_state(ObjectState::Flagged);
             return Err(anyhow!("Free operation on possibly non-heap memory object"));
         }
-        match (self.is_unique, self.state) {
+        let inner = Arc::make_mut(&mut self.inner);
+        match (inner.is_unique, inner.state) {
             (true, ObjectState::Alive) | (true, ObjectState::Flagged) => {
-                self.state = ObjectState::Dangling;
+                inner.state = ObjectState::Dangling;
                 Ok(())
             }
             (false, ObjectState::Flagged) => {
-                self.state = ObjectState::Unknown;
+                inner.state = ObjectState::Unknown;
                 Ok(())
             }
             (true, _) | (false, ObjectState::Dangling) => {
-                self.state = ObjectState::Flagged;
+                inner.state = ObjectState::Flagged;
                 Err(anyhow!("Object may already have been freed"))
             }
             (false, _) => {
-                self.state = ObjectState::Unknown;
+                inner.state = ObjectState::Unknown;
                 Ok(())
             }
         }
@@ -282,38 +331,51 @@ impl AbstractObjectInfo {
     /// Returns an error if the object was definitely freed before
     /// or if the object may not be a heap object.
     pub fn mark_as_maybe_freed(&mut self) -> Result<(), Error> {
-        if self.type_ != Some(ObjectType::Heap) {
+        if self.inner.type_ != Some(ObjectType::Heap) {
             self.set_state(ObjectState::Flagged);
             return Err(anyhow!("Free operation on possibly non-heap memory object"));
         }
-        match self.state {
+        let inner = Arc::make_mut(&mut self.inner);
+        match inner.state {
             ObjectState::Dangling => {
-                self.state = ObjectState::Flagged;
+                inner.state = ObjectState::Flagged;
                 Err(anyhow!("Object may already have been freed"))
             }
             _ => {
-                self.state = ObjectState::Unknown;
+                inner.state = ObjectState::Unknown;
                 Ok(())
             }
         }
     }
 }
 
-impl AbstractDomain for AbstractObjectInfo {
+impl AbstractDomain for AbstractObject {
     /// Merge two abstract objects
     fn merge(&self, other: &Self) -> Self {
-        AbstractObjectInfo {
-            pointer_targets: self
-                .pointer_targets
-                .union(&other.pointer_targets)
-                .cloned()
-                .collect(),
-            is_unique: self.is_unique && other.is_unique,
-            state: self.state.merge(other.state),
-            type_: same_or_none(&self.type_, &other.type_),
-            memory: self.memory.merge(&other.memory),
-            lower_index_bound: self.lower_index_bound.merge(&other.lower_index_bound),
-            upper_index_bound: self.upper_index_bound.merge(&other.upper_index_bound),
+        if self == other {
+            self.clone()
+        } else {
+            Inner {
+                pointer_targets: self
+                    .inner
+                    .pointer_targets
+                    .union(&other.inner.pointer_targets)
+                    .cloned()
+                    .collect(),
+                is_unique: self.inner.is_unique && other.inner.is_unique,
+                state: self.inner.state.merge(other.inner.state),
+                type_: same_or_none(&self.inner.type_, &other.inner.type_),
+                memory: self.inner.memory.merge(&other.inner.memory),
+                lower_index_bound: self
+                    .inner
+                    .lower_index_bound
+                    .merge(&other.inner.lower_index_bound),
+                upper_index_bound: self
+                    .inner
+                    .upper_index_bound
+                    .merge(&other.inner.upper_index_bound),
+            }
+            .into()
         }
     }
 
@@ -323,33 +385,34 @@ impl AbstractDomain for AbstractObjectInfo {
     }
 }
 
-impl AbstractObjectInfo {
+impl AbstractObject {
     /// Get a more compact json-representation of the abstract object.
     /// Intended for pretty printing, not useable for serialization/deserialization.
     pub fn to_json_compact(&self) -> serde_json::Value {
         let mut elements = vec![
             (
                 "is_unique".to_string(),
-                serde_json::Value::String(format!("{}", self.is_unique)),
+                serde_json::Value::String(format!("{}", self.inner.is_unique)),
             ),
             (
                 "state".to_string(),
-                serde_json::Value::String(format!("{:?}", self.state)),
+                serde_json::Value::String(format!("{:?}", self.inner.state)),
             ),
             (
                 "type".to_string(),
-                serde_json::Value::String(format!("{:?}", self.type_)),
+                serde_json::Value::String(format!("{:?}", self.inner.type_)),
             ),
             (
                 "lower_index_bound".to_string(),
-                serde_json::Value::String(format!("{}", self.lower_index_bound)),
+                serde_json::Value::String(format!("{}", self.inner.lower_index_bound)),
             ),
             (
                 "upper_index_bound".to_string(),
-                serde_json::Value::String(format!("{}", self.upper_index_bound)),
+                serde_json::Value::String(format!("{}", self.inner.upper_index_bound)),
             ),
         ];
         let memory = self
+            .inner
             .memory
             .iter()
             .map(|(index, value)| (format!("{}", index), value.to_json_compact()));
@@ -368,29 +431,6 @@ fn same_or_none<T: Eq + Clone>(left: &Option<T>, right: &Option<T>) -> Option<T>
     } else {
         None
     }
-}
-
-/// An object is either a stack or a heap object.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy, PartialOrd, Ord)]
-pub enum ObjectType {
-    /// A stack object, i.e. the stack frame of a function.
-    Stack,
-    /// A memory object located on the heap.
-    Heap,
-}
-
-/// An object is either alive or dangling (because the memory was freed or a function return invalidated the stack frame).
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy, PartialOrd, Ord)]
-pub enum ObjectState {
-    /// The object is alive.
-    Alive,
-    /// The object is dangling, i.e. the memory has been freed already.
-    Dangling,
-    /// The state of the object is unknown (due to merging different object states).
-    Unknown,
-    /// The object was referenced in an "use-after-free" or "double-free" CWE-warning.
-    /// This state is meant to be temporary to prevent obvious subsequent CWE-warnings with the same root cause.
-    Flagged,
 }
 
 impl ObjectState {
@@ -413,7 +453,7 @@ mod tests {
     use super::*;
 
     fn new_abstract_object() -> AbstractObject {
-        let obj_info = AbstractObjectInfo {
+        let inner = Inner {
             pointer_targets: BTreeSet::new(),
             is_unique: true,
             state: ObjectState::Alive,
@@ -422,7 +462,7 @@ mod tests {
             lower_index_bound: Bitvector::from_u64(0).into(),
             upper_index_bound: Bitvector::from_u64(99).into(),
         };
-        AbstractObject(Arc::new(obj_info))
+        inner.into()
     }
 
     fn new_data(number: i64) -> Data {
