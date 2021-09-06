@@ -12,7 +12,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: Log in to ghcr.io Container registry
+      - name: Build test docker image
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          load: true
+          tags: cwe_checker:test
+
+      - name: Check functionality of the image
+        run: docker run --rm cwe_checker:test /bin/echo | grep -q CWE676
+
         uses: docker/login-action@v1
         with:
           registry: ghcr.io
