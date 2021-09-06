@@ -76,10 +76,16 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
                 Some(new_state)
             }
             Def::Load { var, address } => {
-                self.log_debug(
-                    new_state.handle_load(var, address, &self.runtime_memory_image),
-                    Some(&def.tid),
-                );
+                if !self.is_mips_gp_load_to_top_value(state, var, address) {
+                    self.log_debug(
+                        new_state.handle_load(var, address, self.runtime_memory_image),
+                        Some(&def.tid),
+                    );
+                }
+                // Else we ignore the load and hope that the value still contained in the gp register is still correct.
+                // This only works because gp is (incorrectly) marked as a callee-saved register.
+                // FIXME: If the rest of the analysis becomes good enough so that this case is not common anymore,
+                // we should log it.
                 Some(new_state)
             }
         }
@@ -164,6 +170,11 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
                 )
                 .into(),
             );
+            // For MIPS architecture only: Ensure that the t9 register contains the address of the called function
+            if self.project.cpu_architecture.contains("MIPS") {
+                let _ = callee_state
+                    .set_mips_link_register(callee_tid, self.project.stack_pointer_register.size);
+            }
             // set the list of caller stack ids to only this caller id
             callee_state.caller_stack_ids = BTreeSet::new();
             callee_state.caller_stack_ids.insert(new_caller_stack_id);

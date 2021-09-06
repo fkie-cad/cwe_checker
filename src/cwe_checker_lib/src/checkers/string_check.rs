@@ -41,7 +41,7 @@ pub fn check_cwe(
     cwe_params: &serde_json::Value,
 ) -> (Vec<LogMessage>, Vec<CweWarning>) {
     let config: Config = serde_json::from_value(cwe_params.clone()).unwrap();
-    let mut string_abstraction: StringAbstraction<BricksDomain> =
+    let mut string_abstraction: StringAbstraction<CharacterInclusionDomain> =
         StringAbstraction::new(
             analysis_results.project,
             analysis_results.runtime_memory_image,
@@ -111,7 +111,7 @@ pub fn check_cwe(
                             {
                                 let pi_state = pi_node.unwrap_value();
                                 let source_state = source_node.unwrap_value();
-                                check_system_call_parameter_with_br_domain(
+                                check_system_call_parameter_with_ci_domain(
                                     source_state,
                                     pi_state,
                                     system_symbol,
