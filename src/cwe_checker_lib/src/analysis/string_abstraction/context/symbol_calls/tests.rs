@@ -2,12 +2,11 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt::Debug;
 
 use petgraph::graph::NodeIndex;
-use regex::{Match, Regex};
 
 use super::Context;
 use crate::abstract_domain::{
     AbstractDomain, CharacterInclusionDomain, CharacterSet, DataDomain, DomainInsertion, HasTop,
-    Interval, IntervalDomain, PointerDomain,
+    IntervalDomain, PointerDomain,
 };
 use crate::analysis::forward_interprocedural_fixpoint::Context as _;
 use crate::analysis::pointer_inference::PointerInference as PointerInferenceComputation;
@@ -99,7 +98,210 @@ fn mock_string_symbol_map(project: &Project) -> HashMap<Tid, &ExternSymbol> {
 }
 
 #[test]
-fn test_handle_string_symbol_calls() {}
+fn test_handle_generic_symbol_calls() {
+    let memcpy_symbol = ExternSymbol::mock_memcpy_symbol_arm();
+    let project = mock_project_with_intraprocedural_control_flow(
+        vec![(memcpy_symbol.clone(), vec![true])],
+        "func",
+    );
+    let mem_image = RuntimeMemoryImage::mock();
+    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
+    pi_results.compute();
+
+    let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
+
+    setup.state_before_call.add_new_variable_to_pointer_entry(
+        Variable::mock("r1", 4),
+        DataDomain::Value(IntervalDomain::from(Bitvector::from_i32(32))),
+    );
+
+    let new_state = setup
+        .context
+        .handle_generic_symbol_calls(&memcpy_symbol, &mut setup.state_before_call);
+
+    assert!(new_state.get_variable_to_pointer_map().is_empty());
+}
+
+#[test]
+fn test_handle_unknown_symbol_calls() {
+    let memcpy_symbol = ExternSymbol::mock_memcpy_symbol_arm();
+    let project = mock_project_with_intraprocedural_control_flow(
+        vec![(memcpy_symbol.clone(), vec![true])],
+        "func",
+    );
+    let mem_image = RuntimeMemoryImage::mock();
+    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
+    pi_results.compute();
+
+    let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
+
+    setup.state_before_call.add_new_variable_to_pointer_entry(
+        Variable::mock("r1", 4),
+        DataDomain::Value(IntervalDomain::from(Bitvector::from_i32(32))),
+    );
+
+    setup
+        .context
+        .handle_unknown_symbol_calls(&mut setup.state_before_call);
+
+    assert!(setup
+        .state_before_call
+        .get_variable_to_pointer_map()
+        .is_empty());
+}
+
+#[test]
+fn test_handle_memcpy_calls_with_multiple_source_targets() {
+    let memcpy_symbol = ExternSymbol::mock_memcpy_symbol_arm();
+    let project = mock_project_with_intraprocedural_control_flow(
+        vec![(memcpy_symbol.clone(), vec![true])],
+        "func",
+    );
+    let mem_image = RuntimeMemoryImage::mock();
+    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
+    pi_results.compute();
+
+    let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
+
+    let stack_id = AbstractIdentifier::new(
+        Tid::new("func"),
+        AbstractLocation::from_var(&Variable::mock("sp", 4)).unwrap(),
+    );
+
+    let heap_id = AbstractIdentifier::new(
+        Tid::new("func"),
+        AbstractLocation::from_var(&Variable::mock("r5", 4)).unwrap(),
+    );
+
+    let mut parameter_pointer: PointerDomain<IntervalDomain> =
+        PointerDomain::new(stack_id.clone(), Bitvector::from_i32(4).into());
+
+    parameter_pointer.add_target(heap_id.clone(), Bitvector::from_i32(0).into());
+    setup
+        .state_before_call
+        .add_new_stack_offset_to_string_entry(4, CharacterInclusionDomain::from("a".to_string()));
+    setup
+        .state_before_call
+        .add_new_heap_to_string_entry(heap_id, CharacterInclusionDomain::from("b".to_string()));
+
+    setup.pi_state_before_symbol_call.set_register(
+        &Variable::mock("r1", 4),
+        DataDomain::Pointer(parameter_pointer),
+    );
+
+    setup
+        .state_before_call
+        .set_pointer_inference_state(Some(setup.pi_state_before_symbol_call));
+
+    // Test Case: destination pointer has multiple targets and source pointer has a unique target.
+    let new_state = setup
+        .context
+        .handle_memcpy_calls(&setup.state_before_call, &memcpy_symbol);
+
+    let expected_domain = CharacterInclusionDomain::Value((
+        CharacterSet::Value(BTreeSet::new()),
+        CharacterSet::Value(vec!['a', 'b'].into_iter().collect()),
+    ));
+
+    assert_eq!(
+        expected_domain,
+        *new_state
+            .get_stack_offset_to_string_map()
+            .get(&-60)
+            .unwrap()
+    );
+}
+
+#[test]
+fn test_handle_memcpy_calls_with_unique_pointers() {
+    let memcpy_symbol = ExternSymbol::mock_memcpy_symbol_arm();
+    let project = mock_project_with_intraprocedural_control_flow(
+        vec![(memcpy_symbol.clone(), vec![true])],
+        "func",
+    );
+    let mem_image = RuntimeMemoryImage::mock();
+    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
+    pi_results.compute();
+
+    let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
+
+    // Test Case: destination and source pointer have unique targets and source is global constant
+    let new_state = setup
+        .context
+        .handle_memcpy_calls(&setup.state_before_call, &memcpy_symbol);
+    assert_eq!(
+        CharacterInclusionDomain::from("str1 str2 str3 str4".to_string()),
+        *new_state
+            .get_stack_offset_to_string_map()
+            .get(&-60)
+            .unwrap()
+    );
+}
+
+#[test]
+fn test_get_domain_from_single_pointer_target() {
+    let memcpy_symbol = ExternSymbol::mock_memcpy_symbol_arm();
+    let project = mock_project_with_intraprocedural_control_flow(
+        vec![(memcpy_symbol.clone(), vec![true])],
+        "func",
+    );
+    let mem_image = RuntimeMemoryImage::mock();
+    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
+    let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
+    pi_results.compute();
+
+    let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
+
+    // Test Case 1: Pointer has single heap target
+    let heap_id = AbstractIdentifier::new(
+        Tid::new("func"),
+        AbstractLocation::from_var(&Variable::mock("r5", 4)).unwrap(),
+    );
+
+    let heap_pointer: PointerDomain<IntervalDomain> = PointerDomain::new(
+        heap_id.clone(),
+        Bitvector::zero(apint::BitWidth::from(4)).into(),
+    );
+
+    setup
+        .state_before_call
+        .add_new_heap_to_string_entry(heap_id, CharacterInclusionDomain::Top);
+
+    assert_eq!(
+        Some(CharacterInclusionDomain::Top),
+        setup.context.get_domain_from_single_pointer_target(
+            &setup.state_before_call,
+            &heap_pointer,
+            &setup.pi_state_before_symbol_call,
+        ),
+    );
+
+    // Test Case 2: Pointer has single stack target
+    let stack_id = AbstractIdentifier::new(
+        Tid::new("func"),
+        AbstractLocation::from_var(&Variable::mock("sp", 4)).unwrap(),
+    );
+
+    let stack_pointer: PointerDomain<IntervalDomain> =
+        PointerDomain::new(stack_id.clone(), Bitvector::from_i32(4).into());
+
+    setup
+        .state_before_call
+        .add_new_stack_offset_to_string_entry(4, CharacterInclusionDomain::Top);
+
+    assert_eq!(
+        Some(CharacterInclusionDomain::Top),
+        setup.context.get_domain_from_single_pointer_target(
+            &setup.state_before_call,
+            &stack_pointer,
+            &setup.pi_state_before_symbol_call,
+        ),
+    );
+}
 
 #[test]
 fn test_handle_scanf_calls() {
@@ -1021,10 +1223,9 @@ fn test_handle_sprintf_and_snprintf_calls_known_format_string() {
 
     let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
-    let new_state = setup.context.handle_sprintf_and_snprintf_calls(
-        &setup.state_before_call,
-        &sprintf_symbol,
-    );
+    let new_state = setup
+        .context
+        .handle_sprintf_and_snprintf_calls(&setup.state_before_call, &sprintf_symbol);
 
     let expected_domain = CharacterInclusionDomain::Value((
         CharacterSet::Value(
@@ -1059,10 +1260,9 @@ fn test_handle_sprintf_and_snprintf_calls_unknown_format_string() {
 
     let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
-    let new_state = setup.context.handle_sprintf_and_snprintf_calls(
-        &setup.state_before_call,
-        &sprintf_symbol,
-    );
+    let new_state = setup
+        .context
+        .handle_sprintf_and_snprintf_calls(&setup.state_before_call, &sprintf_symbol);
 
     assert_eq!(
         CharacterInclusionDomain::Top,

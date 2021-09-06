@@ -36,6 +36,11 @@ pub struct Config {
     abstract_strings: StringAbstractConfig,
 }
 
+// IMPORTANT NOTE!: To switch between the analysis using the CI and BR domain,
+    // change the generic parameter to the StringAbstraction Object accordingly.
+    // Further down in the function, switch the function call between:
+    // "check_system_call_parameter_with_ci_domain" and
+    // "check_system_call_parameter_with_br_domain" 
 pub fn check_cwe(
     analysis_results: &AnalysisResults,
     cwe_params: &serde_json::Value,
@@ -128,6 +133,7 @@ pub fn check_cwe(
     (vec![], vec![])
 }
 
+/// Checks the system call parameter given by the Bricks Domain.
 pub fn check_system_call_parameter_with_br_domain(
     source_state: &State<BricksDomain>,
     pi_state: &PointerInferenceState,
@@ -167,6 +173,7 @@ pub fn check_system_call_parameter_with_br_domain(
     }
 }
 
+/// Checks if the CharacterInclusion Domain indicates a vulnerability at the system call.
 pub fn check_if_string_domain_indicates_vulnerability_with_br_domain(
     input_domain: BricksDomain,
     jmp_tid: &Tid,
@@ -197,6 +204,7 @@ pub fn check_if_string_domain_indicates_vulnerability_with_br_domain(
     }
 }
 
+/// Checks the system call parameter given by the CharacterInclusion Domain.
 pub fn check_system_call_parameter_with_ci_domain(
     source_state: &State<CharacterInclusionDomain>,
     pi_state: &PointerInferenceState,
@@ -247,6 +255,7 @@ pub fn check_system_call_parameter_with_ci_domain(
     }
 }
 
+/// Checks if the Bricks Domain indicates a vulnerability at the system call.
 pub fn check_if_string_domain_indicates_vulnerability_with_ci_domain(
     input_domain: CharacterInclusionDomain,
     jmp_tid: &Tid,

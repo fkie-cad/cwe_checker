@@ -233,20 +233,22 @@ impl DomainInsertion for BricksDomain {
         }
     }
 
-    /// Returns *Top* since no assumption about the order of characters
-    /// nor the length of the sequence can be made.
+    /// Create a string domain that approximates float values.
     fn create_float_value_domain() -> Self {
         BricksDomain::from("[float inserted]".to_string())
     }
 
+    /// Create a string domain that approximates char values.
     fn create_char_domain() -> Self {
         BricksDomain::from("[char inserted]".to_string())
     }
 
+    /// Create a string domain that approximates integer values.
     fn create_integer_domain() -> Self {
         BricksDomain::from("[integer inserted]".to_string())
     }
 
+    /// Create a string domain that approximates pointer values.
     fn create_pointer_value_domain() -> Self {
         BricksDomain::Top
     }
@@ -256,6 +258,7 @@ impl DomainInsertion for BricksDomain {
         BricksDomain::Top
     }
 
+    /// Create a string domain that represents an empty string.
     fn create_empty_string_domain() -> Self {
         BricksDomain::from("".to_string())
     }

@@ -74,27 +74,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debu
                 &self.block_first_def_set,
             ),
         }
-
-        /*if vec!["00011420"].contains(&def.tid.address.as_str()) {
-            println!("Strings on the stack after {}: ", def.tid.address);
-            for (offset, domain) in new_state.get_stack_offset_to_string_map().iter() {
-                println!("    Offset: {}, Domain: {:?}", offset, domain);
-            }
-            println!("Pointers in variables: ");
-            for (var, pointer) in new_state.get_variable_to_pointer_map().iter() {
-                println!("    Reg: {}, Pointer: {:?}", var.name, pointer);
-            }
-            println!("Pointers on the stack: ");
-            for (offset, pointer) in new_state.get_stack_offset_to_pointer_map().iter() {
-                println!("    Offset: {}, Pointer: {:?}", offset, pointer);
-            }
-            println!("Unassigned pointers: ");
-            for pointer in new_state.get_unassigned_return_pointer().iter() {
-                println!("    Pointer: {:?}", pointer);
-            }
-
-            println!("\n##################################################################################################\n");
-        }*/
+        
         Some(new_state)
     }
 
@@ -142,10 +122,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debu
             Jmp::Call { target, .. } => match self.extern_symbol_map.get(target) {
                 Some(symbol) => {
                     if let Some(string_symbol) = self.string_symbol_map.get(target) {
-                        new_state = self.handle_string_symbol_calls(
-                            string_symbol,
-                            &new_state,
-                        );
+                        new_state = self.handle_string_symbol_calls(string_symbol, &new_state);
                     } else {
                         new_state = self.handle_generic_symbol_calls(symbol, &new_state);
                     }

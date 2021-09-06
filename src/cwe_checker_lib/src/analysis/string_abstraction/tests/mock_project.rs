@@ -357,7 +357,53 @@ fn mock_defs_for_malloc(blk_num: usize) -> Vec<Term<Def>> {
     defs
 }
 
+fn mock_defs_for_memcpy(copy_from_global: bool, blk_num: usize) -> Vec<Term<Def>> {
+    let setup = Setup::new();
+    let mut defs: Vec<Term<Def>> = Vec::new();
+
+    /*
+        r11 = INT_ADD sp, 4:4
+
+        r0 = INT_SUB r11, 40:4,
+
+            r1 = LOAD ram(0x7000)
+
+            OR
+
+            r1 = INT_ADD r11, 0x24:4
+    */
+
+    defs.push(setup.pointer_plus_offset(&format!("def_0_blk_{}", blk_num), "r11", "sp", 4));
+
+    defs.push(setup.pointer_minus_offset(&format!("def_1_blk_{}", blk_num), "r0", "r11", 0x40));
+
+    if copy_from_global {
+        defs.push(setup.string_input_constant(&format!("def_2_blk_{}", blk_num), "r1", 0x7000));
+    } else {
+        defs.push(setup.pointer_plus_offset(&format!("def_3_blk_{}", blk_num), "r1", "r11", 0x24));
+    }
+
+    defs
+}
+
 impl ExternSymbol {
+    pub fn mock_memcpy_symbol_arm() -> ExternSymbol {
+        ExternSymbol {
+            tid: Tid::new("memcpy"),
+            addresses: vec!["UNKNOWN".to_string()],
+            name: "memcpy".to_string(),
+            calling_convention: Some("__stdcall".to_string()),
+            parameters: vec![
+                Arg::mock_register("r0", 4),
+                Arg::mock_register("r1", 4),
+                Arg::mock_register("r2", 4),
+            ],
+            return_values: vec![Arg::mock_register("r0", 4)],
+            no_return: false,
+            has_var_args: true,
+        }
+    }
+
     pub fn mock_sprintf_symbol_arm() -> ExternSymbol {
         ExternSymbol {
             tid: Tid::new("sprintf"),
@@ -500,6 +546,7 @@ fn mock_block_with_function_call(
         "strcat" => mock_defs_for_strcat(*config.get(0).unwrap(), blk_num),
         "free" => mock_defs_for_free(blk_num),
         "malloc" => mock_defs_for_malloc(blk_num),
+        "memcpy" => mock_defs_for_memcpy(*config.get(0).unwrap(), blk_num),
         _ => panic!("Invalid symbol name for def mock"),
     };
     blk.term.defs = defs;

@@ -264,7 +264,47 @@ fn test_handle_assign_and_load() {
 }
 
 #[test]
-fn test_add_pointer_to_variable_maps_if_tracked() {}
+fn test_add_pointer_to_variable_maps_if_tracked() {
+    let output_var = Variable::mock("r2", 4);
+    let origin_var = Variable::mock("r5", 4);
+    let mut mock_state =
+        State::<CharacterInclusionDomain>::mock_with_default_pi_state(Sub::mock("func"));
+    let pi_state = mock_state.get_pointer_inference_state().unwrap().clone();
+
+    let heap_id = AbstractIdentifier::new(
+        Tid::new("func"),
+        AbstractLocation::from_var(&Variable::mock("r5", 4)).unwrap(),
+    );
+    let stack_id = AbstractIdentifier::new(
+        Tid::new("func"),
+        AbstractLocation::from_var(&Variable::mock("sp", 4)).unwrap(),
+    );
+
+    let mut source_pointer: PointerDomain<IntervalDomain> =
+        PointerDomain::new(stack_id.clone(), Bitvector::from_i32(4).into());
+
+    // Test Case 1: Pointer is tracked in unassigned pointer map.
+    mock_state.add_unassigned_return_pointer(source_pointer.clone());
+    assert!(mock_state.add_pointer_to_variable_maps_if_tracked(&pi_state, &output_var, source_pointer.clone()));
+    mock_state.set_all_maps_empty();
+
+    // Test Case 2: Pointer is tracked in register to pointer map.
+    mock_state.add_new_variable_to_pointer_entry(origin_var, DataDomain::Pointer(source_pointer.clone()));
+    assert!(mock_state.add_pointer_to_variable_maps_if_tracked(&pi_state, &output_var, source_pointer.clone()));
+    assert_eq!(DataDomain::Pointer(source_pointer.clone()), *mock_state.get_variable_to_pointer_map().get(&output_var).unwrap());
+    mock_state.set_all_maps_empty();
+
+    // Test Case 3: Pointer is partially tracked.
+    source_pointer.add_target(heap_id.clone(), Bitvector::zero(32.into()).into());
+    mock_state.add_new_stack_offset_to_string_entry(4, CharacterInclusionDomain::Top);
+    assert!(mock_state.add_pointer_to_variable_maps_if_tracked(&pi_state, &output_var, source_pointer.clone()));
+    assert_eq!(DataDomain::Pointer(source_pointer.clone()), *mock_state.get_variable_to_pointer_map().get(&output_var).unwrap());
+    assert_eq!(CharacterInclusionDomain::Top, *mock_state.get_heap_to_string_map().get(&heap_id).unwrap());
+    mock_state.set_all_maps_empty();
+    
+    // Test Case 4: Pointer is not tracked.
+    assert!(!mock_state.add_pointer_to_variable_maps_if_tracked(&pi_state, &output_var, source_pointer));
+}
 
 #[test]
 fn test_pointer_targets_partially_tracked() {

@@ -8,8 +8,7 @@ use anyhow::Error;
 use itertools::izip;
 
 use crate::abstract_domain::{
-    DataDomain, DomainInsertion, HasTop, IntervalDomain, PointerDomain,
-    TryToBitvec,
+    DataDomain, DomainInsertion, HasTop, IntervalDomain, PointerDomain, TryToBitvec,
 };
 use crate::analysis::pointer_inference::State as PointerInferenceState;
 use crate::intermediate_representation::{Arg, Bitvector, Datatype};
@@ -37,6 +36,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debu
         new_state
     }
 
+    /// Handles calls to external symbols for which no ExternSymbol object is known.
     pub fn handle_unknown_symbol_calls(&self, state: &mut State<T>) {
         if let Some(standard_cconv) = self.project.get_standard_calling_convention() {
             let mut filtered_map = state.get_variable_to_pointer_map().clone();
@@ -144,6 +144,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debu
                                             new_state.add_unassigned_return_pointer(
                                                 return_pointer.clone(),
                                             );
+                                            println!("Return: {:?}", return_pointer);
                                             Context::<T>::add_new_string_abstract_domain(
                                                 &mut new_state,
                                                 pi_state,
@@ -219,6 +220,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debu
         new_state
     }
 
+    /// Creates string abstract domains for return values of (s)scanf calls.
     pub fn create_abstract_domain_entries_for_function_return_values(
         &self,
         pi_state: &PointerInferenceState,
@@ -259,6 +261,8 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debu
         }
     }
 
+    /// Handles calls to sscanf. If the source string is known, it is split by spaces
+    /// and for each substring a string abstract domain is generated at its corresponding location.
     pub fn handle_sscanf_calls(&self, state: &State<T>, extern_symbol: &ExternSymbol) -> State<T> {
         let mut new_state = state.clone();
         if let Some(pi_state) = state.get_pointer_inference_state() {
@@ -300,6 +304,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debu
         new_state
     }
 
+    /// Maps source strings parameters to return arguments for sscanf calls.
     pub fn map_source_string_parameters_to_return_arguments(
         &self,
         pi_state: &PointerInferenceState,

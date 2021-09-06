@@ -51,6 +51,7 @@ impl CharacterInclusionDomain {
 }
 
 impl DomainInsertion for CharacterInclusionDomain {
+    /// Append string domain as part of a concatenation. (different to merge)
     fn append_string_domain(&self, string_domain: &Self) -> CharacterInclusionDomain {
         match self {
             CharacterInclusionDomain::Value((self_certain, self_possible)) => match string_domain {
@@ -73,6 +74,7 @@ impl DomainInsertion for CharacterInclusionDomain {
         }
     }
 
+    /// Create a string domain that approximates float values.
     fn create_float_value_domain() -> Self {
         let float_character_set: BTreeSet<char> = vec![
             '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '-', 'a', 'i', 'n', 'f',
@@ -85,10 +87,12 @@ impl DomainInsertion for CharacterInclusionDomain {
         ))
     }
 
+    /// Create a string domain that approximates char values.
     fn create_char_domain() -> Self {
         CharacterInclusionDomain::Top
     }
 
+    /// Create a string domain that approximates integer values.
     fn create_integer_domain() -> Self {
         let integer_character_set: BTreeSet<char> =
             vec!['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '-']
@@ -100,6 +104,7 @@ impl DomainInsertion for CharacterInclusionDomain {
         ))
     }
 
+    /// Create a string domain that approximates pointer values.
     fn create_pointer_value_domain() -> Self {
         CharacterInclusionDomain::Top
     }
@@ -109,6 +114,7 @@ impl DomainInsertion for CharacterInclusionDomain {
         CharacterInclusionDomain::Top
     }
 
+    /// Create a string domain that represents an empty string.
     fn create_empty_string_domain() -> Self {
         CharacterInclusionDomain::from("".to_string())
     }
