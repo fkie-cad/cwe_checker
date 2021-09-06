@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
 mod cwe_helpers;
-mod list_manipulation;
 mod id_manipulation;
+mod list_manipulation;
 
 /// The list of all known abstract objects.
 ///
