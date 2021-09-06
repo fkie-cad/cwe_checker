@@ -1,3 +1,5 @@
+//! Methods of [`State`] for handling memory and register access operations.
+
 use crate::utils::binary::RuntimeMemoryImage;
 
 use super::*;
