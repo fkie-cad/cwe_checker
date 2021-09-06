@@ -7,6 +7,12 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
+/// Methods for manipulating abstract IDs contained in an abstract object.
+mod id_manipulation;
+
+/// Methods for handling read/write operations on an abstract object.
+mod value_access;
+
 /// An abstract object contains all knowledge tracked about a particular memory object.
 ///
 /// In some cases one abstract object can represent more than one actual memory object.
@@ -118,135 +124,6 @@ impl AbstractObject {
         inner.upper_index_bound = upper_bound;
     }
 
-    /// Check whether a memory access to the abstract object at the given offset
-    /// and with the given size of the accessed value is contained in the bounds of the memory object.
-    /// If `offset` contains more than one possible index value,
-    /// then only return `true` if the access is contained in the abstract object for all possible offset values.
-    pub fn access_contained_in_bounds(&self, offset: &ValueDomain, size: ByteSize) -> bool {
-        if let Ok(offset_interval) = offset.try_to_interval() {
-            if let Ok(lower_bound) = self.inner.lower_index_bound.try_to_bitvec() {
-                if lower_bound.checked_sgt(&offset_interval.start).unwrap() {
-                    return false;
-                }
-            }
-            if let Ok(upper_bound) = self.inner.upper_index_bound.try_to_bitvec() {
-                let mut size_as_bitvec = Bitvector::from_u64(u64::from(size));
-                match offset.bytesize().cmp(&size_as_bitvec.bytesize()) {
-                    std::cmp::Ordering::Less => size_as_bitvec.truncate(offset.bytesize()).unwrap(),
-                    std::cmp::Ordering::Greater => {
-                        size_as_bitvec.sign_extend(offset.bytesize()).unwrap()
-                    }
-                    std::cmp::Ordering::Equal => (),
-                }
-                let max_index = if let Some(val) = offset_interval
-                    .end
-                    .signed_add_overflow_checked(&size_as_bitvec)
-                {
-                    val - &Bitvector::one(offset.bytesize().into())
-                } else {
-                    return false; // The max index already causes an integer overflow
-                };
-                if upper_bound.checked_slt(&max_index).unwrap() {
-                    return false;
-                }
-            }
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Read the value at the given offset of the given size inside the memory region.
-    pub fn get_value(&self, offset: Bitvector, bytesize: ByteSize) -> Data {
-        self.inner.memory.get(offset, bytesize)
-    }
-
-    /// Write a value at the given offset to the memory region.
-    ///
-    /// If the abstract object is not unique (i.e. may represent more than one actual object),
-    /// merge the old value at the given offset with the new value.
-    pub fn set_value(&mut self, value: Data, offset: &ValueDomain) -> Result<(), Error> {
-        let inner = Arc::make_mut(&mut self.inner);
-        inner
-            .pointer_targets
-            .extend(value.referenced_ids().cloned());
-        if let Ok(concrete_offset) = offset.try_to_bitvec() {
-            if inner.is_unique {
-                inner.memory.add(value, concrete_offset);
-            } else {
-                let merged_value = inner
-                    .memory
-                    .get(concrete_offset.clone(), value.bytesize())
-                    .merge(&value);
-                inner.memory.add(merged_value, concrete_offset);
-            };
-        } else if let Ok((start, end)) = offset.try_to_offset_interval() {
-            inner
-                .memory
-                .mark_interval_values_as_top(start, end, value.bytesize());
-        } else {
-            inner.memory.mark_all_values_as_top();
-        }
-        Ok(())
-    }
-
-    /// Merge `value` at position `offset` with the value currently saved at that position.
-    pub fn merge_value(&mut self, value: Data, offset: &ValueDomain) {
-        let inner = Arc::make_mut(&mut self.inner);
-        inner
-            .pointer_targets
-            .extend(value.referenced_ids().cloned());
-        if let Ok(concrete_offset) = offset.try_to_bitvec() {
-            let merged_value = inner
-                .memory
-                .get(concrete_offset.clone(), value.bytesize())
-                .merge(&value);
-            inner.memory.add(merged_value, concrete_offset);
-        } else if let Ok((start, end)) = offset.try_to_offset_interval() {
-            inner
-                .memory
-                .mark_interval_values_as_top(start, end, value.bytesize());
-        } else {
-            inner.memory.mark_all_values_as_top();
-        }
-    }
-
-    /// Get all abstract IDs that the object may contain pointers to.
-    /// This yields an overapproximation of possible pointer targets.
-    pub fn get_referenced_ids_overapproximation(&self) -> &BTreeSet<AbstractIdentifier> {
-        &self.inner.pointer_targets
-    }
-
-    /// Get all abstract IDs for which the object contains pointers to.
-    /// This yields an underapproximation of pointer targets,
-    /// since the object may contain pointers that could not be tracked by the analysis.
-    pub fn get_referenced_ids_underapproximation(&self) -> BTreeSet<AbstractIdentifier> {
-        let mut referenced_ids = BTreeSet::new();
-        for data in self.inner.memory.values() {
-            referenced_ids.extend(data.referenced_ids().cloned())
-        }
-        referenced_ids
-    }
-
-    /// For pointer values replace an abstract identifier with another one and add the offset_adjustment to the pointer offsets.
-    /// This is needed to adjust stack pointers on call and return instructions.
-    pub fn replace_abstract_id(
-        &mut self,
-        old_id: &AbstractIdentifier,
-        new_id: &AbstractIdentifier,
-        offset_adjustment: &ValueDomain,
-    ) {
-        let inner = Arc::make_mut(&mut self.inner);
-        for elem in inner.memory.values_mut() {
-            elem.replace_abstract_id(old_id, new_id, offset_adjustment);
-        }
-        inner.memory.clear_top_values();
-        if inner.pointer_targets.get(old_id).is_some() {
-            inner.pointer_targets.remove(old_id);
-            inner.pointer_targets.insert(new_id.clone());
-        }
-    }
-
     /// Get the state of the memory object.
     pub fn get_state(&self) -> ObjectState {
         self.inner.state
@@ -262,40 +139,9 @@ impl AbstractObject {
         }
     }
 
-    /// Remove the provided IDs from the target lists of all pointers in the memory object.
-    /// Also remove them from the pointer_targets list.
-    ///
-    /// If this operation would produce an empty value, it replaces it with a `Top` value instead.
-    pub fn remove_ids(&mut self, ids_to_remove: &BTreeSet<AbstractIdentifier>) {
-        let inner = Arc::make_mut(&mut self.inner);
-        inner.pointer_targets = inner
-            .pointer_targets
-            .difference(ids_to_remove)
-            .cloned()
-            .collect();
-        for value in inner.memory.values_mut() {
-            value.remove_ids(ids_to_remove);
-            if value.is_empty() {
-                *value = value.top();
-            }
-        }
-        inner.memory.clear_top_values(); // In case the previous operation left *Top* values in the memory struct.
-    }
-
     /// Get the type of the memory object.
     pub fn get_object_type(&self) -> Option<ObjectType> {
         self.inner.type_
-    }
-
-    /// Marks all memory as `Top` and adds the `additional_targets` to the pointer targets.
-    /// Represents the effect of unknown write instructions to the object
-    /// which may include writing pointers to targets from the `additional_targets` set to the object.
-    pub fn assume_arbitrary_writes(&mut self, additional_targets: &BTreeSet<AbstractIdentifier>) {
-        let inner = Arc::make_mut(&mut self.inner);
-        inner.memory.mark_all_values_as_top();
-        inner
-            .pointer_targets
-            .extend(additional_targets.iter().cloned());
     }
 
     /// Mark the memory object as freed.
@@ -449,150 +295,4 @@ impl ObjectState {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn new_abstract_object() -> AbstractObject {
-        let inner = Inner {
-            pointer_targets: BTreeSet::new(),
-            is_unique: true,
-            state: ObjectState::Alive,
-            type_: Some(ObjectType::Heap),
-            memory: MemRegion::new(ByteSize::new(8)),
-            lower_index_bound: Bitvector::from_u64(0).into(),
-            upper_index_bound: Bitvector::from_u64(99).into(),
-        };
-        inner.into()
-    }
-
-    fn new_data(number: i64) -> Data {
-        bv(number).into()
-    }
-
-    fn bv(number: i64) -> ValueDomain {
-        ValueDomain::from(Bitvector::from_i64(number))
-    }
-
-    fn new_id(tid: &str, reg_name: &str) -> AbstractIdentifier {
-        AbstractIdentifier::new(
-            Tid::new(tid),
-            AbstractLocation::Register(reg_name.into(), ByteSize::new(8)),
-        )
-    }
-
-    #[test]
-    fn abstract_object() {
-        let mut object = new_abstract_object();
-        let three = new_data(3);
-        let offset = bv(-15);
-        object.set_value(three, &offset).unwrap();
-        assert_eq!(
-            object.get_value(Bitvector::from_i64(-16), ByteSize::new(8)),
-            Data::new_top(ByteSize::new(8))
-        );
-        assert_eq!(
-            object.get_value(Bitvector::from_i64(-15), ByteSize::new(8)),
-            new_data(3)
-        );
-        object.set_value(new_data(4), &bv(-12)).unwrap();
-        assert_eq!(
-            object.get_value(Bitvector::from_i64(-15), ByteSize::new(8)),
-            Data::new_top(ByteSize::new(8))
-        );
-        object.merge_value(new_data(23), &bv(-12));
-        assert_eq!(
-            object.get_value(Bitvector::from_i64(-12), ByteSize::new(8)),
-            IntervalDomain::mock(4, 23).with_stride(19).into()
-        );
-
-        let mut other_object = new_abstract_object();
-        object.set_value(new_data(0), &bv(0)).unwrap();
-        other_object.set_value(new_data(0), &bv(0)).unwrap();
-        let merged_object = object.merge(&other_object);
-        assert_eq!(
-            merged_object
-                .get_value(Bitvector::from_i64(-12), ByteSize::new(8))
-                .get_absolute_value(),
-            Some(&IntervalDomain::mock(4, 23).with_stride(19).into())
-        );
-        assert!(merged_object
-            .get_value(Bitvector::from_i64(-12), ByteSize::new(8))
-            .contains_top());
-        assert_eq!(
-            merged_object.get_value(Bitvector::from_i64(0), ByteSize::new(8)),
-            new_data(0)
-        );
-    }
-
-    #[test]
-    fn replace_id() {
-        use std::collections::BTreeMap;
-        let mut object = new_abstract_object();
-        let mut target_map = BTreeMap::new();
-        target_map.insert(new_id("time_1", "RAX"), bv(20));
-        target_map.insert(new_id("time_234", "RAX"), bv(30));
-        target_map.insert(new_id("time_1", "RBX"), bv(40));
-        let pointer = DataDomain::mock_from_target_map(target_map.clone());
-        object.set_value(pointer, &bv(-15)).unwrap();
-        assert_eq!(object.get_referenced_ids_overapproximation().len(), 3);
-
-        object.replace_abstract_id(
-            &new_id("time_1", "RAX"),
-            &new_id("time_234", "RAX"),
-            &bv(10),
-        );
-        target_map.remove(&new_id("time_1", "RAX"));
-        let modified_pointer = DataDomain::mock_from_target_map(target_map);
-        assert_eq!(
-            object.get_value(Bitvector::from_i64(-15), ByteSize::new(8)),
-            modified_pointer
-        );
-
-        object.replace_abstract_id(
-            &new_id("time_1", "RBX"),
-            &new_id("time_234", "RBX"),
-            &bv(10),
-        );
-        let mut target_map = BTreeMap::new();
-        target_map.insert(new_id("time_234", "RAX"), bv(30));
-        target_map.insert(new_id("time_234", "RBX"), bv(50));
-        let modified_pointer = DataDomain::mock_from_target_map(target_map);
-        assert_eq!(
-            object.get_value(Bitvector::from_i64(-15), ByteSize::new(8)),
-            modified_pointer
-        );
-    }
-
-    #[test]
-    fn remove_ids() {
-        use std::collections::BTreeMap;
-        let mut object = new_abstract_object();
-        let mut target_map = BTreeMap::new();
-        target_map.insert(new_id("time_1", "RAX"), bv(20));
-        target_map.insert(new_id("time_234", "RAX"), bv(30));
-        target_map.insert(new_id("time_1", "RBX"), bv(40));
-        let pointer = DataDomain::mock_from_target_map(target_map.clone());
-        object.set_value(pointer, &bv(-15)).unwrap();
-        assert_eq!(object.get_referenced_ids_overapproximation().len(), 3);
-
-        let ids_to_remove = vec![new_id("time_1", "RAX"), new_id("time_23", "RBX")]
-            .into_iter()
-            .collect();
-        object.remove_ids(&ids_to_remove);
-        assert_eq!(
-            object.get_referenced_ids_overapproximation(),
-            &vec![new_id("time_234", "RAX"), new_id("time_1", "RBX")]
-                .into_iter()
-                .collect()
-        );
-    }
-
-    #[test]
-    fn access_contained_in_bounds() {
-        let object = new_abstract_object();
-        assert!(object.access_contained_in_bounds(&IntervalDomain::mock(0, 99), ByteSize::new(1)));
-        assert!(!object.access_contained_in_bounds(&IntervalDomain::mock(-1, -1), ByteSize::new(8)));
-        assert!(object.access_contained_in_bounds(&IntervalDomain::mock(92, 92), ByteSize::new(8)));
-        assert!(!object.access_contained_in_bounds(&IntervalDomain::mock(93, 93), ByteSize::new(8)));
-    }
-}
+mod tests;
