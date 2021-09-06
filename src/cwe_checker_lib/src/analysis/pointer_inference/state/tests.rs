@@ -397,7 +397,9 @@ fn reachable_ids_under_and_overapproximation() {
     );
     assert_eq!(
         state.add_directly_reachable_ids_to_id_set(reachable_ids.clone()),
-        vec![stack_id.clone()].into_iter().collect()
+        vec![stack_id.clone(), heap_id.clone()]
+            .into_iter()
+            .collect()
     );
     assert_eq!(
         state.add_recursively_referenced_ids_to_id_set(reachable_ids.clone()),
