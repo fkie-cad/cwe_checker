@@ -93,6 +93,7 @@ impl AbstractObjectList {
         size: ByteSize,
         global_data: &RuntimeMemoryImage,
     ) -> bool {
+        // TODO: Check the interval even if the Top-flag in the DataDomain is set!
         if let Some(value) = address.get_absolute_value() {
             if let Ok((start, end)) = value.try_to_offset_interval() {
                 if start < 0 || end < start {
