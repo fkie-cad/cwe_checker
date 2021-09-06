@@ -112,7 +112,7 @@ impl<T: AbstractDomain + SizedDomain + HasTop + std::fmt::Debug> MemRegion<T> {
     ///
     /// This represents the effect of writing arbitrary values (with known byte size)
     /// to arbitrary offsets contained in the interval.
-    /// Note that if only only wants to mark values in the interval as potentially overwritten without deleting them,
+    /// Note that if one only wants to mark values in the interval as potentially overwritten without deleting them,
     /// then one should use the [`MemRegion::mark_interval_values_as_top`] method instead.
     pub fn clear_offset_interval(&mut self, start: i64, end: i64, value_size: ByteSize) {
         let size = end - start + (u64::from(value_size) as i64);
