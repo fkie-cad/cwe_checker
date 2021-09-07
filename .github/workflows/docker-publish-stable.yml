@@ -16,7 +16,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: Log in to ghcr.io Container registry
+      - name: Build test docker image
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          load: true
+          tags: cwe_checker:test
+
+      - name: Check functionality of the image
+        run: docker run --rm cwe_checker:test /bin/echo | grep -q CWE676
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v1 
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Login to ghcr.io Container registry
         uses: docker/login-action@v1
         with:
           registry: ghcr.io
@@ -28,4 +44,8 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/fkie-cad/cwe_checker:${{ steps.tagName.outputs.tag }}
+          tags: |
+            fkiecad/cwe_checker:stable
+            fkiecad/cwe_checker:${{ steps.tagName.outputs.tag }}
+            ghcr.io/fkie-cad/cwe_checker:stable
+            ghcr.io/fkie-cad/cwe_checker:${{ steps.tagName.outputs.tag }}
