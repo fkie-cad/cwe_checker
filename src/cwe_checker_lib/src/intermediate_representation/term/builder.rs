@@ -2,10 +2,10 @@
 //! for different terms.
 
 #[cfg(test)]
-use crate::intermediate_representation::{Expression, Variable};
+use crate::intermediate_representation::{Def, Expression, Jmp, Variable};
 
 #[cfg(test)]
-use super::{Def, Jmp, Term, Tid};
+use super::{Term, Tid};
 
 /// ## Helper functions for building defs
 #[cfg(test)]

@@ -1,7 +1,7 @@
 //! Structs and functions for generating log messages and CWE warnings.
 
 use crate::prelude::*;
-use std::thread::JoinHandle;
+use std::{collections::BTreeMap, thread::JoinHandle};
 
 /// A CWE warning message.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord, Default)]
@@ -194,6 +194,43 @@ pub fn print_all_messages(
         });
     } else {
         print!("{}", output);
+    }
+}
+
+/// For each analysis count the number of debug log messages in `all_logs`
+/// and add a (INFO level) log message with the resulting number to `all_logs`.
+/// Also count and log the number of general debug log messages.
+pub fn add_debug_log_statistics(all_logs: &mut Vec<LogMessage>) {
+    let mut analysis_debug_log_count = BTreeMap::new();
+    let mut general_debug_log_count = 0u64;
+    for log in all_logs.iter().filter(|log| log.level == LogLevel::Debug) {
+        if let Some(analysis) = &log.source {
+            analysis_debug_log_count
+                .entry(analysis.clone())
+                .and_modify(|count| *count += 1)
+                .or_insert(1u64);
+        } else {
+            general_debug_log_count += 1;
+        }
+    }
+    for (analysis, count) in analysis_debug_log_count {
+        all_logs.push(LogMessage {
+            text: format!("Logged {} debug log messages.", count),
+            level: LogLevel::Info,
+            location: None,
+            source: Some(analysis),
+        });
+    }
+    if general_debug_log_count > 0 {
+        all_logs.push(LogMessage {
+            text: format!(
+                "Logged {} general debug log messages.",
+                general_debug_log_count
+            ),
+            level: LogLevel::Info,
+            location: None,
+            source: None,
+        });
     }
 }
 

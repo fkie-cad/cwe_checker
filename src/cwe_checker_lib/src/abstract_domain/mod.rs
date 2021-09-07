@@ -10,9 +10,6 @@ pub use bitvector::*;
 mod identifier;
 pub use identifier::*;
 
-mod pointer;
-pub use pointer::*;
-
 mod data;
 pub use data::*;
 
@@ -162,4 +159,7 @@ pub trait SpecializeByConditional: Sized {
     /// Return the restriction of `self` to values satisfying `self != bound`
     /// Returns an error if `self` only represents one value for which `self == bound` holds.
     fn add_not_equal_bound(self, bound: &Bitvector) -> Result<Self, Error>;
+
+    /// Return the intersection of two values or an error if the intersection is empty.
+    fn intersect(self, other: &Self) -> Result<Self, Error>;
 }

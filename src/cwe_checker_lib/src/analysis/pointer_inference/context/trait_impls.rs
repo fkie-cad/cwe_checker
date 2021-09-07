@@ -5,7 +5,7 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
 
     /// Get the underlying graph on which the analysis operates.
     fn get_graph(&self) -> &Graph<'a> {
-        &self.graph
+        self.graph
     }
 
     /// Merge two state values.
@@ -76,10 +76,16 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
                 Some(new_state)
             }
             Def::Load { var, address } => {
-                self.log_debug(
-                    new_state.handle_load(var, address, &self.runtime_memory_image),
-                    Some(&def.tid),
-                );
+                if !self.is_mips_gp_load_to_top_value(state, var, address) {
+                    self.log_debug(
+                        new_state.handle_load(var, address, self.runtime_memory_image),
+                        Some(&def.tid),
+                    );
+                }
+                // Else we ignore the load and hope that the value still contained in the gp register is still correct.
+                // This only works because gp is (incorrectly) marked as a callee-saved register.
+                // FIXME: If the rest of the analysis becomes good enough so that this case is not common anymore,
+                // we should log it.
                 Some(new_state)
             }
         }
@@ -158,12 +164,16 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
             // At the beginning of a function this is the only known pointer to the new stack frame.
             callee_state.set_register(
                 &self.project.stack_pointer_register,
-                PointerDomain::new(
+                Data::from_target(
                     callee_stack_id.clone(),
                     Bitvector::zero(apint::BitWidth::from(address_bytesize)).into(),
-                )
-                .into(),
+                ),
             );
+            // For MIPS architecture only: Ensure that the t9 register contains the address of the called function
+            if self.project.cpu_architecture.contains("MIPS") {
+                let _ = callee_state
+                    .set_mips_link_register(callee_tid, self.project.stack_pointer_register.size);
+            }
             // set the list of caller stack ids to only this caller id
             callee_state.caller_stack_ids = BTreeSet::new();
             callee_state.caller_stack_ids.insert(new_caller_stack_id);
@@ -202,7 +212,7 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
                 (Some(state_call), None) => {
                     if self.is_indirect_call_with_top_target(state_call, call_term) {
                         // We know nothing about the call target.
-                        return self.handle_call_to_generic_unknown_function(&state_call);
+                        return self.handle_call_to_generic_unknown_function(state_call);
                     } else {
                         // We know at least something about the call target.
                         // Since we don't have a return value,
@@ -294,7 +304,7 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
             Jmp::CallInd { .. } => {
                 if self.is_indirect_call_with_top_target(state, call) {
                     // We know nothing about the call target.
-                    return self.handle_call_to_generic_unknown_function(&state);
+                    return self.handle_call_to_generic_unknown_function(state);
                 } else {
                     return None;
                 }
@@ -318,7 +328,7 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
                 );
             }
             // Clear non-callee-saved registers from the state.
-            let cconv = extern_symbol.get_calling_convention(&self.project);
+            let cconv = extern_symbol.get_calling_convention(self.project);
             new_state.clear_non_callee_saved_register(&cconv.callee_saved_register[..]);
             // Adjust stack register value (for x86 architecture).
             self.adjust_stack_register_on_extern_call(state, &mut new_state);

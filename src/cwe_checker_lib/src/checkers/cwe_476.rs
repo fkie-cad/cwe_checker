@@ -45,7 +45,7 @@ use crate::prelude::*;
 use crate::utils::log::{CweWarning, LogMessage};
 use crate::CweModule;
 use petgraph::visit::EdgeRef;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 mod state;
 use state::*;
@@ -88,7 +88,7 @@ pub fn check_cwe(
     let general_context = Context::new(
         project,
         analysis_results.runtime_memory_image,
-        &pointer_inference_results,
+        pointer_inference_results,
         cwe_sender,
     );
 
@@ -123,7 +123,7 @@ pub fn check_cwe(
         }
     }
 
-    let mut cwe_warnings = HashMap::new();
+    let mut cwe_warnings = BTreeMap::new();
     for cwe in cwe_receiver.try_iter() {
         match &cwe.addresses[..] {
             [taint_source_address, ..] => cwe_warnings.insert(taint_source_address.clone(), cwe),

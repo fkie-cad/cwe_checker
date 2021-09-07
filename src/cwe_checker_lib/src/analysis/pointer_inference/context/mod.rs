@@ -64,6 +64,26 @@ impl<'a> Context<'a> {
         }
     }
 
+    /// Return `true` if the all of the following properties hold:
+    /// * The CPU architecture is a MIPS variant and `var` is the MIPS global pointer register `gp`
+    /// * Loading the value at `address` into the register `var` would overwrite the value of `var` with a `Top` value.
+    fn is_mips_gp_load_to_top_value(
+        &self,
+        state: &State,
+        var: &Variable,
+        address: &Expression,
+    ) -> bool {
+        if self.project.cpu_architecture.contains("MIPS") && var.name == "gp" {
+            if let Ok(gp_val) = state.load_value(address, var.size, self.runtime_memory_image) {
+                gp_val.is_top()
+            } else {
+                true
+            }
+        } else {
+            false
+        }
+    }
+
     /// If `result` is an `Err`, log the error message as a debug message through the `log_collector` channel.
     pub fn log_debug(&self, result: Result<(), Error>, location: Option<&Tid>) {
         if let Err(err) = result {
@@ -89,27 +109,17 @@ impl<'a> Context<'a> {
             }
             _ => Bitvector::zero(apint::BitWidth::from(self.project.get_pointer_bytesize())),
         };
-        match state_before_return.get_register(&self.project.stack_pointer_register) {
-            Data::Pointer(pointer) => {
-                if pointer.targets().len() == 1 {
-                    let (id, offset) = pointer.targets().iter().next().unwrap();
-                    if *id != state_before_return.stack_id
-                        || *offset != expected_stack_pointer_offset.into()
-                    {
-                        Err(anyhow!("Unexpected stack register value on return"))
-                    } else {
-                        Ok(())
-                    }
-                } else {
-                    Err(anyhow!(
-                        "Unexpected number of stack register targets on return"
-                    ))
-                }
+        match state_before_return
+            .get_register(&self.project.stack_pointer_register)
+            .get_if_unique_target()
+        {
+            Some((id, offset))
+                if *id == state_before_return.stack_id
+                    && *offset == expected_stack_pointer_offset.into() =>
+            {
+                Ok(())
             }
-            Data::Top(_) => Err(anyhow!(
-                "Stack register value lost during function execution"
-            )),
-            Data::Value(_) => Err(anyhow!("Unexpected stack register value on return")),
+            _ => Err(anyhow!("Unexpected stack register value on return")),
         }
     }
 
@@ -166,10 +176,10 @@ impl<'a> Context<'a> {
             }
             _ => DataDomain::new_top(address_bytesize),
         };
-        match object_size {
-            Data::Value(val) => val,
-            _ => ValueDomain::new_top(address_bytesize),
-        }
+        object_size
+            .get_if_absolute_value()
+            .cloned()
+            .unwrap_or_else(|| ValueDomain::new_top(address_bytesize))
     }
 
     /// Add a new abstract object and a pointer to it in the return register of an extern call.
@@ -183,7 +193,7 @@ impl<'a> Context<'a> {
         extern_symbol: &ExternSymbol,
     ) -> State {
         let address_bytesize = self.project.get_pointer_bytesize();
-        let object_size = self.get_allocation_size_of_alloc_call(&state, extern_symbol);
+        let object_size = self.get_allocation_size_of_alloc_call(state, extern_symbol);
 
         match extern_symbol.get_unique_return_register() {
             Ok(return_register) => {
@@ -205,11 +215,11 @@ impl<'a> Context<'a> {
                     &object_id,
                     &(object_size - Bitvector::one(address_bytesize.into()).into()),
                 );
-                let pointer = PointerDomain::new(
+                let pointer = Data::from_target(
                     object_id,
                     Bitvector::zero(apint::BitWidth::from(address_bytesize)).into(),
                 );
-                new_state.set_register(return_register, pointer.into());
+                new_state.set_register(return_register, pointer);
                 new_state
             }
             Err(err) => {
@@ -235,36 +245,29 @@ impl<'a> Context<'a> {
                 let parameter_value = state.eval_parameter_arg(
                     parameter,
                     &self.project.stack_pointer_register,
-                    &self.runtime_memory_image,
+                    self.runtime_memory_image,
                 );
                 match parameter_value {
                     Ok(memory_object_pointer) => {
-                        if let Data::Pointer(pointer) = memory_object_pointer {
-                            if let Err(possible_double_frees) =
-                                new_state.mark_mem_object_as_freed(&pointer)
-                            {
-                                let warning = CweWarning {
-                                    name: "CWE415".to_string(),
-                                    version: VERSION.to_string(),
-                                    addresses: vec![call.tid.address.clone()],
-                                    tids: vec![format!("{}", call.tid)],
-                                    symbols: Vec::new(),
-                                    other: vec![possible_double_frees
-                                        .into_iter()
-                                        .map(|(id, err)| format!("{}: {}", id, err))
-                                        .collect()],
-                                    description: format!(
-                                        "(Double Free) Object may have been freed before at {}",
-                                        call.tid.address
-                                    ),
-                                };
-                                let _ = self.log_collector.send(LogThreadMsg::Cwe(warning));
-                            }
-                        } else {
-                            self.log_debug(
-                                Err(anyhow!("Free on a non-pointer value called.")),
-                                Some(&call.tid),
-                            );
+                        if let Err(possible_double_frees) =
+                            new_state.mark_mem_object_as_freed(&memory_object_pointer)
+                        {
+                            let warning = CweWarning {
+                                name: "CWE415".to_string(),
+                                version: VERSION.to_string(),
+                                addresses: vec![call.tid.address.clone()],
+                                tids: vec![format!("{}", call.tid)],
+                                symbols: Vec::new(),
+                                other: vec![possible_double_frees
+                                    .into_iter()
+                                    .map(|(id, err)| format!("{}: {}", id, err))
+                                    .collect()],
+                                description: format!(
+                                    "(Double Free) Object may have been freed before at {}",
+                                    call.tid.address
+                                ),
+                            };
+                            let _ = self.log_collector.send(LogThreadMsg::Cwe(warning));
                         }
                         new_state.remove_unreferenced_objects();
                         new_state
@@ -294,7 +297,7 @@ impl<'a> Context<'a> {
             match state.eval_parameter_arg(
                 parameter,
                 &self.project.stack_pointer_register,
-                &self.runtime_memory_image,
+                self.runtime_memory_image,
             ) {
                 Ok(value) => {
                     if state.memory.is_dangling_pointer(&value, true) {
@@ -340,7 +343,7 @@ impl<'a> Context<'a> {
             match state.eval_parameter_arg(
                 parameter,
                 &self.project.stack_pointer_register,
-                &self.runtime_memory_image,
+                self.runtime_memory_image,
             ) {
                 Ok(data) => {
                     if state.pointer_contains_out_of_bounds_target(&data, self.runtime_memory_image)
@@ -425,7 +428,7 @@ impl<'a> Context<'a> {
             ),
             Some(&call.tid),
         );
-        let calling_conv = extern_symbol.get_calling_convention(&self.project);
+        let calling_conv = extern_symbol.get_calling_convention(self.project);
         let mut possible_referenced_ids = BTreeSet::new();
         if extern_symbol.parameters.is_empty() && extern_symbol.return_values.is_empty() {
             // We assume here that we do not know the parameters and approximate them by all possible parameter registers.
@@ -437,7 +440,7 @@ impl<'a> Context<'a> {
                 .chain(calling_conv.float_parameter_register.iter())
             {
                 if let Some(register_value) = state.get_register_by_name(parameter_register_name) {
-                    possible_referenced_ids.append(&mut register_value.referenced_ids());
+                    possible_referenced_ids.extend(register_value.referenced_ids().cloned());
                 }
             }
         } else {
@@ -445,9 +448,9 @@ impl<'a> Context<'a> {
                 if let Ok(data) = state.eval_parameter_arg(
                     parameter,
                     &self.project.stack_pointer_register,
-                    &self.runtime_memory_image,
+                    self.runtime_memory_image,
                 ) {
-                    possible_referenced_ids.append(&mut data.referenced_ids());
+                    possible_referenced_ids.extend(data.referenced_ids().cloned());
                 }
             }
         }
@@ -484,7 +487,7 @@ impl<'a> Context<'a> {
                 if let Some(register_value) =
                     state_before_call.get_register_by_name(parameter_register_name)
                 {
-                    possible_referenced_ids.append(&mut register_value.referenced_ids());
+                    possible_referenced_ids.extend(register_value.referenced_ids().cloned());
                 }
             }
             possible_referenced_ids =
@@ -503,15 +506,12 @@ impl<'a> Context<'a> {
 
     /// Get the offset of the current stack pointer to the base of the current stack frame.
     fn get_current_stack_offset(&self, state: &State) -> ValueDomain {
-        if let Data::Pointer(ref stack_pointer) =
-            state.get_register(&self.project.stack_pointer_register)
+        if let Some((stack_id, stack_offset_domain)) = state
+            .get_register(&self.project.stack_pointer_register)
+            .get_if_unique_target()
         {
-            if stack_pointer.targets().len() == 1 {
-                let (stack_id, stack_offset_domain) =
-                    stack_pointer.targets().iter().next().unwrap();
-                if *stack_id == state.stack_id {
-                    return stack_offset_domain.clone();
-                }
+            if *stack_id == state.stack_id {
+                return stack_offset_domain.clone();
             }
         }
         ValueDomain::new_top(self.project.stack_pointer_register.size)

@@ -94,7 +94,8 @@ impl BitvectorExtended for Bitvector {
     }
 
     /// Perform a binary operation on the given bitvectors.
-    /// Returns an error for non-implemented operations (currently all float-related operations).
+    /// Returns an error for non-implemented operations (currently all float-related operations)
+    /// or for divisions-by-zero.
     fn bin_op(&self, op: BinOpType, rhs: &Self) -> Result<Self, Error> {
         use BinOpType::*;
         match op {
@@ -160,7 +161,7 @@ impl BitvectorExtended for Bitvector {
                 if self.width().to_usize() > 64 {
                     Err(anyhow!("Multiplication and division of integers larger than 8 bytes not yet implemented."))
                 } else {
-                    Ok(self.clone().into_checked_udiv(rhs).unwrap())
+                    Ok(self.clone().into_checked_udiv(rhs)?)
                 }
             }
             IntSDiv => {
@@ -168,11 +169,11 @@ impl BitvectorExtended for Bitvector {
                 if self.width().to_usize() > 64 {
                     Err(anyhow!("Multiplication and division of integers larger than 8 bytes not yet implemented."))
                 } else {
-                    Ok(self.clone().into_checked_sdiv(rhs).unwrap())
+                    Ok(self.clone().into_checked_sdiv(rhs)?)
                 }
             }
-            IntRem => Ok(self.clone().into_checked_urem(rhs).unwrap()),
-            IntSRem => Ok(self.clone().into_checked_srem(rhs).unwrap()),
+            IntRem => Ok(self.clone().into_checked_urem(rhs)?),
+            IntSRem => Ok(self.clone().into_checked_srem(rhs)?),
             IntLeft => {
                 let shift_amount = rhs.try_to_u64().unwrap() as usize;
                 if shift_amount < self.width().to_usize() {

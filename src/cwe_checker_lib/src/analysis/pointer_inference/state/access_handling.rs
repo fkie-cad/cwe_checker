@@ -1,3 +1,5 @@
+//! Methods of [`State`] for handling memory and register access operations.
+
 use crate::utils::binary::RuntimeMemoryImage;
 
 use super::*;
@@ -51,9 +53,7 @@ impl State {
             let caller_addresses: Vec<_> = self
                 .caller_stack_ids
                 .iter()
-                .map(|caller_stack_id| {
-                    PointerDomain::new(caller_stack_id.clone(), offset.clone()).into()
-                })
+                .map(|caller_stack_id| Data::from_target(caller_stack_id.clone(), offset.clone()))
                 .collect();
             let mut result = Ok(());
             for address in caller_addresses {
@@ -64,30 +64,27 @@ impl State {
             // Note that this only returns the last error that was detected.
             result
         } else {
-            match self.adjust_pointer_for_read(address) {
-                Data::Pointer(pointer) => {
-                    self.memory.set_value(pointer, value.clone())?;
+            let pointer = self.adjust_pointer_for_read(address);
+            self.memory.set_value(pointer.clone(), value.clone())?;
+            if let Some(absolute_address) = pointer.get_absolute_value() {
+                if let Ok(address_to_global_data) = absolute_address.try_to_bitvec() {
+                    match global_memory.is_address_writeable(&address_to_global_data) {
+                        Ok(true) => Ok(()),
+                        Ok(false) => Err(anyhow!("Write to read-only global data")),
+                        Err(err) => Err(err),
+                    }
+                } else if let Ok((start, end)) = absolute_address.try_to_offset_interval() {
+                    match global_memory.is_interval_writeable(start as u64, end as u64) {
+                        Ok(true) => Ok(()),
+                        Ok(false) => Err(anyhow!("Write to read-only global data")),
+                        Err(err) => Err(err),
+                    }
+                } else {
+                    // We assume inexactness of the algorithm instead of a possible CWE here.
                     Ok(())
                 }
-                Data::Value(absolute_address) => {
-                    if let Ok(address_to_global_data) = absolute_address.try_to_bitvec() {
-                        match global_memory.is_address_writeable(&address_to_global_data) {
-                            Ok(true) => Ok(()),
-                            Ok(false) => Err(anyhow!("Write to read-only global data")),
-                            Err(err) => Err(err),
-                        }
-                    } else if let Ok((start, end)) = absolute_address.try_to_offset_interval() {
-                        match global_memory.is_interval_writeable(start as u64, end as u64) {
-                            Ok(true) => Ok(()),
-                            Ok(false) => Err(anyhow!("Write to read-only global data")),
-                            Err(err) => Err(err),
-                        }
-                    } else {
-                        // We assume inexactness of the algorithm instead of a possible CWE here.
-                        Ok(())
-                    }
-                }
-                Data::Top(_) => Ok(()),
+            } else {
+                Ok(())
             }
         }
     }
@@ -122,28 +119,38 @@ impl State {
         global_memory: &RuntimeMemoryImage,
     ) -> Result<Data, Error> {
         let address = self.adjust_pointer_for_read(&self.eval(address));
-        match address {
-            Data::Value(global_address) => {
-                if let Ok(address_bitvector) = global_address.try_to_bitvec() {
-                    if let Some(loaded_value) = global_memory.read(&address_bitvector, size)? {
-                        Ok(Data::Value(loaded_value.into()))
-                    } else {
-                        Ok(Data::Top(size))
-                    }
-                } else if let Ok((start, end)) = global_address.try_to_offset_interval() {
-                    if global_memory
-                        .is_interval_readable(start as u64, end as u64 + u64::from(size))?
-                    {
-                        Ok(Data::new_top(size))
-                    } else {
-                        Err(anyhow!("Target address is not readable."))
-                    }
-                } else {
-                    Ok(Data::new_top(size))
+        let mut result = if let Some(global_address) = address.get_absolute_value() {
+            if let Ok(address_bitvector) = global_address.try_to_bitvec() {
+                match global_memory.read(&address_bitvector, size) {
+                    Ok(Some(loaded_value)) => loaded_value.into(),
+                    Ok(None) => Data::new_top(size),
+                    Err(_) => Data::new_empty(size),
                 }
+            } else if let Ok((start, end)) = global_address.try_to_offset_interval() {
+                if global_memory
+                    .is_interval_readable(start as u64, end as u64 + u64::from(size))
+                    .ok()
+                    == Some(true)
+                {
+                    Data::new_top(size)
+                } else {
+                    Data::new_empty(size)
+                }
+            } else {
+                Data::new_top(size)
             }
-            Data::Top(_) => Ok(Data::new_top(size)),
-            Data::Pointer(_) => Ok(self.memory.get_value(&address, size)?),
+        } else {
+            Data::new_empty(size)
+        };
+        result = result.merge(&self.memory.get_value(&address, size));
+
+        if address.contains_top() {
+            result.set_contains_top_flag()
+        }
+        if result.is_empty() {
+            Err(anyhow!("Could not read from address"))
+        } else {
+            Ok(result)
         }
     }
 
@@ -169,44 +176,40 @@ impl State {
     /// If the pointer contains a reference to the stack with offset >= 0, replace it with a pointer
     /// pointing to all possible caller IDs.
     fn adjust_pointer_for_read(&self, address: &Data) -> Data {
-        if let Data::Pointer(pointer) = address {
-            let mut new_targets = BTreeMap::new();
-            for (id, offset) in pointer.targets() {
-                if *id == self.stack_id {
-                    if let Ok((interval_start, interval_end)) = offset.try_to_offset_interval() {
-                        if interval_start >= 0
-                            && interval_end >= 0
-                            && !self.caller_stack_ids.is_empty()
-                        {
-                            for caller_id in self.caller_stack_ids.iter() {
-                                new_targets.insert(caller_id.clone(), offset.clone());
-                            }
-                        // Note that the id of the current stack frame was *not* added.
-                        } else {
-                            new_targets.insert(id.clone(), offset.clone());
-                        }
-                    } else {
+        let mut adjusted_address = address.clone();
+        let mut new_targets = BTreeMap::new();
+        for (id, offset) in address.get_relative_values() {
+            if *id == self.stack_id {
+                if let Ok((interval_start, interval_end)) = offset.try_to_offset_interval() {
+                    if interval_start >= 0 && interval_end >= 0 && !self.caller_stack_ids.is_empty()
+                    {
                         for caller_id in self.caller_stack_ids.iter() {
                             new_targets.insert(caller_id.clone(), offset.clone());
                         }
-                        // Note that we also add the id of the current stack frame
+                    // Note that the id of the current stack frame was *not* added.
+                    } else {
                         new_targets.insert(id.clone(), offset.clone());
                     }
                 } else {
+                    for caller_id in self.caller_stack_ids.iter() {
+                        new_targets.insert(caller_id.clone(), offset.clone());
+                    }
+                    // Note that we also add the id of the current stack frame
                     new_targets.insert(id.clone(), offset.clone());
                 }
+            } else {
+                new_targets.insert(id.clone(), offset.clone());
             }
-            Data::Pointer(PointerDomain::with_targets(new_targets))
-        } else {
-            address.clone()
         }
+        adjusted_address.set_relative_values(new_targets);
+        adjusted_address
     }
 
     /// Evaluate the value of an expression in the current state
     pub fn eval(&self, expression: &Expression) -> Data {
         use Expression::*;
         match expression {
-            Var(variable) => self.get_register(&variable),
+            Var(variable) => self.get_register(variable),
             Const(bitvector) => bitvector.clone().into(),
             BinOp { op, lhs, rhs } => {
                 if *op == BinOpType::IntXOr && lhs == rhs {
@@ -294,24 +297,20 @@ impl State {
         data: &Data,
         global_data: &RuntimeMemoryImage,
     ) -> bool {
-        let data = self.adjust_pointer_for_read(data);
-        matches!(data, Data::Pointer(_))
-            && self
-                .memory
-                .is_out_of_bounds_mem_access(&data, ByteSize::new(1), global_data)
+        let mut data = self.adjust_pointer_for_read(data);
+        data.set_absolute_value(None); // Do not check absolute_values
+        self.memory
+            .is_out_of_bounds_mem_access(&data, ByteSize::new(1), global_data)
     }
 
     /// Return `true` if `data` is a pointer to the current stack frame with a constant positive address,
     /// i.e. if it accesses a stack parameter (or the return-to address for x86) of the current function.
     pub fn is_stack_pointer_with_nonnegative_offset(&self, data: &Data) -> bool {
-        if let Data::Pointer(pointer) = data {
-            if pointer.targets().len() == 1 {
-                let (target, offset) = pointer.targets().iter().next().unwrap();
-                if *target == self.stack_id {
-                    if let Ok(offset_val) = offset.try_to_offset() {
-                        if offset_val >= 0 {
-                            return true;
-                        }
+        if let Some((target, offset)) = data.get_if_unique_target() {
+            if *target == self.stack_id {
+                if let Ok(offset_val) = offset.try_to_offset() {
+                    if offset_val >= 0 {
+                        return true;
                     }
                 }
             }
@@ -327,16 +326,13 @@ impl State {
         if self.caller_stack_ids.is_empty() {
             return None;
         }
-        if let Data::Pointer(pointer) = address {
-            match (pointer.targets().len(), pointer.targets().iter().next()) {
-                (1, Some((id, offset))) if self.stack_id == *id => {
-                    if let Ok((interval_start, _interval_end)) = offset.try_to_offset_interval() {
-                        if interval_start >= 0 {
-                            return Some(offset.clone());
-                        }
+        if let Some((id, offset)) = address.get_if_unique_target() {
+            if self.stack_id == *id {
+                if let Ok((interval_start, _interval_end)) = offset.try_to_offset_interval() {
+                    if interval_start >= 0 {
+                        return Some(offset.clone());
                     }
                 }
-                _ => (),
             }
         }
         None

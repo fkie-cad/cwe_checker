@@ -1,8 +1,5 @@
 use crate::analysis::pointer_inference::ValueDomain;
-use crate::{
-    abstract_domain::{DataDomain, PointerDomain},
-    intermediate_representation::CastOpType,
-};
+use crate::{abstract_domain::DataDomain, intermediate_representation::CastOpType};
 
 use super::*;
 
@@ -98,9 +95,9 @@ impl Setup {
             constant: String::from("Hello World"),
             constant_address: Bitvector::from_u32(12290),
             def_tid: Tid::new("def"),
-            stack_pointer: Data::Pointer(PointerDomain::new(stack_id.clone(), bv(0))),
-            base_eight_offset: Data::Pointer(PointerDomain::new(stack_id.clone(), bv(-8))),
-            base_sixteen_offset: Data::Pointer(PointerDomain::new(stack_id.clone(), bv(-16))),
+            stack_pointer: Data::from_target(stack_id.clone(), bv(0)),
+            base_eight_offset: Data::from_target(stack_id.clone(), bv(-8)),
+            base_sixteen_offset: Data::from_target(stack_id.clone(), bv(-16)),
         }
     }
 }

@@ -142,7 +142,7 @@ fn context_problem_implementation() {
 
     // test update_def
     state = context.update_def(&state, &def).unwrap();
-    let stack_pointer = Data::Pointer(PointerDomain::new(new_id("main", "RSP"), bv(-16)));
+    let stack_pointer = Data::from_target(new_id("main", "RSP"), bv(-16));
     assert_eq!(state.eval(&Var(register("RSP"))), stack_pointer);
     state = context.update_def(&state, &store_term).unwrap();
 
@@ -175,8 +175,8 @@ fn context_problem_implementation() {
     callee_state
         .memory
         .set_value(
-            PointerDomain::new(new_id("func", "RSP"), bv(-30)),
-            Data::Value(bv(33).into()),
+            Data::from_target(new_id("func", "RSP"), bv(-30)),
+            bv(33).into(),
         )
         .unwrap();
     // Emulate  removing the return pointer from the stack for x64
@@ -213,28 +213,25 @@ fn context_problem_implementation() {
             .bin_op(BinOpType::IntAdd, &Bitvector::from_i64(8).into())
     );
 
-    state.set_register(&register("callee_saved_reg"), Data::Value(bv(13)));
-    state.set_register(&register("other_reg"), Data::Value(bv(14)));
+    state.set_register(&register("callee_saved_reg"), bv(13).into());
+    state.set_register(&register("other_reg"), bv(14).into());
 
     let malloc = call_term("extern_malloc");
     let mut state_after_malloc = context.update_call_stub(&state, &malloc).unwrap();
     assert_eq!(
         state_after_malloc.get_register(&register("RDX")),
-        Data::Pointer(PointerDomain::new(
-            new_id("call_extern_malloc", "RDX"),
-            bv(0)
-        ))
+        Data::from_target(new_id("call_extern_malloc", "RDX"), bv(0))
     );
     assert_eq!(state_after_malloc.memory.get_num_objects(), 2);
     assert_eq!(
         state_after_malloc.get_register(&register("RSP")),
         state
             .get_register(&register("RSP"))
-            .bin_op(BinOpType::IntAdd, &Data::Value(bv(8)))
+            .bin_op(BinOpType::IntAdd, &bv(8).into())
     );
     assert_eq!(
         state_after_malloc.get_register(&register("callee_saved_reg")),
-        Data::Value(bv(13))
+        bv(13).into()
     );
     assert!(state_after_malloc
         .get_register(&register("other_reg"))
@@ -242,10 +239,7 @@ fn context_problem_implementation() {
 
     state_after_malloc.set_register(
         &register("callee_saved_reg"),
-        Data::Pointer(PointerDomain::new(
-            new_id("call_extern_malloc", "RDX"),
-            bv(0),
-        )),
+        Data::from_target(new_id("call_extern_malloc", "RDX"), bv(0)),
     );
     let free = call_term("extern_free");
     let state_after_free = context
@@ -255,10 +249,7 @@ fn context_problem_implementation() {
     assert_eq!(state_after_free.memory.get_num_objects(), 2);
     assert_eq!(
         state_after_free.get_register(&register("callee_saved_reg")),
-        Data::Pointer(PointerDomain::new(
-            new_id("call_extern_malloc", "RDX"),
-            bv(0)
-        ))
+        Data::from_target(new_id("call_extern_malloc", "RDX"), bv(0))
     );
 
     let other_extern_fn = call_term("extern_other");
@@ -268,11 +259,11 @@ fn context_problem_implementation() {
         state_after_other_fn.get_register(&register("RSP")),
         state
             .get_register(&register("RSP"))
-            .bin_op(BinOpType::IntAdd, &Data::Value(bv(8)))
+            .bin_op(BinOpType::IntAdd, &bv(8).into())
     );
     assert_eq!(
         state_after_other_fn.get_register(&register("callee_saved_reg")),
-        Data::Value(bv(13))
+        bv(13).into()
     );
     assert!(state_after_other_fn
         .get_register(&register("other_reg"))
@@ -326,10 +317,7 @@ fn update_return() {
         .insert(other_callsite_id.clone());
     state_before_return.set_register(
         &register("RDX"),
-        Data::Pointer(PointerDomain::new(
-            new_id("call_callee_other", "RSP"),
-            bv(-32),
-        )),
+        Data::from_target(new_id("call_callee_other", "RSP"), bv(-32)),
     );
 
     let state_before_call = State::new(&register("RSP"), Tid::new("original_caller_id"));
@@ -379,10 +367,7 @@ fn update_return() {
         .get_all_object_ids()
         .get(&new_id("caller_caller", "RSP"))
         .is_some());
-    let expected_rsp = Data::Pointer(PointerDomain::new(
-        new_id("original_caller_id", "RSP"),
-        bv(-8),
-    ));
+    let expected_rsp = Data::from_target(new_id("original_caller_id", "RSP"), bv(-8));
     assert_eq!(state.get_register(&register("RSP")), expected_rsp);
 }
 
