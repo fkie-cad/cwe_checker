@@ -141,5 +141,6 @@ pub fn check_cwe(
         }
     }
 
+    cwes.sort();
     (log_messages, cwes)
 }

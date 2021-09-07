@@ -41,7 +41,7 @@
 //! - Missing Taints due to lost track of pointer targets
 //! - Non tracked function parameters cause incomplete taints that could miss possible dangerous inputs
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::{
     analysis::{
@@ -161,7 +161,7 @@ pub fn check_cwe(
         }
     }
 
-    let mut cwe_warnings = HashMap::new();
+    let mut cwe_warnings = BTreeMap::new();
     for cwe in cwe_receiver.try_iter() {
         match &cwe.addresses[..] {
             [taint_source_address, ..] => cwe_warnings.insert(taint_source_address.clone(), cwe),

@@ -218,6 +218,10 @@ impl Blk {
                 term: jmp_term.term.into(),
             })
             .collect();
+        let indirect_jmp_targets = indirect_jmp_targets
+            .into_iter()
+            .map(|address| Tid::blk_id_at_address(&address))
+            .collect();
         IrBlk {
             defs,
             jmps,
@@ -510,12 +514,11 @@ impl ExternSymbol {
         let mut symbol = self.clone();
         let mut parameters = Vec::new();
         let mut return_values = Vec::new();
-        let input_args: Vec<&Arg> = symbol
+        let symbol_has_input_args = symbol
             .arguments
             .iter()
-            .filter(|arg| matches!(arg.intent, ArgIntent::INPUT))
-            .collect();
-        if symbol.is_scanf_or_sscanf() && input_args.is_empty() {
+            .any(|arg| matches!(arg.intent, ArgIntent::INPUT));
+        if symbol.is_scanf_or_sscanf() && !symbol_has_input_args {
             symbol.create_format_string_args_for_scanf_and_sscanf(
                 conventions,
                 stack_pointer,

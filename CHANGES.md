@@ -1,3 +1,8 @@
+0.6-dev
+====
+
+-   Add support for analysis of bare-metal binaries (PR #203)
+
 0.5 (2021-07)
 ====
 

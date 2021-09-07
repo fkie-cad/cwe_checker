@@ -24,7 +24,7 @@ fn test_get_variable_parameters() {
     let global_address = Bitvector::from_str_radix(16, "5000").unwrap();
     pi_state.set_register(
         &Variable::mock("RDI", 8 as u64),
-        DataDomain::Value(IntervalDomain::new(global_address.clone(), global_address)),
+        IntervalDomain::new(global_address.clone(), global_address).into(),
     );
     let mut project = Project::mock_empty();
     let cconv = CallingConvention::mock_with_parameter_registers(
@@ -66,7 +66,7 @@ fn test_get_variable_parameters() {
     let global_address = Bitvector::from_str_radix(16, "500c").unwrap();
     pi_state.set_register(
         &Variable::mock("RDI", 8 as u64),
-        DataDomain::Value(IntervalDomain::new(global_address.clone(), global_address)),
+        IntervalDomain::new(global_address.clone(), global_address).into(),
     );
 
     assert_eq!(
@@ -91,7 +91,7 @@ fn test_get_input_format_string() {
     let global_address = Bitvector::from_str_radix(16, "3002").unwrap();
     pi_state.set_register(
         &Variable::mock("RSI", 8 as u64),
-        DataDomain::Value(IntervalDomain::new(global_address.clone(), global_address)),
+        IntervalDomain::new(global_address.clone(), global_address).into(),
     );
 
     assert_eq!(

@@ -53,7 +53,7 @@ pub fn get_calls<'a>(
     let mut calls: Vec<(&str, &Tid, &str)> = Vec::new();
     let mut symbol_map: HashMap<&Tid, &str> = HashMap::with_capacity(dangerous_symbols.len());
     for symbol in dangerous_symbols.iter() {
-        symbol_map.insert(&symbol.tid, &symbol.name.as_str());
+        symbol_map.insert(&symbol.tid, symbol.name.as_str());
     }
     for sub in subfunctions.iter() {
         calls.append(&mut get_calls_to_symbols(sub, &symbol_map));
@@ -89,6 +89,7 @@ pub fn generate_cwe_warnings<'a>(
         cwe_warnings.push(cwe_warning);
     }
 
+    cwe_warnings.sort();
     cwe_warnings
 }
 

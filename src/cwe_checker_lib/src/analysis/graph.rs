@@ -284,9 +284,8 @@ impl<'a> GraphBuilder<'a> {
             Node::BlkEnd(source_block, _) => source_block,
             _ => panic!(),
         };
-        for target_address in source_block.term.indirect_jmp_targets.iter() {
-            let target_tid = Tid::blk_id_at_address(target_address);
-            self.add_intraprocedural_edge(source, &target_tid, jump, untaken_conditional);
+        for target_tid in source_block.term.indirect_jmp_targets.iter() {
+            self.add_intraprocedural_edge(source, target_tid, jump, untaken_conditional);
         }
     }
 
@@ -335,7 +334,7 @@ impl<'a> GraphBuilder<'a> {
                     }
                 } else {
                     let mut call_source_node: Option<NodeIndex> = None;
-                    if let Some((target_node, _)) = self.call_targets.get(&target) {
+                    if let Some((target_node, _)) = self.call_targets.get(target) {
                         let (target_block, target_sub) = match self.graph[*target_node] {
                             Node::BlkStart(target_block, target_sub) => (target_block, target_sub),
                             _ => panic!(),
@@ -604,11 +603,11 @@ mod tests {
         let mut blk_tid = Tid::new("blk_00001000");
         blk_tid.address = "00001000".to_string();
         let blk_term = Term {
-            tid: blk_tid,
+            tid: blk_tid.clone(),
             term: Blk {
                 defs: Vec::new(),
                 jmps: vec![indirect_jmp_term],
-                indirect_jmp_targets: vec!["00001000".to_string()],
+                indirect_jmp_targets: vec![blk_tid],
             },
         };
         let sub_term = Term {

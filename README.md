@@ -44,7 +44,7 @@ If you want to build the docker image yourself, just run `docker build -t cwe_ch
 ### Local installation ###
 
 The following dependencies must be installed in order to build and install the *cwe_checker* locally:
--   [Rust](https://www.rust-lang.org) >= 1.49
+-   [Rust](https://www.rust-lang.org) >= 1.53
 -   [Ghidra](https://ghidra-sre.org/) >= 9.2
 
 Run `make all GHIDRA_PATH=/path/to/ghidra_folder` (with the correct path to the local Ghidra installation inserted) to compile and install the cwe_checker.
@@ -68,6 +68,16 @@ If you modify it, add the command line flag `--config=src/config.json` to tell t
 For information about other available command line flags you can pass the `--help` flag to the *cwe_checker*.
 
 If you use the stable version, you can also look at the [online documentation](https://fkie-cad.github.io/cwe_checker/index.html) for more information.
+
+### For Bare-Metal Binaries ###
+
+The cwe_checker offers experimental support for analyzing bare-metal binaries.
+For that one needs to provide a bare metal configuration file via the `--bare-metal-config` command line option.
+An example for such a configuration file can be found at `bare_metal/stm32f407vg.json`
+(which was created and tested for an STM32F407VG MCU).
+
+For more information build and read the documentation locally via `make documentation`.
+Note that this analysis mode is not yet included in the stable version of the cwe_checker.
 
 ## Documentation and Tests ##
 
