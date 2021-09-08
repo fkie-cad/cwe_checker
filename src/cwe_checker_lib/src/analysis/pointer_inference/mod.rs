@@ -15,6 +15,7 @@
 //! - [CWE-125](https://cwe.mitre.org/data/definitions/125.html) Buffer Overflow: Out-of-bounds Read
 //! - [CWE-415](https://cwe.mitre.org/data/definitions/415.html): Double Free
 //! - [CWE-416](https://cwe.mitre.org/data/definitions/416.html): Use After Free
+//! - [CWE-476](https://cwe.mitre.org/data/definitions/476.html): NULL Pointer Dereference
 //! - [CWE-787](https://cwe.mitre.org/data/definitions/787.html): Buffer Overflow: Out-of-bounds Write
 //!
 //! The analysis operates on a best-effort basis.

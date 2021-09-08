@@ -206,8 +206,8 @@ impl<T: RegisterDomain + Display> DataDomain<T> {
         }
         if self.contains_top_values {
             values.push(serde_json::Value::String(format!(
-                "Top:{}",
-                self.bytesize()
+                "Top:i{}",
+                self.bytesize().as_bit_length()
             )));
         }
         match values.len() {
