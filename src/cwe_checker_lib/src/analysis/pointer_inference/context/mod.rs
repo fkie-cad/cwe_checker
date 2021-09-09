@@ -516,6 +516,23 @@ impl<'a> Context<'a> {
         }
         ValueDomain::new_top(self.project.stack_pointer_register.size)
     }
+
+    /// Report a NULL dereference CWE at the address of the given TID.
+    fn report_null_deref(&self, tid: &Tid) {
+        let warning = CweWarning {
+            name: "CWE476".to_string(),
+            version: VERSION.to_string(),
+            addresses: vec![tid.address.clone()],
+            tids: vec![format!("{}", tid)],
+            symbols: Vec::new(),
+            other: Vec::new(),
+            description: format!(
+                "(NULL Pointer Dereference) Memory access at {} may result in a NULL dereference",
+                tid.address
+            ),
+        };
+        let _ = self.log_collector.send(LogThreadMsg::Cwe(warning));
+    }
 }
 
 #[cfg(test)]
