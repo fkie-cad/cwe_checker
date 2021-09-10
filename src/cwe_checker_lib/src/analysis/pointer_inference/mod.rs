@@ -161,7 +161,16 @@ impl<'a> PointerInference<'a> {
             ));
         }
         for (sub_tid, start_node_index) in entry_sub_to_entry_node_map.into_iter() {
-            let mut fn_entry_state = State::new(&project.stack_pointer_register, sub_tid.clone());
+            let mut fn_entry_state = if let Some(cconv) = project.get_standard_calling_convention()
+            {
+                State::new_with_generic_parameter_objects(
+                    &project.stack_pointer_register,
+                    sub_tid.clone(),
+                    &cconv.integer_parameter_register,
+                )
+            } else {
+                State::new(&project.stack_pointer_register, sub_tid.clone())
+            };
             if project.cpu_architecture.contains("MIPS") {
                 let _ = fn_entry_state
                     .set_mips_link_register(&sub_tid, project.stack_pointer_register.size);
@@ -298,7 +307,16 @@ impl<'a> PointerInference<'a> {
                 [&self.computation.get_graph()[entry].get_block().tid]
                 .tid
                 .clone();
-            let mut fn_entry_state = State::new(&project.stack_pointer_register, sub_tid.clone());
+            let mut fn_entry_state = if let Some(cconv) = project.get_standard_calling_convention()
+            {
+                State::new_with_generic_parameter_objects(
+                    &project.stack_pointer_register,
+                    sub_tid.clone(),
+                    &cconv.integer_parameter_register,
+                )
+            } else {
+                State::new(&project.stack_pointer_register, sub_tid.clone())
+            };
             if project.cpu_architecture.contains("MIPS") {
                 let _ = fn_entry_state
                     .set_mips_link_register(&sub_tid, project.stack_pointer_register.size);

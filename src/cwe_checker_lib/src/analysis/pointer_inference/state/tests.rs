@@ -1117,3 +1117,16 @@ fn test_check_def_for_null_dereferences() {
     state.set_register(&var_rax, address);
     assert_eq!(state.check_def_for_null_dereferences(&def).ok(), Some(true));
 }
+
+#[test]
+fn test_new_with_generic_parameter_objects() {
+    let param_names = vec!["param1".to_string(), "param2".to_string()];
+    let state = State::new_with_generic_parameter_objects(
+        &register("RSP"),
+        Tid::new("func_tid"),
+        &param_names,
+    );
+    assert_eq!(state.memory.get_num_objects(), 3);
+    assert!(state.get_register_by_name("param1").is_some());
+    assert!(state.get_register_by_name("param2").is_some());
+}
