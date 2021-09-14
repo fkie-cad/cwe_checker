@@ -303,9 +303,20 @@ impl AbstractDomain for State {
     fn merge(&self, other: &Self) -> Self {
         assert_eq!(self.stack_id, other.stack_id);
         let mut merged_register = BTreeMap::new();
+        for (register, self_value) in self.register.iter() {
+            let merged_value = if let Some(other_value) = other.register.get(register) {
+                self_value.merge(other_value)
+            } else {
+                self_value.top().merge(self_value)
+            };
+            if !merged_value.is_top() {
+                // We only have to keep non-*Top* elements.
+                merged_register.insert(register.clone(), merged_value);
+            }
+        }
         for (register, other_value) in other.register.iter() {
-            if let Some(value) = self.register.get(register) {
-                let merged_value = value.merge(other_value);
+            if self.register.get(register).is_none() {
+                let merged_value = other_value.top().merge(other_value);
                 if !merged_value.is_top() {
                     // We only have to keep non-*Top* elements.
                     merged_register.insert(register.clone(), merged_value);

@@ -60,7 +60,19 @@ fn state() {
     other_state.register.insert(register("RBX"), bv(35).into());
     let merged_state = state.merge(&other_state);
     assert_eq!(merged_state.register[&register("RAX")], bv(42).into());
-    assert_eq!(merged_state.register.get(&register("RBX")), None);
+    assert_eq!(
+        merged_state
+            .register
+            .get(&register("RBX"))
+            .unwrap()
+            .get_absolute_value(),
+        Some(&bv(35).into())
+    );
+    assert!(merged_state
+        .register
+        .get(&register("RBX"))
+        .unwrap()
+        .contains_top());
     assert!(merged_state
         .load_value(&Var(register("RSP")), ByteSize::new(8), &global_memory)
         .unwrap()
