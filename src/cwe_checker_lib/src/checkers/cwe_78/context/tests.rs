@@ -103,12 +103,12 @@ impl Setup {
             .program
             .term
             .extern_symbols
-            .push(ExternSymbol::mock_string());
+            .insert(ExternSymbol::mock_string().tid, ExternSymbol::mock_string());
         project
             .program
             .term
             .extern_symbols
-            .push(ExternSymbol::mock());
+            .insert(ExternSymbol::mock().tid, ExternSymbol::mock());
         project.program.term.subs.push(sub);
         project.program.term.entry_points.push(Tid::new("func"));
         project.calling_conventions.push(CallingConvention::mock());
@@ -138,8 +138,8 @@ impl<'a> Context<'a> {
         graph.reverse();
 
         let mut extern_symbol_map = HashMap::new();
-        for symbol in project.program.term.extern_symbols.iter() {
-            extern_symbol_map.insert(symbol.tid.clone(), symbol);
+        for (tid, symbol) in project.program.term.extern_symbols.iter() {
+            extern_symbol_map.insert(tid.clone(), symbol);
         }
 
         let mut block_first_def_set: HashSet<(Tid, Tid)> = HashSet::new();

@@ -1,13 +1,14 @@
 use super::{Blk, ExternSymbol, Sub};
 use crate::prelude::*;
+use std::collections::BTreeMap;
 
 /// The `Program` structure represents a disassembled binary.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct Program {
     /// The known functions contained in the binary
     pub subs: Vec<Term<Sub>>,
     /// Extern symbols linked to the binary by the linker.
-    pub extern_symbols: Vec<ExternSymbol>,
+    pub extern_symbols: BTreeMap<Tid, ExternSymbol>,
     /// Entry points into to binary,
     /// i.e. the term identifiers of functions that may be called from outside of the binary.
     pub entry_points: Vec<Tid>,
@@ -42,7 +43,7 @@ mod tests {
         pub fn mock_empty() -> Program {
             Program {
                 subs: Vec::new(),
-                extern_symbols: Vec::new(),
+                extern_symbols: BTreeMap::new(),
                 entry_points: Vec::new(),
                 address_base_offset: 0,
             }

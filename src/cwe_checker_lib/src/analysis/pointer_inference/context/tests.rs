@@ -14,21 +14,25 @@ fn new_id(time: &str, reg_name: &str) -> AbstractIdentifier {
     )
 }
 
-fn mock_extern_symbol(name: &str) -> ExternSymbol {
+fn mock_extern_symbol(name: &str) -> (Tid, ExternSymbol) {
     let arg = Arg::Register {
         var: register("RDX"),
         data_type: None,
     };
-    ExternSymbol {
-        tid: Tid::new("extern_".to_string() + name),
-        addresses: vec![],
-        name: name.into(),
-        calling_convention: None,
-        parameters: vec![arg.clone()],
-        return_values: vec![arg],
-        no_return: false,
-        has_var_args: false,
-    }
+    let tid = Tid::new("extern_".to_string() + name);
+    (
+        tid.clone(),
+        ExternSymbol {
+            tid,
+            addresses: vec![],
+            name: name.into(),
+            calling_convention: None,
+            parameters: vec![arg.clone()],
+            return_values: vec![arg],
+            no_return: false,
+            has_var_args: false,
+        },
+    )
 }
 
 fn register(name: &str) -> Variable {
@@ -77,7 +81,9 @@ fn mock_project() -> (Project, Config) {
             mock_extern_symbol("malloc"),
             mock_extern_symbol("free"),
             mock_extern_symbol("other"),
-        ],
+        ]
+        .into_iter()
+        .collect(),
         entry_points: Vec::new(),
         address_base_offset: 0,
     };
