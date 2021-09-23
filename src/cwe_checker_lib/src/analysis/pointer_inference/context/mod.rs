@@ -26,7 +26,7 @@ pub struct Context<'a> {
     /// Note that values of writeable global memory segments are not tracked.
     pub runtime_memory_image: &'a RuntimeMemoryImage,
     /// Maps the TIDs of functions that shall be treated as extern symbols to the `ExternSymbol` object representing it.
-    pub extern_symbol_map: BTreeMap<Tid, &'a ExternSymbol>,
+    pub extern_symbol_map: &'a BTreeMap<Tid, ExternSymbol>,
     /// A channel where found CWE warnings and log messages should be sent to.
     /// The receiver may filter or modify the warnings before presenting them to the user.
     /// For example, the same CWE warning will be found several times
@@ -49,15 +49,11 @@ impl<'a> Context<'a> {
         config: Config,
         log_collector: crossbeam_channel::Sender<LogThreadMsg>,
     ) -> Context<'a> {
-        let mut extern_symbol_map = BTreeMap::new();
-        for symbol in project.program.term.extern_symbols.iter() {
-            extern_symbol_map.insert(symbol.tid.clone(), symbol);
-        }
         Context {
             graph: control_flow_graph,
             project,
             runtime_memory_image,
-            extern_symbol_map,
+            extern_symbol_map: &project.program.term.extern_symbols,
             log_collector,
             allocation_symbols: config.allocation_symbols,
             deallocation_symbols: config.deallocation_symbols,

@@ -8,9 +8,12 @@ use crate::intermediate_representation::*;
 /// Find the extern symbol object for a symbol name and return the symbol tid and name.
 pub fn find_symbol<'a>(prog: &'a Term<Program>, name: &str) -> Option<(&'a Tid, &'a str)> {
     let mut symbol: Option<(&'a Tid, &'a str)> = None;
-    prog.term.extern_symbols.iter().for_each(|sym| {
+    prog.term.extern_symbols.iter().find(|(_tid, sym)| {
         if name == sym.name {
             symbol = Some((&sym.tid, &sym.name));
+            true
+        } else {
+            false
         }
     });
 
@@ -46,18 +49,19 @@ pub fn get_symbol_map<'a>(
 ) -> HashMap<Tid, &'a ExternSymbol> {
     let mut tid_map = HashMap::new();
     for symbol_name in symbols_to_find {
-        if let Some((tid, symbol)) = project
-            .program
-            .term
-            .extern_symbols
-            .iter()
-            .find_map(|symbol| {
-                if symbol.name == *symbol_name {
-                    Some((symbol.tid.clone(), symbol))
-                } else {
-                    None
-                }
-            })
+        if let Some((tid, symbol)) =
+            project
+                .program
+                .term
+                .extern_symbols
+                .iter()
+                .find_map(|(_tid, symbol)| {
+                    if symbol.name == *symbol_name {
+                        Some((symbol.tid.clone(), symbol))
+                    } else {
+                        None
+                    }
+                })
         {
             tid_map.insert(tid, symbol);
         }

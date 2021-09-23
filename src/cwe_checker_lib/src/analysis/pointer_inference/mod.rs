@@ -267,13 +267,7 @@ impl<'a> PointerInference<'a> {
         // TODO: Refactor the fixpoint computation structs, so that the project reference can be extracted from them.
         let mut start_block_to_sub_map: HashMap<&Tid, &Term<Sub>> = HashMap::new();
         for sub in project.program.term.subs.iter() {
-            if project
-                .program
-                .term
-                .extern_symbols
-                .iter()
-                .any(|symbol| symbol.tid == sub.tid)
-            {
+            if project.program.term.extern_symbols.contains_key(&sub.tid) {
                 continue; // We ignore functions marked as extern symbols.
             }
             if let Some(start_block) = sub.term.blocks.first() {

@@ -232,8 +232,8 @@ impl<'a> SymbolMaps<'a> {
     /// Creates a new instance of the symbol maps struct.
     pub fn new(project: &'a Project, config: &Config) -> Self {
         let mut extern_symbol_map = HashMap::new();
-        for symbol in project.program.term.extern_symbols.iter() {
-            extern_symbol_map.insert(symbol.tid.clone(), symbol);
+        for (tid, symbol) in project.program.term.extern_symbols.iter() {
+            extern_symbol_map.insert(tid.clone(), symbol);
         }
         SymbolMaps {
             string_symbol_map: crate::utils::symbol_utils::get_symbol_map(
