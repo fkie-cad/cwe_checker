@@ -1,3 +1,5 @@
+use crate::intermediate_representation::Variable;
+
 use super::*;
 
 fn new_abstract_object() -> AbstractObject {
@@ -24,7 +26,7 @@ fn bv(number: i64) -> ValueDomain {
 fn new_id(tid: &str, reg_name: &str) -> AbstractIdentifier {
     AbstractIdentifier::new(
         Tid::new(tid),
-        AbstractLocation::Register(reg_name.into(), ByteSize::new(8)),
+        AbstractLocation::Register(Variable::mock(reg_name, ByteSize::new(8))),
     )
 }
 
