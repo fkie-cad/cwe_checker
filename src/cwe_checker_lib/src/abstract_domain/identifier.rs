@@ -44,7 +44,7 @@ impl AbstractIdentifier {
     }
 
     /// Get the register associated to the abstract location.
-    /// Panics if the abstract location is a memory location and not a register. 
+    /// Panics if the abstract location is a memory location and not a register.
     pub fn unwrap_register(&self) -> &Variable {
         match &self.location {
             AbstractLocation::Register(var) => var,
