@@ -52,7 +52,7 @@ pub fn get_calls<'a>(
 ) -> Vec<(&'a str, &'a Tid, &'a str)> {
     let mut calls: Vec<(&str, &Tid, &str)> = Vec::new();
     for sub in subfunctions.iter() {
-        calls.append(&mut get_calls_to_symbols(sub, &dangerous_symbols));
+        calls.append(&mut get_calls_to_symbols(sub, dangerous_symbols));
     }
 
     calls
