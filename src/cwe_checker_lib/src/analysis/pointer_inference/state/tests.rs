@@ -8,7 +8,7 @@ fn bv(value: i64) -> ValueDomain {
 fn new_id(time: &str, register: &str) -> AbstractIdentifier {
     AbstractIdentifier::new(
         Tid::new(time),
-        AbstractLocation::Register(register.into(), ByteSize::new(8)),
+        AbstractLocation::Register(Variable::mock(register, ByteSize::new(8))),
     )
 }
 

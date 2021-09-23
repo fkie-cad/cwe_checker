@@ -123,7 +123,7 @@ mod tests {
     fn new_id(name: &str) -> AbstractIdentifier {
         AbstractIdentifier::new(
             Tid::new("time0"),
-            AbstractLocation::Register(name.into(), ByteSize::new(8)),
+            AbstractLocation::Register(Variable::mock(name, ByteSize::new(8))),
         )
     }
 
