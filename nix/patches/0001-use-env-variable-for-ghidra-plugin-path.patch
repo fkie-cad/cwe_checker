@@ -1,0 +1,17 @@
+diff --git a/src/cwe_checker_lib/src/utils/mod.rs b/src/cwe_checker_lib/src/utils/mod.rs
+index f9b0e9c..de41b95 100644
+--- a/src/cwe_checker_lib/src/utils/mod.rs
++++ b/src/cwe_checker_lib/src/utils/mod.rs
+@@ -21,10 +21,8 @@ pub fn read_config_file(filename: &str) -> serde_json::Value {
+ 
+ /// Get the folder path to a Ghidra plugin bundled with the cwe_checker.
+ pub fn get_ghidra_plugin_path(plugin_name: &str) -> std::path::PathBuf {
+-    let project_dirs = directories::ProjectDirs::from("", "", "cwe_checker")
+-        .expect("Could not discern location of data directory.");
+-    let data_dir = project_dirs.data_dir();
+-    data_dir.join("ghidra").join(plugin_name)
++    let plugin_path = std::env::var("CWE_CHECKER_GHIDRA_PLUGIN_PATH").unwrap();
++    std::path::Path::new(&plugin_path).join(plugin_name)
+ }
+ 
+ /// Get the base address for the image of a binary when loaded into memory.

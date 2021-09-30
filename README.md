@@ -49,6 +49,11 @@ The following dependencies must be installed in order to build and install the *
 
 Run `make all GHIDRA_PATH=/path/to/ghidra_folder` (with the correct path to the local Ghidra installation inserted) to compile and install the cwe_checker.
 
+### Nix package manager
+```bash
+nix build 'github:fkie-cad/cwe_checker'
+```
+
 ## Usage ##
 
 The *cwe_checker* takes a binary as input,
@@ -62,6 +67,10 @@ docker run --rm -v /PATH/TO/BINARY:/input fkiecad/cwe_checker /input
 If you installed the *cwe_checker* locally, run
 ```bash
 cwe_checker BINARY
+```
+If you are using Nix package manager, run
+```bash
+nix run 'github:fkie-cad/cwe_checker' BINARY
 ```
 You can adjust the behavior of most checks via a configuration file located at `src/config.json`.
 If you modify it, add the command line flag `--config=src/config.json` to tell the *cwe_checker* to use the modified file.
