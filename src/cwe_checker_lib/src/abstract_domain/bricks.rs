@@ -313,7 +313,7 @@ impl BrickDomain {
     pub fn new(string: String) -> Self {
         let mut new_brick = Brick::new();
         let mut sequence: BTreeSet<String> = BTreeSet::new();
-        sequence.insert(string.to_string());
+        sequence.insert(string);
         new_brick.set_sequence(sequence);
         new_brick.set_min(1);
         new_brick.set_max(1);

@@ -36,6 +36,8 @@ pub struct Config {
     /// Names of extern functions that manipulate strings
     /// or could introduce new strings (e.g. scanf).
     pub string_symbols: Vec<String>,
+    /// The index of the format string parameter in the function signature
+    /// of an external symbol.
     pub format_string_index: BTreeMap<String, usize>,
 }
 
@@ -136,6 +138,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debu
         self.computation.compute_with_max_steps(100); // TODO: make max_steps configurable!
     }
 
+    /// Get the string abstraction computation.
     pub fn get_computation(&self) -> &Computation<GeneralizedContext<'a, Context<'a, T>>> {
         &self.computation
     }

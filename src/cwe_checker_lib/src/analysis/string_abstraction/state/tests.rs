@@ -34,7 +34,7 @@ impl<T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> State<T> 
         }
     }
 
-    pub fn _get_unassigned_return_pointer(&self) -> &HashSet<PointerDomain<IntervalDomain>> {
+    pub fn _get_unassigned_return_pointer(&self) -> &HashSet<DataDomain<IntervalDomain>> {
         &self.unassigned_return_pointer
     }
 }
@@ -48,7 +48,7 @@ fn test_delete_string_map_entries_if_no_pointer_targets_are_tracked() {
         Tid::new("func"),
         AbstractLocation::from_var(&Variable::mock("sp", 4)).unwrap(),
     );
-    let stack_pointer: PointerDomain<IntervalDomain> = PointerDomain::new(
+    let stack_pointer: DataDomain<IntervalDomain> = DataDomain::from_target(
         stack_id.clone(),
         Bitvector::zero(apint::BitWidth::from(4)).into(),
     );
@@ -58,7 +58,7 @@ fn test_delete_string_map_entries_if_no_pointer_targets_are_tracked() {
         AbstractLocation::from_var(&Variable::mock("r5", 4)).unwrap(),
     );
 
-    let heap_pointer_1: PointerDomain<IntervalDomain> = PointerDomain::new(
+    let heap_pointer_1: DataDomain<IntervalDomain> = DataDomain::from_target(
         heap_id_1.clone(),
         Bitvector::zero(apint::BitWidth::from(4)).into(),
     );
@@ -68,7 +68,7 @@ fn test_delete_string_map_entries_if_no_pointer_targets_are_tracked() {
         AbstractLocation::from_var(&Variable::mock("r6", 4)).unwrap(),
     );
 
-    let heap_pointer_2: PointerDomain<IntervalDomain> = PointerDomain::new(
+    let heap_pointer_2: DataDomain<IntervalDomain> = DataDomain::from_target(
         heap_id_2.clone(),
         Bitvector::zero(apint::BitWidth::from(4)).into(),
     );
@@ -80,10 +80,8 @@ fn test_delete_string_map_entries_if_no_pointer_targets_are_tracked() {
 
     state
         .variable_to_pointer_map
-        .insert(Variable::mock("r0", 4), DataDomain::Pointer(stack_pointer));
-    state
-        .stack_offset_to_pointer_map
-        .insert(-8, DataDomain::Pointer(heap_pointer_1));
+        .insert(Variable::mock("r0", 4), stack_pointer);
+    state.stack_offset_to_pointer_map.insert(-8, heap_pointer_1);
     state.unassigned_return_pointer.insert(heap_pointer_2);
 
     state
@@ -130,7 +128,7 @@ fn test_evaluate_constant() {
     let block_first_def_set: HashSet<(Tid, Tid)> = HashSet::new();
 
     assert_eq!(
-        Some(DataDomain::Value(IntervalDomain::new(
+        Some(DataDomain::mock_from_absolute_value(IntervalDomain::new(
             constant.clone(),
             constant.clone(),
         ))),
@@ -162,7 +160,7 @@ fn test_handle_assign_and_load() {
     return_tid.address = "14718".to_string();
     block_first_def_set.insert((return_tid, sub.tid));
 
-    let constant_data_domain = DataDomain::Value(IntervalDomain::new(
+    let constant_data_domain = DataDomain::mock_from_absolute_value(IntervalDomain::new(
         Bitvector::from_str_radix(16, "7000").unwrap(),
         Bitvector::from_str_radix(16, "7000").unwrap(),
     ));
@@ -216,11 +214,11 @@ fn test_handle_assign_and_load() {
         AbstractLocation::from_var(&Variable::mock("r5", 4)).unwrap(),
     );
 
-    let heap_pointer: PointerDomain<IntervalDomain> = PointerDomain::new(
+    let heap_pointer: DataDomain<IntervalDomain> = DataDomain::from_target(
         heap_id.clone(),
         Bitvector::zero(apint::BitWidth::from(4)).into(),
     );
-    pi_state.set_register(&output, DataDomain::Pointer(heap_pointer.clone()));
+    pi_state.set_register(&output, heap_pointer.clone());
     state.set_pointer_inference_state(Some(pi_state.clone()));
     state.unassigned_return_pointer.insert(heap_pointer.clone());
 
@@ -234,7 +232,7 @@ fn test_handle_assign_and_load() {
 
     assert_eq!(
         *state.variable_to_pointer_map.get(&output).unwrap(),
-        DataDomain::Pointer(heap_pointer.clone())
+        heap_pointer
     );
     state.set_all_maps_empty();
 
@@ -259,7 +257,7 @@ fn test_handle_assign_and_load() {
 
     assert_eq!(
         *state.variable_to_pointer_map.get(&output).unwrap(),
-        DataDomain::Pointer(heap_pointer)
+        heap_pointer
     );
 }
 
@@ -280,30 +278,57 @@ fn test_add_pointer_to_variable_maps_if_tracked() {
         AbstractLocation::from_var(&Variable::mock("sp", 4)).unwrap(),
     );
 
-    let mut source_pointer: PointerDomain<IntervalDomain> =
-        PointerDomain::new(stack_id.clone(), Bitvector::from_i32(4).into());
+    let mut source_pointer: DataDomain<IntervalDomain> =
+        DataDomain::from_target(stack_id.clone(), Bitvector::from_i32(4).into());
 
     // Test Case 1: Pointer is tracked in unassigned pointer map.
     mock_state.add_unassigned_return_pointer(source_pointer.clone());
-    assert!(mock_state.add_pointer_to_variable_maps_if_tracked(&pi_state, &output_var, source_pointer.clone()));
+    assert!(mock_state.pointer_added_to_variable_maps(
+        &pi_state,
+        &output_var,
+        source_pointer.clone()
+    ));
     mock_state.set_all_maps_empty();
 
     // Test Case 2: Pointer is tracked in register to pointer map.
-    mock_state.add_new_variable_to_pointer_entry(origin_var, DataDomain::Pointer(source_pointer.clone()));
-    assert!(mock_state.add_pointer_to_variable_maps_if_tracked(&pi_state, &output_var, source_pointer.clone()));
-    assert_eq!(DataDomain::Pointer(source_pointer.clone()), *mock_state.get_variable_to_pointer_map().get(&output_var).unwrap());
+    mock_state.add_new_variable_to_pointer_entry(origin_var, source_pointer.clone());
+    assert!(mock_state.pointer_added_to_variable_maps(
+        &pi_state,
+        &output_var,
+        source_pointer.clone()
+    ));
+    assert_eq!(
+        source_pointer,
+        *mock_state
+            .get_variable_to_pointer_map()
+            .get(&output_var)
+            .unwrap()
+    );
     mock_state.set_all_maps_empty();
 
     // Test Case 3: Pointer is partially tracked.
-    source_pointer.add_target(heap_id.clone(), Bitvector::zero(32.into()).into());
+    source_pointer.insert_relative_value(heap_id.clone(), Bitvector::zero(32.into()).into());
     mock_state.add_new_stack_offset_to_string_entry(4, CharacterInclusionDomain::Top);
-    assert!(mock_state.add_pointer_to_variable_maps_if_tracked(&pi_state, &output_var, source_pointer.clone()));
-    assert_eq!(DataDomain::Pointer(source_pointer.clone()), *mock_state.get_variable_to_pointer_map().get(&output_var).unwrap());
-    assert_eq!(CharacterInclusionDomain::Top, *mock_state.get_heap_to_string_map().get(&heap_id).unwrap());
+    assert!(mock_state.pointer_added_to_variable_maps(
+        &pi_state,
+        &output_var,
+        source_pointer.clone()
+    ));
+    assert_eq!(
+        source_pointer,
+        *mock_state
+            .get_variable_to_pointer_map()
+            .get(&output_var)
+            .unwrap()
+    );
+    assert_eq!(
+        CharacterInclusionDomain::Top,
+        *mock_state.get_heap_to_string_map().get(&heap_id).unwrap()
+    );
     mock_state.set_all_maps_empty();
-    
+
     // Test Case 4: Pointer is not tracked.
-    assert!(!mock_state.add_pointer_to_variable_maps_if_tracked(&pi_state, &output_var, source_pointer));
+    assert!(!mock_state.pointer_added_to_variable_maps(&pi_state, &output_var, source_pointer));
 }
 
 #[test]
@@ -322,12 +347,12 @@ fn test_pointer_targets_partially_tracked() {
         AbstractLocation::from_var(&sp_reg).unwrap(),
     );
 
-    let mut string_pointer = PointerDomain::new(
+    let mut string_pointer = DataDomain::from_target(
         stack_id,
         IntervalDomain::new(Bitvector::from_i32(0), Bitvector::from_i32(0)),
     );
 
-    string_pointer.add_target(
+    string_pointer.insert_relative_value(
         caller_stack_id.clone(),
         IntervalDomain::new(Bitvector::from_i32(-8), Bitvector::from_i32(-8)),
     );
@@ -358,7 +383,7 @@ fn test_pointer_is_in_pointer_maps() {
         AbstractLocation::from_var(&sp_reg).unwrap(),
     );
 
-    let string_pointer = PointerDomain::new(
+    let string_pointer = DataDomain::from_target(
         stack_id,
         IntervalDomain::new(Bitvector::from_i32(0), Bitvector::from_i32(0)),
     );
@@ -367,14 +392,14 @@ fn test_pointer_is_in_pointer_maps() {
 
     mock_state
         .stack_offset_to_pointer_map
-        .insert(-4, DataDomain::Pointer(string_pointer.clone()));
+        .insert(-4, string_pointer.clone());
 
     assert!(mock_state.pointer_is_in_pointer_maps(&string_pointer));
 
     mock_state.stack_offset_to_pointer_map.remove(&(-4i64));
     mock_state
         .variable_to_pointer_map
-        .insert(r2_reg, DataDomain::Pointer(string_pointer.clone()));
+        .insert(r2_reg, string_pointer.clone());
 
     assert!(mock_state.pointer_is_in_pointer_maps(&string_pointer));
 }
@@ -396,24 +421,21 @@ fn test_handle_store() {
         AbstractLocation::from_var(&sp_reg).unwrap(),
     );
 
-    let string_pointer = PointerDomain::new(
+    let string_pointer = DataDomain::from_target(
         stack_id.clone(),
         IntervalDomain::new(Bitvector::from_i32(8), Bitvector::from_i32(8)),
     );
 
-    let string_data_pointer: DataDomain<IntervalDomain> =
-        DataDomain::Pointer(string_pointer.clone());
-
-    let target_address: DataDomain<IntervalDomain> = DataDomain::Pointer(PointerDomain::new(
+    let target_address: DataDomain<IntervalDomain> = DataDomain::from_target(
         stack_id,
         IntervalDomain::new(Bitvector::from_i32(0), Bitvector::from_i32(0)),
-    ));
+    );
 
     let mut pi_state = mock_state.get_pointer_inference_state().unwrap().clone();
     pi_state.set_register(&target_var, target_address.clone());
-    pi_state.set_register(&value_var, string_data_pointer.clone());
+    pi_state.set_register(&value_var, string_pointer.clone());
     pi_state
-        .store_value(&target_address, &string_data_pointer, &runtime_memory_image)
+        .store_value(&target_address, &string_pointer, &runtime_memory_image)
         .unwrap();
     mock_state.set_pointer_inference_state(Some(pi_state));
 
@@ -428,7 +450,9 @@ fn test_handle_store() {
     assert!(mock_state.stack_offset_to_pointer_map.is_empty());
 
     // Test Case 2: Pointer is an unassigned string pointer returned from a symbol call.
-    mock_state.unassigned_return_pointer.insert(string_pointer);
+    mock_state
+        .unassigned_return_pointer
+        .insert(string_pointer.clone());
 
     mock_state.handle_store(
         &target_location,
@@ -438,7 +462,7 @@ fn test_handle_store() {
     );
 
     assert_eq!(
-        string_data_pointer,
+        string_pointer,
         *mock_state.stack_offset_to_pointer_map.get(&(0i64)).unwrap()
     );
     assert!(mock_state.unassigned_return_pointer.is_empty());
@@ -447,7 +471,7 @@ fn test_handle_store() {
     mock_state.set_all_maps_empty();
     mock_state
         .variable_to_pointer_map
-        .insert(Variable::mock("r0", 4), string_data_pointer.clone());
+        .insert(Variable::mock("r0", 4), string_pointer.clone());
 
     mock_state.handle_store(
         &target_location,
@@ -457,7 +481,7 @@ fn test_handle_store() {
     );
 
     assert_eq!(
-        string_data_pointer,
+        string_pointer,
         *mock_state.stack_offset_to_pointer_map.get(&(0i64)).unwrap()
     );
 
@@ -465,7 +489,7 @@ fn test_handle_store() {
     mock_state.set_all_maps_empty();
     mock_state
         .variable_to_pointer_map
-        .insert(Variable::mock("r0", 4), string_data_pointer.clone());
+        .insert(Variable::mock("r0", 4), string_pointer.clone());
     // Test Case 5: Global address pointer as constant.
     // Test Case 6: Global address pointer in variable.
 }
@@ -483,10 +507,10 @@ fn test_add_pointer_to_stack_map() {
         AbstractLocation::from_var(&sp_reg).unwrap(),
     );
 
-    let string_pointer: DataDomain<IntervalDomain> = DataDomain::Pointer(PointerDomain::new(
+    let string_pointer: DataDomain<IntervalDomain> = DataDomain::from_target(
         stack_id,
         IntervalDomain::new(Bitvector::from_i32(0), Bitvector::from_i32(0)),
-    ));
+    );
 
     let mut pi_state = mock_state.get_pointer_inference_state().unwrap().clone();
     pi_state.set_register(&r2_reg, string_pointer.clone());
@@ -510,12 +534,14 @@ fn test_remove_non_callee_saved_pointer_entries_for_external_symbol() {
         project.program.term.subs.get(0).unwrap().clone(),
     );
 
+    let top_domain = DataDomain::new_empty(ByteSize::new(4));
+
     mock_state
         .variable_to_pointer_map
-        .insert(Variable::mock("r0", 4), DataDomain::Top(ByteSize::new(4)));
+        .insert(Variable::mock("r0", 4), top_domain.clone());
     mock_state
         .variable_to_pointer_map
-        .insert(Variable::mock("r11", 4), DataDomain::Top(ByteSize::new(4)));
+        .insert(Variable::mock("r11", 4), top_domain);
 
     mock_state
         .remove_non_callee_saved_pointer_entries_for_external_symbol(&project, &sprintf_symbol);

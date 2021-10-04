@@ -236,12 +236,12 @@ fn mock_defs_for_sscanf(source_known: bool, format_known: bool, blk_num: usize) 
        r3 = INT_SUB r11, 0x96:4
 
        $U1050:4 = INT_ADD sp, 0:4
-       STORE ram($U1050), r3       - variable string input 4
+       STORE ram($U1050), r3       - variable string input 3
 
        r3 = INT_SUB r11, 0x88:4
 
        $U1050:4 = INT_ADD sp, 4:4
-       STORE ram($U1050), r3       - variable string input 3
+       STORE ram($U1050), r3       - variable string input 4
 
        r3 = INT_SUB r11, 0x6c:4    - variable string input 2
 
@@ -364,7 +364,7 @@ fn mock_defs_for_memcpy(copy_from_global: bool, blk_num: usize) -> Vec<Term<Def>
     /*
         r11 = INT_ADD sp, 4:4
 
-        r0 = INT_SUB r11, 40:4,
+        r0 = INT_SUB r11, 0x40:4,
 
             r1 = LOAD ram(0x7000)
 
@@ -590,6 +590,9 @@ pub fn mock_project_with_intraprocedural_control_flow(
         sub_name,
         symbol_call_config,
     ));
+    program
+        .extern_symbols
+        .push(ExternSymbol::mock_memcpy_symbol_arm());
     program
         .extern_symbols
         .push(ExternSymbol::mock_sprintf_symbol_arm());

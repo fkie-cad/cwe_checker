@@ -117,7 +117,7 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String> + DomainInsertion> Conte
             Some(pi_state.clone())
         } else if let Some(node_id) = self
             .block_start_node_map
-            .get(&(tid.clone(), state.get_current_sub().unwrap().tid.clone()))
+            .get(&(tid.clone(), state.get_current_sub().unwrap().tid))
         {
             match self.pointer_inference_results.get_node_value(*node_id) {
                 Some(NodeValue::Value(val)) => Some(val.clone()),

@@ -118,7 +118,7 @@ pub fn parse_format_string_parameters(
     Ok(datatype_map)
 }
 
-/// Returns an argument vector of detected variable parameters if they are of type string.
+/// Returns an argument vector of detected variable parameters.
 pub fn get_variable_parameters(
     project: &Project,
     pi_state: &PointerInferenceState,

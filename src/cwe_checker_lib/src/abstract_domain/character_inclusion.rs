@@ -177,9 +177,12 @@ impl fmt::Debug for CharacterInclusionDomain {
     }
 }
 
+/// A domain that represents character sets.
 #[derive(Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub enum CharacterSet {
+    /// The *Top* value represents a character set of all allowed characters.
     Top,
+    /// Represents a real subset of all allowed characters.
     Value(BTreeSet<char>),
 }
 
@@ -249,19 +252,21 @@ impl fmt::Debug for CharacterSet {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
 
-    fn ci(concrete: &str) -> CharacterInclusionDomain {
-        let abstract_set = CharacterSet::Value(concrete.chars().into_iter().collect());
-        CharacterInclusionDomain::Value((abstract_set.clone(), abstract_set.clone()))
+    impl CharacterInclusionDomain {
+        pub fn ci(concrete: &str) -> CharacterInclusionDomain {
+            let abstract_set = CharacterSet::Value(concrete.chars().into_iter().collect());
+            CharacterInclusionDomain::Value((abstract_set.clone(), abstract_set.clone()))
+        }
     }
 
     #[test]
     fn merging() {
-        let first = ci("abc");
-        let second = ci("def");
-        let third = ci("dabc");
+        let first = CharacterInclusionDomain::ci("abc");
+        let second = CharacterInclusionDomain::ci("def");
+        let third = CharacterInclusionDomain::ci("dabc");
         let possible_set = CharacterSet::Value("abcdef".chars().into_iter().collect());
         let certain_set = CharacterSet::Value("d".chars().into_iter().collect());
 

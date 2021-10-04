@@ -1,12 +1,13 @@
 use std::collections::{HashMap, HashSet};
 
+use itertools::Itertools;
 use petgraph::graph::NodeIndex;
 
 use crate::abstract_domain::{DataDomain, DomainInsertion, HasTop, TryToBitvec};
 use crate::intermediate_representation::{ExternSymbol, Project};
 use crate::{abstract_domain::IntervalDomain, prelude::*};
 use crate::{
-    abstract_domain::{AbstractDomain, AbstractIdentifier, PointerDomain},
+    abstract_domain::{AbstractDomain, AbstractIdentifier},
     analysis::pointer_inference::PointerInference as PointerInferenceComputation,
     analysis::pointer_inference::State as PointerInferenceState,
     intermediate_representation::{Expression, Sub, Variable},
@@ -18,7 +19,7 @@ use crate::{
 pub struct State<T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> {
     /// Keeps track of pointers that are returned by external calls
     /// where the location is temporarily unknown.
-    unassigned_return_pointer: HashSet<PointerDomain<IntervalDomain>>,
+    unassigned_return_pointer: HashSet<DataDomain<IntervalDomain>>,
     /// Maps registers to pointer which point to abstract string domains.
     variable_to_pointer_map: HashMap<Variable, DataDomain<IntervalDomain>>,
     /// Maps stack offsets to pointers that have been stored on the stack
@@ -65,9 +66,9 @@ impl<T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> AbstractD
 
         for (offset, other_pointer) in other.stack_offset_to_pointer_map.iter() {
             if let Some(pointer) = self.stack_offset_to_pointer_map.get(offset) {
-                stack_offset_to_pointer_map.insert(offset.clone(), pointer.merge(other_pointer));
+                stack_offset_to_pointer_map.insert(*offset, pointer.merge(other_pointer));
             } else {
-                stack_offset_to_pointer_map.insert(offset.clone(), other_pointer.clone());
+                stack_offset_to_pointer_map.insert(*offset, other_pointer.clone());
             }
         }
 
@@ -76,9 +77,9 @@ impl<T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> AbstractD
         for (offset, other_string_domain) in other.stack_offset_to_string_map.iter() {
             if let Some(string_domain) = self.stack_offset_to_string_map.get(offset) {
                 stack_offset_to_string_map
-                    .insert(offset.clone(), string_domain.merge(other_string_domain));
+                    .insert(*offset, string_domain.merge(other_string_domain));
             } else {
-                stack_offset_to_string_map.insert(offset.clone(), T::create_top_value_domain());
+                stack_offset_to_string_map.insert(*offset, T::create_top_value_domain());
             }
         }
 
@@ -153,11 +154,13 @@ impl<T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> State<T> 
     }
 
     /// Adds a return pointer to the unassigned return pointer set.
-    pub fn add_unassigned_return_pointer(&mut self, pointer: PointerDomain<IntervalDomain>) {
+    pub fn add_unassigned_return_pointer(&mut self, pointer: DataDomain<IntervalDomain>) {
         self.unassigned_return_pointer.insert(pointer);
     }
 
-    pub fn get_unassigned_return_pointer(&self) -> &HashSet<PointerDomain<IntervalDomain>> {
+    /// Returns the set of function return pointer that have not yet been assigned to
+    /// a memory location or register.
+    pub fn get_unassigned_return_pointer(&self) -> &HashSet<DataDomain<IntervalDomain>> {
         &self.unassigned_return_pointer
     }
 
@@ -233,56 +236,60 @@ impl<T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> State<T> 
     /// in the pointer maps.
     pub fn delete_string_map_entries_if_no_pointer_targets_are_tracked(&self) -> Self {
         let mut new_state = self.clone();
-        let mut stack_strings: HashMap<i64, T> = HashMap::new();
-        let mut heap_strings: HashMap<AbstractIdentifier, T> = HashMap::new();
         if let Some(pi_state) = self.get_pointer_inference_state() {
-            let mut pointer: Vec<DataDomain<IntervalDomain>> = self
-                .stack_offset_to_pointer_map
-                .iter()
-                .map(|(_, pointer)| pointer.clone())
-                .collect();
-            let mut var_pointer = self
-                .variable_to_pointer_map
-                .iter()
-                .map(|(_, pointer)| pointer.clone())
-                .collect();
-            let mut unassigned_pointer: Vec<DataDomain<IntervalDomain>> = self
-                .unassigned_return_pointer
-                .iter()
-                .map(|pointer| DataDomain::Pointer(pointer.clone()))
-                .collect();
-            pointer.append(&mut var_pointer);
-            pointer.append(&mut unassigned_pointer);
-
-            for data in pointer.iter() {
-                if let DataDomain::Pointer(pointer) = data {
-                    for (target, offset) in pointer.targets().iter() {
-                        if pi_state.caller_stack_ids.contains(target)
-                            || pi_state.stack_id == *target
-                        {
-                            if let Ok(offset_value) = offset.try_to_offset() {
-                                if let Some((key, value)) =
-                                    self.stack_offset_to_string_map.get_key_value(&offset_value)
-                                {
-                                    stack_strings.insert(key.clone(), value.clone());
-                                }
-                            }
-                        } else {
-                            if let Some((key, value)) =
-                                self.heap_to_string_map.get_key_value(&target)
-                            {
-                                heap_strings.insert(key.clone(), value.clone());
-                            }
-                        }
-                    }
-                }
-            }
+            let (stack_strings, heap_strings) = self.filter_string_map_entries(pi_state);
 
             new_state.stack_offset_to_string_map = stack_strings;
             new_state.heap_to_string_map = heap_strings;
         }
 
         new_state
+    }
+
+    /// Returns a vector of all currently tracked pointers.
+    pub fn collect_all_tracked_pointers(&self) -> Vec<DataDomain<IntervalDomain>> {
+        let mut pointers: Vec<DataDomain<IntervalDomain>> = self
+            .stack_offset_to_pointer_map
+            .iter()
+            .map(|(_, pointer)| pointer.clone())
+            .collect();
+        let mut var_pointers = self
+            .variable_to_pointer_map
+            .iter()
+            .map(|(_, pointer)| pointer.clone())
+            .collect();
+        let mut unassigned_pointers: Vec<DataDomain<IntervalDomain>> =
+            self.unassigned_return_pointer.iter().cloned().collect_vec();
+        pointers.append(&mut var_pointers);
+        pointers.append(&mut unassigned_pointers);
+
+        pointers
+    }
+
+    /// Removes all string entries for which the pointers are not tracked anymore.
+    pub fn filter_string_map_entries(
+        &self,
+        pi_state: &PointerInferenceState,
+    ) -> (HashMap<i64, T>, HashMap<AbstractIdentifier, T>) {
+        let mut stack_strings: HashMap<i64, T> = HashMap::new();
+        let mut heap_strings: HashMap<AbstractIdentifier, T> = HashMap::new();
+        for pointer in self.collect_all_tracked_pointers().iter() {
+            for (target, offset) in pointer.get_relative_values().iter() {
+                if State::<T>::is_stack_pointer(pi_state, target) {
+                    if let Ok(offset_value) = offset.try_to_offset() {
+                        if let Some((key, value)) =
+                            self.stack_offset_to_string_map.get_key_value(&offset_value)
+                        {
+                            stack_strings.insert(*key, value.clone());
+                        }
+                    }
+                } else if let Some((key, value)) = self.heap_to_string_map.get_key_value(target) {
+                    heap_strings.insert(key.clone(), value.clone());
+                }
+            }
+        }
+
+        (stack_strings, heap_strings)
     }
 
     /// Evaluates the constant used as input of a Def Term.
@@ -299,25 +306,22 @@ impl<T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> State<T> 
         if let Ok(address) = constant.try_to_u64() {
             if !block_first_def_set.iter().any(|(def_tid, _)| {
                 u64::from_str_radix(def_tid.address.as_str(), 16).unwrap() == address
-            }) {
-                if runtime_memory_image.is_global_memory_address(&constant) {
-                    if runtime_memory_image
-                        .read_string_until_null_terminator(&constant)
-                        .is_ok()
-                    {
-                        return Some(DataDomain::from(IntervalDomain::new(
-                            constant.clone(),
-                            constant.clone(),
-                        )));
-                    }
-                }
+            }) && runtime_memory_image.is_global_memory_address(&constant)
+                && runtime_memory_image
+                    .read_string_until_null_terminator(&constant)
+                    .is_ok()
+            {
+                return Some(DataDomain::from(IntervalDomain::new(
+                    constant.clone(),
+                    constant,
+                )));
             }
         }
 
         None
     }
 
-    /// Handles assign Def Terms.
+    /// Handles assign and load Def Terms.
     pub fn handle_assign_and_load(
         &mut self,
         output: &Variable,
@@ -326,79 +330,145 @@ impl<T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> State<T> 
         block_first_def_set: &HashSet<(Tid, Tid)>,
         is_assign: bool,
     ) {
-        let mut is_not_a_string_pointer = true;
+        let mut is_string_pointer = false;
         if let Some(pi_state) = self.clone().get_pointer_inference_state() {
-            match pi_state.eval(&Expression::Var(output.clone())) {
-                DataDomain::Value(interval) => {
-                    if let Ok(constant) = interval.try_to_bitvec() {
-                        if let Some(global_pointer) = self.evaluate_constant(
-                            runtime_memory_image,
-                            block_first_def_set,
-                            constant,
-                        ) {
-                            self.variable_to_pointer_map
-                                .insert(output.clone(), global_pointer);
-
-                            is_not_a_string_pointer = false;
-                        }
-                    }
-                }
-                DataDomain::Pointer(assigned_pointer) => {
-                    if self.add_pointer_to_variable_maps_if_tracked(
-                        pi_state,
-                        output,
-                        assigned_pointer,
-                    ) {
-                        is_not_a_string_pointer = false;
-                    }
-                }
-                DataDomain::Top(_) => (),
-            }
+            is_string_pointer = self.check_if_output_is_string_pointer_and_add_targets(
+                pi_state,
+                output,
+                runtime_memory_image,
+                block_first_def_set,
+            )
         } else if is_assign {
-            match input {
-                Expression::Const(constant) => {
-                    if let Some(global_pointer) = self.evaluate_constant(
-                        runtime_memory_image,
-                        block_first_def_set,
-                        constant.clone(),
-                    ) {
-                        self.variable_to_pointer_map
-                            .insert(output.clone(), global_pointer);
-
-                        is_not_a_string_pointer = false;
-                    }
-                }
-                _ => (),
-            }
+            is_string_pointer = self.add_global_pointer_if_input_is_string_constant(
+                runtime_memory_image,
+                block_first_def_set,
+                output,
+                input,
+            )
         }
 
-        // If the loaded data is not a string pointer, remove the variable from the
-        // variable to pointer maps. (if it's tracked)
-        if is_not_a_string_pointer {
-            self.variable_to_pointer_map.remove(&output);
+        // If the output variable is tracked and the new data is not a string pointer,
+        // remove the variable from the pointer map.
+        if !is_string_pointer {
+            self.variable_to_pointer_map.remove(output);
         }
     }
 
-    /// Adds a pointer to the string pointer maps if its targets were fully or partially tracked.
-    /// Returns true if it was added.
-    pub fn add_pointer_to_variable_maps_if_tracked(
+    /// Checks whether the given pointer points to a string and adds missing targets
+    /// to the string maps as *Top* values.
+    pub fn check_if_output_is_string_pointer_and_add_targets(
         &mut self,
         pi_state: &PointerInferenceState,
         output: &Variable,
-        loaded_pointer: PointerDomain<IntervalDomain>,
+        runtime_memory_image: &RuntimeMemoryImage,
+        block_first_def_set: &HashSet<(Tid, Tid)>,
+    ) -> bool {
+        let output_domain = pi_state.eval(&Expression::Var(output.clone()));
+        if let Some(value) = output_domain.get_absolute_value() {
+            if let Ok(constant) = value.try_to_bitvec() {
+                if let Some(global_pointer) =
+                    self.evaluate_constant(runtime_memory_image, block_first_def_set, constant)
+                {
+                    self.variable_to_pointer_map
+                        .insert(output.clone(), global_pointer);
+                    self.add_relative_targets_to_string_maps(pi_state, &output_domain);
+
+                    return true;
+                }
+            }
+        } else if !output_domain.get_relative_values().is_empty() {
+            return self.pointer_added_to_variable_maps(pi_state, output, output_domain);
+        }
+
+        false
+    }
+
+    /// If the input is a string constant, add the global pointer to the variable map.
+    pub fn add_global_pointer_if_input_is_string_constant(
+        &mut self,
+        runtime_memory_image: &RuntimeMemoryImage,
+        block_first_def_set: &HashSet<(Tid, Tid)>,
+        output: &Variable,
+        input: &Expression,
+    ) -> bool {
+        if let Expression::Const(constant) = input {
+            if let Some(global_pointer) =
+                self.evaluate_constant(runtime_memory_image, block_first_def_set, constant.clone())
+            {
+                self.variable_to_pointer_map
+                    .insert(output.clone(), global_pointer);
+
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// Adds all relative targets of the given DataDomain to the string maps
+    /// if they are not already tracked.
+    pub fn add_relative_targets_to_string_maps(
+        &mut self,
+        pi_state: &PointerInferenceState,
+        pointer: &DataDomain<IntervalDomain>,
+    ) {
+        for (target, offset) in pointer.get_relative_values().iter() {
+            if State::<T>::is_stack_pointer(pi_state, target) {
+                if let Ok(offset_value) = offset.try_to_offset() {
+                    self.stack_offset_to_string_map
+                        .entry(offset_value)
+                        .or_insert_with(T::create_top_value_domain);
+                }
+            } else if !self.heap_to_string_map.contains_key(target) {
+                self.heap_to_string_map
+                    .insert(target.clone(), T::create_top_value_domain());
+            }
+        }
+    }
+
+    /// Adds a pointer to the variable pointer maps if its targets were fully or partially tracked.
+    /// Returns true if it was added.
+    pub fn pointer_added_to_variable_maps(
+        &mut self,
+        pi_state: &PointerInferenceState,
+        output: &Variable,
+        loaded_pointer: DataDomain<IntervalDomain>,
     ) -> bool {
         if self.unassigned_return_pointer.contains(&loaded_pointer) {
             self.variable_to_pointer_map
-                .insert(output.clone(), DataDomain::Pointer(loaded_pointer.clone()));
+                .insert(output.clone(), loaded_pointer.clone());
             self.unassigned_return_pointer.remove(&loaded_pointer);
             true
-        } else if self.pointer_is_in_pointer_maps(&loaded_pointer) {
+        } else if self.pointer_is_in_pointer_maps(&loaded_pointer)
+            || self.pointer_targets_partially_tracked(pi_state, &loaded_pointer)
+        {
             self.variable_to_pointer_map
-                .insert(output.clone(), DataDomain::Pointer(loaded_pointer));
+                .insert(output.clone(), loaded_pointer);
             true
-        } else if self.pointer_targets_partially_tracked(pi_state, &loaded_pointer) {
-            self.variable_to_pointer_map
-                .insert(output.clone(), DataDomain::Pointer(loaded_pointer).clone());
+        } else {
+            false
+        }
+    }
+
+    /// Adds a pointer to the stack pointer maps if its targets were fully or partially tracked.
+    pub fn pointer_added_to_stack_maps(
+        &mut self,
+        pi_state: &PointerInferenceState,
+        target_address: &Expression,
+        potential_string_pointer: DataDomain<IntervalDomain>,
+    ) -> bool {
+        if self
+            .unassigned_return_pointer
+            .contains(&potential_string_pointer)
+        {
+            self.unassigned_return_pointer
+                .remove(&potential_string_pointer);
+            self.add_pointer_to_stack_map(target_address, potential_string_pointer);
+            true
+        } else if self.pointer_is_in_pointer_maps(&potential_string_pointer)
+            || self.pointer_targets_partially_tracked(pi_state, &potential_string_pointer)
+        {
+            self.add_pointer_to_stack_map(target_address, potential_string_pointer);
             true
         } else {
             false
@@ -410,13 +480,13 @@ impl<T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> State<T> 
     pub fn pointer_targets_partially_tracked(
         &mut self,
         pi_state: &PointerInferenceState,
-        pointer: &PointerDomain<IntervalDomain>,
+        pointer: &DataDomain<IntervalDomain>,
     ) -> bool {
         let mut contains_string_target = false;
         let mut new_stack_entries: Vec<i64> = Vec::new();
         let mut new_heap_entries: Vec<AbstractIdentifier> = Vec::new();
-        for (target, offset) in pointer.targets().iter() {
-            if pi_state.caller_stack_ids.contains(target) || pi_state.stack_id == *target {
+        for (target, offset) in pointer.get_relative_values().iter() {
+            if State::<T>::is_stack_pointer(pi_state, target) {
                 if let Ok(offset_value) = offset.try_to_offset() {
                     if self.stack_offset_to_string_map.contains_key(&offset_value) {
                         contains_string_target = true;
@@ -424,44 +494,48 @@ impl<T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> State<T> 
                         new_stack_entries.push(offset_value);
                     }
                 }
+            } else if self.heap_to_string_map.contains_key(target) {
+                contains_string_target = true;
             } else {
-                if self.heap_to_string_map.contains_key(target) {
-                    contains_string_target = true;
-                } else {
-                    new_heap_entries.push(target.clone());
-                }
+                new_heap_entries.push(target.clone());
             }
         }
 
         if contains_string_target {
-            for entry in new_stack_entries.iter() {
-                self.stack_offset_to_string_map
-                    .insert(*entry, T::create_top_value_domain());
-            }
-            for entry in new_heap_entries.iter() {
-                self.heap_to_string_map
-                    .insert(entry.clone(), T::create_top_value_domain());
-            }
+            self.add_top_domain_values_for_additional_pointer_targets(
+                new_stack_entries,
+                new_heap_entries,
+            )
         }
 
         contains_string_target
     }
 
+    /// Adds *Top* values to stack and heap maps for additional pointer targets.
+    pub fn add_top_domain_values_for_additional_pointer_targets(
+        &mut self,
+        new_stack_entries: Vec<i64>,
+        new_heap_entries: Vec<AbstractIdentifier>,
+    ) {
+        for entry in new_stack_entries.iter() {
+            self.stack_offset_to_string_map
+                .insert(*entry, T::create_top_value_domain());
+        }
+        for entry in new_heap_entries.iter() {
+            self.heap_to_string_map
+                .insert(entry.clone(), T::create_top_value_domain());
+        }
+    }
+
     /// Checks whether a given pointer is contained in one of the pointer maps.
-    pub fn pointer_is_in_pointer_maps(&self, pointer: &PointerDomain<IntervalDomain>) -> bool {
+    pub fn pointer_is_in_pointer_maps(&self, pointer: &DataDomain<IntervalDomain>) -> bool {
         self.stack_offset_to_pointer_map
             .iter()
-            .any(|(_, tracked_value)| match tracked_value {
-                DataDomain::Pointer(tracked_pointer) => tracked_pointer == pointer,
-                _ => false,
-            })
+            .any(|(_, tracked_value)| tracked_value == pointer)
             || self
                 .variable_to_pointer_map
                 .iter()
-                .any(|(_, tracked_value)| match tracked_value {
-                    DataDomain::Pointer(tracked_pointer) => tracked_pointer == pointer,
-                    _ => false,
-                })
+                .any(|(_, tracked_value)| tracked_value == pointer)
     }
 
     /// Handles store Def Terms.
@@ -485,27 +559,12 @@ impl<T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> State<T> 
             _ => {
                 if let Some(pi_state) = self.get_pointer_inference_state().cloned() {
                     let potential_string_pointer = pi_state.eval(value);
-                    match potential_string_pointer.clone() {
-                        DataDomain::Pointer(pointer) => {
-                            if self.unassigned_return_pointer.contains(&pointer) {
-                                self.unassigned_return_pointer.remove(&pointer);
-                                self.add_pointer_to_stack_map(
-                                    target_address,
-                                    potential_string_pointer,
-                                );
-                            } else if self.pointer_is_in_pointer_maps(&pointer) {
-                                self.add_pointer_to_stack_map(
-                                    target_address,
-                                    potential_string_pointer,
-                                );
-                            } else if self.pointer_targets_partially_tracked(&pi_state, &pointer) {
-                                self.add_pointer_to_stack_map(
-                                    target_address,
-                                    potential_string_pointer,
-                                );
-                            }
-                        }
-                        DataDomain::Value(constant) => {
+                    if !self.pointer_added_to_stack_maps(
+                        &pi_state,
+                        target_address,
+                        potential_string_pointer.clone(),
+                    ) {
+                        if let Some(constant) = potential_string_pointer.get_absolute_value() {
                             if let Ok(constant_value) = constant.try_to_bitvec() {
                                 self.handle_store(
                                     target_address,
@@ -515,7 +574,6 @@ impl<T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> State<T> 
                                 )
                             }
                         }
-                        _ => (),
                     }
                 }
             }
@@ -529,13 +587,12 @@ impl<T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> State<T> 
         string_pointer: DataDomain<IntervalDomain>,
     ) {
         if let Some(pi_state) = self.get_pointer_inference_state().cloned() {
-            if let DataDomain::Pointer(pointer) = pi_state.eval(target) {
-                for (target, offset) in pointer.targets().iter() {
-                    if pi_state.caller_stack_ids.contains(target) || pi_state.stack_id == *target {
-                        if let Ok(offset_value) = offset.try_to_offset() {
-                            self.stack_offset_to_pointer_map
-                                .insert(offset_value, string_pointer.clone());
-                        }
+            let pointer = pi_state.eval(target);
+            for (target, offset) in pointer.get_relative_values().iter() {
+                if State::<T>::is_stack_pointer(&pi_state, target) {
+                    if let Ok(offset_value) = offset.try_to_offset() {
+                        self.stack_offset_to_pointer_map
+                            .insert(offset_value, string_pointer.clone());
                     }
                 }
             }
@@ -552,13 +609,18 @@ impl<T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> State<T> 
         let mut filtered_map = self.variable_to_pointer_map.clone();
         for (register, _) in self.variable_to_pointer_map.clone().iter() {
             if !cconv.callee_saved_register.contains(&register.name) {
-                if let Some(DataDomain::Pointer(pointer)) = filtered_map.remove(register) {
+                if let Some(pointer) = filtered_map.remove(register) {
                     self.unassigned_return_pointer.insert(pointer);
                 }
             }
         }
 
         self.variable_to_pointer_map = filtered_map;
+    }
+
+    /// Checks whether a target refers to the Stack.
+    pub fn is_stack_pointer(pi_state: &PointerInferenceState, target: &AbstractIdentifier) -> bool {
+        pi_state.caller_stack_ids.contains(target) || pi_state.stack_id == *target
     }
 }
 

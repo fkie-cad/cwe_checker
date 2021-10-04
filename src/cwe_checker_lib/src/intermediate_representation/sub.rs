@@ -171,6 +171,27 @@ mod tests {
                 data_type: None,
             }
         }
+
+        pub fn mock_register_with_data_type(
+            name: impl ToString,
+            size_in_bytes: impl Into<ByteSize>,
+            data_type: Option<Datatype>,
+        ) -> Arg {
+            Arg::Register {
+                var: Variable::mock(name.to_string(), size_in_bytes),
+                data_type,
+            }
+        }
+
+        pub fn mock_pointer_register(
+            name: impl ToString,
+            size_in_bytes: impl Into<ByteSize>,
+        ) -> Arg {
+            Arg::Register {
+                var: Variable::mock(name.to_string(), size_in_bytes),
+                data_type: Some(Datatype::Pointer),
+            }
+        }
     }
 
     impl ExternSymbol {

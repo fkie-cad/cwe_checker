@@ -15,7 +15,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debu
 
     /// Get the underlying graph on which the analysis operates.
     fn get_graph(&self) -> &crate::analysis::graph::Graph<'a> {
-        &self.pointer_inference_results.get_graph()
+        self.pointer_inference_results.get_graph()
     }
 
     /// Merge two state values.
@@ -33,11 +33,9 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debu
                 if let Some(pi_state) = self.get_current_pointer_inference_state(state, &def.tid) {
                     new_state.set_pointer_inference_state(Some(pi_state));
                 } else {
-                    println!("NO PI STATE at {}", def.tid.address);
                     return None;
                 }
             } else {
-                println!("NO PI STATE at {}", def.tid.address);
                 return None;
             }
         }
@@ -74,7 +72,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debu
                 &self.block_first_def_set,
             ),
         }
-        
+
         Some(new_state)
     }
 

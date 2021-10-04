@@ -1,3 +1,4 @@
+/// A set of functions that all abstract string domains should implement.
 pub trait DomainInsertion {
     /// Inserts a string domain at a certain position if order is considered.
     fn append_string_domain(&self, string_domain: &Self) -> Self;

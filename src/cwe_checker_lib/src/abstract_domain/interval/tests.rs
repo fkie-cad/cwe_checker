@@ -11,6 +11,11 @@ impl IntervalDomain {
         IntervalDomain::new(Bitvector::from_i8(start), Bitvector::from_i8(end))
     }
 
+    /// Return a new interval domain of 4-byte integers.
+    pub fn mock_i32(start: i32, end: i32) -> IntervalDomain {
+        IntervalDomain::new(Bitvector::from_i32(start), Bitvector::from_i32(end))
+    }
+
     pub fn mock_with_bounds(
         lower_bound: Option<i64>,
         start: i64,
