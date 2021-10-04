@@ -356,7 +356,6 @@ fn get_project_from_ghidra(
             }
         }
 
-        println!("{}", String::from_utf8(output.stdout.clone()).unwrap());
         if !output.status.success() {
             match output.status.code() {
                 Some(code) => {

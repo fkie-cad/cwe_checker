@@ -69,8 +69,8 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String> + DomainInsertion> Conte
             &config.string_symbols[..],
         ));
         let mut extern_symbol_map = HashMap::new();
-        for symbol in project.program.term.extern_symbols.iter() {
-            extern_symbol_map.insert(symbol.tid.clone(), symbol);
+        for (tid, symbol) in project.program.term.extern_symbols.iter() {
+            extern_symbol_map.insert(tid.clone(), symbol);
         }
 
         let mut block_start_node_map: HashMap<(Tid, Tid), NodeIndex> = HashMap::new();

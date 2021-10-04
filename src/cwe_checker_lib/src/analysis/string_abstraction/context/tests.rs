@@ -9,8 +9,8 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
         runtime_memory_image: &'a RuntimeMemoryImage,
     ) -> Self {
         let mut extern_symbol_map = HashMap::new();
-        for symbol in project.program.term.extern_symbols.iter() {
-            extern_symbol_map.insert(symbol.tid.clone(), symbol);
+        for (tid, symbol) in project.program.term.extern_symbols.iter() {
+            extern_symbol_map.insert(tid.clone(), symbol);
         }
 
         let mut block_start_node_map = HashMap::new();

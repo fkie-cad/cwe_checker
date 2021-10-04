@@ -55,23 +55,22 @@ pub fn check_cwe(
         );
     string_abstraction.compute();
 
-    let external_symbols = &string_abstraction
+    let system_symbol: Option<ExternSymbol> = string_abstraction
         .get_context()
         .project
         .program
         .term
-        .extern_symbols;
-    let system_symbol_index = external_symbols
-        .iter()
-        .position(|symbol| symbol.name == "system")
-        .unwrap();
+        .extern_symbols
+        .clone()
+        .into_values()
+        .find(|symbol| symbol.name == "system");
     let string_graph = string_abstraction.get_graph();
 
-    if let Some(system_symbol) = external_symbols.get(system_symbol_index) {
+    if let Some(system) = system_symbol {
         for edge in string_graph.edge_references() {
             if let Edge::ExternCallStub(jmp) = edge.weight() {
                 if let Jmp::Call { target, .. } = &jmp.term {
-                    if system_symbol.tid == *target {
+                    if system.tid == *target {
                         if let Some(source_node) = string_abstraction.get_node_value(edge.source())
                         {
                             if let Some(pi_node) = analysis_results
@@ -84,7 +83,7 @@ pub fn check_cwe(
                                 check_system_call_parameter_with_ci_domain(
                                     source_state,
                                     pi_state,
-                                    system_symbol,
+                                    &system,
                                     &jmp.tid,
                                 )
                             }

@@ -178,7 +178,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debu
                 .term
                 .extern_symbols
                 .iter()
-                .any(|symbol| symbol.tid == sub.tid)
+                .any(|(tid, _)| *tid == sub.tid)
             {
                 continue; // We ignore functions marked as extern symbols.
             }

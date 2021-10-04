@@ -590,27 +590,20 @@ pub fn mock_project_with_intraprocedural_control_flow(
         sub_name,
         symbol_call_config,
     ));
-    program
-        .extern_symbols
-        .push(ExternSymbol::mock_memcpy_symbol_arm());
-    program
-        .extern_symbols
-        .push(ExternSymbol::mock_sprintf_symbol_arm());
-    program
-        .extern_symbols
-        .push(ExternSymbol::mock_scanf_symbol_arm());
-    program
-        .extern_symbols
-        .push(ExternSymbol::mock_sscanf_symbol_arm());
-    program
-        .extern_symbols
-        .push(ExternSymbol::mock_strcat_symbol_arm());
-    program
-        .extern_symbols
-        .push(ExternSymbol::mock_free_symbol_arm());
-    program
-        .extern_symbols
-        .push(ExternSymbol::mock_malloc_symbol_arm());
+    let memcpy = ExternSymbol::mock_memcpy_symbol_arm();
+    program.extern_symbols.insert(memcpy.tid.clone(), memcpy);
+    let sprintf = ExternSymbol::mock_sprintf_symbol_arm();
+    program.extern_symbols.insert(sprintf.tid.clone(), sprintf);
+    let scanf = ExternSymbol::mock_scanf_symbol_arm();
+    program.extern_symbols.insert(scanf.tid.clone(), scanf);
+    let sscanf = ExternSymbol::mock_sscanf_symbol_arm();
+    program.extern_symbols.insert(sscanf.tid.clone(), sscanf);
+    let strcat = ExternSymbol::mock_strcat_symbol_arm();
+    program.extern_symbols.insert(strcat.tid.clone(), strcat);
+    let free = ExternSymbol::mock_free_symbol_arm();
+    program.extern_symbols.insert(free.tid.clone(), free);
+    let malloc = ExternSymbol::mock_malloc_symbol_arm();
+    program.extern_symbols.insert(malloc.tid.clone(), malloc);
     program.entry_points.push(Tid::new(sub_name));
 
     let register_list = ["r0", "r1", "r2", "r3", "r11", "sp"]
