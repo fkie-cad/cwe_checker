@@ -55,18 +55,18 @@ pub fn check_cwe(
         );
     string_abstraction.compute();
 
-    let system_symbol: Option<ExternSymbol> = string_abstraction
+    let system_symbol: Option<(Tid, ExternSymbol)> = string_abstraction
         .get_context()
         .project
         .program
         .term
         .extern_symbols
         .clone()
-        .into_values()
-        .find(|symbol| symbol.name == "system");
+        .into_iter()
+        .find(|(_, symbol)| symbol.name == "system");
     let string_graph = string_abstraction.get_graph();
 
-    if let Some(system) = system_symbol {
+    if let Some((_, system)) = system_symbol {
         for edge in string_graph.edge_references() {
             if let Edge::ExternCallStub(jmp) = edge.weight() {
                 if let Jmp::Call { target, .. } = &jmp.term {
