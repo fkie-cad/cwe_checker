@@ -8,7 +8,7 @@ fn bv(value: i64) -> ValueDomain {
 fn new_id(time: &str, register: &str) -> AbstractIdentifier {
     AbstractIdentifier::new(
         Tid::new(time),
-        AbstractLocation::Register(register.into(), ByteSize::new(8)),
+        AbstractLocation::Register(Variable::mock(register, ByteSize::new(8))),
     )
 }
 
@@ -1084,4 +1084,49 @@ fn specialize_pointer_comparison() {
         .specialize_by_expression_result(&expression, Bitvector::from_i8(0).into())
         .is_ok());
     assert_eq!(state.get_register(&register("RAX")), specialized_pointer);
+}
+
+#[test]
+fn test_check_def_for_null_dereferences() {
+    let mut state = State::new(&register("RSP"), Tid::new("func_tid"));
+    let var_rax = Variable::mock("RAX", 8);
+    let def = Def::load(
+        "load_def",
+        Variable::mock("RBX", 8),
+        Expression::Var(var_rax.clone()),
+    );
+    state.set_register(&var_rax, Bitvector::from_i64(0).into());
+    assert!(state.check_def_for_null_dereferences(&def).is_err());
+
+    state.set_register(&var_rax, Bitvector::from_i64(12345).into());
+    assert_eq!(
+        state.check_def_for_null_dereferences(&def).ok(),
+        Some(false)
+    );
+
+    state.set_register(&var_rax, IntervalDomain::mock(-2000, 5).into());
+    assert_eq!(state.check_def_for_null_dereferences(&def).ok(), Some(true));
+    assert_eq!(
+        state.get_register(&var_rax),
+        IntervalDomain::mock(-2000, -1024).into()
+    );
+
+    let mut address = state.get_register(&register("RSP"));
+    address.set_contains_top_flag();
+    address.set_absolute_value(Some(IntervalDomain::mock(0, 0xffff)));
+    state.set_register(&var_rax, address);
+    assert_eq!(state.check_def_for_null_dereferences(&def).ok(), Some(true));
+}
+
+#[test]
+fn test_new_with_generic_parameter_objects() {
+    let param_names = vec!["param1".to_string(), "param2".to_string()];
+    let state = State::new_with_generic_parameter_objects(
+        &register("RSP"),
+        Tid::new("func_tid"),
+        &param_names,
+    );
+    assert_eq!(state.memory.get_num_objects(), 3);
+    assert!(state.get_register_by_name("param1").is_some());
+    assert!(state.get_register_by_name("param2").is_some());
 }

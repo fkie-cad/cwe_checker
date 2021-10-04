@@ -206,8 +206,8 @@ impl<T: RegisterDomain + Display> DataDomain<T> {
         }
         if self.contains_top_values {
             values.push(serde_json::Value::String(format!(
-                "Top:{}",
-                self.bytesize()
+                "Top:i{}",
+                self.bytesize().as_bit_length()
             )));
         }
         match values.len() {
@@ -256,7 +256,7 @@ mod tests {
     fn new_id(name: &str) -> AbstractIdentifier {
         AbstractIdentifier::new(
             Tid::new("time0"),
-            AbstractLocation::Register(name.into(), ByteSize::new(8)),
+            AbstractLocation::Register(Variable::mock(name, ByteSize::new(8))),
         )
     }
 

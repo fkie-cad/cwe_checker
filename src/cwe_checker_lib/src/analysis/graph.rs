@@ -497,6 +497,7 @@ pub fn get_program_cfg(program: &Term<Program>, extern_subs: HashSet<Tid>) -> Gr
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeMap;
 
     fn mock_program() -> Term<Program> {
         let call_term = Term {
@@ -577,7 +578,7 @@ mod tests {
             tid: Tid::new("program"),
             term: Program {
                 subs: vec![sub1, sub2],
-                extern_symbols: Vec::new(),
+                extern_symbols: BTreeMap::new(),
                 entry_points: Vec::new(),
                 address_base_offset: 0,
             },

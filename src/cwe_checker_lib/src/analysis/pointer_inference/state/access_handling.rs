@@ -337,4 +337,51 @@ impl State {
         }
         None
     }
+
+    /// Check whether the given `def` could result in a memory access through a NULL pointer.
+    ///
+    /// If no NULL pointer dereference is detected then `Ok(false)` is returned.
+    /// If a NULL pointer dereference is detected,
+    /// try to specialize the state so that `address_expr` cannot result in a NULL pointer anymore.
+    /// If that succeeds, `Ok(true)` is returned.
+    /// If that would result in an unsatisfiable state, an error is returned.
+    pub fn check_def_for_null_dereferences(&mut self, def: &Term<Def>) -> Result<bool, Error> {
+        let address_expr = match &def.term {
+            Def::Load { address, .. } | Def::Store { address, .. } => address,
+            Def::Assign { .. } => return Ok(false),
+        };
+        let mut address_val = self.eval(address_expr);
+        if let Some((start_index, end_index)) = address_val
+            .get_absolute_value()
+            .map(|val| val.try_to_offset_interval().ok())
+            .flatten()
+        {
+            if (start_index > -1024 && start_index < 1024)
+                || (end_index > -1024 && end_index < 1024)
+            {
+                // Interval starts or ends with a null pointer
+                let absolute_val = address_val.get_absolute_value().unwrap().clone();
+                let new_absolute_val = if start_index > -1024 && start_index < 1024 {
+                    absolute_val
+                        .add_signed_greater_equal_bound(
+                            &Bitvector::from_i16(1024).into_resize_signed(address_val.bytesize()),
+                        )
+                        .ok()
+                } else {
+                    absolute_val
+                        .add_signed_less_equal_bound(
+                            &Bitvector::from_i16(-1024).into_resize_signed(address_val.bytesize()),
+                        )
+                        .ok()
+                };
+                address_val.set_absolute_value(new_absolute_val);
+                if address_val.is_empty() {
+                    return Err(anyhow!("Unsatisfiable state"));
+                }
+                self.specialize_by_expression_result(address_expr, address_val)?;
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
 }

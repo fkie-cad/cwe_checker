@@ -164,8 +164,8 @@ fn run_with_ghidra(args: &CmdlineArgs) {
         .program
         .term
         .extern_symbols
-        .iter()
-        .map(|symbol| symbol.tid.clone())
+        .keys()
+        .cloned()
         .collect();
     let control_flow_graph = graph::get_program_cfg(&project.program, extern_sub_tids);
 

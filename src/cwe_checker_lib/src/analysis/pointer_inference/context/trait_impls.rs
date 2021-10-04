@@ -32,8 +32,17 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
             };
             let _ = self.log_collector.send(LogThreadMsg::Cwe(warning));
         }
+        // check for null dereferences
+        match new_state.check_def_for_null_dereferences(def) {
+            Err(_) => {
+                self.report_null_deref(&def.tid);
+                return None;
+            }
+            Ok(true) => self.report_null_deref(&def.tid),
+            Ok(false) => (), // no null dereference detected
+        }
         // check for out-of-bounds memory access
-        if state.contains_out_of_bounds_mem_access(&def.term, self.runtime_memory_image) {
+        if new_state.contains_out_of_bounds_mem_access(&def.term, self.runtime_memory_image) {
             let (warning_name, warning_description) = match def.term {
                 Def::Load { .. } => (
                     "CWE125",

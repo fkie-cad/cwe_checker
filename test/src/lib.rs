@@ -184,7 +184,7 @@ mod tests {
         let num_cwes = String::from_utf8(output.stdout)
             .unwrap()
             .lines()
-            .filter(|line| line.starts_with("[CWE125]"))
+            .filter(|line| line.starts_with("[CWE476]"))
             .count();
         // We check the number of found CWEs only approximately
         // so that this check does not fail on minor result changes.

@@ -1,6 +1,6 @@
-use crate::intermediate_representation::*;
-
 use super::{create_computation, mock_context, NodeValue};
+use crate::intermediate_representation::*;
+use std::collections::BTreeMap;
 
 use mock_context::Context;
 use mock_context::StartEnd;
@@ -128,7 +128,7 @@ fn mock_program() -> Term<Program> {
         tid: Tid::new("program"),
         term: Program {
             subs: vec![sub1, sub2],
-            extern_symbols: Vec::new(),
+            extern_symbols: BTreeMap::new(),
             entry_points: Vec::new(),
             address_base_offset: 0,
         },
