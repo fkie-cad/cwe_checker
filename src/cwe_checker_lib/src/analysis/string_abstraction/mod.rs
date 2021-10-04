@@ -198,10 +198,6 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debu
                             .next()
                             .is_none())
                 {
-                    /*if sub.tid.address == "00013798" {
-                        new_entry_points.push(node_id);
-                    }*/
-
                     new_entry_points.push(node_id);
                 }
             }
