@@ -610,7 +610,12 @@ impl Program {
         let extern_symbols = self
             .extern_symbols
             .into_iter()
-            .map(|symbol| symbol.into_ir_symbol(conventions, stack_pointer, cpu_arch))
+            .map(|symbol| {
+                (
+                    symbol.tid.clone(),
+                    symbol.into_ir_symbol(conventions, stack_pointer, cpu_arch),
+                )
+            })
             .collect();
         let address_base_offset =
             u64::from_str_radix(&self.image_base, 16).unwrap() - binary_base_address;

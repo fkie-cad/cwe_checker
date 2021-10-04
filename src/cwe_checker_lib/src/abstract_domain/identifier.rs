@@ -7,7 +7,7 @@ use std::sync::Arc;
 ///
 /// Since many program states can be represented by the same abstract state in data-flow analysis,
 /// one sometimes needs a way to uniquely identify a variable or a memory object in all of the represented program states.
-/// Abstract identifier achieve this by identifying a *time*, i.e. a specific abstract state,
+/// Abstract identifiers achieve this by identifying a *time*, i.e. a specific abstract state,
 /// and a *location*, i.e. a recipe for abstracting a concrete value from any concrete state that is represented by the abstract state.
 /// The value in question then serves as the identifier.
 /// For example, a pointer may uniquely determine the memory object it is pointing to.
@@ -38,9 +38,23 @@ pub struct AbstractIdentifierData {
 }
 
 impl AbstractIdentifier {
-    /// create a new abstract identifier
+    /// Create a new abstract identifier.
     pub fn new(time: Tid, location: AbstractLocation) -> AbstractIdentifier {
         AbstractIdentifier(Arc::new(AbstractIdentifierData { time, location }))
+    }
+
+    /// Get the register associated to the abstract location.
+    /// Panics if the abstract location is a memory location and not a register.
+    pub fn unwrap_register(&self) -> &Variable {
+        match &self.location {
+            AbstractLocation::Register(var) => var,
+            AbstractLocation::Pointer(_, _) => panic!("Abstract location is not a register."),
+        }
+    }
+
+    /// Get the TID representing the time component of the abstract ID.
+    pub fn get_tid(&self) -> &Tid {
+        &self.time
     }
 }
 
@@ -54,23 +68,23 @@ impl std::fmt::Display for AbstractIdentifier {
 ///
 /// It is defined recursively, where the root is always a register.
 /// This way only locations that the local state knows about are representable.
-/// It is also impossible to accidently describe circular references.
+/// It is also impossible to accidentally describe circular references.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
 pub enum AbstractLocation {
-    /// The location is given by a register with the given name and byte size.
-    Register(String, ByteSize),
+    /// The location is given by a register.
+    Register(Variable),
     /// The location is in memory.
-    /// One needs to follow the pointer in the register with the given name (as `String`)
+    /// One needs to follow the pointer in the given register
     /// and then follow the abstract memory location inside the pointed to memory object
     /// to find the actual memory location.
-    Pointer(String, AbstractMemoryLocation),
+    Pointer(Variable, AbstractMemoryLocation),
 }
 
 impl std::fmt::Display for AbstractLocation {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Self::Register(name, _size) => write!(formatter, "{}", name),
-            Self::Pointer(reg_name, location) => write!(formatter, "{}->{}", reg_name, location),
+            Self::Register(var) => write!(formatter, "{}", var.name),
+            Self::Pointer(var, location) => write!(formatter, "{}->{}", var.name, location),
         }
     }
 }
@@ -84,10 +98,19 @@ impl AbstractLocation {
                 "Cannot create abstract location from temporary variables."
             ));
         }
-        Ok(AbstractLocation::Register(
-            variable.name.clone(),
-            variable.size,
-        ))
+        Ok(AbstractLocation::Register(variable.clone()))
+    }
+
+    /// Create an abstract location on the stack.
+    /// The returned location describes the value of the given `size`
+    /// at the given `offset` relative to the memory location that the `stack_register` is pointing to.
+    pub fn from_stack_position(
+        stack_register: &Variable,
+        offset: i64,
+        size: ByteSize,
+    ) -> AbstractLocation {
+        let stack_pos = AbstractMemoryLocation::Location { offset, size };
+        AbstractLocation::Pointer(stack_register.clone(), stack_pos)
     }
 }
 
@@ -101,16 +124,14 @@ pub enum AbstractMemoryLocation {
     /// A location inside the current memory object.
     Location {
         /// The offset with respect to the zero offset of the memory object where the value can be found.
-        offset: isize,
+        offset: i64,
         /// The size in bytes of the value that the memory location points to.
-        size: usize,
+        size: ByteSize,
     },
     /// A pointer which needs to be followed to get to the actual memory location
     Pointer {
         /// The offset inside the current memory object where the pointer can be found.
-        offset: isize,
-        /// The size in bytes of the pointer.
-        size: usize,
+        offset: i64,
         /// The memory location inside the target of the pointer that this memory location points to.
         target: Box<AbstractMemoryLocation>,
     },
@@ -120,11 +141,7 @@ impl std::fmt::Display for AbstractMemoryLocation {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Self::Location { offset, .. } => write!(formatter, "({})", offset),
-            Self::Pointer {
-                offset,
-                size: _,
-                target,
-            } => write!(formatter, "({})->{}", offset, target),
+            Self::Pointer { offset, target } => write!(formatter, "({})->{}", offset, target),
         }
     }
 }

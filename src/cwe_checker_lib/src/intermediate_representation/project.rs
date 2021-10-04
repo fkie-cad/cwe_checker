@@ -10,7 +10,7 @@ use block_duplication_normalization::*;
 ///
 /// It contains information about the disassembled binary
 /// and about the execution environment of the binary.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct Project {
     /// All (known) executable code of the binary is contained in the `program` term.
     pub program: Term<Program>,
@@ -89,8 +89,8 @@ impl Project {
                 jump_target_tids.insert(block.tid.clone());
             }
         }
-        for symbol in self.program.term.extern_symbols.iter() {
-            jump_target_tids.insert(symbol.tid.clone());
+        for symbol_tid in self.program.term.extern_symbols.keys() {
+            jump_target_tids.insert(symbol_tid.clone());
         }
         // Replace all jumps to non-existing jump targets with jumps to dummy targets
         let dummy_sub_tid = Tid::new("Artificial Sink Sub");

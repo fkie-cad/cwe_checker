@@ -87,8 +87,8 @@ impl<'a> Context<'a> {
             }
         }
         let mut extern_symbol_map = HashMap::new();
-        for symbol in project.program.term.extern_symbols.iter() {
-            extern_symbol_map.insert(symbol.tid.clone(), symbol);
+        for (tid, symbol) in project.program.term.extern_symbols.iter() {
+            extern_symbol_map.insert(tid.clone(), symbol);
         }
         Context {
             project,
@@ -112,14 +112,8 @@ impl<'a> Context<'a> {
                 .program
                 .term
                 .extern_symbols
-                .iter()
-                .find_map(|symb| {
-                    if symb.tid == *target {
-                        Some(symb.name.clone())
-                    } else {
-                        None
-                    }
-                })
+                .get(target)
+                .map(|symbol| symbol.name.clone())
                 .unwrap_or_else(|| "Unknown".to_string()),
             _ => "Unknown".to_string(),
         };

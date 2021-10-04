@@ -64,6 +64,46 @@ impl State {
         }
     }
 
+    /// Create a new state that contains one memory object corresponding to the stack
+    /// and one memory object for each provided parameter register.
+    ///
+    /// This function can be used to approximate states of entry points
+    /// where the number and types of its parameters is unknown.
+    /// Note that this may also cause analysis errors,
+    /// e.g. if two parameters point to the same memory object instead of different ones.
+    pub fn new_with_generic_parameter_objects(
+        stack_register: &Variable,
+        function_tid: Tid,
+        params: &[String],
+    ) -> State {
+        let mut state = State::new(stack_register, function_tid.clone());
+        for param_name in params {
+            let param = Variable {
+                name: param_name.clone(),
+                size: stack_register.size,
+                is_temp: false,
+            };
+            let param_id = AbstractIdentifier::new(
+                function_tid.clone(),
+                AbstractLocation::from_var(&param).unwrap(),
+            );
+            state.memory.add_abstract_object(
+                param_id.clone(),
+                Bitvector::zero(stack_register.size.into()).into(),
+                super::object::ObjectType::Heap,
+                stack_register.size,
+            );
+            state.set_register(
+                &param,
+                DataDomain::from_target(
+                    param_id,
+                    Bitvector::zero(stack_register.size.into()).into(),
+                ),
+            )
+        }
+        state
+    }
+
     /// Set the MIPS link register `t9` to the address of the callee TID.
     ///
     /// According to the System V ABI for MIPS the caller has to save the callee address in register `t9`

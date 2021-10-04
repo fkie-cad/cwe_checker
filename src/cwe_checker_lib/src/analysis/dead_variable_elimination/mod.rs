@@ -18,8 +18,8 @@ pub fn compute_alive_vars(project: &Project) -> HashMap<Tid, HashSet<Variable>> 
         .program
         .term
         .extern_symbols
-        .iter()
-        .map(|symbol| symbol.tid.clone())
+        .keys()
+        .cloned()
         .collect();
     let mut graph = crate::analysis::graph::get_program_cfg(&project.program, extern_subs);
     graph.reverse();

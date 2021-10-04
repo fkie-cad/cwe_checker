@@ -15,6 +15,7 @@
 //! - [CWE-125](https://cwe.mitre.org/data/definitions/125.html) Buffer Overflow: Out-of-bounds Read
 //! - [CWE-415](https://cwe.mitre.org/data/definitions/415.html): Double Free
 //! - [CWE-416](https://cwe.mitre.org/data/definitions/416.html): Use After Free
+//! - [CWE-476](https://cwe.mitre.org/data/definitions/476.html): NULL Pointer Dereference
 //! - [CWE-787](https://cwe.mitre.org/data/definitions/787.html): Buffer Overflow: Out-of-bounds Write
 //!
 //! The analysis operates on a best-effort basis.
@@ -160,7 +161,16 @@ impl<'a> PointerInference<'a> {
             ));
         }
         for (sub_tid, start_node_index) in entry_sub_to_entry_node_map.into_iter() {
-            let mut fn_entry_state = State::new(&project.stack_pointer_register, sub_tid.clone());
+            let mut fn_entry_state = if let Some(cconv) = project.get_standard_calling_convention()
+            {
+                State::new_with_generic_parameter_objects(
+                    &project.stack_pointer_register,
+                    sub_tid.clone(),
+                    &cconv.integer_parameter_register,
+                )
+            } else {
+                State::new(&project.stack_pointer_register, sub_tid.clone())
+            };
             if project.cpu_architecture.contains("MIPS") {
                 let _ = fn_entry_state
                     .set_mips_link_register(&sub_tid, project.stack_pointer_register.size);
@@ -257,13 +267,7 @@ impl<'a> PointerInference<'a> {
         // TODO: Refactor the fixpoint computation structs, so that the project reference can be extracted from them.
         let mut start_block_to_sub_map: HashMap<&Tid, &Term<Sub>> = HashMap::new();
         for sub in project.program.term.subs.iter() {
-            if project
-                .program
-                .term
-                .extern_symbols
-                .iter()
-                .any(|symbol| symbol.tid == sub.tid)
-            {
+            if project.program.term.extern_symbols.contains_key(&sub.tid) {
                 continue; // We ignore functions marked as extern symbols.
             }
             if let Some(start_block) = sub.term.blocks.first() {
@@ -297,7 +301,16 @@ impl<'a> PointerInference<'a> {
                 [&self.computation.get_graph()[entry].get_block().tid]
                 .tid
                 .clone();
-            let mut fn_entry_state = State::new(&project.stack_pointer_register, sub_tid.clone());
+            let mut fn_entry_state = if let Some(cconv) = project.get_standard_calling_convention()
+            {
+                State::new_with_generic_parameter_objects(
+                    &project.stack_pointer_register,
+                    sub_tid.clone(),
+                    &cconv.integer_parameter_register,
+                )
+            } else {
+                State::new(&project.stack_pointer_register, sub_tid.clone())
+            };
             if project.cpu_architecture.contains("MIPS") {
                 let _ = fn_entry_state
                     .set_mips_link_register(&sub_tid, project.stack_pointer_register.size);

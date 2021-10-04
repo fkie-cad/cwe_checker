@@ -19,7 +19,7 @@ False Negatives
 * None known
 */
 use crate::prelude::*;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::{
     intermediate_representation::{ExternSymbol, Program, Sub, Term, Tid},
@@ -48,15 +48,11 @@ pub struct Config {
 /// For each subroutine and each found dangerous symbol, check for calls to the corresponding symbol
 pub fn get_calls<'a>(
     subfunctions: &'a [Term<Sub>],
-    dangerous_symbols: &'a [&'a ExternSymbol],
+    dangerous_symbols: &'a HashMap<&'a Tid, &'a str>,
 ) -> Vec<(&'a str, &'a Tid, &'a str)> {
     let mut calls: Vec<(&str, &Tid, &str)> = Vec::new();
-    let mut symbol_map: HashMap<&Tid, &str> = HashMap::with_capacity(dangerous_symbols.len());
-    for symbol in dangerous_symbols.iter() {
-        symbol_map.insert(&symbol.tid, symbol.name.as_str());
-    }
     for sub in subfunctions.iter() {
-        calls.append(&mut get_calls_to_symbols(sub, &symbol_map));
+        calls.append(&mut get_calls_to_symbols(sub, dangerous_symbols));
     }
 
     calls
@@ -95,15 +91,16 @@ pub fn generate_cwe_warnings<'a>(
 
 /// Filter external symbols by dangerous symbols
 pub fn resolve_symbols<'a>(
-    external_symbols: &'a [ExternSymbol],
+    external_symbols: &'a BTreeMap<Tid, ExternSymbol>,
     symbols: &'a [String],
-) -> Vec<&'a ExternSymbol> {
+) -> HashMap<&'a Tid, &'a str> {
+    let dangerous_symbols: HashSet<&'a String> = symbols.iter().collect();
     external_symbols
         .iter()
-        .filter(|symbol| {
-            symbols
-                .iter()
-                .any(|dangerous_function| *symbol.name == *dangerous_function)
+        .filter_map(|(tid, symbol)| {
+            dangerous_symbols
+                .get(&symbol.name)
+                .map(|name| (tid, name.as_str()))
         })
         .collect()
 }
@@ -118,7 +115,7 @@ pub fn check_cwe(
     let config: Config = serde_json::from_value(cwe_params.clone()).unwrap();
     let prog: &Term<Program> = &project.program;
     let subfunctions: &Vec<Term<Sub>> = &prog.term.subs;
-    let external_symbols: &Vec<ExternSymbol> = &prog.term.extern_symbols;
+    let external_symbols: &BTreeMap<Tid, ExternSymbol> = &prog.term.extern_symbols;
     let dangerous_symbols = resolve_symbols(external_symbols, &config.symbols);
     let dangerous_calls = get_calls(subfunctions, &dangerous_symbols);
 
