@@ -227,7 +227,7 @@ impl State {
                     self.string_constants.insert(format_string.to_string());
                 }
                 // TODO: Change to log
-                Err(e) => panic!("{}", e),
+                Err(_e) => (),
             }
         }
     }
