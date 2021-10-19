@@ -37,12 +37,12 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
             project,
             runtime_memory_image,
             pointer_inference_results,
-            string_symbol_map: Arc::new(string_symbols),
-            extern_symbol_map: Arc::new(extern_symbol_map),
-            format_string_index_map: Arc::new(format_string_index),
-            block_start_node_map: Arc::new(block_start_node_map),
-            block_first_def_set: Arc::new(block_first_def_set),
-            jmp_to_blk_end_node_map: Arc::new(jmp_to_blk_end_node_map),
+            string_symbol_map: string_symbols,
+            extern_symbol_map,
+            format_string_index_map: format_string_index,
+            block_start_node_map,
+            block_first_def_set,
+            jmp_to_blk_end_node_map: jmp_to_blk_end_node_map,
             _phantom_string_domain: PhantomData,
         }
     }

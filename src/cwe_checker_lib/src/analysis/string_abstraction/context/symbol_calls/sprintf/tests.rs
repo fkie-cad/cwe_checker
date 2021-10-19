@@ -7,8 +7,7 @@ use crate::intermediate_representation::{Bitvector, Tid, Variable};
 use crate::{
     abstract_domain::{CharacterInclusionDomain, CharacterSet},
     analysis::string_abstraction::{
-        context::symbol_calls::tests::Setup,
-        tests::mock_project::mock_project_with_intraprocedural_control_flow,
+        context::symbol_calls::tests::Setup, tests::mock_project_with_intraprocedural_control_flow,
     },
     utils::binary::RuntimeMemoryImage,
 };
@@ -618,16 +617,13 @@ fn test_fetch_constant_domain_if_available() {
     pi_results.compute();
 
     let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
-    let string_data: DataDomain<IntervalDomain> =
-        DataDomain::mock_from_absolute_value(IntervalDomain::mock(0x7000, 0x7000));
+    let string_data: DataDomain<IntervalDomain> = DataDomain::from(Bitvector::from_i32(0x7000));
     let string_arg: Arg = Arg::mock_pointer_register("r0", 4);
 
-    let integer_data: DataDomain<IntervalDomain> =
-        DataDomain::mock_from_absolute_value(IntervalDomain::mock(2, 2));
+    let integer_data: DataDomain<IntervalDomain> = DataDomain::from(Bitvector::from_i32(2));
     let integer_arg: Arg = Arg::mock_register_with_data_type("r0", 4, Some(Datatype::Integer));
 
-    let char_data: DataDomain<IntervalDomain> =
-        DataDomain::mock_from_absolute_value(IntervalDomain::mock(0x61, 0x61));
+    let char_data: DataDomain<IntervalDomain> = DataDomain::from(Bitvector::from_i32(0x61));
     let char_arg: Arg = Arg::mock_register_with_data_type("r0", 4, Some(Datatype::Char));
 
     assert_eq!(

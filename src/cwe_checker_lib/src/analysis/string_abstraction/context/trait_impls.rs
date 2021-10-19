@@ -1,5 +1,3 @@
-use std::fmt::Debug;
-
 use crate::{
     abstract_domain::{AbstractDomain, DomainInsertion, HasTop},
     analysis::string_abstraction::state::State,
@@ -8,7 +6,7 @@ use crate::{
 
 use super::Context;
 
-impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debug>
+impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>>
     crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Context<'a, T>
 {
     type Value = State<T>;
@@ -26,10 +24,10 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debu
     fn update_def(&self, state: &State<T>, def: &Term<Def>) -> Option<State<T>> {
         let mut new_state = state.clone();
         if state.get_pointer_inference_state().is_none() {
-            if self
-                .block_first_def_set
-                .contains(&(def.tid.clone(), state.get_current_sub().unwrap().tid))
-            {
+            if self.block_first_def_set.contains(&(
+                def.tid.clone(),
+                state.get_current_sub().unwrap().tid.clone(),
+            )) {
                 if let Some(pi_state) = self.get_current_pointer_inference_state(state, &def.tid) {
                     new_state.set_pointer_inference_state(Some(pi_state));
                 } else {

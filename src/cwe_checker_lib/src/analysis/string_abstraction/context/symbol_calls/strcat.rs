@@ -1,4 +1,3 @@
-use super::Debug;
 use crate::analysis::pointer_inference::State as PointerInferenceState;
 use crate::{
     abstract_domain::{AbstractDomain, DomainInsertion, HasTop, TryToBitvec},
@@ -6,7 +5,7 @@ use crate::{
     intermediate_representation::ExternSymbol,
 };
 
-impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debug> Context<'a, T> {
+impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Context<'a, T> {
     /// Handles the resulting string domain from strcat and strncat calls.
     /// The symbol call returns the pointer to the destination string in its return register.
     pub fn handle_strcat_and_strncat_calls(
@@ -108,7 +107,7 @@ mod tests {
         analysis::pointer_inference::PointerInference as PointerInferenceComputation,
         analysis::string_abstraction::{
             context::symbol_calls::tests::Setup,
-            tests::mock_project::mock_project_with_intraprocedural_control_flow,
+            tests::mock_project_with_intraprocedural_control_flow,
         },
         intermediate_representation::{ByteSize, Variable},
         utils::binary::RuntimeMemoryImage,

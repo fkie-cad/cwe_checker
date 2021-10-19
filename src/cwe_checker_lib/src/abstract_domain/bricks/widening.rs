@@ -71,7 +71,7 @@ impl BricksDomain {
     }
 
     /// Checks whether all bricks of the BricksDomain are *Top* values.
-    /// If so, the BricksDomain itself is converted into a *Top* value.
+    /// If so, the BricksDomain itself should be converted into a *Top* value.
     pub fn all_bricks_are_top(bricks: &[BrickDomain]) -> bool {
         bricks.iter().all(|brick| matches!(brick, BrickDomain::Top))
     }

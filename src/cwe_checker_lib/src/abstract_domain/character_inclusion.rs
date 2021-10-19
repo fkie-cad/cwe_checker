@@ -22,16 +22,17 @@
 use std::{collections::BTreeSet, fmt};
 
 use crate::prelude::*;
+use std::fmt::Debug;
 
 use super::{AbstractDomain, DomainInsertion, HasTop};
 
-/// The `CharacterInclusionDomain` is a abstract domain describing the characters a string certainly has.
+/// The `CharacterInclusionDomain` is a abstract domain describing the characters a string certainly has
 /// and the characters a string may have.
 ///
 /// The value comprises of a set of certainly contained characters and a set of possibly contained characters
 /// while the *Top* value does not get any data. However, the *Top* value stands for an empty set of certainly
 /// contained characters and the whole alphabet of allowed characters for the possibly contained characters.
-#[derive(Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Debug)]
 pub enum CharacterInclusionDomain {
     /// The *Top* value stands for an empty set of certainly contained characters and
     /// the whole alphabet of allowed characters for the possibly contained characters.
@@ -77,7 +78,8 @@ impl DomainInsertion for CharacterInclusionDomain {
     /// Create a string domain that approximates float values.
     fn create_float_value_domain() -> Self {
         let float_character_set: BTreeSet<char> = vec![
-            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '-', 'a', 'i', 'n', 'f',
+            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '-', 'a', 'i', 'n', 'f', 'e',
+            'E',
         ]
         .into_iter()
         .collect();
@@ -162,23 +164,19 @@ impl HasTop for CharacterInclusionDomain {
     }
 }
 
-impl fmt::Debug for CharacterInclusionDomain {
+impl fmt::Display for CharacterInclusionDomain {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CharacterInclusionDomain::Top => write!(f, "Top"),
             CharacterInclusionDomain::Value((certain_set, possible_set)) => {
-                write!(
-                    f,
-                    "Certain: {:?}, Possible: {:?}",
-                    certain_set, possible_set
-                )
+                write!(f, "Certain: {}, Possible: {}", certain_set, possible_set)
             }
         }
     }
 }
 
 /// A domain that represents character sets.
-#[derive(Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Debug)]
 pub enum CharacterSet {
     /// The *Top* value represents a character set of all allowed characters.
     Top,
@@ -240,7 +238,7 @@ impl HasTop for CharacterSet {
     }
 }
 
-impl fmt::Debug for CharacterSet {
+impl fmt::Display for CharacterSet {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CharacterSet::Top => write!(f, "Top"),

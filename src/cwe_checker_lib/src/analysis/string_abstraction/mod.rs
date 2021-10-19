@@ -8,7 +8,7 @@ use std::{
 
 use crate::{
     abstract_domain::{AbstractDomain, DomainInsertion, HasTop},
-    intermediate_representation::{Project, Sub},
+    intermediate_representation::Project,
     prelude::*,
     utils::binary::RuntimeMemoryImage,
 };
@@ -16,9 +16,7 @@ use crate::{
 use self::state::State;
 
 use super::{
-    fixpoint::Computation,
-    forward_interprocedural_fixpoint::GeneralizedContext,
-    graph::{Graph, Node},
+    fixpoint::Computation, forward_interprocedural_fixpoint::GeneralizedContext, graph::Graph,
     interprocedural_fixpoint_generic::NodeValue,
     pointer_inference::PointerInference as PointerInferenceComputation,
 };
@@ -27,8 +25,8 @@ pub mod context;
 pub mod state;
 
 use context::*;
+use petgraph::graph::NodeIndex;
 use petgraph::Direction;
-use petgraph::{graph::NodeIndex, visit::IntoNodeReferences};
 
 /// Configurable parameters for the analysis.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
@@ -42,14 +40,11 @@ pub struct Config {
 }
 
 /// A wrapper struct for the string abstraction computation object.
-pub struct StringAbstraction<
-    'a,
-    T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debug,
-> {
+pub struct StringAbstraction<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> {
     computation: Computation<GeneralizedContext<'a, Context<'a, T>>>,
 }
 
-impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debug>
+impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>>
     StringAbstraction<'a, T>
 {
     /// Generate a new string abstraction computation for a project.
@@ -67,19 +62,10 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debu
             config,
         );
 
-        let mut entry_sub_to_entry_blocks_map = HashMap::new();
-        let subs: HashMap<Tid, &Term<Sub>> = project
-            .program
-            .term
-            .subs
-            .iter()
-            .map(|sub| (sub.tid.clone(), sub))
-            .collect();
-        for sub_tid in project.program.term.entry_points.iter() {
-            if let Some(sub) = subs.get(sub_tid) {
-                if let Some(entry_block) = sub.term.blocks.get(0) {
-                    entry_sub_to_entry_blocks_map.insert(sub_tid, entry_block.tid.clone());
-                }
+        let mut sub_to_entry_blocks_map = HashMap::new();
+        for sub in project.program.term.subs.iter() {
+            if let Some(entry_block) = sub.term.blocks.get(0) {
+                sub_to_entry_blocks_map.insert(sub.tid.clone(), entry_block.tid.clone());
             }
         }
         let mut tid_to_graph_indices_map = HashMap::new();
@@ -88,7 +74,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debu
                 tid_to_graph_indices_map.insert((block.tid.clone(), sub.tid.clone()), node);
             }
         }
-        let entry_sub_to_entry_node_map: HashMap<Tid, NodeIndex> = entry_sub_to_entry_blocks_map
+        let sub_to_entry_node_map: HashMap<Tid, NodeIndex> = sub_to_entry_blocks_map
             .into_iter()
             .filter_map(|(sub_tid, block_tid)| {
                 if let Some(start_node_index) =
@@ -100,7 +86,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debu
                         .next()
                         .is_none()
                     {
-                        Some((sub_tid.clone(), *start_node_index))
+                        Some((sub_tid, *start_node_index))
                     } else {
                         None
                     }
@@ -113,7 +99,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debu
         let mut fixpoint_computation =
             super::forward_interprocedural_fixpoint::create_computation(context, None);
 
-        for (_, start_node_index) in entry_sub_to_entry_node_map.into_iter() {
+        for (_, start_node_index) in sub_to_entry_node_map.into_iter() {
             fixpoint_computation.set_node_value(
                 start_node_index,
                 super::interprocedural_fixpoint_generic::NodeValue::Value(State::new(
@@ -123,13 +109,9 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debu
             );
         }
 
-        let mut abstr = StringAbstraction {
+        StringAbstraction {
             computation: fixpoint_computation,
-        };
-
-        abstr.add_speculative_entry_points(project, false);
-
-        abstr
+        }
     }
 
     /// Compute the fixpoint of the string abstraction analysis.
@@ -159,66 +141,10 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debu
     pub fn get_node_value(&self, node_id: NodeIndex) -> Option<&NodeValue<State<T>>> {
         self.computation.get_node_value(node_id)
     }
-
-    /// Add speculative entry points to the fixpoint algorithm state.
-    ///
-    /// Since indirect jumps and calls are not handled yet (TODO: change that),
-    /// the analysis may miss a *lot* of code in some cases.
-    /// To remedy this somewhat,
-    /// we mark all function starts, that are also roots in the control flow graph
-    /// and do not have a state assigned to them yet, as additional entry points.
-    ///
-    /// If `only_cfg_roots` is set to `false`, then all function starts without a state are marked as roots.
-    fn add_speculative_entry_points(&mut self, project: &Project, only_cfg_roots: bool) {
-        // TODO: Refactor the fixpoint computation structs, so that the project reference can be extracted from them.
-        let mut start_block_to_sub_map: HashMap<&Tid, &Term<Sub>> = HashMap::new();
-        for sub in project.program.term.subs.iter() {
-            if project
-                .program
-                .term
-                .extern_symbols
-                .iter()
-                .any(|(tid, _)| *tid == sub.tid)
-            {
-                continue; // We ignore functions marked as extern symbols.
-            }
-            if let Some(start_block) = sub.term.blocks.first() {
-                start_block_to_sub_map.insert(&start_block.tid, sub);
-            }
-        }
-        let graph = self.computation.get_graph();
-        let mut new_entry_points = Vec::new();
-        for (node_id, node) in graph.node_references() {
-            if let Node::BlkStart(block, sub) = node {
-                if start_block_to_sub_map.get(&block.tid) == Some(sub)
-                    && self.computation.get_node_value(node_id).is_none()
-                    && (!only_cfg_roots
-                        || graph
-                            .neighbors_directed(node_id, Direction::Incoming)
-                            .next()
-                            .is_none())
-                {
-                    new_entry_points.push(node_id);
-                }
-            }
-        }
-        for entry in new_entry_points {
-            self.computation.set_node_value(
-                entry,
-                super::interprocedural_fixpoint_generic::NodeValue::Value(State::new(
-                    entry,
-                    self.get_context().pointer_inference_results,
-                )),
-            );
-        }
-    }
 }
 
-/// Compute the pointer inference analysis and return its results.
-///
-/// If `print_debug` is set to `true` print debug information to *stdout*.
-/// Note that the format of the debug information is currently unstable and subject to change.
-pub fn run<'a, T: AbstractDomain + HasTop + Eq + From<String> + DomainInsertion + Debug>(
+/// Compute the string abstraction and return its results.
+pub fn run<'a, T: AbstractDomain + HasTop + Eq + From<String> + DomainInsertion>(
     project: &'a Project,
     runtime_memory_image: &'a RuntimeMemoryImage,
     control_flow_graph: &'a Graph<'a>,

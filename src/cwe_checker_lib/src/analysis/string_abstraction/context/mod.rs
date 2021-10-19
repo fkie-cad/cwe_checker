@@ -1,7 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
     marker::PhantomData,
-    sync::Arc,
 };
 
 use petgraph::{graph::NodeIndex, visit::IntoNodeReferences};
@@ -37,23 +36,23 @@ pub struct Context<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<
     /// which in turn is used to keep track of taint on the stack or on the heap.
     pub pointer_inference_results: &'a PointerInferenceComputation<'a>,
     /// Maps the TIDs of functions that shall be treated as string extern symbols to the `ExternSymbol` object representing it.
-    pub string_symbol_map: Arc<HashMap<Tid, &'a ExternSymbol>>,
+    pub string_symbol_map: HashMap<Tid, &'a ExternSymbol>,
     /// Maps the TIDs of functions that shall be treated as general extern symbols to the `ExternSymbol` object representing it.
-    pub extern_symbol_map: Arc<HashMap<Tid, &'a ExternSymbol>>,
+    pub extern_symbol_map: HashMap<Tid, &'a ExternSymbol>,
     /// Maps string symbols to their corresponding format string parameter index.
-    pub format_string_index_map: Arc<HashMap<String, usize>>,
+    pub format_string_index_map: HashMap<String, usize>,
     /// A map to get the node index of the `BlkStart` node containing a given [`Def`] as the first `Def` of the block.
     /// The keys are of the form `(Def-TID, Current-Sub-TID)`
     /// to distinguish the nodes for blocks contained in more than one function.
-    pub block_start_node_map: Arc<HashMap<(Tid, Tid), NodeIndex>>,
+    pub block_start_node_map: HashMap<(Tid, Tid), NodeIndex>,
     /// A set containing a given [`Def`](crate::intermediate_representation::Def) as the first `Def` of the block.
     /// The keys are of the form `(Def-TID, Current-Sub-TID)`
     /// to distinguish the nodes for blocks contained in more than one function.
-    pub block_first_def_set: Arc<HashSet<(Tid, Tid)>>,
+    pub block_first_def_set: HashSet<(Tid, Tid)>,
     /// A map to get the node index of the `BlkEnd` node containing a given [`Jmp`].
     /// The keys are of the form `(Jmp-TID, Current-Sub-TID)`
     /// to distinguish the nodes for blocks contained in more than one function.
-    pub jmp_to_blk_end_node_map: Arc<HashMap<(Tid, Tid), NodeIndex>>,
+    pub jmp_to_blk_end_node_map: HashMap<(Tid, Tid), NodeIndex>,
     _phantom_string_domain: PhantomData<T>,
 }
 impl<'a, T: AbstractDomain + HasTop + Eq + From<String> + DomainInsertion> Context<'a, T> {
@@ -64,10 +63,8 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String> + DomainInsertion> Conte
         pointer_inference_results: &'a PointerInferenceComputation<'a>,
         config: Config,
     ) -> Context<'a, T> {
-        let string_symbol_map = Arc::new(crate::utils::symbol_utils::get_symbol_map(
-            project,
-            &config.string_symbols[..],
-        ));
+        let string_symbol_map =
+            crate::utils::symbol_utils::get_symbol_map(project, &config.string_symbols[..]);
         let mut extern_symbol_map = HashMap::new();
         for (tid, symbol) in project.program.term.extern_symbols.iter() {
             extern_symbol_map.insert(tid.clone(), symbol);
@@ -97,12 +94,12 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String> + DomainInsertion> Conte
             project,
             runtime_memory_image,
             pointer_inference_results,
-            format_string_index_map: Arc::new(config.format_string_index.into_iter().collect()),
+            format_string_index_map: config.format_string_index.into_iter().collect(),
             string_symbol_map,
-            extern_symbol_map: Arc::new(extern_symbol_map),
-            block_start_node_map: Arc::new(block_start_node_map),
-            block_first_def_set: Arc::new(block_first_def_set),
-            jmp_to_blk_end_node_map: Arc::new(jmp_to_blk_end_node_map),
+            extern_symbol_map,
+            block_start_node_map,
+            block_first_def_set,
+            jmp_to_blk_end_node_map,
             _phantom_string_domain: PhantomData,
         }
     }
@@ -117,7 +114,7 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String> + DomainInsertion> Conte
             Some(pi_state.clone())
         } else if let Some(node_id) = self
             .block_start_node_map
-            .get(&(tid.clone(), state.get_current_sub().unwrap().tid))
+            .get(&(tid.clone(), state.get_current_sub().unwrap().tid.clone()))
         {
             match self.pointer_inference_results.get_node_value(*node_id) {
                 Some(NodeValue::Value(val)) => Some(val.clone()),

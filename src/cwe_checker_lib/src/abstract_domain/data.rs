@@ -235,15 +235,6 @@ mod tests {
             }
         }
 
-        pub fn mock_from_absolute_value(absolute_value: T) -> Self {
-            DataDomain {
-                size: absolute_value.bytesize(),
-                relative_values: BTreeMap::new(),
-                absolute_value: Some(absolute_value),
-                contains_top_values: false,
-            }
-        }
-
         pub fn insert_relative_value(&mut self, id: AbstractIdentifier, offset: T) {
             self.relative_values.insert(id, offset);
         }

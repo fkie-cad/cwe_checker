@@ -10,9 +10,7 @@ use crate::{
     utils::arguments::{get_input_format_string, get_variable_parameters},
 };
 
-use std::fmt::Debug;
-
-impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debug> Context<'a, T> {
+impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Context<'a, T> {
     /// Handles the detection of string parameters to sprintf and snprintf calls.
     /// Is able to identify a string constant parameter and to insert it into the format string.
     /// e.g. the format string is "cat %s" and the analysis detected that the input string
@@ -109,7 +107,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debu
             self.project,
             pi_state,
             extern_symbol,
-            &*self.format_string_index_map,
+            &self.format_string_index_map,
             self.runtime_memory_image,
         ) {
             Ok(var_args) => {

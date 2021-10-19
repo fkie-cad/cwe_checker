@@ -1,6 +1,5 @@
 use regex::Regex;
 use std::collections::BTreeMap;
-use std::fmt::Debug;
 
 use crate::abstract_domain::{
     AbstractIdentifier, DomainInsertion, HasTop, IntervalDomain, TryToBitvec,
@@ -17,7 +16,7 @@ mod scanf;
 mod sprintf;
 mod strcat;
 
-impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debug> Context<'a, T> {
+impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Context<'a, T> {
     /// Handles generic symbol calls by deleting all non callee saved pointer entries.
     pub fn handle_generic_symbol_calls(
         &self,

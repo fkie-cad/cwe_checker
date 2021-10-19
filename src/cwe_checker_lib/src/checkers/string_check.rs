@@ -145,7 +145,7 @@ pub fn check_if_string_domain_indicates_vulnerability_with_br_domain(
     match &input_domain {
         BricksDomain::Top => {
             println!(
-                "Input of system call at {} unknown. Possibly vulnerable.\n Domain: {:?}",
+                "Input of system call at {} unknown. Possibly vulnerable.\n Domain: {}",
                 jmp_tid.address, input_domain
             );
         }
@@ -155,12 +155,12 @@ pub fn check_if_string_domain_indicates_vulnerability_with_br_domain(
                 .any(|brick| matches!(brick, crate::abstract_domain::BrickDomain::Top));
             if !fully_known {
                 println!(
-                    "Input of system call at {} without dangerous chars. Not vulnerable.\n Domain: {:?}",
+                    "Input of system call at {} without dangerous chars. Not vulnerable.\n Domain: {}",
                     jmp_tid.address, input_domain
                 );
             } else {
                 println!(
-                    "Input of system call at {} partially unknown. Possibly vulnerable.\n Domain: {:?}",
+                    "Input of system call at {} partially unknown. Possibly vulnerable.\n Domain: {}",
                     jmp_tid.address, input_domain
                 );
             }
@@ -216,7 +216,7 @@ pub fn check_if_string_domain_indicates_vulnerability_with_ci_domain(
     match &input_domain {
         CharacterInclusionDomain::Top => {
             println!(
-                "Input of system call at {} unknown. Possibly vulnerable.\n Domain: {:?}",
+                "Input of system call at {} unknown. Possibly vulnerable.\n Domain: {}",
                 jmp_tid.address, input_domain
             );
         }
@@ -230,7 +230,7 @@ pub fn check_if_string_domain_indicates_vulnerability_with_ci_domain(
                         )
                     } else {
                         println!(
-                                "Input of system call at {} partially unknown. Possibly vulnerable.\n Domain: {:?}",
+                                "Input of system call at {} partially unknown. Possibly vulnerable.\n Domain: {}",
                                 jmp_tid.address, input_domain
                             );
                     }
@@ -239,7 +239,7 @@ pub fn check_if_string_domain_indicates_vulnerability_with_ci_domain(
             },
             crate::abstract_domain::CharacterSet::Value(_) => {
                 println!(
-                    "Input of system call at {} without dangerous chars. Not vulnerable.\n Domain: {:?}",
+                    "Input of system call at {} without dangerous chars. Not vulnerable.\n Domain: {}",
                     jmp_tid.address, input_domain
                 );
             }

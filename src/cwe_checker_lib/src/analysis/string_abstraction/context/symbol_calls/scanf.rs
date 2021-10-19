@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use anyhow::Error;
 use itertools::izip;
-use std::fmt::Debug;
 
 use crate::abstract_domain::TryToBitvec;
 use crate::analysis::pointer_inference::State as PointerInferenceState;
@@ -14,7 +13,7 @@ use crate::{
     utils::arguments::get_variable_parameters,
 };
 
-impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debug> Context<'a, T> {
+impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Context<'a, T> {
     /// Handles the detection of string parameters to scanf calls.
     /// Adds new string abstract domains to the current state.
     pub fn handle_scanf_calls(&self, state: &State<T>, extern_symbol: &ExternSymbol) -> State<T> {
@@ -25,7 +24,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debu
                 self.project,
                 pi_state,
                 extern_symbol,
-                &*self.format_string_index_map,
+                &self.format_string_index_map,
                 self.runtime_memory_image,
             ) {
                 self.create_abstract_domain_entries_for_function_return_values(
@@ -163,7 +162,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debu
             self.project,
             pi_state,
             extern_symbol,
-            &*self.format_string_index_map,
+            &self.format_string_index_map,
             self.runtime_memory_image,
         ) {
             let return_values: Vec<String> =
@@ -202,7 +201,7 @@ mod tests {
 
     use crate::abstract_domain::{AbstractIdentifier, AbstractLocation, CharacterInclusionDomain};
     use crate::analysis::pointer_inference::PointerInference as PointerInferenceComputation;
-    use crate::analysis::string_abstraction::tests::mock_project::mock_project_with_intraprocedural_control_flow;
+    use crate::analysis::string_abstraction::tests::mock_project_with_intraprocedural_control_flow;
     use crate::intermediate_representation::Variable;
     use crate::utils::binary::RuntimeMemoryImage;
 
@@ -677,7 +676,7 @@ mod tests {
     #[test]
     fn test_source_string_mapped_to_return_locations() {
         let source_string: DataDomain<IntervalDomain> =
-            DataDomain::mock_from_absolute_value(IntervalDomain::mock(0x7000, 0x7000));
+            DataDomain::from(Bitvector::from_i32(0x7000));
         let sscanf_symbol = ExternSymbol::mock_sscanf_symbol_arm();
 
         let project = mock_project_with_intraprocedural_control_flow(

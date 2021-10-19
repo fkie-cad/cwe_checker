@@ -314,7 +314,7 @@ fn test_generate_permutations_of_fixed_length() {
         .into_iter()
         .map(|s| String::from(s))
         .collect();
-    let result = Brick::generate_permutations_of_fixed_length(length, &sequence, Vec::new());
+    let result = Brick::generate_permutations_of_fixed_length(length, &sequence, Vec::new(), 1);
     let expected: Vec<String> = vec!["aa", "ba", "ca", "ab", "bb", "cb", "ac", "bc", "cc"]
         .into_iter()
         .map(|s| String::from(s))

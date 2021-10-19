@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 use itertools::Itertools;
 use petgraph::graph::NodeIndex;
@@ -33,7 +34,7 @@ pub struct State<T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String
     /// For simplicity reasons it is assumed that a heap object only represents one string at offset 0.
     heap_to_string_map: HashMap<AbstractIdentifier, T>,
     /// Holds the currently analyzed subroutine term
-    current_sub: Option<Term<Sub>>,
+    current_sub: Arc<Option<Term<Sub>>>,
     /// The state of the pointer inference analysis.
     /// Used only for preventing unneccessary recomputation during handling of `Def`s in a basic block.
     /// It is set when handling `Def`s (except for the first `Def` in a block)
@@ -139,7 +140,7 @@ impl<T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> State<T> 
             stack_offset_to_pointer_map: HashMap::new(),
             stack_offset_to_string_map: HashMap::new(),
             heap_to_string_map: HashMap::new(),
-            current_sub,
+            current_sub: Arc::new(current_sub),
             pointer_inference_state: pi_state,
         }
     }
@@ -218,8 +219,11 @@ impl<T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> State<T> 
     }
 
     /// Gets the current subroutine since the analysis is interprocedural.
-    pub fn get_current_sub(&self) -> Option<Term<Sub>> {
-        self.current_sub.clone()
+    pub fn get_current_sub(&self) -> Option<&Term<Sub>> {
+        match &*self.current_sub {
+            Some(sub) => Some(sub),
+            None => None,
+        }
     }
 
     /// Get the current pointer inference state if it is contained as an intermediate value in the state.
@@ -301,8 +305,6 @@ impl<T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> State<T> 
         block_first_def_set: &HashSet<(Tid, Tid)>,
         constant: Bitvector,
     ) -> Option<DataDomain<IntervalDomain>> {
-        // TODO: Add Info to MemoryImage about the purpose of the segment.
-        // e.g. address is instruction address.
         if let Ok(address) = constant.try_to_u64() {
             if !block_first_def_set.iter().any(|(def_tid, _)| {
                 u64::from_str_radix(def_tid.address.as_str(), 16).unwrap() == address

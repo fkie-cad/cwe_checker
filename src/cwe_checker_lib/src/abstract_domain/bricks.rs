@@ -26,6 +26,7 @@ use std::{collections::BTreeSet, fmt};
 
 use super::{AbstractDomain, DomainInsertion, HasTop};
 use crate::prelude::*;
+use std::fmt::Debug;
 
 mod brick;
 use brick::Brick;
@@ -34,7 +35,7 @@ mod widening;
 
 /// The BricksDomain contains a sorted list of single normalized BrickDomains.
 /// It represents the composition of a string through sub sequences.
-#[derive(Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Debug)]
 pub enum BricksDomain {
     /// The *Top* value represents an invalid sequence.
     Top,
@@ -189,14 +190,14 @@ impl BricksDomain {
     }
 }
 
-impl fmt::Debug for BricksDomain {
+impl fmt::Display for BricksDomain {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             BricksDomain::Top => write!(f, "Top"),
             BricksDomain::Value(brick_domains) => {
                 write!(f, "Bricks: ")?;
                 for brick_domain in brick_domains.iter() {
-                    write!(f, "{:?} ", brick_domain)?;
+                    write!(f, "{} ", brick_domain)?;
                 }
 
                 Ok(())
@@ -299,7 +300,7 @@ impl HasTop for BricksDomain {
 ///
 /// e.g. \[{"mo", "de"}\]^{1,2} represents the following set of strings:
 /// {mo, de, momo, dede, mode, demo}.
-#[derive(Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Debug)]
 pub enum BrickDomain {
     /// The *Top* value represents the powerset over the alphabet
     /// of allowed characters with a minimum of 0 and a maximum of positive infinity.
@@ -360,7 +361,7 @@ impl AbstractDomain for BrickDomain {
     }
 }
 
-impl fmt::Debug for BrickDomain {
+impl fmt::Display for BrickDomain {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             BrickDomain::Top => write!(f, "[T]"),

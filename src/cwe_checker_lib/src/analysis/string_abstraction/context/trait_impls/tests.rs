@@ -1,4 +1,4 @@
-use std::{collections::HashSet, sync::Arc};
+use std::collections::HashSet;
 
 use crate::{
     abstract_domain::{
@@ -9,11 +9,10 @@ use crate::{
         forward_interprocedural_fixpoint::Context,
         string_abstraction::{
             context::symbol_calls::tests::Setup,
-            tests::mock_project::mock_project_with_intraprocedural_control_flow,
-            tests::mock_project::Setup as ProjectSetup,
+            tests::mock_project_with_intraprocedural_control_flow, tests::Setup as ProjectSetup,
         },
     },
-    intermediate_representation::{Blk, ByteSize, ExternSymbol, Jmp, Tid, Variable},
+    intermediate_representation::{Bitvector, Blk, ByteSize, ExternSymbol, Jmp, Tid, Variable},
     utils::binary::RuntimeMemoryImage,
 };
 
@@ -30,7 +29,7 @@ fn test_update_def() {
     pi_results.compute();
 
     let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
-    setup.context.block_first_def_set = Arc::new(HashSet::new());
+    setup.context.block_first_def_set = HashSet::new();
 
     let project_setup = ProjectSetup::new();
     let assign_def = project_setup.string_input_constant("assign_def", "r1", 0x7000);
@@ -42,8 +41,7 @@ fn test_update_def() {
         .update_def(&setup.state_before_call, &assign_def)
         .unwrap();
 
-    let absolute_target =
-        DataDomain::mock_from_absolute_value(IntervalDomain::mock_i32(0x7000, 0x7000));
+    let absolute_target = DataDomain::from(Bitvector::from_i32(0x7000));
 
     assert_eq!(
         absolute_target,
@@ -174,7 +172,7 @@ fn test_update_return() {
 
     let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
-    let pointer = DataDomain::mock_from_absolute_value(IntervalDomain::mock_i32(0x6000, 0x6000));
+    let pointer = DataDomain::from(Bitvector::from_i32(0x6000));
     let callee_saved_reg = Variable::mock("r11", 4);
     let non_callee_saved_reg = Variable::mock("r0", 4);
 

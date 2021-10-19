@@ -10,11 +10,10 @@ use crate::{
     intermediate_representation::ExternSymbol,
 };
 use std::collections::BTreeMap;
-use std::fmt::Debug;
 
 use crate::prelude::*;
 
-impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debug> Context<'a, T> {
+impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Context<'a, T> {
     /// Handles the detection of string parameters to memcpy calls.
     pub fn handle_memcpy_calls(&self, state: &State<T>, extern_symbol: &ExternSymbol) -> State<T> {
         let mut new_state = state.clone();
@@ -214,7 +213,7 @@ mod tests {
         analysis::pointer_inference::PointerInference as PointerInferenceComputation,
         analysis::string_abstraction::{
             context::symbol_calls::tests::Setup,
-            tests::mock_project::mock_project_with_intraprocedural_control_flow,
+            tests::mock_project_with_intraprocedural_control_flow,
         },
         intermediate_representation::{Bitvector, Tid, Variable},
         utils::binary::RuntimeMemoryImage,
@@ -359,7 +358,7 @@ mod tests {
         let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
         let expected_data: DataDomain<IntervalDomain> =
-            DataDomain::mock_from_absolute_value(IntervalDomain::mock_i32(0x7000, 0x7000));
+            DataDomain::from(Bitvector::from_i32(0x7000));
         assert_eq!(
             expected_data,
             setup
@@ -478,8 +477,7 @@ mod tests {
         pi_results.compute();
 
         let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
-        let input_target =
-            DataDomain::mock_from_absolute_value(IntervalDomain::mock_i32(0x7000, 0x7000));
+        let input_target = DataDomain::from(Bitvector::from_i32(0x7000));
 
         assert_eq!(
             CharacterInclusionDomain::ci("str1 str2 str3 str4"),

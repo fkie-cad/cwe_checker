@@ -12,7 +12,7 @@ use crate::analysis::forward_interprocedural_fixpoint::Context as _;
 use crate::analysis::pointer_inference::PointerInference as PointerInferenceComputation;
 use crate::analysis::pointer_inference::State as PiState;
 use crate::analysis::string_abstraction::state::State;
-use crate::analysis::string_abstraction::tests::mock_project::*;
+use crate::analysis::string_abstraction::tests::*;
 use crate::intermediate_representation::{Bitvector, ExternSymbol, Project, Sub};
 use crate::{
     abstract_domain::{AbstractIdentifier, AbstractLocation},

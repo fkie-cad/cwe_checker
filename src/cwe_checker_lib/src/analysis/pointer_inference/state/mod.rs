@@ -15,7 +15,7 @@ mod value_specialization;
 pub struct State {
     /// Maps a register variable to the data known about its content.
     /// A variable not contained in the map has value `Data::Top(..)`, i.e. nothing is known about its content.
-    pub register: BTreeMap<Variable, Data>,
+    register: BTreeMap<Variable, Data>,
     /// The list of all known memory objects.
     pub memory: AbstractObjectList,
     /// The abstract identifier of the current stack frame.

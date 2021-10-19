@@ -3,7 +3,7 @@ use crate::{
     abstract_domain::{AbstractLocation, CharacterInclusionDomain},
     analysis::{
         pointer_inference::State as PiState,
-        string_abstraction::tests::mock_project::mock_project_with_intraprocedural_control_flow,
+        string_abstraction::tests::mock_project_with_intraprocedural_control_flow,
     },
 };
 
@@ -17,7 +17,7 @@ impl<T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> State<T> 
             stack_offset_to_pointer_map: HashMap::new(),
             stack_offset_to_string_map: HashMap::new(),
             heap_to_string_map: HashMap::new(),
-            current_sub: Some(current_sub),
+            current_sub: Arc::new(Some(current_sub)),
             pointer_inference_state: Some(pi_state),
         }
     }
@@ -29,7 +29,7 @@ impl<T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> State<T> 
             stack_offset_to_pointer_map: HashMap::new(),
             stack_offset_to_string_map: HashMap::new(),
             heap_to_string_map: HashMap::new(),
-            current_sub: Some(current_sub),
+            current_sub: Arc::new(Some(current_sub)),
             pointer_inference_state: Some(pi_state),
         }
     }
@@ -128,9 +128,8 @@ fn test_evaluate_constant() {
     let block_first_def_set: HashSet<(Tid, Tid)> = HashSet::new();
 
     assert_eq!(
-        Some(DataDomain::mock_from_absolute_value(IntervalDomain::new(
-            constant.clone(),
-            constant.clone(),
+        Some(DataDomain::from(Bitvector::from_i32(
+            constant.clone().try_to_i32().unwrap()
         ))),
         state.evaluate_constant(&runtime_memory_image, &block_first_def_set, constant)
     );
@@ -160,10 +159,7 @@ fn test_handle_assign_and_load() {
     return_tid.address = "14718".to_string();
     block_first_def_set.insert((return_tid, sub.tid));
 
-    let constant_data_domain = DataDomain::mock_from_absolute_value(IntervalDomain::new(
-        Bitvector::from_str_radix(16, "7000").unwrap(),
-        Bitvector::from_str_radix(16, "7000").unwrap(),
-    ));
+    let constant_data_domain = DataDomain::from(Bitvector::from_i64(0x7000));
 
     let mut pi_state = state.get_pointer_inference_state().unwrap().clone();
     pi_state.set_register(&output, constant_data_domain.clone());

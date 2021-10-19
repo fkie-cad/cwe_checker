@@ -98,7 +98,7 @@ impl Brick {
     /// min = max = 1. e.g. B = \[{a,b}\]^{2,2} => B_new = \[{aa, ab, ba, bb}\]^{1,1}.
     pub fn transform_brick_with_min_max_equal(&self, length: usize) -> Self {
         let permutations: BTreeSet<String> =
-            Self::generate_permutations_of_fixed_length(length, &self.sequence, Vec::new())
+            Self::generate_permutations_of_fixed_length(length, &self.sequence, Vec::new(), 1)
                 .into_iter()
                 .collect();
         Brick {
@@ -137,9 +137,10 @@ impl Brick {
     /// Note that the length can also be greater or smaller than
     /// the number of elements in the sequence.
     pub fn generate_permutations_of_fixed_length(
-        length: usize,
+        max_length: usize,
         sequence: &BTreeSet<String>,
         generated: Vec<String>,
+        current_length: usize,
     ) -> Vec<String> {
         let mut new_gen: Vec<String> = Vec::new();
         for s in sequence.iter() {
@@ -152,8 +153,13 @@ impl Brick {
             }
         }
 
-        if new_gen.get(0).unwrap().len() < length {
-            return Self::generate_permutations_of_fixed_length(length, sequence, new_gen);
+        if current_length < max_length {
+            return Self::generate_permutations_of_fixed_length(
+                max_length,
+                sequence,
+                new_gen,
+                current_length + 1,
+            );
         }
 
         new_gen
