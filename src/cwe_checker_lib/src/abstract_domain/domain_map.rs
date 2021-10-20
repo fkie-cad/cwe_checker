@@ -100,6 +100,7 @@ where
 /// * [`IntersectMergeStrategy`]
 /// * [`MergeTopStrategy`]
 pub trait MapMergeStrategy<K: Ord + Clone, V: AbstractDomain> {
+    /// This function determines how two [`DomainMap`] instances are merged as abstract domains.
     fn merge_map(map_left: &BTreeMap<K, V>, map_right: &BTreeMap<K, V>) -> BTreeMap<K, V>;
 }
 
@@ -124,7 +125,7 @@ impl<K: Ord + Clone, V: AbstractDomain> MapMergeStrategy<K, V> for UnionMergeStr
                 .and_modify(|value| {
                     *value = value.merge(value_right);
                 })
-                .or_insert(value_right.clone());
+                .or_insert_with(|| value_right.clone());
         }
         merged_map
     }
