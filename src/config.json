@@ -1,29 +1,8 @@
 {
   "CWE78": {
     "system_symbols": [
-      "system",
-      "execl"
-    ],
-    "string_symbols": [
-      "sprintf",
-      "snprintf",
-      "strcat",
-      "strncat"
-    ],
-    "user_input_symbols": [
-      "scanf",
-      "__isoc99_scanf",
-      "sscanf",
-      "__isoc99_sscanf"
-    ],
-    "format_string_index": {
-      "sprintf": 1,
-      "snprintf": 2,
-      "scanf": 0,
-      "__isoc99_scanf": 0,
-      "sscanf": 1,
-      "__isoc99_sscanf": 1
-    }
+      "system"
+    ]
   },
   "CWE134": {
     "format_string_symbols": [
@@ -254,36 +233,31 @@
       "free"
     ]
   },
-  "StringCheck": {
-    "system_symbols": [
-      "system"
+  "StringAbstraction": {
+    "string_symbols": [
+      "sprintf",
+      "snprintf",
+      "vsprintf",
+      "vsnprintf",
+      "strcat",
+      "strncat",
+      "scanf",
+      "__isoc99_scanf",
+      "sscanf",
+      "__isoc99_sscanf",
+      "memcpy",
+      "free"
     ],
-    "abstract_strings": {
-      "string_symbols": [
-        "sprintf",
-        "snprintf",
-        "vsprintf",
-        "vsnprintf",
-        "strcat",
-        "strncat",
-        "scanf",
-        "__isoc99_scanf",
-        "sscanf",
-        "__isoc99_sscanf",
-        "memcpy",
-        "free"
-      ],
-      "format_string_index": {
-        "printf": 0,
-        "sprintf": 1,
-        "snprintf": 2,
-        "vsprintf": 1,
-        "vsnprintf": 2,
-        "scanf": 0,
-        "__isoc99_scanf": 0,
-        "sscanf": 1,
-        "__isoc99_sscanf": 1
-      }
+    "format_string_index": {
+      "printf": 0,
+      "sprintf": 1,
+      "snprintf": 2,
+      "vsprintf": 1,
+      "vsnprintf": 2,
+      "scanf": 0,
+      "__isoc99_scanf": 0,
+      "sscanf": 1,
+      "__isoc99_sscanf": 1
     }
   }
 }

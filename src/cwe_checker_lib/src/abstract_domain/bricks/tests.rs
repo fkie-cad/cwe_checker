@@ -310,15 +310,17 @@ fn test_normalize() {
 #[test]
 fn test_generate_permutations_of_fixed_length() {
     let length: usize = 2;
-    let sequence: BTreeSet<String> = vec!["a", "b", "c"]
+    let sequence: BTreeSet<String> = vec!["a_", "b_", "c_"]
         .into_iter()
         .map(|s| String::from(s))
         .collect();
     let result = Brick::generate_permutations_of_fixed_length(length, &sequence, Vec::new(), 1);
-    let expected: Vec<String> = vec!["aa", "ba", "ca", "ab", "bb", "cb", "ac", "bc", "cc"]
-        .into_iter()
-        .map(|s| String::from(s))
-        .collect();
+    let expected: Vec<String> = vec![
+        "a_a_", "b_a_", "c_a_", "a_b_", "b_b_", "c_b_", "a_c_", "b_c_", "c_c_",
+    ]
+    .into_iter()
+    .map(|s| String::from(s))
+    .collect();
 
     assert_eq!(result, expected);
 }

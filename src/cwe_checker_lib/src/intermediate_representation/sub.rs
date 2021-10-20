@@ -207,5 +207,18 @@ mod tests {
                 has_var_args: false,
             }
         }
+
+        pub fn mock_string() -> Self {
+            ExternSymbol {
+                tid: Tid::new("sprintf"),
+                addresses: vec!["UNKNOWN".to_string()],
+                name: "sprintf".to_string(),
+                calling_convention: Some("__stdcall".to_string()),
+                parameters: vec![Arg::mock_register("RDI", 8), Arg::mock_register("RSI", 8)],
+                return_values: vec![Arg::mock_register("RAX", 8)],
+                no_return: false,
+                has_var_args: true,
+            }
+        }
     }
 }

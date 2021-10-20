@@ -151,13 +151,17 @@ pub fn run<'a, T: AbstractDomain + HasTop + Eq + From<String> + DomainInsertion>
     pointer_inference: &'a PointerInferenceComputation<'a>,
     config: Config,
 ) -> StringAbstraction<'a, T> {
-    StringAbstraction::new(
+    let mut string_abstraction = StringAbstraction::new(
         project,
         runtime_memory_image,
         control_flow_graph,
         pointer_inference,
         config,
-    )
+    );
+
+    string_abstraction.compute();
+
+    string_abstraction
 }
 
 #[cfg(test)]
