@@ -133,8 +133,9 @@ pub fn check_cwe(
             _ => panic!(),
         };
     }
+
     let cwe_warnings = cwe_warnings.into_iter().map(|(_, cwe)| cwe).collect();
-    let log_messages = log_receiver.into_iter().collect();
+    let log_messages = log_receiver.try_iter().collect();
 
     (log_messages, cwe_warnings)
 }

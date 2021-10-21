@@ -26,7 +26,6 @@ pub mod state;
 
 use context::*;
 use petgraph::graph::NodeIndex;
-use petgraph::Direction;
 
 /// Configurable parameters for the analysis.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
@@ -80,16 +79,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>>
                 if let Some(start_node_index) =
                     tid_to_graph_indices_map.get(&(block_tid, sub_tid.clone()))
                 {
-                    // We only add entry points that are also control flow graph roots
-                    if control_flow_graph
-                        .neighbors_directed(*start_node_index, Direction::Incoming)
-                        .next()
-                        .is_none()
-                    {
-                        Some((sub_tid, *start_node_index))
-                    } else {
-                        None
-                    }
+                    Some((sub_tid, *start_node_index))
                 } else {
                     None
                 }

@@ -176,42 +176,34 @@ fn run_with_ghidra(args: &CmdlineArgs) {
         &project,
     );
 
-    let mut pointer_inference_computed = false;
     let modules_depending_on_string_abstraction = vec!["CWE78"];
-    let modules_depend_on_string_abstraction = modules
-        .iter()
-        .any(|module| modules_depending_on_string_abstraction.contains(&module.name));
-
-    let pointer_inference_results = if modules_depend_on_string_abstraction {
-        pointer_inference_computed = true;
-        Some(analysis_results.compute_pointer_inference(&config["Memory"], args.statistics))
-    } else {
-        None
-    };
-
-    let string_abstraction_results = if modules_depend_on_string_abstraction {
-        let pi_results = pointer_inference_results.as_ref();
-        Some(analysis_results.compute_string_abstraction(&config["StringAbstraction"], pi_results))
-    } else {
-        None
-    };
-
     let modules_depending_on_pointer_inference = vec!["CWE134", "CWE476", "Memory"];
-    let pointer_inference_results = if !pointer_inference_computed
-        && modules
-            .iter()
-            .any(|module| modules_depending_on_pointer_inference.contains(&module.name))
-    {
+
+    let string_abstraction_needed = modules
+    .iter()
+    .any(|module| modules_depending_on_string_abstraction.contains(&module.name));
+
+    let pi_analysis_needed = string_abstraction_needed || modules
+    .iter()
+    .any(|module| modules_depending_on_pointer_inference.contains(&module.name));
+
+    let pi_analysis_results = if pi_analysis_needed {
         Some(analysis_results.compute_pointer_inference(&config["Memory"], args.statistics))
     } else {
         None
     };
 
-    let analysis_results =
-        analysis_results.set_pointer_inference(pointer_inference_results.as_ref());
+    let analysis_results = analysis_results.set_pointer_inference(pi_analysis_results.as_ref());
 
-    let analysis_results =
-        analysis_results.set_string_abstraction(string_abstraction_results.as_ref());
+    let string_abstraction_results = if string_abstraction_needed {
+        Some(analysis_results.compute_string_abstraction(&config["StringAbstraction"], pi_analysis_results.as_ref()))
+    } else {
+        None
+    };
+
+    let analysis_results = analysis_results.set_string_abstraction(string_abstraction_results.as_ref());
+
+
 
     // Print debug and then return.
     // Right now there is only one debug printing function.
@@ -380,6 +372,7 @@ fn get_project_from_ghidra(
             }
         }
 
+        println!("{}", String::from_utf8(output.stdout.clone()).unwrap());
         if !output.status.success() {
             match output.status.code() {
                 Some(code) => {
