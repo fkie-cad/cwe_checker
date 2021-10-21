@@ -28,12 +28,16 @@ pub use character_inclusion::*;
 mod strings;
 pub use strings::*;
 
+mod domain_map;
+pub use domain_map::*;
+
 /// The main trait describing an abstract domain.
 ///
 /// Each abstract domain is partially ordered.
 /// Abstract domains of the same type can be merged.
 pub trait AbstractDomain: Sized + Eq + Clone {
     /// Return an upper bound (with respect to the partial order on the domain) for the two inputs `self` and `other`.
+    #[must_use]
     fn merge(&self, other: &Self) -> Self;
 
     /// Returns whether the element represents the top element (i.e. maximal with respect to the partial order) or not.
