@@ -76,13 +76,9 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>>
         let sub_to_entry_node_map: HashMap<Tid, NodeIndex> = sub_to_entry_blocks_map
             .into_iter()
             .filter_map(|(sub_tid, block_tid)| {
-                if let Some(start_node_index) =
-                    tid_to_graph_indices_map.get(&(block_tid, sub_tid.clone()))
-                {
-                    Some((sub_tid, *start_node_index))
-                } else {
-                    None
-                }
+                tid_to_graph_indices_map
+                    .get(&(block_tid, sub_tid.clone()))
+                    .map(|start_node_index| (sub_tid, *start_node_index))
             })
             .collect();
 

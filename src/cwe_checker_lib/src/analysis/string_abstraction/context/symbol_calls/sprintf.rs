@@ -307,14 +307,14 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
         if !data.get_relative_values().is_empty() {
             if let Some(data_type) = arg.get_data_type() {
                 if matches!(data_type, Datatype::Pointer) {
-                    let generated_domain =
+                    let mut generated_domain =
                         Context::<T>::merge_domains_from_multiple_pointer_targets(
                             state,
                             pi_state,
                             data.get_relative_values(),
                         );
                     if let Some(constant) = constant_domain {
-                        generated_domain.merge(&constant);
+                        generated_domain = generated_domain.merge(&constant);
                     }
 
                     return Some(generated_domain);
