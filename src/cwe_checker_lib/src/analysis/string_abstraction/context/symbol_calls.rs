@@ -1,3 +1,5 @@
+//! This module handles the string processing at external symbol calls.
+
 use regex::Regex;
 use std::collections::BTreeMap;
 

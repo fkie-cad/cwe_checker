@@ -1,3 +1,6 @@
+//! This module contains the Context Object for the String Abstraction.
+//! It holds all necessary information that stays unchanged during the analysis.
+
 use std::{
     collections::{HashMap, HashSet},
     marker::PhantomData,

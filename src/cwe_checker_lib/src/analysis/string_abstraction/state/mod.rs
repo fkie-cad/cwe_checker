@@ -1,3 +1,7 @@
+//! The state module holds all information at CFG nodes that are generated from
+//! the String Abstraction analysis.
+//! Its content changes until a fixpoint is reached.
+
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
