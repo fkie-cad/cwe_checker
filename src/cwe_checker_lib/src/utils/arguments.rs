@@ -118,7 +118,7 @@ pub fn parse_format_string_parameters(
     Ok(datatype_map)
 }
 
-/// Returns an argument vector of detected variable parameters if they are of type string.
+/// Returns an argument vector of detected variable parameters.
 pub fn get_variable_parameters(
     project: &Project,
     pi_state: &PointerInferenceState,
@@ -140,14 +140,19 @@ pub fn get_variable_parameters(
     );
 
     if let Ok(format_string) = format_string_results.as_ref() {
-        if let Ok(parameters) =
-            parse_format_string_parameters(format_string, &project.datatype_properties)
-        {
-            return Ok(calculate_parameter_locations(
-                parameters,
-                extern_symbol.get_calling_convention(project),
-                format_string_index,
-            ));
+        let parameter_result =
+            parse_format_string_parameters(format_string, &project.datatype_properties);
+        match parameter_result {
+            Ok(parameters) => {
+                return Ok(calculate_parameter_locations(
+                    parameters,
+                    extern_symbol.get_calling_convention(project),
+                    format_string_index,
+                ));
+            }
+            Err(e) => {
+                return Err(anyhow!("Could not parse variable parameters: {}", e));
+            }
         }
     }
 

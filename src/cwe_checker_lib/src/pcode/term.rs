@@ -565,8 +565,8 @@ impl ExternSymbol {
             calling_convention: self.calling_convention,
             parameters,
             return_values,
-            no_return: self.no_return,
-            has_var_args: self.has_var_args,
+            no_return: symbol.no_return,
+            has_var_args: symbol.has_var_args,
         }
     }
 }

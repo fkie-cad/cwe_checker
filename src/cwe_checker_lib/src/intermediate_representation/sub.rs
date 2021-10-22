@@ -171,6 +171,27 @@ mod tests {
                 data_type: None,
             }
         }
+
+        pub fn mock_register_with_data_type(
+            name: impl ToString,
+            size_in_bytes: impl Into<ByteSize>,
+            data_type: Option<Datatype>,
+        ) -> Arg {
+            Arg::Register {
+                var: Variable::mock(name.to_string(), size_in_bytes),
+                data_type,
+            }
+        }
+
+        pub fn mock_pointer_register(
+            name: impl ToString,
+            size_in_bytes: impl Into<ByteSize>,
+        ) -> Arg {
+            Arg::Register {
+                var: Variable::mock(name.to_string(), size_in_bytes),
+                data_type: Some(Datatype::Pointer),
+            }
+        }
     }
 
     impl ExternSymbol {
@@ -184,6 +205,19 @@ mod tests {
                 return_values: vec![Arg::mock_register("RAX", 8)],
                 no_return: false,
                 has_var_args: false,
+            }
+        }
+
+        pub fn mock_string() -> Self {
+            ExternSymbol {
+                tid: Tid::new("sprintf"),
+                addresses: vec!["UNKNOWN".to_string()],
+                name: "sprintf".to_string(),
+                calling_convention: Some("__stdcall".to_string()),
+                parameters: vec![Arg::mock_register("RDI", 8), Arg::mock_register("RSI", 8)],
+                return_values: vec![Arg::mock_register("RAX", 8)],
+                no_return: false,
+                has_var_args: true,
             }
         }
     }

@@ -176,17 +176,38 @@ fn run_with_ghidra(args: &CmdlineArgs) {
         &project,
     );
 
-    let modules_depending_on_pointer_inference = vec!["CWE78", "CWE134", "CWE476", "Memory"];
-    let pointer_inference_results = if modules
+    let modules_depending_on_string_abstraction = vec!["CWE78"];
+    let modules_depending_on_pointer_inference = vec!["CWE134", "CWE476", "Memory"];
+
+    let string_abstraction_needed = modules
         .iter()
-        .any(|module| modules_depending_on_pointer_inference.contains(&module.name))
-    {
+        .any(|module| modules_depending_on_string_abstraction.contains(&module.name));
+
+    let pi_analysis_needed = string_abstraction_needed
+        || modules
+            .iter()
+            .any(|module| modules_depending_on_pointer_inference.contains(&module.name));
+
+    let pi_analysis_results = if pi_analysis_needed {
         Some(analysis_results.compute_pointer_inference(&config["Memory"], args.statistics))
     } else {
         None
     };
+
+    let analysis_results = analysis_results.set_pointer_inference(pi_analysis_results.as_ref());
+
+    let string_abstraction_results =
+        if string_abstraction_needed {
+            Some(analysis_results.compute_string_abstraction(
+                &config["StringAbstraction"],
+                pi_analysis_results.as_ref(),
+            ))
+        } else {
+            None
+        };
+
     let analysis_results =
-        analysis_results.set_pointer_inference(pointer_inference_results.as_ref());
+        analysis_results.set_string_abstraction(string_abstraction_results.as_ref());
 
     // Print debug and then return.
     // Right now there is only one debug printing function.

@@ -216,6 +216,7 @@ mod tests {
         mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
         mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.
 
+        mark_skipped(&mut tests, "x86", "gcc");
         mark_skipped(&mut tests, "x86", "clang"); // Return value detection insufficient for x86
         mark_skipped(&mut tests, "arm", "clang"); // Loss of stack pointer position
         mark_skipped(&mut tests, "aarch64", "clang"); // Loss of stack pointer position

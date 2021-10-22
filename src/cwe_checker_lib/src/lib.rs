@@ -60,8 +60,11 @@ You can find out more information about each check, including known false positi
 by reading the check-specific module documentation in the [`checkers`] module.
 */
 
+use abstract_domain::BricksDomain;
+
 use crate::analysis::graph::Graph;
 use crate::analysis::pointer_inference::PointerInference;
+use crate::analysis::string_abstraction::StringAbstraction;
 use crate::intermediate_representation::Project;
 use crate::utils::binary::RuntimeMemoryImage;
 use crate::utils::log::{CweWarning, LogMessage};
@@ -140,6 +143,8 @@ pub struct AnalysisResults<'a> {
     pub project: &'a Project,
     /// The result of the pointer inference analysis if already computed.
     pub pointer_inference: Option<&'a PointerInference<'a>>,
+    /// The result of the string abstraction if already computed.
+    pub string_abstraction: Option<&'a StringAbstraction<'a, BricksDomain>>,
 }
 
 impl<'a> AnalysisResults<'a> {
@@ -156,6 +161,7 @@ impl<'a> AnalysisResults<'a> {
             control_flow_graph,
             project,
             pointer_inference: None,
+            string_abstraction: None,
         }
     }
 
@@ -183,6 +189,35 @@ impl<'a> AnalysisResults<'a> {
     ) -> AnalysisResults<'b> {
         AnalysisResults {
             pointer_inference: pi_results,
+            ..self
+        }
+    }
+
+    /// Compute the string abstraction.
+    /// As the string abstraction depends on the pointer inference, the
+    /// pointer inference is also computed and put into the `AnalysisResults` struct.
+    /// The result gets returned, but not saved to the `AnalysisResults` struct itself.
+    pub fn compute_string_abstraction(
+        &'a self,
+        config: &serde_json::Value,
+        pi_results: Option<&'a PointerInference<'a>>,
+    ) -> StringAbstraction<BricksDomain> {
+        crate::analysis::string_abstraction::run(
+            self.project,
+            self.runtime_memory_image,
+            self.control_flow_graph,
+            pi_results.unwrap(),
+            serde_json::from_value(config.clone()).unwrap(),
+        )
+    }
+
+    /// Create a new `AnalysisResults` struct containing the given string abstraction results.
+    pub fn set_string_abstraction<'b: 'a>(
+        self,
+        string_abstraction: Option<&'b StringAbstraction<'a, BricksDomain>>,
+    ) -> AnalysisResults<'b> {
+        AnalysisResults {
+            string_abstraction,
             ..self
         }
     }

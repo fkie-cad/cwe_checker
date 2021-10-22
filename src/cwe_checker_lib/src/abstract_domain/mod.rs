@@ -19,6 +19,15 @@ pub use mem_region::*;
 mod interval;
 pub use interval::*;
 
+mod bricks;
+pub use bricks::*;
+
+mod character_inclusion;
+pub use character_inclusion::*;
+
+mod strings;
+pub use strings::*;
+
 mod domain_map;
 pub use domain_map::*;
 
