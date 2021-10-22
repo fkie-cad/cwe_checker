@@ -21,30 +21,33 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
                     &self.project.stack_pointer_register,
                     self.runtime_memory_image,
                 ) {
-                    let target_domain = Context::<T>::merge_domains_from_multiple_pointer_targets(
-                        state,
-                        pi_state,
-                        return_pointer.get_relative_values(),
-                    );
+                    if !return_pointer.get_relative_values().is_empty() {
+                        let target_domain =
+                            Context::<T>::merge_domains_from_multiple_pointer_targets(
+                                state,
+                                pi_state,
+                                return_pointer.get_relative_values(),
+                            );
 
-                    Context::add_new_string_abstract_domain(
-                        &mut new_state,
-                        pi_state,
-                        return_pointer.get_relative_values(),
-                        target_domain.append_string_domain(&self.process_second_input_domain(
-                            state,
-                            extern_symbol,
+                        Context::add_new_string_abstract_domain(
+                            &mut new_state,
                             pi_state,
-                        )),
-                    );
-
-                    if let Ok(return_register) = extern_symbol.get_unique_return_register() {
-                        new_state.add_new_variable_to_pointer_entry(
-                            return_register.clone(),
-                            return_pointer,
+                            return_pointer.get_relative_values(),
+                            target_domain.append_string_domain(&self.process_second_input_domain(
+                                state,
+                                extern_symbol,
+                                pi_state,
+                            )),
                         );
-                    } else {
-                        new_state.add_unassigned_return_pointer(return_pointer);
+
+                        if let Ok(return_register) = extern_symbol.get_unique_return_register() {
+                            new_state.add_new_variable_to_pointer_entry(
+                                return_register.clone(),
+                                return_pointer,
+                            );
+                        } else {
+                            new_state.add_unassigned_return_pointer(return_pointer);
+                        }
                     }
                 }
             }

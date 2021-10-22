@@ -196,7 +196,7 @@ pub fn check_system_call_parameter(
     }
 }
 
-/// Checks if the CharacterInclusion Domain indicates a vulnerability at the system call.
+/// Checks if the Bricks Domain indicates a vulnerability at the system call.
 pub fn check_if_string_domain_indicates_vulnerability(
     input_domain: BricksDomain,
     jmp_tid: &Tid,
@@ -230,7 +230,7 @@ pub fn check_if_string_domain_indicates_vulnerability(
 /// Generates the CWE Warning for the CWE 78 check
 pub fn generate_cwe_warning(sub_name: &str, jmp_tid: &Tid, symbol_name: &str) -> CweWarning {
     let description: String = format!(
-        "(Potential OS Command Injection) Input for call to {} is not properly sanitized in function {} ({})",
+        "(OS Command Injection) Input for call to {} may not be properly sanitized in function {} ({})",
         symbol_name, sub_name, jmp_tid.address,
     );
     CweWarning::new(
