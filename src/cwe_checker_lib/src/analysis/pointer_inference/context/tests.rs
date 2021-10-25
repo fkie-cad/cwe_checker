@@ -76,7 +76,7 @@ fn return_term(target_name: &str) -> Term<Jmp> {
 
 fn mock_project() -> (Project, Config) {
     let program = Program {
-        subs: Vec::new(),
+        subs: BTreeMap::new(),
         extern_symbols: vec![
             mock_extern_symbol("malloc"),
             mock_extern_symbol("free"),

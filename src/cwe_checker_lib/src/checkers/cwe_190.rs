@@ -108,7 +108,7 @@ pub fn check_cwe(
     let config: Config = serde_json::from_value(cwe_params.clone()).unwrap();
     let mut cwe_warnings = Vec::new();
     let symbol_map = get_symbol_map(project, &config.symbols);
-    for sub in project.program.term.subs.iter() {
+    for sub in project.program.term.subs.values() {
         for (block, jump, symbol) in get_callsites(sub, &symbol_map) {
             if block_contains_multiplication(block) {
                 cwe_warnings.push(generate_cwe_warning(&jump.tid, symbol));

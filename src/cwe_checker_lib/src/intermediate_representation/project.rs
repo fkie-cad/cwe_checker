@@ -57,7 +57,7 @@ impl Project {
     /// For all expressions contained in the project,
     /// replace trivially computable subexpressions like `a XOR a` with their result.
     fn substitute_trivial_expressions(&mut self) {
-        for sub in self.program.term.subs.iter_mut() {
+        for sub in self.program.term.subs.values_mut() {
             for block in sub.term.blocks.iter_mut() {
                 for def in block.term.defs.iter_mut() {
                     match &mut def.term {
@@ -95,7 +95,7 @@ impl Project {
     fn remove_references_to_nonexisting_tids(&mut self) -> Vec<LogMessage> {
         // Gather all existing jump targets
         let mut jump_target_tids = HashSet::new();
-        for sub in self.program.term.subs.iter() {
+        for sub in self.program.term.subs.values() {
             jump_target_tids.insert(sub.tid.clone());
             for block in sub.term.blocks.iter() {
                 jump_target_tids.insert(block.tid.clone());
@@ -108,7 +108,7 @@ impl Project {
         let dummy_sub_tid = Tid::new("Artificial Sink Sub");
         let dummy_blk_tid = Tid::new("Artificial Sink Block");
         let mut log_messages = Vec::new();
-        for sub in self.program.term.subs.iter_mut() {
+        for sub in self.program.term.subs.values_mut() {
             for block in sub.term.blocks.iter_mut() {
                 if let Err(mut logs) =
                     block.remove_nonexisting_indirect_jump_targets(&jump_target_tids)
@@ -142,7 +142,10 @@ impl Project {
                     }],
                 },
             };
-            self.program.term.subs.push(dummy_sub);
+            self.program
+                .term
+                .subs
+                .insert(dummy_sub.tid.clone(), dummy_sub);
         }
         log_messages
     }
@@ -152,7 +155,7 @@ impl Project {
     /// The propagation only occurs inside basic blocks
     /// but not across basic block boundaries.
     fn propagate_input_expressions(&mut self) {
-        for sub in self.program.term.subs.iter_mut() {
+        for sub in self.program.term.subs.values_mut() {
             for block in sub.term.blocks.iter_mut() {
                 block.merge_def_assignments_to_same_var();
                 block.propagate_input_expressions();

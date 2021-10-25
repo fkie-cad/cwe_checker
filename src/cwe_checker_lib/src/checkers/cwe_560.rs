@@ -114,7 +114,7 @@ pub fn check_cwe(
     let mut log_messages = Vec::new();
     let umask_symbol_map = get_symbol_map(project, &["umask".to_string()]);
     if !umask_symbol_map.is_empty() {
-        for sub in project.program.term.subs.iter() {
+        for sub in project.program.term.subs.values() {
             for (block, jmp, umask_symbol) in get_callsites(sub, &umask_symbol_map) {
                 match get_umask_permission_arg(
                     block,

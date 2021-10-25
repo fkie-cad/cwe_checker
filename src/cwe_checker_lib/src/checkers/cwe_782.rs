@@ -79,7 +79,7 @@ pub fn check_cwe(
         let symbol: &HashMap<&Tid, &str> = &[(tid, name)].iter().cloned().collect();
         prog.term
             .subs
-            .iter()
+            .values()
             .for_each(|sub| warnings.append(&mut handle_sub(sub, symbol)));
     }
     warnings.sort();

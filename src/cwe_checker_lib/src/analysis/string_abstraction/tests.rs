@@ -591,11 +591,9 @@ pub fn mock_project_with_intraprocedural_control_flow(
     sub_name: &str,
 ) -> Project {
     let mut program = Program::mock_empty();
+    let mocked_sub = mock_sub_with_name_and_symbol_calls(sub_name, symbol_call_config);
 
-    program.subs.push(mock_sub_with_name_and_symbol_calls(
-        sub_name,
-        symbol_call_config,
-    ));
+    program.subs.insert(mocked_sub.tid.clone(), mocked_sub);
     let memcpy = ExternSymbol::mock_memcpy_symbol_arm();
     program.extern_symbols.insert(memcpy.tid.clone(), memcpy);
     let sprintf = ExternSymbol::mock_sprintf_symbol_arm();

@@ -107,15 +107,8 @@ impl<'a> PointerInference<'a> {
         );
 
         let mut entry_sub_to_entry_blocks_map = HashMap::new();
-        let subs: HashMap<Tid, &Term<Sub>> = project
-            .program
-            .term
-            .subs
-            .iter()
-            .map(|sub| (sub.tid.clone(), sub))
-            .collect();
         for sub_tid in project.program.term.entry_points.iter() {
-            if let Some(sub) = subs.get(sub_tid) {
+            if let Some(sub) = project.program.term.subs.get(sub_tid) {
                 if let Some(entry_block) = sub.term.blocks.get(0) {
                     entry_sub_to_entry_blocks_map.insert(sub_tid, entry_block.tid.clone());
                 }
@@ -266,7 +259,7 @@ impl<'a> PointerInference<'a> {
     ) {
         // TODO: Refactor the fixpoint computation structs, so that the project reference can be extracted from them.
         let mut start_block_to_sub_map: HashMap<&Tid, &Term<Sub>> = HashMap::new();
-        for sub in project.program.term.subs.iter() {
+        for sub in project.program.term.subs.values() {
             if project.program.term.extern_symbols.contains_key(&sub.tid) {
                 continue; // We ignore functions marked as extern symbols.
             }

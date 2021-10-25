@@ -117,7 +117,7 @@ fn remove_dead_var_assignments_of_block(
 /// Remove all dead assignments from all basic blocks in the given `project`.
 pub fn remove_dead_var_assignments(project: &mut Project) {
     let alive_vars_map = compute_alive_vars(project);
-    for sub in project.program.term.subs.iter_mut() {
+    for sub in project.program.term.subs.values_mut() {
         for block in sub.term.blocks.iter_mut() {
             remove_dead_var_assignments_of_block(block, &alive_vars_map);
         }
@@ -163,7 +163,7 @@ mod tests {
             },
         };
         let mut project = Project::mock_empty();
-        project.program.term.subs.push(sub);
+        project.program.term.subs.insert(sub.tid.clone(), sub);
         remove_dead_var_assignments(&mut project);
 
         let cleaned_defs = vec![
@@ -173,7 +173,9 @@ mod tests {
             def_assign_term(5, "C", "RBX"),
         ];
         assert_eq!(
-            &project.program.term.subs[0].term.blocks[0].term.defs,
+            &project.program.term.subs[&Tid::new("sub")].term.blocks[0]
+                .term
+                .defs,
             &cleaned_defs
         );
     }

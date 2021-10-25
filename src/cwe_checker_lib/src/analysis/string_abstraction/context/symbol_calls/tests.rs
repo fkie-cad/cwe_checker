@@ -42,7 +42,8 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debu
             .program
             .term
             .subs
-            .get(0)
+            .values()
+            .next()
             .unwrap()
             .term
             .blocks
@@ -64,7 +65,15 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debu
         );
 
         let state_before_call: State<T> = State::mock_with_given_pi_state(
-            pi_context.project.program.term.subs.get(0).unwrap().clone(),
+            pi_context
+                .project
+                .program
+                .term
+                .subs
+                .values()
+                .next()
+                .unwrap()
+                .clone(),
             pi_state.clone(),
         );
 

@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct Program {
     /// The known functions contained in the binary
-    pub subs: Vec<Term<Sub>>,
+    pub subs: BTreeMap<Tid, Term<Sub>>,
     /// Extern symbols linked to the binary by the linker.
     pub extern_symbols: BTreeMap<Tid, ExternSymbol>,
     /// Entry points into to binary,
@@ -29,7 +29,7 @@ impl Program {
     pub fn find_block(&self, tid: &Tid) -> Option<&Term<Blk>> {
         self.subs
             .iter()
-            .map(|sub| sub.term.blocks.iter())
+            .map(|(_, sub)| sub.term.blocks.iter())
             .flatten()
             .find(|block| block.tid == *tid)
     }
@@ -42,7 +42,7 @@ mod tests {
     impl Program {
         pub fn mock_empty() -> Program {
             Program {
-                subs: Vec::new(),
+                subs: BTreeMap::new(),
                 extern_symbols: BTreeMap::new(),
                 entry_points: Vec::new(),
                 address_base_offset: 0,

@@ -605,7 +605,7 @@ impl Program {
         let subs = self
             .subs
             .into_iter()
-            .map(|sub| sub.into_ir_sub_term(stack_pointer.size))
+            .map(|sub| (sub.tid.clone(), sub.into_ir_sub_term(stack_pointer.size)))
             .collect();
         let extern_symbols = self
             .extern_symbols
@@ -698,7 +698,7 @@ impl Project {
         let mut zero_extend_tids: HashSet<Tid> = HashSet::new();
         // iterates over definitions and checks whether sub registers are used
         // if so, they are swapped with subpieces of base registers
-        for sub in program.term.subs.iter_mut() {
+        for sub in program.term.subs.values_mut() {
             for blk in sub.term.blocks.iter_mut() {
                 let mut def_iter = blk.term.defs.iter_mut().peekable();
                 while let Some(def) = def_iter.next() {

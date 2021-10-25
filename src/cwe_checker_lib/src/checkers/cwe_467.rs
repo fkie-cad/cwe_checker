@@ -120,7 +120,7 @@ pub fn check_cwe(
     let mut cwe_warnings = Vec::new();
 
     let symbol_map = get_symbol_map(project, &config.symbols);
-    for sub in project.program.term.subs.iter() {
+    for sub in project.program.term.subs.values() {
         for (block, jmp, symbol) in get_callsites(sub, &symbol_map) {
             if check_for_pointer_sized_arg(
                 project,
