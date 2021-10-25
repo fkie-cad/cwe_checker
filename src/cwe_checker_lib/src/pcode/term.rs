@@ -622,7 +622,7 @@ impl Program {
         IrProgram {
             subs,
             extern_symbols,
-            entry_points: self.entry_points,
+            entry_points: self.entry_points.into_iter().collect(),
             address_base_offset,
         }
     }

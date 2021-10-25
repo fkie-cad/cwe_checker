@@ -497,7 +497,8 @@ pub fn get_program_cfg(program: &Term<Program>, extern_subs: HashSet<Tid>) -> Gr
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{collections::BTreeMap, iter::FromIterator};
+    use std::collections::{BTreeMap, BTreeSet};
+    use std::iter::FromIterator;
 
     fn mock_program() -> Term<Program> {
         let call_term = Term {
@@ -579,7 +580,7 @@ mod tests {
             term: Program {
                 subs: BTreeMap::from_iter([(sub1.tid.clone(), sub1), (sub2.tid.clone(), sub2)]),
                 extern_symbols: BTreeMap::new(),
-                entry_points: Vec::new(),
+                entry_points: BTreeSet::new(),
                 address_base_offset: 0,
             },
         };

@@ -1,6 +1,6 @@
 use super::{Blk, ExternSymbol, Sub};
 use crate::prelude::*;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// The `Program` structure represents a disassembled binary.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
@@ -11,7 +11,7 @@ pub struct Program {
     pub extern_symbols: BTreeMap<Tid, ExternSymbol>,
     /// Entry points into to binary,
     /// i.e. the term identifiers of functions that may be called from outside of the binary.
-    pub entry_points: Vec<Tid>,
+    pub entry_points: BTreeSet<Tid>,
     /// An offset that has been added to all addresses in the program compared to the addresses
     /// as specified in the binary file.
     ///
@@ -44,7 +44,7 @@ mod tests {
             Program {
                 subs: BTreeMap::new(),
                 extern_symbols: BTreeMap::new(),
-                entry_points: Vec::new(),
+                entry_points: BTreeSet::new(),
                 address_base_offset: 0,
             }
         }

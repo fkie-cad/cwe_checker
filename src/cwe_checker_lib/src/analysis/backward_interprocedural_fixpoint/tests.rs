@@ -1,6 +1,7 @@
 use super::{create_computation, mock_context, NodeValue};
 use crate::intermediate_representation::*;
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::iter::FromIterator;
 
 use mock_context::Context;
@@ -130,7 +131,7 @@ fn mock_program() -> Term<Program> {
         term: Program {
             subs: BTreeMap::from_iter([(sub1.tid.clone(), sub1), (sub2.tid.clone(), sub2)]),
             extern_symbols: BTreeMap::new(),
-            entry_points: Vec::new(),
+            entry_points: BTreeSet::new(),
             address_base_offset: 0,
         },
     };

@@ -213,7 +213,7 @@ pub mod tests {
         sub.term.blocks.push(block1);
         sub.term.blocks.push(block2);
         project.program.term.subs.insert(sub.tid.clone(), sub);
-        project.program.term.entry_points.push(Tid::new("func"));
+        project.program.term.entry_points.insert(Tid::new("func"));
 
         project
     }

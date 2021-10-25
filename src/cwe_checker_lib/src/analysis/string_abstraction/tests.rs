@@ -608,7 +608,7 @@ pub fn mock_project_with_intraprocedural_control_flow(
     program.extern_symbols.insert(free.tid.clone(), free);
     let malloc = ExternSymbol::mock_malloc_symbol_arm();
     program.extern_symbols.insert(malloc.tid.clone(), malloc);
-    program.entry_points.push(Tid::new(sub_name));
+    program.entry_points.insert(Tid::new(sub_name));
 
     let register_list = ["r0", "r1", "r2", "r3", "r11", "sp"]
         .iter()

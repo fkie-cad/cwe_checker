@@ -84,7 +84,7 @@ fn mock_project() -> (Project, Config) {
         ]
         .into_iter()
         .collect(),
-        entry_points: Vec::new(),
+        entry_points: BTreeSet::new(),
         address_base_offset: 0,
     };
     let program_term = Term {
