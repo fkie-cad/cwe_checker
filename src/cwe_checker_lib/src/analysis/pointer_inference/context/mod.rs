@@ -424,7 +424,7 @@ impl<'a> Context<'a> {
             ),
             Some(&call.tid),
         );
-        let calling_conv = extern_symbol.get_calling_convention(self.project);
+        let calling_conv = self.project.get_calling_convention(extern_symbol);
         let mut possible_referenced_ids = BTreeSet::new();
         if extern_symbol.parameters.is_empty() && extern_symbol.return_values.is_empty() {
             // We assume here that we do not know the parameters and approximate them by all possible parameter registers.

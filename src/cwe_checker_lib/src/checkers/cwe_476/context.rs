@@ -293,7 +293,7 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
                     }
                     let mut new_state = state.clone();
                     new_state.remove_non_callee_saved_taint(
-                        extern_symbol.get_calling_convention(self.project),
+                        self.project.get_calling_convention(extern_symbol),
                     );
                     Some(new_state)
                 } else {

@@ -146,7 +146,7 @@ fn backward_fixpoint() {
             size: ByteSize::new(8),
             is_temp: false,
         },
-        calling_conventions: Vec::new(),
+        calling_conventions: BTreeMap::new(),
         register_list: Vec::new(),
         datatype_properties: DatatypeProperties::mock(),
     };

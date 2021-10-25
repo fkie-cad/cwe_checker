@@ -97,12 +97,7 @@ impl ExternSymbol {
 
     /// Get the calling convention corresponding to the extern symbol.
     pub fn get_calling_convention<'a>(&self, project: &'a Project) -> &'a CallingConvention {
-        let cconv_name: &str = self.calling_convention.as_deref().unwrap_or("default");
-        project
-            .calling_conventions
-            .iter()
-            .find(|cconv| cconv.name == cconv_name)
-            .unwrap()
+        project.get_calling_convention(self)
     }
 }
 

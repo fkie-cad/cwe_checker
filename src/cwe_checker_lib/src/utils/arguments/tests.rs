@@ -1,4 +1,6 @@
 use crate::intermediate_representation::{Bitvector, Tid};
+use std::collections::BTreeMap;
+use std::iter::FromIterator;
 
 use super::*;
 
@@ -31,7 +33,7 @@ fn test_get_variable_parameters() {
         vec!["RDI".to_string()],
         vec!["XMM0".to_string()],
     );
-    project.calling_conventions = vec![cconv];
+    project.calling_conventions = BTreeMap::from_iter([(cconv.name.clone(), cconv)]);
 
     let mut output: Vec<Arg> = Vec::new();
     output.push(Arg::Stack {

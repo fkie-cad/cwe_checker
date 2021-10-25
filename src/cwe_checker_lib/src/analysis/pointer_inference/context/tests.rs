@@ -1,7 +1,7 @@
 use crate::intermediate_representation::DatatypeProperties;
 
 use super::*;
-use std::collections::HashSet;
+use std::{collections::HashSet, iter::FromIterator};
 
 fn bv(value: i64) -> ValueDomain {
     ValueDomain::from(Bitvector::from_i64(value))
@@ -92,7 +92,7 @@ fn mock_project() -> (Project, Config) {
         term: program,
     };
     let cconv = CallingConvention {
-        name: "default".to_string(),
+        name: "__cdecl".to_string(),
         integer_parameter_register: vec!["RDX".to_string()],
         float_parameter_register: vec!["XMM0".to_string()],
         return_register: vec!["RDX".to_string()],
@@ -107,7 +107,7 @@ fn mock_project() -> (Project, Config) {
             program: program_term,
             cpu_architecture: "x86_64".to_string(),
             stack_pointer_register: register("RSP"),
-            calling_conventions: vec![cconv],
+            calling_conventions: BTreeMap::from_iter([(cconv.name.clone(), cconv)]),
             register_list,
             datatype_properties: DatatypeProperties::mock(),
         },

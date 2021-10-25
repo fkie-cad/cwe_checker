@@ -802,7 +802,7 @@ impl Project {
                 .register_calling_convention
                 .clone()
                 .into_iter()
-                .map(|cconv| cconv.into())
+                .map(|cconv| (cconv.name.clone(), cconv.into()))
                 .collect(),
             register_list,
             datatype_properties: self.datatype_properties.clone(),

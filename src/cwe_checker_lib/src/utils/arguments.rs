@@ -146,7 +146,7 @@ pub fn get_variable_parameters(
             Ok(parameters) => {
                 return Ok(calculate_parameter_locations(
                     parameters,
-                    extern_symbol.get_calling_convention(project),
+                    project.get_calling_convention(extern_symbol),
                     format_string_index,
                 ));
             }

@@ -1,4 +1,5 @@
 use crate::intermediate_representation::*;
+use std::{collections::BTreeMap, iter::FromIterator};
 
 pub struct Setup;
 
@@ -615,6 +616,7 @@ pub fn mock_project_with_intraprocedural_control_flow(
         .iter()
         .map(|name| Variable::mock(name, ByteSize::new(4)))
         .collect();
+    let cconv = CallingConvention::mock_standard_arm_32();
 
     Project {
         program: Term {
@@ -623,7 +625,7 @@ pub fn mock_project_with_intraprocedural_control_flow(
         },
         cpu_architecture: "arm_32".to_string(),
         stack_pointer_register: Variable::mock("sp", 4u64),
-        calling_conventions: vec![CallingConvention::mock_standard_arm_32()],
+        calling_conventions: BTreeMap::from_iter([(cconv.name.clone(), cconv)]),
         register_list,
         datatype_properties: DatatypeProperties::mock_standard_arm_32(),
     }

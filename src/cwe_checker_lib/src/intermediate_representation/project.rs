@@ -1,7 +1,6 @@
-use super::{Blk, CallingConvention, DatatypeProperties, Def, Jmp, Program, Sub, Variable};
-use crate::prelude::*;
+use super::*;
 use crate::utils::log::LogMessage;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 mod block_duplication_normalization;
 use block_duplication_normalization::*;
@@ -19,7 +18,7 @@ pub struct Project {
     /// The stack pointer register for the given CPU architecture.
     pub stack_pointer_register: Variable,
     /// The known calling conventions that may be used for calls to extern functions.
-    pub calling_conventions: Vec<CallingConvention>,
+    pub calling_conventions: BTreeMap<String, CallingConvention>,
     /// A list of all known physical registers for the CPU architecture.
     /// Does only contain base registers, i.e. sub registers of other registers are not contained.
     pub register_list: Vec<Variable>,
@@ -36,8 +35,21 @@ impl Project {
     /// Try to guess a standard calling convention from the list of calling conventions in the project.
     pub fn get_standard_calling_convention(&self) -> Option<&CallingConvention> {
         self.calling_conventions
-            .iter()
-            .find(|cconv| cconv.name == "__stdcall" || cconv.name == "__cdecl")
+            .get("__stdcall")
+            .or_else(|| self.calling_conventions.get("__cdecl"))
+    }
+
+    /// Return the calling convention associated to the given extern symbol.
+    /// If the extern symbol has no annotated calling convention
+    /// then return the standard calling convention of the project instead.
+    ///
+    /// This function panics if no suitable calling convention is found.
+    pub fn get_calling_convention(&self, extern_symbol: &ExternSymbol) -> &CallingConvention {
+        if let Some(cconv_name) = &extern_symbol.calling_convention {
+            self.calling_conventions.get(cconv_name).unwrap()
+        } else {
+            self.get_standard_calling_convention().unwrap()
+        }
     }
 }
 
@@ -232,7 +244,7 @@ mod tests {
                 },
                 cpu_architecture: "x86_64".to_string(),
                 stack_pointer_register: Variable::mock("RSP", 8u64),
-                calling_conventions: Vec::new(),
+                calling_conventions: BTreeMap::new(),
                 register_list,
                 datatype_properties: DatatypeProperties::mock(),
             }
