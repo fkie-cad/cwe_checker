@@ -149,7 +149,7 @@ fn backward_fixpoint() {
             is_temp: false,
         },
         calling_conventions: BTreeMap::new(),
-        register_list: Vec::new(),
+        register_set: BTreeSet::new(),
         datatype_properties: DatatypeProperties::mock(),
     };
 

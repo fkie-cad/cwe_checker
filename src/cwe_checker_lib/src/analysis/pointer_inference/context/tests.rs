@@ -98,7 +98,7 @@ fn mock_project() -> (Project, Config) {
         return_register: vec!["RDX".to_string()],
         callee_saved_register: vec!["callee_saved_reg".to_string()],
     };
-    let register_list = vec!["RAX", "RCX", "RDX", "RBX", "RSP", "RBP", "RSI", "RDI"]
+    let register_set = vec!["RAX", "RCX", "RDX", "RBX", "RSP", "RBP", "RSI", "RDI"]
         .into_iter()
         .map(|name| Variable::mock(name, ByteSize::new(8)))
         .collect();
@@ -108,7 +108,7 @@ fn mock_project() -> (Project, Config) {
             cpu_architecture: "x86_64".to_string(),
             stack_pointer_register: register("RSP"),
             calling_conventions: BTreeMap::from_iter([(cconv.name.clone(), cconv)]),
-            register_list,
+            register_set,
             datatype_properties: DatatypeProperties::mock(),
         },
         Config {

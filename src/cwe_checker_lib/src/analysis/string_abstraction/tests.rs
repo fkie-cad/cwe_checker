@@ -610,7 +610,7 @@ pub fn mock_project_with_intraprocedural_control_flow(
     program.extern_symbols.insert(malloc.tid.clone(), malloc);
     program.entry_points.insert(Tid::new(sub_name));
 
-    let register_list = ["r0", "r1", "r2", "r3", "r11", "sp"]
+    let register_set = ["r0", "r1", "r2", "r3", "r11", "sp"]
         .iter()
         .map(|name| Variable::mock(name, ByteSize::new(4)))
         .collect();
@@ -624,7 +624,7 @@ pub fn mock_project_with_intraprocedural_control_flow(
         cpu_architecture: "arm_32".to_string(),
         stack_pointer_register: Variable::mock("sp", 4u64),
         calling_conventions: BTreeMap::from_iter([(cconv.name.clone(), cconv)]),
-        register_list,
+        register_set,
         datatype_properties: DatatypeProperties::mock_standard_arm_32(),
     }
 }

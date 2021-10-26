@@ -1,6 +1,6 @@
 use super::*;
 use crate::utils::log::LogMessage;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 mod block_duplication_normalization;
 use block_duplication_normalization::*;
@@ -19,9 +19,9 @@ pub struct Project {
     pub stack_pointer_register: Variable,
     /// The known calling conventions that may be used for calls to extern functions.
     pub calling_conventions: BTreeMap<String, CallingConvention>,
-    /// A list of all known physical registers for the CPU architecture.
+    /// The set of all known physical registers for the CPU architecture.
     /// Does only contain base registers, i.e. sub registers of other registers are not contained.
-    pub register_list: Vec<Variable>,
+    pub register_set: BTreeSet<Variable>,
     /// Contains the properties of C data types. (e.g. size)
     pub datatype_properties: DatatypeProperties,
 }
@@ -236,7 +236,7 @@ mod tests {
 
     impl Project {
         pub fn mock_empty() -> Project {
-            let register_list = vec!["RAX", "RCX", "RDX", "RBX", "RSP", "RBP", "RSI", "RDI"]
+            let register_set = vec!["RAX", "RCX", "RDX", "RBX", "RSP", "RBP", "RSI", "RDI"]
                 .into_iter()
                 .map(|name| Variable::mock(name, ByteSize::new(8)))
                 .collect();
@@ -248,7 +248,7 @@ mod tests {
                 cpu_architecture: "x86_64".to_string(),
                 stack_pointer_register: Variable::mock("RSP", 8u64),
                 calling_conventions: BTreeMap::new(),
-                register_list,
+                register_set,
                 datatype_properties: DatatypeProperties::mock(),
             }
         }

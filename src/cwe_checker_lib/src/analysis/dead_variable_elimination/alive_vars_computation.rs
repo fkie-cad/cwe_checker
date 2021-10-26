@@ -1,11 +1,10 @@
-use std::collections::HashSet;
-
 use crate::analysis::graph::Graph;
 use crate::intermediate_representation::*;
+use std::collections::BTreeSet;
 
 /// Given the variables that are alive after execution of the given `Def` term,
 /// modify the set of variables to the ones that are alive before the execution of the `Def` term.
-pub fn update_alive_vars_by_def(alive_variables: &mut HashSet<Variable>, def: &Term<Def>) {
+pub fn update_alive_vars_by_def(alive_variables: &mut BTreeSet<Variable>, def: &Term<Def>) {
     match &def.term {
         Def::Assign { var, value } => {
             if alive_variables.contains(var) {
@@ -44,23 +43,22 @@ pub struct Context<'a> {
     /// This is the set of registers that are assumed to be alive at call/return instructions
     /// and all other places in the control flow graph,
     /// where the next instruction to be executed may not be known.
-    pub all_physical_registers: HashSet<Variable>,
+    pub all_physical_registers: &'a BTreeSet<Variable>,
 }
 
 impl<'a> Context<'a> {
     /// Create a new context object for the given project and reversed control flow graph.
     pub fn new(project: &'a Project, graph: &'a Graph) -> Context<'a> {
-        let all_physical_registers = project.register_list.iter().cloned().collect();
         Context {
             graph,
-            all_physical_registers,
+            all_physical_registers: &project.register_set,
         }
     }
 }
 
 impl<'a> crate::analysis::backward_interprocedural_fixpoint::Context<'a> for Context<'a> {
     /// The value at each node is the set of variables that are known to be alive.
-    type Value = HashSet<Variable>;
+    type Value = BTreeSet<Variable>;
 
     /// Get the reversed control flow graph on which the fixpoint computation operates.
     fn get_graph(&self) -> &Graph<'a> {

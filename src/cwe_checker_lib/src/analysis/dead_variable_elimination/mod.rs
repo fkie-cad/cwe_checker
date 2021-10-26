@@ -5,7 +5,7 @@ use crate::analysis::backward_interprocedural_fixpoint::create_computation;
 use crate::analysis::graph::Node;
 use crate::analysis::interprocedural_fixpoint_generic::NodeValue;
 use crate::intermediate_representation::*;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap};
 
 mod alive_vars_computation;
 use alive_vars_computation::*;
@@ -13,7 +13,7 @@ use alive_vars_computation::*;
 /// Compute alive variables by means of an intraprocedural fixpoint computation.
 /// Returns a map that assigns to each basic block `Tid` the set of all variables
 /// that are alive at the end of the basic block.
-pub fn compute_alive_vars(project: &Project) -> HashMap<Tid, HashSet<Variable>> {
+pub fn compute_alive_vars(project: &Project) -> HashMap<Tid, BTreeSet<Variable>> {
     let extern_subs = project
         .program
         .term
@@ -59,18 +59,18 @@ pub fn compute_alive_vars(project: &Project) -> HashMap<Tid, HashSet<Variable>> 
                     }
                     computation.set_node_value(node, NodeValue::Value(alive_vars));
                 } else {
-                    computation.set_node_value(node, NodeValue::Value(HashSet::new()))
+                    computation.set_node_value(node, NodeValue::Value(BTreeSet::new()))
                 }
             }
             Node::CallReturn { .. } => {
-                computation.set_node_value(node, NodeValue::Value(HashSet::new()));
+                computation.set_node_value(node, NodeValue::Value(BTreeSet::new()));
             }
             Node::CallSource { .. } => {
                 computation.set_node_value(
                     node,
                     NodeValue::CallFlowCombinator {
-                        call_stub: Some(HashSet::new()),
-                        interprocedural_flow: Some(HashSet::new()),
+                        call_stub: Some(BTreeSet::new()),
+                        interprocedural_flow: Some(BTreeSet::new()),
                     },
                 );
             }
@@ -100,7 +100,7 @@ pub fn compute_alive_vars(project: &Project) -> HashMap<Tid, HashSet<Variable>> 
 /// An assignment is considered dead if the register is not read before its value is overwritten by another assignment.
 fn remove_dead_var_assignments_of_block(
     block: &mut Term<Blk>,
-    alive_vars_map: &HashMap<Tid, HashSet<Variable>>,
+    alive_vars_map: &HashMap<Tid, BTreeSet<Variable>>,
 ) {
     let mut alive_vars = alive_vars_map.get(&block.tid).unwrap().clone();
     let mut cleaned_defs = Vec::new();

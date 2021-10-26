@@ -783,7 +783,7 @@ impl Project {
                 });
             }
         }
-        let register_list = self
+        let register_set = self
             .register_properties
             .iter()
             .filter_map(|reg| {
@@ -804,7 +804,7 @@ impl Project {
                 .into_iter()
                 .map(|cconv| (cconv.name.clone(), cconv.into()))
                 .collect(),
-            register_list,
+            register_set,
             datatype_properties: self.datatype_properties.clone(),
         }
     }
