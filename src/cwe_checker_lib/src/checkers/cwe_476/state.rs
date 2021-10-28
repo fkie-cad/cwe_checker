@@ -255,26 +255,23 @@ impl State {
     /// Return `true` if taint was found and `false` if no taint was found.
     fn check_register_list_for_taint(
         &self,
-        register_list: &[String],
+        register_list: &[Variable],
         pi_state_option: Option<&PointerInferenceState>,
     ) -> bool {
         // Check whether a register contains taint
-        for (register, taint) in &self.register_taint {
-            if register_list
-                .iter()
-                .any(|reg_name| *reg_name == register.name)
-                && !taint.is_top()
-            {
-                return true;
+        for register in register_list {
+            if let Some(taint) = self.register_taint.get(register) {
+                if !taint.is_top() {
+                    return true;
+                }
             }
         }
         // Check whether some memory object referenced by a register may contain taint
         if let Some(pi_state) = pi_state_option {
-            for register_name in register_list {
-                if let Some(register_value) = pi_state.get_register_by_name(register_name) {
-                    if self.check_if_address_points_to_taint(register_value, pi_state) {
-                        return true;
-                    }
+            for register in register_list {
+                let register_value = pi_state.get_register(register);
+                if self.check_if_address_points_to_taint(register_value, pi_state) {
+                    return true;
                 }
             }
         }
@@ -324,7 +321,7 @@ impl State {
                 if calling_conv
                     .callee_saved_register
                     .iter()
-                    .any(|callee_saved_reg| register.name == *callee_saved_reg)
+                    .any(|callee_saved_reg| register == callee_saved_reg)
                 {
                     Some((register.clone(), *taint))
                 } else {

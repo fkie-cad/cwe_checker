@@ -74,15 +74,10 @@ impl State {
     pub fn new_with_generic_parameter_objects(
         stack_register: &Variable,
         function_tid: Tid,
-        params: &[String],
+        params: &[Variable],
     ) -> State {
         let mut state = State::new(stack_register, function_tid.clone());
-        for param_name in params {
-            let param = Variable {
-                name: param_name.clone(),
-                size: stack_register.size,
-                is_temp: false,
-            };
+        for param in params {
             let param_id = AbstractIdentifier::new(
                 function_tid.clone(),
                 AbstractLocation::from_var(&param).unwrap(),
@@ -94,11 +89,8 @@ impl State {
                 stack_register.size,
             );
             state.set_register(
-                &param,
-                DataDomain::from_target(
-                    param_id,
-                    Bitvector::zero(stack_register.size.into()).into(),
-                ),
+                param,
+                DataDomain::from_target(param_id, Bitvector::zero(param.size.into()).into()),
             )
         }
         state
@@ -135,18 +127,15 @@ impl State {
     /// Clear all non-callee-saved registers from the state.
     /// This automatically also removes all virtual registers.
     /// The parameter is a list of callee-saved register names.
-    pub fn clear_non_callee_saved_register(&mut self, callee_saved_register_names: &[String]) {
-        let register = self
-            .register
+    pub fn clear_non_callee_saved_register(&mut self, callee_saved_register: &[Variable]) {
+        let register = callee_saved_register
             .iter()
-            .filter_map(|(register, value)| {
-                if callee_saved_register_names
-                    .iter()
-                    .any(|reg_name| **reg_name == register.name)
-                {
-                    Some((register.clone(), value.clone()))
-                } else {
+            .filter_map(|var| {
+                let value = self.get_register(var);
+                if value.is_top() {
                     None
+                } else {
+                    Some((var.clone(), value))
                 }
             })
             .collect();
@@ -268,32 +257,19 @@ impl State {
         cconv: &CallingConvention,
         stack_register: &Variable,
     ) {
-        for (register, value) in caller_state.register.iter() {
-            if register != stack_register
-                && cconv
-                    .callee_saved_register
-                    .iter()
-                    .any(|reg_name| *reg_name == register.name)
-            {
-                self.set_register(register, value.clone());
-            }
+        for register in cconv
+            .callee_saved_register
+            .iter()
+            .filter(|reg| *reg != stack_register)
+        {
+            self.set_register(register, caller_state.get_register(register));
         }
     }
 
     /// Remove all knowledge about the contents of callee-saved registers from the state.
     pub fn remove_callee_saved_register(&mut self, cconv: &CallingConvention) {
-        let mut register_to_remove = Vec::new();
-        for register in self.register.keys() {
-            if cconv
-                .callee_saved_register
-                .iter()
-                .any(|reg_name| *reg_name == register.name)
-            {
-                register_to_remove.push(register.clone());
-            }
-        }
-        for register in register_to_remove {
-            self.register.remove(&register);
+        for register in &cconv.callee_saved_register {
+            self.register.remove(register);
         }
     }
 }

@@ -1120,12 +1120,9 @@ fn test_check_def_for_null_dereferences() {
 
 #[test]
 fn test_new_with_generic_parameter_objects() {
-    let param_names = vec!["param1".to_string(), "param2".to_string()];
-    let state = State::new_with_generic_parameter_objects(
-        &register("RSP"),
-        Tid::new("func_tid"),
-        &param_names,
-    );
+    let params = vec![Variable::mock("param1", 8), Variable::mock("param2", 8)];
+    let state =
+        State::new_with_generic_parameter_objects(&register("RSP"), Tid::new("func_tid"), &params);
     assert_eq!(state.memory.get_num_objects(), 3);
     assert!(state.get_register_by_name("param1").is_some());
     assert!(state.get_register_by_name("param2").is_some());

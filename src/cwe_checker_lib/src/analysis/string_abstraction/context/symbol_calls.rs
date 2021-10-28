@@ -39,10 +39,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
         if let Some(standard_cconv) = self.project.get_standard_calling_convention() {
             let mut filtered_map = state.get_variable_to_pointer_map().clone();
             for (register, _) in state.get_variable_to_pointer_map().clone().iter() {
-                if !standard_cconv
-                    .callee_saved_register
-                    .contains(&register.name)
-                {
+                if !standard_cconv.callee_saved_register.contains(&register) {
                     filtered_map.remove(register);
                 }
             }

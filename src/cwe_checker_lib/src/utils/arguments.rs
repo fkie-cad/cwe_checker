@@ -181,12 +181,13 @@ pub fn calculate_parameter_locations(
         match data_type {
             Datatype::Integer | Datatype::Pointer | Datatype::Char => {
                 if integer_arg_register_count > 0 {
-                    let register_name = calling_convention.integer_parameter_register
-                        [calling_convention.integer_parameter_register.len()
-                            - integer_arg_register_count]
+                    let register = calling_convention.integer_parameter_register[calling_convention
+                        .integer_parameter_register
+                        .len()
+                        - integer_arg_register_count]
                         .clone();
 
-                    var_args.push(create_register_arg(*size, register_name, data_type.clone()));
+                    var_args.push(create_register_arg(register, data_type.clone()));
 
                     integer_arg_register_count -= 1;
                 } else {
@@ -196,12 +197,13 @@ pub fn calculate_parameter_locations(
             }
             Datatype::Double => {
                 if float_arg_register_count > 0 {
-                    let register_name = calling_convention.float_parameter_register
-                        [calling_convention.float_parameter_register.len()
-                            - float_arg_register_count]
+                    let register = calling_convention.float_parameter_register[calling_convention
+                        .float_parameter_register
+                        .len()
+                        - float_arg_register_count]
                         .clone();
 
-                    var_args.push(create_register_arg(*size, register_name, data_type.clone()));
+                    var_args.push(create_register_arg(register, data_type.clone()));
 
                     float_arg_register_count -= 1;
                 } else {
@@ -226,13 +228,9 @@ pub fn create_stack_arg(size: ByteSize, stack_offset: i64, data_type: Datatype) 
 }
 
 /// Creates a register parameter given a size, register name and data type.
-pub fn create_register_arg(size: ByteSize, register_name: String, data_type: Datatype) -> Arg {
+pub fn create_register_arg(register: Variable, data_type: Datatype) -> Arg {
     Arg::Register {
-        var: Variable {
-            name: register_name,
-            size,
-            is_temp: false,
-        },
+        var: register,
         data_type: Some(data_type),
     }
 }

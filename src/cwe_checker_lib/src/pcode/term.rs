@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::usize;
 
 use super::{Expression, ExpressionType, RegisterProperties, Variable};
@@ -14,6 +14,7 @@ use crate::intermediate_representation::Jmp as IrJmp;
 use crate::intermediate_representation::Program as IrProgram;
 use crate::intermediate_representation::Project as IrProject;
 use crate::intermediate_representation::Sub as IrSub;
+use crate::intermediate_representation::Variable as IrVariable;
 use crate::prelude::*;
 use crate::utils::log::LogMessage;
 
@@ -646,14 +647,20 @@ pub struct CallingConvention {
     killed_by_call_register: Vec<String>,
 }
 
-impl From<CallingConvention> for IrCallingConvention {
-    fn from(cconv: CallingConvention) -> IrCallingConvention {
+impl CallingConvention {
+    /// Convert a calling convention parsed from Ghidra to the internally used IR.
+    fn to_ir_cconv(self, register_map: &BTreeMap<String, IrVariable>) -> IrCallingConvention {
+        let to_ir_var_list = |list: Vec<String>| {
+            list.into_iter()
+                .map(|register_name| register_map.get(&register_name).cloned().unwrap())
+                .collect()
+        };
         IrCallingConvention {
-            name: cconv.name,
-            integer_parameter_register: cconv.integer_parameter_register,
-            float_parameter_register: cconv.float_parameter_register,
-            return_register: cconv.return_register,
-            callee_saved_register: cconv.unaffected_register,
+            name: self.name,
+            integer_parameter_register: to_ir_var_list(self.integer_parameter_register),
+            float_parameter_register: to_ir_var_list(self.float_parameter_register),
+            return_register: to_ir_var_list(self.return_register),
+            callee_saved_register: to_ir_var_list(self.unaffected_register),
         }
     }
 }
@@ -783,27 +790,29 @@ impl Project {
                 });
             }
         }
-        let register_set = self
+        let register_map: BTreeMap<String, IrVariable> = self
             .register_properties
             .iter()
             .filter_map(|reg| {
                 if reg.register == reg.base_register {
-                    Some(reg.into())
+                    Some((reg.register.clone(), reg.into()))
                 } else {
                     None
                 }
             })
             .collect();
+        let calling_conventions = self
+            .register_calling_convention
+            .clone()
+            .into_iter()
+            .map(|cconv| (cconv.name.clone(), cconv.to_ir_cconv(&register_map)))
+            .collect();
+        let register_set = register_map.into_values().collect();
         IrProject {
             program,
             cpu_architecture: self.cpu_architecture,
             stack_pointer_register: self.stack_pointer_register.into(),
-            calling_conventions: self
-                .register_calling_convention
-                .clone()
-                .into_iter()
-                .map(|cconv| (cconv.name.clone(), cconv.into()))
-                .collect(),
+            calling_conventions,
             register_set,
             datatype_properties: self.datatype_properties.clone(),
         }

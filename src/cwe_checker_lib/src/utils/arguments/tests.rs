@@ -30,8 +30,8 @@ fn test_get_variable_parameters() {
     );
     let mut project = Project::mock_empty();
     let cconv = CallingConvention::mock_with_parameter_registers(
-        vec!["RDI".to_string()],
-        vec!["XMM0".to_string()],
+        vec![Variable::mock("RDI", 8)],
+        vec![Variable::mock("XMM0", 16)],
     );
     project.calling_conventions = BTreeMap::from_iter([(cconv.name.clone(), cconv)]);
 
@@ -182,12 +182,12 @@ fn test_parse_format_string_parameters() {
 fn test_calculate_parameter_locations() {
     let cconv = CallingConvention::mock_with_parameter_registers(
         vec![
-            "RDI".to_string(),
-            "RSI".to_string(),
-            "R8".to_string(),
-            "R9".to_string(),
+            Variable::mock("RDI", 8),
+            Variable::mock("RSI", 8),
+            Variable::mock("R8", 8),
+            Variable::mock("R9", 8),
         ],
-        vec!["XMM0".to_string()],
+        vec![Variable::mock("XMM0", 16)],
     );
     let format_string_index: usize = 1;
     let mut parameters: Vec<(Datatype, ByteSize)> = Vec::new();
@@ -240,15 +240,4 @@ fn test_create_stack_arg() {
         },
         create_stack_arg(ByteSize::new(8), 8, Datatype::Pointer),
     )
-}
-
-#[test]
-fn test_create_register_arg() {
-    assert_eq!(
-        Arg::Register {
-            var: Variable::mock("R9", ByteSize::new(8)),
-            data_type: Some(Datatype::Pointer),
-        },
-        create_register_arg(ByteSize::new(8), "R9".to_string(), Datatype::Pointer),
-    );
 }

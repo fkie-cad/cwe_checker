@@ -40,6 +40,14 @@ pub enum Arg {
 }
 
 impl Arg {
+    /// Generate a new register argument.
+    pub fn from_var(var: Variable, data_type_hint: Option<Datatype>) -> Arg {
+        Arg::Register {
+            var,
+            data_type: data_type_hint,
+        }
+    }
+
     /// Returns the data type field of an Arg object.
     pub fn get_data_type(&self) -> Option<Datatype> {
         match self {
@@ -108,14 +116,14 @@ pub struct CallingConvention {
     #[serde(rename = "calling_convention")]
     pub name: String,
     /// Possible integer parameter registers.
-    pub integer_parameter_register: Vec<String>,
+    pub integer_parameter_register: Vec<Variable>,
     /// Possible float parameter registers.
-    pub float_parameter_register: Vec<String>,
+    pub float_parameter_register: Vec<Variable>,
     /// A list of possible return register
-    pub return_register: Vec<String>,
+    pub return_register: Vec<Variable>,
     /// A list of callee-saved register,
     /// i.e. the values of these registers should be the same after the call as they were before the call.
-    pub callee_saved_register: Vec<String>,
+    pub callee_saved_register: Vec<Variable>,
 }
 
 #[cfg(test)]
@@ -138,23 +146,23 @@ mod tests {
         pub fn mock() -> CallingConvention {
             CallingConvention {
                 name: "__stdcall".to_string(), // so that the mock is useable as standard calling convention in tests
-                integer_parameter_register: vec!["RDI".to_string()],
-                float_parameter_register: vec!["XMMO".to_string()],
-                return_register: vec!["RAX".to_string()],
-                callee_saved_register: vec!["RBP".to_string()],
+                integer_parameter_register: vec![Variable::mock("RDI", 8)],
+                float_parameter_register: vec![Variable::mock("XMMO", 16)],
+                return_register: vec![Variable::mock("RAX", 8)],
+                callee_saved_register: vec![Variable::mock("RBP", 8)],
             }
         }
 
         pub fn mock_with_parameter_registers(
-            integer_parameter_register: Vec<String>,
-            float_parameter_register: Vec<String>,
+            integer_parameter_register: Vec<Variable>,
+            float_parameter_register: Vec<Variable>,
         ) -> CallingConvention {
             CallingConvention {
                 name: "__stdcall".to_string(), // so that the mock is useable as standard calling convention in tests
                 integer_parameter_register,
                 float_parameter_register,
-                return_register: vec!["RAX".to_string()],
-                callee_saved_register: vec!["RBP".to_string()],
+                return_register: vec![Variable::mock("RAX", 8)],
+                callee_saved_register: vec![Variable::mock("RBP", 8)],
             }
         }
     }

@@ -430,14 +430,13 @@ impl<'a> Context<'a> {
             // We assume here that we do not know the parameters and approximate them by all possible parameter registers.
             // This approximation is wrong if the function is known but has neither parameters nor return values.
             // We cannot distinguish these two cases yet.
-            for parameter_register_name in calling_conv
+            for parameter_register in calling_conv
                 .integer_parameter_register
                 .iter()
                 .chain(calling_conv.float_parameter_register.iter())
             {
-                if let Some(register_value) = state.get_register_by_name(parameter_register_name) {
-                    possible_referenced_ids.extend(register_value.referenced_ids().cloned());
-                }
+                let register_value = state.get_register(parameter_register);
+                possible_referenced_ids.extend(register_value.referenced_ids().cloned());
             }
         } else {
             for parameter in extern_symbol.parameters.iter() {
@@ -475,16 +474,13 @@ impl<'a> Context<'a> {
             self.adjust_stack_register_on_extern_call(state_before_call, &mut new_state);
 
             let mut possible_referenced_ids = BTreeSet::new();
-            for parameter_register_name in calling_conv
+            for parameter_register in calling_conv
                 .integer_parameter_register
                 .iter()
                 .chain(calling_conv.float_parameter_register.iter())
             {
-                if let Some(register_value) =
-                    state_before_call.get_register_by_name(parameter_register_name)
-                {
-                    possible_referenced_ids.extend(register_value.referenced_ids().cloned());
-                }
+                let register_value = state_before_call.get_register(parameter_register);
+                possible_referenced_ids.extend(register_value.referenced_ids().cloned());
             }
             possible_referenced_ids =
                 state_before_call.add_recursively_referenced_ids_to_id_set(possible_referenced_ids);

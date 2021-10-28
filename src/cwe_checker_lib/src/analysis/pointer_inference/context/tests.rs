@@ -93,10 +93,10 @@ fn mock_project() -> (Project, Config) {
     };
     let cconv = CallingConvention {
         name: "__cdecl".to_string(),
-        integer_parameter_register: vec!["RDX".to_string()],
-        float_parameter_register: vec!["XMM0".to_string()],
-        return_register: vec!["RDX".to_string()],
-        callee_saved_register: vec!["callee_saved_reg".to_string()],
+        integer_parameter_register: vec![Variable::mock("RDX", 8)],
+        float_parameter_register: vec![Variable::mock("XMM0", 16)],
+        return_register: vec![Variable::mock("RDX", 8)],
+        callee_saved_register: vec![Variable::mock("callee_saved_reg", 8)],
     };
     let register_set = vec!["RAX", "RCX", "RDX", "RBX", "RSP", "RBP", "RSI", "RDI"]
         .into_iter()

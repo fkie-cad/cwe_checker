@@ -495,14 +495,14 @@ impl CallingConvention {
             name: "__stdcall".to_string(), // so that the mock is useable as standard calling convention in tests
             integer_parameter_register: ["r0", "r1", "r2", "r3"]
                 .iter()
-                .map(|s| s.to_string())
+                .map(|s| Variable::mock(s, 4))
                 .collect(),
             float_parameter_register: ["s0", "s1", "s2", "s3"]
                 .iter()
-                .map(|s| s.to_string())
+                .map(|s| Variable::mock(s, 4))
                 .collect(),
-            return_register: vec!["r0".to_string()],
-            callee_saved_register: vec!["r11".to_string()],
+            return_register: vec![Variable::mock("r0", 4)],
+            callee_saved_register: vec![Variable::mock("r11", 4)],
         }
     }
 }
