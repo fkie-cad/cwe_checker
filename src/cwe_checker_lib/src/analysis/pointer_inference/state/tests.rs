@@ -1124,6 +1124,6 @@ fn test_new_with_generic_parameter_objects() {
     let state =
         State::new_with_generic_parameter_objects(&register("RSP"), Tid::new("func_tid"), &params);
     assert_eq!(state.memory.get_num_objects(), 3);
-    assert!(state.get_register_by_name("param1").is_some());
-    assert!(state.get_register_by_name("param2").is_some());
+    assert!(!state.get_register(&Variable::mock("param1", 8)).is_top());
+    assert!(!state.get_register(&Variable::mock("param1", 8)).is_top());
 }

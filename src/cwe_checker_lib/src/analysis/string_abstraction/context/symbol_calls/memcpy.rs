@@ -384,14 +384,12 @@ mod tests {
 
         let return_targets = setup
             .pi_state_before_symbol_call
-            .get_register_by_name("r0")
-            .unwrap();
+            .get_register(&Variable::mock("r0", 4));
 
         let input_target: DataDomain<IntervalDomain> = DataDomain::from(
             setup
                 .pi_state_before_symbol_call
-                .get_register_by_name("r1")
-                .unwrap()
+                .get_register(&Variable::mock("r1", 4))
                 .get_absolute_value()
                 .unwrap()
                 .clone(),
@@ -430,16 +428,14 @@ mod tests {
 
         let return_targets = setup
             .pi_state_before_symbol_call
-            .get_register_by_name("r0")
-            .unwrap()
+            .get_register(&Variable::mock("r0", 4))
             .get_relative_values()
             .clone();
 
         let input_target: DataDomain<IntervalDomain> = DataDomain::from(
             setup
                 .pi_state_before_symbol_call
-                .get_register_by_name("r1")
-                .unwrap()
+                .get_register(&Variable::mock("r1", 4))
                 .get_absolute_value()
                 .unwrap()
                 .clone(),

@@ -14,19 +14,6 @@ impl State {
         }
     }
 
-    /// Get the value of a register by its name.
-    ///
-    /// Returns None if no value is set for the register.
-    pub fn get_register_by_name(&self, reg_name: &str) -> Option<Data> {
-        self.register.iter().find_map(|(key, value)| {
-            if key.name == reg_name {
-                Some(value.clone())
-            } else {
-                None
-            }
-        })
-    }
-
     /// Set the value of a register.
     pub fn set_register(&mut self, variable: &Variable, value: Data) {
         if !value.is_top() {
