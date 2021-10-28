@@ -614,7 +614,7 @@ impl<T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> State<T> 
         let cconv = project.get_calling_convention(extern_symbol);
         let mut filtered_map = self.variable_to_pointer_map.clone();
         for (register, _) in self.variable_to_pointer_map.clone().iter() {
-            if !cconv.callee_saved_register.contains(&register) {
+            if !cconv.callee_saved_register.contains(register) {
                 if let Some(pointer) = filtered_map.remove(register) {
                     self.unassigned_return_pointer.insert(pointer);
                 }

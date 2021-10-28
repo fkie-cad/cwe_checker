@@ -80,7 +80,7 @@ impl State {
         for param in params {
             let param_id = AbstractIdentifier::new(
                 function_tid.clone(),
-                AbstractLocation::from_var(&param).unwrap(),
+                AbstractLocation::from_var(param).unwrap(),
             );
             state.memory.add_abstract_object(
                 param_id.clone(),

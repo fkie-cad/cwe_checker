@@ -649,7 +649,7 @@ pub struct CallingConvention {
 
 impl CallingConvention {
     /// Convert a calling convention parsed from Ghidra to the internally used IR.
-    fn to_ir_cconv(self, register_map: &BTreeMap<String, IrVariable>) -> IrCallingConvention {
+    fn into_ir_cconv(self, register_map: &BTreeMap<String, IrVariable>) -> IrCallingConvention {
         let to_ir_var_list = |list: Vec<String>| {
             list.into_iter()
                 .map(|register_name| register_map.get(&register_name).cloned().unwrap())
@@ -805,7 +805,7 @@ impl Project {
             .register_calling_convention
             .clone()
             .into_iter()
-            .map(|cconv| (cconv.name.clone(), cconv.to_ir_cconv(&register_map)))
+            .map(|cconv| (cconv.name.clone(), cconv.into_ir_cconv(&register_map)))
             .collect();
         let register_set = register_map.into_values().collect();
         IrProject {
