@@ -438,6 +438,29 @@ fn def_deserialization() {
 }
 
 #[test]
+fn def_deserialization_issue_247_regression_test() {
+    let def: Def = serde_json::from_str(
+        r#"{
+        "lhs": {
+          "address": "15f0499e",
+          "size": 2,
+          "is_virtual": false
+        },
+        "rhs": {
+          "mnemonic": "TRUNC",
+          "input0": {
+            "name": "$U5df80",
+            "size": 10,
+            "is_virtual": true
+          }
+        }
+      }"#,
+    )
+    .unwrap();
+    let _: IrDef = def.into_ir_def(ByteSize::new(8));
+}
+
+#[test]
 fn label_deserialization() {
     let _: Label = serde_json::from_str(
         r#"

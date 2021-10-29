@@ -141,45 +141,48 @@ impl Def {
     pub fn into_ir_def(self, generic_pointer_size: ByteSize) -> IrDef {
         use super::ExpressionType::*;
         match self.rhs.mnemonic {
-            LOAD => IrDef::Load {
-                var: self.lhs.unwrap().into(),
-                address: self.rhs.input1.unwrap().into(),
-            },
-            STORE => IrDef::Store {
-                address: self.rhs.input1.unwrap().into(),
-                value: self.rhs.input2.unwrap().into(),
-            },
-            SUBPIECE => IrDef::Assign {
-                var: self.lhs.clone().unwrap().into(),
-                value: IrExpression::Subpiece {
-                    low_byte: self.rhs.input1.unwrap().parse_to_bytesize(),
-                    size: self.lhs.unwrap().size,
-                    arg: Box::new(self.rhs.input0.unwrap().into()),
-                },
-            },
-            INT_ZEXT | INT_SEXT | INT2FLOAT | FLOAT2FLOAT | TRUNC | POPCOUNT => IrDef::Assign {
-                var: self.lhs.clone().unwrap().into(),
-                value: IrExpression::Cast {
-                    op: self.rhs.mnemonic.into(),
-                    size: self.lhs.unwrap().size,
-                    arg: Box::new(self.rhs.input0.unwrap().into()),
-                },
-            },
-            _ => {
-                let target_var = self.lhs.unwrap();
-                if target_var.address.is_some() {
-                    IrDef::Store {
-                        address: IrExpression::Const(
-                            target_var.parse_address_to_bitvector(generic_pointer_size),
-                        ),
-                        value: self.rhs.into(),
-                    }
-                } else {
-                    IrDef::Assign {
-                        var: target_var.into(),
-                        value: self.rhs.into(),
-                    }
+            LOAD => {
+                return IrDef::Load {
+                    var: self.lhs.unwrap().into(),
+                    address: self.rhs.input1.unwrap().into(),
                 }
+            }
+            STORE => {
+                return IrDef::Store {
+                    address: self.rhs.input1.unwrap().into(),
+                    value: self.rhs.input2.unwrap().into(),
+                }
+            }
+            _ => (),
+        }
+        let target_var = self.lhs.unwrap();
+        let value = match self.rhs.mnemonic {
+            LOAD | STORE => unreachable!(),
+            SUBPIECE => IrExpression::Subpiece {
+                low_byte: self.rhs.input1.unwrap().parse_to_bytesize(),
+                size: target_var.size,
+                arg: Box::new(self.rhs.input0.unwrap().into()),
+            },
+            INT_ZEXT | INT_SEXT | INT2FLOAT | FLOAT2FLOAT | TRUNC | POPCOUNT => {
+                IrExpression::Cast {
+                    op: self.rhs.mnemonic.into(),
+                    size: target_var.size,
+                    arg: Box::new(self.rhs.input0.unwrap().into()),
+                }
+            }
+            _ => self.rhs.into(),
+        };
+        if target_var.address.is_some() {
+            IrDef::Store {
+                address: IrExpression::Const(
+                    target_var.parse_address_to_bitvector(generic_pointer_size),
+                ),
+                value,
+            }
+        } else {
+            IrDef::Assign {
+                var: target_var.into(),
+                value,
             }
         }
     }
