@@ -178,8 +178,8 @@ impl<'a> Context<'a> {
     ) -> bool {
         // First check for taint directly in parameter registers (we don't need a pointer inference state for that)
         for parameter in extern_symbol.parameters.iter() {
-            if let Arg::Register { var, .. } = parameter {
-                if state.eval(&Expression::Var(var.clone())).is_tainted() {
+            if let Arg::Register { expr, .. } = parameter {
+                if state.eval(expr).is_tainted() {
                     return true;
                 }
             }
@@ -190,28 +190,22 @@ impl<'a> Context<'a> {
             // Check stack parameters and collect referenced memory object that need to be checked for taint.
             for parameter in extern_symbol.parameters.iter() {
                 match parameter {
-                    Arg::Register { var, .. } => {
-                        let data = pi_state.eval(&Expression::Var(var.clone()));
+                    Arg::Register { expr, .. } => {
+                        let data = pi_state.eval(expr);
                         if state.check_if_address_points_to_taint(data, pi_state) {
                             return true;
                         }
                     }
-                    Arg::Stack { offset, size, .. } => {
-                        let stack_address = pi_state.eval(
-                            &Expression::Var(self.project.stack_pointer_register.clone())
-                                .plus_const(*offset),
-                        );
+                    Arg::Stack { address, size, .. } => {
                         if state
-                            .load_taint_from_memory(&stack_address, *size)
+                            .load_taint_from_memory(&pi_state.eval(address), *size)
                             .is_tainted()
                         {
                             return true;
                         }
-                        if let Ok(stack_param) = pi_state.eval_parameter_arg(
-                            parameter,
-                            &self.project.stack_pointer_register,
-                            self.runtime_memory_image,
-                        ) {
+                        if let Ok(stack_param) =
+                            pi_state.eval_parameter_arg(parameter, self.runtime_memory_image)
+                        {
                             if state.check_if_address_points_to_taint(stack_param, pi_state) {
                                 return true;
                             }

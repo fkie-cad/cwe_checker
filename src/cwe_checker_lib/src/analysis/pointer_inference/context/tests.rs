@@ -16,7 +16,7 @@ fn new_id(time: &str, reg_name: &str) -> AbstractIdentifier {
 
 fn mock_extern_symbol(name: &str) -> (Tid, ExternSymbol) {
     let arg = Arg::Register {
-        var: register("RDX"),
+        expr: Expression::Var(register("RDX")),
         data_type: None,
     };
     let tid = Tid::new("extern_".to_string() + name);
@@ -94,8 +94,9 @@ fn mock_project() -> (Project, Config) {
     let cconv = CallingConvention {
         name: "__cdecl".to_string(),
         integer_parameter_register: vec![Variable::mock("RDX", 8)],
-        float_parameter_register: vec![Variable::mock("XMM0", 16)],
-        return_register: vec![Variable::mock("RDX", 8)],
+        float_parameter_register: vec![Expression::Var(Variable::mock("XMMO", 16))],
+        integer_return_register: vec![Variable::mock("RDX", 8)],
+        float_return_register: vec![],
         callee_saved_register: vec![Variable::mock("callee_saved_reg", 8)],
     };
     let register_set = vec!["RAX", "RCX", "RDX", "RBX", "RSP", "RBP", "RSI", "RDI"]

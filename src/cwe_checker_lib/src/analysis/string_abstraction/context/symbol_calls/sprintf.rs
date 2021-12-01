@@ -24,11 +24,9 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
         let mut new_state = state.clone();
         if let Some(return_arg) = extern_symbol.parameters.first() {
             if let Some(pi_state) = state.get_pointer_inference_state() {
-                if let Ok(return_pointer) = pi_state.eval_parameter_arg(
-                    return_arg,
-                    &self.project.stack_pointer_register,
-                    self.runtime_memory_image,
-                ) {
+                if let Ok(return_pointer) =
+                    pi_state.eval_parameter_arg(return_arg, self.runtime_memory_image)
+                {
                     if !return_pointer.get_relative_values().is_empty() {
                         let format_string_index = self
                             .format_string_index_map
@@ -65,7 +63,6 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
             pi_state,
             extern_symbol,
             format_string_index,
-            &self.project.stack_pointer_register,
             self.runtime_memory_image,
         ) {
             let returned_abstract_domain = self.create_string_domain_for_sprintf_snprintf(
@@ -261,11 +258,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
         pi_state: &PointerInferenceState,
         state: &State<T>,
     ) -> T {
-        if let Ok(data) = pi_state.eval_parameter_arg(
-            arg,
-            &self.project.stack_pointer_register,
-            self.runtime_memory_image,
-        ) {
+        if let Ok(data) = pi_state.eval_parameter_arg(arg, self.runtime_memory_image) {
             let constant_domain: Option<T> = self.fetch_constant_domain_if_available(&data, arg);
             if let Some(generated_domain) = Context::<T>::fetch_subdomains_if_available(
                 &data,

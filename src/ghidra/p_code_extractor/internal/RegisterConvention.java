@@ -14,6 +14,8 @@ public class RegisterConvention {
     private ArrayList<String> floatParameter;
     @SerializedName("return_register")
     private ArrayList<String> return_;
+    @SerializedName("float_return_register")
+    private ArrayList<String> floatReturn;
     @SerializedName("unaffected_register")
     private ArrayList<String> unaffected;
     @SerializedName("killed_by_call_register")
@@ -31,7 +33,8 @@ public class RegisterConvention {
         String cconv, 
         ArrayList<String> integerParameter, 
         ArrayList<String> floatParameter, 
-        ArrayList<String> return_, 
+        ArrayList<String> return_,
+        ArrayList<String> floatReturn,
         ArrayList<String> unaffected, 
         ArrayList<String> killedByCall
     ) {
@@ -39,6 +42,7 @@ public class RegisterConvention {
         this.setIntegerParameter(integerParameter);
         this.setFloatParameter(floatParameter);
         this.setReturn(return_);
+        this.setFloatReturn(floatReturn);
         this.setUnaffected(unaffected);
         this.setKilledByCall(killedByCall);
     }
@@ -73,6 +77,14 @@ public class RegisterConvention {
 
     public void setReturn(ArrayList<String> return_) {
         this.return_ = return_;
+    }
+
+    public ArrayList<String> getFloatReturn() {
+        return floatReturn;
+    }
+
+    public void setFloatReturn(ArrayList<String> floatReturn) {
+        this.floatReturn = floatReturn;
     }
 
     public ArrayList<String> getUnaffected() {

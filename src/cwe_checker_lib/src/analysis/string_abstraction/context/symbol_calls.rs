@@ -217,11 +217,9 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
 
         if let Some(dest_arg) = extern_symbol.parameters.first() {
             if let Some(pi_state) = state.get_pointer_inference_state() {
-                if let Ok(pointer) = pi_state.eval_parameter_arg(
-                    dest_arg,
-                    &self.project.stack_pointer_register,
-                    self.runtime_memory_image,
-                ) {
+                if let Ok(pointer) =
+                    pi_state.eval_parameter_arg(dest_arg, self.runtime_memory_image)
+                {
                     let heap_to_string_map = state.get_heap_to_string_map();
                     for (target, _) in pointer.get_relative_values().iter() {
                         if heap_to_string_map.contains_key(target) {

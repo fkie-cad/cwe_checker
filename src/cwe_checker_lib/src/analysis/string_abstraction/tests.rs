@@ -499,9 +499,10 @@ impl CallingConvention {
                 .collect(),
             float_parameter_register: ["s0", "s1", "s2", "s3"]
                 .iter()
-                .map(|s| Variable::mock(s, 4))
+                .map(|s| Expression::Var(Variable::mock(s, 4)))
                 .collect(),
-            return_register: vec![Variable::mock("r0", 4)],
+            integer_return_register: vec![Variable::mock("r0", 4)],
+            float_return_register: vec![],
             callee_saved_register: vec![Variable::mock("r11", 4)],
         }
     }

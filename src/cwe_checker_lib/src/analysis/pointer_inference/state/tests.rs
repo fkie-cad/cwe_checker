@@ -273,7 +273,7 @@ fn clear_parameters_on_the_stack_on_extern_calls() {
         .unwrap();
     // create an extern symbol which uses the value on the stack as a parameter
     let stack_param = Arg::Stack {
-        offset: 8,
+        address: reg_add("RSP", 8),
         size: ByteSize::new(8),
         data_type: None,
     };
@@ -295,7 +295,7 @@ fn clear_parameters_on_the_stack_on_extern_calls() {
     );
     // clear stack parameter
     state
-        .clear_stack_parameter(&extern_symbol, &register("RSP"), &global_memory)
+        .clear_stack_parameter(&extern_symbol, &global_memory)
         .unwrap();
     // check the value after
     assert_eq!(

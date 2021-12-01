@@ -9,14 +9,6 @@ fn mock_pi_state() -> PointerInferenceState {
 }
 
 #[test]
-fn test_get_return_registers_from_symbol() {
-    assert_eq!(
-        vec!["RAX"],
-        get_return_registers_from_symbol(&ExternSymbol::mock_string())
-    );
-}
-
-#[test]
 fn test_get_variable_parameters() {
     let mem_image = RuntimeMemoryImage::mock();
     let mut pi_state = mock_pi_state();
@@ -37,13 +29,13 @@ fn test_get_variable_parameters() {
 
     let mut output: Vec<Arg> = Vec::new();
     output.push(Arg::Stack {
-        offset: 0,
+        address: Expression::Var(Variable::mock("RSP", 8)),
         size: ByteSize::new(4),
         data_type: Some(Datatype::Char),
     });
 
     output.push(Arg::Stack {
-        offset: 4,
+        address: Expression::Var(Variable::mock("RSP", 8)).plus_const(4),
         size: ByteSize::new(4),
         data_type: Some(Datatype::Integer),
     });
@@ -60,7 +52,7 @@ fn test_get_variable_parameters() {
     );
 
     output = vec![Arg::Stack {
-        offset: 0,
+        address: Expression::Var(Variable::mock("RSP", 8)),
         size: ByteSize::new(8),
         data_type: Some(Datatype::Pointer),
     }];
@@ -98,14 +90,7 @@ fn test_get_input_format_string() {
 
     assert_eq!(
         "Hello World",
-        get_input_format_string(
-            &pi_state,
-            &sprintf_symbol,
-            1,
-            &Variable::mock("RSP", 8 as u64),
-            &mem_image
-        )
-        .unwrap()
+        get_input_format_string(&pi_state, &sprintf_symbol, 1, &mem_image).unwrap()
     );
 }
 
@@ -197,15 +182,15 @@ fn test_calculate_parameter_locations() {
 
     let mut expected_args = vec![
         Arg::Register {
-            var: Variable::mock("R8", ByteSize::new(8)),
+            expr: Expression::Var(Variable::mock("R8", ByteSize::new(8))),
             data_type: Some(Datatype::Integer),
         },
         Arg::Register {
-            var: Variable::mock("XMM0", ByteSize::new(16)),
+            expr: Expression::Var(Variable::mock("XMM0", ByteSize::new(16))),
             data_type: Some(Datatype::Double),
         },
         Arg::Register {
-            var: Variable::mock("R9", ByteSize::new(8)),
+            expr: Expression::Var(Variable::mock("R9", ByteSize::new(8))),
             data_type: Some(Datatype::Pointer),
         },
     ];
@@ -213,12 +198,17 @@ fn test_calculate_parameter_locations() {
     // Test Case 1: The string parameter is still written in the R9 register since 'f' is contained in the float register.
     assert_eq!(
         expected_args,
-        calculate_parameter_locations(parameters.clone(), &cconv, format_string_index)
+        calculate_parameter_locations(
+            parameters.clone(),
+            &cconv,
+            format_string_index,
+            &Variable::mock("RSP", 8)
+        )
     );
 
     parameters.push(("s".to_string().into(), ByteSize::new(8)));
     expected_args.push(Arg::Stack {
-        offset: 0,
+        address: Expression::Var(Variable::mock("RSP", 8)),
         size: ByteSize::new(8),
         data_type: Some(Datatype::Pointer),
     });
@@ -226,7 +216,12 @@ fn test_calculate_parameter_locations() {
     // Test Case 2: A second string parameter does not fit into the registers anymore and is written into the stack.
     assert_eq!(
         expected_args,
-        calculate_parameter_locations(parameters, &cconv, format_string_index)
+        calculate_parameter_locations(
+            parameters,
+            &cconv,
+            format_string_index,
+            &Variable::mock("RSP", 8)
+        )
     );
 }
 
@@ -234,10 +229,15 @@ fn test_calculate_parameter_locations() {
 fn test_create_stack_arg() {
     assert_eq!(
         Arg::Stack {
+            address: Expression::Var(Variable::mock("RSP", 8)).plus_const(8),
             size: ByteSize::new(8),
-            offset: 8,
             data_type: Some(Datatype::Pointer),
         },
-        create_stack_arg(ByteSize::new(8), 8, Datatype::Pointer),
+        create_stack_arg(
+            ByteSize::new(8),
+            8,
+            Datatype::Pointer,
+            &Variable::mock("RSP", 8)
+        ),
     )
 }

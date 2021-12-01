@@ -12,6 +12,9 @@ package internal;
  * 
  * If the correct .cpsec file was found, it iterates over the XML DOM to extract the above mentioned registers.
  * 
+ * TODO: Since Ghidra 10.0 it should be a possible to extract the registers using the Ghidra API without parsing the .cspec file.
+ * See issue 2357 in the Ghidra repository.
+ * We should update the code below accordingly as soon as we bump the minimal Ghidra version to 10.0!
  */
 
 import ghidra.xml.*;
@@ -299,7 +302,7 @@ public class ParseCspecContent {
             } else if (entries.getName().equals("killedbycall")) {
                 convention.setKilledByCall(getRegisters(parser));
             } else if (entries.getName().equals("output")) {
-                convention.setReturn(parseOutput(parser));
+                parseOutput(parser, convention);
             } else {
                 discardSubTree(parser);
             }
@@ -364,15 +367,21 @@ public class ParseCspecContent {
      * 
      * Parses the output and pentry wrapper to access the return register fields
      */
-    public static ArrayList<String> parseOutput(XmlPullParser parser) {
-        ArrayList<String> registers = new ArrayList<String>(); 
+    public static void parseOutput(XmlPullParser parser, RegisterConvention convention) {
+        ArrayList<String> integerRegisters = new ArrayList<String>();
+        ArrayList<String> floatRegisters = new ArrayList<String>();
         parser.start("output");
         while(parser.peek().isStart()) {
+            XmlElement pentry = parser.peek();
             parser.start("pentry");
             XmlElement entry = parser.peek();
             if(entry.getName().equals("register")) {
                 parser.start("register");
-                registers.add(entry.getAttribute("name"));
+                if(isFloatRegister(pentry)) {
+                    floatRegisters.add(entry.getAttribute("name"));
+                } else {
+                    integerRegisters.add(entry.getAttribute("name"));
+                }
                 parser.end();
             } else {
                 discardSubTree(parser);
@@ -381,7 +390,8 @@ public class ParseCspecContent {
         }
         parser.end();
 
-        return registers;
+        convention.setReturn(integerRegisters);
+        convention.setFloatReturn(floatRegisters);
     }
 
 

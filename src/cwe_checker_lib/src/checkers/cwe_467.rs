@@ -79,9 +79,7 @@ fn check_for_pointer_sized_arg(
     let pointer_size = project.stack_pointer_register.size;
     let state = compute_block_end_state(project, global_memory, block);
     for parameter in symbol.parameters.iter() {
-        if let Ok(param) =
-            state.eval_parameter_arg(parameter, &project.stack_pointer_register, global_memory)
-        {
+        if let Ok(param) = state.eval_parameter_arg(parameter, global_memory) {
             if let Ok(param_value) = param.try_to_bitvec() {
                 if Ok(u64::from(pointer_size)) == param_value.try_to_u64() {
                     return true;

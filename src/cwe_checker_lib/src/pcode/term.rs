@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::usize;
 
 use super::{Expression, ExpressionType, RegisterProperties, Variable};
@@ -529,22 +529,23 @@ impl ExternSymbol {
         for arg in symbol.arguments.iter() {
             let ir_arg = if let Some(var) = arg.var.clone() {
                 IrArg::Register {
-                    var: var.into(),
+                    expr: IrExpression::Var(var.into()),
                     data_type: None,
                 }
             } else if let Some(expr) = arg.location.clone() {
                 if expr.mnemonic == ExpressionType::LOAD {
+                    let offset = i64::from_str_radix(
+                        expr.input0
+                            .clone()
+                            .unwrap()
+                            .address
+                            .unwrap()
+                            .trim_start_matches("0x"),
+                        16,
+                    )
+                    .unwrap();
                     IrArg::Stack {
-                        offset: i64::from_str_radix(
-                            expr.input0
-                                .clone()
-                                .unwrap()
-                                .address
-                                .unwrap()
-                                .trim_start_matches("0x"),
-                            16,
-                        )
-                        .unwrap(),
+                        address: IrExpression::Var(stack_pointer.clone().into()).plus_const(offset),
                         size: expr.input0.unwrap().size,
                         data_type: None,
                     }
@@ -639,8 +640,10 @@ pub struct CallingConvention {
     integer_parameter_register: Vec<String>,
     /// Possible float parameter registers.
     float_parameter_register: Vec<String>,
-    /// Possible return registers.
+    /// Possible integer return registers.
     return_register: Vec<String>,
+    /// Possible float return registers.
+    float_return_register: Vec<String>,
     /// Callee-saved registers.
     unaffected_register: Vec<String>,
     /// Registers that may be overwritten by the call, i.e. caller-saved registers.
@@ -649,18 +652,50 @@ pub struct CallingConvention {
 
 impl CallingConvention {
     /// Convert a calling convention parsed from Ghidra to the internally used IR.
-    fn into_ir_cconv(self, register_map: &BTreeMap<String, IrVariable>) -> IrCallingConvention {
+    fn into_ir_cconv(
+        self,
+        register_map: &HashMap<&String, &RegisterProperties>,
+    ) -> IrCallingConvention {
         let to_ir_var_list = |list: Vec<String>| {
             list.into_iter()
-                .map(|register_name| register_map.get(&register_name).cloned().unwrap())
+                .map(|register_name| {
+                    let reg = register_map.get(&register_name).cloned().unwrap();
+                    assert_eq!(reg.register, reg.base_register);
+                    reg.into()
+                })
                 .collect()
+        };
+        let to_ir_expression_list = |list: Vec<String>| {
+            list.into_iter()
+                .map(|register_name| {
+                    let reg = register_map.get(&register_name).cloned().unwrap();
+                    let mut expression = IrExpression::Var(reg.into());
+                    expression.replace_input_sub_register(register_map);
+                    expression
+                })
+                .collect()
+        };
+        let to_ir_base_var_list = |list: Vec<String>| {
+            let register_set: BTreeSet<IrVariable> = list
+                .into_iter()
+                .map(|reg_name| {
+                    let reg = register_map.get(&reg_name).unwrap();
+                    let base_reg = *register_map.get(&reg.base_register).unwrap();
+                    base_reg.into()
+                })
+                .collect();
+            register_set.into_iter().collect()
         };
         IrCallingConvention {
             name: self.name,
             integer_parameter_register: to_ir_var_list(self.integer_parameter_register),
-            float_parameter_register: to_ir_var_list(self.float_parameter_register),
-            return_register: to_ir_var_list(self.return_register),
-            callee_saved_register: to_ir_var_list(self.unaffected_register),
+            float_parameter_register: to_ir_expression_list(self.float_parameter_register),
+            integer_return_register: to_ir_var_list(self.return_register),
+            float_return_register: to_ir_expression_list(self.float_return_register),
+            // TODO / FIXME: Using `to_ir_base_var_list` is technically incorrect.
+            // For example, on AArch64 only the bottom 64bit of some floating point registers are callee-saved.
+            // To fix this one may have to to change callee_saved_register to a Vec<Expression>.
+            callee_saved_register: to_ir_base_var_list(self.unaffected_register),
         }
     }
 }
@@ -688,6 +723,11 @@ impl Project {
     /// The `binary_base_address` denotes the base address of the memory image of the binary
     /// according to the program headers of the binary.
     pub fn into_ir_project(self, binary_base_address: u64) -> IrProject {
+        let register_map: HashMap<&String, &RegisterProperties> = self
+            .register_properties
+            .iter()
+            .map(|p| (&p.register, p))
+            .collect();
         let mut program: Term<IrProgram> = Term {
             tid: self.program.tid,
             term: self.program.term.into_ir_program(
@@ -697,11 +737,6 @@ impl Project {
                 &self.cpu_architecture,
             ),
         };
-        let register_map: HashMap<&String, &RegisterProperties> = self
-            .register_properties
-            .iter()
-            .map(|p| (&p.register, p))
-            .collect();
         let mut zero_extend_tids: HashSet<Tid> = HashSet::new();
         // iterates over definitions and checks whether sub registers are used
         // if so, they are swapped with subpieces of base registers
@@ -790,12 +825,26 @@ impl Project {
                 });
             }
         }
-        let register_map: BTreeMap<String, IrVariable> = self
+        // Iterate over symbol arguments and replace used sub-registers
+        for symbol in program.term.extern_symbols.values_mut() {
+            for arg in symbol.parameters.iter_mut() {
+                if let IrArg::Register { expr, .. } = arg {
+                    expr.replace_input_sub_register(&register_map);
+                }
+            }
+            for arg in symbol.return_values.iter_mut() {
+                if let IrArg::Register { expr, .. } = arg {
+                    expr.replace_input_sub_register(&register_map);
+                }
+            }
+        }
+
+        let register_set = self
             .register_properties
             .iter()
             .filter_map(|reg| {
                 if reg.register == reg.base_register {
-                    Some((reg.register.clone(), reg.into()))
+                    Some(reg.into())
                 } else {
                     None
                 }
@@ -807,7 +856,6 @@ impl Project {
             .into_iter()
             .map(|cconv| (cconv.name.clone(), cconv.into_ir_cconv(&register_map)))
             .collect();
-        let register_set = register_map.into_values().collect();
         IrProject {
             program,
             cpu_architecture: self.cpu_architecture,

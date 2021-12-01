@@ -31,7 +31,6 @@ use crate::analysis::interprocedural_fixpoint_generic::NodeValue;
 use crate::analysis::pointer_inference::PointerInference;
 use crate::intermediate_representation::ExternSymbol;
 use crate::intermediate_representation::Jmp;
-use crate::intermediate_representation::Variable;
 use crate::prelude::*;
 use crate::utils::binary::RuntimeMemoryImage;
 use crate::utils::log::CweWarning;
@@ -93,7 +92,6 @@ pub fn check_cwe(
                         &format_string_index,
                         pointer_inference_results,
                         analysis_results.runtime_memory_image,
-                        &project.stack_pointer_register,
                     );
 
                     if matches!(
@@ -121,18 +119,15 @@ fn locate_format_string(
     format_string_index: &HashMap<String, usize>,
     pointer_inference_results: &PointerInference,
     runtime_memory_image: &RuntimeMemoryImage,
-    stack_pointer: &Variable,
 ) -> StringLocation {
     if let Some(NodeValue::Value(pi_state)) = pointer_inference_results.get_node_value(*node) {
         let format_string_parameter = symbol
             .parameters
             .get(*format_string_index.get(&symbol.name).unwrap())
             .unwrap();
-        if let Ok(address) = pi_state.eval_parameter_arg(
-            format_string_parameter,
-            stack_pointer,
-            runtime_memory_image,
-        ) {
+        if let Ok(address) =
+            pi_state.eval_parameter_arg(format_string_parameter, runtime_memory_image)
+        {
             if let Ok(address_vector) = address.try_to_bitvec() {
                 if runtime_memory_image.is_global_memory_address(&address_vector) {
                     if runtime_memory_image
@@ -184,7 +179,7 @@ pub mod tests {
     use std::collections::HashSet;
 
     use crate::analysis::pointer_inference::PointerInference as PointerInferenceComputation;
-    use crate::intermediate_representation::{Blk, Def, Expression, Jmp, Project, Sub};
+    use crate::intermediate_representation::*;
 
     use super::*;
 
@@ -221,7 +216,6 @@ pub mod tests {
     #[test]
     fn test_locate_format_string() {
         let sprintf_symbol = ExternSymbol::mock_string();
-        let stack_pointer = Variable::mock("RSP", ByteSize::new(8));
         let runtime_memory_image = RuntimeMemoryImage::mock();
         let project = mock_project();
         let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
@@ -246,7 +240,6 @@ pub mod tests {
                 &format_string_index,
                 &pi_results,
                 &runtime_memory_image,
-                &stack_pointer
             ),
             StringLocation::GlobalReadable
         );

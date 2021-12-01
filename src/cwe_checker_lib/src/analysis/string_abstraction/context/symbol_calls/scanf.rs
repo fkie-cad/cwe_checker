@@ -47,11 +47,8 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
     ) {
         for (argument, value) in arg_to_value_map.into_iter() {
             if argument.get_data_type().unwrap() == Datatype::Pointer {
-                if let Ok(data) = pi_state.eval_parameter_arg(
-                    &argument,
-                    &self.project.stack_pointer_register,
-                    self.runtime_memory_image,
-                ) {
+                if let Ok(data) = pi_state.eval_parameter_arg(&argument, self.runtime_memory_image)
+                {
                     if !data.get_relative_values().is_empty() {
                         Context::add_constant_or_top_value_to_return_locations(
                             state, pi_state, data, value,
@@ -94,11 +91,9 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
         let mut new_state = state.clone();
         if let Some(pi_state) = state.get_pointer_inference_state() {
             if let Some(source_string_arg) = extern_symbol.parameters.first() {
-                if let Ok(source_string) = pi_state.eval_parameter_arg(
-                    source_string_arg,
-                    &self.project.stack_pointer_register,
-                    self.runtime_memory_image,
-                ) {
+                if let Ok(source_string) =
+                    pi_state.eval_parameter_arg(source_string_arg, self.runtime_memory_image)
+                {
                     if self.source_string_mapped_to_return_locations(
                         pi_state,
                         &mut new_state,
@@ -202,7 +197,7 @@ mod tests {
     use crate::abstract_domain::{AbstractIdentifier, AbstractLocation, CharacterInclusionDomain};
     use crate::analysis::pointer_inference::PointerInference as PointerInferenceComputation;
     use crate::analysis::string_abstraction::tests::mock_project_with_intraprocedural_control_flow;
-    use crate::intermediate_representation::Variable;
+    use crate::intermediate_representation::{Expression, Variable};
     use crate::utils::binary::RuntimeMemoryImage;
 
     use super::super::tests::*;
@@ -316,11 +311,11 @@ mod tests {
         let mut arg_to_value_map: HashMap<Arg, Option<String>> = HashMap::new();
 
         let register_arg = Arg::Register {
-            var: r2_reg.clone(),
+            expr: Expression::Var(r2_reg.clone()),
             data_type: Some(Datatype::Pointer),
         };
         let stack_arg = Arg::Stack {
-            offset: 0,
+            address: Expression::Var(Variable::mock("sp", 4)),
             size: ByteSize::new(4),
             data_type: Some(Datatype::Pointer),
         };
@@ -393,11 +388,11 @@ mod tests {
 
         let mut arg_to_value_map: HashMap<Arg, Option<String>> = HashMap::new();
         let register_arg = Arg::Register {
-            var: r1_reg.clone(),
+            expr: Expression::Var(r1_reg.clone()),
             data_type: Some(Datatype::Pointer),
         };
         let stack_arg = Arg::Stack {
-            offset: 0,
+            address: Expression::Var(Variable::mock("sp", 4)),
             size: ByteSize::new(4),
             data_type: Some(Datatype::Pointer),
         };
@@ -761,7 +756,7 @@ mod tests {
             ),
             (
                 Arg::Stack {
-                    offset: 0,
+                    address: Expression::Var(Variable::mock("sp", 4)),
                     size: ByteSize::new(4),
                     data_type: Some(Datatype::Pointer),
                 },
@@ -769,7 +764,7 @@ mod tests {
             ),
             (
                 Arg::Stack {
-                    offset: 4,
+                    address: Expression::Var(Variable::mock("sp", 4)).plus_const(4),
                     size: ByteSize::new(4),
                     data_type: Some(Datatype::Pointer),
                 },

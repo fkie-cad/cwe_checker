@@ -147,20 +147,15 @@ impl State {
     pub fn clear_stack_parameter(
         &mut self,
         extern_call: &ExternSymbol,
-        stack_pointer_register: &Variable,
         global_memory: &RuntimeMemoryImage,
     ) -> Result<(), Error> {
         let mut result_log = Ok(());
         for arg in &extern_call.parameters {
             match arg {
                 Arg::Register { .. } => (),
-                Arg::Stack { offset, size, .. } => {
+                Arg::Stack { address, size, .. } => {
                     let data_top = Data::new_top(*size);
-                    let location_expression =
-                        Expression::Var(stack_pointer_register.clone()).plus_const(*offset);
-                    if let Err(err) =
-                        self.write_to_address(&location_expression, &data_top, global_memory)
-                    {
+                    if let Err(err) = self.write_to_address(address, &data_top, global_memory) {
                         result_log = Err(err);
                     }
                 }

@@ -1,4 +1,4 @@
-use super::{Blk, Datatype, Project, Variable};
+use super::{Blk, Datatype, Expression, Project, Variable};
 use crate::prelude::*;
 
 /// A `Sub` or subroutine represents a function with a given name and a list of basic blocks belonging to it.
@@ -18,20 +18,17 @@ pub struct Sub {
 /// A parameter or return argument of a function.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub enum Arg {
-    /// The argument is passed in the given register
+    /// The argument is passed in a register
     Register {
-        /// The variable object representing the register.
-        var: Variable,
+        /// The expression evaluating to the argument.
+        expr: Expression,
         /// An optional data type indicator.
         data_type: Option<Datatype>,
     },
     /// The argument is passed on the stack.
-    /// It is positioned at the given offset (in bytes) relative to the stack pointer on function entry
-    /// and has the given size.
     Stack {
-        /// The position of the argument on the stack
-        /// given as offset relative to the stack pointer on function entry.
-        offset: i64,
+        /// The expression that computes the address of the argument on the stack.
+        address: Expression,
         /// The size in bytes of the argument.
         size: ByteSize,
         /// An optional data type indicator.
@@ -43,7 +40,7 @@ impl Arg {
     /// Generate a new register argument.
     pub fn from_var(var: Variable, data_type_hint: Option<Datatype>) -> Arg {
         Arg::Register {
-            var,
+            expr: Expression::Var(var),
             data_type: data_type_hint,
         }
     }
@@ -86,7 +83,11 @@ impl ExternSymbol {
     pub fn get_unique_return_register(&self) -> Result<&Variable, Error> {
         if self.return_values.len() == 1 {
             match self.return_values[0] {
-                Arg::Register { ref var, .. } => Ok(var),
+                Arg::Register {
+                    expr: Expression::Var(ref var),
+                    ..
+                } => Ok(var),
+                Arg::Register { .. } => Err(anyhow!("Return value is a sub-register")),
                 Arg::Stack { .. } => Err(anyhow!("Return value is passed on the stack")),
             }
         } else {
@@ -118,9 +119,13 @@ pub struct CallingConvention {
     /// Possible integer parameter registers.
     pub integer_parameter_register: Vec<Variable>,
     /// Possible float parameter registers.
-    pub float_parameter_register: Vec<Variable>,
-    /// A list of possible return register
-    pub return_register: Vec<Variable>,
+    /// Given as expressions, since they are usually sub-register of larger floating point registers.
+    pub float_parameter_register: Vec<Expression>,
+    /// A list of possible return register for non-float values.
+    pub integer_return_register: Vec<Variable>,
+    /// A list of possible return register for float values.
+    /// Given as expressions, since they are usually sub-register of larger floating point registers.
+    pub float_return_register: Vec<Expression>,
     /// A list of callee-saved register,
     /// i.e. the values of these registers should be the same after the call as they were before the call.
     pub callee_saved_register: Vec<Variable>,
@@ -147,8 +152,9 @@ mod tests {
             CallingConvention {
                 name: "__stdcall".to_string(), // so that the mock is useable as standard calling convention in tests
                 integer_parameter_register: vec![Variable::mock("RDI", 8)],
-                float_parameter_register: vec![Variable::mock("XMMO", 16)],
-                return_register: vec![Variable::mock("RAX", 8)],
+                float_parameter_register: vec![Expression::Var(Variable::mock("XMMO", 16))],
+                integer_return_register: vec![Variable::mock("RAX", 8)],
+                float_return_register: vec![],
                 callee_saved_register: vec![Variable::mock("RBP", 8)],
             }
         }
@@ -157,11 +163,16 @@ mod tests {
             integer_parameter_register: Vec<Variable>,
             float_parameter_register: Vec<Variable>,
         ) -> CallingConvention {
+            let float_parameter_register = float_parameter_register
+                .into_iter()
+                .map(Expression::Var)
+                .collect();
             CallingConvention {
                 name: "__stdcall".to_string(), // so that the mock is useable as standard calling convention in tests
                 integer_parameter_register,
                 float_parameter_register,
-                return_register: vec![Variable::mock("RAX", 8)],
+                integer_return_register: vec![Variable::mock("RAX", 8)],
+                float_return_register: vec![],
                 callee_saved_register: vec![Variable::mock("RBP", 8)],
             }
         }
@@ -170,7 +181,7 @@ mod tests {
     impl Arg {
         pub fn mock_register(name: impl ToString, size_in_bytes: impl Into<ByteSize>) -> Arg {
             Arg::Register {
-                var: Variable::mock(name.to_string(), size_in_bytes),
+                expr: Expression::Var(Variable::mock(name.to_string(), size_in_bytes)),
                 data_type: None,
             }
         }
@@ -181,7 +192,7 @@ mod tests {
             data_type: Option<Datatype>,
         ) -> Arg {
             Arg::Register {
-                var: Variable::mock(name.to_string(), size_in_bytes),
+                expr: Expression::Var(Variable::mock(name.to_string(), size_in_bytes)),
                 data_type,
             }
         }
@@ -191,7 +202,7 @@ mod tests {
             size_in_bytes: impl Into<ByteSize>,
         ) -> Arg {
             Arg::Register {
-                var: Variable::mock(name.to_string(), size_in_bytes),
+                expr: Expression::Var(Variable::mock(name.to_string(), size_in_bytes)),
                 data_type: Some(Datatype::Pointer),
             }
         }

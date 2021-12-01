@@ -42,6 +42,7 @@ use crate::analysis::pointer_inference::State as PointerInferenceState;
 use crate::analysis::string_abstraction::context::Context;
 use crate::analysis::string_abstraction::state::State;
 use crate::intermediate_representation::Arg;
+use crate::intermediate_representation::Expression;
 use crate::intermediate_representation::ExternSymbol;
 use crate::intermediate_representation::Jmp;
 use crate::intermediate_representation::Sub;
@@ -151,7 +152,11 @@ pub fn check_system_call_parameter(
     runtime_memory_image: &RuntimeMemoryImage,
 ) {
     let sub = source_state.get_current_sub().unwrap();
-    if let Some(Arg::Register { var, .. }) = system_symbol.parameters.get(0) {
+    if let Some(Arg::Register {
+        expr: Expression::Var(var),
+        ..
+    }) = system_symbol.parameters.get(0)
+    {
         if let Some(value) = source_state.get_variable_to_pointer_map().get(var) {
             let contains_string_constant = value.get_absolute_value().is_some();
             let contains_relative_string_pointer = !value.get_relative_values().is_empty();

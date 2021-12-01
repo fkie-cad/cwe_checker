@@ -224,16 +224,11 @@ impl State {
     pub fn eval_parameter_arg(
         &self,
         parameter: &Arg,
-        stack_pointer: &Variable,
         global_memory: &RuntimeMemoryImage,
     ) -> Result<Data, Error> {
         match parameter {
-            Arg::Register { var, .. } => Ok(self.eval(&Expression::Var(var.clone()))),
-            Arg::Stack { offset, size, .. } => self.load_value(
-                &Expression::Var(stack_pointer.clone()).plus_const(*offset),
-                *size,
-                global_memory,
-            ),
+            Arg::Register { expr, .. } => Ok(self.eval(expr)),
+            Arg::Stack { address, size, .. } => self.load_value(address, *size, global_memory),
         }
     }
 

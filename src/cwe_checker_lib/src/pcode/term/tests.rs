@@ -88,6 +88,7 @@ impl Setup {
                             "integer_parameter_register": [],
                             "float_parameter_register": [],
                             "return_register": [],
+                            "float_return_register": [],
                             "unaffected_register": [],
                             "killed_by_call_register": []
                         }

@@ -70,8 +70,7 @@ fn get_umask_permission_arg(
     }
 
     let parameter = umask_symbol.get_unique_parameter()?;
-    let param_value =
-        state.eval_parameter_arg(parameter, &project.stack_pointer_register, global_memory)?;
+    let param_value = state.eval_parameter_arg(parameter, global_memory)?;
     if let Ok(umask_arg) = param_value.try_to_bitvec() {
         Ok(umask_arg.try_to_u64()?)
     } else {
