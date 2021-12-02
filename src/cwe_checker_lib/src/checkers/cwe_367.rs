@@ -81,7 +81,7 @@ pub fn check_cwe(
         .term
         .extern_symbols
         .iter()
-        .map(|symbol| (symbol.name.as_str(), symbol.tid.clone()))
+        .map(|(tid, symbol)| (symbol.name.as_str(), tid.clone()))
         .collect();
 
     for (source, sink) in config.pairs {
@@ -119,5 +119,6 @@ pub fn check_cwe(
         }
     }
 
+    cwe_warnings.sort();
     (Vec::new(), cwe_warnings)
 }

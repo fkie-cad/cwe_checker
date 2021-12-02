@@ -5,7 +5,7 @@ extern crate cwe_checker_lib; // Needed for the docstring-link to work
 
 use cwe_checker_lib::analysis::graph;
 use cwe_checker_lib::utils::binary::{BareMetalConfig, RuntimeMemoryImage};
-use cwe_checker_lib::utils::log::print_all_messages;
+use cwe_checker_lib::utils::log::{print_all_messages, LogLevel};
 use cwe_checker_lib::utils::{get_ghidra_plugin_path, read_config_file};
 use cwe_checker_lib::AnalysisResults;
 use cwe_checker_lib::{intermediate_representation::Project, utils::log::LogMessage};
@@ -45,6 +45,15 @@ struct CmdlineArgs {
     /// Do not print log messages. This prevents polluting stdout for json output.
     #[structopt(long, short)]
     quiet: bool,
+
+    /// Print additional debug log messages.
+    #[structopt(long, short, conflicts_with("quiet"))]
+    verbose: bool,
+
+    /// Include various statistics in the log messages.
+    /// This can be helpful for assessing the analysis quality for the input binary.
+    #[structopt(long, conflicts_with("quiet"))]
+    statistics: bool,
 
     /// Path to a configuration file for analysis of bare metal binaries.
     ///
@@ -137,7 +146,7 @@ fn run_with_ghidra(args: &CmdlineArgs) {
 
     // Generate the representation of the runtime memory image of the binary
     let mut runtime_memory_image = if let Some(bare_metal_config) = bare_metal_config_opt.as_ref() {
-        RuntimeMemoryImage::new_from_bare_metal(&binary, &bare_metal_config).unwrap_or_else(|err| {
+        RuntimeMemoryImage::new_from_bare_metal(&binary, bare_metal_config).unwrap_or_else(|err| {
             panic!("Error while generating runtime memory image: {}", err);
         })
     } else {
@@ -155,8 +164,8 @@ fn run_with_ghidra(args: &CmdlineArgs) {
         .program
         .term
         .extern_symbols
-        .iter()
-        .map(|symbol| symbol.tid.clone())
+        .keys()
+        .cloned()
         .collect();
     let control_flow_graph = graph::get_program_cfg(&project.program, extern_sub_tids);
 
@@ -167,17 +176,38 @@ fn run_with_ghidra(args: &CmdlineArgs) {
         &project,
     );
 
-    let modules_depending_on_pointer_inference = vec!["CWE78", "CWE134", "CWE476", "Memory"];
-    let pointer_inference_results = if modules
+    let modules_depending_on_string_abstraction = vec!["CWE78"];
+    let modules_depending_on_pointer_inference = vec!["CWE134", "CWE476", "Memory"];
+
+    let string_abstraction_needed = modules
         .iter()
-        .any(|module| modules_depending_on_pointer_inference.contains(&module.name))
-    {
-        Some(analysis_results.compute_pointer_inference(&config["Memory"]))
+        .any(|module| modules_depending_on_string_abstraction.contains(&module.name));
+
+    let pi_analysis_needed = string_abstraction_needed
+        || modules
+            .iter()
+            .any(|module| modules_depending_on_pointer_inference.contains(&module.name));
+
+    let pi_analysis_results = if pi_analysis_needed {
+        Some(analysis_results.compute_pointer_inference(&config["Memory"], args.statistics))
     } else {
         None
     };
+
+    let analysis_results = analysis_results.set_pointer_inference(pi_analysis_results.as_ref());
+
+    let string_abstraction_results =
+        if string_abstraction_needed {
+            Some(analysis_results.compute_string_abstraction(
+                &config["StringAbstraction"],
+                pi_analysis_results.as_ref(),
+            ))
+        } else {
+            None
+        };
+
     let analysis_results =
-        analysis_results.set_pointer_inference(pointer_inference_results.as_ref());
+        analysis_results.set_string_abstraction(string_abstraction_results.as_ref());
 
     // Print debug and then return.
     // Right now there is only one debug printing function.
@@ -189,6 +219,7 @@ fn run_with_ghidra(args: &CmdlineArgs) {
             &control_flow_graph,
             serde_json::from_value(config["Memory"].clone()).unwrap(),
             true,
+            false,
         );
         return;
     }
@@ -204,6 +235,13 @@ fn run_with_ghidra(args: &CmdlineArgs) {
     // Print the results of the modules.
     if args.quiet {
         all_logs = Vec::new(); // Suppress all log messages since the `--quiet` flag is set.
+    } else {
+        if args.statistics {
+            cwe_checker_lib::utils::log::add_debug_log_statistics(&mut all_logs);
+        }
+        if !args.verbose {
+            all_logs.retain(|log_msg| log_msg.level != LogLevel::Debug);
+        }
     }
     print_all_messages(all_logs, all_cwes, args.out.as_deref(), args.json);
 }

@@ -88,7 +88,7 @@ pub fn check_cwe(
         system_symbol.insert(tid, name);
     }
     if !system_symbol.is_empty() && !privilege_changing_symbols.is_empty() {
-        for sub in project.program.term.subs.iter() {
+        for sub in project.program.term.subs.values() {
             if !get_calls_to_symbols(sub, &system_symbol).is_empty()
                 && !get_calls_to_symbols(sub, &privilege_changing_symbols).is_empty()
             {
@@ -96,5 +96,6 @@ pub fn check_cwe(
             }
         }
     }
+    cwe_warnings.sort();
     (Vec::new(), cwe_warnings)
 }

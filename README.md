@@ -44,7 +44,7 @@ If you want to build the docker image yourself, just run `docker build -t cwe_ch
 ### Local installation ###
 
 The following dependencies must be installed in order to build and install the *cwe_checker* locally:
--   [Rust](https://www.rust-lang.org) >= 1.49
+-   [Rust](https://www.rust-lang.org) >= 1.54
 -   [Ghidra](https://ghidra-sre.org/) >= 9.2
 
 Run `make all GHIDRA_PATH=/path/to/ghidra_folder` (with the correct path to the local Ghidra installation inserted) to compile and install the cwe_checker.

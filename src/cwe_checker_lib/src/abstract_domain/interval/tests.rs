@@ -11,6 +11,11 @@ impl IntervalDomain {
         IntervalDomain::new(Bitvector::from_i8(start), Bitvector::from_i8(end))
     }
 
+    /// Return a new interval domain of 4-byte integers.
+    pub fn mock_i32(start: i32, end: i32) -> IntervalDomain {
+        IntervalDomain::new(Bitvector::from_i32(start), Bitvector::from_i32(end))
+    }
+
     pub fn mock_with_bounds(
         lower_bound: Option<i64>,
         start: i64,
@@ -591,7 +596,7 @@ fn add_not_equal_bounds() {
 fn intersection() {
     let interval1 = IntervalDomain::mock_with_bounds(Some(-100), -10, 10, Some(100));
     let interval2 = IntervalDomain::mock_with_bounds(Some(-20), 2, 30, None);
-    let intersection = interval1.intersect(&interval2).unwrap();
+    let intersection = interval1.clone().intersect(&interval2).unwrap();
     assert_eq!(
         intersection,
         IntervalDomain::mock_with_bounds(Some(-20), 2, 10, Some(100))

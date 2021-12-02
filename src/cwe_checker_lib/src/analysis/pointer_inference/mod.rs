@@ -15,6 +15,7 @@
 //! - [CWE-125](https://cwe.mitre.org/data/definitions/125.html) Buffer Overflow: Out-of-bounds Read
 //! - [CWE-415](https://cwe.mitre.org/data/definitions/415.html): Double Free
 //! - [CWE-416](https://cwe.mitre.org/data/definitions/416.html): Use After Free
+//! - [CWE-476](https://cwe.mitre.org/data/definitions/476.html): NULL Pointer Dereference
 //! - [CWE-787](https://cwe.mitre.org/data/definitions/787.html): Buffer Overflow: Out-of-bounds Write
 //!
 //! The analysis operates on a best-effort basis.
@@ -39,12 +40,13 @@ use crate::{
 use petgraph::graph::NodeIndex;
 use petgraph::visit::IntoNodeReferences;
 use petgraph::Direction;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 mod context;
 pub mod object;
 mod object_list;
 mod state;
+mod statistics;
 
 use context::Context;
 pub use state::State;
@@ -94,6 +96,7 @@ impl<'a> PointerInference<'a> {
         control_flow_graph: &'a Graph<'a>,
         config: Config,
         log_sender: crossbeam_channel::Sender<LogThreadMsg>,
+        print_stats: bool,
     ) -> PointerInference<'a> {
         let context = Context::new(
             project,
@@ -104,15 +107,8 @@ impl<'a> PointerInference<'a> {
         );
 
         let mut entry_sub_to_entry_blocks_map = HashMap::new();
-        let subs: HashMap<Tid, &Term<Sub>> = project
-            .program
-            .term
-            .subs
-            .iter()
-            .map(|sub| (sub.tid.clone(), sub))
-            .collect();
         for sub_tid in project.program.term.entry_points.iter() {
-            if let Some(sub) = subs.get(sub_tid) {
+            if let Some(sub) = project.program.term.subs.get(sub_tid) {
                 if let Some(entry_block) = sub.term.blocks.get(0) {
                     entry_sub_to_entry_blocks_map.insert(sub_tid, entry_block.tid.clone());
                 }
@@ -147,18 +143,34 @@ impl<'a> PointerInference<'a> {
             })
             .collect();
         let mut fixpoint_computation =
-            super::forward_interprocedural_fixpoint::create_computation(context, None);
-        let _ = log_sender.send(LogThreadMsg::Log(LogMessage::new_debug(format!(
-            "Pointer Inference: Adding {} entry points",
-            entry_sub_to_entry_node_map.len()
-        ))));
+            super::forward_interprocedural_fixpoint::create_computation_with_alternate_worklist_order(context, None);
+        if print_stats {
+            let _ = log_sender.send(LogThreadMsg::Log(
+                LogMessage::new_info(format!(
+                    "Adding {} entry points",
+                    entry_sub_to_entry_node_map.len()
+                ))
+                .source("Pointer Inference"),
+            ));
+        }
         for (sub_tid, start_node_index) in entry_sub_to_entry_node_map.into_iter() {
+            let mut fn_entry_state = if let Some(cconv) = project.get_standard_calling_convention()
+            {
+                State::new_with_generic_parameter_objects(
+                    &project.stack_pointer_register,
+                    sub_tid.clone(),
+                    &cconv.integer_parameter_register,
+                )
+            } else {
+                State::new(&project.stack_pointer_register, sub_tid.clone())
+            };
+            if project.cpu_architecture.contains("MIPS") {
+                let _ = fn_entry_state
+                    .set_mips_link_register(&sub_tid, project.stack_pointer_register.size);
+            }
             fixpoint_computation.set_node_value(
                 start_node_index,
-                super::interprocedural_fixpoint_generic::NodeValue::Value(State::new(
-                    &project.stack_pointer_register,
-                    sub_tid,
-                )),
+                super::interprocedural_fixpoint_generic::NodeValue::Value(fn_entry_state),
             );
         }
         PointerInference {
@@ -239,17 +251,16 @@ impl<'a> PointerInference<'a> {
     /// and do not have a state assigned to them yet, as additional entry points.
     ///
     /// If `only_cfg_roots` is set to `false`, then all function starts without a state are marked as roots.
-    fn add_speculative_entry_points(&mut self, project: &Project, only_cfg_roots: bool) {
+    fn add_speculative_entry_points(
+        &mut self,
+        project: &Project,
+        only_cfg_roots: bool,
+        print_stats: bool,
+    ) {
         // TODO: Refactor the fixpoint computation structs, so that the project reference can be extracted from them.
         let mut start_block_to_sub_map: HashMap<&Tid, &Term<Sub>> = HashMap::new();
-        for sub in project.program.term.subs.iter() {
-            if project
-                .program
-                .term
-                .extern_symbols
-                .iter()
-                .any(|symbol| symbol.tid == sub.tid)
-            {
+        for sub in project.program.term.subs.values() {
+            if project.program.term.extern_symbols.contains_key(&sub.tid) {
                 continue; // We ignore functions marked as extern symbols.
             }
             if let Some(start_block) = sub.term.blocks.first() {
@@ -272,21 +283,34 @@ impl<'a> PointerInference<'a> {
                 }
             }
         }
-        self.log_debug(format!(
-            "Pointer Inference: Adding {} speculative entry points",
-            new_entry_points.len()
-        ));
+        if print_stats {
+            self.log_info(format!(
+                "Adding {} speculative entry points",
+                new_entry_points.len()
+            ));
+        }
         for entry in new_entry_points {
             let sub_tid = start_block_to_sub_map
                 [&self.computation.get_graph()[entry].get_block().tid]
                 .tid
                 .clone();
+            let mut fn_entry_state = if let Some(cconv) = project.get_standard_calling_convention()
+            {
+                State::new_with_generic_parameter_objects(
+                    &project.stack_pointer_register,
+                    sub_tid.clone(),
+                    &cconv.integer_parameter_register,
+                )
+            } else {
+                State::new(&project.stack_pointer_register, sub_tid.clone())
+            };
+            if project.cpu_architecture.contains("MIPS") {
+                let _ = fn_entry_state
+                    .set_mips_link_register(&sub_tid, project.stack_pointer_register.size);
+            }
             self.computation.set_node_value(
                 entry,
-                super::interprocedural_fixpoint_generic::NodeValue::Value(State::new(
-                    &project.stack_pointer_register,
-                    sub_tid,
-                )),
+                super::interprocedural_fixpoint_generic::NodeValue::Value(fn_entry_state),
             );
         }
     }
@@ -305,38 +329,47 @@ impl<'a> PointerInference<'a> {
                 }
             }
         }
-        self.log_debug(format!(
-            "Pointer Inference: Blocks with state: {} / {}",
+        self.log_info(format!(
+            "Blocks with state: {} / {}",
             stateful_blocks, all_blocks
         ));
     }
 
-    fn log_debug(&self, msg: impl Into<String>) {
-        let log_msg = LogMessage::new_debug(msg.into());
+    fn log_info(&self, msg: impl Into<String>) {
+        let log_msg = LogMessage::new_info(msg.into()).source("Pointer Inference");
         let _ = self.log_collector.send(LogThreadMsg::Log(log_msg));
     }
 
     /// Compute the results of the pointer inference fixpoint algorithm.
     /// Successively adds more functions as possible entry points
     /// to increase code coverage.
-    pub fn compute_with_speculative_entry_points(&mut self, project: &Project) {
+    pub fn compute_with_speculative_entry_points(&mut self, project: &Project, print_stats: bool) {
         self.compute();
-        self.count_blocks_with_state();
+        if print_stats {
+            self.count_blocks_with_state();
+        }
         // Now compute again with speculative entry points added
-        self.add_speculative_entry_points(project, true);
+        self.add_speculative_entry_points(project, true, print_stats);
         self.compute();
-        self.count_blocks_with_state();
+        if print_stats {
+            self.count_blocks_with_state();
+        }
         // Now compute again with all missed functions as additional entry points
-        self.add_speculative_entry_points(project, false);
+        self.add_speculative_entry_points(project, false, print_stats);
         self.compute();
-        self.count_blocks_with_state();
+        if print_stats {
+            self.count_blocks_with_state();
+        }
 
         if !self.computation.has_stabilized() {
             let worklist_size = self.computation.get_worklist().len();
-            let _ = self.log_debug(format!(
-                "Pointer Inference: Fixpoint did not stabilize. Remaining worklist size: {}",
-                worklist_size
+            let _ = self.log_info(format!(
+                "Fixpoint did not stabilize. Remaining worklist size: {}",
+                worklist_size,
             ));
+        }
+        if print_stats {
+            statistics::compute_and_log_mem_access_stats(self);
         }
     }
 
@@ -360,7 +393,7 @@ impl<'a> PointerInference<'a> {
                             for jmp in block.term.jmps.iter() {
                                 match &jmp.term {
                                     Jmp::BranchInd(target_expr) => {
-                                        let address = state.eval(&target_expr);
+                                        let address = state.eval(target_expr);
                                         println!(
                                             "{}: Indirect jump to {}",
                                             jmp.tid,
@@ -368,7 +401,7 @@ impl<'a> PointerInference<'a> {
                                         );
                                     }
                                     Jmp::CallInd { target, return_ } => {
-                                        let address = state.eval(&target);
+                                        let address = state.eval(target);
                                         println!(
                                             "{}: Indirect call to {}. HasReturn: {}",
                                             jmp.tid,
@@ -438,6 +471,7 @@ pub fn run<'a>(
     control_flow_graph: &'a Graph<'a>,
     config: Config,
     print_debug: bool,
+    print_stats: bool,
 ) -> PointerInference<'a> {
     let logging_thread = LogThread::spawn(collect_all_logs);
 
@@ -447,9 +481,10 @@ pub fn run<'a>(
         control_flow_graph,
         config,
         logging_thread.get_msg_sender(),
+        print_stats,
     );
 
-    computation.compute_with_speculative_entry_points(project);
+    computation.compute_with_speculative_entry_points(project, print_stats);
 
     if print_debug {
         computation.print_compact_json();
@@ -467,9 +502,9 @@ pub fn run<'a>(
 fn collect_all_logs(
     receiver: crossbeam_channel::Receiver<LogThreadMsg>,
 ) -> (Vec<LogMessage>, Vec<CweWarning>) {
-    let mut logs_with_address = HashMap::new();
+    let mut logs_with_address = BTreeMap::new();
     let mut general_logs = Vec::new();
-    let mut collected_cwes = HashMap::new();
+    let mut collected_cwes = BTreeMap::new();
 
     while let Ok(log_thread_msg) = receiver.recv() {
         match log_thread_msg {
@@ -494,7 +529,10 @@ fn collect_all_logs(
         .cloned()
         .chain(general_logs.into_iter())
         .collect();
-    let cwes = collected_cwes.drain().map(|(_key, value)| value).collect();
+    let cwes = collected_cwes
+        .into_iter()
+        .map(|(_key, value)| value)
+        .collect();
     (logs, cwes)
 }
 
@@ -513,7 +551,7 @@ mod tests {
                 deallocation_symbols: vec!["free".to_string()],
             };
             let (log_sender, _) = crossbeam_channel::unbounded();
-            PointerInference::new(project, mem_image, graph, config, log_sender)
+            PointerInference::new(project, mem_image, graph, config, log_sender, false)
         }
 
         pub fn set_node_value(&mut self, node_value: State, node_index: NodeIndex) {

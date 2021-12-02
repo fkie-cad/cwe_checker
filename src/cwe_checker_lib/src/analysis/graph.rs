@@ -222,7 +222,7 @@ impl<'a> GraphBuilder<'a> {
     /// i.e. for blocks contained in more than one function the extra nodes have to be added separately later.
     /// The `sub` a block is associated with is the `sub` that the block is contained in in the `program` struct.
     fn add_program_blocks(&mut self) {
-        let subs = self.program.term.subs.iter();
+        let subs = self.program.term.subs.values();
         for sub in subs {
             for block in sub.term.blocks.iter() {
                 self.add_block(block, sub);
@@ -232,7 +232,7 @@ impl<'a> GraphBuilder<'a> {
 
     /// add all subs to the call targets so that call instructions can be linked to the starting block of the corresponding sub.
     fn add_subs_to_call_targets(&mut self) {
-        for sub in self.program.term.subs.iter() {
+        for sub in self.program.term.subs.values() {
             if !sub.term.blocks.is_empty() {
                 let start_block = &sub.term.blocks[0];
                 let target_index = self.jump_targets[&(start_block.tid.clone(), sub.tid.clone())];
@@ -334,7 +334,7 @@ impl<'a> GraphBuilder<'a> {
                     }
                 } else {
                     let mut call_source_node: Option<NodeIndex> = None;
-                    if let Some((target_node, _)) = self.call_targets.get(&target) {
+                    if let Some((target_node, _)) = self.call_targets.get(target) {
                         let (target_block, target_sub) = match self.graph[*target_node] {
                             Node::BlkStart(target_block, target_sub) => (target_block, target_sub),
                             _ => panic!(),
@@ -497,6 +497,8 @@ pub fn get_program_cfg(program: &Term<Program>, extern_subs: HashSet<Tid>) -> Gr
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::{BTreeMap, BTreeSet};
+    use std::iter::FromIterator;
 
     fn mock_program() -> Term<Program> {
         let call_term = Term {
@@ -576,9 +578,9 @@ mod tests {
         let program = Term {
             tid: Tid::new("program"),
             term: Program {
-                subs: vec![sub1, sub2],
-                extern_symbols: Vec::new(),
-                entry_points: Vec::new(),
+                subs: BTreeMap::from_iter([(sub1.tid.clone(), sub1), (sub2.tid.clone(), sub2)]),
+                extern_symbols: BTreeMap::new(),
+                entry_points: BTreeSet::new(),
                 address_base_offset: 0,
             },
         };
@@ -618,7 +620,7 @@ mod tests {
             },
         };
         let mut program = Program::mock_empty();
-        program.subs.push(sub_term);
+        program.subs.insert(sub_term.tid.clone(), sub_term);
         let program_term = Term {
             tid: Tid::new("program".to_string()),
             term: program,

@@ -80,11 +80,7 @@ impl AbstractDomain for State {
 
 impl State {
     /// Get a new state in which only the return values of the given extern symbol are tainted.
-    pub fn new(
-        taint_source: &ExternSymbol,
-        stack_pointer_register: &Variable,
-        pi_state: Option<&PointerInferenceState>,
-    ) -> State {
+    pub fn new(taint_source: &ExternSymbol, pi_state: Option<&PointerInferenceState>) -> State {
         let mut state = State {
             register_taint: HashMap::new(),
             memory_taint: HashMap::new(),
@@ -92,16 +88,16 @@ impl State {
         };
         for return_arg in taint_source.return_values.iter() {
             match return_arg {
-                Arg::Register { var, .. } => {
-                    state
-                        .register_taint
-                        .insert(var.clone(), Taint::Tainted(var.size));
+                Arg::Register { expr, .. } => {
+                    for var in expr.input_vars() {
+                        state
+                            .register_taint
+                            .insert(var.clone(), Taint::Tainted(var.size));
+                    }
                 }
-                Arg::Stack { offset, size, .. } => {
+                Arg::Stack { address, size, .. } => {
                     if let Some(pi_state) = pi_state {
-                        let address_exp =
-                            Expression::Var(stack_pointer_register.clone()).plus_const(*offset);
-                        let address = pi_state.eval(&address_exp);
+                        let address = pi_state.eval(address);
                         state.save_taint_to_memory(&address, Taint::Tainted(*size));
                     }
                 }
@@ -150,13 +146,11 @@ impl State {
     /// Return whether the value at the given address (with the given size) is tainted.
     pub fn load_taint_from_memory(&self, address: &Data, size: ByteSize) -> Taint {
         let mut taint = Taint::Top(size);
-        if let Data::Pointer(pointer) = address {
-            for (mem_id, offset) in pointer.targets().iter() {
-                if let (Some(mem_region), Ok(position)) =
-                    (self.memory_taint.get(mem_id), offset.try_to_bitvec())
-                {
-                    taint = taint.merge(&mem_region.get(position.clone(), size));
-                }
+        for (mem_id, offset) in address.get_relative_values() {
+            if let (Some(mem_region), Ok(position)) =
+                (self.memory_taint.get(mem_id), offset.try_to_bitvec())
+            {
+                taint = taint.merge(&mem_region.get(position.clone(), size));
             }
         }
         taint
@@ -168,30 +162,26 @@ impl State {
     /// we merge the taint object with the object at the targets,
     /// possibly tainting all possible targets.
     pub fn save_taint_to_memory(&mut self, address: &Data, taint: Taint) {
-        if let Data::Pointer(pointer) = address {
-            if pointer.targets().len() == 1 {
-                for (mem_id, offset) in pointer.targets().iter() {
-                    if let Ok(position) = offset.try_to_bitvec() {
-                        if let Some(mem_region) = self.memory_taint.get_mut(mem_id) {
-                            mem_region.add(taint, position.clone());
-                        } else {
-                            let mut mem_region = MemRegion::new(address.bytesize());
-                            mem_region.add(taint, position.clone());
-                            self.memory_taint.insert(mem_id.clone(), mem_region);
-                        }
-                    }
+        if let Some((mem_id, offset)) = address.get_if_unique_target() {
+            if let Ok(position) = offset.try_to_bitvec() {
+                if let Some(mem_region) = self.memory_taint.get_mut(mem_id) {
+                    mem_region.add(taint, position);
+                } else {
+                    let mut mem_region = MemRegion::new(address.bytesize());
+                    mem_region.add(taint, position);
+                    self.memory_taint.insert(mem_id.clone(), mem_region);
                 }
-            } else {
-                for (mem_id, offset) in pointer.targets().iter() {
-                    if let Ok(position) = offset.try_to_bitvec() {
-                        if let Some(mem_region) = self.memory_taint.get_mut(mem_id) {
-                            let old_taint = mem_region.get(position.clone(), taint.bytesize());
-                            mem_region.add(old_taint.merge(&taint), position.clone());
-                        } else {
-                            let mut mem_region = MemRegion::new(address.bytesize());
-                            mem_region.add(taint, position.clone());
-                            self.memory_taint.insert(mem_id.clone(), mem_region);
-                        }
+            }
+        } else {
+            for (mem_id, offset) in address.get_relative_values() {
+                if let Ok(position) = offset.try_to_bitvec() {
+                    if let Some(mem_region) = self.memory_taint.get_mut(mem_id) {
+                        let old_taint = mem_region.get(position.clone(), taint.bytesize());
+                        mem_region.add(old_taint.merge(&taint), position.clone());
+                    } else {
+                        let mut mem_region = MemRegion::new(address.bytesize());
+                        mem_region.add(taint, position.clone());
+                        self.memory_taint.insert(mem_id.clone(), mem_region);
                     }
                 }
             }
@@ -214,7 +204,7 @@ impl State {
 
     /// Return true if the memory object with the given ID contains a tainted value.
     pub fn check_mem_id_for_taint(&self, id: &AbstractIdentifier) -> bool {
-        if let Some(mem_object) = self.memory_taint.get(&id) {
+        if let Some(mem_object) = self.memory_taint.get(id) {
             for elem in mem_object.values() {
                 if elem.is_tainted() {
                     return true;
@@ -234,27 +224,26 @@ impl State {
         pi_state: &PointerInferenceState,
     ) -> bool {
         use crate::analysis::pointer_inference::object::ObjectType;
-        if let Data::Pointer(pointer) = address {
-            for (target, offset) in pointer.targets() {
-                if let Ok(Some(ObjectType::Stack)) = pi_state.memory.get_object_type(target) {
-                    // Only check if the value at the address is tainted
-                    if let (Some(mem_object), Ok(target_offset)) =
-                        (self.memory_taint.get(target), offset.try_to_bitvec())
-                    {
-                        if let Some(taint) = mem_object.get_unsized(target_offset.clone()) {
-                            if taint.is_tainted() {
-                                return true;
-                            }
+        for (target, offset) in address.get_relative_values() {
+            if let Ok(Some(ObjectType::Stack)) = pi_state.memory.get_object_type(target) {
+                // Only check if the value at the address is tainted
+                if let (Some(mem_object), Ok(target_offset)) =
+                    (self.memory_taint.get(target), offset.try_to_bitvec())
+                {
+                    if let Some(taint) = mem_object.get_unsized(target_offset.clone()) {
+                        if taint.is_tainted() {
+                            return true;
                         }
                     }
-                } else {
-                    // Check whether the memory object contains any taint.
-                    if self.check_mem_id_for_taint(target) {
-                        return true;
-                    }
+                }
+            } else {
+                // Check whether the memory object contains any taint.
+                if self.check_mem_id_for_taint(target) {
+                    return true;
                 }
             }
         }
+
         false
     }
 
@@ -262,26 +251,23 @@ impl State {
     /// Return `true` if taint was found and `false` if no taint was found.
     fn check_register_list_for_taint(
         &self,
-        register_list: &[String],
+        register_list: &[Variable],
         pi_state_option: Option<&PointerInferenceState>,
     ) -> bool {
         // Check whether a register contains taint
-        for (register, taint) in &self.register_taint {
-            if register_list
-                .iter()
-                .any(|reg_name| *reg_name == register.name)
-                && !taint.is_top()
-            {
-                return true;
+        for register in register_list {
+            if let Some(taint) = self.register_taint.get(register) {
+                if !taint.is_top() {
+                    return true;
+                }
             }
         }
         // Check whether some memory object referenced by a register may contain taint
         if let Some(pi_state) = pi_state_option {
-            for register_name in register_list {
-                if let Some(register_value) = pi_state.get_register_by_name(register_name) {
-                    if self.check_if_address_points_to_taint(register_value, pi_state) {
-                        return true;
-                    }
+            for register in register_list {
+                let register_value = pi_state.get_register(register);
+                if self.check_if_address_points_to_taint(register_value, pi_state) {
+                    return true;
                 }
             }
         }
@@ -298,7 +284,11 @@ impl State {
     ) -> bool {
         if let Some(calling_conv) = project.get_standard_calling_convention() {
             let mut all_parameters = calling_conv.integer_parameter_register.clone();
-            all_parameters.append(&mut calling_conv.float_parameter_register.clone());
+            for float_param in calling_conv.float_parameter_register.iter() {
+                for var in float_param.input_vars() {
+                    all_parameters.push(var.clone());
+                }
+            }
             self.check_register_list_for_taint(&all_parameters, pi_state_option)
         } else {
             // No standard calling convention found. Assume everything may be parameters or referenced by parameters.
@@ -315,7 +305,10 @@ impl State {
         pi_state_option: Option<&PointerInferenceState>,
     ) -> bool {
         if let Some(calling_conv) = project.get_standard_calling_convention() {
-            self.check_register_list_for_taint(&calling_conv.return_register[..], pi_state_option)
+            self.check_register_list_for_taint(
+                &calling_conv.integer_return_register[..],
+                pi_state_option,
+            )
         } else {
             // No standard calling convention found. Assume everything may be return values or referenced by return values.
             !self.is_empty()
@@ -331,7 +324,7 @@ impl State {
                 if calling_conv
                     .callee_saved_register
                     .iter()
-                    .any(|callee_saved_reg| register.name == *callee_saved_reg)
+                    .any(|callee_saved_reg| register == callee_saved_reg)
                 {
                     Some((register.clone(), *taint))
                 } else {
@@ -396,11 +389,11 @@ mod tests {
 
         pub fn mock_with_pi_state() -> (State, PointerInferenceState) {
             let arg1 = Arg::Register {
-                var: register("RAX"),
+                expr: Expression::Var(register("RAX")),
                 data_type: None,
             };
             let arg2 = Arg::Stack {
-                offset: 0,
+                address: Expression::Var(register("RSP")),
                 size: ByteSize::new(8),
                 data_type: None,
             };
@@ -415,7 +408,7 @@ mod tests {
                 no_return: false,
                 has_var_args: false,
             };
-            let state = State::new(&symbol, &register("RSP"), Some(&pi_state));
+            let state = State::new(&symbol, Some(&pi_state));
             (state, pi_state)
         }
     }
@@ -435,13 +428,13 @@ mod tests {
     fn new_id(name: &str) -> AbstractIdentifier {
         AbstractIdentifier::new(
             Tid::new("time0"),
-            AbstractLocation::Register(name.into(), ByteSize::new(8)),
+            AbstractLocation::Register(Variable::mock(name, ByteSize::new(8))),
         )
     }
 
-    fn new_pointer_domain(location: &str, offset: i64) -> PointerDomain<ValueDomain> {
+    fn new_pointer(location: &str, offset: i64) -> DataDomain<ValueDomain> {
         let id = new_id(location);
-        PointerDomain::new(id, bv(offset))
+        DataDomain::from_target(id, bv(offset))
     }
 
     #[test]
@@ -453,7 +446,7 @@ mod tests {
         state.set_register_taint(&register("RAX"), taint.clone());
 
         let mut other_state = State::mock();
-        let address = Data::Pointer(new_pointer_domain("mem", 10));
+        let address = new_pointer("mem", 10);
         other_state.save_taint_to_memory(&address, taint);
 
         let merged_state = state.merge(&other_state);
@@ -466,7 +459,7 @@ mod tests {
             merged_state.load_taint_from_memory(&address, ByteSize::new(8)),
             taint.clone()
         );
-        let other_address = Data::Pointer(new_pointer_domain("mem", 18));
+        let other_address = new_pointer("mem", 18);
         assert_eq!(
             merged_state.load_taint_from_memory(&other_address, ByteSize::new(8)),
             top.clone()

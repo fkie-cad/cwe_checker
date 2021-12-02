@@ -103,36 +103,73 @@ impl<T: Context> Computation<T> {
     pub fn new(fp_context: T, default_value: Option<T::NodeValue>) -> Self {
         let graph = fp_context.get_graph();
         // order the nodes in weak topological order
-        let sorted_nodes: Vec<NodeIndex> = petgraph::algo::kosaraju_scc(&graph)
+        let priority_sorted_nodes: Vec<NodeIndex> = petgraph::algo::kosaraju_scc(&graph)
             .into_iter()
             .flatten()
-            .rev()
             .collect();
+        Self::from_node_priority_list(fp_context, default_value, priority_sorted_nodes)
+    }
+
+    /// Create a new fixpoint computation from a fixpoint problem, an optional default value
+    /// and the list of nodes of the graph ordered by the priority for the worklist algorithm.
+    /// The worklist algorithm will try to stabilize the nodes with a higher index
+    /// in the `priority_sorted_nodes` array before those with a lower index.
+    fn from_node_priority_list(
+        fp_context: T,
+        default_value: Option<T::NodeValue>,
+        priority_sorted_nodes: Vec<NodeIndex>,
+    ) -> Self {
         let mut node_to_index = BTreeMap::new();
-        for (i, node_index) in sorted_nodes.iter().enumerate() {
+        for (i, node_index) in priority_sorted_nodes.iter().enumerate() {
             node_to_index.insert(node_index, i);
         }
         let node_priority_list: Vec<usize> = node_to_index.values().copied().collect();
         let mut worklist = BTreeSet::new();
         // If a default value exists, all nodes are added to the worklist. If not, the worklist is empty
         if default_value.is_some() {
-            for i in 0..sorted_nodes.len() {
+            for i in 0..priority_sorted_nodes.len() {
                 worklist.insert(i);
             }
         }
         Computation {
             fp_context,
             node_priority_list,
-            priority_to_node_list: sorted_nodes,
+            priority_to_node_list: priority_sorted_nodes,
             worklist,
             default_value,
             node_values: FnvHashMap::default(),
         }
     }
 
+    /// Create a new fixpoint computation from a fixpoint problem and an optional default value for all nodes.
+    ///
+    /// Computations created by this function use an alternate priority order for the fixpoint stabilization algorithm:
+    /// Nodes with 10 or more incoming edges will be stabilized last by the algorithm.
+    pub fn new_with_alternate_worklist_order(
+        fp_context: T,
+        default_value: Option<T::NodeValue>,
+    ) -> Self {
+        let graph = fp_context.get_graph();
+        let mut high_priority_nodes = Vec::new();
+        let mut priority_sorted_nodes = Vec::new();
+        for node in petgraph::algo::kosaraju_scc(&graph).into_iter().flatten() {
+            if graph
+                .neighbors_directed(node, petgraph::EdgeDirection::Incoming)
+                .count()
+                >= 10
+            {
+                priority_sorted_nodes.push(node);
+            } else {
+                high_priority_nodes.push(node)
+            }
+        }
+        priority_sorted_nodes.append(&mut high_priority_nodes);
+        Self::from_node_priority_list(fp_context, default_value, priority_sorted_nodes)
+    }
+
     /// Get the value of a node.
     pub fn get_node_value(&self, node: NodeIndex) -> Option<&T::NodeValue> {
-        if let Some(ref value) = self.node_values.get(&node) {
+        if let Some(value) = self.node_values.get(&node) {
             Some(value)
         } else {
             self.default_value.as_ref()
@@ -184,6 +221,16 @@ impl<T: Context> Computation<T> {
         }
     }
 
+    /// Remove the highest priority node from the internal worklist and return it.
+    fn take_next_node_from_worklist(&mut self) -> Option<NodeIndex> {
+        if let Some(priority) = self.worklist.iter().next_back().cloned() {
+            let priority = self.worklist.take(&priority).unwrap();
+            Some(self.priority_to_node_list[priority])
+        } else {
+            None
+        }
+    }
+
     /// Compute the fixpoint of the fixpoint problem.
     /// Each node will be visited at most max_steps times.
     /// If a node does not stabilize after max_steps visits, the end result will not be a fixpoint but only an intermediate result of a fixpoint computation.
@@ -207,9 +254,7 @@ impl<T: Context> Computation<T> {
     /// Compute the fixpoint of the fixpoint problem.
     /// If the fixpoint algorithm does not converge to a fixpoint, this function will not terminate.
     pub fn compute(&mut self) {
-        while let Some(priority) = self.worklist.iter().next_back().cloned() {
-            let priority = self.worklist.take(&priority).unwrap();
-            let node = self.priority_to_node_list[priority];
+        while let Some(node) = self.take_next_node_from_worklist() {
             self.update_node(node);
         }
     }
@@ -289,5 +334,67 @@ mod tests {
 
         assert_eq!(30, *solution.get_node_value(NodeIndex::new(9)).unwrap());
         assert_eq!(0, *solution.get_node_value(NodeIndex::new(5)).unwrap());
+    }
+
+    #[test]
+    fn worklist_node_order() {
+        let mut graph: DiGraph<(), u64> = DiGraph::new();
+        for _i in 0..21 {
+            graph.add_node(());
+        }
+        for i in 1..19 {
+            graph.add_edge(NodeIndex::new(0), NodeIndex::new(i), 1);
+        }
+        for i in 1..19 {
+            graph.add_edge(NodeIndex::new(i), NodeIndex::new(19), 1);
+        }
+        graph.add_edge(NodeIndex::new(19), NodeIndex::new(20), 1);
+        let mut computation = Computation::new(
+            FPContext {
+                graph: graph.clone(),
+            },
+            Some(1),
+        );
+        assert!(computation.node_priority_list[0] > computation.node_priority_list[1]);
+        assert!(computation.node_priority_list[1] > computation.node_priority_list[19]);
+        assert!(computation.node_priority_list[19] > computation.node_priority_list[20]);
+        // assert that the nodes have the correct priority ordering
+        assert_eq!(
+            computation.take_next_node_from_worklist(),
+            Some(NodeIndex::new(0))
+        );
+        for _i in 1..19 {
+            assert!(computation.take_next_node_from_worklist().unwrap().index() < 19);
+        }
+        assert_eq!(
+            computation.take_next_node_from_worklist(),
+            Some(NodeIndex::new(19))
+        );
+        assert_eq!(
+            computation.take_next_node_from_worklist(),
+            Some(NodeIndex::new(20))
+        );
+
+        let mut computation =
+            Computation::new_with_alternate_worklist_order(FPContext { graph }, Some(1));
+        assert!(computation.node_priority_list[19] < computation.node_priority_list[0]);
+        assert!(computation.node_priority_list[1] > computation.node_priority_list[20]);
+        // assert that the nodes have the correct priority ordering
+        assert_eq!(
+            computation.take_next_node_from_worklist(),
+            Some(NodeIndex::new(0))
+        );
+        for _i in 1..19 {
+            assert!(computation.take_next_node_from_worklist().unwrap().index() < 19);
+        }
+        assert_eq!(
+            computation.take_next_node_from_worklist(),
+            Some(NodeIndex::new(20))
+        );
+        // nodes with a lot of incoming edges get stabilized last in the alternate worklist order
+        assert_eq!(
+            computation.take_next_node_from_worklist(),
+            Some(NodeIndex::new(19))
+        );
     }
 }

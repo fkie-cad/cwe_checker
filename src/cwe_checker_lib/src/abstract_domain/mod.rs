@@ -10,9 +10,6 @@ pub use bitvector::*;
 mod identifier;
 pub use identifier::*;
 
-mod pointer;
-pub use pointer::*;
-
 mod data;
 pub use data::*;
 
@@ -22,12 +19,25 @@ pub use mem_region::*;
 mod interval;
 pub use interval::*;
 
+mod bricks;
+pub use bricks::*;
+
+mod character_inclusion;
+pub use character_inclusion::*;
+
+mod strings;
+pub use strings::*;
+
+mod domain_map;
+pub use domain_map::*;
+
 /// The main trait describing an abstract domain.
 ///
 /// Each abstract domain is partially ordered.
 /// Abstract domains of the same type can be merged.
 pub trait AbstractDomain: Sized + Eq + Clone {
     /// Return an upper bound (with respect to the partial order on the domain) for the two inputs `self` and `other`.
+    #[must_use]
     fn merge(&self, other: &Self) -> Self;
 
     /// Returns whether the element represents the top element (i.e. maximal with respect to the partial order) or not.
@@ -153,4 +163,7 @@ pub trait SpecializeByConditional: Sized {
     /// Return the restriction of `self` to values satisfying `self != bound`
     /// Returns an error if `self` only represents one value for which `self == bound` holds.
     fn add_not_equal_bound(self, bound: &Bitvector) -> Result<Self, Error>;
+
+    /// Return the intersection of two values or an error if the intersection is empty.
+    fn intersect(self, other: &Self) -> Result<Self, Error>;
 }
