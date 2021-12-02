@@ -1,4 +1,5 @@
 use crate::intermediate_representation::*;
+use std::{collections::BTreeMap, iter::FromIterator};
 
 pub struct Setup;
 
@@ -494,14 +495,15 @@ impl CallingConvention {
             name: "__stdcall".to_string(), // so that the mock is useable as standard calling convention in tests
             integer_parameter_register: ["r0", "r1", "r2", "r3"]
                 .iter()
-                .map(|s| s.to_string())
+                .map(|s| Variable::mock(s, 4))
                 .collect(),
             float_parameter_register: ["s0", "s1", "s2", "s3"]
                 .iter()
-                .map(|s| s.to_string())
+                .map(|s| Expression::Var(Variable::mock(s, 4)))
                 .collect(),
-            return_register: vec!["r0".to_string()],
-            callee_saved_register: vec!["r11".to_string()],
+            integer_return_register: vec![Variable::mock("r0", 4)],
+            float_return_register: vec![],
+            callee_saved_register: vec![Variable::mock("r11", 4)],
         }
     }
 }
@@ -590,11 +592,9 @@ pub fn mock_project_with_intraprocedural_control_flow(
     sub_name: &str,
 ) -> Project {
     let mut program = Program::mock_empty();
+    let mocked_sub = mock_sub_with_name_and_symbol_calls(sub_name, symbol_call_config);
 
-    program.subs.push(mock_sub_with_name_and_symbol_calls(
-        sub_name,
-        symbol_call_config,
-    ));
+    program.subs.insert(mocked_sub.tid.clone(), mocked_sub);
     let memcpy = ExternSymbol::mock_memcpy_symbol_arm();
     program.extern_symbols.insert(memcpy.tid.clone(), memcpy);
     let sprintf = ExternSymbol::mock_sprintf_symbol_arm();
@@ -609,12 +609,13 @@ pub fn mock_project_with_intraprocedural_control_flow(
     program.extern_symbols.insert(free.tid.clone(), free);
     let malloc = ExternSymbol::mock_malloc_symbol_arm();
     program.extern_symbols.insert(malloc.tid.clone(), malloc);
-    program.entry_points.push(Tid::new(sub_name));
+    program.entry_points.insert(Tid::new(sub_name));
 
-    let register_list = ["r0", "r1", "r2", "r3", "r11", "sp"]
+    let register_set = ["r0", "r1", "r2", "r3", "r11", "sp"]
         .iter()
         .map(|name| Variable::mock(name, ByteSize::new(4)))
         .collect();
+    let cconv = CallingConvention::mock_standard_arm_32();
 
     Project {
         program: Term {
@@ -623,8 +624,8 @@ pub fn mock_project_with_intraprocedural_control_flow(
         },
         cpu_architecture: "arm_32".to_string(),
         stack_pointer_register: Variable::mock("sp", 4u64),
-        calling_conventions: vec![CallingConvention::mock_standard_arm_32()],
-        register_list,
+        calling_conventions: BTreeMap::from_iter([(cconv.name.clone(), cconv)]),
+        register_set,
         datatype_properties: DatatypeProperties::mock_standard_arm_32(),
     }
 }

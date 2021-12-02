@@ -43,11 +43,9 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
         pi_state: &PointerInferenceState,
     ) -> Result<DataDomain<IntervalDomain>, Error> {
         if let Some(return_arg) = extern_symbol.parameters.first() {
-            if let Ok(return_data) = pi_state.eval_parameter_arg(
-                return_arg,
-                &self.project.stack_pointer_register,
-                self.runtime_memory_image,
-            ) {
+            if let Ok(return_data) =
+                pi_state.eval_parameter_arg(return_arg, self.runtime_memory_image)
+            {
                 if !return_data.get_relative_values().is_empty() {
                     return Ok(return_data);
                 }
@@ -64,11 +62,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
         pi_state: &PointerInferenceState,
     ) -> Result<DataDomain<IntervalDomain>, Error> {
         if let Some(input_arg) = extern_symbol.parameters.get(1) {
-            return pi_state.eval_parameter_arg(
-                input_arg,
-                &self.project.stack_pointer_register,
-                self.runtime_memory_image,
-            );
+            return pi_state.eval_parameter_arg(input_arg, self.runtime_memory_image);
         }
 
         Err(anyhow!("No input values"))
@@ -384,14 +378,12 @@ mod tests {
 
         let return_targets = setup
             .pi_state_before_symbol_call
-            .get_register_by_name("r0")
-            .unwrap();
+            .get_register(&Variable::mock("r0", 4));
 
         let input_target: DataDomain<IntervalDomain> = DataDomain::from(
             setup
                 .pi_state_before_symbol_call
-                .get_register_by_name("r1")
-                .unwrap()
+                .get_register(&Variable::mock("r1", 4))
                 .get_absolute_value()
                 .unwrap()
                 .clone(),
@@ -430,16 +422,14 @@ mod tests {
 
         let return_targets = setup
             .pi_state_before_symbol_call
-            .get_register_by_name("r0")
-            .unwrap()
+            .get_register(&Variable::mock("r0", 4))
             .get_relative_values()
             .clone();
 
         let input_target: DataDomain<IntervalDomain> = DataDomain::from(
             setup
                 .pi_state_before_symbol_call
-                .get_register_by_name("r1")
-                .unwrap()
+                .get_register(&Variable::mock("r1", 4))
                 .get_absolute_value()
                 .unwrap()
                 .clone(),

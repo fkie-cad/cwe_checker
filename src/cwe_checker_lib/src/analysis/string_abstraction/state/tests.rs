@@ -527,7 +527,7 @@ fn test_remove_non_callee_saved_pointer_entries_for_external_symbol() {
     );
 
     let mut mock_state = State::<CharacterInclusionDomain>::mock_with_default_pi_state(
-        project.program.term.subs.get(0).unwrap().clone(),
+        project.program.term.subs.values().next().unwrap().clone(),
     );
 
     let top_domain = DataDomain::new_empty(ByteSize::new(4));

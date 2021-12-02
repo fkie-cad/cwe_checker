@@ -337,7 +337,7 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
                 );
             }
             // Clear non-callee-saved registers from the state.
-            let cconv = extern_symbol.get_calling_convention(self.project);
+            let cconv = self.project.get_calling_convention(extern_symbol);
             new_state.clear_non_callee_saved_register(&cconv.callee_saved_register[..]);
             // Adjust stack register value (for x86 architecture).
             self.adjust_stack_register_on_extern_call(state, &mut new_state);

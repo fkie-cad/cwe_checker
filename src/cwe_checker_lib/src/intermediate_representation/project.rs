@@ -1,7 +1,6 @@
-use super::{Blk, CallingConvention, DatatypeProperties, Def, Jmp, Program, Sub, Variable};
-use crate::prelude::*;
+use super::*;
 use crate::utils::log::LogMessage;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 mod block_duplication_normalization;
 use block_duplication_normalization::*;
@@ -19,10 +18,10 @@ pub struct Project {
     /// The stack pointer register for the given CPU architecture.
     pub stack_pointer_register: Variable,
     /// The known calling conventions that may be used for calls to extern functions.
-    pub calling_conventions: Vec<CallingConvention>,
-    /// A list of all known physical registers for the CPU architecture.
+    pub calling_conventions: BTreeMap<String, CallingConvention>,
+    /// The set of all known physical registers for the CPU architecture.
     /// Does only contain base registers, i.e. sub registers of other registers are not contained.
-    pub register_list: Vec<Variable>,
+    pub register_set: BTreeSet<Variable>,
     /// Contains the properties of C data types. (e.g. size)
     pub datatype_properties: DatatypeProperties,
 }
@@ -36,8 +35,21 @@ impl Project {
     /// Try to guess a standard calling convention from the list of calling conventions in the project.
     pub fn get_standard_calling_convention(&self) -> Option<&CallingConvention> {
         self.calling_conventions
-            .iter()
-            .find(|cconv| cconv.name == "__stdcall" || cconv.name == "__cdecl")
+            .get("__stdcall")
+            .or_else(|| self.calling_conventions.get("__cdecl"))
+    }
+
+    /// Return the calling convention associated to the given extern symbol.
+    /// If the extern symbol has no annotated calling convention
+    /// then return the standard calling convention of the project instead.
+    ///
+    /// This function panics if no suitable calling convention is found.
+    pub fn get_calling_convention(&self, extern_symbol: &ExternSymbol) -> &CallingConvention {
+        if let Some(cconv_name) = &extern_symbol.calling_convention {
+            self.calling_conventions.get(cconv_name).unwrap()
+        } else {
+            self.get_standard_calling_convention().unwrap()
+        }
     }
 }
 
@@ -45,7 +57,7 @@ impl Project {
     /// For all expressions contained in the project,
     /// replace trivially computable subexpressions like `a XOR a` with their result.
     fn substitute_trivial_expressions(&mut self) {
-        for sub in self.program.term.subs.iter_mut() {
+        for sub in self.program.term.subs.values_mut() {
             for block in sub.term.blocks.iter_mut() {
                 for def in block.term.defs.iter_mut() {
                     match &mut def.term {
@@ -83,7 +95,7 @@ impl Project {
     fn remove_references_to_nonexisting_tids(&mut self) -> Vec<LogMessage> {
         // Gather all existing jump targets
         let mut jump_target_tids = HashSet::new();
-        for sub in self.program.term.subs.iter() {
+        for sub in self.program.term.subs.values() {
             jump_target_tids.insert(sub.tid.clone());
             for block in sub.term.blocks.iter() {
                 jump_target_tids.insert(block.tid.clone());
@@ -96,7 +108,7 @@ impl Project {
         let dummy_sub_tid = Tid::new("Artificial Sink Sub");
         let dummy_blk_tid = Tid::new("Artificial Sink Block");
         let mut log_messages = Vec::new();
-        for sub in self.program.term.subs.iter_mut() {
+        for sub in self.program.term.subs.values_mut() {
             for block in sub.term.blocks.iter_mut() {
                 if let Err(mut logs) =
                     block.remove_nonexisting_indirect_jump_targets(&jump_target_tids)
@@ -130,7 +142,10 @@ impl Project {
                     }],
                 },
             };
-            self.program.term.subs.push(dummy_sub);
+            self.program
+                .term
+                .subs
+                .insert(dummy_sub.tid.clone(), dummy_sub);
         }
         log_messages
     }
@@ -140,7 +155,7 @@ impl Project {
     /// The propagation only occurs inside basic blocks
     /// but not across basic block boundaries.
     fn propagate_input_expressions(&mut self) {
-        for sub in self.program.term.subs.iter_mut() {
+        for sub in self.program.term.subs.values_mut() {
             for block in sub.term.blocks.iter_mut() {
                 block.merge_def_assignments_to_same_var();
                 block.propagate_input_expressions();
@@ -221,7 +236,7 @@ mod tests {
 
     impl Project {
         pub fn mock_empty() -> Project {
-            let register_list = vec!["RAX", "RCX", "RDX", "RBX", "RSP", "RBP", "RSI", "RDI"]
+            let register_set = vec!["RAX", "RCX", "RDX", "RBX", "RSP", "RBP", "RSI", "RDI"]
                 .into_iter()
                 .map(|name| Variable::mock(name, ByteSize::new(8)))
                 .collect();
@@ -232,8 +247,8 @@ mod tests {
                 },
                 cpu_architecture: "x86_64".to_string(),
                 stack_pointer_register: Variable::mock("RSP", 8u64),
-                calling_conventions: Vec::new(),
-                register_list,
+                calling_conventions: BTreeMap::new(),
+                register_set,
                 datatype_properties: DatatypeProperties::mock(),
             }
         }

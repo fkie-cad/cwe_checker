@@ -1,44 +1,25 @@
 //! Handles argument detection by parsing format string arguments during a function call. (e.g. sprintf)
 
-use std::collections::HashMap;
-
-use crate::{intermediate_representation::Datatype, prelude::*};
-
-use regex::Regex;
-
+use super::binary::RuntimeMemoryImage;
+use crate::prelude::*;
 use crate::{
     abstract_domain::{IntervalDomain, TryToBitvec},
     analysis::pointer_inference::State as PointerInferenceState,
-    intermediate_representation::{
-        Arg, ByteSize, CallingConvention, DatatypeProperties, ExternSymbol, Project, Variable,
-    },
+    intermediate_representation::*,
 };
-
-use super::binary::RuntimeMemoryImage;
-
-/// Returns all return registers of a symbol as a vector of strings.
-pub fn get_return_registers_from_symbol(symbol: &ExternSymbol) -> Vec<String> {
-    symbol
-        .return_values
-        .iter()
-        .filter_map(|ret| match ret {
-            Arg::Register { var, .. } => Some(var.name.clone()),
-            _ => None,
-        })
-        .collect::<Vec<String>>()
-}
+use regex::Regex;
+use std::collections::HashMap;
 
 /// Parses the input format string for the corresponding string function.
 pub fn get_input_format_string(
     pi_state: &PointerInferenceState,
     extern_symbol: &ExternSymbol,
     format_string_index: usize,
-    stack_pointer_register: &Variable,
     runtime_memory_image: &RuntimeMemoryImage,
 ) -> Result<String, Error> {
     if let Some(format_string) = extern_symbol.parameters.get(format_string_index) {
         if let Ok(Some(address)) = pi_state
-            .eval_parameter_arg(format_string, stack_pointer_register, runtime_memory_image)
+            .eval_parameter_arg(format_string, runtime_memory_image)
             .as_ref()
             .map(|param| param.get_if_absolute_value())
         {
@@ -135,7 +116,6 @@ pub fn get_variable_parameters(
         pi_state,
         extern_symbol,
         format_string_index,
-        &project.stack_pointer_register,
         runtime_memory_image,
     );
 
@@ -146,8 +126,10 @@ pub fn get_variable_parameters(
             Ok(parameters) => {
                 return Ok(calculate_parameter_locations(
                     parameters,
-                    extern_symbol.get_calling_convention(project),
+                    project.get_calling_convention(extern_symbol),
                     format_string_index,
+                    &project.stack_pointer_register,
+                    &project.cpu_architecture,
                 ));
             }
             Err(e) => {
@@ -168,6 +150,8 @@ pub fn calculate_parameter_locations(
     parameters: Vec<(Datatype, ByteSize)>,
     calling_convention: &CallingConvention,
     format_string_index: usize,
+    stack_register: &Variable,
+    cpu_arch: &str,
 ) -> Vec<Arg> {
     let mut var_args: Vec<Arg> = Vec::new();
     // The number of the remaining integer argument registers are calculated
@@ -175,37 +159,55 @@ pub fn calculate_parameter_locations(
     let mut integer_arg_register_count =
         calling_convention.integer_parameter_register.len() - (format_string_index + 1);
     let mut float_arg_register_count = calling_convention.float_parameter_register.len();
-    let mut stack_offset: i64 = 0;
+    let mut stack_offset: i64 = match cpu_arch {
+        "x86" | "x86_32" | "x86_64" => u64::from(stack_register.size) as i64,
+        _ => 0,
+    };
 
     for (data_type, size) in parameters.iter() {
         match data_type {
             Datatype::Integer | Datatype::Pointer | Datatype::Char => {
                 if integer_arg_register_count > 0 {
-                    let register_name = calling_convention.integer_parameter_register
-                        [calling_convention.integer_parameter_register.len()
-                            - integer_arg_register_count]
+                    let register = calling_convention.integer_parameter_register[calling_convention
+                        .integer_parameter_register
+                        .len()
+                        - integer_arg_register_count]
                         .clone();
 
-                    var_args.push(create_register_arg(*size, register_name, data_type.clone()));
+                    var_args.push(create_register_arg(
+                        Expression::Var(register),
+                        data_type.clone(),
+                    ));
 
                     integer_arg_register_count -= 1;
                 } else {
-                    var_args.push(create_stack_arg(*size, stack_offset, data_type.clone()));
+                    var_args.push(create_stack_arg(
+                        *size,
+                        stack_offset,
+                        data_type.clone(),
+                        stack_register,
+                    ));
                     stack_offset += u64::from(*size) as i64
                 }
             }
             Datatype::Double => {
                 if float_arg_register_count > 0 {
-                    let register_name = calling_convention.float_parameter_register
-                        [calling_convention.float_parameter_register.len()
-                            - float_arg_register_count]
+                    let expr = calling_convention.float_parameter_register[calling_convention
+                        .float_parameter_register
+                        .len()
+                        - float_arg_register_count]
                         .clone();
 
-                    var_args.push(create_register_arg(*size, register_name, data_type.clone()));
+                    var_args.push(create_register_arg(expr, data_type.clone()));
 
                     float_arg_register_count -= 1;
                 } else {
-                    var_args.push(create_stack_arg(*size, stack_offset, data_type.clone()));
+                    var_args.push(create_stack_arg(
+                        *size,
+                        stack_offset,
+                        data_type.clone(),
+                        stack_register,
+                    ));
                     stack_offset += u64::from(*size) as i64
                 }
             }
@@ -217,22 +219,23 @@ pub fn calculate_parameter_locations(
 }
 
 /// Creates a stack parameter given a size, stack offset and data type.
-pub fn create_stack_arg(size: ByteSize, stack_offset: i64, data_type: Datatype) -> Arg {
+pub fn create_stack_arg(
+    size: ByteSize,
+    stack_offset: i64,
+    data_type: Datatype,
+    stack_register: &Variable,
+) -> Arg {
     Arg::Stack {
-        offset: stack_offset,
+        address: Expression::Var(stack_register.clone()).plus_const(stack_offset),
         size,
         data_type: Some(data_type),
     }
 }
 
 /// Creates a register parameter given a size, register name and data type.
-pub fn create_register_arg(size: ByteSize, register_name: String, data_type: Datatype) -> Arg {
+pub fn create_register_arg(expr: Expression, data_type: Datatype) -> Arg {
     Arg::Register {
-        var: Variable {
-            name: register_name,
-            size,
-            is_temp: false,
-        },
+        expr,
         data_type: Some(data_type),
     }
 }

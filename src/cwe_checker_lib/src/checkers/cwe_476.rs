@@ -111,11 +111,7 @@ pub fn check_cwe(
                     let mut computation = create_computation(context, None);
                     computation.set_node_value(
                         node,
-                        NodeValue::Value(State::new(
-                            symbol,
-                            &project.stack_pointer_register,
-                            pi_state_at_taint_source.as_ref(),
-                        )),
+                        NodeValue::Value(State::new(symbol, pi_state_at_taint_source.as_ref())),
                     );
                     computation.compute_with_max_steps(100);
                 }

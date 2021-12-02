@@ -39,10 +39,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
         if let Some(standard_cconv) = self.project.get_standard_calling_convention() {
             let mut filtered_map = state.get_variable_to_pointer_map().clone();
             for (register, _) in state.get_variable_to_pointer_map().clone().iter() {
-                if !standard_cconv
-                    .callee_saved_register
-                    .contains(&register.name)
-                {
+                if !standard_cconv.callee_saved_register.contains(register) {
                     filtered_map.remove(register);
                 }
             }
@@ -220,11 +217,9 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
 
         if let Some(dest_arg) = extern_symbol.parameters.first() {
             if let Some(pi_state) = state.get_pointer_inference_state() {
-                if let Ok(pointer) = pi_state.eval_parameter_arg(
-                    dest_arg,
-                    &self.project.stack_pointer_register,
-                    self.runtime_memory_image,
-                ) {
+                if let Ok(pointer) =
+                    pi_state.eval_parameter_arg(dest_arg, self.runtime_memory_image)
+                {
                     let heap_to_string_map = state.get_heap_to_string_map();
                     for (target, _) in pointer.get_relative_values().iter() {
                         if heap_to_string_map.contains_key(target) {

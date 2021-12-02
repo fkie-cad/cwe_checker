@@ -134,39 +134,23 @@ impl<'a> Context<'a> {
             "malloc" => {
                 let size_parameter = extern_symbol.parameters.get(0).unwrap();
                 state
-                    .eval_parameter_arg(
-                        size_parameter,
-                        &self.project.stack_pointer_register,
-                        self.runtime_memory_image,
-                    )
+                    .eval_parameter_arg(size_parameter, self.runtime_memory_image)
                     .unwrap_or_else(|_| Data::new_top(address_bytesize))
             }
             "realloc" => {
                 let size_parameter = extern_symbol.parameters.get(1).unwrap();
                 state
-                    .eval_parameter_arg(
-                        size_parameter,
-                        &self.project.stack_pointer_register,
-                        self.runtime_memory_image,
-                    )
+                    .eval_parameter_arg(size_parameter, self.runtime_memory_image)
                     .unwrap_or_else(|_| Data::new_top(address_bytesize))
             }
             "calloc" => {
                 let size_param1 = extern_symbol.parameters.get(0).unwrap();
                 let size_param2 = extern_symbol.parameters.get(1).unwrap();
                 let param1_value = state
-                    .eval_parameter_arg(
-                        size_param1,
-                        &self.project.stack_pointer_register,
-                        self.runtime_memory_image,
-                    )
+                    .eval_parameter_arg(size_param1, self.runtime_memory_image)
                     .unwrap_or_else(|_| Data::new_top(address_bytesize));
                 let param2_value = state
-                    .eval_parameter_arg(
-                        size_param2,
-                        &self.project.stack_pointer_register,
-                        self.runtime_memory_image,
-                    )
+                    .eval_parameter_arg(size_param2, self.runtime_memory_image)
                     .unwrap_or_else(|_| Data::new_top(address_bytesize));
                 param1_value.bin_op(BinOpType::IntMult, &param2_value)
             }
@@ -238,11 +222,8 @@ impl<'a> Context<'a> {
     ) -> State {
         match extern_symbol.get_unique_parameter() {
             Ok(parameter) => {
-                let parameter_value = state.eval_parameter_arg(
-                    parameter,
-                    &self.project.stack_pointer_register,
-                    self.runtime_memory_image,
-                );
+                let parameter_value =
+                    state.eval_parameter_arg(parameter, self.runtime_memory_image);
                 match parameter_value {
                     Ok(memory_object_pointer) => {
                         if let Err(possible_double_frees) =
@@ -290,11 +271,7 @@ impl<'a> Context<'a> {
         extern_symbol: &ExternSymbol,
     ) {
         for parameter in extern_symbol.parameters.iter() {
-            match state.eval_parameter_arg(
-                parameter,
-                &self.project.stack_pointer_register,
-                self.runtime_memory_image,
-            ) {
+            match state.eval_parameter_arg(parameter, self.runtime_memory_image) {
                 Ok(value) => {
                     if state.memory.is_dangling_pointer(&value, true) {
                         state
@@ -336,11 +313,7 @@ impl<'a> Context<'a> {
         extern_symbol: &ExternSymbol,
     ) {
         for parameter in extern_symbol.parameters.iter() {
-            match state.eval_parameter_arg(
-                parameter,
-                &self.project.stack_pointer_register,
-                self.runtime_memory_image,
-            ) {
+            match state.eval_parameter_arg(parameter, self.runtime_memory_image) {
                 Ok(data) => {
                     if state.pointer_contains_out_of_bounds_target(&data, self.runtime_memory_image)
                     {
@@ -417,35 +390,26 @@ impl<'a> Context<'a> {
         extern_symbol: &ExternSymbol,
     ) -> State {
         self.log_debug(
-            new_state.clear_stack_parameter(
-                extern_symbol,
-                &self.project.stack_pointer_register,
-                self.runtime_memory_image,
-            ),
+            new_state.clear_stack_parameter(extern_symbol, self.runtime_memory_image),
             Some(&call.tid),
         );
-        let calling_conv = extern_symbol.get_calling_convention(self.project);
+        let calling_conv = self.project.get_calling_convention(extern_symbol);
         let mut possible_referenced_ids = BTreeSet::new();
         if extern_symbol.parameters.is_empty() && extern_symbol.return_values.is_empty() {
             // We assume here that we do not know the parameters and approximate them by all possible parameter registers.
             // This approximation is wrong if the function is known but has neither parameters nor return values.
             // We cannot distinguish these two cases yet.
-            for parameter_register_name in calling_conv
-                .integer_parameter_register
-                .iter()
-                .chain(calling_conv.float_parameter_register.iter())
-            {
-                if let Some(register_value) = state.get_register_by_name(parameter_register_name) {
-                    possible_referenced_ids.extend(register_value.referenced_ids().cloned());
-                }
+            for parameter_register in calling_conv.integer_parameter_register.iter() {
+                let register_value = state.get_register(parameter_register);
+                possible_referenced_ids.extend(register_value.referenced_ids().cloned());
+            }
+            for float_parameter_expression in calling_conv.float_parameter_register.iter() {
+                let register_value = state.eval(float_parameter_expression);
+                possible_referenced_ids.extend(register_value.referenced_ids().cloned());
             }
         } else {
             for parameter in extern_symbol.parameters.iter() {
-                if let Ok(data) = state.eval_parameter_arg(
-                    parameter,
-                    &self.project.stack_pointer_register,
-                    self.runtime_memory_image,
-                ) {
+                if let Ok(data) = state.eval_parameter_arg(parameter, self.runtime_memory_image) {
                     possible_referenced_ids.extend(data.referenced_ids().cloned());
                 }
             }
@@ -475,16 +439,13 @@ impl<'a> Context<'a> {
             self.adjust_stack_register_on_extern_call(state_before_call, &mut new_state);
 
             let mut possible_referenced_ids = BTreeSet::new();
-            for parameter_register_name in calling_conv
-                .integer_parameter_register
-                .iter()
-                .chain(calling_conv.float_parameter_register.iter())
-            {
-                if let Some(register_value) =
-                    state_before_call.get_register_by_name(parameter_register_name)
-                {
-                    possible_referenced_ids.extend(register_value.referenced_ids().cloned());
-                }
+            for parameter_register in calling_conv.integer_parameter_register.iter() {
+                let register_value = state_before_call.get_register(parameter_register);
+                possible_referenced_ids.extend(register_value.referenced_ids().cloned());
+            }
+            for float_parameter_expression in calling_conv.float_parameter_register.iter() {
+                let register_value = state_before_call.eval(float_parameter_expression);
+                possible_referenced_ids.extend(register_value.referenced_ids().cloned());
             }
             possible_referenced_ids =
                 state_before_call.add_recursively_referenced_ids_to_id_set(possible_referenced_ids);

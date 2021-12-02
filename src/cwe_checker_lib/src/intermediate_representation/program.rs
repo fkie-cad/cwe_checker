@@ -1,17 +1,17 @@
 use super::{Blk, ExternSymbol, Sub};
 use crate::prelude::*;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// The `Program` structure represents a disassembled binary.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct Program {
     /// The known functions contained in the binary
-    pub subs: Vec<Term<Sub>>,
+    pub subs: BTreeMap<Tid, Term<Sub>>,
     /// Extern symbols linked to the binary by the linker.
     pub extern_symbols: BTreeMap<Tid, ExternSymbol>,
     /// Entry points into to binary,
     /// i.e. the term identifiers of functions that may be called from outside of the binary.
-    pub entry_points: Vec<Tid>,
+    pub entry_points: BTreeSet<Tid>,
     /// An offset that has been added to all addresses in the program compared to the addresses
     /// as specified in the binary file.
     ///
@@ -29,7 +29,7 @@ impl Program {
     pub fn find_block(&self, tid: &Tid) -> Option<&Term<Blk>> {
         self.subs
             .iter()
-            .map(|sub| sub.term.blocks.iter())
+            .map(|(_, sub)| sub.term.blocks.iter())
             .flatten()
             .find(|block| block.tid == *tid)
     }
@@ -42,9 +42,9 @@ mod tests {
     impl Program {
         pub fn mock_empty() -> Program {
             Program {
-                subs: Vec::new(),
+                subs: BTreeMap::new(),
                 extern_symbols: BTreeMap::new(),
-                entry_points: Vec::new(),
+                entry_points: BTreeSet::new(),
                 address_base_offset: 0,
             }
         }

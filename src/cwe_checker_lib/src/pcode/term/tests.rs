@@ -88,6 +88,7 @@ impl Setup {
                             "integer_parameter_register": [],
                             "float_parameter_register": [],
                             "return_register": [],
+                            "float_return_register": [],
                             "unaffected_register": [],
                             "killed_by_call_register": []
                         }
@@ -746,6 +747,7 @@ fn from_project_to_ir_project() {
     blk.term.jmps.push(setup.jmp_t);
 
     let mut sub = setup.sub_t;
+    let sub_tid = sub.tid.clone();
     sub.term.blocks.push(blk);
     mock_project.program.term.subs.push(sub.clone());
 
@@ -888,31 +890,14 @@ fn from_project_to_ir_project() {
     };
 
     // Checks whether the zero extension was correctly removed; leaving only 5 definitions behind.
-    assert_eq!(ir_program.subs[0].term.blocks[0].term.defs.len(), 5);
+    let ir_block = &ir_program.subs.get(&sub_tid).unwrap().term.blocks[0].term;
+    assert_eq!(ir_block.defs.len(), 5);
 
     // Checks if the other definitions and the jump were correctly casted.
-    assert_eq!(
-        ir_program.subs[0].term.blocks[0].term.defs[0].term,
-        expected_def_0
-    );
-    assert_eq!(
-        ir_program.subs[0].term.blocks[0].term.defs[1].term,
-        expected_def_1
-    );
-    assert_eq!(
-        ir_program.subs[0].term.blocks[0].term.defs[2].term,
-        expected_def_3
-    );
-    assert_eq!(
-        ir_program.subs[0].term.blocks[0].term.defs[3].term,
-        expected_def_4
-    );
-    assert_eq!(
-        ir_program.subs[0].term.blocks[0].term.defs[4].term,
-        expected_def_5
-    );
-    assert_eq!(
-        ir_program.subs[0].term.blocks[0].term.jmps[0].term,
-        expected_jmp
-    );
+    assert_eq!(ir_block.defs[0].term, expected_def_0);
+    assert_eq!(ir_block.defs[1].term, expected_def_1);
+    assert_eq!(ir_block.defs[2].term, expected_def_3);
+    assert_eq!(ir_block.defs[3].term, expected_def_4);
+    assert_eq!(ir_block.defs[4].term, expected_def_5);
+    assert_eq!(ir_block.jmps[0].term, expected_jmp);
 }

@@ -38,7 +38,7 @@ impl Project {
     /// to the `Sub` TID in which the term is contained.
     fn generate_tid_to_sub_tid_map(&self) -> HashMap<Tid, Tid> {
         let mut tid_to_sub_map = HashMap::new();
-        for sub in self.program.term.subs.iter() {
+        for sub in self.program.term.subs.values() {
             tid_to_sub_map.insert(sub.tid.clone(), sub.tid.clone());
             for block in sub.term.blocks.iter() {
                 tid_to_sub_map.insert(block.tid.clone(), sub.tid.clone());
@@ -56,7 +56,7 @@ impl Project {
     /// Generate a map mapping all block TIDs to the corresponding block.
     fn generate_block_tid_to_block_term_map(&self) -> HashMap<Tid, &Term<Blk>> {
         let mut tid_to_block_map = HashMap::new();
-        for sub in self.program.term.subs.iter() {
+        for sub in self.program.term.subs.values() {
             for block in sub.term.blocks.iter() {
                 tid_to_block_map.insert(block.tid.clone(), block);
             }
@@ -72,7 +72,7 @@ impl Project {
         block_tid_to_block_map: &HashMap<Tid, &Term<Blk>>,
     ) -> HashMap<Tid, HashSet<Tid>> {
         let mut sub_to_blocks_map = HashMap::new();
-        for sub in self.program.term.subs.iter() {
+        for sub in self.program.term.subs.values() {
             let mut worklist: Vec<Tid> =
                 sub.term.blocks.iter().map(|blk| blk.tid.clone()).collect();
             let mut block_set = HashSet::new();
@@ -120,7 +120,7 @@ impl Project {
     ) -> HashMap<Tid, Vec<Term<Blk>>> {
         // Generate new blocks without adjusting jump TIDs
         let mut sub_to_additional_blocks_map = HashMap::new();
-        for sub in self.program.term.subs.iter() {
+        for sub in self.program.term.subs.values() {
             let tid_suffix = format!("_{}", sub.tid);
             let mut additional_blocks = Vec::new();
             for block_tid in sub_to_blocks_map.get(&sub.tid).unwrap() {
@@ -147,7 +147,7 @@ impl Project {
         &mut self,
         tid_to_original_sub_map: &HashMap<Tid, Tid>,
     ) {
-        for sub in self.program.term.subs.iter_mut() {
+        for sub in self.program.term.subs.values_mut() {
             let tid_suffix = format!("_{}", sub.tid);
             for block in sub.term.blocks.iter_mut() {
                 for jump in block.term.jmps.iter_mut() {
@@ -198,7 +198,7 @@ pub fn make_block_to_sub_mapping_unique(project: &mut Project) {
         &block_tid_to_block_map,
     );
     // Add the new blocks to the subs
-    for sub in project.program.term.subs.iter_mut() {
+    for sub in project.program.term.subs.values_mut() {
         sub.term
             .blocks
             .append(&mut sub_to_additional_blocks_map.remove(&sub.tid).unwrap());
@@ -210,6 +210,7 @@ pub fn make_block_to_sub_mapping_unique(project: &mut Project) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::iter::FromIterator;
 
     fn create_block_with_jump_target(block_name: &str, target_name: &str) -> Term<Blk> {
         Term {
@@ -252,12 +253,19 @@ mod tests {
             "sub_3",
             vec![create_block_with_jump_target("blk_4", "blk_3")],
         );
+        let sub_1_tid = &sub_1.tid;
+        let sub_2_tid = &sub_2.tid;
+        let sub_3_tid = &sub_3.tid;
         let mut project = Project::mock_empty();
-        project.program.term.subs = vec![sub_1.clone(), sub_2, sub_3];
+        project.program.term.subs = BTreeMap::from_iter([
+            (sub_1_tid.clone(), sub_1.clone()),
+            (sub_2_tid.clone(), sub_2.clone()),
+            (sub_3.tid.clone(), sub_3.clone()),
+        ]);
 
         make_block_to_sub_mapping_unique(&mut project);
 
-        assert_eq!(&project.program.term.subs[0], &sub_1);
+        assert_eq!(&project.program.term.subs[sub_1_tid], &sub_1);
         let sub_2_modified = create_sub_with_blocks(
             "sub_2",
             vec![
@@ -266,16 +274,16 @@ mod tests {
                 create_block_with_jump_target("blk_1_sub_2", "blk_2_sub_2"),
             ],
         );
-        assert_eq!(project.program.term.subs[1].term.blocks.len(), 3);
+        assert_eq!(project.program.term.subs[sub_2_tid].term.blocks.len(), 3);
         assert_eq!(
-            &project.program.term.subs[1].term.blocks[0],
+            &project.program.term.subs[sub_2_tid].term.blocks[0],
             &sub_2_modified.term.blocks[0]
         );
-        assert!(project.program.term.subs[1]
+        assert!(project.program.term.subs[sub_2_tid]
             .term
             .blocks
             .contains(&sub_2_modified.term.blocks[1]));
-        assert!(project.program.term.subs[1]
+        assert!(project.program.term.subs[sub_2_tid]
             .term
             .blocks
             .contains(&sub_2_modified.term.blocks[2]));
@@ -288,24 +296,24 @@ mod tests {
                 create_block_with_jump_target("blk_1_sub_3", "blk_2_sub_3"),
             ],
         );
-        assert_eq!(project.program.term.subs[2].term.blocks.len(), 4);
+        assert_eq!(project.program.term.subs[sub_3_tid].term.blocks.len(), 4);
         assert_eq!(
-            &project.program.term.subs[2].term.blocks[0],
+            &project.program.term.subs[sub_3_tid].term.blocks[0],
             &sub_3_modified.term.blocks[0]
         );
-        assert!(project.program.term.subs[2]
+        assert!(project.program.term.subs[sub_3_tid]
             .term
             .blocks
             .contains(&sub_3_modified.term.blocks[0]));
-        assert!(project.program.term.subs[2]
+        assert!(project.program.term.subs[sub_3_tid]
             .term
             .blocks
             .contains(&sub_3_modified.term.blocks[1]));
-        assert!(project.program.term.subs[2]
+        assert!(project.program.term.subs[sub_3_tid]
             .term
             .blocks
             .contains(&sub_3_modified.term.blocks[2]));
-        assert!(project.program.term.subs[2]
+        assert!(project.program.term.subs[sub_3_tid]
             .term
             .blocks
             .contains(&sub_3_modified.term.blocks[3]));

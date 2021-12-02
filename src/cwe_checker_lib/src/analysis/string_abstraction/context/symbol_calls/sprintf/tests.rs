@@ -3,7 +3,7 @@ use std::collections::{BTreeSet, HashSet};
 use super::*;
 use crate::abstract_domain::{AbstractIdentifier, AbstractLocation};
 use crate::analysis::pointer_inference::PointerInference as PointerInferenceComputation;
-use crate::intermediate_representation::{Bitvector, Tid, Variable};
+use crate::intermediate_representation::{Bitvector, Expression, Tid, Variable};
 use crate::{
     abstract_domain::{CharacterInclusionDomain, CharacterSet},
     analysis::string_abstraction::{
@@ -183,15 +183,15 @@ fn test_create_string_domain_using_data_type_approximations() {
 fn test_create_string_domain_using_constants_and_sub_domains() {
     let sprintf_symbol = ExternSymbol::mock_sprintf_symbol_arm();
     let string_arg = Arg::Register {
-        var: Variable::mock("r6", 4),
+        expr: Expression::Var(Variable::mock("r6", 4)),
         data_type: Some(Datatype::Pointer),
     };
     let integer_arg = Arg::Register {
-        var: Variable::mock("r7", 4),
+        expr: Expression::Var(Variable::mock("r7", 4)),
         data_type: Some(Datatype::Integer),
     };
     let char_arg = Arg::Register {
-        var: Variable::mock("r8", 4),
+        expr: Expression::Var(Variable::mock("r8", 4)),
         data_type: Some(Datatype::Char),
     };
 
@@ -352,15 +352,15 @@ fn test_no_specifiers() {
 fn test_fetch_constant_and_domain_for_format_specifier() {
     let sprintf_symbol = ExternSymbol::mock_sprintf_symbol_arm();
     let string_arg = Arg::Register {
-        var: Variable::mock("r6", 4),
+        expr: Expression::Var(Variable::mock("r6", 4)),
         data_type: Some(Datatype::Pointer),
     };
     let integer_arg = Arg::Register {
-        var: Variable::mock("r7", 4),
+        expr: Expression::Var(Variable::mock("r7", 4)),
         data_type: Some(Datatype::Integer),
     };
     let char_arg = Arg::Register {
-        var: Variable::mock("r8", 4),
+        expr: Expression::Var(Variable::mock("r8", 4)),
         data_type: Some(Datatype::Char),
     };
 

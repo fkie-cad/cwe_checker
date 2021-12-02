@@ -611,10 +611,10 @@ impl<T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> State<T> 
         project: &Project,
         extern_symbol: &ExternSymbol,
     ) {
-        let cconv = extern_symbol.get_calling_convention(project);
+        let cconv = project.get_calling_convention(extern_symbol);
         let mut filtered_map = self.variable_to_pointer_map.clone();
         for (register, _) in self.variable_to_pointer_map.clone().iter() {
-            if !cconv.callee_saved_register.contains(&register.name) {
+            if !cconv.callee_saved_register.contains(register) {
                 if let Some(pointer) = filtered_map.remove(register) {
                     self.unassigned_return_pointer.insert(pointer);
                 }

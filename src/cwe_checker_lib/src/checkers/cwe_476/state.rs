@@ -80,11 +80,7 @@ impl AbstractDomain for State {
 
 impl State {
     /// Get a new state in which only the return values of the given extern symbol are tainted.
-    pub fn new(
-        taint_source: &ExternSymbol,
-        stack_pointer_register: &Variable,
-        pi_state: Option<&PointerInferenceState>,
-    ) -> State {
+    pub fn new(taint_source: &ExternSymbol, pi_state: Option<&PointerInferenceState>) -> State {
         let mut state = State {
             register_taint: HashMap::new(),
             memory_taint: HashMap::new(),
@@ -92,16 +88,16 @@ impl State {
         };
         for return_arg in taint_source.return_values.iter() {
             match return_arg {
-                Arg::Register { var, .. } => {
-                    state
-                        .register_taint
-                        .insert(var.clone(), Taint::Tainted(var.size));
+                Arg::Register { expr, .. } => {
+                    for var in expr.input_vars() {
+                        state
+                            .register_taint
+                            .insert(var.clone(), Taint::Tainted(var.size));
+                    }
                 }
-                Arg::Stack { offset, size, .. } => {
+                Arg::Stack { address, size, .. } => {
                     if let Some(pi_state) = pi_state {
-                        let address_exp =
-                            Expression::Var(stack_pointer_register.clone()).plus_const(*offset);
-                        let address = pi_state.eval(&address_exp);
+                        let address = pi_state.eval(address);
                         state.save_taint_to_memory(&address, Taint::Tainted(*size));
                     }
                 }
@@ -255,26 +251,23 @@ impl State {
     /// Return `true` if taint was found and `false` if no taint was found.
     fn check_register_list_for_taint(
         &self,
-        register_list: &[String],
+        register_list: &[Variable],
         pi_state_option: Option<&PointerInferenceState>,
     ) -> bool {
         // Check whether a register contains taint
-        for (register, taint) in &self.register_taint {
-            if register_list
-                .iter()
-                .any(|reg_name| *reg_name == register.name)
-                && !taint.is_top()
-            {
-                return true;
+        for register in register_list {
+            if let Some(taint) = self.register_taint.get(register) {
+                if !taint.is_top() {
+                    return true;
+                }
             }
         }
         // Check whether some memory object referenced by a register may contain taint
         if let Some(pi_state) = pi_state_option {
-            for register_name in register_list {
-                if let Some(register_value) = pi_state.get_register_by_name(register_name) {
-                    if self.check_if_address_points_to_taint(register_value, pi_state) {
-                        return true;
-                    }
+            for register in register_list {
+                let register_value = pi_state.get_register(register);
+                if self.check_if_address_points_to_taint(register_value, pi_state) {
+                    return true;
                 }
             }
         }
@@ -291,7 +284,11 @@ impl State {
     ) -> bool {
         if let Some(calling_conv) = project.get_standard_calling_convention() {
             let mut all_parameters = calling_conv.integer_parameter_register.clone();
-            all_parameters.append(&mut calling_conv.float_parameter_register.clone());
+            for float_param in calling_conv.float_parameter_register.iter() {
+                for var in float_param.input_vars() {
+                    all_parameters.push(var.clone());
+                }
+            }
             self.check_register_list_for_taint(&all_parameters, pi_state_option)
         } else {
             // No standard calling convention found. Assume everything may be parameters or referenced by parameters.
@@ -308,7 +305,10 @@ impl State {
         pi_state_option: Option<&PointerInferenceState>,
     ) -> bool {
         if let Some(calling_conv) = project.get_standard_calling_convention() {
-            self.check_register_list_for_taint(&calling_conv.return_register[..], pi_state_option)
+            self.check_register_list_for_taint(
+                &calling_conv.integer_return_register[..],
+                pi_state_option,
+            )
         } else {
             // No standard calling convention found. Assume everything may be return values or referenced by return values.
             !self.is_empty()
@@ -324,7 +324,7 @@ impl State {
                 if calling_conv
                     .callee_saved_register
                     .iter()
-                    .any(|callee_saved_reg| register.name == *callee_saved_reg)
+                    .any(|callee_saved_reg| register == callee_saved_reg)
                 {
                     Some((register.clone(), *taint))
                 } else {
@@ -389,11 +389,11 @@ mod tests {
 
         pub fn mock_with_pi_state() -> (State, PointerInferenceState) {
             let arg1 = Arg::Register {
-                var: register("RAX"),
+                expr: Expression::Var(register("RAX")),
                 data_type: None,
             };
             let arg2 = Arg::Stack {
-                offset: 0,
+                address: Expression::Var(register("RSP")),
                 size: ByteSize::new(8),
                 data_type: None,
             };
@@ -408,7 +408,7 @@ mod tests {
                 no_return: false,
                 has_var_args: false,
             };
-            let state = State::new(&symbol, &register("RSP"), Some(&pi_state));
+            let state = State::new(&symbol, Some(&pi_state));
             (state, pi_state)
         }
     }

@@ -14,19 +14,6 @@ impl State {
         }
     }
 
-    /// Get the value of a register by its name.
-    ///
-    /// Returns None if no value is set for the register.
-    pub fn get_register_by_name(&self, reg_name: &str) -> Option<Data> {
-        self.register.iter().find_map(|(key, value)| {
-            if key.name == reg_name {
-                Some(value.clone())
-            } else {
-                None
-            }
-        })
-    }
-
     /// Set the value of a register.
     pub fn set_register(&mut self, variable: &Variable, value: Data) {
         if !value.is_top() {
@@ -237,16 +224,11 @@ impl State {
     pub fn eval_parameter_arg(
         &self,
         parameter: &Arg,
-        stack_pointer: &Variable,
         global_memory: &RuntimeMemoryImage,
     ) -> Result<Data, Error> {
         match parameter {
-            Arg::Register { var, .. } => Ok(self.eval(&Expression::Var(var.clone()))),
-            Arg::Stack { offset, size, .. } => self.load_value(
-                &Expression::Var(stack_pointer.clone()).plus_const(*offset),
-                *size,
-                global_memory,
-            ),
+            Arg::Register { expr, .. } => Ok(self.eval(expr)),
+            Arg::Stack { address, size, .. } => self.load_value(address, *size, global_memory),
         }
     }
 

@@ -272,7 +272,10 @@ impl Expression {
 
     /// This function recursively iterates into the expression and checks whether a sub register was used.
     /// If so, the sub register is turned into a SUBPIECE of the corresponding base register.
-    fn replace_input_sub_register(&mut self, register_map: &HashMap<&String, &RegisterProperties>) {
+    pub fn replace_input_sub_register(
+        &mut self,
+        register_map: &HashMap<&String, &RegisterProperties>,
+    ) {
         match self {
             Expression::BinOp { lhs, rhs, .. } => {
                 lhs.replace_input_sub_register(register_map);

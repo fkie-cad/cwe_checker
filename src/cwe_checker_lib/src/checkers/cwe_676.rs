@@ -47,11 +47,11 @@ pub struct Config {
 
 /// For each subroutine and each found dangerous symbol, check for calls to the corresponding symbol
 pub fn get_calls<'a>(
-    subfunctions: &'a [Term<Sub>],
+    subfunctions: &'a BTreeMap<Tid, Term<Sub>>,
     dangerous_symbols: &'a HashMap<&'a Tid, &'a str>,
 ) -> Vec<(&'a str, &'a Tid, &'a str)> {
     let mut calls: Vec<(&str, &Tid, &str)> = Vec::new();
-    for sub in subfunctions.iter() {
+    for sub in subfunctions.values() {
         calls.append(&mut get_calls_to_symbols(sub, dangerous_symbols));
     }
 
@@ -114,7 +114,7 @@ pub fn check_cwe(
     let project = analysis_results.project;
     let config: Config = serde_json::from_value(cwe_params.clone()).unwrap();
     let prog: &Term<Program> = &project.program;
-    let subfunctions: &Vec<Term<Sub>> = &prog.term.subs;
+    let subfunctions = &prog.term.subs;
     let external_symbols: &BTreeMap<Tid, ExternSymbol> = &prog.term.extern_symbols;
     let dangerous_symbols = resolve_symbols(external_symbols, &config.symbols);
     let dangerous_calls = get_calls(subfunctions, &dangerous_symbols);

@@ -88,6 +88,9 @@ impl Expression {
     ///
     /// The bytesize of the value is automatically adjusted to the bytesize of the given expression.
     pub fn plus_const(self, value: i64) -> Expression {
+        if value == 0 {
+            return self;
+        }
         let bytesize = self.bytesize();
         let mut value = Bitvector::from_i64(value);
         match u64::from(bytesize) {

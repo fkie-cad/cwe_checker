@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::usize;
 
 use super::{Expression, ExpressionType, RegisterProperties, Variable};
@@ -14,6 +14,7 @@ use crate::intermediate_representation::Jmp as IrJmp;
 use crate::intermediate_representation::Program as IrProgram;
 use crate::intermediate_representation::Project as IrProject;
 use crate::intermediate_representation::Sub as IrSub;
+use crate::intermediate_representation::Variable as IrVariable;
 use crate::prelude::*;
 use crate::utils::log::LogMessage;
 
@@ -531,22 +532,23 @@ impl ExternSymbol {
         for arg in symbol.arguments.iter() {
             let ir_arg = if let Some(var) = arg.var.clone() {
                 IrArg::Register {
-                    var: var.into(),
+                    expr: IrExpression::Var(var.into()),
                     data_type: None,
                 }
             } else if let Some(expr) = arg.location.clone() {
                 if expr.mnemonic == ExpressionType::LOAD {
+                    let offset = i64::from_str_radix(
+                        expr.input0
+                            .clone()
+                            .unwrap()
+                            .address
+                            .unwrap()
+                            .trim_start_matches("0x"),
+                        16,
+                    )
+                    .unwrap();
                     IrArg::Stack {
-                        offset: i64::from_str_radix(
-                            expr.input0
-                                .clone()
-                                .unwrap()
-                                .address
-                                .unwrap()
-                                .trim_start_matches("0x"),
-                            16,
-                        )
-                        .unwrap(),
+                        address: IrExpression::Var(stack_pointer.clone().into()).plus_const(offset),
                         size: expr.input0.unwrap().size,
                         data_type: None,
                     }
@@ -608,7 +610,7 @@ impl Program {
         let subs = self
             .subs
             .into_iter()
-            .map(|sub| sub.into_ir_sub_term(stack_pointer.size))
+            .map(|sub| (sub.tid.clone(), sub.into_ir_sub_term(stack_pointer.size)))
             .collect();
         let extern_symbols = self
             .extern_symbols
@@ -625,7 +627,7 @@ impl Program {
         IrProgram {
             subs,
             extern_symbols,
-            entry_points: self.entry_points,
+            entry_points: self.entry_points.into_iter().collect(),
             address_base_offset,
         }
     }
@@ -641,22 +643,62 @@ pub struct CallingConvention {
     integer_parameter_register: Vec<String>,
     /// Possible float parameter registers.
     float_parameter_register: Vec<String>,
-    /// Possible return registers.
+    /// Possible integer return registers.
     return_register: Vec<String>,
+    /// Possible float return registers.
+    float_return_register: Vec<String>,
     /// Callee-saved registers.
     unaffected_register: Vec<String>,
     /// Registers that may be overwritten by the call, i.e. caller-saved registers.
     killed_by_call_register: Vec<String>,
 }
 
-impl From<CallingConvention> for IrCallingConvention {
-    fn from(cconv: CallingConvention) -> IrCallingConvention {
+impl CallingConvention {
+    /// Convert a calling convention parsed from Ghidra to the internally used IR.
+    fn into_ir_cconv(
+        self,
+        register_map: &HashMap<&String, &RegisterProperties>,
+    ) -> IrCallingConvention {
+        let to_ir_var_list = |list: Vec<String>| {
+            list.into_iter()
+                .map(|register_name| {
+                    let reg = register_map.get(&register_name).cloned().unwrap();
+                    assert_eq!(reg.register, reg.base_register);
+                    reg.into()
+                })
+                .collect()
+        };
+        let to_ir_expression_list = |list: Vec<String>| {
+            list.into_iter()
+                .map(|register_name| {
+                    let reg = register_map.get(&register_name).cloned().unwrap();
+                    let mut expression = IrExpression::Var(reg.into());
+                    expression.replace_input_sub_register(register_map);
+                    expression
+                })
+                .collect()
+        };
+        let to_ir_base_var_list = |list: Vec<String>| {
+            let register_set: BTreeSet<IrVariable> = list
+                .into_iter()
+                .map(|reg_name| {
+                    let reg = register_map.get(&reg_name).unwrap();
+                    let base_reg = *register_map.get(&reg.base_register).unwrap();
+                    base_reg.into()
+                })
+                .collect();
+            register_set.into_iter().collect()
+        };
         IrCallingConvention {
-            name: cconv.name,
-            integer_parameter_register: cconv.integer_parameter_register,
-            float_parameter_register: cconv.float_parameter_register,
-            return_register: cconv.return_register,
-            callee_saved_register: cconv.unaffected_register,
+            name: self.name,
+            integer_parameter_register: to_ir_var_list(self.integer_parameter_register),
+            float_parameter_register: to_ir_expression_list(self.float_parameter_register),
+            integer_return_register: to_ir_var_list(self.return_register),
+            float_return_register: to_ir_expression_list(self.float_return_register),
+            // TODO / FIXME: Using `to_ir_base_var_list` is technically incorrect.
+            // For example, on AArch64 only the bottom 64bit of some floating point registers are callee-saved.
+            // To fix this one may have to to change callee_saved_register to a Vec<Expression>.
+            callee_saved_register: to_ir_base_var_list(self.unaffected_register),
         }
     }
 }
@@ -684,6 +726,11 @@ impl Project {
     /// The `binary_base_address` denotes the base address of the memory image of the binary
     /// according to the program headers of the binary.
     pub fn into_ir_project(self, binary_base_address: u64) -> IrProject {
+        let register_map: HashMap<&String, &RegisterProperties> = self
+            .register_properties
+            .iter()
+            .map(|p| (&p.register, p))
+            .collect();
         let mut program: Term<IrProgram> = Term {
             tid: self.program.tid,
             term: self.program.term.into_ir_program(
@@ -693,15 +740,10 @@ impl Project {
                 &self.cpu_architecture,
             ),
         };
-        let register_map: HashMap<&String, &RegisterProperties> = self
-            .register_properties
-            .iter()
-            .map(|p| (&p.register, p))
-            .collect();
         let mut zero_extend_tids: HashSet<Tid> = HashSet::new();
         // iterates over definitions and checks whether sub registers are used
         // if so, they are swapped with subpieces of base registers
-        for sub in program.term.subs.iter_mut() {
+        for sub in program.term.subs.values_mut() {
             for blk in sub.term.blocks.iter_mut() {
                 let mut def_iter = blk.term.defs.iter_mut().peekable();
                 while let Some(def) = def_iter.next() {
@@ -786,7 +828,21 @@ impl Project {
                 });
             }
         }
-        let register_list = self
+        // Iterate over symbol arguments and replace used sub-registers
+        for symbol in program.term.extern_symbols.values_mut() {
+            for arg in symbol.parameters.iter_mut() {
+                if let IrArg::Register { expr, .. } = arg {
+                    expr.replace_input_sub_register(&register_map);
+                }
+            }
+            for arg in symbol.return_values.iter_mut() {
+                if let IrArg::Register { expr, .. } = arg {
+                    expr.replace_input_sub_register(&register_map);
+                }
+            }
+        }
+
+        let register_set = self
             .register_properties
             .iter()
             .filter_map(|reg| {
@@ -797,17 +853,18 @@ impl Project {
                 }
             })
             .collect();
+        let calling_conventions = self
+            .register_calling_convention
+            .clone()
+            .into_iter()
+            .map(|cconv| (cconv.name.clone(), cconv.into_ir_cconv(&register_map)))
+            .collect();
         IrProject {
             program,
             cpu_architecture: self.cpu_architecture,
             stack_pointer_register: self.stack_pointer_register.into(),
-            calling_conventions: self
-                .register_calling_convention
-                .clone()
-                .into_iter()
-                .map(|cconv| cconv.into())
-                .collect(),
-            register_list,
+            calling_conventions,
+            register_set,
             datatype_properties: self.datatype_properties.clone(),
         }
     }

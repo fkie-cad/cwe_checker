@@ -1,7 +1,7 @@
 use crate::intermediate_representation::DatatypeProperties;
 
 use super::*;
-use std::collections::HashSet;
+use std::{collections::HashSet, iter::FromIterator};
 
 fn bv(value: i64) -> ValueDomain {
     ValueDomain::from(Bitvector::from_i64(value))
@@ -16,7 +16,7 @@ fn new_id(time: &str, reg_name: &str) -> AbstractIdentifier {
 
 fn mock_extern_symbol(name: &str) -> (Tid, ExternSymbol) {
     let arg = Arg::Register {
-        var: register("RDX"),
+        expr: Expression::Var(register("RDX")),
         data_type: None,
     };
     let tid = Tid::new("extern_".to_string() + name);
@@ -76,7 +76,7 @@ fn return_term(target_name: &str) -> Term<Jmp> {
 
 fn mock_project() -> (Project, Config) {
     let program = Program {
-        subs: Vec::new(),
+        subs: BTreeMap::new(),
         extern_symbols: vec![
             mock_extern_symbol("malloc"),
             mock_extern_symbol("free"),
@@ -84,7 +84,7 @@ fn mock_project() -> (Project, Config) {
         ]
         .into_iter()
         .collect(),
-        entry_points: Vec::new(),
+        entry_points: BTreeSet::new(),
         address_base_offset: 0,
     };
     let program_term = Term {
@@ -92,13 +92,14 @@ fn mock_project() -> (Project, Config) {
         term: program,
     };
     let cconv = CallingConvention {
-        name: "default".to_string(),
-        integer_parameter_register: vec!["RDX".to_string()],
-        float_parameter_register: vec!["XMM0".to_string()],
-        return_register: vec!["RDX".to_string()],
-        callee_saved_register: vec!["callee_saved_reg".to_string()],
+        name: "__cdecl".to_string(),
+        integer_parameter_register: vec![Variable::mock("RDX", 8)],
+        float_parameter_register: vec![Expression::Var(Variable::mock("XMMO", 16))],
+        integer_return_register: vec![Variable::mock("RDX", 8)],
+        float_return_register: vec![],
+        callee_saved_register: vec![Variable::mock("callee_saved_reg", 8)],
     };
-    let register_list = vec!["RAX", "RCX", "RDX", "RBX", "RSP", "RBP", "RSI", "RDI"]
+    let register_set = vec!["RAX", "RCX", "RDX", "RBX", "RSP", "RBP", "RSI", "RDI"]
         .into_iter()
         .map(|name| Variable::mock(name, ByteSize::new(8)))
         .collect();
@@ -107,8 +108,8 @@ fn mock_project() -> (Project, Config) {
             program: program_term,
             cpu_architecture: "x86_64".to_string(),
             stack_pointer_register: register("RSP"),
-            calling_conventions: vec![cconv],
-            register_list,
+            calling_conventions: BTreeMap::from_iter([(cconv.name.clone(), cconv)]),
+            register_set,
             datatype_properties: DatatypeProperties::mock(),
         },
         Config {
