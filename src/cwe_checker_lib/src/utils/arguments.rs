@@ -129,6 +129,7 @@ pub fn get_variable_parameters(
                     project.get_calling_convention(extern_symbol),
                     format_string_index,
                     &project.stack_pointer_register,
+                    &project.cpu_architecture,
                 ));
             }
             Err(e) => {
@@ -150,6 +151,7 @@ pub fn calculate_parameter_locations(
     calling_convention: &CallingConvention,
     format_string_index: usize,
     stack_register: &Variable,
+    cpu_arch: &str,
 ) -> Vec<Arg> {
     let mut var_args: Vec<Arg> = Vec::new();
     // The number of the remaining integer argument registers are calculated
@@ -157,7 +159,10 @@ pub fn calculate_parameter_locations(
     let mut integer_arg_register_count =
         calling_convention.integer_parameter_register.len() - (format_string_index + 1);
     let mut float_arg_register_count = calling_convention.float_parameter_register.len();
-    let mut stack_offset: i64 = 0;
+    let mut stack_offset: i64 = match cpu_arch {
+        "x86" | "x86_32" | "x86_64" => u64::from(stack_register.size) as i64,
+        _ => 0,
+    };
 
     for (data_type, size) in parameters.iter() {
         match data_type {

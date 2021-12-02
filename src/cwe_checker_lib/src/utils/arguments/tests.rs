@@ -29,13 +29,13 @@ fn test_get_variable_parameters() {
 
     let mut output: Vec<Arg> = Vec::new();
     output.push(Arg::Stack {
-        address: Expression::Var(Variable::mock("RSP", 8)),
+        address: Expression::Var(Variable::mock("RSP", 8)).plus_const(8),
         size: ByteSize::new(4),
         data_type: Some(Datatype::Char),
     });
 
     output.push(Arg::Stack {
-        address: Expression::Var(Variable::mock("RSP", 8)).plus_const(4),
+        address: Expression::Var(Variable::mock("RSP", 8)).plus_const(12),
         size: ByteSize::new(4),
         data_type: Some(Datatype::Integer),
     });
@@ -52,7 +52,7 @@ fn test_get_variable_parameters() {
     );
 
     output = vec![Arg::Stack {
-        address: Expression::Var(Variable::mock("RSP", 8)),
+        address: Expression::Var(Variable::mock("RSP", 8)).plus_const(8),
         size: ByteSize::new(8),
         data_type: Some(Datatype::Pointer),
     }];
@@ -202,13 +202,14 @@ fn test_calculate_parameter_locations() {
             parameters.clone(),
             &cconv,
             format_string_index,
-            &Variable::mock("RSP", 8)
+            &Variable::mock("RSP", 8),
+            "x86_64"
         )
     );
 
     parameters.push(("s".to_string().into(), ByteSize::new(8)));
     expected_args.push(Arg::Stack {
-        address: Expression::Var(Variable::mock("RSP", 8)),
+        address: Expression::Var(Variable::mock("RSP", 8)).plus_const(8),
         size: ByteSize::new(8),
         data_type: Some(Datatype::Pointer),
     });
@@ -220,7 +221,8 @@ fn test_calculate_parameter_locations() {
             parameters,
             &cconv,
             format_string_index,
-            &Variable::mock("RSP", 8)
+            &Variable::mock("RSP", 8),
+            "x86_64"
         )
     );
 }
