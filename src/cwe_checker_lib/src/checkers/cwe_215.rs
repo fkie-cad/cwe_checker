@@ -42,7 +42,7 @@ pub fn check_cwe(
     match goblin::Object::parse(binary) {
         Ok(goblin::Object::Elf(elf_binary)) => {
             for section_header in elf_binary.section_headers {
-                if let Some(Ok(section_name)) = elf_binary.shdr_strtab.get(section_header.sh_name) {
+                if let Some(section_name) = elf_binary.shdr_strtab.get_at(section_header.sh_name) {
                     if section_name.starts_with(".debug") {
                         let cwe_warning = CweWarning::new(
                             CWE_MODULE.name,
