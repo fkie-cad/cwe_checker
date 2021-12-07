@@ -303,10 +303,13 @@ impl Expression {
             }
             Expression::Var(variable) => {
                 if let Some(register) = register_map.get(&variable.name) {
-                    if variable.name != *register.base_register {
+                    // We replace the register with a subpiece if the register itself is not a base register
+                    // or if the expression is an implicit subpiece (identifiable with `variable.size < register.size`).
+                    if variable.name != *register.base_register || variable.size < register.size {
+                        let target_size = variable.size;
                         self.create_subpiece_from_sub_register(
                             register.base_register.clone(),
-                            register.size,
+                            target_size,
                             register.lsb,
                             register_map,
                         );
