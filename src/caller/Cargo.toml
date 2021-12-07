@@ -2,7 +2,7 @@
 name = "cwe_checker"
 version = "0.6.0-dev"
 authors = ["Enkelmann <nils-edvin.enkelmann@fkie.fraunhofer.de>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 structopt = "0.3"
