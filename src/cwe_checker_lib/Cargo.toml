@@ -2,7 +2,7 @@
 name = "cwe_checker_lib"
 version = "0.6.0-dev"
 authors = ["Nils-Edvin Enkelmann <nils-edvin.enkelmann@fkie.fraunhofer.de>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 apint = "0.2"

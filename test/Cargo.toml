@@ -2,7 +2,7 @@
 name = "acceptance_tests_ghidra"
 version = "0.1.0"
 authors = ["Enkelmann <nils-edvin.enkelmann@fkie.fraunhofer.de>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 colored = "2.0"

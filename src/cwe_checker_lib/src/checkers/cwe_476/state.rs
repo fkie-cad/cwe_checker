@@ -346,7 +346,6 @@ impl State {
     #[allow(dead_code)]
     pub fn to_json_compact(&self) -> serde_json::Value {
         use serde_json::*;
-        use std::iter::FromIterator;
         let register: Vec<(String, Value)> = self
             .register_taint
             .iter()
