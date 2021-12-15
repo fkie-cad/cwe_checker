@@ -43,6 +43,15 @@ impl AbstractIdentifier {
         AbstractIdentifier(Arc::new(AbstractIdentifierData { time, location }))
     }
 
+    /// Create a new abstract identifier where the abstract location is a register.
+    /// Panics if the register is a temporary register.
+    pub fn new_from_var(time: Tid, variable: &Variable) -> AbstractIdentifier {
+        AbstractIdentifier(Arc::new(AbstractIdentifierData {
+            time,
+            location: AbstractLocation::from_var(variable).unwrap(),
+        }))
+    }
+
     /// Get the register associated to the abstract location.
     /// Panics if the abstract location is a memory location and not a register.
     pub fn unwrap_register(&self) -> &Variable {
@@ -55,6 +64,11 @@ impl AbstractIdentifier {
     /// Get the TID representing the time component of the abstract ID.
     pub fn get_tid(&self) -> &Tid {
         &self.time
+    }
+
+    /// Get the location component of the abstract ID
+    pub fn get_location(&self) -> &AbstractLocation {
+        &self.location
     }
 }
 

@@ -1,5 +1,6 @@
 use super::ByteSize;
 use crate::prelude::*;
+use std::fmt::Display;
 
 /// A variable represents a register with a known size and name.
 ///
@@ -17,6 +18,16 @@ pub struct Variable {
     pub size: ByteSize,
     /// Set to `false` for physical registers and to `true` for temporary (virtual) variables.
     pub is_temp: bool,
+}
+
+impl Display for Variable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", self.name, self.size.as_bit_length())?;
+        if self.is_temp {
+            write!(f, "(temp)")?;
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]

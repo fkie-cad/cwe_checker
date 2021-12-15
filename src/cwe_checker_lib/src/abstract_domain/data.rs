@@ -121,6 +121,12 @@ impl<T: RegisterDomain> DataDomain<T> {
         self.contains_top_values = true;
     }
 
+    /// Indicate that the domain does not contain any `Top` values
+    /// in addition to the contained absolute and relative values.
+    pub fn unset_contains_top_flag(&mut self) {
+        self.contains_top_values = false;
+    }
+
     /// Return a new value representing a variable plus an offset,
     /// where the variable is represented by the given abstract ID.
     pub fn from_target(id: AbstractIdentifier, offset: T) -> Self {

@@ -52,6 +52,46 @@ impl Arg {
             Arg::Stack { data_type, .. } => data_type.clone(),
         }
     }
+
+    /// If the argument is a stack argument,
+    /// return its offset relative to the current stack register value.
+    /// Return an error for register arguments or if the offset could not be computed.
+    pub fn eval_stack_offset(&self, stack_register: &Variable) -> Result<Bitvector, Error> {
+        let expression = match self {
+            Arg::Register { .. } => return Err(anyhow!("The argument is not a stack argument.")),
+            Arg::Stack { address, .. } => address,
+        };
+        Self::eval_stack_offset_expression(expression, stack_register)
+    }
+
+    /// If the given expression computes a constant offset to the given stack register,
+    /// then return the offset.
+    /// Else return an error.
+    fn eval_stack_offset_expression(
+        expression: &Expression,
+        stack_register: &Variable,
+    ) -> Result<Bitvector, Error> {
+        match expression {
+            Expression::Var(var) => {
+                if var == stack_register {
+                    Ok(Bitvector::zero(var.size.into()))
+                } else {
+                    Err(anyhow!("Input register is not the stack register"))
+                }
+            }
+            Expression::Const(bitvec) => Ok(bitvec.clone()),
+            Expression::BinOp { op, lhs, rhs } => {
+                let lhs = Self::eval_stack_offset_expression(lhs, stack_register)?;
+                let rhs = Self::eval_stack_offset_expression(rhs, stack_register)?;
+                lhs.bin_op(*op, &rhs)
+            }
+            Expression::UnOp { op, arg } => {
+                let arg = Self::eval_stack_offset_expression(arg, stack_register)?;
+                arg.un_op(*op)
+            }
+            _ => Err(anyhow!("Expression type not supported for argument values")),
+        }
+    }
 }
 
 /// An extern symbol represents a funtion that is dynamically linked from another binary.
@@ -131,6 +171,30 @@ pub struct CallingConvention {
     pub callee_saved_register: Vec<Variable>,
 }
 
+impl CallingConvention {
+    /// Return a list of all parameter registers of the calling convention.
+    /// For parameters, where only a part of a register is the actual parameter,
+    /// the parameter register is approximated by the (larger) base register.
+    pub fn get_all_parameter_register(&self) -> Vec<&Variable> {
+        let mut register_list: Vec<&Variable> = self.integer_parameter_register.iter().collect();
+        for float_param_expr in self.float_parameter_register.iter() {
+            register_list.append(&mut float_param_expr.input_vars());
+        }
+        register_list
+    }
+
+    /// Return a list of all return registers of the calling convention.
+    /// For return register, where only a part of a register is the actual return register,
+    /// the return register is approximated by the (larger) base register.
+    pub fn get_all_return_register(&self) -> Vec<&Variable> {
+        let mut register_list: Vec<&Variable> = self.integer_return_register.iter().collect();
+        for float_param_expr in self.float_return_register.iter() {
+            register_list.append(&mut float_param_expr.input_vars());
+        }
+        register_list
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -156,6 +220,17 @@ mod tests {
                 integer_return_register: vec![Variable::mock("RAX", 8)],
                 float_return_register: vec![],
                 callee_saved_register: vec![Variable::mock("RBP", 8)],
+            }
+        }
+
+        pub fn mock_arm32() -> CallingConvention {
+            CallingConvention {
+                name: "__stdcall".to_string(), // so that the mock is useable as standard calling convention in tests
+                integer_parameter_register: vec![Variable::mock("r0", 4)],
+                float_parameter_register: vec![Expression::Var(Variable::mock("d0", 8))],
+                integer_return_register: vec![Variable::mock("r0", 4)],
+                float_return_register: vec![],
+                callee_saved_register: vec![Variable::mock("r4", 4)],
             }
         }
 
@@ -209,7 +284,7 @@ mod tests {
     }
 
     impl ExternSymbol {
-        pub fn mock() -> ExternSymbol {
+        pub fn mock_x64() -> ExternSymbol {
             ExternSymbol {
                 tid: Tid::new("mock_symbol"),
                 addresses: vec!["UNKNOWN".to_string()],
@@ -217,6 +292,20 @@ mod tests {
                 calling_convention: Some("__stdcall".to_string()),
                 parameters: vec![Arg::mock_register("RDI", 8)],
                 return_values: vec![Arg::mock_register("RAX", 8)],
+                no_return: false,
+                has_var_args: false,
+            }
+        }
+
+        pub fn mock_arm32() -> ExternSymbol {
+            // There is also the mock_standard_arm32() method. Only on of the two should exist!
+            ExternSymbol {
+                tid: Tid::new("mock_symbol"),
+                addresses: vec!["UNKNOWN".to_string()],
+                name: "mock_symbol".to_string(),
+                calling_convention: Some("__stdcall".to_string()),
+                parameters: vec![Arg::mock_register("r0", 4)],
+                return_values: vec![Arg::mock_register("r0", 4)],
                 no_return: false,
                 has_var_args: false,
             }
