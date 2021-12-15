@@ -8,6 +8,8 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  GHIDRA_RELEASE_TAG: Ghidra_10.1_build
+  GHIDRA_VERSION: ghidra_10.1_PUBLIC_20211210
 
 jobs: 
  
@@ -28,10 +30,10 @@ jobs:
           architecture: x64
       - name: Install Ghidra
         run: |
-          curl -fSL https://www.ghidra-sre.org/ghidra_9.2.1_PUBLIC_20201215.zip -o ghidra.zip
-          unzip -q ghidra.zip
-          mv ghidra_9.2.1_PUBLIC /opt/ghidra
-          rm ghidra.zip
+          wget https://github.com/NationalSecurityAgency/ghidra/releases/download/${GHIDRA_RELEASE_TAG}/${GHIDRA_VERSION}.zip
+          unzip -d ghidra ${GHIDRA_VERSION}.zip
+          mv ghidra/ghidra_* /opt/ghidra
+          rm ${GHIDRA_VERSION}.zip
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
