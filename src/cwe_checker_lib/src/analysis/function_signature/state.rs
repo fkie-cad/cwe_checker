@@ -208,7 +208,7 @@ impl State {
     }
 
     /// If the address is an exactly known pointer to the stack with a constant offset, then return the offset.
-    fn get_offset_if_exact_stack_pointer(
+    pub fn get_offset_if_exact_stack_pointer(
         &self,
         address: &DataDomain<BitvectorDomain>,
     ) -> Option<Bitvector> {
