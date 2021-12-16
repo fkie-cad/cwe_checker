@@ -446,7 +446,11 @@ mod tests {
         let (mut state, _pi_state) = State::mock_with_pi_state();
 
         assert_eq!(
-            context.check_parameters_for_taint(&state, &ExternSymbol::mock(), NodeIndex::new(0)),
+            context.check_parameters_for_taint(
+                &state,
+                &ExternSymbol::mock_x64(),
+                NodeIndex::new(0)
+            ),
             false
         );
 
@@ -455,7 +459,11 @@ mod tests {
             Taint::Tainted(ByteSize::new(8)),
         );
         assert_eq!(
-            context.check_parameters_for_taint(&state, &ExternSymbol::mock(), NodeIndex::new(0)),
+            context.check_parameters_for_taint(
+                &state,
+                &ExternSymbol::mock_x64(),
+                NodeIndex::new(0)
+            ),
             true
         );
     }
