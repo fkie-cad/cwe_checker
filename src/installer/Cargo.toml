@@ -1,12 +1,13 @@
 [package]
 name = "cwe_checker_install"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 
-directories = "3.0"
+directories = "4.0.1"
 walkdir = "2"
-fs_extra = "1.2.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

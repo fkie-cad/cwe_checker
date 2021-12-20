@@ -1,15 +1,29 @@
+//! This crate defines automates the installation of cwe_checker.
+//! It creates config files, copies the Ghida-Plugin and can search for a Ghidra installation at common used locations.
+
 use directories::{BaseDirs, ProjectDirs, UserDirs};
+use serde::{Deserialize, Serialize};
 use std::env;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
 use walkdir::WalkDir;
 
-fn copy_config_json(location: &Path) {
-    let json = env::current_dir().unwrap();
-    std::fs::copy(&json.join("src/config.json"), location.join("config.json"))
-        .unwrap_or_else(|_| panic!("Copy to {} failed", location.display()));
+#[derive(Serialize, Deserialize, Debug)]
+struct GhidraConfig {
+    ghidra_path: PathBuf,
 }
 
+/// Copies src/config.json to specified location
+fn copy_config_json(location: &Path) {
+    let repo_dir = env::current_dir().unwrap();
+    std::fs::copy(
+        &repo_dir.join("src/config.json"),
+        location.join("config.json"),
+    )
+    .unwrap_or_else(|_| panic!("Copy to {} failed", location.display()));
+}
+
+/// Returns vector of os-specific locations
 fn get_search_locations() -> Vec<PathBuf> {
     let mut locations: Vec<PathBuf> = Vec::new();
     let base_dirs = BaseDirs::new().expect("Could not derive BaseDirs");
@@ -47,6 +61,7 @@ fn get_search_locations() -> Vec<PathBuf> {
     locations
 }
 
+/// Returns None if Ghidra were not found. Else returns path to Ghidra, which might be user selected.
 fn find_ghidra() -> Option<PathBuf> {
     let mut ghidra_locations: Vec<PathBuf> = get_search_locations()
         .into_iter()
@@ -60,6 +75,7 @@ fn find_ghidra() -> Option<PathBuf> {
     }
 }
 
+/// Searches for a file containing "ghidraRun" at provided path recursively.
 fn search_for_ghidrarun(entry_path: &Path) -> Option<PathBuf> {
     for entry in WalkDir::new(entry_path)
         .into_iter()
@@ -75,6 +91,7 @@ fn search_for_ghidrarun(entry_path: &Path) -> Option<PathBuf> {
     None
 }
 
+/// Determines Ghidra versions and provides selection interface for the user.
 fn select_ghidra_version(mut ghidra_locations: Vec<PathBuf>) -> Option<PathBuf> {
     let mut i = 0;
     while i < ghidra_locations.len() {
@@ -111,6 +128,7 @@ fn select_ghidra_version(mut ghidra_locations: Vec<PathBuf>) -> Option<PathBuf> 
     get_user_choice(&ghidra_locations)
 }
 
+/// Determines Ghidra versions and provides selection interface for the user.
 fn get_user_choice(ghidra_locations: &[PathBuf]) -> Option<PathBuf> {
     println!("Please select (0-{}): ", ghidra_locations.len() - 1);
 
@@ -123,27 +141,32 @@ fn get_user_choice(ghidra_locations: &[PathBuf]) -> Option<PathBuf> {
     match choice.trim().parse::<usize>() {
         Ok(i) => {
             if i < ghidra_locations.len() {
-                return Some(ghidra_locations[i].clone());
+                Some(ghidra_locations[i].clone())
             } else {
-                return None;
+                None
             }
         }
-        Err(_) => return None,
-    };
+        Err(_) => None,
+    }
 }
 
+/// Creates ghidra.json for a Ghidra location at provided locaton.
 fn create_ghidra_json(location: &Path, ghidra_location: Option<PathBuf>) {
-    // add ghidra.json
     match ghidra_location {
-        Some(loc) => std::fs::write(
-            location.join("ghidra.json"),
-            format!("{{\"ghidra_path\": \"{}\" }}\n", loc.display()),
-        )
-        .unwrap_or_else(|_| panic!("Writing to {} failed", location.display())),
+        Some(loc) => {
+            let conf = GhidraConfig { ghidra_path: loc };
+            println!("{:?}", conf);
+            std::fs::write(
+                location.join("ghidra.json"),
+                serde_json::to_string(&conf).unwrap(),
+            )
+            .unwrap()
+        }
         None => panic!("Error: Could not find Ghidra."),
     }
 }
 
+/// Runs Cargo install to install cwe_checker.
 fn install_cwe_checker() {
     std::process::Command::new("cargo")
         .args(["install", "--path", "src/caller", "--locked"])
@@ -151,6 +174,7 @@ fn install_cwe_checker() {
         .expect("Failed to install cwe-checker");
 }
 
+// Recursive copy of files and directories.
 fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> io::Result<()> {
     fs::create_dir_all(&dst)?;
     for entry in fs::read_dir(src)? {
@@ -165,6 +189,7 @@ fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> io::Result<()> 
     Ok(())
 }
 
+// Copy src/ghidra to provided location.
 fn copy_ghidra_plugin(target: &Path) {
     let target = &target;
     let mut source = env::current_dir().unwrap();
@@ -183,25 +208,34 @@ fn main() {
         )
     });
 
-    println!("creating config.json");
+    println!("creating config.json...");
     copy_config_json(cwe_checker_conf_dir.config_dir());
 
-    if args.len() < 2 {
-        println!("searching for ghidra");
-        let ghidra_location = find_ghidra();
-
-        create_ghidra_json(cwe_checker_conf_dir.config_dir(), ghidra_location);
-    } else {
+    println!("create ghidra.json...");
+    if args.len() == 2 {
         create_ghidra_json(
             cwe_checker_conf_dir.config_dir(),
             Some(PathBuf::from(&args[1])),
         );
-    }
-    println!("create ghidra.json");
+    } else if cwe_checker_conf_dir
+        .config_dir()
+        .join("ghidra.json")
+        .exists()
+    {
+        println!(
+            "found ghidra.json at {}, keeping it.",
+            cwe_checker_conf_dir.config_dir().display()
+        );
+    } else {
+        println!("searching for ghidra...");
+        let ghidra_location = find_ghidra();
 
-    println!("installing CWE-Checker");
+        create_ghidra_json(cwe_checker_conf_dir.config_dir(), ghidra_location);
+    }
+
+    println!("installing CWE-Checker...");
     install_cwe_checker();
 
-    println!("copy Ghidra Plugin");
+    println!("copy Ghidra Plugin...");
     copy_ghidra_plugin(cwe_checker_conf_dir.data_dir())
 }
