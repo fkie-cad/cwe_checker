@@ -84,6 +84,7 @@ impl BitvectorExtended for Bitvector {
                 if self.is_zero() {
                     Ok(Bitvector::from_u8(1))
                 } else {
+                    assert_eq!(self, &Bitvector::from_u8(1)); // Any other value would indicate a bug.
                     Ok(Bitvector::from_u8(0))
                 }
             }
