@@ -339,7 +339,7 @@ pub struct Sub {
     pub blocks: Vec<Term<Blk>>,
 
     /// The calling convention used (as reported by Ghidra, i.e. this may not be correct).
-    pub calling_convention: Option<String>
+    pub calling_convention: Option<String>,
 }
 
 impl Term<Sub> {
@@ -379,7 +379,7 @@ impl Term<Sub> {
             term: IrSub {
                 name: self.term.name,
                 blocks,
-                calling_convention: self.term.calling_convention
+                calling_convention: self.term.calling_convention,
             },
         }
     }

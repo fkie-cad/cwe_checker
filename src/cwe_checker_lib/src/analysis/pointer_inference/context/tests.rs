@@ -167,12 +167,14 @@ fn context_problem_implementation() {
         term: Sub {
             name: "caller_sub".into(),
             blocks: vec![target_block.clone()],
-            calling_convention: None
+            calling_convention: None,
         },
     };
     let target_node = crate::analysis::graph::Node::BlkStart(&target_block, &sub);
     let call = call_term("func");
-    let mut callee_state = context.update_call(&state, &call, &target_node, &None).unwrap();
+    let mut callee_state = context
+        .update_call(&state, &call, &target_node, &None)
+        .unwrap();
     assert_eq!(callee_state.stack_id, new_id("func", "RSP"));
     assert_eq!(callee_state.caller_stack_ids.len(), 1);
     assert_eq!(
@@ -209,7 +211,7 @@ fn context_problem_implementation() {
             Some(&state),
             &call,
             &return_term("return_target"),
-            &None
+            &None,
         )
         .unwrap();
     assert_eq!(return_state.stack_id, new_id("main", "RSP"));
@@ -356,7 +358,7 @@ fn update_return() {
             Some(&state_before_call),
             &call_term("callee"),
             &return_term("return_target"),
-            &None
+            &None,
         )
         .unwrap();
 

@@ -208,7 +208,7 @@ mod tests {
                 term: Sub {
                     name: name.to_string(),
                     blocks: Vec::new(),
-                    calling_convention: None
+                    calling_convention: None,
                 },
             }
         }

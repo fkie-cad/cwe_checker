@@ -176,7 +176,7 @@ impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
         _state: &State,
         _call: &Term<Jmp>,
         _target: &crate::analysis::graph::Node,
-        _calling_convention: &Option<String>
+        _calling_convention: &Option<String>,
     ) -> Option<State> {
         // No knowledge is transferred from the caller to the callee.
         None
@@ -216,7 +216,7 @@ impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
         state_before_call: Option<&State>,
         call_term: &Term<Jmp>,
         _return_term: &Term<Jmp>,
-        _calling_convention: &Option<String>
+        _calling_convention: &Option<String>,
     ) -> Option<State> {
         if state.is_none() || state_before_call.is_none() {
             return None;
