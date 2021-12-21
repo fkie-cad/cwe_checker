@@ -260,7 +260,7 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
 
     /// Generate a CWE warning if taint may be contained in the function parameters.
     /// Always returns `None` so that the analysis stays intraprocedural.
-    fn update_call(&self, state: &State, call: &Term<Jmp>, _target: &Node) -> Option<Self::Value> {
+    fn update_call(&self, state: &State, call: &Term<Jmp>, _target: &Node, _calling_convention: &Option<String>) -> Option<Self::Value> {
         let pi_state_option = self.get_current_pointer_inference_state(state, &call.tid);
         if state.check_generic_function_params_for_taint(self.project, pi_state_option.as_ref()) {
             self.generate_cwe_warning(&call.tid);
@@ -390,6 +390,7 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
         state_before_call: Option<&State>,
         call_term: &Term<Jmp>,
         return_term: &Term<Jmp>,
+        _calling_convention: &Option<String>,
     ) -> Option<State> {
         if let Some(state) = state_before_return {
             // If taint is returned, generate a CWE warning

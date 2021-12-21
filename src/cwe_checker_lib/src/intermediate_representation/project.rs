@@ -39,6 +39,16 @@ impl Project {
             .or_else(|| self.calling_conventions.get("__cdecl"))
     }
 
+    /// Try to find a specific calling convention in the list of calling conventions in the project.
+    pub fn get_specific_calling_convention(&self, cconv_name_opt : &Option<String>) -> Option<&CallingConvention> {
+        if let Some(cconv_name) = cconv_name_opt {
+            self.calling_conventions.get(cconv_name)
+        }
+        else {
+            self.get_standard_calling_convention()
+        }
+    }
+
     /// Return the calling convention associated to the given extern symbol.
     /// If the extern symbol has no annotated calling convention
     /// then return the standard calling convention of the project instead.
@@ -140,6 +150,7 @@ impl Project {
                             indirect_jmp_targets: Vec::new(),
                         },
                     }],
+                    calling_convention: None,
                 },
             };
             self.program

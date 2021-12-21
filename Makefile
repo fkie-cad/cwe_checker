@@ -21,7 +21,7 @@ test:
 		echo "Acceptance test binaries not found. Please see test/artificial_samples/Readme.md for build instructions."; \
 		exit -1; \
 	fi
-	cargo test --no-fail-fast -p acceptance_tests_ghidra -- --show-output --ignored
+	cargo test --no-fail-fast -p acceptance_tests_ghidra -- --show-output --ignored --test-threads 1
 
 compile_test_files:
 	cd test/artificial_samples \

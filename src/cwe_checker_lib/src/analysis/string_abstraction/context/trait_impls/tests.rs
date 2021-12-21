@@ -189,6 +189,7 @@ fn test_update_return() {
         None,
         &Jmp::branch("start1", "end1"),
         &Jmp::branch("start2", "end2"),
+        &None
     );
 
     assert_eq!(None, new_state);
@@ -200,6 +201,7 @@ fn test_update_return() {
             Some(&setup.state_before_call),
             &Jmp::branch("start1", "end1"),
             &Jmp::branch("start2", "end2"),
+            &None
         )
         .unwrap();
 

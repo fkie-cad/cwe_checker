@@ -120,6 +120,7 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
         state: &State,
         call_term: &Term<Jmp>,
         _target_node: &crate::analysis::graph::Node,
+        calling_convention: &Option<String>
     ) -> Option<State> {
         if let Jmp::Call {
             target: ref callee_tid,
@@ -143,7 +144,7 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
             // Remove callee-saved register, since the callee should not use their values anyway.
             // This should prevent recursive references to all stack frames in the call tree
             // since the source for it, the stack frame base pointer, is callee-saved.
-            if let Some(cconv) = self.project.get_standard_calling_convention() {
+            if let Some(cconv) = self.project.get_specific_calling_convention(calling_convention) {
                 // Note that this may lead to analysis errors if the function uses another calling convention.
                 callee_state.remove_callee_saved_register(cconv);
             }
@@ -209,6 +210,7 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
         state_before_call: Option<&State>,
         call_term: &Term<Jmp>,
         return_term: &Term<Jmp>,
+        calling_convention: &Option<String>
     ) -> Option<State> {
         // TODO: For the long term we may have to replace the IDs representing callers with something
         // that identifies the edge of the call and not just the callsite.
@@ -280,7 +282,7 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
 
         state_after_return.readd_caller_objects(state_before_call);
 
-        if let Some(cconv) = self.project.get_standard_calling_convention() {
+        if let Some(cconv) = self.project.get_specific_calling_convention(calling_convention) {
             // Restore information about callee-saved register from the caller state.
             // TODO: Implement some kind of check to ensure that the callee adheres to the given calling convention!
             // The current workaround should be reasonably exact for programs written in C,

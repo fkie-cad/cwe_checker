@@ -13,6 +13,8 @@ pub struct Sub {
     /// The basic blocks belonging to the subroutine.
     /// The first block is also the entry point of the subroutine.
     pub blocks: Vec<Term<Blk>>,
+    /// The calling convention used to call if known
+    pub calling_convention: Option<String>,
 }
 
 /// A parameter or return argument of a function.
@@ -206,6 +208,7 @@ mod tests {
                 term: Sub {
                     name: name.to_string(),
                     blocks: Vec::new(),
+                    calling_convention: None
                 },
             }
         }

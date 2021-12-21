@@ -57,6 +57,7 @@ pub trait Context<'a> {
         value: &Self::Value,
         call: &Term<Jmp>,
         target: &Node,
+        calling_convention: &Option<String>
     ) -> Option<Self::Value>;
 
     /// Transition function for return instructions.
@@ -68,6 +69,7 @@ pub trait Context<'a> {
         value_before_call: Option<&Self::Value>,
         call_term: &Term<Jmp>,
         return_term: &Term<Jmp>,
+        calling_convention: &Option<String>
     ) -> Option<Self::Value>;
 
     /// Transition function for calls to functions not contained in the binary.
@@ -163,7 +165,7 @@ impl<'a, T: Context<'a>> GeneralFPContext for GeneralizedContext<'a, T> {
             Edge::CallCombine(_) => Some(Self::NodeValue::Value(node_value.unwrap_value().clone())),
             Edge::Call(call) => self
                 .context
-                .update_call(node_value.unwrap_value(), call, &graph[end_node])
+                .update_call(node_value.unwrap_value(), call, &graph[end_node], &graph[end_node].get_sub().term.calling_convention)
                 .map(NodeValue::Value),
             Edge::CrCallStub => Some(NodeValue::CallFlowCombinator {
                 call_stub: Some(node_value.unwrap_value().clone()),
@@ -179,11 +181,12 @@ impl<'a, T: Context<'a>> GeneralFPContext for GeneralizedContext<'a, T> {
                     call_stub,
                     interprocedural_flow,
                 } => {
-                    let return_from_block = match graph.node_weight(start_node) {
+                    let (return_from_block, return_from_sub) =
+                    match graph.node_weight(start_node) {
                         Some(Node::CallReturn {
                             call: _,
-                            return_: (return_from_block, _),
-                        }) => return_from_block,
+                            return_: (return_from_block, return_from_sub),
+                        }) => (return_from_block,return_from_sub),
                         _ => panic!("Malformed Control flow graph"),
                     };
                     let return_from_jmp = &return_from_block.term.jmps[0];
@@ -193,6 +196,7 @@ impl<'a, T: Context<'a>> GeneralFPContext for GeneralizedContext<'a, T> {
                             call_stub.as_ref(),
                             call_term,
                             return_from_jmp,
+                            &return_from_sub.term.calling_convention
                         )
                         .map(NodeValue::Value)
                 }

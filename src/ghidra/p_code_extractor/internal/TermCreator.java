@@ -43,7 +43,11 @@ public class TermCreator {
      * Creates a Sub Term with an unique TID consisting of the prefix sub and its entry address.
      */
     public static Term<Sub> createSubTerm(Function func) {
-        return new Term<Sub>(HelperFunctions.functionEntryPoints.get(func.getEntryPoint().toString()), new Sub(func.getName(), func.getBody()));
+        Sub subInTerm = new Sub(func.getName(), func.getBody());
+        if (func.getCallingConvention() != null) {
+            subInTerm.setCallingConvention(func.getCallingConvention().toString());
+        }
+        return new Term<Sub>(HelperFunctions.functionEntryPoints.get(func.getEntryPoint().toString()), subInTerm);
     }
 
 

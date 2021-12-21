@@ -9,6 +9,8 @@ public class Call {
     private Label return_;
     @SerializedName("call_string")
     private String callString;
+    @SerializedName("calling_convention")
+    private String callingConvention;
 
     public Call() {
     }

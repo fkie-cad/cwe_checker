@@ -337,6 +337,9 @@ pub struct Sub {
     ///
     /// Note that the first block of the array may *not* be the function entry point!
     pub blocks: Vec<Term<Blk>>,
+
+    /// The calling convention used (as reported by Ghidra, i.e. this may not be correct).
+    pub calling_convention: Option<String>
 }
 
 impl Term<Sub> {
@@ -376,6 +379,7 @@ impl Term<Sub> {
             term: IrSub {
                 name: self.term.name,
                 blocks,
+                calling_convention: self.term.calling_convention
             },
         }
     }
