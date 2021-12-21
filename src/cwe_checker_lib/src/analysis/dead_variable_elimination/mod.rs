@@ -160,6 +160,7 @@ mod tests {
             term: Sub {
                 name: "sub".to_string(),
                 blocks: vec![block],
+                calling_convention: None,
             },
         };
         let mut project = Project::mock_empty();

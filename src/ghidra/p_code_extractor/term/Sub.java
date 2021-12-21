@@ -12,6 +12,8 @@ public class Sub {
     private AddressSetView addresses;
     @SerializedName("blocks")
     private ArrayList<Term<Blk>> blocks;
+    @SerializedName("calling_convention")
+    private String callingConvention;
 
     public Sub() {
     }
@@ -53,5 +55,13 @@ public class Sub {
 
     public void setAddresses(AddressSetView addresses) {
         this.addresses = addresses;
+    }
+
+    public String getCallingConvention() {
+        return this.callingConvention;
+    }
+
+    public void setCallingConvention(String callingConvention) {
+        this.callingConvention = callingConvention;
     }
 }

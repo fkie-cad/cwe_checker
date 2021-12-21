@@ -91,6 +91,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>>
         _state: &State<T>,
         _call: &Term<Jmp>,
         _target: &crate::analysis::graph::Node,
+        _calling_convention: &Option<String>,
     ) -> Option<State<T>> {
         None
     }
@@ -101,6 +102,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>>
         state_before_call: Option<&State<T>>,
         _call_term: &Term<Jmp>,
         _return_term: &Term<Jmp>,
+        _calling_convention: &Option<String>,
     ) -> Option<State<T>> {
         if let Some(state) = state_before_call {
             let mut new_state = state.clone();

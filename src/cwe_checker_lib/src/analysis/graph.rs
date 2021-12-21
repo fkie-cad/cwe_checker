@@ -538,6 +538,7 @@ mod tests {
             term: Sub {
                 name: "sub1".to_string(),
                 blocks: vec![sub1_blk1, sub1_blk2],
+                calling_convention: None,
             },
         };
         let cond_jump = Jmp::CBranch {
@@ -573,6 +574,7 @@ mod tests {
             term: Sub {
                 name: "sub2".to_string(),
                 blocks: vec![sub2_blk1, sub2_blk2],
+                calling_convention: None,
             },
         };
         let program = Term {
@@ -617,6 +619,7 @@ mod tests {
             term: Sub {
                 name: "sub".to_string(),
                 blocks: vec![blk_term],
+                calling_convention: None,
             },
         };
         let mut program = Program::mock_empty();

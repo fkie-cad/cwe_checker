@@ -434,7 +434,7 @@ mod tests {
         // We would need knowledge about alignment guarantees for the stack pointer at the start of main() to fix this.
         mark_skipped(&mut tests, "x86", "gcc");
 
-        mark_compiler_skipped(&mut tests, "mingw32-gcc"); // TODO: Check reason for failure!
+        mark_skipped(&mut tests, "x86", "mingw32-gcc"); // TODO: Check reason for failure! Probably same as above?
 
         for test_case in tests {
             let num_expected_occurences = 2;
@@ -462,7 +462,7 @@ mod tests {
         // We would need knowledge about alignment guarantees for the stack pointer at the start of main() to fix this.
         mark_skipped(&mut tests, "x86", "gcc");
 
-        mark_compiler_skipped(&mut tests, "mingw32-gcc"); // TODO: Check reason for failure!
+        mark_skipped(&mut tests, "x86", "mingw32-gcc"); // TODO: Check reason for failure! Probably same as above?
 
         for test_case in tests {
             let num_expected_occurences = 1;
