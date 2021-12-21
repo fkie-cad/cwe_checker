@@ -265,7 +265,7 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
         state: &State,
         call: &Term<Jmp>,
         _target: &Node,
-        _calling_convention: &Option<String>
+        _calling_convention: &Option<String>,
     ) -> Option<Self::Value> {
         let pi_state_option = self.get_current_pointer_inference_state(state, &call.tid);
         if state.check_generic_function_params_for_taint(self.project, pi_state_option.as_ref()) {

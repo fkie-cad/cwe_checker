@@ -69,7 +69,7 @@ pub trait Context<'a> {
         value_before_call: Option<&Self::Value>,
         call_term: &Term<Jmp>,
         return_term: &Term<Jmp>,
-        calling_convention: &Option<String>
+        calling_convention: &Option<String>,
     ) -> Option<Self::Value>;
 
     /// Transition function for calls to functions not contained in the binary.

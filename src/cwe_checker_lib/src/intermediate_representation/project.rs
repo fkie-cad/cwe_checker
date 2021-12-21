@@ -42,7 +42,7 @@ impl Project {
     /// Try to find a specific calling convention in the list of calling conventions in the project.
     pub fn get_specific_calling_convention(
         &self,
-        cconv_name_opt : &Option<String>
+        cconv_name_opt : &Option<String>,
     ) -> Option<&CallingConvention> {
         if let Some(cconv_name) = cconv_name_opt {
             self.calling_conventions.get(cconv_name)
