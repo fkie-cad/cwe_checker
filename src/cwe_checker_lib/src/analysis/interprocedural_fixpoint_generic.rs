@@ -14,8 +14,8 @@ use crate::prelude::*;
 /// The interprocedural_flow value will either be transferred from the end of the called subroutine
 /// to the return site in case of a forward analysis or from the beginning of the called subroutine
 /// to the callsite in a backward analysis.
-#[derive(PartialEq, Eq, Serialize, Deserialize)]
-pub enum NodeValue<T: PartialEq + Eq> {
+#[derive(PartialEq, Eq, Serialize, Deserialize, Clone)]
+pub enum NodeValue<T: PartialEq + Eq + Clone> {
     /// A single abstract value
     Value(T),
     /// The value saved at artificial combinator nodes.
@@ -29,7 +29,7 @@ pub enum NodeValue<T: PartialEq + Eq> {
     },
 }
 
-impl<T: PartialEq + Eq> NodeValue<T> {
+impl<T: PartialEq + Eq + Clone> NodeValue<T> {
     /// Unwraps the contained value for non-combinator nodes.
     /// Panics if given a combinator value of an artificial node.
     pub fn unwrap_value(&self) -> &T {
