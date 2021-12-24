@@ -20,6 +20,7 @@
 //!
 //! In the current implementation edge transition functions are also allowed to return `None`
 //! to indicate that no information flows through the edge.
+//! In such a case the value at the target node of the edge will not get updated.
 //! For example, an analysis can use this to indicate edges that are never taken
 //! and thus prevent dead code to affect the analysis.
 //!
@@ -49,7 +50,7 @@ pub trait Context {
     type NodeLabel;
     /// The type of the value that gets assigned to each node.
     /// The values should form a partially ordered set.
-    type NodeValue: PartialEq + Eq;
+    type NodeValue: PartialEq + Eq + Clone;
 
     /// Get the graph on which the fixpoint computation operates.
     fn get_graph(&self) -> &DiGraph<Self::NodeLabel, Self::EdgeLabel>;
@@ -91,8 +92,6 @@ pub struct Computation<T: Context> {
     priority_to_node_list: Vec<NodeIndex>,
     /// The worklist contains the priority numbers (not the node indices!) of nodes marked as not yet stabilized.
     worklist: BTreeSet<usize>,
-    /// The (optional) default value assigned to nodes without an explicit value.
-    default_value: Option<T::NodeValue>,
     /// The internal map containing all known node values.
     node_values: FnvHashMap<NodeIndex, T::NodeValue>,
 }
@@ -126,9 +125,11 @@ impl<T: Context> Computation<T> {
         let node_priority_list: Vec<usize> = node_to_index.values().copied().collect();
         let mut worklist = BTreeSet::new();
         // If a default value exists, all nodes are added to the worklist. If not, the worklist is empty
-        if default_value.is_some() {
+        let mut node_values: FnvHashMap<NodeIndex, T::NodeValue> = FnvHashMap::default();
+        if let Some(default) = default_value {
             for i in 0..priority_sorted_nodes.len() {
                 worklist.insert(i);
+                node_values.insert(NodeIndex::new(i), default.clone());
             }
         }
         Computation {
@@ -136,8 +137,7 @@ impl<T: Context> Computation<T> {
             node_priority_list,
             priority_to_node_list: priority_sorted_nodes,
             worklist,
-            default_value,
-            node_values: FnvHashMap::default(),
+            node_values,
         }
     }
 
@@ -169,11 +169,7 @@ impl<T: Context> Computation<T> {
 
     /// Get the value of a node.
     pub fn get_node_value(&self, node: NodeIndex) -> Option<&T::NodeValue> {
-        if let Some(value) = self.node_values.get(&node) {
-            Some(value)
-        } else {
-            self.default_value.as_ref()
-        }
+        self.node_values.get(&node)
     }
 
     /// Set the value of a node and mark the node as not yet stabilized.
@@ -334,6 +330,27 @@ mod tests {
 
         assert_eq!(30, *solution.get_node_value(NodeIndex::new(9)).unwrap());
         assert_eq!(0, *solution.get_node_value(NodeIndex::new(5)).unwrap());
+    }
+
+    #[test]
+    fn fixpoint_with_default_value() {
+        let mut graph: DiGraph<(), u64> = DiGraph::new();
+        for _i in 0..101 {
+            graph.add_node(());
+        }
+        for i in 0..100 {
+            graph.add_edge(NodeIndex::new(i), NodeIndex::new(i + 1), i as u64 % 10 + 1);
+        }
+        for i in 0..10 {
+            graph.add_edge(NodeIndex::new(i * 10), NodeIndex::new(i * 10 + 5), 0);
+        }
+
+        let mut solution = Computation::new(FPContext { graph }, Some(100));
+        solution.set_node_value(NodeIndex::new(10), 0);
+        solution.compute_with_max_steps(20);
+
+        assert_eq!(100, *solution.get_node_value(NodeIndex::new(0)).unwrap());
+        assert_eq!(3, *solution.get_node_value(NodeIndex::new(12)).unwrap());
     }
 
     #[test]
