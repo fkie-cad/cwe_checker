@@ -129,7 +129,7 @@ fn extract_fn_signatures_from_fixpoint<'a>(
 pub fn compute_function_signatures<'a>(
     project: &'a Project,
     graph: &'a Graph,
-) -> (Vec<LogMessage>, BTreeMap<Tid, FunctionSignature>) {
+) -> (BTreeMap<Tid, FunctionSignature>, Vec<LogMessage>) {
     let mut computation = generate_fixpoint_computation(project, graph);
     computation.compute_with_max_steps(100);
     let mut fn_sig_map = extract_fn_signatures_from_fixpoint(project, graph, computation);
@@ -145,7 +145,7 @@ pub fn compute_function_signatures<'a>(
         }
     }
 
-    (logs, fn_sig_map)
+    (fn_sig_map, logs)
 }
 
 /// The signature of a function.

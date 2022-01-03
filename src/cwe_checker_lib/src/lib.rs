@@ -60,14 +60,7 @@ You can find out more information about each check, including known false positi
 by reading the check-specific module documentation in the [`checkers`] module.
 */
 
-use abstract_domain::BricksDomain;
-
-use crate::analysis::graph::Graph;
-use crate::analysis::pointer_inference::PointerInference;
-use crate::analysis::string_abstraction::StringAbstraction;
-use crate::intermediate_representation::Project;
-use crate::utils::binary::RuntimeMemoryImage;
-use crate::utils::log::{CweWarning, LogMessage};
+use std::collections::BTreeMap;
 
 pub mod abstract_domain;
 pub mod analysis;
@@ -75,6 +68,15 @@ pub mod checkers;
 pub mod intermediate_representation;
 pub mod pcode;
 pub mod utils;
+
+use abstract_domain::BricksDomain;
+use analysis::function_signature::FunctionSignature;
+use analysis::graph::Graph;
+use analysis::pointer_inference::PointerInference;
+use analysis::string_abstraction::StringAbstraction;
+use intermediate_representation::Project;
+use utils::binary::RuntimeMemoryImage;
+use utils::log::{CweWarning, LogMessage};
 
 mod prelude {
     pub use apint::Width;
@@ -85,6 +87,7 @@ mod prelude {
     pub use crate::AnalysisResults;
     pub use anyhow::{anyhow, Error};
 }
+use prelude::*;
 
 /// The generic function signature for the main function of a CWE module
 pub type CweModuleFn =
@@ -141,6 +144,8 @@ pub struct AnalysisResults<'a> {
     pub control_flow_graph: &'a Graph<'a>,
     /// A pointer to the project struct
     pub project: &'a Project,
+    /// The results of the function signature analysis if already computed.
+    pub function_signatures: Option<&'a BTreeMap<Tid, FunctionSignature>>,
     /// The result of the pointer inference analysis if already computed.
     pub pointer_inference: Option<&'a PointerInference<'a>>,
     /// The result of the string abstraction if already computed.
@@ -160,8 +165,30 @@ impl<'a> AnalysisResults<'a> {
             runtime_memory_image,
             control_flow_graph,
             project,
+            function_signatures: None,
             pointer_inference: None,
             string_abstraction: None,
+        }
+    }
+
+    /// Compute the function signatures for internal functions.
+    pub fn compute_function_signatures(
+        &self,
+    ) -> (BTreeMap<Tid, FunctionSignature>, Vec<LogMessage>) {
+        analysis::function_signature::compute_function_signatures(
+            self.project,
+            self.control_flow_graph,
+        )
+    }
+
+    /// Create a new `AnalysisResults` struct containing the given function signature analysis results.
+    pub fn with_function_signatures(
+        self,
+        function_signatures: Option<&'a BTreeMap<Tid, FunctionSignature>>,
+    ) -> AnalysisResults<'a> {
+        AnalysisResults {
+            function_signatures,
+            ..self
         }
     }
 
@@ -183,7 +210,7 @@ impl<'a> AnalysisResults<'a> {
     }
 
     /// Create a new `AnalysisResults` struct containing the given pointer inference analysis results.
-    pub fn set_pointer_inference<'b: 'a>(
+    pub fn with_pointer_inference<'b: 'a>(
         self,
         pi_results: Option<&'b PointerInference<'a>>,
     ) -> AnalysisResults<'b> {
@@ -212,7 +239,7 @@ impl<'a> AnalysisResults<'a> {
     }
 
     /// Create a new `AnalysisResults` struct containing the given string abstraction results.
-    pub fn set_string_abstraction<'b: 'a>(
+    pub fn with_string_abstraction<'b: 'a>(
         self,
         string_abstraction: Option<&'b StringAbstraction<'a, BricksDomain>>,
     ) -> AnalysisResults<'b> {
