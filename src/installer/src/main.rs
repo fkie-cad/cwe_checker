@@ -189,22 +189,17 @@ fn copy_ghidra_plugin(target: &Path) -> Result<()> {
     let mut source = env::current_dir()?;
     source.push("src/ghidra");
 
-    copy_dir_all(source, target.join("ghidra")).unwrap();
+    copy_dir_all(source, target.join("ghidra"))?;
     Ok(())
 }
 
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
     let cwe_checker_conf_dir = ProjectDirs::from("", "", "cwe_checker").unwrap();
-    std::fs::create_dir_all(cwe_checker_conf_dir.config_dir()).unwrap_or_else(|_| {
-        panic!(
-            "Could not create {}",
-            cwe_checker_conf_dir.config_dir().display()
-        )
-    });
+    std::fs::create_dir_all(cwe_checker_conf_dir.config_dir())?;
 
     println!("creating config.json...");
-    copy_config_json(cwe_checker_conf_dir.config_dir()).unwrap();
+    copy_config_json(cwe_checker_conf_dir.config_dir())?;
 
     println!("create ghidra.json...");
     if args.len() == 2 {
