@@ -62,7 +62,9 @@ fn generate_fixpoint_computation<'a>(
                         NodeValue::Value(State::new(
                             &sub.tid,
                             &project.stack_pointer_register,
-                            project.get_standard_calling_convention().unwrap(),
+                            project
+                                .get_specific_calling_convention(&sub.term.calling_convention)
+                                .unwrap(),
                         )),
                     )
                 }
