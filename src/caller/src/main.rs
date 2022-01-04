@@ -10,7 +10,7 @@ use cwe_checker_lib::utils::{get_ghidra_plugin_path, read_config_file};
 use cwe_checker_lib::AnalysisResults;
 use cwe_checker_lib::{intermediate_representation::Project, utils::log::LogMessage};
 use nix::{sys::stat, unistd};
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::thread;
@@ -176,8 +176,9 @@ fn run_with_ghidra(args: &CmdlineArgs) {
         &project,
     );
 
-    let modules_depending_on_string_abstraction = vec!["CWE78"];
-    let modules_depending_on_pointer_inference = vec!["CWE134", "CWE476", "Memory"];
+    let modules_depending_on_string_abstraction = BTreeSet::from_iter(["CWE78"]);
+    let modules_depending_on_pointer_inference =
+        BTreeSet::from_iter(["CWE134", "CWE476", "Memory"]);
 
     let string_abstraction_needed = modules
         .iter()
@@ -188,14 +189,23 @@ fn run_with_ghidra(args: &CmdlineArgs) {
             .iter()
             .any(|module| modules_depending_on_pointer_inference.contains(&module.name));
 
+    // Compute function signatures if required
+    let function_signatures = if pi_analysis_needed {
+        let (function_signatures, mut logs) = analysis_results.compute_function_signatures();
+        all_logs.append(&mut logs);
+        Some(function_signatures)
+    } else {
+        None
+    };
+    let analysis_results = analysis_results.with_function_signatures(function_signatures.as_ref());
+    // Compute pointer inference if required
     let pi_analysis_results = if pi_analysis_needed {
         Some(analysis_results.compute_pointer_inference(&config["Memory"], args.statistics))
     } else {
         None
     };
-
-    let analysis_results = analysis_results.set_pointer_inference(pi_analysis_results.as_ref());
-
+    let analysis_results = analysis_results.with_pointer_inference(pi_analysis_results.as_ref());
+    // Compute string abstraction analysis if required
     let string_abstraction_results =
         if string_abstraction_needed {
             Some(analysis_results.compute_string_abstraction(
@@ -205,18 +215,15 @@ fn run_with_ghidra(args: &CmdlineArgs) {
         } else {
             None
         };
-
     let analysis_results =
-        analysis_results.set_string_abstraction(string_abstraction_results.as_ref());
+        analysis_results.with_string_abstraction(string_abstraction_results.as_ref());
 
     // Print debug and then return.
     // Right now there is only one debug printing function.
     // When more debug printing modes exist, this behaviour will change!
     if args.debug {
         cwe_checker_lib::analysis::pointer_inference::run(
-            &project,
-            &runtime_memory_image,
-            &control_flow_graph,
+            &analysis_results,
             serde_json::from_value(config["Memory"].clone()).unwrap(),
             true,
             false,

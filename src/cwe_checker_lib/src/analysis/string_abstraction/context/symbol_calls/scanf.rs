@@ -191,17 +191,12 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
 
 #[cfg(test)]
 mod tests {
-
-    use std::collections::HashSet;
-
+    use super::super::tests::*;
+    use super::*;
     use crate::abstract_domain::{AbstractIdentifier, AbstractLocation, CharacterInclusionDomain};
     use crate::analysis::pointer_inference::PointerInference as PointerInferenceComputation;
     use crate::analysis::string_abstraction::tests::mock_project_with_intraprocedural_control_flow;
     use crate::intermediate_representation::{Expression, Variable};
-    use crate::utils::binary::RuntimeMemoryImage;
-
-    use super::super::tests::*;
-    use super::*;
 
     #[test]
     fn test_handle_scanf_calls() {
@@ -211,9 +206,7 @@ mod tests {
             vec![(scanf_symbol.clone(), vec![true])],
             "func",
         );
-        let mem_image = RuntimeMemoryImage::mock();
-        let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
-        let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
+        let mut pi_results = PointerInferenceComputation::mock(&project);
         pi_results.compute();
 
         let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
@@ -296,9 +289,7 @@ mod tests {
             vec![(sscanf_symbol.clone(), vec![true, true])],
             "func",
         );
-        let mem_image = RuntimeMemoryImage::mock();
-        let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
-        let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
+        let mut pi_results = PointerInferenceComputation::mock(&project);
         pi_results.compute();
 
         let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
@@ -374,9 +365,7 @@ mod tests {
             vec![(scanf_symbol.clone(), vec![false])],
             "func",
         );
-        let mem_image = RuntimeMemoryImage::mock();
-        let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
-        let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
+        let mut pi_results = PointerInferenceComputation::mock(&project);
         pi_results.compute();
 
         let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
@@ -449,9 +438,7 @@ mod tests {
             vec![(sscanf_symbol.clone(), vec![false, false])],
             "func",
         );
-        let mem_image = RuntimeMemoryImage::mock();
-        let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
-        let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
+        let mut pi_results = PointerInferenceComputation::mock(&project);
         pi_results.compute();
 
         let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
@@ -493,9 +480,7 @@ mod tests {
             vec![(sscanf_symbol.clone(), vec![false, false])],
             "func",
         );
-        let mem_image = RuntimeMemoryImage::mock();
-        let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
-        let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
+        let mut pi_results = PointerInferenceComputation::mock(&project);
         pi_results.compute();
 
         let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
@@ -516,9 +501,7 @@ mod tests {
             vec![(sscanf_symbol.clone(), vec![true, false])],
             "func",
         );
-        let mem_image = RuntimeMemoryImage::mock();
-        let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
-        let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
+        let mut pi_results = PointerInferenceComputation::mock(&project);
         pi_results.compute();
 
         let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
@@ -539,9 +522,7 @@ mod tests {
             vec![(sscanf_symbol.clone(), vec![false, true])],
             "func",
         );
-        let mem_image = RuntimeMemoryImage::mock();
-        let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
-        let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
+        let mut pi_results = PointerInferenceComputation::mock(&project);
         pi_results.compute();
 
         let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
@@ -594,9 +575,7 @@ mod tests {
             vec![(sscanf_symbol.clone(), vec![true, true])],
             "func",
         );
-        let mem_image = RuntimeMemoryImage::mock();
-        let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
-        let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
+        let mut pi_results = PointerInferenceComputation::mock(&project);
         pi_results.compute();
 
         let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
@@ -678,9 +657,7 @@ mod tests {
             vec![(sscanf_symbol.clone(), vec![true, true])],
             "func",
         );
-        let mem_image = RuntimeMemoryImage::mock();
-        let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
-        let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
+        let mut pi_results = PointerInferenceComputation::mock(&project);
         pi_results.compute();
 
         let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
@@ -738,9 +715,7 @@ mod tests {
             vec![(sscanf_symbol.clone(), vec![true, true])],
             "func",
         );
-        let mem_image = RuntimeMemoryImage::mock();
-        let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
-        let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
+        let mut pi_results = PointerInferenceComputation::mock(&project);
         pi_results.compute();
 
         let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
