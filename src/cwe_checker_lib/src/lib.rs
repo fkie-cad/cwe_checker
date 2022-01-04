@@ -200,9 +200,7 @@ impl<'a> AnalysisResults<'a> {
         print_stats: bool,
     ) -> PointerInference<'a> {
         crate::analysis::pointer_inference::run(
-            self.project,
-            self.runtime_memory_image,
-            self.control_flow_graph,
+            self,
             serde_json::from_value(config.clone()).unwrap(),
             false,
             print_stats,
@@ -246,6 +244,33 @@ impl<'a> AnalysisResults<'a> {
         AnalysisResults {
             string_abstraction,
             ..self
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::analysis::graph::get_program_cfg;
+    use std::collections::HashSet;
+
+    impl<'a> AnalysisResults<'a> {
+        /// Mocks the `AnalysisResults` struct with a given project.
+        /// Note that the function leaks memory!
+        pub fn mock_from_project(project: &'a Project) -> AnalysisResults<'a> {
+            let extern_subs =
+                HashSet::from_iter(project.program.term.extern_symbols.keys().cloned());
+            let graph = Box::new(get_program_cfg(&project.program, extern_subs));
+            let graph: &'a Graph = Box::leak(graph);
+            let runtime_mem_image = Box::new(RuntimeMemoryImage::mock());
+            let runtime_mem_image: &'a RuntimeMemoryImage = Box::leak(runtime_mem_image);
+            let binary: &'a Vec<u8> = Box::leak(Box::new(Vec::new()));
+
+            let analysis_results = AnalysisResults::new(binary, runtime_mem_image, graph, project);
+            let (fn_sigs, _) = analysis_results.compute_function_signatures();
+            let fn_sigs: &'a BTreeMap<_, _> = Box::leak(Box::new(fn_sigs));
+            let analysis_results = analysis_results.with_function_signatures(Some(fn_sigs));
+            analysis_results
         }
     }
 }

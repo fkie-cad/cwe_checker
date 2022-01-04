@@ -209,6 +209,9 @@ pub mod tests {
         sub.term.blocks.push(block2);
         project.program.term.subs.insert(sub.tid.clone(), sub);
         project.program.term.entry_points.insert(Tid::new("func"));
+        project
+            .calling_conventions
+            .insert("__stdcall".to_string(), CallingConvention::mock());
 
         project
     }
@@ -219,8 +222,7 @@ pub mod tests {
         let runtime_memory_image = RuntimeMemoryImage::mock();
         let project = mock_project();
         let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
-        let mut pi_results =
-            PointerInferenceComputation::mock(&project, &runtime_memory_image, &graph);
+        let mut pi_results = PointerInferenceComputation::mock(&project);
         pi_results.compute();
         let mut format_string_index: HashMap<String, usize> = HashMap::new();
         format_string_index.insert("sprintf".to_string(), 1);

@@ -418,7 +418,6 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
 mod tests {
     use super::*;
     use crate::utils::binary::RuntimeMemoryImage;
-    use std::collections::HashSet;
 
     impl<'a> Context<'a> {
         pub fn mock(
@@ -447,8 +446,7 @@ mod tests {
     fn check_parameter_arg_for_taint() {
         let project = Project::mock_empty();
         let runtime_memory_image = RuntimeMemoryImage::mock();
-        let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
-        let pi_results = PointerInferenceComputation::mock(&project, &runtime_memory_image, &graph);
+        let pi_results = PointerInferenceComputation::mock(&project);
         let context = Context::mock(&project, &runtime_memory_image, &pi_results);
         let (mut state, _pi_state) = State::mock_with_pi_state();
 
@@ -479,8 +477,7 @@ mod tests {
     fn handle_generic_call() {
         let project = Project::mock_empty();
         let runtime_memory_image = RuntimeMemoryImage::mock();
-        let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
-        let pi_results = PointerInferenceComputation::mock(&project, &runtime_memory_image, &graph);
+        let pi_results = PointerInferenceComputation::mock(&project);
         let context = Context::mock(&project, &runtime_memory_image, &pi_results);
         let mut state = State::mock();
 
@@ -501,8 +498,7 @@ mod tests {
     fn update_def() {
         let project = Project::mock_empty();
         let runtime_memory_image = RuntimeMemoryImage::mock();
-        let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
-        let pi_results = PointerInferenceComputation::mock(&project, &runtime_memory_image, &graph);
+        let pi_results = PointerInferenceComputation::mock(&project);
         let context = Context::mock(&project, &runtime_memory_image, &pi_results);
         let (mut state, pi_state) = State::mock_with_pi_state();
         state.set_pointer_inference_state(Some(pi_state));
@@ -555,8 +551,7 @@ mod tests {
     fn update_jump() {
         let project = Project::mock_empty();
         let runtime_memory_image = RuntimeMemoryImage::mock();
-        let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
-        let pi_results = PointerInferenceComputation::mock(&project, &runtime_memory_image, &graph);
+        let pi_results = PointerInferenceComputation::mock(&project);
         let context = Context::mock(&project, &runtime_memory_image, &pi_results);
         let (state, _pi_state) = State::mock_with_pi_state();
 

@@ -223,9 +223,7 @@ fn run_with_ghidra(args: &CmdlineArgs) {
     // When more debug printing modes exist, this behaviour will change!
     if args.debug {
         cwe_checker_lib::analysis::pointer_inference::run(
-            &project,
-            &runtime_memory_image,
-            &control_flow_graph,
+            &analysis_results,
             serde_json::from_value(config["Memory"].clone()).unwrap(),
             true,
             false,

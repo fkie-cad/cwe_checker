@@ -24,8 +24,7 @@ fn test_update_def() {
         "func",
     );
     let mem_image = RuntimeMemoryImage::mock();
-    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
-    let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
+    let mut pi_results = PointerInferenceComputation::mock(&project);
     pi_results.compute();
 
     let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
@@ -138,9 +137,7 @@ fn test_update_jump() {
         vec![(memcpy_symbol.clone(), vec![true])],
         "func",
     );
-    let mem_image = RuntimeMemoryImage::mock();
-    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
-    let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
+    let mut pi_results = PointerInferenceComputation::mock(&project);
     pi_results.compute();
 
     let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
@@ -165,9 +162,7 @@ fn test_update_return() {
         vec![(memcpy_symbol.clone(), vec![true])],
         "func",
     );
-    let mem_image = RuntimeMemoryImage::mock();
-    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
-    let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
+    let mut pi_results = PointerInferenceComputation::mock(&project);
     pi_results.compute();
 
     let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
@@ -223,9 +218,7 @@ fn test_update_call_stub() {
         vec![(memcpy_symbol.clone(), vec![true])],
         "func",
     );
-    let mem_image = RuntimeMemoryImage::mock();
-    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
-    let mut pi_results = PointerInferenceComputation::mock(&project, &mem_image, &graph);
+    let mut pi_results = PointerInferenceComputation::mock(&project);
     pi_results.compute();
 
     let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);

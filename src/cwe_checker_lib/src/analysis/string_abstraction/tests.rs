@@ -470,7 +470,7 @@ impl ExternSymbol {
             calling_convention: Some("__stdcall".to_string()),
             parameters: vec![Arg::mock_register("r0", 4)],
             return_values: vec![],
-            no_return: true,
+            no_return: false,
             has_var_args: false,
         }
     }
