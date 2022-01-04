@@ -69,6 +69,24 @@ where
     }
 }
 
+impl<K, V, S> FromIterator<(K, V)> for DomainMap<K, V, S>
+where
+    K: PartialOrd + Ord + Clone,
+    V: AbstractDomain,
+    S: MapMergeStrategy<K, V>,
+{
+    /// Generate a new `DomainMap` from an iterator over the key-value pairs that it should contain.
+    fn from_iter<I>(iter: I) -> Self
+    where
+        I: IntoIterator<Item = (K, V)>,
+    {
+        DomainMap {
+            inner: Arc::new(iter.into_iter().collect()),
+            phantom: PhantomData,
+        }
+    }
+}
+
 impl<K, V, S> AbstractDomain for DomainMap<K, V, S>
 where
     K: PartialOrd + Ord + Clone,

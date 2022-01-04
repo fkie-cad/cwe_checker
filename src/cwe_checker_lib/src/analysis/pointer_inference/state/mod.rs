@@ -15,7 +15,7 @@ mod value_specialization;
 pub struct State {
     /// Maps a register variable to the data known about its content.
     /// A variable not contained in the map has value `Data::Top(..)`, i.e. nothing is known about its content.
-    register: BTreeMap<Variable, Data>,
+    register: DomainMap<Variable, Data, MergeTopStrategy>,
     /// The list of all known memory objects.
     pub memory: AbstractObjectList,
     /// The abstract identifier of the current stack frame.
@@ -47,7 +47,7 @@ impl State {
             function_tid,
             AbstractLocation::from_var(stack_register).unwrap(),
         );
-        let mut register: BTreeMap<Variable, Data> = BTreeMap::new();
+        let mut register = DomainMap::from(BTreeMap::new());
         register.insert(
             stack_register.clone(),
             Data::from_target(
@@ -223,9 +223,9 @@ impl State {
     pub fn remove_virtual_register(&mut self) {
         self.register = self
             .register
-            .clone()
-            .into_iter()
+            .iter()
             .filter(|(register, _value)| !register.is_temp)
+            .map(|(reg, val)| (reg.clone(), val.clone()))
             .collect();
     }
 
@@ -273,19 +273,9 @@ impl AbstractDomain for State {
     /// Merge two states
     fn merge(&self, other: &Self) -> Self {
         assert_eq!(self.stack_id, other.stack_id);
-        let mut merged_register = BTreeMap::new();
-        for (register, other_value) in other.register.iter() {
-            if let Some(value) = self.register.get(register) {
-                let merged_value = value.merge(other_value);
-                if !merged_value.is_top() {
-                    // We only have to keep non-*Top* elements.
-                    merged_register.insert(register.clone(), merged_value);
-                }
-            }
-        }
         let merged_memory_objects = self.memory.merge(&other.memory);
         State {
-            register: merged_register,
+            register: self.register.merge(&other.register),
             memory: merged_memory_objects,
             stack_id: self.stack_id.clone(),
             caller_stack_ids: self
