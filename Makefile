@@ -2,7 +2,6 @@ GHIDRA_PATH =
 
 .PHONY: all clean test uninstall docker
 all:
-
 	cargo build -p cwe_checker_install --release
 	./target/release/cwe_checker_install ${GHIDRA_PATH}
 

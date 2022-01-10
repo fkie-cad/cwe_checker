@@ -1,12 +1,11 @@
 //! This crate automates the installation of cwe_checker.
 //! It creates config files, copies the Ghida-Plugin and can search for a Ghidra installation at commonly used locations.
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use directories::{BaseDirs, ProjectDirs, UserDirs};
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs;
-use std::io::{Error, ErrorKind};
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
@@ -70,8 +69,10 @@ fn find_ghidra() -> Result<PathBuf> {
         .filter_map(|x| search_for_ghidrarun(&x))
         .collect();
 
+    ghidra_locations.dedup_by(|a, b| a == b);
+
     match ghidra_locations.len() {
-        0 => Err(Error::new(ErrorKind::NotFound, "Ghidra not found").into()),
+        0 => Err(anyhow!("Ghidra not found.")),
         1 => Ok(ghidra_locations.pop().unwrap()),
         _ => select_ghidra_version(ghidra_locations),
     }
@@ -93,59 +94,56 @@ fn search_for_ghidrarun(entry_path: &Path) -> Option<PathBuf> {
     None
 }
 
-/// Determines Ghidra versions and provides selection interface for the user.
-fn select_ghidra_version(mut ghidra_locations: Vec<PathBuf>) -> Result<PathBuf> {
-    let mut i = 0;
-    while i < ghidra_locations.len() {
-        ghidra_locations[i].push("Ghidra/application.properties");
-        let app_prop = std::fs::read_to_string(&ghidra_locations[i]);
-
-        match app_prop {
-            Ok(properties) => {
-                let version: &str = properties
-                    .lines()
-                    .filter_map(|x| x.strip_prefix("application.version="))
-                    .next()
-                    .unwrap_or("?");
-                ghidra_locations[i].pop();
-                ghidra_locations[i].pop();
-                println!(
-                    "Use Ghidra at: {} [v{}]? ({})",
-                    ghidra_locations[i].display(),
-                    version,
-                    i
-                );
-                i += 1;
-            }
-
-            Err(_) => {
-                ghidra_locations.remove(i);
-            }
-        }
-    }
-    if ghidra_locations.is_empty() {
-        return Err(Error::new(ErrorKind::NotFound, "Ghidra not found").into());
-    }
-
-    get_user_choice(&ghidra_locations)
+fn is_good_ghidra_location(loc: &Path) -> bool {
+    loc.to_path_buf().push("Ghidra/application.properties");
+    loc.exists()
 }
 
 /// Determines Ghidra versions and provides selection interface for the user.
-fn get_user_choice(ghidra_locations: &[PathBuf]) -> Result<PathBuf> {
-    println!("Please select (0-{}): ", ghidra_locations.len() - 1);
+fn select_ghidra_version(ghidra_locations: Vec<PathBuf>) -> Result<PathBuf> {
+    let iterator: Vec<&PathBuf> = ghidra_locations
+        .iter()
+        .filter(|x| is_good_ghidra_location(x))
+        .collect();
+
+    if iterator.is_empty() {
+        return Err(anyhow!("Ghidra not found"));
+    }
+
+    for (i, loc) in iterator.iter().enumerate() {
+        let mut app_prob_file = (*loc).clone();
+        app_prob_file.push("Ghidra/application.properties");
+
+        let version = match std::fs::read_to_string(app_prob_file) {
+            Ok(app_prop) => app_prop
+                .lines()
+                .filter_map(|x| x.strip_prefix("application.version="))
+                .next()
+                .unwrap_or("?")
+                .to_string(),
+
+            Err(_) => "?".to_string(),
+        };
+
+        println!("Use Ghidra at: {} [v{}]? ({})", loc.display(), version, i);
+    }
+    println!("Abort ({})", iterator.len());
+
+    get_user_choice(iterator)
+}
+
+/// Determines Ghidra versions and provides selection interface for the user.
+fn get_user_choice(ghidra_locations: Vec<&PathBuf>) -> Result<PathBuf> {
+    println!("Please select (0-{}): ", ghidra_locations.len());
 
     let mut choice = String::new();
 
     std::io::stdin().read_line(&mut choice)?;
 
     match choice.trim().parse::<usize>() {
-        Ok(i) => {
-            if i < ghidra_locations.len() {
-                Ok(ghidra_locations[i].clone())
-            } else {
-                Err(Error::new(ErrorKind::InvalidInput, "invalid user input").into())
-            }
-        }
+        Ok(i) if i == ghidra_locations.len() => Err(anyhow!("Installation canceled by user")),
+        Ok(i) if i < ghidra_locations.len() => Ok(ghidra_locations[i].clone()),
+        Ok(_) => Err(anyhow!("Invalid user input")),
         Err(error) => Err(error.into()),
     }
 }
@@ -168,7 +166,7 @@ fn install_cwe_checker() -> Result<()> {
     Ok(())
 }
 
-// Recursive copy of files and directories.
+/// Recursive copy of files and directories.
 fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> Result<()> {
     fs::create_dir_all(&dst)?;
     for entry in fs::read_dir(src)? {
@@ -183,7 +181,7 @@ fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> Result<()> {
     Ok(())
 }
 
-// Copy src/ghidra to provided location.
+/// Copy src/ghidra to provided location.
 fn copy_ghidra_plugin(target: &Path) -> Result<()> {
     let target = &target;
     let mut source = env::current_dir()?;
@@ -197,9 +195,6 @@ fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
     let cwe_checker_conf_dir = ProjectDirs::from("", "", "cwe_checker").unwrap();
     std::fs::create_dir_all(cwe_checker_conf_dir.config_dir())?;
-
-    println!("creating config.json...");
-    copy_config_json(cwe_checker_conf_dir.config_dir())?;
 
     println!("create ghidra.json...");
     if args.len() == 2 {
@@ -226,7 +221,16 @@ fn main() -> Result<()> {
     println!("installing CWE-Checker...");
     install_cwe_checker()?;
 
-    println!("copy Ghidra Plugin...");
+    println!(
+        "creating config.json at: {}",
+        cwe_checker_conf_dir.config_dir().display()
+    );
+    copy_config_json(cwe_checker_conf_dir.config_dir())?;
+
+    println!(
+        "copy Ghidra Plugin to: {}",
+        cwe_checker_conf_dir.data_dir().display()
+    );
     copy_ghidra_plugin(cwe_checker_conf_dir.data_dir())?;
     Ok(())
 }

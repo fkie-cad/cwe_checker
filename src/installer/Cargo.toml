@@ -3,10 +3,7 @@ name = "cwe_checker_install"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-
 directories = "4.0.1"
 walkdir = "2"
 serde = { version = "1.0", features = ["derive"] }
