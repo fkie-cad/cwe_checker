@@ -7,7 +7,19 @@ use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+use structopt::StructOpt;
 use walkdir::WalkDir;
+
+#[derive(Debug, StructOpt)]
+/// Installs CWE_Checker
+struct CmdlineArgs {
+    /// The path to the binary.
+    #[structopt()]
+    ghidra_path: Option<String>,
+
+    #[structopt(long, short)]
+    uninstall: bool,
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 struct GhidraConfig {
@@ -101,16 +113,16 @@ fn is_good_ghidra_location(loc: &Path) -> bool {
 
 /// Determines Ghidra versions and provides selection interface for the user.
 fn select_ghidra_version(ghidra_locations: Vec<PathBuf>) -> Result<PathBuf> {
-    let iterator: Vec<&PathBuf> = ghidra_locations
+    let good_ghidra_locations: Vec<&PathBuf> = ghidra_locations
         .iter()
         .filter(|x| is_good_ghidra_location(x))
         .collect();
 
-    if iterator.is_empty() {
+    if good_ghidra_locations.is_empty() {
         return Err(anyhow!("Ghidra not found"));
     }
 
-    for (i, loc) in iterator.iter().enumerate() {
+    for (i, loc) in good_ghidra_locations.iter().enumerate() {
         let mut app_prob_file = (*loc).clone();
         app_prob_file.push("Ghidra/application.properties");
 
@@ -127,9 +139,9 @@ fn select_ghidra_version(ghidra_locations: Vec<PathBuf>) -> Result<PathBuf> {
 
         println!("Use Ghidra at: {} [v{}]? ({})", loc.display(), version, i);
     }
-    println!("Abort ({})", iterator.len());
+    println!("Abort ({})", good_ghidra_locations.len());
 
-    get_user_choice(iterator)
+    get_user_choice(good_ghidra_locations)
 }
 
 /// Determines Ghidra versions and provides selection interface for the user.
@@ -153,7 +165,8 @@ fn create_ghidra_json(location: &Path, ghidra_location: PathBuf) -> Result<()> {
     let conf = GhidraConfig {
         ghidra_path: ghidra_location,
     };
-
+    println!("creating ghidra.json at: {}", location.display());
+    std::fs::create_dir_all(location)?;
     std::fs::write(location.join("ghidra.json"), serde_json::to_string(&conf)?)?;
     Ok(())
 }
@@ -191,32 +204,54 @@ fn copy_ghidra_plugin(target: &Path) -> Result<()> {
     Ok(())
 }
 
-fn main() -> Result<()> {
-    let args: Vec<String> = env::args().collect();
-    let cwe_checker_conf_dir = ProjectDirs::from("", "", "cwe_checker").unwrap();
-    std::fs::create_dir_all(cwe_checker_conf_dir.config_dir())?;
+/// Removes provided locations and uninstalls cwe_checker via cargo 
+fn uninstall(conf_dir: &Path, data_dir: &Path) -> Result<()> {
+    
+    std::fs::remove_dir_all(conf_dir)?;
+    std::fs::remove_dir_all(data_dir)?;
+    std::process::Command::new("cargo")
+        .args(["uninstall", "cwe_checker"])
+        .status()?;
+    Ok(())
+}
 
-    println!("create ghidra.json...");
-    if args.len() == 2 {
-        create_ghidra_json(cwe_checker_conf_dir.config_dir(), PathBuf::from(&args[1]))?;
-    } else if cwe_checker_conf_dir
-        .config_dir()
-        .join("ghidra.json")
-        .exists()
-    {
-        println!(
-            "found ghidra.json at {}, keeping it.",
-            cwe_checker_conf_dir.config_dir().display()
-        );
-    } else {
-        println!("searching for ghidra...");
-        match find_ghidra() {
-            Ok(ghidra_location) => {
-                create_ghidra_json(cwe_checker_conf_dir.config_dir(), ghidra_location)?;
-            }
-            Err(err) => return Err(err),
+fn main() -> Result<()> {
+    let cwe_checker_conf_dir = ProjectDirs::from("", "", "cwe_checker").unwrap();
+    let cmdline_args = CmdlineArgs::from_args();
+    
+    match cmdline_args.uninstall {
+        true => {
+            uninstall(cwe_checker_conf_dir.config_dir(), cwe_checker_conf_dir.data_dir())?;
+            return Ok(());
         }
+        false => match cmdline_args.ghidra_path {
+            
+            Some(ghidra_input_location) => create_ghidra_json(
+                cwe_checker_conf_dir.config_dir(),
+                PathBuf::from(ghidra_input_location),
+            )?,
+            None if cwe_checker_conf_dir
+                .config_dir()
+                .join("ghidra.json")
+                .exists() =>
+            {
+                println!(
+                    "found ghidra.json at {}, keeping it.",
+                    cwe_checker_conf_dir.config_dir().display()
+                )
+            }
+            None => {
+                println!("searching for ghidra...");
+                match find_ghidra() {
+                    Ok(ghidra_location) => {
+                        create_ghidra_json(cwe_checker_conf_dir.config_dir(), ghidra_location)?;
+                    }
+                    Err(err) => return Err(err),
+                }
+            }
+        },
     }
+
 
     println!("installing CWE-Checker...");
     install_cwe_checker()?;

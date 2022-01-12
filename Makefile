@@ -27,9 +27,8 @@ clean:
 	rm -f -r doc/html
 
 uninstall:
-	rm -f -r ${HOME}/.config/cwe_checker
-	rm -f -r ${HOME}/.local/share/cwe_checker
-	cargo uninstall cwe_checker
+	cargo build -p cwe_checker_install --release
+	./target/release/cwe_checker_install --uninstall
 
 documentation:
 	cargo doc --open --no-deps
