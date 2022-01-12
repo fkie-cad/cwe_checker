@@ -204,9 +204,8 @@ fn copy_ghidra_plugin(target: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Removes provided locations and uninstalls cwe_checker via cargo 
+/// Removes provided locations and uninstalls cwe_checker via cargo
 fn uninstall(conf_dir: &Path, data_dir: &Path) -> Result<()> {
-    
     std::fs::remove_dir_all(conf_dir)?;
     std::fs::remove_dir_all(data_dir)?;
     std::process::Command::new("cargo")
@@ -218,14 +217,16 @@ fn uninstall(conf_dir: &Path, data_dir: &Path) -> Result<()> {
 fn main() -> Result<()> {
     let cwe_checker_conf_dir = ProjectDirs::from("", "", "cwe_checker").unwrap();
     let cmdline_args = CmdlineArgs::from_args();
-    
+
     match cmdline_args.uninstall {
         true => {
-            uninstall(cwe_checker_conf_dir.config_dir(), cwe_checker_conf_dir.data_dir())?;
+            uninstall(
+                cwe_checker_conf_dir.config_dir(),
+                cwe_checker_conf_dir.data_dir(),
+            )?;
             return Ok(());
         }
         false => match cmdline_args.ghidra_path {
-            
             Some(ghidra_input_location) => create_ghidra_json(
                 cwe_checker_conf_dir.config_dir(),
                 PathBuf::from(ghidra_input_location),
@@ -251,7 +252,6 @@ fn main() -> Result<()> {
             }
         },
     }
-
 
     println!("installing CWE-Checker...");
     install_cwe_checker()?;
