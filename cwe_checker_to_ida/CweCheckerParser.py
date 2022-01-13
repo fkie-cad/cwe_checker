@@ -4,7 +4,10 @@ RED = 0x6666FF
 ORANGE = 0x6699FF
 YELLOW = 0xC0FFFF
 
-colors = {'CWE190': YELLOW,
+colors = {'CWE125': RED,
+          'CWE134': RED,
+          'CWE119': RED,
+          'CWE190': YELLOW,
           'CWE215': None,
           'CWE243': None,
           'CWE248': YELLOW,
