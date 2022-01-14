@@ -268,7 +268,7 @@ fn main() -> Result<()> {
         },
     }
 
-    println!("installing cwe-checker...");
+    println!("installing cwe_checker...");
     install_cwe_checker()?;
 
     println!(
