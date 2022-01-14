@@ -11,7 +11,7 @@ use structopt::StructOpt;
 use walkdir::WalkDir;
 
 #[derive(Debug, StructOpt)]
-/// Installs cwe_Checker
+/// Installs cwe_checker
 struct CmdlineArgs {
     #[structopt()]
     /// Path to a ghidra installation.
