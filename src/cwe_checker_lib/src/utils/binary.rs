@@ -407,7 +407,7 @@ pub mod tests {
     use super::*;
 
     impl RuntimeMemoryImage {
-        /// Create a mock runtime memory image for unit tests.
+        /// Creates a mock runtime memory image with: byte series, strings and format strings.
         pub fn mock() -> RuntimeMemoryImage {
             RuntimeMemoryImage {
                 memory_segments: vec![

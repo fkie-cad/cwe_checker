@@ -222,11 +222,11 @@ mod tests {
                     Variable::mock("RDI", 8),
                     Variable::mock("RSI", 8),
                     Variable::mock("RDX", 8),
-                    Variable::mock("RX", 8),
+                    Variable::mock("RCX", 8),
                     Variable::mock("R8", 8),
                     Variable::mock("R9", 8),
                 ],
-                float_parameter_register: vec![Expression::Var(Variable::mock("XMMO", 16))],
+                float_parameter_register: vec![Expression::Var(Variable::mock("XMM0", 16))],
                 integer_return_register: vec![Variable::mock("RAX", 8)],
                 float_return_register: vec![],
                 callee_saved_register: vec![
@@ -259,24 +259,6 @@ mod tests {
                     Variable::mock("r11", 4),
                     Variable::mock("r13", 4),
                 ],
-            }
-        }
-
-        pub fn mock_with_parameter_registers(
-            integer_parameter_register: Vec<Variable>,
-            float_parameter_register: Vec<Variable>,
-        ) -> CallingConvention {
-            let float_parameter_register = float_parameter_register
-                .into_iter()
-                .map(Expression::Var)
-                .collect();
-            CallingConvention {
-                name: "__stdcall".to_string(), // so that the mock is useable as standard calling convention in tests
-                integer_parameter_register,
-                float_parameter_register,
-                integer_return_register: vec![Variable::mock("RAX", 8)],
-                float_return_register: vec![],
-                callee_saved_register: vec![Variable::mock("RBP", 8)],
             }
         }
     }
