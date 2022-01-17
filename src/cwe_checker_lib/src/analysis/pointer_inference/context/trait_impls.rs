@@ -378,13 +378,12 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
         is_true: bool,
     ) -> Option<State> {
         let mut specialized_state = state.clone();
-        if specialized_state
+        match specialized_state
             .specialize_by_expression_result(condition, Bitvector::from_u8(is_true as u8).into())
-            .is_err()
         {
+            Ok(_) => Some(specialized_state),
             // State is unsatisfiable
-            return None;
+            Err(_) => None,
         }
-        Some(specialized_state)
     }
 }

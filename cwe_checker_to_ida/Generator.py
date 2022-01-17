@@ -1,6 +1,6 @@
-from CweCheckerParser import CweWarning
+from CweCheckerParser import Cwe
 
-class IdaGenerator(object):
+class IdaGenerator:
 
     def __init__(self, results):
         self._results = results
@@ -8,17 +8,7 @@ class IdaGenerator(object):
     def generate(self):
         script = "import sark\nimport idaapi\n"
         for res in self._results:
-            if isinstance(res, CweWarning):
-                if res.highlight and res.address:
-                    first_address = res.address[0]
-                    script += "sark.Line(%s).color = %s\n" % (first_address, res.color)
-                    script += "sark.Line(%s).comments.regular = '%s'\n" % (first_address, res.description)
-                    script += "print('[ %s ] %s')\n" % (first_address, res.description)
-                else:
-                    script += "print('[ GENERAL ] %s')\n" % res.description
-            else:
-                script += "print('[CheckPath] %s ( %s ) -> %s via %s')\n" % (res.source,
-                                                                           res.source_addr,
-                                                                           res.destination,
-                                                                           res.path_str)
+            script += "sark.Line(%s).color = %s\n" % (res.address, res.color)
+            script += "sark.Line(%s).comments.regular = '%s'\n" % (res.address, res.comment)
+            script += "print('[ %s ] %s')\n" % (res.address, res.comment)
         return script
