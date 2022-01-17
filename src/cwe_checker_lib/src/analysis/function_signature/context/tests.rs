@@ -4,7 +4,7 @@ use std::collections::HashSet;
 #[test]
 fn test_compute_return_values_of_call() {
     let project = Project::mock_empty();
-    let cconv = CallingConvention::mock();
+    let cconv = CallingConvention::mock_x64();
     let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
 
     let context = Context::new(&project, &graph);

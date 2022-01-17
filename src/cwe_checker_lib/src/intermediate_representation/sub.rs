@@ -215,14 +215,29 @@ mod tests {
     }
 
     impl CallingConvention {
-        pub fn mock() -> CallingConvention {
+        pub fn mock_x64() -> CallingConvention {
             CallingConvention {
                 name: "__stdcall".to_string(), // so that the mock is useable as standard calling convention in tests
-                integer_parameter_register: vec![Variable::mock("RDI", 8)],
+                integer_parameter_register: vec![
+                    Variable::mock("RDI", 8),
+                    Variable::mock("RSI", 8),
+                    Variable::mock("RDX", 8),
+                    Variable::mock("RX", 8),
+                    Variable::mock("R8", 8),
+                    Variable::mock("R9", 8),
+                ],
                 float_parameter_register: vec![Expression::Var(Variable::mock("XMMO", 16))],
                 integer_return_register: vec![Variable::mock("RAX", 8)],
                 float_return_register: vec![],
-                callee_saved_register: vec![Variable::mock("RBP", 8)],
+                callee_saved_register: vec![
+                    Variable::mock("RBP", 8),
+                    Variable::mock("RBX", 8),
+                    Variable::mock("RSP", 8),
+                    Variable::mock("R12", 8),
+                    Variable::mock("R13", 8),
+                    Variable::mock("R14", 8),
+                    Variable::mock("R15", 8),
+                ],
             }
         }
 
@@ -230,10 +245,20 @@ mod tests {
             CallingConvention {
                 name: "__stdcall".to_string(), // so that the mock is useable as standard calling convention in tests
                 integer_parameter_register: vec![Variable::mock("r0", 4)],
-                float_parameter_register: vec![Expression::Var(Variable::mock("d0", 8))],
+                float_parameter_register: vec![Expression::Var(Variable::mock("r0", 8))],
                 integer_return_register: vec![Variable::mock("r0", 4)],
-                float_return_register: vec![],
-                callee_saved_register: vec![Variable::mock("r4", 4)],
+                float_return_register: vec![Expression::Var(Variable::mock("r0", 4))],
+                callee_saved_register: vec![
+                    Variable::mock("r4", 4),
+                    Variable::mock("r5", 4),
+                    Variable::mock("r6", 4),
+                    Variable::mock("r7", 4),
+                    Variable::mock("r8", 4),
+                    Variable::mock("r9", 4),
+                    Variable::mock("r10", 4),
+                    Variable::mock("r11", 4),
+                    Variable::mock("r13", 4),
+                ],
             }
         }
 

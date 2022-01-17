@@ -338,7 +338,7 @@ fn merge_callee_stack_to_caller_stack() {
 fn remove_and_restore_callee_saved_register() {
     let mut state = State::new(&register("RSP"), Tid::new("func_tid"));
     let value: Data = Bitvector::from_u64(42).into();
-    let cconv = CallingConvention::mock();
+    let cconv = CallingConvention::mock_x64();
     state.set_register(&register("RBP"), value.clone());
     state.set_register(&register("RAX"), value.clone());
 
