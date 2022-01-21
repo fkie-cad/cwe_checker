@@ -9,16 +9,16 @@ fn mock_pi_state() -> PointerInferenceState {
 }
 
 #[test]
-/// tests extraction of format string '/dev/sd%c%d' and 'cat %s'
+/// Tests extraction of format string parameters '/dev/sd%c%d' and 'cat %s'.
 fn test_get_variable_parameters() {
     let mem_image = RuntimeMemoryImage::mock();
     let mut pi_state = mock_pi_state();
     let sprintf_symbol = ExternSymbol::mock_string();
     let mut format_string_index_map: HashMap<String, usize> = HashMap::new();
-    format_string_index_map.insert("sprintf".to_string(), 0);
+    format_string_index_map.insert("sprintf".to_string(), 1);
     let global_address = Bitvector::from_str_radix(16, "5000").unwrap();
     pi_state.set_register(
-        &Variable::mock("RDI", 8 as u64),
+        &Variable::mock("RSI", 8 as u64),
         IntervalDomain::new(global_address.clone(), global_address).into(),
     );
     let mut project = Project::mock_empty();
@@ -27,11 +27,11 @@ fn test_get_variable_parameters() {
 
     let mut output: Vec<Arg> = Vec::new();
     output.push(Arg::from_var(
-        Variable::mock("RSI", 8),
+        Variable::mock("RDX", 8),
         Some(Datatype::Char),
     ));
     output.push(Arg::from_var(
-        Variable::mock("RDX", 8),
+        Variable::mock("RCX", 8),
         Some(Datatype::Integer),
     ));
 
@@ -48,13 +48,13 @@ fn test_get_variable_parameters() {
     );
 
     output = vec![Arg::from_var(
-        Variable::mock("RSI", 8),
+        Variable::mock("RDX", 8),
         Some(Datatype::Pointer),
     )];
 
     let global_address = Bitvector::from_str_radix(16, "500c").unwrap();
     pi_state.set_register(
-        &Variable::mock("RDI", 8 as u64),
+        &Variable::mock("RSI", 8 as u64),
         IntervalDomain::new(global_address.clone(), global_address).into(),
     );
 
