@@ -226,9 +226,21 @@ mod tests {
                     Variable::mock("R8", 8),
                     Variable::mock("R9", 8),
                 ],
-                float_parameter_register: vec![Expression::Var(Variable::mock("XMM0", 16))],
-                integer_return_register: vec![Variable::mock("RAX", 8)],
-                float_return_register: vec![],
+                float_parameter_register: vec![
+                    Expression::Var(Variable::mock("XMM0", 16)),
+                    Expression::Var(Variable::mock("XMM1", 16)),
+                    Expression::Var(Variable::mock("XMM2", 16)),
+                    Expression::Var(Variable::mock("XMM3", 16)),
+                    Expression::Var(Variable::mock("XMM4", 16)),
+                    Expression::Var(Variable::mock("XMM5", 16)),
+                    Expression::Var(Variable::mock("XMM6", 16)),
+                    Expression::Var(Variable::mock("XMM7", 16)),
+                ],
+                integer_return_register: vec![Variable::mock("RAX", 8), Variable::mock("RDX", 8)],
+                float_return_register: vec![
+                    Expression::Var(Variable::mock("XMM0", 16)),
+                    Expression::Var(Variable::mock("XMM1", 16)),
+                ],
                 callee_saved_register: vec![
                     Variable::mock("RBP", 8),
                     Variable::mock("RBX", 8),
@@ -245,7 +257,7 @@ mod tests {
             CallingConvention {
                 name: "__stdcall".to_string(), // so that the mock is useable as standard calling convention in tests
                 integer_parameter_register: vec![Variable::mock("r0", 4)],
-                float_parameter_register: vec![Expression::Var(Variable::mock("r0", 8))],
+                float_parameter_register: vec![Expression::Var(Variable::mock("r0", 4))],
                 integer_return_register: vec![Variable::mock("r0", 4)],
                 float_return_register: vec![Expression::Var(Variable::mock("r0", 4))],
                 callee_saved_register: vec![
