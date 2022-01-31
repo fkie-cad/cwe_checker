@@ -320,7 +320,6 @@ mod tests {
         }
 
         pub fn mock_arm32() -> ExternSymbol {
-            // There is also the mock_standard_arm32() method. Only on of the two should exist!
             ExternSymbol {
                 tid: Tid::new("mock_symbol"),
                 addresses: vec!["UNKNOWN".to_string()],
