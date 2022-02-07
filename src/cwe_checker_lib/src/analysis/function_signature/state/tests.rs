@@ -15,7 +15,7 @@ impl State {
         State::new(
             &Tid::new(tid_name),
             &Variable::mock("RSP", 8),
-            &CallingConvention::mock(),
+            &CallingConvention::mock_x64(),
         )
     }
 }

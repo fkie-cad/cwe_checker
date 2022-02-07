@@ -213,45 +213,108 @@ mod tests {
             }
         }
     }
+    /// Wrapper for subpiece to model float register for argument passing
+    fn create_float_register_subpiece(
+        name: &str,
+        reg_size: u64,
+        low_byte: u64,
+        size: u64,
+    ) -> Expression {
+        Expression::subpiece(
+            Expression::Var(Variable::mock(name, reg_size)),
+            ByteSize::new(low_byte),
+            ByteSize::new(size),
+        )
+    }
 
     impl CallingConvention {
-        pub fn mock() -> CallingConvention {
+        /// Creates System V Calling Convention with Advanced Vector Extensions 512
+        pub fn mock_x64() -> CallingConvention {
             CallingConvention {
                 name: "__stdcall".to_string(), // so that the mock is useable as standard calling convention in tests
-                integer_parameter_register: vec![Variable::mock("RDI", 8)],
-                float_parameter_register: vec![Expression::Var(Variable::mock("XMMO", 16))],
-                integer_return_register: vec![Variable::mock("RAX", 8)],
-                float_return_register: vec![],
-                callee_saved_register: vec![Variable::mock("RBP", 8)],
+                integer_parameter_register: vec![
+                    Variable::mock("RDI", 8),
+                    Variable::mock("RSI", 8),
+                    Variable::mock("RDX", 8),
+                    Variable::mock("RCX", 8),
+                    Variable::mock("R8", 8),
+                    Variable::mock("R9", 8),
+                ],
+                // ABI: first 8 Bytes of ZMM0-ZMM7 for float parameter
+                // Ghidra: first 8 Bytes of YMM0-YMM7 for float parameter
+                float_parameter_register: vec![
+                    create_float_register_subpiece("ZMM0", 64, 0, 8),
+                    create_float_register_subpiece("ZMM1", 64, 0, 8),
+                    create_float_register_subpiece("ZMM2", 64, 0, 8),
+                    create_float_register_subpiece("ZMM3", 64, 0, 8),
+                    create_float_register_subpiece("ZMM4", 64, 0, 8),
+                    create_float_register_subpiece("ZMM5", 64, 0, 8),
+                    create_float_register_subpiece("ZMM6", 64, 0, 8),
+                    create_float_register_subpiece("ZMM7", 64, 0, 8),
+                ],
+                integer_return_register: vec![Variable::mock("RAX", 8), Variable::mock("RDX", 8)],
+                // ABI: XMM0-XMM1 float return register
+                // Ghidra: uses XMM0 only
+                float_return_register: vec![create_float_register_subpiece("ZMM0", 64, 0, 8)],
+                callee_saved_register: vec![
+                    Variable::mock("RBP", 8),
+                    Variable::mock("RBX", 8),
+                    Variable::mock("RSP", 8),
+                    Variable::mock("R12", 8),
+                    Variable::mock("R13", 8),
+                    Variable::mock("R14", 8),
+                    Variable::mock("R15", 8),
+                ],
             }
         }
-
+        /// Following ARM32 ABI with MVE Extention
         pub fn mock_arm32() -> CallingConvention {
             CallingConvention {
                 name: "__stdcall".to_string(), // so that the mock is useable as standard calling convention in tests
-                integer_parameter_register: vec![Variable::mock("r0", 4)],
-                float_parameter_register: vec![Expression::Var(Variable::mock("d0", 8))],
-                integer_return_register: vec![Variable::mock("r0", 4)],
-                float_return_register: vec![],
-                callee_saved_register: vec![Variable::mock("r4", 4)],
-            }
-        }
-
-        pub fn mock_with_parameter_registers(
-            integer_parameter_register: Vec<Variable>,
-            float_parameter_register: Vec<Variable>,
-        ) -> CallingConvention {
-            let float_parameter_register = float_parameter_register
-                .into_iter()
-                .map(Expression::Var)
-                .collect();
-            CallingConvention {
-                name: "__stdcall".to_string(), // so that the mock is useable as standard calling convention in tests
-                integer_parameter_register,
-                float_parameter_register,
-                integer_return_register: vec![Variable::mock("RAX", 8)],
-                float_return_register: vec![],
-                callee_saved_register: vec![Variable::mock("RBP", 8)],
+                integer_parameter_register: vec![
+                    Variable::mock("r0", 4),
+                    Variable::mock("r1", 4),
+                    Variable::mock("r2", 4),
+                    Variable::mock("r3", 4),
+                ],
+                // ABI: q0-q3 used for argument passing
+                // Ghidra: uses q0-q1 only
+                float_parameter_register: vec![
+                    create_float_register_subpiece("q0", 16, 0, 4),
+                    create_float_register_subpiece("q0", 16, 4, 4),
+                    create_float_register_subpiece("q0", 16, 8, 4),
+                    create_float_register_subpiece("q0", 16, 12, 4),
+                    create_float_register_subpiece("q1", 16, 0, 4),
+                    create_float_register_subpiece("q1", 16, 4, 4),
+                    create_float_register_subpiece("q1", 16, 8, 4),
+                    create_float_register_subpiece("q1", 16, 12, 4),
+                ],
+                // ABI: r0-r1 used as integer return register
+                // Ghidra uses r0 only
+                integer_return_register: vec![
+                    Variable::mock("r0", 4),
+                    Variable::mock("r1", 4),
+                    Variable::mock("r2", 4),
+                    Variable::mock("r3", 4),
+                ],
+                // ABI: whole q0 used as float return
+                // Ghidra: uses first 8 Bytes of q0 only
+                float_return_register: vec![create_float_register_subpiece("q0", 16, 0, 4)],
+                callee_saved_register: vec![
+                    Variable::mock("r4", 4),
+                    Variable::mock("r5", 4),
+                    Variable::mock("r6", 4),
+                    Variable::mock("r7", 4),
+                    Variable::mock("r8", 4),
+                    Variable::mock("r9", 4),
+                    Variable::mock("r10", 4),
+                    Variable::mock("r11", 4),
+                    Variable::mock("r13", 4),
+                    Variable::mock("q4", 16),
+                    Variable::mock("q5", 16),
+                    Variable::mock("q6", 16),
+                    Variable::mock("q7", 16),
+                ],
             }
         }
     }
@@ -301,7 +364,6 @@ mod tests {
         }
 
         pub fn mock_arm32() -> ExternSymbol {
-            // There is also the mock_standard_arm32() method. Only on of the two should exist!
             ExternSymbol {
                 tid: Tid::new("mock_symbol"),
                 addresses: vec!["UNKNOWN".to_string()],

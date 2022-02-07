@@ -9,36 +9,32 @@ fn mock_pi_state() -> PointerInferenceState {
 }
 
 #[test]
+/// Tests extraction of format string parameters '/dev/sd%c%d' and 'cat %s'.
 fn test_get_variable_parameters() {
     let mem_image = RuntimeMemoryImage::mock();
     let mut pi_state = mock_pi_state();
     let sprintf_symbol = ExternSymbol::mock_string();
     let mut format_string_index_map: HashMap<String, usize> = HashMap::new();
-    format_string_index_map.insert("sprintf".to_string(), 0);
+    format_string_index_map.insert("sprintf".to_string(), 1);
     let global_address = Bitvector::from_str_radix(16, "5000").unwrap();
     pi_state.set_register(
-        &Variable::mock("RDI", 8 as u64),
+        &Variable::mock("RSI", 8 as u64),
         IntervalDomain::new(global_address.clone(), global_address).into(),
     );
     let mut project = Project::mock_empty();
-    let cconv = CallingConvention::mock_with_parameter_registers(
-        vec![Variable::mock("RDI", 8)],
-        vec![Variable::mock("XMM0", 16)],
-    );
+    let cconv = CallingConvention::mock_x64();
     project.calling_conventions = BTreeMap::from_iter([(cconv.name.clone(), cconv)]);
 
     let mut output: Vec<Arg> = Vec::new();
-    output.push(Arg::Stack {
-        address: Expression::Var(Variable::mock("RSP", 8)).plus_const(8),
-        size: ByteSize::new(4),
-        data_type: Some(Datatype::Char),
-    });
+    output.push(Arg::from_var(
+        Variable::mock("RDX", 8),
+        Some(Datatype::Char),
+    ));
+    output.push(Arg::from_var(
+        Variable::mock("RCX", 8),
+        Some(Datatype::Integer),
+    ));
 
-    output.push(Arg::Stack {
-        address: Expression::Var(Variable::mock("RSP", 8)).plus_const(12),
-        size: ByteSize::new(4),
-        data_type: Some(Datatype::Integer),
-    });
     assert_eq!(
         output,
         get_variable_parameters(
@@ -51,15 +47,14 @@ fn test_get_variable_parameters() {
         .unwrap()
     );
 
-    output = vec![Arg::Stack {
-        address: Expression::Var(Variable::mock("RSP", 8)).plus_const(8),
-        size: ByteSize::new(8),
-        data_type: Some(Datatype::Pointer),
-    }];
+    output = vec![Arg::from_var(
+        Variable::mock("RDX", 8),
+        Some(Datatype::Pointer),
+    )];
 
     let global_address = Bitvector::from_str_radix(16, "500c").unwrap();
     pi_state.set_register(
-        &Variable::mock("RDI", 8 as u64),
+        &Variable::mock("RSI", 8 as u64),
         IntervalDomain::new(global_address.clone(), global_address).into(),
     );
 
@@ -164,16 +159,9 @@ fn test_parse_format_string_parameters() {
 }
 
 #[test]
+/// Tests tracking of parameters according to format string
 fn test_calculate_parameter_locations() {
-    let cconv = CallingConvention::mock_with_parameter_registers(
-        vec![
-            Variable::mock("RDI", 8),
-            Variable::mock("RSI", 8),
-            Variable::mock("R8", 8),
-            Variable::mock("R9", 8),
-        ],
-        vec![Variable::mock("XMM0", 16)],
-    );
+    let cconv = CallingConvention::mock_x64();
     let format_string_index: usize = 1;
     let mut parameters: Vec<(Datatype, ByteSize)> = Vec::new();
     parameters.push(("d".to_string().into(), ByteSize::new(8)));
@@ -182,20 +170,24 @@ fn test_calculate_parameter_locations() {
 
     let mut expected_args = vec![
         Arg::Register {
-            expr: Expression::Var(Variable::mock("R8", ByteSize::new(8))),
+            expr: Expression::Var(Variable::mock("RDX", ByteSize::new(8))),
             data_type: Some(Datatype::Integer),
         },
         Arg::Register {
-            expr: Expression::Var(Variable::mock("XMM0", ByteSize::new(16))),
+            expr: Expression::subpiece(
+                Expression::Var(Variable::mock("ZMM0", 64)),
+                ByteSize::new(0),
+                ByteSize::new(8),
+            ),
             data_type: Some(Datatype::Double),
         },
         Arg::Register {
-            expr: Expression::Var(Variable::mock("R9", ByteSize::new(8))),
+            expr: Expression::Var(Variable::mock("RCX", ByteSize::new(8))),
             data_type: Some(Datatype::Pointer),
         },
     ];
 
-    // Test Case 1: The string parameter is still written in the R9 register since 'f' is contained in the float register.
+    // Test Case 1: The string parameter is still written in the RCX register since 'f' is contained in the float register.
     assert_eq!(
         expected_args,
         calculate_parameter_locations(
@@ -208,13 +200,24 @@ fn test_calculate_parameter_locations() {
     );
 
     parameters.push(("s".to_string().into(), ByteSize::new(8)));
+    parameters.push(("s".to_string().into(), ByteSize::new(8)));
+    parameters.push(("s".to_string().into(), ByteSize::new(8)));
+
+    expected_args.push(Arg::Register {
+        expr: Expression::Var(Variable::mock("R8", ByteSize::new(8))),
+        data_type: Some(Datatype::Pointer),
+    });
+    expected_args.push(Arg::Register {
+        expr: Expression::Var(Variable::mock("R9", ByteSize::new(8))),
+        data_type: Some(Datatype::Pointer),
+    });
     expected_args.push(Arg::Stack {
         address: Expression::Var(Variable::mock("RSP", 8)).plus_const(8),
         size: ByteSize::new(8),
         data_type: Some(Datatype::Pointer),
     });
 
-    // Test Case 2: A second string parameter does not fit into the registers anymore and is written into the stack.
+    // Test Case 2: Three further string parameter does not fit into the registers anymore and one is written into the stack.
     assert_eq!(
         expected_args,
         calculate_parameter_locations(
