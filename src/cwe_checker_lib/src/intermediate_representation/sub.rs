@@ -213,7 +213,7 @@ mod tests {
             }
         }
     }
-    /// Wrapper for subpiece to model float register for arument passing
+    /// Wrapper for subpiece to model float register for argument passing
     fn create_float_register_subpiece(
         name: &str,
         reg_size: u64,
@@ -271,7 +271,12 @@ mod tests {
         pub fn mock_arm32() -> CallingConvention {
             CallingConvention {
                 name: "__stdcall".to_string(), // so that the mock is useable as standard calling convention in tests
-                integer_parameter_register: vec![Variable::mock("r0", 4)],
+                integer_parameter_register: vec![
+                    Variable::mock("r0", 4),
+                    Variable::mock("r1", 4),
+                    Variable::mock("r2", 4),
+                    Variable::mock("r3", 4),
+                ],
                 // ABI: q0-q3 used for argument passing
                 // Ghidra: uses q0-q1 only
                 float_parameter_register: vec![
