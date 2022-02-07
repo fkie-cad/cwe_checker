@@ -31,7 +31,7 @@ public class TermCreator {
      */
     public static Term<Program> createProgramTerm() {
         Tid progTid = new Tid(String.format("prog_%s", HelperFunctions.ghidraProgram.getMinAddress().toString()), HelperFunctions.ghidraProgram.getMinAddress().toString());
-        String imageBase = HelperFunctions.ghidraProgram.getImageBase().toString();
+        String imageBase = HelperFunctions.removePrefix(HelperFunctions.ghidraProgram.getImageBase().toString());
         return new Term<Program>(progTid, new Program(new ArrayList<Term<Sub>>(), HelperFunctions.addEntryPoints(symTab), imageBase));
     }
 
@@ -195,10 +195,10 @@ public class TermCreator {
             var.setName(HelperFunctions.renameVirtualRegister(node.getAddress().toString()));
             var.setIsVirtual(true);
         } else if (node.isConstant()) {
-            var.setValue(HelperFunctions.removeConstantPrefix(node.getAddress().toString()));
+            var.setValue(HelperFunctions.removePrefix(node.getAddress().toString()));
             var.setIsVirtual(false);
         } else if (node.isAddress()) {
-            var.setAddress(node.getAddress().toString());
+            var.setAddress(HelperFunctions.removePrefix(node.getAddress().toString()));
             var.setIsVirtual(false);
         } else if (node.isFree()) {
             var.setAddress(HelperFunctions.removeStackPrefix(node.getAddress().toString()));
