@@ -217,7 +217,7 @@ fn test_calculate_parameter_locations() {
         data_type: Some(Datatype::Pointer),
     });
 
-    // Test Case 2: Tree further string parameter does not fit into the registers anymore and one is written into the stack.
+    // Test Case 2: Three further string parameter does not fit into the registers anymore and one is written into the stack.
     assert_eq!(
         expected_args,
         calculate_parameter_locations(

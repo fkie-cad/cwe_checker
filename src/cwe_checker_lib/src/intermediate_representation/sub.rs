@@ -213,20 +213,17 @@ mod tests {
             }
         }
     }
-    /// Returns model for floating points for argument passing in x64
-    fn create_x64_float_register_subpice(name: &str) -> Expression {
+    /// Wrapper for subpiece to model float register for arument passing
+    fn create_float_register_subpiece(
+        name: &str,
+        reg_size: u64,
+        low_byte: u64,
+        size: u64,
+    ) -> Expression {
         Expression::subpiece(
-            Expression::Var(Variable::mock(name, 64)),
-            ByteSize::new(0),
-            ByteSize::new(8),
-        )
-    }
-    /// Returns model for floating points for argument passing in arm32
-    fn create_arm32_float_register_subpice(name: &str, low_byte: u64) -> Expression {
-        Expression::subpiece(
-            Expression::Var(Variable::mock(name, 16)),
+            Expression::Var(Variable::mock(name, reg_size)),
             ByteSize::new(low_byte),
-            ByteSize::new(4),
+            ByteSize::new(size),
         )
     }
 
@@ -246,19 +243,19 @@ mod tests {
                 // ABI: first 8 Bytes of ZMM0-ZMM7 for float parameter
                 // Ghidra: first 8 Bytes of YMM0-YMM7 for float parameter
                 float_parameter_register: vec![
-                    create_x64_float_register_subpice("ZMM0"),
-                    create_x64_float_register_subpice("ZMM1"),
-                    create_x64_float_register_subpice("ZMM2"),
-                    create_x64_float_register_subpice("ZMM3"),
-                    create_x64_float_register_subpice("ZMM4"),
-                    create_x64_float_register_subpice("ZMM5"),
-                    create_x64_float_register_subpice("ZMM6"),
-                    create_x64_float_register_subpice("ZMM7"),
+                    create_float_register_subpiece("ZMM0", 64, 0, 8),
+                    create_float_register_subpiece("ZMM1", 64, 0, 8),
+                    create_float_register_subpiece("ZMM2", 64, 0, 8),
+                    create_float_register_subpiece("ZMM3", 64, 0, 8),
+                    create_float_register_subpiece("ZMM4", 64, 0, 8),
+                    create_float_register_subpiece("ZMM5", 64, 0, 8),
+                    create_float_register_subpiece("ZMM6", 64, 0, 8),
+                    create_float_register_subpiece("ZMM7", 64, 0, 8),
                 ],
                 integer_return_register: vec![Variable::mock("RAX", 8), Variable::mock("RDX", 8)],
                 // ABI: XMM0-XMM1 float return register
                 // Ghidra: uses XMM0 only
-                float_return_register: vec![create_x64_float_register_subpice("ZMM0")],
+                float_return_register: vec![create_float_register_subpiece("ZMM0", 64, 0, 8)],
                 callee_saved_register: vec![
                     Variable::mock("RBP", 8),
                     Variable::mock("RBX", 8),
@@ -278,21 +275,26 @@ mod tests {
                 // ABI: q0-q3 used for argument passing
                 // Ghidra: uses q0-q1 only
                 float_parameter_register: vec![
-                    create_arm32_float_register_subpice("q0", 0),
-                    create_arm32_float_register_subpice("q0", 4),
-                    create_arm32_float_register_subpice("q0", 8),
-                    create_arm32_float_register_subpice("q0", 12),
-                    create_arm32_float_register_subpice("q1", 0),
-                    create_arm32_float_register_subpice("q1", 4),
-                    create_arm32_float_register_subpice("q1", 8),
-                    create_arm32_float_register_subpice("q1", 12),
+                    create_float_register_subpiece("q0", 16, 0, 4),
+                    create_float_register_subpiece("q0", 16, 4, 4),
+                    create_float_register_subpiece("q0", 16, 8, 4),
+                    create_float_register_subpiece("q0", 16, 12, 4),
+                    create_float_register_subpiece("q1", 16, 0, 4),
+                    create_float_register_subpiece("q1", 16, 4, 4),
+                    create_float_register_subpiece("q1", 16, 8, 4),
+                    create_float_register_subpiece("q1", 16, 12, 4),
                 ],
                 // ABI: r0-r1 used as integer return register
                 // Ghidra uses r0 only
-                integer_return_register: vec![Variable::mock("r0", 4)],
+                integer_return_register: vec![
+                    Variable::mock("r0", 4),
+                    Variable::mock("r1", 4),
+                    Variable::mock("r2", 4),
+                    Variable::mock("r3", 4),
+                ],
                 // ABI: whole q0 used as float return
                 // Ghidra: uses first 8 Bytes of q0 only
-                float_return_register: vec![create_arm32_float_register_subpice("q0", 0)],
+                float_return_register: vec![create_float_register_subpiece("q0", 16, 0, 4)],
                 callee_saved_register: vec![
                     Variable::mock("r4", 4),
                     Variable::mock("r5", 4),
