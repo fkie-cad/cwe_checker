@@ -174,7 +174,11 @@ fn test_calculate_parameter_locations() {
             data_type: Some(Datatype::Integer),
         },
         Arg::Register {
-            expr: Expression::Var(Variable::mock("XMM0", ByteSize::new(16))),
+            expr: Expression::subpiece(
+                Expression::Var(Variable::mock("ZMM0", 64)),
+                ByteSize::new(0),
+                ByteSize::new(8),
+            ),
             data_type: Some(Datatype::Double),
         },
         Arg::Register {

@@ -25,7 +25,7 @@ fn test_compute_return_values_of_call() {
         AbstractIdentifier::new_from_var(Tid::new("call_tid"), &Variable::mock("RAX", 8)),
         Bitvector::from_i64(0).into(),
     );
-    assert_eq!(return_values.iter().len(), 4);
+    assert_eq!(return_values.iter().len(), 3);
     assert_eq!(return_values[0], (&Variable::mock("RAX", 8), expected_val));
     // Test returning a known value.
     let param_ref = DataDomain::from_target(
@@ -39,6 +39,6 @@ fn test_compute_return_values_of_call() {
     );
     let return_values =
         context.compute_return_values_of_call(&mut caller_state, &callee_state, &cconv, &call);
-    assert_eq!(return_values.iter().len(), 4);
+    assert_eq!(return_values.iter().len(), 3);
     assert_eq!(return_values[0], (&Variable::mock("RAX", 8), expected_val));
 }
