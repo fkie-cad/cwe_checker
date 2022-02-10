@@ -162,7 +162,7 @@ public class ParseCspecContent {
      */
     public static ResourceFile getLdefFile() {
         String processorDef = String.format("%s.ldefs", program.getLanguage().getLanguageDescription().getProcessor().toString());
-        if(processorDef.startsWith("MIPS")) {
+        if(processorDef.startsWith("MIPS") || processorDef.startsWith("AVR")) {
             processorDef = processorDef.toLowerCase();
         }
         if(processorDef.startsWith("PowerPC")) {

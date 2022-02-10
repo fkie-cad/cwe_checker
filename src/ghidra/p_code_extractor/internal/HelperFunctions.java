@@ -94,13 +94,13 @@ public final class HelperFunctions {
 
 
     /**
-     * @param constant: Constant value
-     * @return: Constant value without prefix
+     * @param constant: Value which may have a prefix
+     * @return: Value without prefix
      * 
-     * Removes the consts prefix from the constant.
+     * Removes prefixes like "const:" and "mem:" from the constant.
      */
-    public static String removeConstantPrefix(String constant) {
-        return constant.replaceFirst("^(const:)", "");
+    public static String removePrefix(String constant) {
+        return constant.replaceFirst("^([a-zA-Z]*:)", "");
     }
 
 

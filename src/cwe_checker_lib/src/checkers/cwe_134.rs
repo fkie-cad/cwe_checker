@@ -211,7 +211,7 @@ pub mod tests {
         project.program.term.entry_points.insert(Tid::new("func"));
         project
             .calling_conventions
-            .insert("__stdcall".to_string(), CallingConvention::mock());
+            .insert("__stdcall".to_string(), CallingConvention::mock_x64());
 
         project
     }
