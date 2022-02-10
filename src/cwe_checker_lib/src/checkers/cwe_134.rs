@@ -223,7 +223,7 @@ pub mod tests {
         let project = mock_project();
         let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
         let mut pi_results = PointerInferenceComputation::mock(&project);
-        pi_results.compute();
+        pi_results.compute(false);
         let mut format_string_index: HashMap<String, usize> = HashMap::new();
         format_string_index.insert("sprintf".to_string(), 1);
         // Get the BlkEnd node with the function call.

@@ -99,7 +99,7 @@ impl<'a> Context<'a> {
         // If the Top-flag of the return value was set we replace it with an ID representing the return register
         // to indicate where the unknown value originated from.
         if return_value.contains_top() {
-            let id = AbstractIdentifier::new_from_var(call.tid.clone(), return_register);
+            let id = AbstractIdentifier::from_var(call.tid.clone(), return_register);
             let value =
                 DataDomain::from_target(id, Bitvector::zero(return_register.size.into()).into());
             return_value = return_value.merge(&value);

@@ -86,7 +86,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
         domain_input_string: T,
     ) {
         for (target, offset) in pointer.iter() {
-            if pi_state.caller_stack_ids.contains(target) || pi_state.stack_id == *target {
+            if pi_state.stack_id == *target {
                 if let Ok(offset_value) = offset.try_to_offset() {
                     state.add_new_stack_offset_to_string_entry(
                         offset_value,
@@ -115,7 +115,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
         let mut domains: Vec<T> = Vec::new();
         for (target, offset) in pointer.iter() {
             // Check the stack offset map if the target points to a stack position.
-            if pi_state.caller_stack_ids.contains(target) || pi_state.stack_id == *target {
+            if pi_state.stack_id == *target {
                 if let Ok(offset_value) = offset.try_to_offset() {
                     if let Some(domain) = state.get_stack_offset_to_string_map().get(&offset_value)
                     {

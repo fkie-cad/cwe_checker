@@ -22,7 +22,7 @@ impl State {
 
 /// Mock an abstract ID representing the stack.
 fn mock_stack_id() -> AbstractIdentifier {
-    AbstractIdentifier::new_from_var(Tid::new("mock_fn"), &Variable::mock("sp", 4))
+    AbstractIdentifier::from_var(Tid::new("mock_fn"), &Variable::mock("sp", 4))
 }
 
 /// Mock an abstract ID of a stack parameter
@@ -149,9 +149,9 @@ fn test_extern_symbol_handling() {
             return_: Some(Tid::new("return_tid")),
         },
     };
-    let param_id = AbstractIdentifier::new_from_var(Tid::new("mock_fn"), &Variable::mock("r0", 4));
+    let param_id = AbstractIdentifier::from_var(Tid::new("mock_fn"), &Variable::mock("r0", 4));
     let return_val_id =
-        AbstractIdentifier::new_from_var(Tid::new("call_tid"), &Variable::mock("r0", 4));
+        AbstractIdentifier::from_var(Tid::new("call_tid"), &Variable::mock("r0", 4));
     // Test extern symbol handling.
     state.handle_extern_symbol(&call, &extern_symbol, &cconv);
     assert_eq!(

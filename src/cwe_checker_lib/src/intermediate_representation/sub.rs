@@ -58,40 +58,39 @@ impl Arg {
     /// If the argument is a stack argument,
     /// return its offset relative to the current stack register value.
     /// Return an error for register arguments or if the offset could not be computed.
-    pub fn eval_stack_offset(&self, stack_register: &Variable) -> Result<Bitvector, Error> {
+    pub fn eval_stack_offset(&self) -> Result<Bitvector, Error> {
         let expression = match self {
             Arg::Register { .. } => return Err(anyhow!("The argument is not a stack argument.")),
             Arg::Stack { address, .. } => address,
         };
-        Self::eval_stack_offset_expression(expression, stack_register)
+        Self::eval_stack_offset_expression(expression)
     }
 
     /// If the given expression computes a constant offset to the given stack register,
     /// then return the offset.
     /// Else return an error.
-    fn eval_stack_offset_expression(
-        expression: &Expression,
-        stack_register: &Variable,
-    ) -> Result<Bitvector, Error> {
+    fn eval_stack_offset_expression(expression: &Expression) -> Result<Bitvector, Error> {
         match expression {
-            Expression::Var(var) => {
-                if var == stack_register {
-                    Ok(Bitvector::zero(var.size.into()))
-                } else {
-                    Err(anyhow!("Input register is not the stack register"))
-                }
-            }
+            Expression::Var(var) => Ok(Bitvector::zero(var.size.into())),
             Expression::Const(bitvec) => Ok(bitvec.clone()),
             Expression::BinOp { op, lhs, rhs } => {
-                let lhs = Self::eval_stack_offset_expression(lhs, stack_register)?;
-                let rhs = Self::eval_stack_offset_expression(rhs, stack_register)?;
+                let lhs = Self::eval_stack_offset_expression(lhs)?;
+                let rhs = Self::eval_stack_offset_expression(rhs)?;
                 lhs.bin_op(*op, &rhs)
             }
             Expression::UnOp { op, arg } => {
-                let arg = Self::eval_stack_offset_expression(arg, stack_register)?;
+                let arg = Self::eval_stack_offset_expression(arg)?;
                 arg.un_op(*op)
             }
             _ => Err(anyhow!("Expression type not supported for argument values")),
+        }
+    }
+
+    /// Return the bytesize of the argument.
+    pub fn bytesize(&self) -> ByteSize {
+        match self {
+            Arg::Register { expr, .. } => expr.bytesize(),
+            Arg::Stack { size, .. } => *size,
         }
     }
 }

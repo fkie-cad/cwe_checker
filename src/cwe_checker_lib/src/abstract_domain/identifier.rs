@@ -55,12 +55,35 @@ impl AbstractIdentifier {
 
     /// Create a new abstract identifier where the abstract location is a register.
     /// Panics if the register is a temporary register.
-    pub fn new_from_var(time: Tid, variable: &Variable) -> AbstractIdentifier {
+    pub fn from_var(time: Tid, variable: &Variable) -> AbstractIdentifier {
         AbstractIdentifier(Arc::new(AbstractIdentifierData {
             time,
             location: AbstractLocation::from_var(variable).unwrap(),
             path_hints: Vec::new(),
         }))
+    }
+
+    /// Create an abstract identifier from a parameter argument.
+    ///
+    /// If the argument is a sub-register, then the created identifier contains the whole base register.
+    pub fn from_arg(time: &Tid, arg: &Arg) -> AbstractIdentifier {
+        let location_register = match arg {
+            Arg::Register { expr, .. } | Arg::Stack { address: expr, .. } => {
+                match &expr.input_vars()[..] {
+                    [var] => var.clone(),
+                    _ => panic!("Malformed argument expression encountered"),
+                }
+            }
+        };
+        let location = match arg {
+            Arg::Register { .. } => AbstractLocation::from_var(location_register).unwrap(),
+            Arg::Stack { size, .. } => AbstractLocation::from_stack_position(
+                location_register,
+                arg.eval_stack_offset().unwrap().try_to_i64().unwrap(),
+                *size,
+            ),
+        };
+        AbstractIdentifier::new(time.clone(), location)
     }
 
     /// Create a new abstract identifier

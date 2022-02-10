@@ -166,6 +166,20 @@ impl FunctionSignature {
         }
     }
 
+    /// The returned number is the maximum of stack offset plus parameter size
+    /// taken over all stack parameters in the function signature.
+    pub fn get_stack_params_total_size(&self) -> i64 {
+        let mut stack_params_total_size: i64 = 0;
+        for param in self.parameters.keys() {
+            if let Ok(param_offset) = param.eval_stack_offset() {
+                let param_upper_bound =
+                    param_offset.try_to_i64().unwrap() + (u64::from(param.bytesize()) as i64);
+                stack_params_total_size = std::cmp::max(stack_params_total_size, param_upper_bound);
+            }
+        }
+        stack_params_total_size
+    }
+
     /// Merge the parameter list of `self` with the given parameter list.
     fn merge_parameter_list(&mut self, params: &[(Arg, AccessPattern)]) {
         for (arg, sig_new) in params {
@@ -213,7 +227,7 @@ impl FunctionSignature {
                 if *size != stack_register.size {
                     return Err(anyhow!("Unexpected stack parameter size"));
                 }
-                if let Ok(offset) = arg.eval_stack_offset(stack_register) {
+                if let Ok(offset) = arg.eval_stack_offset() {
                     if offset.try_to_u64()? % u64::from(stack_register.size) != 0 {
                         return Err(anyhow!("Unexpected stack parameter alignment"));
                     }

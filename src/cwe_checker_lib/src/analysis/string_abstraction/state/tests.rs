@@ -329,42 +329,36 @@ fn test_add_pointer_to_variable_maps_if_tracked() {
 
 #[test]
 fn test_pointer_targets_partially_tracked() {
-    let sp_reg = Variable::mock("sp", 4);
     let mut mock_state =
         State::<CharacterInclusionDomain>::mock_with_default_pi_state(Sub::mock("func"));
+    let pi_state = mock_state.get_pointer_inference_state().unwrap().clone();
 
-    let stack_id = AbstractIdentifier::new(
-        Tid::new("func"),
-        AbstractLocation::from_var(&sp_reg).unwrap(),
+    let heap_id = AbstractIdentifier::new(
+        Tid::new("heap"),
+        AbstractLocation::from_var(&Variable::mock("r0", 4)).unwrap(),
     );
-
-    let caller_stack_id = AbstractIdentifier::new(
-        Tid::new("caller_func"),
-        AbstractLocation::from_var(&sp_reg).unwrap(),
-    );
+    let stack_id = pi_state.stack_id.clone();
 
     let mut string_pointer = DataDomain::from_target(
-        stack_id,
+        heap_id.clone(),
         IntervalDomain::new(Bitvector::from_i32(0), Bitvector::from_i32(0)),
     );
 
     string_pointer.insert_relative_value(
-        caller_stack_id.clone(),
+        stack_id.clone(),
         IntervalDomain::new(Bitvector::from_i32(-8), Bitvector::from_i32(-8)),
     );
 
-    let mut pi_state = mock_state.get_pointer_inference_state().unwrap().clone();
-    pi_state.caller_stack_ids.insert(caller_stack_id);
     mock_state.set_pointer_inference_state(Some(pi_state.clone()));
 
     assert!(!mock_state.pointer_targets_partially_tracked(&pi_state, &string_pointer));
 
     mock_state
         .stack_offset_to_string_map
-        .insert(0, CharacterInclusionDomain::Top);
+        .insert(-8, CharacterInclusionDomain::Top);
 
     assert!(mock_state.pointer_targets_partially_tracked(&pi_state, &string_pointer));
-    assert!(mock_state.stack_offset_to_string_map.contains_key(&(-8)));
+    assert!(mock_state.heap_to_string_map.contains_key(&heap_id));
 }
 
 #[test]

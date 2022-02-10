@@ -112,7 +112,7 @@ impl State {
             {
                 if var.size == generic_pointer_size {
                     let specific_target = DataDomain::from_target(
-                        AbstractIdentifier::new_from_var(call_tid.clone(), var),
+                        AbstractIdentifier::from_var(call_tid.clone(), var),
                         Bitvector::zero(var.size.into()).into(),
                     );
                     let output = generic_output.merge(&specific_target);

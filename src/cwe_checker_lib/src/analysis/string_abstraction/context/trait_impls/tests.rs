@@ -25,7 +25,7 @@ fn test_update_def() {
     );
     let mem_image = RuntimeMemoryImage::mock();
     let mut pi_results = PointerInferenceComputation::mock(&project);
-    pi_results.compute();
+    pi_results.compute(false);
 
     let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
     setup.context.block_first_def_set = HashSet::new();
@@ -138,7 +138,7 @@ fn test_update_jump() {
         "func",
     );
     let mut pi_results = PointerInferenceComputation::mock(&project);
-    pi_results.compute();
+    pi_results.compute(false);
 
     let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
@@ -163,7 +163,7 @@ fn test_update_return() {
         "func",
     );
     let mut pi_results = PointerInferenceComputation::mock(&project);
-    pi_results.compute();
+    pi_results.compute(false);
 
     let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
@@ -219,7 +219,7 @@ fn test_update_call_stub() {
         "func",
     );
     let mut pi_results = PointerInferenceComputation::mock(&project);
-    pi_results.compute();
+    pi_results.compute(false);
 
     let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
