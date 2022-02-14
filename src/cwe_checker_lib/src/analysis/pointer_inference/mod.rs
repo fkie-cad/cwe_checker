@@ -36,7 +36,6 @@ use crate::prelude::*;
 use crate::utils::log::*;
 use petgraph::graph::NodeIndex;
 use petgraph::visit::IntoNodeReferences;
-use petgraph::Direction;
 use std::collections::{BTreeMap, HashMap};
 
 mod context;
@@ -86,7 +85,7 @@ pub struct PointerInference<'a> {
 }
 
 impl<'a> PointerInference<'a> {
-    /// Generate a new pointer inference compuation for a project.
+    /// Generate a new pointer inference computation for a project.
     pub fn new(
         analysis_results: &'a AnalysisResults<'a>,
         config: Config,
@@ -95,13 +94,12 @@ impl<'a> PointerInference<'a> {
     ) -> PointerInference<'a> {
         let context = Context::new(analysis_results, config, log_sender.clone());
         let project = analysis_results.project;
+        let function_signatures = analysis_results.function_signatures.unwrap();
 
-        let mut entry_sub_to_entry_blocks_map = HashMap::new();
-        for sub_tid in project.program.term.entry_points.iter() {
-            if let Some(sub) = project.program.term.subs.get(sub_tid) {
-                if let Some(entry_block) = sub.term.blocks.get(0) {
-                    entry_sub_to_entry_blocks_map.insert(sub_tid, entry_block.tid.clone());
-                }
+        let mut sub_to_entry_blocks_map = HashMap::new();
+        for (sub_tid, sub) in project.program.term.subs.iter() {
+            if let Some(entry_block) = sub.term.blocks.get(0) {
+                sub_to_entry_blocks_map.insert(sub_tid, entry_block.tid.clone());
             }
         }
         let mut tid_to_graph_indices_map = HashMap::new();
@@ -110,26 +108,12 @@ impl<'a> PointerInference<'a> {
                 tid_to_graph_indices_map.insert((block.tid.clone(), sub.tid.clone()), node);
             }
         }
-        let entry_sub_to_entry_node_map: HashMap<Tid, NodeIndex> = entry_sub_to_entry_blocks_map
+        let sub_to_entry_node_map: HashMap<Tid, NodeIndex> = sub_to_entry_blocks_map
             .into_iter()
             .filter_map(|(sub_tid, block_tid)| {
-                if let Some(start_node_index) =
-                    tid_to_graph_indices_map.get(&(block_tid, sub_tid.clone()))
-                {
-                    // We only add entry points that are also control flow graph roots
-                    if context
-                        .graph
-                        .neighbors_directed(*start_node_index, Direction::Incoming)
-                        .next()
-                        .is_none()
-                    {
-                        Some((sub_tid.clone(), *start_node_index))
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
+                tid_to_graph_indices_map
+                    .get(&(block_tid, sub_tid.clone()))
+                    .map(|start_node_index| (sub_tid.clone(), *start_node_index))
             })
             .collect();
         let mut fixpoint_computation =
@@ -138,22 +122,18 @@ impl<'a> PointerInference<'a> {
             let _ = log_sender.send(LogThreadMsg::Log(
                 LogMessage::new_info(format!(
                     "Adding {} entry points",
-                    entry_sub_to_entry_node_map.len()
+                    sub_to_entry_node_map.len()
                 ))
                 .source("Pointer Inference"),
             ));
         }
-        for (sub_tid, start_node_index) in entry_sub_to_entry_node_map.into_iter() {
-            let mut fn_entry_state = if let Some(cconv) = project.get_standard_calling_convention()
-            {
-                State::new_with_generic_parameter_objects(
-                    &project.stack_pointer_register,
-                    sub_tid.clone(),
-                    &cconv.integer_parameter_register,
-                )
-            } else {
-                State::new(&project.stack_pointer_register, sub_tid.clone())
-            };
+        for (sub_tid, start_node_index) in sub_to_entry_node_map.into_iter() {
+            let fn_signature = function_signatures.get(&sub_tid).unwrap();
+            let mut fn_entry_state = State::from_fn_sig(
+                fn_signature,
+                &project.stack_pointer_register,
+                sub_tid.clone(),
+            );
             if project.cpu_architecture.contains("MIPS") {
                 let _ = fn_entry_state
                     .set_mips_link_register(&sub_tid, project.stack_pointer_register.size);
@@ -172,8 +152,23 @@ impl<'a> PointerInference<'a> {
 
     /// Compute the fixpoint of the pointer inference analysis.
     /// Has a `max_steps` bound for the fixpoint algorithm to prevent infinite loops.
-    pub fn compute(&mut self) {
+    ///
+    /// If `print_stats` is `true` then some extra log messages with statistics about the computation are generated.
+    pub fn compute(&mut self, print_stats: bool) {
         self.computation.compute_with_max_steps(100); // TODO: make max_steps configurable!
+        if print_stats {
+            self.count_blocks_with_state();
+        }
+        if !self.computation.has_stabilized() {
+            let worklist_size = self.computation.get_worklist().len();
+            let _ = self.log_info(format!(
+                "Fixpoint did not stabilize. Remaining worklist size: {}",
+                worklist_size,
+            ));
+        }
+        if print_stats {
+            statistics::compute_and_log_mem_access_stats(self);
+        }
     }
 
     /// Print results serialized as YAML to stdout
@@ -232,79 +227,6 @@ impl<'a> PointerInference<'a> {
         self.computation.get_node_value(node_id)
     }
 
-    /// Add speculative entry points to the fixpoint algorithm state.
-    ///
-    /// Since indirect jumps and calls are not handled yet (TODO: change that),
-    /// the analysis may miss a *lot* of code in some cases.
-    /// To remedy this somewhat,
-    /// we mark all function starts, that are also roots in the control flow graph
-    /// and do not have a state assigned to them yet, as additional entry points.
-    ///
-    /// If `only_cfg_roots` is set to `false`, then all function starts without a state are marked as roots.
-    fn add_speculative_entry_points(
-        &mut self,
-        project: &Project,
-        only_cfg_roots: bool,
-        print_stats: bool,
-    ) {
-        // TODO: Refactor the fixpoint computation structs, so that the project reference can be extracted from them.
-        let mut start_block_to_sub_map: HashMap<&Tid, &Term<Sub>> = HashMap::new();
-        for sub in project.program.term.subs.values() {
-            if project.program.term.extern_symbols.contains_key(&sub.tid) {
-                continue; // We ignore functions marked as extern symbols.
-            }
-            if let Some(start_block) = sub.term.blocks.first() {
-                start_block_to_sub_map.insert(&start_block.tid, sub);
-            }
-        }
-        let graph = self.computation.get_graph();
-        let mut new_entry_points = Vec::new();
-        for (node_id, node) in graph.node_references() {
-            if let Node::BlkStart(block, sub) = node {
-                if start_block_to_sub_map.get(&block.tid) == Some(sub)
-                    && self.computation.get_node_value(node_id).is_none()
-                    && (!only_cfg_roots
-                        || graph
-                            .neighbors_directed(node_id, Direction::Incoming)
-                            .next()
-                            .is_none())
-                {
-                    new_entry_points.push(node_id);
-                }
-            }
-        }
-        if print_stats {
-            self.log_info(format!(
-                "Adding {} speculative entry points",
-                new_entry_points.len()
-            ));
-        }
-        for entry in new_entry_points {
-            let sub_tid = start_block_to_sub_map
-                [&self.computation.get_graph()[entry].get_block().tid]
-                .tid
-                .clone();
-            let mut fn_entry_state = if let Some(cconv) = project.get_standard_calling_convention()
-            {
-                State::new_with_generic_parameter_objects(
-                    &project.stack_pointer_register,
-                    sub_tid.clone(),
-                    &cconv.integer_parameter_register,
-                )
-            } else {
-                State::new(&project.stack_pointer_register, sub_tid.clone())
-            };
-            if project.cpu_architecture.contains("MIPS") {
-                let _ = fn_entry_state
-                    .set_mips_link_register(&sub_tid, project.stack_pointer_register.size);
-            }
-            self.computation.set_node_value(
-                entry,
-                super::interprocedural_fixpoint_generic::NodeValue::Value(fn_entry_state),
-            );
-        }
-    }
-
     /// Print the number of blocks that have a state associated to them.
     /// Intended for debug purposes.
     fn count_blocks_with_state(&self) {
@@ -328,39 +250,6 @@ impl<'a> PointerInference<'a> {
     fn log_info(&self, msg: impl Into<String>) {
         let log_msg = LogMessage::new_info(msg.into()).source("Pointer Inference");
         let _ = self.log_collector.send(LogThreadMsg::Log(log_msg));
-    }
-
-    /// Compute the results of the pointer inference fixpoint algorithm.
-    /// Successively adds more functions as possible entry points
-    /// to increase code coverage.
-    pub fn compute_with_speculative_entry_points(&mut self, project: &Project, print_stats: bool) {
-        self.compute();
-        if print_stats {
-            self.count_blocks_with_state();
-        }
-        // Now compute again with speculative entry points added
-        self.add_speculative_entry_points(project, true, print_stats);
-        self.compute();
-        if print_stats {
-            self.count_blocks_with_state();
-        }
-        // Now compute again with all missed functions as additional entry points
-        self.add_speculative_entry_points(project, false, print_stats);
-        self.compute();
-        if print_stats {
-            self.count_blocks_with_state();
-        }
-
-        if !self.computation.has_stabilized() {
-            let worklist_size = self.computation.get_worklist().len();
-            let _ = self.log_info(format!(
-                "Fixpoint did not stabilize. Remaining worklist size: {}",
-                worklist_size,
-            ));
-        }
-        if print_stats {
-            statistics::compute_and_log_mem_access_stats(self);
-        }
     }
 
     /// Print information on dead ends in the control flow graph for debugging purposes.
@@ -399,14 +288,7 @@ impl<'a> PointerInference<'a> {
                                             return_.is_some()
                                         );
                                     }
-                                    Jmp::Return(_) => {
-                                        if !state.caller_stack_ids.is_empty() {
-                                            println!(
-                                                "{}: Return dead end despite known caller ids",
-                                                jmp.tid
-                                            )
-                                        }
-                                    }
+                                    Jmp::Return(_) => {}
                                     _ => println!(
                                         "{}: Unexpected Jmp dead end: {:?}",
                                         jmp.tid, jmp.term
@@ -470,7 +352,7 @@ pub fn run<'a>(
         print_stats,
     );
 
-    computation.compute_with_speculative_entry_points(analysis_results.project, print_stats);
+    computation.compute(print_stats);
 
     if print_debug {
         computation.print_compact_json();

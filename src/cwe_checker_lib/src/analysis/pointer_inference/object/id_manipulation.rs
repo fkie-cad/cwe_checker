@@ -1,4 +1,5 @@
 use super::*;
+use std::collections::BTreeMap;
 
 impl AbstractObject {
     /// Get all abstract IDs that the object may contain pointers to.
@@ -55,5 +56,24 @@ impl AbstractObject {
             }
         }
         inner.memory.clear_top_values(); // In case the previous operation left *Top* values in the memory struct.
+    }
+
+    /// Replace all abstract IDs in `self` with the values given by the replacement map.
+    /// IDs not contained as keys in the replacement map are replaced by `Top` values.
+    pub fn replace_ids(&mut self, replacement_map: &BTreeMap<AbstractIdentifier, Data>) {
+        let inner = Arc::make_mut(&mut self.inner);
+        for elem in inner.memory.values_mut() {
+            elem.replace_all_ids(replacement_map);
+        }
+        inner.memory.clear_top_values();
+        let mut new_pointer_targets = BTreeSet::new();
+        for target in &inner.pointer_targets {
+            if let Some(replacement_value) = replacement_map.get(target) {
+                for new_target in replacement_value.referenced_ids() {
+                    new_pointer_targets.insert(new_target.clone());
+                }
+            }
+        }
+        inner.pointer_targets = new_pointer_targets;
     }
 }

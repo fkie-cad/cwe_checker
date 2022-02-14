@@ -17,12 +17,7 @@ mod list_manipulation;
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct AbstractObjectList {
     /// The abstract objects.
-    ///
-    /// Each abstract object comes with an offset given as a [`ValueDomain`].
-    /// This offset determines where the zero offset corresponding to the abstract identifier inside the object is.
-    /// Note that this offset may be a `Top` element
-    /// if the exact offset corresponding to the identifier is unknown.
-    objects: BTreeMap<AbstractIdentifier, (AbstractObject, ValueDomain)>,
+    objects: BTreeMap<AbstractIdentifier, AbstractObject>,
 }
 
 impl AbstractObjectList {
@@ -35,15 +30,9 @@ impl AbstractObjectList {
         address_bytesize: ByteSize,
     ) -> AbstractObjectList {
         let mut objects = BTreeMap::new();
-        let mut stack_object = AbstractObject::new(ObjectType::Stack, address_bytesize);
+        let mut stack_object = AbstractObject::new(Some(ObjectType::Stack), address_bytesize);
         stack_object.set_upper_index_bound(Bitvector::zero(address_bytesize.into()).into());
-        objects.insert(
-            stack_id,
-            (
-                stack_object,
-                Bitvector::zero(apint::BitWidth::from(address_bytesize)).into(),
-            ),
-        );
+        objects.insert(stack_id, stack_object);
         AbstractObjectList { objects }
     }
 
@@ -54,9 +43,8 @@ impl AbstractObjectList {
     /// If the address does not contain any relative targets an empty value is returned.
     pub fn get_value(&self, address: &Data, size: ByteSize) -> Data {
         let mut merged_value = Data::new_empty(size);
-        for (id, offset_pointer) in address.get_relative_values() {
-            if let Some((object, offset_identifier)) = self.objects.get(id) {
-                let offset = offset_pointer.clone() + offset_identifier.clone();
+        for (id, offset) in address.get_relative_values() {
+            if let Some(object) = self.objects.get(id) {
                 if let Ok(concrete_offset) = offset.try_to_bitvec() {
                     let value = object.get_value(concrete_offset, size);
                     merged_value = merged_value.merge(&value);
@@ -73,30 +61,33 @@ impl AbstractObjectList {
         merged_value
     }
 
+    /// Get a mutable reference to the object with the given abstract ID.
+    pub fn get_object_mut(&mut self, id: &AbstractIdentifier) -> Option<&mut AbstractObject> {
+        self.objects.get_mut(id)
+    }
+
     /// Set the value at a given address.
     ///
     /// If the address has more than one target,
     /// we merge-write the value to all targets.
     pub fn set_value(&mut self, pointer: Data, value: Data) -> Result<(), Error> {
-        let targets = pointer.get_relative_values();
-        match targets.len() {
-            0 => Ok(()),
-            1 => {
-                let (id, pointer_offset) = targets.iter().next().unwrap();
-                let (object, id_offset) = self.objects.get_mut(id).unwrap();
-                let adjusted_offset = pointer_offset.clone() + id_offset.clone();
-                object.set_value(value, &adjusted_offset)
+        if let Some((id, offset)) = pointer.get_if_unique_target() {
+            let object = self
+                .objects
+                .get_mut(id)
+                .ok_or_else(|| anyhow!("Abstract object does not exist."))?;
+            object.set_value(value, offset)
+        } else {
+            // There may be more than one object that the pointer may write to.
+            // We merge-write to all possible targets
+            for (id, offset) in pointer.get_relative_values() {
+                let object = self
+                    .objects
+                    .get_mut(id)
+                    .ok_or_else(|| anyhow!("Abstract object does not exist."))?;
+                object.merge_value(value.clone(), offset);
             }
-            _ => {
-                // There is more than one object that the pointer may write to.
-                // We merge-write to all possible targets
-                for (id, offset) in targets {
-                    let (object, object_offset) = self.objects.get_mut(id).unwrap();
-                    let adjusted_offset = offset.clone() + object_offset.clone();
-                    object.merge_value(value.clone(), &adjusted_offset);
-                }
-                Ok(())
-            }
+            Ok(())
         }
     }
 
@@ -113,7 +104,7 @@ impl AbstractObjectList {
         object_id: &AbstractIdentifier,
         new_possible_reference_targets: &BTreeSet<AbstractIdentifier>,
     ) {
-        if let Some((object, _)) = self.objects.get_mut(object_id) {
+        if let Some(object) = self.objects.get_mut(object_id) {
             object.assume_arbitrary_writes(new_possible_reference_targets);
         }
     }
@@ -125,7 +116,7 @@ impl AbstractObjectList {
         object_id: &AbstractIdentifier,
     ) -> Result<Option<ObjectType>, ()> {
         match self.objects.get(object_id) {
-            Some((object, _)) => Ok(object.get_object_type()),
+            Some(object) => Ok(object.get_object_type()),
             None => Err(()),
         }
     }
@@ -135,7 +126,7 @@ impl AbstractObjectList {
     /// Returns an error if the ID is not contained in the object list.
     pub fn is_unique_object(&self, object_id: &AbstractIdentifier) -> Result<bool, Error> {
         match self.objects.get(object_id) {
-            Some((object, _)) => Ok(object.is_unique()),
+            Some(object) => Ok(object.is_unique()),
             None => Err(anyhow!("Object ID not contained in object list.")),
         }
     }
@@ -151,12 +142,11 @@ impl AbstractDomain for AbstractObjectList {
     /// where more than one ID should point to the same object.
     fn merge(&self, other: &Self) -> Self {
         let mut merged_objects = self.objects.clone();
-        for (id, (other_object, other_offset)) in other.objects.iter() {
-            if let Some((object, offset)) = merged_objects.get_mut(id) {
+        for (id, other_object) in other.objects.iter() {
+            if let Some(object) = merged_objects.get_mut(id) {
                 *object = object.merge(other_object);
-                *offset = offset.merge(other_offset);
             } else {
-                merged_objects.insert(id.clone(), (other_object.clone(), other_offset.clone()));
+                merged_objects.insert(id.clone(), other_object.clone());
             }
         }
         AbstractObjectList {
@@ -176,11 +166,8 @@ impl AbstractObjectList {
     pub fn to_json_compact(&self) -> serde_json::Value {
         use serde_json::*;
         let mut object_map = Map::new();
-        for (id, (object, offset)) in self.objects.iter() {
-            object_map.insert(
-                format!("{} (base offset {})", id, offset),
-                object.to_json_compact(),
-            );
+        for (id, object) in self.objects.iter() {
+            object_map.insert(format!("{}", id), object.to_json_compact());
         }
         Value::Object(object_map)
     }

@@ -17,7 +17,6 @@ fn new_id(name: &str) -> AbstractIdentifier {
 fn abstract_object_list() {
     let mut obj_list = AbstractObjectList::from_stack_id(new_id("RSP".into()), ByteSize::new(8));
     assert_eq!(obj_list.objects.len(), 1);
-    assert_eq!(obj_list.objects.values().next().unwrap().1, bv(0));
 
     let pointer = DataDomain::from_target(new_id("RSP".into()), bv(8));
     obj_list.set_value(pointer.clone(), bv(42).into()).unwrap();
@@ -42,9 +41,8 @@ fn abstract_object_list() {
 
     other_obj_list.add_abstract_object(
         new_id("RAX".into()),
-        bv(0),
-        ObjectType::Heap,
         ByteSize::new(8),
+        Some(ObjectType::Heap),
     );
     let heap_pointer = DataDomain::from_target(new_id("RAX".into()), bv(8));
     other_obj_list
@@ -94,66 +92,25 @@ fn abstract_object_list() {
         new_id("RAX".into())
     );
 
-    let modified_heap_pointer = DataDomain::from_target(new_id("ID2".into()), bv(8));
-    other_obj_list.replace_abstract_id(&new_id("RAX".into()), &new_id("ID2".into()), &bv(0));
-    assert_eq!(
-        other_obj_list.get_value(&pointer, ByteSize::new(8)),
-        modified_heap_pointer.clone()
-    );
-    assert_eq!(other_obj_list.objects.get(&new_id("RAX".into())), None);
-    assert!(matches!(
-        other_obj_list.objects.get(&new_id("ID2".into())),
-        Some(_)
-    ));
-
     let mut ids_to_keep = BTreeSet::new();
-    ids_to_keep.insert(new_id("ID2".into()));
+    ids_to_keep.insert(new_id("RAX".into()));
     other_obj_list.remove_unused_objects(&ids_to_keep);
     assert_eq!(other_obj_list.objects.len(), 1);
     assert_eq!(
         other_obj_list.objects.iter().next().unwrap().0,
-        &new_id("ID2".into())
+        &new_id("RAX".into())
     );
 
     assert_eq!(
-        other_obj_list
-            .objects
-            .values()
-            .next()
-            .unwrap()
-            .0
-            .get_state(),
+        other_obj_list.objects.values().next().unwrap().get_state(),
         crate::analysis::pointer_inference::object::ObjectState::Alive
     );
+    let modified_heap_pointer = DataDomain::from_target(new_id("RAX".into()), bv(8));
     other_obj_list
         .mark_mem_object_as_freed(&modified_heap_pointer)
         .unwrap();
     assert_eq!(
-        other_obj_list
-            .objects
-            .values()
-            .next()
-            .unwrap()
-            .0
-            .get_state(),
+        other_obj_list.objects.values().next().unwrap().get_state(),
         crate::analysis::pointer_inference::object::ObjectState::Dangling
     );
-}
-
-#[test]
-fn append_unknown_objects_test() {
-    let mut obj_list = AbstractObjectList::from_stack_id(new_id("stack"), ByteSize::new(8));
-
-    let mut other_obj_list = AbstractObjectList::from_stack_id(new_id("stack"), ByteSize::new(8));
-    other_obj_list.add_abstract_object(
-        new_id("heap_obj"),
-        bv(0).into(),
-        ObjectType::Heap,
-        ByteSize::new(8),
-    );
-
-    obj_list.append_unknown_objects(&other_obj_list);
-    assert_eq!(obj_list.objects.len(), 2);
-    assert!(obj_list.objects.get(&new_id("stack")).is_some());
-    assert!(obj_list.objects.get(&new_id("heap_obj")).is_some());
 }

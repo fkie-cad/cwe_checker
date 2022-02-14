@@ -1,4 +1,3 @@
-use super::object::ObjectType;
 use crate::analysis::function_signature::FunctionSignature;
 use crate::analysis::graph::Graph;
 use crate::intermediate_representation::*;
@@ -11,13 +10,15 @@ use super::state::State;
 use super::ValueDomain;
 use super::{Config, Data, VERSION};
 
-// contains trait implementations for the `Context` struct,
-// especially the implementation of the `interprocedural_fixpoint::Context` trait.
+/// Contains methods of the `Context` struct that deal with the manipulation of abstract IDs.
+mod id_manipulation;
+/// Contains trait implementations for the `Context` struct,
+/// especially the implementation of the [`forward_interprocedural_fixpoint::Context`](crate::analysis::forward_interprocedural_fixpoint::Context) trait.
 mod trait_impls;
 
 /// Contains all context information needed for the pointer inference fixpoint computation.
 ///
-/// The struct also implements the `interprocedural_fixpoint::Context` trait to enable the fixpoint computation.
+/// The struct also implements the [`forward_interprocedural_fixpoint::Context`](crate::analysis::forward_interprocedural_fixpoint::Context) trait to enable the fixpoint computation.
 pub struct Context<'a> {
     /// The program control flow graph on which the fixpoint will be computed
     pub graph: &'a Graph<'a>,
@@ -185,9 +186,8 @@ impl<'a> Context<'a> {
                 );
                 new_state.memory.add_abstract_object(
                     object_id.clone(),
-                    Bitvector::zero(apint::BitWidth::from(address_bytesize)).into(),
-                    super::object::ObjectType::Heap,
                     address_bytesize,
+                    Some(super::object::ObjectType::Heap),
                 );
                 new_state.memory.set_lower_index_bound(
                     &object_id,
@@ -266,13 +266,15 @@ impl<'a> Context<'a> {
     }
 
     /// Check all parameter registers of a call for dangling pointers and report possible use-after-frees.
-    fn check_parameter_register_for_dangling_pointer(
+    fn check_parameter_register_for_dangling_pointer<'iter, I>(
         &self,
         state: &mut State,
         call: &Term<Jmp>,
-        extern_symbol: &ExternSymbol,
-    ) {
-        for parameter in extern_symbol.parameters.iter() {
+        parameters: I,
+    ) where
+        I: Iterator<Item = &'iter Arg>,
+    {
+        for parameter in parameters {
             match state.eval_parameter_arg(parameter, self.runtime_memory_image) {
                 Ok(value) => {
                     if state.memory.is_dangling_pointer(&value, true) {
@@ -287,8 +289,8 @@ impl<'a> Context<'a> {
                             symbols: Vec::new(),
                             other: Vec::new(),
                             description: format!(
-                                "(Use After Free) Call to {} may access freed memory at {}",
-                                extern_symbol.name, call.tid.address
+                                "(Use After Free) Call at {} may access freed memory",
+                                call.tid.address
                             ),
                         };
                         let _ = self.log_collector.send(LogThreadMsg::Cwe(warning));
@@ -354,14 +356,14 @@ impl<'a> Context<'a> {
         }
     }
 
-    /// Adjust the stack register after a call to an extern function.
+    /// Adjust the stack register after a call to a function.
     ///
     /// On x86, this removes the return address from the stack
     /// (other architectures pass the return address in a register, not on the stack).
     /// On other architectures the stack register retains the value it had before the call.
     /// Note that in some calling conventions the callee also clears function parameters from the stack.
     /// We do not detect and handle these cases yet.
-    fn adjust_stack_register_on_extern_call(
+    fn adjust_stack_register_on_return_from_call(
         &self,
         state_before_call: &State,
         new_state: &mut State,
@@ -383,7 +385,7 @@ impl<'a> Context<'a> {
     }
 
     /// Handle an extern symbol call, whose concrete effect on the state is unknown.
-    /// Basically, we assume that the call may write to all memory objects and register that is has access to.
+    /// Basically, we assume that the call may write to all memory objects and registers that is has access to.
     fn handle_generic_extern_call(
         &self,
         state: &State,
@@ -438,7 +440,7 @@ impl<'a> Context<'a> {
             let mut new_state = state_before_call.clone();
             new_state.clear_non_callee_saved_register(&calling_conv.callee_saved_register[..]);
             // Adjust stack register value (for x86 architecture).
-            self.adjust_stack_register_on_extern_call(state_before_call, &mut new_state);
+            self.adjust_stack_register_on_return_from_call(state_before_call, &mut new_state);
 
             let mut possible_referenced_ids = BTreeSet::new();
             for parameter_register in calling_conv.integer_parameter_register.iter() {
@@ -461,19 +463,6 @@ impl<'a> Context<'a> {
         } else {
             None // We don't try to handle cases where we cannot guess a reasonable standard calling convention.
         }
-    }
-
-    /// Get the offset of the current stack pointer to the base of the current stack frame.
-    fn get_current_stack_offset(&self, state: &State) -> ValueDomain {
-        if let Some((stack_id, stack_offset_domain)) = state
-            .get_register(&self.project.stack_pointer_register)
-            .get_if_unique_target()
-        {
-            if *stack_id == state.stack_id {
-                return stack_offset_domain.clone();
-            }
-        }
-        ValueDomain::new_top(self.project.stack_pointer_register.size)
     }
 
     /// Report a NULL dereference CWE at the address of the given TID.

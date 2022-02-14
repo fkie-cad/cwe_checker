@@ -70,7 +70,7 @@ impl AbstractIdentifier {
         let location_register = match arg {
             Arg::Register { expr, .. } | Arg::Stack { address: expr, .. } => {
                 match &expr.input_vars()[..] {
-                    [var] => var.clone(),
+                    [var] => *var,
                     _ => panic!("Malformed argument expression encountered"),
                 }
             }

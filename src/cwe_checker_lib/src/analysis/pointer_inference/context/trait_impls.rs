@@ -43,19 +43,19 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
         }
         // check for out-of-bounds memory access
         if new_state.contains_out_of_bounds_mem_access(&def.term, self.runtime_memory_image) {
-            let (warning_name, warning_description) = match def.term {
+            let (warning_name, warning_description) = match &def.term {
                 Def::Load { .. } => (
                     "CWE125",
                     format!(
                         "(Out-of-bounds Read) Memory load at {} may be out of bounds",
-                        def.tid.address
+                        def.tid.address,
                     ),
                 ),
                 Def::Store { .. } => (
                     "CWE787",
                     format!(
                         "(Out-of-bounds Write) Memory write at {} may be out of bounds",
-                        def.tid.address
+                        def.tid.address,
                     ),
                 ),
                 Def::Assign { .. } => panic!(),
@@ -101,16 +101,15 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
     }
 
     /// Update the state according to the effects of the given `Jmp` term.
-    /// Right now the state is not changed.
     fn update_jump(
         &self,
-        value: &State,
+        state: &State,
         _jump: &Term<Jmp>,
         _untaken_conditional: Option<&Term<Jmp>>,
         _target: &Term<Blk>,
     ) -> Option<State> {
-        let new_value = value.clone();
-        Some(new_value)
+        let new_state = state.clone();
+        Some(new_state)
     }
 
     /// Update the state according to the effects of the given `Call` term.
@@ -120,84 +119,22 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
         state: &State,
         call_term: &Term<Jmp>,
         _target_node: &crate::analysis::graph::Node,
-        calling_convention: &Option<String>,
+        _calling_convention: &Option<String>,
     ) -> Option<State> {
         if let Jmp::Call {
             target: ref callee_tid,
             return_: _,
         } = call_term.term
         {
-            let callee_stack_id = AbstractIdentifier::new(
-                callee_tid.clone(),
-                AbstractLocation::from_var(&self.project.stack_pointer_register).unwrap(),
+            // Check call parameters for dangling pointers
+            let callee_fn_sig = self.fn_signatures.get(callee_tid).unwrap();
+            self.check_parameter_register_for_dangling_pointer(
+                &mut state.clone(),
+                call_term,
+                callee_fn_sig.parameters.keys(),
             );
-            let new_caller_stack_id = AbstractIdentifier::new(
-                call_term.tid.clone(),
-                AbstractLocation::from_var(&self.project.stack_pointer_register).unwrap(),
-            );
-            let stack_offset_adjustment = self.get_current_stack_offset(state);
-            let address_bytesize = self.project.stack_pointer_register.size;
-
-            let mut callee_state = state.clone();
-            // Remove virtual register since they do no longer exist in the callee
-            callee_state.remove_virtual_register();
-            // Remove callee-saved register, since the callee should not use their values anyway.
-            // This should prevent recursive references to all stack frames in the call tree
-            // since the source for it, the stack frame base pointer, is callee-saved.
-            if let Some(cconv) = self
-                .project
-                .get_specific_calling_convention(calling_convention)
-            {
-                // Note that this may lead to analysis errors if the function uses another calling convention.
-                callee_state.remove_callee_saved_register(cconv);
-            }
-
-            // Set the lower index bound for the caller stack frame.
-            callee_state
-                .memory
-                .set_lower_index_bound(&state.stack_id, &stack_offset_adjustment);
-            // Replace the caller stack ID with one determined by the call instruction.
-            // This has to be done *before* adding the new callee stack id
-            // to avoid confusing caller and callee stack ids in case of recursive calls.
-            callee_state.replace_abstract_id(
-                &state.stack_id,
-                &new_caller_stack_id,
-                &stack_offset_adjustment,
-            );
-            // add a new memory object for the callee stack frame
-            callee_state.memory.add_abstract_object(
-                callee_stack_id.clone(),
-                Bitvector::zero(apint::BitWidth::from(address_bytesize)).into(),
-                ObjectType::Stack,
-                address_bytesize,
-            );
-            // set the new stack_id
-            callee_state.stack_id = callee_stack_id.clone();
-            // Set the stack pointer register to the callee stack id.
-            // At the beginning of a function this is the only known pointer to the new stack frame.
-            callee_state.set_register(
-                &self.project.stack_pointer_register,
-                Data::from_target(
-                    callee_stack_id.clone(),
-                    Bitvector::zero(apint::BitWidth::from(address_bytesize)).into(),
-                ),
-            );
-            // For MIPS architecture only: Ensure that the t9 register contains the address of the called function
-            if self.project.cpu_architecture.contains("MIPS") {
-                let _ = callee_state
-                    .set_mips_link_register(callee_tid, self.project.stack_pointer_register.size);
-            }
-            // set the list of caller stack ids to only this caller id
-            callee_state.caller_stack_ids = BTreeSet::new();
-            callee_state.caller_stack_ids.insert(new_caller_stack_id);
-            // Remove non-referenced objects and objects, only the caller knows about, from the state.
-            callee_state.ids_known_to_caller = BTreeSet::new();
-            callee_state.remove_unreferenced_objects();
-            // all remaining objects, except for the callee stack id, are also known to the caller
-            callee_state.ids_known_to_caller = callee_state.memory.get_all_object_ids();
-            callee_state.ids_known_to_caller.remove(&callee_stack_id);
-
-            Some(callee_state)
+            // No information flows from caller to the callee in the analysis.
+            None
         } else if let Jmp::CallInd { .. } = call_term.term {
             panic!("Indirect call edges not yet supported.")
         } else {
@@ -213,13 +150,8 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
         state_before_call: Option<&State>,
         call_term: &Term<Jmp>,
         return_term: &Term<Jmp>,
-        calling_convention: &Option<String>,
+        calling_convention_opt: &Option<String>,
     ) -> Option<State> {
-        // TODO: For the long term we may have to replace the IDs representing callers with something
-        // that identifies the edge of the call and not just the callsite.
-        // When indirect calls are handled, the callsite alone is not a unique identifier anymore.
-        // This may lead to confusion if both caller and callee have the same ID in their respective caller_stack_id sets.
-
         let (state_before_call, state_before_return) =
             match (state_before_call, state_before_return) {
                 (Some(state_call), Some(state_return)) => (state_call, state_return),
@@ -238,13 +170,17 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
                 (None, None) => return None,
             };
 
-        let original_caller_stack_id = &state_before_call.stack_id;
-        let caller_stack_id = AbstractIdentifier::new(
-            call_term.tid.clone(),
-            AbstractLocation::from_var(&self.project.stack_pointer_register).unwrap(),
-        );
-        let callee_stack_id = &state_before_return.stack_id;
-        let stack_offset_on_call = self.get_current_stack_offset(state_before_call);
+        let cconv = match self
+            .project
+            .get_specific_calling_convention(calling_convention_opt)
+        {
+            Some(cconv) => cconv,
+            None => {
+                // If we neither know the specific nor a default calling convention for the function,
+                // then we treat it as a dead end in the control flow graph.
+                return None;
+            }
+        };
 
         // Detect possible information loss on the stack pointer and report it.
         if let Err(err) = self.detect_stack_pointer_information_loss_on_return(state_before_return)
@@ -255,60 +191,79 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
             return None;
         }
 
-        // Check whether state_before_return actually knows the `caller_stack_id`.
-        // If not, we are returning from a state that cannot correspond to this callsite.
-        if !state_before_return
-            .caller_stack_ids
-            .contains(&caller_stack_id)
-        {
-            return None;
-        }
-
-        let mut state_after_return = state_before_return.clone();
-        state_after_return.remove_virtual_register();
-        // Remove the IDs of other callers not corresponding to this call
-        state_after_return.remove_other_caller_stack_ids(&caller_stack_id);
-
-        state_after_return.replace_abstract_id(
-            &caller_stack_id,
-            original_caller_stack_id,
-            &(-stack_offset_on_call.clone()),
+        // Create a mapping of IDs from the callee to IDs that should be used in the caller.
+        let id_map = self.create_callee_id_to_caller_data_map(
+            state_before_call,
+            state_before_return,
+            &call_term.tid,
         );
-        state_after_return.merge_callee_stack_to_caller_stack(
-            callee_stack_id,
-            original_caller_stack_id,
-            &(-stack_offset_on_call),
-        );
-        state_after_return.stack_id = original_caller_stack_id.clone();
-        state_after_return.caller_stack_ids = state_before_call.caller_stack_ids.clone();
-        state_after_return.ids_known_to_caller = state_before_call.ids_known_to_caller.clone();
+        let callee_id_to_access_pattern_map =
+            self.create_id_to_access_pattern_map(state_before_return);
+        // Identify caller IDs for which the callee analysis may be unsound for this callsite.
+        let unsound_caller_ids =
+            self.get_unsound_caller_ids(&id_map, &callee_id_to_access_pattern_map);
+        // TODO: Unsound caller IDs occur too often to log the cases right now.
+        // We have to investigate the reasons for it (maybe too many parameters on the caller stack?)
+        // and find better heuristics to prevent them poisoning the analysis soundness.
 
-        state_after_return.readd_caller_objects(state_before_call);
-
-        if let Some(cconv) = self
-            .project
-            .get_specific_calling_convention(calling_convention)
-        {
-            // Restore information about callee-saved register from the caller state.
-            // TODO: Implement some kind of check to ensure that the callee adheres to the given calling convention!
-            // The current workaround should be reasonably exact for programs written in C,
-            // but may introduce a lot of errors
-            // if the compiler often uses other calling conventions for internal function calls.
-            state_after_return.restore_callee_saved_register(
-                state_before_call,
-                cconv,
-                &self.project.stack_pointer_register,
-            );
+        let mut state_after_return = state_before_call.clone();
+        // Adjust register values of state_after_return
+        state_after_return.remove_non_callee_saved_register(cconv);
+        self.adjust_stack_register_on_return_from_call(state_before_call, &mut state_after_return);
+        for return_reg in cconv.get_all_return_register() {
+            let mut return_value = state_before_return.get_register(return_reg);
+            return_value.replace_all_ids(&id_map);
+            if !return_value.is_top() {
+                state_after_return.set_register(return_reg, return_value);
+            }
         }
+        // Merge or add memory objects from the callee to the caller state.
+        for (callee_object_id, callee_object) in state_before_return.memory.iter() {
+            if *callee_object_id == state_before_return.stack_id {
+                // The callee stack frame does not exist anymore after return to the caller.
+                continue;
+            }
+            if Some(false)
+                == callee_id_to_access_pattern_map
+                    .get(callee_object_id)
+                    .map(|access_pattern| access_pattern.is_mutably_dereferenced())
+            {
+                // We do not have to modify anything for parameter objects that are only read but not written to.
+                continue;
+            }
+            let mut callee_object = callee_object.clone();
+            callee_object.replace_ids(&id_map);
 
-        // remove non-referenced objects from the state
+            if callee_id_to_access_pattern_map
+                .get(callee_object_id)
+                .is_none()
+            {
+                // Add a callee object that does not correspond to a parameter to the caller or the stack of the callee.
+                if let Ok(new_object_id) = callee_object_id.with_path_hint(call_term.tid.clone()) {
+                    state_after_return
+                        .memory
+                        .insert(new_object_id, callee_object);
+                }
+            } else {
+                // The callee object is a parameter object.
+                self.log_debug(
+                    state_after_return.add_param_object_from_callee(
+                        callee_object,
+                        id_map.get(callee_object_id).unwrap(),
+                    ),
+                    Some(&call_term.tid),
+                );
+            }
+        }
+        // Additionally assume arbitrary writes for every caller ID where the callee handling might be unsound.
+        for id in &unsound_caller_ids {
+            state_after_return
+                .memory
+                .assume_arbitrary_writes_to_object(id, &BTreeSet::new());
+            // TODO: We should specify more possible reference targets.
+        }
+        // Cleanup
         state_after_return.remove_unreferenced_objects();
-
-        // remove the lower index bound of the stack frame
-        state_after_return.memory.set_lower_index_bound(
-            original_caller_stack_id,
-            &IntervalDomain::new_top(self.project.stack_pointer_register.size),
-        );
 
         Some(state_after_return)
     }
@@ -341,14 +296,14 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
                 self.check_parameter_register_for_dangling_pointer(
                     &mut new_state,
                     call,
-                    extern_symbol,
+                    extern_symbol.parameters.iter(),
                 );
             }
             // Clear non-callee-saved registers from the state.
             let cconv = self.project.get_calling_convention(extern_symbol);
             new_state.clear_non_callee_saved_register(&cconv.callee_saved_register[..]);
             // Adjust stack register value (for x86 architecture).
-            self.adjust_stack_register_on_extern_call(state, &mut new_state);
+            self.adjust_stack_register_on_return_from_call(state, &mut new_state);
 
             match extern_symbol.name.as_str() {
                 malloc_like_fn if self.allocation_symbols.iter().any(|x| x == malloc_like_fn) => {

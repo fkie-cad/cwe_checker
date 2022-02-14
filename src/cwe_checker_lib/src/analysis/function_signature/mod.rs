@@ -243,3 +243,27 @@ impl Default for FunctionSignature {
         Self::new()
     }
 }
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+
+    impl FunctionSignature {
+        /// Create a mock x64 function signature with 2 parameters, one of which is accessed mutably.
+        pub fn mock_x64() -> FunctionSignature {
+            let mut write_access_pattern = AccessPattern::new();
+            write_access_pattern.set_unknown_access_flags();
+            let parameters = HashMap::from_iter([
+                (
+                    Arg::from_var(Variable::mock("RDI", 8), None),
+                    AccessPattern::new(),
+                ),
+                (
+                    Arg::from_var(Variable::mock("RSI", 8), None),
+                    write_access_pattern,
+                ),
+            ]);
+            FunctionSignature { parameters }
+        }
+    }
+}
