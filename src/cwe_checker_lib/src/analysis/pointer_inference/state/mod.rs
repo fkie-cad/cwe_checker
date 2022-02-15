@@ -60,8 +60,16 @@ impl State {
         let mock_global_memory = RuntimeMemoryImage::empty(true);
         let mut state = State::new(stack_register, function_tid.clone());
         // Adjust the upper bound of the stack frame to include all stack parameters
+        // (and the return address at stack offset 0 for x86).
+        let stack_upper_bound: i64 = match stack_register.name.as_str() {
+            "ESP" => 4,
+            "RSP" => 8,
+            _ => 0,
+        };
+        let stack_upper_bound =
+            std::cmp::max(stack_upper_bound, fn_sig.get_stack_params_total_size());
         let stack_obj = state.memory.get_object_mut(&state.stack_id).unwrap();
-        stack_obj.add_to_upper_index_bound(fn_sig.get_stack_params_total_size());
+        stack_obj.add_to_upper_index_bound(stack_upper_bound);
         // Set parameter values and create parameter memory objects.
         for (arg, access_pattern) in &fn_sig.parameters {
             let param_id = AbstractIdentifier::from_arg(&function_tid, arg);
