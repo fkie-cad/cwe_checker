@@ -57,14 +57,19 @@ fn generate_fixpoint_computation<'a>(
             if let Some(entry_block) = sub.term.blocks.get(0) {
                 if entry_block.tid == block.tid {
                     // The node of a function entry point
+                    let calling_convention = project
+                        .get_specific_calling_convention(&sub.term.calling_convention)
+                        .unwrap_or_else(|| {
+                            project
+                                .get_standard_calling_convention()
+                                .expect("No standard calling convention found.")
+                        });
                     computation.set_node_value(
                         node,
                         NodeValue::Value(State::new(
                             &sub.tid,
                             &project.stack_pointer_register,
-                            project
-                                .get_specific_calling_convention(&sub.term.calling_convention)
-                                .unwrap(),
+                            calling_convention,
                         )),
                     )
                 }
