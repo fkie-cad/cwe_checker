@@ -1,40 +1,9 @@
 //! Methods of [`State`] for manipulating abstract IDs.
 
 use super::*;
+use crate::analysis::pointer_inference::object::AbstractObject;
 
 impl State {
-    /// Replace all occurences of old_id with new_id and adjust offsets accordingly.
-    /// This is needed to replace stack/caller IDs on call and return instructions.
-    ///
-    /// **Example:**
-    /// Assume the old_id points to offset 0 in the corresponding memory object and the new_id points to offset -32.
-    /// Then the offset_adjustment is -32.
-    /// The offset_adjustment gets *added* to the base offset in self.memory.ids (so that it points to offset -32 in the memory object),
-    /// while it gets *subtracted* from all pointer values (so that they still point to the same spot in the corresponding memory object).
-    pub fn replace_abstract_id(
-        &mut self,
-        old_id: &AbstractIdentifier,
-        new_id: &AbstractIdentifier,
-        offset_adjustment: &ValueDomain,
-    ) {
-        for register_data in self.register.values_mut() {
-            register_data.replace_abstract_id(old_id, new_id, &(-offset_adjustment.clone()));
-        }
-        self.memory
-            .replace_abstract_id(old_id, new_id, offset_adjustment);
-        if &self.stack_id == old_id {
-            self.stack_id = new_id.clone();
-        }
-        if self.caller_stack_ids.get(old_id).is_some() {
-            self.caller_stack_ids.remove(old_id);
-            self.caller_stack_ids.insert(new_id.clone());
-        }
-        if self.ids_known_to_caller.get(old_id).is_some() {
-            self.ids_known_to_caller.remove(old_id);
-            self.ids_known_to_caller.insert(new_id.clone());
-        }
-    }
-
     /// Search (recursively) through all memory objects referenced by the given IDs
     /// and add all IDs reachable through concrete pointers contained in them to the set of IDs.
     ///
@@ -84,23 +53,40 @@ impl State {
         ids
     }
 
-    /// Recursively remove all `caller_stack_ids` not corresponding to the given caller.
-    pub fn remove_other_caller_stack_ids(&mut self, caller_id: &AbstractIdentifier) {
-        let mut ids_to_remove = self.caller_stack_ids.clone();
-        ids_to_remove.remove(caller_id);
-        for register_value in self.register.values_mut() {
-            register_value.remove_ids(&ids_to_remove);
-            if register_value.is_empty() {
-                *register_value = register_value.top();
+    /// Add the given `param_object` from the callee state to `self`
+    /// (where `self` represents the state after returning from the callee).
+    ///
+    /// `param_value_at_call` is the value that the parameter had at the callsite.
+    /// It is assumed that all IDs contained in the `param_object` are already replaced with values relative to the caller.
+    ///
+    /// If the `param_object` corresponds to a unique object in `self`
+    /// then the contents of that object are overwritten with those of `param_object`.
+    /// Else the contents are only merged with all possible caller objects,
+    /// since the exact object that corresponds to the callee object is unknown.
+    pub fn add_param_object_from_callee(
+        &mut self,
+        param_object: AbstractObject,
+        param_value_at_call: &Data,
+    ) -> Result<(), Error> {
+        if let Some((caller_id, offset)) = param_value_at_call.get_if_unique_target() {
+            // The corresponding caller object is unique
+            if let Some(caller_object) = self.memory.get_object_mut(caller_id) {
+                caller_object.overwrite_with(&param_object, offset);
+            } else {
+                return Err(anyhow!("Missing caller memory object"));
+            }
+        } else {
+            // We cannot exactly identify to which caller object the callee object corresponds.
+            for (caller_id, offset) in param_value_at_call.get_relative_values() {
+                if let Some(caller_object) = self.memory.get_object_mut(caller_id) {
+                    let mut param_object = param_object.clone();
+                    param_object.add_offset_to_all_indices(offset);
+                    *caller_object = caller_object.merge(&param_object);
+                } else {
+                    return Err(anyhow!("Missing caller memory object"));
+                }
             }
         }
-        self.memory.remove_ids(&ids_to_remove);
-        self.caller_stack_ids = BTreeSet::new();
-        self.caller_stack_ids.insert(caller_id.clone());
-        self.ids_known_to_caller = self
-            .ids_known_to_caller
-            .difference(&ids_to_remove)
-            .cloned()
-            .collect();
+        Ok(())
     }
 }

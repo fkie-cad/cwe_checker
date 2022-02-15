@@ -13,10 +13,7 @@ fn new_id(time: &str, reg_name: &str) -> AbstractIdentifier {
 }
 
 fn mock_extern_symbol(name: &str) -> (Tid, ExternSymbol) {
-    let arg = Arg::Register {
-        expr: Expression::Var(register("RDX")),
-        data_type: None,
-    };
+    let arg = Arg::from_var(register("RDX"), None);
     let tid = Tid::new("extern_".to_string() + name);
     (
         tid.clone(),
@@ -89,14 +86,7 @@ fn mock_project() -> (Project, Config) {
         tid: Tid::new("program"),
         term: program,
     };
-    let cconv = CallingConvention {
-        name: "__cdecl".to_string(),
-        integer_parameter_register: vec![Variable::mock("RDX", 8)],
-        float_parameter_register: vec![Expression::Var(Variable::mock("XMMO", 16))],
-        integer_return_register: vec![Variable::mock("RDX", 8)],
-        float_return_register: vec![],
-        callee_saved_register: vec![Variable::mock("callee_saved_reg", 8)],
-    };
+    let cconv = CallingConvention::mock_x64();
     let register_set = vec!["RAX", "RCX", "RDX", "RBX", "RSP", "RBP", "RSI", "RDI"]
         .into_iter()
         .map(|name| Variable::mock(name, ByteSize::new(8)))
@@ -117,16 +107,32 @@ fn mock_project() -> (Project, Config) {
     )
 }
 
+/// Create a mock context for unit tests.
+/// Note that the function leaks memory!
+fn mock_context() -> Context<'static> {
+    let (project, config) = mock_project();
+    let project = Box::new(project);
+    let project = Box::leak(project);
+    let analysis_results = Box::new(AnalysisResults::mock_from_project(project));
+    let analysis_results = Box::leak(analysis_results);
+    let (log_sender, _log_receiver) = crossbeam_channel::unbounded();
+    let mut mock_context = Context::new(analysis_results, config, log_sender);
+    // Create mocked function signatures
+    let fn_sigs = BTreeMap::from_iter([(Tid::new("callee"), FunctionSignature::mock_x64())]);
+    let fn_sigs = Box::new(fn_sigs);
+    let fn_sigs = Box::leak(fn_sigs);
+    mock_context.fn_signatures = fn_sigs;
+
+    mock_context
+}
+
 #[test]
 fn context_problem_implementation() {
     use crate::analysis::forward_interprocedural_fixpoint::Context as IpFpContext;
     use crate::analysis::pointer_inference::Data;
     use Expression::*;
 
-    let (project, config) = mock_project();
-    let (log_sender, _log_receiver) = crossbeam_channel::unbounded();
-    let analysis_results = AnalysisResults::mock_from_project(&project);
-    let context = Context::new(&analysis_results, config, log_sender);
+    let context = mock_context();
     let mut state = State::new(&register("RSP"), Tid::new("main"));
 
     let def = Term {
@@ -150,79 +156,9 @@ fn context_problem_implementation() {
     assert_eq!(state.eval(&Var(register("RSP"))), stack_pointer);
     state = context.update_def(&state, &store_term).unwrap();
 
-    // Test update_call
-    let target_block = Term {
-        tid: Tid::new("func_start"),
-        term: Blk {
-            defs: Vec::new(),
-            jmps: Vec::new(),
-            indirect_jmp_targets: Vec::new(),
-        },
-    };
-    let sub = Term {
-        tid: Tid::new("caller_sub"),
-        term: Sub {
-            name: "caller_sub".into(),
-            blocks: vec![target_block.clone()],
-            calling_convention: None,
-        },
-    };
-    let target_node = crate::analysis::graph::Node::BlkStart(&target_block, &sub);
-    let call = call_term("func");
-    let mut callee_state = context
-        .update_call(&state, &call, &target_node, &None)
-        .unwrap();
-    assert_eq!(callee_state.stack_id, new_id("func", "RSP"));
-    assert_eq!(callee_state.caller_stack_ids.len(), 1);
-    assert_eq!(
-        callee_state.caller_stack_ids.iter().next().unwrap(),
-        &new_id("call_func", "RSP")
-    );
-
-    callee_state
-        .memory
-        .set_value(
-            Data::from_target(new_id("func", "RSP"), bv(-30)),
-            bv(33).into(),
-        )
-        .unwrap();
-    // Emulate  removing the return pointer from the stack for x64
-    let stack_pointer_update_def = Term {
-        tid: Tid::new("stack_pointer_update_def"),
-        term: Def::Assign {
-            var: register("RSP"),
-            value: BinOp {
-                op: BinOpType::IntAdd,
-                lhs: Box::new(Var(register("RSP"))),
-                rhs: Box::new(Const(Bitvector::from_i64(8))),
-            },
-        },
-    };
-    callee_state = context
-        .update_def(&callee_state, &stack_pointer_update_def)
-        .unwrap();
-    // Test update_return
-    let return_state = context
-        .update_return(
-            Some(&callee_state),
-            Some(&state),
-            &call,
-            &return_term("return_target"),
-            &None,
-        )
-        .unwrap();
-    assert_eq!(return_state.stack_id, new_id("main", "RSP"));
-    assert_eq!(return_state.caller_stack_ids, BTreeSet::new());
-    assert_eq!(return_state.memory, state.memory);
-    assert_eq!(
-        return_state.get_register(&register("RSP")),
-        state
-            .get_register(&register("RSP"))
-            .bin_op(BinOpType::IntAdd, &Bitvector::from_i64(8).into())
-    );
-
-    state.set_register(&register("callee_saved_reg"), bv(13).into());
-    state.set_register(&register("other_reg"), bv(14).into());
+    // Test extern function handling
+    state.set_register(&register("RBP"), bv(13).into());
+    state.set_register(&register("RSI"), bv(14).into());
 
     let malloc = call_term("extern_malloc");
     let mut state_after_malloc = context.update_call_stub(&state, &malloc).unwrap();
@@ -238,15 +174,13 @@ fn context_problem_implementation() {
             .bin_op(BinOpType::IntAdd, &bv(8).into())
     );
     assert_eq!(
-        state_after_malloc.get_register(&register("callee_saved_reg")),
+        state_after_malloc.get_register(&register("RBP")),
         bv(13).into()
     );
-    assert!(state_after_malloc
-        .get_register(&register("other_reg"))
-        .is_top());
+    assert!(state_after_malloc.get_register(&register("RSI")).is_top());
 
     state_after_malloc.set_register(
-        &register("callee_saved_reg"),
+        &register("RBP"),
         Data::from_target(new_id("call_extern_malloc", "RDX"), bv(0)),
     );
     let free = call_term("extern_free");
@@ -256,7 +190,7 @@ fn context_problem_implementation() {
     assert!(state_after_free.get_register(&register("RDX")).is_top());
     assert_eq!(state_after_free.memory.get_num_objects(), 2);
     assert_eq!(
-        state_after_free.get_register(&register("callee_saved_reg")),
+        state_after_free.get_register(&register("RBP")),
         Data::from_target(new_id("call_extern_malloc", "RDX"), bv(0))
     );
 
@@ -270,12 +204,10 @@ fn context_problem_implementation() {
             .bin_op(BinOpType::IntAdd, &bv(8).into())
     );
     assert_eq!(
-        state_after_other_fn.get_register(&register("callee_saved_reg")),
+        state_after_other_fn.get_register(&register("RBP")),
         bv(13).into()
     );
-    assert!(state_after_other_fn
-        .get_register(&register("other_reg"))
-        .is_top());
+    assert!(state_after_other_fn.get_register(&register("RSI")).is_top());
 }
 
 #[test]
@@ -283,11 +215,13 @@ fn update_return() {
     use crate::analysis::forward_interprocedural_fixpoint::Context as IpFpContext;
     use crate::analysis::pointer_inference::object::ObjectType;
     use crate::analysis::pointer_inference::Data;
-    let (project, config) = mock_project();
-    let (log_sender, _log_receiver) = crossbeam_channel::unbounded();
-    let analysis_results = AnalysisResults::mock_from_project(&project);
-    let context = Context::new(&analysis_results, config, log_sender);
-    let state_before_return = State::new(&register("RSP"), Tid::new("callee"));
+    let context = mock_context();
+    let callee_tid = Tid::new("callee");
+    let state_before_return = State::from_fn_sig(
+        context.fn_signatures.get(&callee_tid).unwrap(),
+        &register("RSP"),
+        callee_tid.clone(),
+    );
     let mut state_before_return = context
         .update_def(
             &state_before_return,
@@ -295,58 +229,42 @@ fn update_return() {
         )
         .unwrap();
 
-    let callsite_id = new_id("call_callee", "RSP");
+    let callee_created_heap_id = new_id("callee_created_heap", "RAX");
     state_before_return.memory.add_abstract_object(
-        callsite_id.clone(),
-        bv(0).into(),
-        ObjectType::Stack,
+        callee_created_heap_id.clone(),
         ByteSize::new(8),
+        Some(ObjectType::Heap),
     );
-    state_before_return
-        .caller_stack_ids
-        .insert(callsite_id.clone());
-    state_before_return
-        .ids_known_to_caller
-        .insert(callsite_id.clone());
-
-    let other_callsite_id = new_id("call_callee_other", "RSP");
-    state_before_return.memory.add_abstract_object(
-        other_callsite_id.clone(),
-        bv(0).into(),
-        ObjectType::Stack,
-        ByteSize::new(8),
+    state_before_return.set_register(
+        &register("RAX"),
+        Data::from_target(callee_created_heap_id.clone(), bv(16)),
     );
-    state_before_return
-        .caller_stack_ids
-        .insert(other_callsite_id.clone());
-    state_before_return
-        .ids_known_to_caller
-        .insert(other_callsite_id.clone());
     state_before_return.set_register(
         &register("RDX"),
-        Data::from_target(new_id("call_callee_other", "RSP"), bv(-32)),
+        Data::from_target(new_id("callee", "RDI"), bv(0)),
     );
 
-    let state_before_call = State::new(&register("RSP"), Tid::new("original_caller_id"));
+    let state_before_call = State::new(&register("RSP"), Tid::new("caller"));
     let mut state_before_call = context
         .update_def(
             &state_before_call,
             &reg_add_term("RSP", -16, "stack_offset_on_call_adjustment"),
         )
         .unwrap();
-    let caller_caller_id = new_id("caller_caller", "RSP");
+    let param_obj_id = new_id("caller_created_heap", "RAX");
     state_before_call.memory.add_abstract_object(
-        caller_caller_id.clone(),
-        bv(0).into(),
-        ObjectType::Stack,
+        param_obj_id.clone(),
         ByteSize::new(8),
+        Some(ObjectType::Heap),
     );
-    state_before_call
-        .caller_stack_ids
-        .insert(caller_caller_id.clone());
-    state_before_call
-        .ids_known_to_caller
-        .insert(caller_caller_id.clone());
+    state_before_call.set_register(
+        &register("RDI"),
+        Data::from_target(param_obj_id.clone(), bv(0).into()),
+    );
+    state_before_call.set_register(
+        &register("RBX"),
+        Data::from_target(param_obj_id.clone(), bv(0).into()),
+    );
 
     let state = context
         .update_return(
@@ -358,25 +276,43 @@ fn update_return() {
         )
         .unwrap();
 
-    let mut caller_caller_set = BTreeSet::new();
-    caller_caller_set.insert(caller_caller_id);
-    assert_eq!(state.ids_known_to_caller, caller_caller_set.clone());
-    assert_eq!(state.caller_stack_ids, caller_caller_set.clone());
-    assert_eq!(state.stack_id, new_id("original_caller_id", "RSP"));
-    assert!(state_before_return.memory.get_all_object_ids().len() == 3);
-    assert!(state.memory.get_all_object_ids().len() == 2);
+    assert_eq!(state.stack_id, new_id("caller", "RSP"));
+    assert_eq!(
+        state.get_register(&register("RAX")),
+        Data::from_target(
+            callee_created_heap_id
+                .with_path_hint(Tid::new("call_callee"))
+                .unwrap(),
+            bv(16).into()
+        )
+    );
+    assert_eq!(
+        state.get_register(&register("RBX")),
+        Data::from_target(param_obj_id.clone(), bv(0).into())
+    );
+    assert_eq!(
+        state.get_register(&register("RDX")),
+        Data::from_target(param_obj_id.clone(), bv(0).into())
+    );
+    assert_eq!(
+        state.get_register(&register("RSP")),
+        Data::from_target(new_id("caller", "RSP"), bv(-8).into())
+    );
+    assert!(state.memory.get_all_object_ids().len() == 3);
     assert!(state
         .memory
         .get_all_object_ids()
-        .get(&new_id("original_caller_id", "RSP"))
+        .get(&param_obj_id)
         .is_some());
     assert!(state
         .memory
         .get_all_object_ids()
-        .get(&new_id("caller_caller", "RSP"))
+        .get(
+            &callee_created_heap_id
+                .with_path_hint(Tid::new("call_callee"))
+                .unwrap()
+        )
         .is_some());
-    let expected_rsp = Data::from_target(new_id("original_caller_id", "RSP"), bv(-8));
-    assert_eq!(state.get_register(&register("RSP")), expected_rsp);
 }
 
 #[test]
@@ -417,4 +353,32 @@ fn specialize_conditional() {
     state.set_register(&register("RAX"), IntervalDomain::mock(-20, 0).into());
     let result = context.specialize_conditional(&state, &condition, &block, false);
     assert!(result.is_none());
+}
+
+#[test]
+fn get_unsound_caller_ids() {
+    let context = mock_context();
+    let mut callee_id_to_caller_data_map = BTreeMap::new();
+    callee_id_to_caller_data_map.insert(
+        new_id("callee", "RDI"),
+        Data::from_target(new_id("caller", "RAX"), bv(1).into()),
+    );
+    callee_id_to_caller_data_map.insert(
+        new_id("callee", "RSI"),
+        Data::from_target(new_id("caller", "RAX"), bv(2).into()),
+    );
+
+    let callee_tid = Tid::new("callee");
+    let callee_state = State::from_fn_sig(
+        context.fn_signatures.get(&callee_tid).unwrap(),
+        &register("RSP"),
+        callee_tid.clone(),
+    );
+    let callee_id_to_access_pattern_map = context.create_id_to_access_pattern_map(&callee_state);
+
+    let unsound_ids = context.get_unsound_caller_ids(
+        &callee_id_to_caller_data_map,
+        &callee_id_to_access_pattern_map,
+    );
+    assert_eq!(unsound_ids, BTreeSet::from_iter([new_id("caller", "RAX")]));
 }

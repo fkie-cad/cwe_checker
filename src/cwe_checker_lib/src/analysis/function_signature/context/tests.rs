@@ -22,19 +22,19 @@ fn test_compute_return_values_of_call() {
     let return_values =
         context.compute_return_values_of_call(&mut caller_state, &callee_state, &cconv, &call);
     let expected_val = DataDomain::from_target(
-        AbstractIdentifier::new_from_var(Tid::new("call_tid"), &Variable::mock("RAX", 8)),
+        AbstractIdentifier::from_var(Tid::new("call_tid"), &Variable::mock("RAX", 8)),
         Bitvector::from_i64(0).into(),
     );
     assert_eq!(return_values.iter().len(), 3);
     assert_eq!(return_values[0], (&Variable::mock("RAX", 8), expected_val));
     // Test returning a known value.
     let param_ref = DataDomain::from_target(
-        AbstractIdentifier::new_from_var(Tid::new("callee"), &Variable::mock("RDI", 8)),
+        AbstractIdentifier::from_var(Tid::new("callee"), &Variable::mock("RDI", 8)),
         Bitvector::from_i64(0).into(),
     );
     callee_state.set_register(&Variable::mock("RAX", 8), param_ref);
     let expected_val = DataDomain::from_target(
-        AbstractIdentifier::new_from_var(Tid::new("caller"), &Variable::mock("RDI", 8)),
+        AbstractIdentifier::from_var(Tid::new("caller"), &Variable::mock("RDI", 8)),
         Bitvector::from_i64(0).into(),
     );
     let return_values =

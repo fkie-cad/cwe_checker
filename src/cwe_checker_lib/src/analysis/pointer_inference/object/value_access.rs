@@ -5,7 +5,15 @@ impl AbstractObject {
     /// and with the given size of the accessed value is contained in the bounds of the memory object.
     /// If `offset` contains more than one possible index value,
     /// then only return `true` if the access is contained in the abstract object for all possible offset values.
+    ///
+    /// If `offset` is a `Top` value, then the function assumes this to be due to analysis inaccuracies
+    /// and does not flag them as possible out-of-bounds access.
     pub fn access_contained_in_bounds(&self, offset: &ValueDomain, size: ByteSize) -> bool {
+        if offset.is_top() {
+            // Currently TOP offsets happen a lot due to inaccuracies in the analysis.
+            // So for the time being we do not flag them as possible CWEs.
+            return true;
+        }
         if let Ok(offset_interval) = offset.try_to_interval() {
             if let Ok(lower_bound) = self.inner.lower_index_bound.try_to_bitvec() {
                 if lower_bound.checked_sgt(&offset_interval.start).unwrap() {

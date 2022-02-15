@@ -626,7 +626,7 @@ impl<T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> State<T> 
 
     /// Checks whether a target refers to the Stack.
     pub fn is_stack_pointer(pi_state: &PointerInferenceState, target: &AbstractIdentifier) -> bool {
-        pi_state.caller_stack_ids.contains(target) || pi_state.stack_id == *target
+        pi_state.stack_id == *target
     }
 }
 

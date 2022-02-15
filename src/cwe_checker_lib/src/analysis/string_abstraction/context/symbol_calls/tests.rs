@@ -115,7 +115,7 @@ fn test_handle_generic_symbol_calls() {
         "func",
     );
     let mut pi_results = PointerInferenceComputation::mock(&project);
-    pi_results.compute();
+    pi_results.compute(false);
 
     let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
@@ -139,7 +139,7 @@ fn test_handle_unknown_symbol_calls() {
         "func",
     );
     let mut pi_results = PointerInferenceComputation::mock(&project);
-    pi_results.compute();
+    pi_results.compute(false);
 
     let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
@@ -167,7 +167,7 @@ fn test_add_new_string_abstract_domain() {
         "func",
     );
     let mut pi_results = PointerInferenceComputation::mock(&project);
-    pi_results.compute();
+    pi_results.compute(false);
 
     let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
@@ -222,7 +222,7 @@ fn test_merge_domains_from_multiple_pointer_targets() {
         "func",
     );
     let mut pi_results = PointerInferenceComputation::mock(&project);
-    pi_results.compute();
+    pi_results.compute(false);
 
     let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
@@ -304,7 +304,7 @@ fn test_handle_sprintf_and_snprintf_calls_known_format_string() {
         "func",
     );
     let mut pi_results = PointerInferenceComputation::mock(&project);
-    pi_results.compute();
+    pi_results.compute(false);
 
     let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
@@ -339,7 +339,7 @@ fn test_handle_sprintf_and_snprintf_calls_unknown_format_string() {
         "func",
     );
     let mut pi_results = PointerInferenceComputation::mock(&project);
-    pi_results.compute();
+    pi_results.compute(false);
 
     let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
@@ -374,7 +374,7 @@ fn test_insert_constant_char_into_format_string() {
         "func",
     );
     let mut pi_results = PointerInferenceComputation::mock(&project);
-    pi_results.compute();
+    pi_results.compute(false);
 
     let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
@@ -406,7 +406,7 @@ fn test_insert_constant_string_into_format_string() {
         "func",
     );
     let mut pi_results = PointerInferenceComputation::mock(&project);
-    pi_results.compute();
+    pi_results.compute(false);
 
     let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
@@ -435,7 +435,7 @@ fn test_handle_free() {
     );
 
     let mut pi_results = PointerInferenceComputation::mock(&project);
-    pi_results.compute();
+    pi_results.compute(false);
 
     let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 

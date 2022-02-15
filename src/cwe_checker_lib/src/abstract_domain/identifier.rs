@@ -20,7 +20,12 @@ use std::sync::Arc;
 /// E.g. it may represent the union of all values at the specific *location* for each time the program point is visited during an execution trace
 /// or it may only represent the value at the last time the program point was visited.
 ///
-/// An abstract identifier is given by a time identifier and a location identifier.
+/// Alternatively one can also add path hints to an identifier to further distinguish points in time in an execution trace.
+/// Path hints are given as a possibly empty array of time identifiers.
+/// To prevent infinitely long path hints, each time identifier is only allowed to appear at most once in the array.
+/// The specific meaning of the path hints depends upon the use case.
+///
+/// An abstract identifier is given by a time identifier, a location identifier and a path hints array (containing time identifiers).
 ///
 /// For the location identifier see `AbstractLocation`.
 /// The time identifier is given by a `Tid`.
@@ -35,21 +40,69 @@ pub struct AbstractIdentifier(Arc<AbstractIdentifierData>);
 pub struct AbstractIdentifierData {
     time: Tid,
     location: AbstractLocation,
+    path_hints: Vec<Tid>,
 }
 
 impl AbstractIdentifier {
     /// Create a new abstract identifier.
     pub fn new(time: Tid, location: AbstractLocation) -> AbstractIdentifier {
-        AbstractIdentifier(Arc::new(AbstractIdentifierData { time, location }))
+        AbstractIdentifier(Arc::new(AbstractIdentifierData {
+            time,
+            location,
+            path_hints: Vec::new(),
+        }))
     }
 
     /// Create a new abstract identifier where the abstract location is a register.
     /// Panics if the register is a temporary register.
-    pub fn new_from_var(time: Tid, variable: &Variable) -> AbstractIdentifier {
+    pub fn from_var(time: Tid, variable: &Variable) -> AbstractIdentifier {
         AbstractIdentifier(Arc::new(AbstractIdentifierData {
             time,
             location: AbstractLocation::from_var(variable).unwrap(),
+            path_hints: Vec::new(),
         }))
+    }
+
+    /// Create an abstract identifier from a parameter argument.
+    ///
+    /// If the argument is a sub-register, then the created identifier contains the whole base register.
+    pub fn from_arg(time: &Tid, arg: &Arg) -> AbstractIdentifier {
+        let location_register = match arg {
+            Arg::Register { expr, .. } | Arg::Stack { address: expr, .. } => {
+                match &expr.input_vars()[..] {
+                    [var] => *var,
+                    _ => panic!("Malformed argument expression encountered"),
+                }
+            }
+        };
+        let location = match arg {
+            Arg::Register { .. } => AbstractLocation::from_var(location_register).unwrap(),
+            Arg::Stack { size, .. } => AbstractLocation::from_stack_position(
+                location_register,
+                arg.eval_stack_offset().unwrap().try_to_i64().unwrap(),
+                *size,
+            ),
+        };
+        AbstractIdentifier::new(time.clone(), location)
+    }
+
+    /// Create a new abstract identifier
+    /// by pushing the given path hint to the array of path hints of `self`.
+    /// Returns an error if the path hint is already contained in the path hints of `self`.
+    pub fn with_path_hint(&self, path_hint: Tid) -> Result<Self, Error> {
+        if self.path_hints.iter().any(|tid| *tid == path_hint) {
+            Err(anyhow!("Path hint already contained."))
+        } else {
+            let mut new_id = self.clone();
+            let inner = Arc::make_mut(&mut new_id.0);
+            inner.path_hints.push(path_hint);
+            Ok(new_id)
+        }
+    }
+
+    /// Get the path hints array of `self`.
+    pub fn get_path_hints(&self) -> &[Tid] {
+        &self.path_hints
     }
 
     /// Get the register associated to the abstract location.
@@ -74,7 +127,15 @@ impl AbstractIdentifier {
 
 impl std::fmt::Display for AbstractIdentifier {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(formatter, "{} @ {}", self.0.time, self.0.location)
+        if self.path_hints.is_empty() {
+            write!(formatter, "{} @ {}", self.0.time, self.0.location)
+        } else {
+            write!(formatter, "{}(", self.0.time)?;
+            for hint in &self.0.path_hints {
+                write!(formatter, "->{}", hint)?;
+            }
+            write!(formatter, ") @ {}", self.0.location)
+        }
     }
 }
 
@@ -157,5 +218,29 @@ impl std::fmt::Display for AbstractMemoryLocation {
             Self::Location { offset, .. } => write!(formatter, "({})", offset),
             Self::Pointer { offset, target } => write!(formatter, "({})->{}", offset, target),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_constraint_enforcements() {
+        // Test that no temporary registers are allowed as abstract locations.
+        assert!(AbstractLocation::from_var(&Variable {
+            name: "var".to_string(),
+            size: ByteSize::new(8),
+            is_temp: true,
+        })
+        .is_err());
+        // Test uniqueness of TIDs in path hint array.
+        let id = AbstractIdentifier::new(
+            Tid::new("time_id"),
+            AbstractLocation::from_var(&Variable::mock("var", 8)).unwrap(),
+        );
+        let id = id.with_path_hint(Tid::new("first_hint")).unwrap();
+        let id = id.with_path_hint(Tid::new("second_hint")).unwrap();
+        assert!(id.with_path_hint(Tid::new("first_hint")).is_err());
     }
 }

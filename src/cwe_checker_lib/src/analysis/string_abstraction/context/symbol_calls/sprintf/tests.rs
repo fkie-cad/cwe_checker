@@ -19,7 +19,7 @@ fn test_handle_sprintf_and_snprintf_calls() {
         "func",
     );
     let mut pi_results = PointerInferenceComputation::mock(&project);
-    pi_results.compute();
+    pi_results.compute(false);
 
     let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
@@ -78,7 +78,7 @@ fn test_parse_format_string_and_add_new_string_domain() {
         "func",
     );
     let mut pi_results = PointerInferenceComputation::mock(&project);
-    pi_results.compute();
+    pi_results.compute(false);
 
     let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
@@ -118,7 +118,7 @@ fn test_create_string_domain_for_sprintf_snprintf() {
         "func",
     );
     let mut pi_results = PointerInferenceComputation::mock(&project);
-    pi_results.compute();
+    pi_results.compute(false);
 
     let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
@@ -151,7 +151,7 @@ fn test_create_string_domain_using_data_type_approximations() {
         "func",
     );
     let mut pi_results = PointerInferenceComputation::mock(&project);
-    pi_results.compute();
+    pi_results.compute(false);
 
     let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
@@ -194,7 +194,7 @@ fn test_create_string_domain_using_constants_and_sub_domains() {
         "func",
     );
     let mut pi_results = PointerInferenceComputation::mock(&project);
-    pi_results.compute();
+    pi_results.compute(false);
 
     let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
@@ -358,7 +358,7 @@ fn test_fetch_constant_and_domain_for_format_specifier() {
         "func",
     );
     let mut pi_results = PointerInferenceComputation::mock(&project);
-    pi_results.compute();
+    pi_results.compute(false);
 
     let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
@@ -539,7 +539,7 @@ fn test_fetch_subdomains_if_available() {
         "func",
     );
     let mut pi_results = PointerInferenceComputation::mock(&project);
-    pi_results.compute();
+    pi_results.compute(false);
 
     let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
@@ -597,7 +597,7 @@ fn test_fetch_constant_domain_if_available() {
         "func",
     );
     let mut pi_results = PointerInferenceComputation::mock(&project);
-    pi_results.compute();
+    pi_results.compute(false);
 
     let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
     let string_data: DataDomain<IntervalDomain> = DataDomain::from(Bitvector::from_i32(0x7000));

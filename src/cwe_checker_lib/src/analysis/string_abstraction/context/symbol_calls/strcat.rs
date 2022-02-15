@@ -119,7 +119,7 @@ mod tests {
             "func",
         );
         let mut pi_results = PointerInferenceComputation::mock(&project);
-        pi_results.compute();
+        pi_results.compute(false);
 
         let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
@@ -153,7 +153,7 @@ mod tests {
             "func",
         );
         let mut pi_results = PointerInferenceComputation::mock(&project);
-        pi_results.compute();
+        pi_results.compute(false);
 
         let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
@@ -204,7 +204,7 @@ mod tests {
             "func",
         );
         let mut pi_results = PointerInferenceComputation::mock(&project);
-        pi_results.compute();
+        pi_results.compute(false);
 
         let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
@@ -226,7 +226,7 @@ mod tests {
             "func",
         );
         let mut pi_results = PointerInferenceComputation::mock(&project);
-        pi_results.compute();
+        pi_results.compute(false);
 
         let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
@@ -253,7 +253,7 @@ mod tests {
             "func",
         );
         let mut pi_results = PointerInferenceComputation::mock(&project);
-        pi_results.compute();
+        pi_results.compute(false);
 
         let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 

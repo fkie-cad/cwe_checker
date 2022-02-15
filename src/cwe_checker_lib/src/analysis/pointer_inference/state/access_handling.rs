@@ -35,44 +35,26 @@ impl State {
         value: &Data,
         global_memory: &RuntimeMemoryImage,
     ) -> Result<(), Error> {
-        // If the address is a unique caller stack address, write to *all* caller stacks.
-        if let Some(offset) = self.unwrap_offset_if_caller_stack_address(address) {
-            let caller_addresses: Vec<_> = self
-                .caller_stack_ids
-                .iter()
-                .map(|caller_stack_id| Data::from_target(caller_stack_id.clone(), offset.clone()))
-                .collect();
-            let mut result = Ok(());
-            for address in caller_addresses {
-                if let Err(err) = self.store_value(&address, &value.clone(), global_memory) {
-                    result = Err(err);
+        self.memory.set_value(address.clone(), value.clone())?;
+        if let Some(absolute_address) = address.get_absolute_value() {
+            if let Ok(address_to_global_data) = absolute_address.try_to_bitvec() {
+                match global_memory.is_address_writeable(&address_to_global_data) {
+                    Ok(true) => Ok(()),
+                    Ok(false) => Err(anyhow!("Write to read-only global data")),
+                    Err(err) => Err(err),
                 }
-            }
-            // Note that this only returns the last error that was detected.
-            result
-        } else {
-            let pointer = self.adjust_pointer_for_read(address);
-            self.memory.set_value(pointer.clone(), value.clone())?;
-            if let Some(absolute_address) = pointer.get_absolute_value() {
-                if let Ok(address_to_global_data) = absolute_address.try_to_bitvec() {
-                    match global_memory.is_address_writeable(&address_to_global_data) {
-                        Ok(true) => Ok(()),
-                        Ok(false) => Err(anyhow!("Write to read-only global data")),
-                        Err(err) => Err(err),
-                    }
-                } else if let Ok((start, end)) = absolute_address.try_to_offset_interval() {
-                    match global_memory.is_interval_writeable(start as u64, end as u64) {
-                        Ok(true) => Ok(()),
-                        Ok(false) => Err(anyhow!("Write to read-only global data")),
-                        Err(err) => Err(err),
-                    }
-                } else {
-                    // We assume inexactness of the algorithm instead of a possible CWE here.
-                    Ok(())
+            } else if let Ok((start, end)) = absolute_address.try_to_offset_interval() {
+                match global_memory.is_interval_writeable(start as u64, end as u64) {
+                    Ok(true) => Ok(()),
+                    Ok(false) => Err(anyhow!("Write to read-only global data")),
+                    Err(err) => Err(err),
                 }
             } else {
+                // We assume inexactness of the algorithm instead of a possible CWE here.
                 Ok(())
             }
+        } else {
+            Ok(())
         }
     }
 
@@ -105,7 +87,7 @@ impl State {
         size: ByteSize,
         global_memory: &RuntimeMemoryImage,
     ) -> Result<Data, Error> {
-        let address = self.adjust_pointer_for_read(&self.eval(address));
+        let address = self.eval(address);
         let mut result = if let Some(global_address) = address.get_absolute_value() {
             if let Ok(address_bitvector) = global_address.try_to_bitvec() {
                 match global_memory.read(&address_bitvector, size) {
@@ -158,38 +140,6 @@ impl State {
                 Err(err)
             }
         }
-    }
-
-    /// If the pointer contains a reference to the stack with offset >= 0, replace it with a pointer
-    /// pointing to all possible caller IDs.
-    fn adjust_pointer_for_read(&self, address: &Data) -> Data {
-        let mut adjusted_address = address.clone();
-        let mut new_targets = BTreeMap::new();
-        for (id, offset) in address.get_relative_values() {
-            if *id == self.stack_id {
-                if let Ok((interval_start, interval_end)) = offset.try_to_offset_interval() {
-                    if interval_start >= 0 && interval_end >= 0 && !self.caller_stack_ids.is_empty()
-                    {
-                        for caller_id in self.caller_stack_ids.iter() {
-                            new_targets.insert(caller_id.clone(), offset.clone());
-                        }
-                    // Note that the id of the current stack frame was *not* added.
-                    } else {
-                        new_targets.insert(id.clone(), offset.clone());
-                    }
-                } else {
-                    for caller_id in self.caller_stack_ids.iter() {
-                        new_targets.insert(caller_id.clone(), offset.clone());
-                    }
-                    // Note that we also add the id of the current stack frame
-                    new_targets.insert(id.clone(), offset.clone());
-                }
-            } else {
-                new_targets.insert(id.clone(), offset.clone());
-            }
-        }
-        adjusted_address.set_relative_values(new_targets);
-        adjusted_address
     }
 
     /// Evaluate the value of an expression in the current state
@@ -257,16 +207,11 @@ impl State {
         def: &Def,
         global_data: &RuntimeMemoryImage,
     ) -> bool {
-        let (raw_address, size) = match def {
+        let (address, size) = match def {
             Def::Load { address, var } => (self.eval(address), var.size),
             Def::Store { address, value } => (self.eval(address), value.bytesize()),
             _ => return false,
         };
-        if self.is_stack_pointer_with_nonnegative_offset(&raw_address) {
-            // Access to a parameter or the return address of the function
-            return false;
-        }
-        let address = self.adjust_pointer_for_read(&raw_address);
         self.memory
             .is_out_of_bounds_mem_access(&address, size, global_data)
     }
@@ -279,45 +224,10 @@ impl State {
         data: &Data,
         global_data: &RuntimeMemoryImage,
     ) -> bool {
-        let mut data = self.adjust_pointer_for_read(data);
+        let mut data = data.clone();
         data.set_absolute_value(None); // Do not check absolute_values
         self.memory
             .is_out_of_bounds_mem_access(&data, ByteSize::new(1), global_data)
-    }
-
-    /// Return `true` if `data` is a pointer to the current stack frame with a constant positive address,
-    /// i.e. if it accesses a stack parameter (or the return-to address for x86) of the current function.
-    pub fn is_stack_pointer_with_nonnegative_offset(&self, data: &Data) -> bool {
-        if let Some((target, offset)) = data.get_if_unique_target() {
-            if *target == self.stack_id {
-                if let Ok(offset_val) = offset.try_to_offset() {
-                    if offset_val >= 0 {
-                        return true;
-                    }
-                }
-            }
-        }
-        false
-    }
-
-    /// If  the given address is a positive stack offset and `self.caller_stack_ids` is non-empty,
-    /// i.e. it is an access to the caller stack, return the offset.
-    ///
-    /// In all other cases, including the case that the address has more than one target, return `None`.
-    fn unwrap_offset_if_caller_stack_address(&self, address: &Data) -> Option<ValueDomain> {
-        if self.caller_stack_ids.is_empty() {
-            return None;
-        }
-        if let Some((id, offset)) = address.get_if_unique_target() {
-            if self.stack_id == *id {
-                if let Ok((interval_start, _interval_end)) = offset.try_to_offset_interval() {
-                    if interval_start >= 0 {
-                        return Some(offset.clone());
-                    }
-                }
-            }
-        }
-        None
     }
 
     /// Check whether the given `def` could result in a memory access through a NULL pointer.

@@ -1,6 +1,7 @@
 use super::object_list::AbstractObjectList;
-use super::{Data, ValueDomain};
+use super::Data;
 use crate::abstract_domain::*;
+use crate::analysis::function_signature::FunctionSignature;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
 use crate::utils::binary::RuntimeMemoryImage;
@@ -15,28 +16,12 @@ mod value_specialization;
 pub struct State {
     /// Maps a register variable to the data known about its content.
     /// A variable not contained in the map has value `Data::Top(..)`, i.e. nothing is known about its content.
-    register: BTreeMap<Variable, Data>,
+    register: DomainMap<Variable, Data, MergeTopStrategy>,
     /// The list of all known memory objects.
     pub memory: AbstractObjectList,
     /// The abstract identifier of the current stack frame.
     /// It points to the base of the stack frame, i.e. only negative offsets point into the current stack frame.
     pub stack_id: AbstractIdentifier,
-    /// All known IDs of caller stack frames.
-    /// Note that these IDs are named after the callsite,
-    /// i.e. we can distinguish every callsite and for recursive functions the caller and current stack frames have different IDs.
-    ///
-    /// Writes to the current stack frame with offset >= 0 are written to *all* caller stack frames.
-    /// Reads to the current stack frame with offset >= 0 are handled as merge-read from all caller stack frames.
-    pub caller_stack_ids: BTreeSet<AbstractIdentifier>,
-    /// All IDs of objects that are known to some caller.
-    /// This is an overapproximation of all object IDs that may have been passed as parameters to the function.
-    /// The corresponding objects are not allowed to be deleted (even if no pointer to them exists anymore)
-    /// so that after returning from a call the caller can recover their modified contents
-    /// and the callee does not accidentally delete this information if it loses all pointers to an object.
-    ///
-    /// Note that IDs that the callee should not have access to are not included here.
-    /// For these IDs the caller can assume that the contents of the corresponding memory object were not accessed or modified by the call.
-    pub ids_known_to_caller: BTreeSet<AbstractIdentifier>,
 }
 
 impl State {
@@ -47,7 +32,7 @@ impl State {
             function_tid,
             AbstractLocation::from_var(stack_register).unwrap(),
         );
-        let mut register: BTreeMap<Variable, Data> = BTreeMap::new();
+        let mut register = DomainMap::from(BTreeMap::new());
         register.insert(
             stack_register.clone(),
             Data::from_target(
@@ -59,39 +44,57 @@ impl State {
             register,
             memory: AbstractObjectList::from_stack_id(stack_id.clone(), stack_register.size),
             stack_id,
-            caller_stack_ids: BTreeSet::new(),
-            ids_known_to_caller: BTreeSet::new(),
         }
     }
 
-    /// Create a new state that contains one memory object corresponding to the stack
-    /// and one memory object for each provided parameter register.
+    /// Create a new state from a function signature.
     ///
-    /// This function can be used to approximate states of entry points
-    /// where the number and types of its parameters is unknown.
-    /// Note that this may also cause analysis errors,
-    /// e.g. if two parameters point to the same memory object instead of different ones.
-    pub fn new_with_generic_parameter_objects(
+    /// The created state contains one memory object for the stack frame of the function
+    /// and one memory object for each parameter that is dereferenced by the function
+    /// (according to the function signature).
+    pub fn from_fn_sig(
+        fn_sig: &FunctionSignature,
         stack_register: &Variable,
         function_tid: Tid,
-        params: &[Variable],
     ) -> State {
+        let mock_global_memory = RuntimeMemoryImage::empty(true);
         let mut state = State::new(stack_register, function_tid.clone());
-        for param in params {
-            let param_id = AbstractIdentifier::new(
-                function_tid.clone(),
-                AbstractLocation::from_var(param).unwrap(),
-            );
-            state.memory.add_abstract_object(
-                param_id.clone(),
-                Bitvector::zero(stack_register.size.into()).into(),
-                super::object::ObjectType::Heap,
-                stack_register.size,
-            );
-            state.set_register(
-                param,
-                DataDomain::from_target(param_id, Bitvector::zero(param.size.into()).into()),
-            )
+        // Adjust the upper bound of the stack frame to include all stack parameters
+        // (and the return address at stack offset 0 for x86).
+        let stack_upper_bound: i64 = match stack_register.name.as_str() {
+            "ESP" => 4,
+            "RSP" => 8,
+            _ => 0,
+        };
+        let stack_upper_bound =
+            std::cmp::max(stack_upper_bound, fn_sig.get_stack_params_total_size());
+        let stack_obj = state.memory.get_object_mut(&state.stack_id).unwrap();
+        stack_obj.add_to_upper_index_bound(stack_upper_bound);
+        // Set parameter values and create parameter memory objects.
+        for (arg, access_pattern) in &fn_sig.parameters {
+            let param_id = AbstractIdentifier::from_arg(&function_tid, arg);
+            match arg {
+                Arg::Register {
+                    expr: Expression::Var(var),
+                    ..
+                } => state.set_register(
+                    var,
+                    Data::from_target(param_id.clone(), Bitvector::zero(var.size.into()).into()),
+                ),
+                Arg::Register { .. } => continue, // Parameters in floating point registers are currently ignored.
+                Arg::Stack { address, size, .. } => {
+                    let param_data =
+                        Data::from_target(param_id.clone(), Bitvector::zero((*size).into()).into());
+                    state
+                        .write_to_address(address, &param_data, &mock_global_memory)
+                        .unwrap();
+                }
+            }
+            if access_pattern.is_dereferenced() {
+                state
+                    .memory
+                    .add_abstract_object(param_id, stack_register.size, None);
+            }
         }
         state
     }
@@ -171,37 +174,20 @@ impl State {
     /// The function uses an underapproximation of all possible pointer targets contained in a memory object.
     /// This keeps the number of tracked objects reasonably small.
     pub fn remove_unreferenced_objects(&mut self) {
-        // get all referenced IDs
+        // get all referenced IDs from registers
         let mut referenced_ids = BTreeSet::new();
         for (_reg_name, data) in self.register.iter() {
             referenced_ids.extend(data.referenced_ids().cloned());
         }
-        referenced_ids.insert(self.stack_id.clone());
-        referenced_ids.append(&mut self.caller_stack_ids.clone());
-        referenced_ids.append(&mut self.ids_known_to_caller.clone());
+        // get all IDs of parameter objects and the current stack frame
+        for id in self.memory.get_all_object_ids() {
+            if id.get_tid() == self.stack_id.get_tid() && id.get_path_hints().is_empty() {
+                referenced_ids.insert(id);
+            }
+        }
         referenced_ids = self.add_directly_reachable_ids_to_id_set(referenced_ids);
         // remove unreferenced objects
         self.memory.remove_unused_objects(&referenced_ids);
-    }
-
-    /// Merge the callee stack with the caller stack.
-    ///
-    /// This deletes the memory object corresponding to the callee_id
-    /// and updates all other references pointing to the callee_id to point to the caller_id.
-    /// The offset adjustment is handled as in `replace_abstract_id`.
-    ///
-    /// Note that right now the content of the callee memory object is *not* merged into the caller memory object.
-    /// In general this is the correct behaviour
-    /// as the content below the stack pointer should be considered uninitialized memory after returning to the caller.
-    /// However, an aggressively optimizing compiler or an unknown calling convention may deviate from this.
-    pub fn merge_callee_stack_to_caller_stack(
-        &mut self,
-        callee_id: &AbstractIdentifier,
-        caller_id: &AbstractIdentifier,
-        offset_adjustment: &ValueDomain,
-    ) {
-        self.memory.remove_object(callee_id);
-        self.replace_abstract_id(callee_id, caller_id, offset_adjustment);
     }
 
     /// Mark a memory object as already freed (i.e. pointers to it are dangling).
@@ -216,56 +202,20 @@ impl State {
         self.memory.mark_mem_object_as_freed(object_pointer)
     }
 
-    /// Remove all virtual register from the state.
-    /// This should only be done in cases where it is known that no virtual registers can be alive.
-    ///
-    /// Example: At the start of a basic block no virtual registers should be alive.
-    pub fn remove_virtual_register(&mut self) {
-        self.register = self
-            .register
-            .clone()
-            .into_iter()
-            .filter(|(register, _value)| !register.is_temp)
-            .collect();
-    }
-
-    /// Add those objects from the `caller_state` to `self`, that are not known to `self`.
-    ///
-    /// Since self does not know these objects, we assume that the current function could not have accessed
-    /// them in any way during execution.
-    /// This means they are unchanged from the moment of the call until the return from the call,
-    /// thus we can simply copy their object-state from the moment of the call.
-    pub fn readd_caller_objects(&mut self, caller_state: &State) {
-        self.memory.append_unknown_objects(&caller_state.memory);
-    }
-
-    /// Restore the content of callee-saved registers from the caller state
-    /// with the exception of the stack register.
-    ///
-    /// This function does not check what the callee state currently contains in these registers.
-    /// If the callee does not adhere to the given calling convention, this may introduce analysis errors!
-    /// It will also mask cases
-    /// where a callee-saved register was incorrectly modified (e.g. because of a bug in the callee).
-    pub fn restore_callee_saved_register(
-        &mut self,
-        caller_state: &State,
-        cconv: &CallingConvention,
-        stack_register: &Variable,
-    ) {
-        for register in cconv
-            .callee_saved_register
-            .iter()
-            .filter(|reg| *reg != stack_register)
-        {
-            self.set_register(register, caller_state.get_register(register));
+    /// Remove all knowledge about the contents of non-callee-saved registers from the state.
+    pub fn remove_non_callee_saved_register(&mut self, cconv: &CallingConvention) {
+        let mut callee_saved_register = BTreeMap::new();
+        for var in &cconv.callee_saved_register {
+            if let Some(value) = self.register.get(var) {
+                callee_saved_register.insert(var.clone(), value.clone());
+            }
         }
+        self.register = callee_saved_register.into();
     }
 
-    /// Remove all knowledge about the contents of callee-saved registers from the state.
-    pub fn remove_callee_saved_register(&mut self, cconv: &CallingConvention) {
-        for register in &cconv.callee_saved_register {
-            self.register.remove(register);
-        }
+    /// Get the Tid of the function that this state belongs to.
+    pub fn get_fn_tid(&self) -> &Tid {
+        self.stack_id.get_tid()
     }
 }
 
@@ -273,31 +223,11 @@ impl AbstractDomain for State {
     /// Merge two states
     fn merge(&self, other: &Self) -> Self {
         assert_eq!(self.stack_id, other.stack_id);
-        let mut merged_register = BTreeMap::new();
-        for (register, other_value) in other.register.iter() {
-            if let Some(value) = self.register.get(register) {
-                let merged_value = value.merge(other_value);
-                if !merged_value.is_top() {
-                    // We only have to keep non-*Top* elements.
-                    merged_register.insert(register.clone(), merged_value);
-                }
-            }
-        }
         let merged_memory_objects = self.memory.merge(&other.memory);
         State {
-            register: merged_register,
+            register: self.register.merge(&other.register),
             memory: merged_memory_objects,
             stack_id: self.stack_id.clone(),
-            caller_stack_ids: self
-                .caller_stack_ids
-                .union(&other.caller_stack_ids)
-                .cloned()
-                .collect(),
-            ids_known_to_caller: self
-                .ids_known_to_caller
-                .union(&other.ids_known_to_caller)
-                .cloned()
-                .collect(),
         }
     }
 
@@ -324,24 +254,6 @@ impl State {
         state_map.insert(
             "stack_id".into(),
             Value::String(format!("{}", self.stack_id)),
-        );
-        state_map.insert(
-            "caller_stack_ids".into(),
-            Value::Array(
-                self.caller_stack_ids
-                    .iter()
-                    .map(|id| Value::String(format!("{}", id)))
-                    .collect(),
-            ),
-        );
-        state_map.insert(
-            "ids_known_to_caller".into(),
-            Value::Array(
-                self.ids_known_to_caller
-                    .iter()
-                    .map(|id| Value::String(format!("{}", id)))
-                    .collect(),
-            ),
         );
 
         Value::Object(state_map)

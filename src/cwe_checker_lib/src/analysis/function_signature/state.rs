@@ -41,7 +41,7 @@ impl State {
         let mut tracked_ids = BTreeMap::new();
         // Generate tracked IDs for all parameters and also add them to the register map
         for var in calling_convention.get_all_parameter_register() {
-            let id = AbstractIdentifier::new_from_var(func_tid.clone(), var);
+            let id = AbstractIdentifier::from_var(func_tid.clone(), var);
             let value =
                 DataDomain::from_target(id.clone(), Bitvector::zero(var.size.into()).into());
             register_map.insert(var.clone(), value);
@@ -50,7 +50,7 @@ impl State {
             }
         }
         // Generate all stack-related objects
-        let stack_id = AbstractIdentifier::new_from_var(func_tid.clone(), stack_register);
+        let stack_id = AbstractIdentifier::from_var(func_tid.clone(), stack_register);
         let stack_value = DataDomain::from_target(
             stack_id.clone(),
             Bitvector::zero(stack_register.size.into()).into(),

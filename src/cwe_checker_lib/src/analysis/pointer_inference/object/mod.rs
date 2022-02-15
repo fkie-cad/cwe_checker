@@ -87,12 +87,12 @@ impl std::convert::Into<AbstractObject> for Inner {
 
 impl AbstractObject {
     /// Create a new abstract object with given object type and address bytesize.
-    pub fn new(type_: ObjectType, address_bytesize: ByteSize) -> AbstractObject {
+    pub fn new(type_: Option<ObjectType>, address_bytesize: ByteSize) -> AbstractObject {
         let inner = Inner {
             pointer_targets: BTreeSet::new(),
             is_unique: true,
             state: ObjectState::Alive,
-            type_: Some(type_),
+            type_,
             memory: MemRegion::new(address_bytesize),
             lower_index_bound: BitvectorDomain::Top(address_bytesize),
             upper_index_bound: BitvectorDomain::Top(address_bytesize),
@@ -122,6 +122,14 @@ impl AbstractObject {
     pub fn set_upper_index_bound(&mut self, upper_bound: BitvectorDomain) {
         let inner = Arc::make_mut(&mut self.inner);
         inner.upper_index_bound = upper_bound;
+    }
+
+    /// Add an offset to the upper index bound that is still considered to be contained in the abstract object.
+    pub fn add_to_upper_index_bound(&mut self, offset: i64) {
+        let inner = Arc::make_mut(&mut self.inner);
+        let offset =
+            Bitvector::from_i64(offset).into_resize_signed(inner.upper_index_bound.bytesize());
+        inner.upper_index_bound = inner.upper_index_bound.clone() + offset.into();
     }
 
     /// Get the state of the memory object.
@@ -191,6 +199,80 @@ impl AbstractObject {
                 inner.state = ObjectState::Unknown;
                 Ok(())
             }
+        }
+    }
+
+    /// Overwrite the values in `self` with those in `other`
+    /// under the assumption that the zero offset in `other` corresponds to the offset `offset_other` in `self`.
+    ///
+    /// If `self` is not a unique memory object or if `offset_other` is not a precisely known offset,
+    /// then the function tries to merge `self` and `other`,
+    /// since we do not exactly know which values of `self` were overwritten by `other`.
+    ///
+    /// All values of `self` are marked as possibly overwritten, i.e. `Top`,
+    /// but they are only deleted if they intersect a non-`Top` value of `other`.
+    /// This approximates the fact that we currently do not track exactly which indices
+    /// in `other` were overwritten with a `Top` element and which indices simply were not
+    /// accessed at all in `other`.
+    ///
+    /// The upper and lower index bounds of `self` are kept and not overwritten.
+    pub fn overwrite_with(&mut self, other: &AbstractObject, offset_other: &ValueDomain) {
+        if let Ok(obj_offset) = offset_other.try_to_offset() {
+            if self.inner.is_unique {
+                let inner = Arc::make_mut(&mut self.inner);
+                // Overwrite values in the memory region of self with those of other.
+                inner.memory.mark_all_values_as_top();
+                for (elem_offset, elem) in other.inner.memory.iter() {
+                    inner
+                        .memory
+                        .insert_at_byte_index(elem.clone(), obj_offset + elem_offset);
+                }
+                // Merge all other properties with those of other.
+                inner.is_unique &= other.inner.is_unique;
+                inner.state = inner.state.merge(other.inner.state);
+                inner
+                    .pointer_targets
+                    .append(&mut other.inner.pointer_targets.clone());
+                // TODO: We should log cases where the index bounds are violated by `other`.
+            } else {
+                let inner = Arc::make_mut(&mut self.inner);
+                let mut other = other.clone();
+                let other_inner = Arc::make_mut(&mut other.inner);
+                other_inner.memory.add_offset_to_all_indices(obj_offset);
+
+                inner.memory = inner.memory.merge(&other_inner.memory);
+                inner.is_unique &= other.inner.is_unique;
+                inner.state = inner.state.merge(other.inner.state);
+                inner
+                    .pointer_targets
+                    .append(&mut other.inner.pointer_targets.clone());
+                // TODO: We should log cases where the index bounds are violated by `other`.
+            }
+        } else {
+            let inner = Arc::make_mut(&mut self.inner);
+            inner.memory.mark_all_values_as_top();
+            inner.is_unique &= other.inner.is_unique;
+            inner.state = inner.state.merge(other.inner.state);
+            inner
+                .pointer_targets
+                .append(&mut other.inner.pointer_targets.clone());
+        }
+    }
+
+    /// Add an offset to all values contained in the abstract object.
+    /// The offset is also added to the lower and upper index bounds.
+    pub fn add_offset_to_all_indices(&mut self, offset: &ValueDomain) {
+        let inner = Arc::make_mut(&mut self.inner);
+        if let Ok(offset) = offset.try_to_offset() {
+            inner.memory.add_offset_to_all_indices(offset);
+            let offset =
+                Bitvector::from_i64(offset).into_resize_signed(inner.lower_index_bound.bytesize());
+            inner.lower_index_bound = inner.lower_index_bound.clone() + offset.clone().into();
+            inner.upper_index_bound = inner.upper_index_bound.clone() + offset.into();
+        } else {
+            inner.memory = MemRegion::new(inner.memory.get_address_bytesize());
+            inner.lower_index_bound = inner.lower_index_bound.top();
+            inner.upper_index_bound = inner.upper_index_bound.top();
         }
     }
 }

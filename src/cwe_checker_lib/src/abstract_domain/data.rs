@@ -78,6 +78,26 @@ impl<T: RegisterDomain> DataDomain<T> {
         }
     }
 
+    /// Replace all abstract IDs in self with the corresponding values given by the `replacement_map`.
+    ///
+    /// For IDs without a replacement value the `contains_top_values` flag will be set.
+    pub fn replace_all_ids(&mut self, replacement_map: &BTreeMap<AbstractIdentifier, Self>) {
+        let mut new_self = DataDomain {
+            size: self.size,
+            relative_values: BTreeMap::new(),
+            absolute_value: self.absolute_value.clone(),
+            contains_top_values: self.contains_top_values,
+        };
+        for (id, offset) in self.relative_values.iter() {
+            if let Some(replacement_value) = replacement_map.get(id) {
+                new_self = new_self.merge(&(replacement_value.clone() + offset.clone().into()));
+            } else {
+                new_self.contains_top_values = true;
+            }
+        }
+        *self = new_self;
+    }
+
     /// Return an iterator over all referenced abstract IDs.
     pub fn referenced_ids(&self) -> impl Iterator<Item = &AbstractIdentifier> {
         self.relative_values.keys()
@@ -262,14 +282,33 @@ mod tests {
         let mut targets = BTreeMap::new();
         targets.insert(new_id("Rax"), bv(1));
         targets.insert(new_id("Rbx"), bv(2));
-        let mut data = DataDomain::mock_from_target_map(targets);
+        targets.insert(new_id("Rcx"), bv(3));
+        // Test replacing exactly one ID.
+        let mut data = DataDomain::mock_from_target_map(targets.clone());
         data.replace_abstract_id(&new_id("Rbx"), &new_id("replaced_Rbx"), &bv(10));
-        assert_eq!(data.relative_values.len(), 2);
+        assert_eq!(data.relative_values.len(), 3);
         assert_eq!(*data.relative_values.get(&new_id("Rax")).unwrap(), bv(1));
         assert_eq!(
             *data.relative_values.get(&new_id("replaced_Rbx")).unwrap(),
             bv(12)
         );
+        // Test replacing all IDs using a replacement map.
+        let mut data = DataDomain::mock_from_target_map(targets);
+        let replacement_map = BTreeMap::from_iter([
+            (
+                new_id("Rax"),
+                DataDomain::from_target(new_id("replaced_Rax"), bv(0)),
+            ),
+            (new_id("Rbx"), bv(10).into()),
+        ]);
+        data.replace_all_ids(&replacement_map);
+        assert_eq!(data.relative_values.len(), 1);
+        assert_eq!(
+            *data.relative_values.get(&new_id("replaced_Rax")).unwrap(),
+            bv(1)
+        );
+        assert!(data.contains_top());
+        assert_eq!(data.absolute_value.unwrap(), bv(12));
     }
 
     #[test]

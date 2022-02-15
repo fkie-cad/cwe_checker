@@ -107,18 +107,6 @@ impl<T: AbstractDomain + SizedDomain + HasTop + std::fmt::Debug> MemRegion<T> {
         }
     }
 
-    /// Clear all values that might be fully or partially overwritten if one writes a value with byte size `value_size`
-    /// to an offset contained in the interval from `start` to `end` (both bounds included in the interval).
-    ///
-    /// This represents the effect of writing arbitrary values (with known byte size)
-    /// to arbitrary offsets contained in the interval.
-    /// Note that if one only wants to mark values in the interval as potentially overwritten without deleting them,
-    /// then one should use the [`MemRegion::mark_interval_values_as_top`] method instead.
-    pub fn clear_offset_interval(&mut self, start: i64, end: i64, value_size: ByteSize) {
-        let size = end - start + (u64::from(value_size) as i64);
-        self.clear_interval(start, size);
-    }
-
     /// Add a value to the memory region.
     pub fn add(&mut self, value: T, position: Bitvector) {
         assert_eq!(
@@ -257,6 +245,19 @@ impl<T: AbstractDomain + SizedDomain + HasTop + std::fmt::Debug> MemRegion<T> {
             *value = value.merge(&value.top());
         }
         self.clear_top_values();
+    }
+
+    /// Add the given offset to the indices of all values contained in the memory region.
+    pub fn add_offset_to_all_indices(&mut self, offset: i64) {
+        if offset == 0 {
+            return;
+        }
+        let mut new_values = BTreeMap::new();
+        for (index, value) in self.inner.values.iter() {
+            new_values.insert(*index + offset, value.clone());
+        }
+        let inner = Arc::make_mut(&mut self.inner);
+        inner.values = new_values;
     }
 
     /// Merge two memory regions.

@@ -13,7 +13,7 @@ impl AbstractObjectList {
     /// even if their state is unknown and `report_unknown_states` is `true`.
     pub fn is_dangling_pointer(&self, address: &Data, report_unknown_states: bool) -> bool {
         for id in address.referenced_ids() {
-            if let Some((object, _offset_id)) = self.objects.get(id) {
+            if let Some(object) = self.objects.get(id) {
                 match (report_unknown_states, object.get_state()) {
                     (_, ObjectState::Dangling) => return true,
                     (true, ObjectState::Unknown) => {
@@ -34,7 +34,7 @@ impl AbstractObjectList {
     /// as flagged.
     pub fn mark_dangling_pointer_targets_as_flagged(&mut self, address: &Data) {
         for id in address.referenced_ids() {
-            let (object, _) = self.objects.get_mut(id).unwrap();
+            let object = self.objects.get_mut(id).unwrap();
             if matches!(
                 object.get_state(),
                 ObjectState::Unknown | ObjectState::Dangling
@@ -69,11 +69,8 @@ impl AbstractObjectList {
             }
         }
         for (id, offset) in address.get_relative_values() {
-            if let Some((object, base_offset)) = self.objects.get(id) {
-                let adjusted_offset = offset.clone() + base_offset.clone();
-                if !adjusted_offset.is_top()
-                    && !object.access_contained_in_bounds(&adjusted_offset, size)
-                {
+            if let Some(object) = self.objects.get(id) {
+                if !object.access_contained_in_bounds(offset, size) {
                     return true;
                 }
             }
@@ -86,8 +83,9 @@ impl AbstractObjectList {
     ///
     /// Any `bound` value other than a constant bitvector is interpreted as the memory object not having a lower bound.
     pub fn set_lower_index_bound(&mut self, object_id: &AbstractIdentifier, bound: &ValueDomain) {
-        let (object, base_offset) = self.objects.get_mut(object_id).unwrap();
-        let bound = (bound.clone() + base_offset.clone())
+        let object = self.objects.get_mut(object_id).unwrap();
+        let bound = bound
+            .clone()
             .try_to_bitvec()
             .map(|bitvec| bitvec.into())
             .unwrap_or_else(|_| BitvectorDomain::new_top(bound.bytesize()));
@@ -99,8 +97,9 @@ impl AbstractObjectList {
     ///
     /// Any `bound` value other than a constant bitvector is interpreted as the memory object not having an upper bound.
     pub fn set_upper_index_bound(&mut self, object_id: &AbstractIdentifier, bound: &ValueDomain) {
-        let (object, base_offset) = self.objects.get_mut(object_id).unwrap();
-        let bound = (bound.clone() + base_offset.clone())
+        let object = self.objects.get_mut(object_id).unwrap();
+        let bound = bound
+            .clone()
             .try_to_bitvec()
             .map(|bitvec| bitvec.into())
             .unwrap_or_else(|_| BitvectorDomain::new_top(bound.bytesize()));
@@ -117,14 +116,17 @@ impl AbstractObjectList {
     ) -> Result<(), Vec<(AbstractIdentifier, Error)>> {
         let ids: Vec<AbstractIdentifier> = object_pointer.referenced_ids().cloned().collect();
         let mut possible_double_free_ids = Vec::new();
-        if ids.len() > 1 {
+        if ids.len() > 1
+            || object_pointer.contains_top()
+            || object_pointer.get_absolute_value().is_some()
+        {
             for id in ids {
-                if let Err(error) = self.objects.get_mut(&id).unwrap().0.mark_as_maybe_freed() {
+                if let Err(error) = self.objects.get_mut(&id).unwrap().mark_as_maybe_freed() {
                     possible_double_free_ids.push((id.clone(), error));
                 }
             }
         } else if let Some(id) = ids.get(0) {
-            if let Err(error) = self.objects.get_mut(id).unwrap().0.mark_as_freed() {
+            if let Err(error) = self.objects.get_mut(id).unwrap().mark_as_freed() {
                 possible_double_free_ids.push((id.clone(), error));
             }
         }

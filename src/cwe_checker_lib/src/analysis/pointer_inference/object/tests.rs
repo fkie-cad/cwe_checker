@@ -1,6 +1,6 @@
-use crate::intermediate_representation::Variable;
-
 use super::*;
+use crate::intermediate_representation::Variable;
+use std::collections::BTreeMap;
 
 fn new_abstract_object() -> AbstractObject {
     let inner = Inner {
@@ -75,45 +75,6 @@ fn abstract_object() {
 }
 
 #[test]
-fn replace_id() {
-    use std::collections::BTreeMap;
-    let mut object = new_abstract_object();
-    let mut target_map = BTreeMap::new();
-    target_map.insert(new_id("time_1", "RAX"), bv(20));
-    target_map.insert(new_id("time_234", "RAX"), bv(30));
-    target_map.insert(new_id("time_1", "RBX"), bv(40));
-    let pointer = DataDomain::mock_from_target_map(target_map.clone());
-    object.set_value(pointer, &bv(-15)).unwrap();
-    assert_eq!(object.get_referenced_ids_overapproximation().len(), 3);
-
-    object.replace_abstract_id(
-        &new_id("time_1", "RAX"),
-        &new_id("time_234", "RAX"),
-        &bv(10),
-    );
-    target_map.remove(&new_id("time_1", "RAX"));
-    let modified_pointer = DataDomain::mock_from_target_map(target_map);
-    assert_eq!(
-        object.get_value(Bitvector::from_i64(-15), ByteSize::new(8)),
-        modified_pointer
-    );
-
-    object.replace_abstract_id(
-        &new_id("time_1", "RBX"),
-        &new_id("time_234", "RBX"),
-        &bv(10),
-    );
-    let mut target_map = BTreeMap::new();
-    target_map.insert(new_id("time_234", "RAX"), bv(30));
-    target_map.insert(new_id("time_234", "RBX"), bv(50));
-    let modified_pointer = DataDomain::mock_from_target_map(target_map);
-    assert_eq!(
-        object.get_value(Bitvector::from_i64(-15), ByteSize::new(8)),
-        modified_pointer
-    );
-}
-
-#[test]
 fn remove_ids() {
     use std::collections::BTreeMap;
     let mut object = new_abstract_object();
@@ -144,4 +105,54 @@ fn access_contained_in_bounds() {
     assert!(!object.access_contained_in_bounds(&IntervalDomain::mock(-1, -1), ByteSize::new(8)));
     assert!(object.access_contained_in_bounds(&IntervalDomain::mock(92, 92), ByteSize::new(8)));
     assert!(!object.access_contained_in_bounds(&IntervalDomain::mock(93, 93), ByteSize::new(8)));
+}
+
+#[test]
+fn overwrite_with() {
+    let mut object = new_abstract_object();
+    object.set_value(bv(1).into(), &bv(0).into()).unwrap();
+    object.set_value(bv(2).into(), &bv(8).into()).unwrap();
+    let mut other_object = new_abstract_object();
+    other_object.set_value(bv(3).into(), &bv(0).into()).unwrap();
+    other_object.set_value(bv(4).into(), &bv(8).into()).unwrap();
+
+    object.overwrite_with(&other_object, &bv(8).into());
+
+    let mut expected_result = new_abstract_object();
+    let mut data: Data = bv(1).into();
+    data.set_contains_top_flag();
+    expected_result.set_value(data, &bv(0).into()).unwrap();
+    expected_result
+        .set_value(bv(3).into(), &bv(8).into())
+        .unwrap();
+    expected_result
+        .set_value(bv(4).into(), &bv(16).into())
+        .unwrap();
+
+    assert_eq!(object, expected_result);
+}
+
+#[test]
+fn replace_ids() {
+    let set_value = |object: &mut AbstractObject, tid: &str, register: &str, offset: i64| {
+        object
+            .set_value(
+                Data::from_target(new_id(tid, register), bv(0).into()),
+                &bv(offset).into(),
+            )
+            .unwrap();
+    };
+    let mut object = new_abstract_object();
+    set_value(&mut object, "before", "RAX", 0);
+    set_value(&mut object, "before", "RBX", 8);
+    let mut replacement_map = BTreeMap::new();
+    replacement_map.insert(
+        new_id("before", "RAX"),
+        Data::from_target(new_id("after", "RCX"), bv(0).into()),
+    );
+    let mut expected_result = new_abstract_object();
+    set_value(&mut expected_result, "after", "RCX", 0);
+
+    object.replace_ids(&replacement_map);
+    assert_eq!(object, expected_result);
 }

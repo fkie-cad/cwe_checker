@@ -145,6 +145,15 @@ impl MemorySegment {
 }
 
 impl RuntimeMemoryImage {
+    /// Generate a runtime memory image containing no memory segments.
+    /// Primarily useful in situations where any access to global memory would be an error.
+    pub fn empty(is_little_endian: bool) -> RuntimeMemoryImage {
+        RuntimeMemoryImage {
+            memory_segments: Vec::new(),
+            is_little_endian,
+        }
+    }
+
     /// Generate a runtime memory image for a given binary.
     ///
     /// The function can parse ELF and PE files as input.

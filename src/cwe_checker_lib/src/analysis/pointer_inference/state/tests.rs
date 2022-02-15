@@ -1,5 +1,8 @@
+use super::super::ValueDomain;
 use super::*;
+use crate::analysis::pointer_inference::object::*;
 use crate::utils::binary::RuntimeMemoryImage;
+use Expression::*;
 
 fn bv(value: i64) -> ValueDomain {
     ValueDomain::from(Bitvector::from_i64(value))
@@ -34,8 +37,6 @@ fn reg_sub(name: &str, value: i64) -> Expression {
 
 #[test]
 fn state() {
-    use crate::analysis::pointer_inference::object::*;
-    use Expression::*;
     let global_memory = RuntimeMemoryImage::mock();
     let mut state = State::new(&register("RSP"), Tid::new("time0"));
     let stack_id = new_id("time0", "RSP");
@@ -60,85 +61,31 @@ fn state() {
     other_state.register.insert(register("RBX"), bv(35).into());
     let merged_state = state.merge(&other_state);
     assert_eq!(merged_state.register[&register("RAX")], bv(42).into());
-    assert_eq!(merged_state.register.get(&register("RBX")), None);
+    assert_eq!(
+        merged_state
+            .get_register(&register("RBX"))
+            .get_absolute_value()
+            .unwrap(),
+        &bv(35).into()
+    );
+    assert!(merged_state.get_register(&register("RBX")).contains_top());
     assert!(merged_state
         .load_value(&Var(register("RSP")), ByteSize::new(8), &global_memory)
         .unwrap()
         .contains_top());
 
-    // Test pointer adjustment on reads
     state.memory.add_abstract_object(
-        new_id("time0", "caller"),
-        bv(0),
-        ObjectType::Stack,
+        new_id("heap_time", "heap_obj"),
         ByteSize::new(8),
+        Some(ObjectType::Heap),
     );
-    state.caller_stack_ids.insert(new_id("time0", "caller"));
-    state
-        .store_value(&stack_addr, &bv(15).into(), &global_memory)
-        .unwrap();
-    assert_eq!(
-        state.memory.get_value(
-            &Data::from_target(new_id("time0", "caller"), bv(8)),
-            ByteSize::new(8)
-        ),
-        bv(15).into()
-    );
-    assert_eq!(
-        state
-            .load_value(&Var(register("RSP")), ByteSize::new(8), &global_memory)
-            .unwrap(),
-        bv(15).into()
-    );
-
-    // Test replace_abstract_id
-    let pointer = Data::from_target(stack_id.clone(), bv(-16));
-    state.register.insert(register("RSP"), pointer.clone());
-    state
-        .store_value(&pointer, &bv(7).into(), &global_memory)
-        .unwrap();
-    assert_eq!(
-        state
-            .load_value(&Var(register("RSP")), ByteSize::new(8), &global_memory)
-            .unwrap(),
-        bv(7).into()
-    );
-    state.replace_abstract_id(&stack_id, &new_id("time0", "callee"), &bv(-8));
-    assert_eq!(
-        state
-            .load_value(&Var(register("RSP")), ByteSize::new(8), &global_memory)
-            .unwrap(),
-        bv(7).into()
-    );
-    assert_eq!(
-        state.memory.get_value(
-            &Data::from_target(new_id("time0", "callee"), bv(-8)),
-            ByteSize::new(8)
-        ),
-        bv(7).into()
-    );
-    assert_eq!(
-        state.memory.get_value(
-            &Data::from_target(new_id("time0", "callee"), bv(-16)),
-            ByteSize::new(8)
-        ),
-        Data::new_top(ByteSize::new(8))
-    );
-
-    state.memory.add_abstract_object(
-        new_id("time0", "heap_obj"),
-        bv(0),
-        ObjectType::Heap,
-        ByteSize::new(8),
-    );
-    assert_eq!(state.memory.get_num_objects(), 3);
-    state.remove_unreferenced_objects();
     assert_eq!(state.memory.get_num_objects(), 2);
+    state.remove_unreferenced_objects();
+    assert_eq!(state.memory.get_num_objects(), 1);
 }
 
 #[test]
 fn handle_store() {
-    use Expression::*;
     let global_memory = RuntimeMemoryImage::mock();
     let mut state = State::new(&register("RSP"), Tid::new("time0"));
     let stack_id = new_id("time0", "RSP");
@@ -202,61 +149,7 @@ fn handle_store() {
 }
 
 #[test]
-fn handle_caller_stack_stores() {
-    use super::super::object::ObjectType;
-    use Expression::*;
-    let global_memory = RuntimeMemoryImage::mock();
-    let mut state = State::new(&register("RSP"), Tid::new("time0"));
-    state.memory.add_abstract_object(
-        new_id("caller1", "RSP"),
-        bv(0),
-        ObjectType::Stack,
-        ByteSize::new(8),
-    );
-    state.memory.add_abstract_object(
-        new_id("caller2", "RSP"),
-        bv(0),
-        ObjectType::Stack,
-        ByteSize::new(8),
-    );
-    state.caller_stack_ids.insert(new_id("caller1", "RSP"));
-    state.caller_stack_ids.insert(new_id("caller2", "RSP"));
-    // store something on the caller stack
-    state
-        .handle_store(
-            &reg_add("RSP", 8),
-            &Const(Bitvector::from_i64(42)),
-            &global_memory,
-        )
-        .unwrap();
-    // check that it was saved in all caller objects and not on the callee stack object
-    let pointer = Data::from_target(new_id("time0", "RSP"), bv(8));
-    assert_eq!(
-        state.memory.get_value(&pointer, ByteSize::new(8)),
-        Data::new_top(ByteSize::new(8))
-    );
-    let pointer = Data::from_target(new_id("caller1", "RSP"), bv(8));
-    assert_eq!(
-        state.memory.get_value(&pointer, ByteSize::new(8)),
-        bv(42).into()
-    );
-    let pointer = Data::from_target(new_id("caller2", "RSP"), bv(8));
-    assert_eq!(
-        state.memory.get_value(&pointer, ByteSize::new(8)),
-        bv(42).into()
-    );
-    // accessing through a positive stack register offset should yield the value of the caller stacks
-    assert_eq!(
-        state
-            .load_value(&reg_add("RSP", 8), ByteSize::new(8), &global_memory)
-            .unwrap(),
-        bv(42).into()
-    );
-}
-
-#[test]
 fn clear_parameters_on_the_stack_on_extern_calls() {
-    use Expression::*;
     let global_memory = RuntimeMemoryImage::mock();
     let mut state = State::new(&register("RSP"), Tid::new("time0"));
     state.register.insert(
@@ -305,59 +198,6 @@ fn clear_parameters_on_the_stack_on_extern_calls() {
 }
 
 #[test]
-fn merge_callee_stack_to_caller_stack() {
-    use super::super::object::ObjectType;
-    let mut state = State::new(&register("RSP"), Tid::new("callee"));
-    state.memory.add_abstract_object(
-        new_id("callsite", "RSP"),
-        bv(52),
-        ObjectType::Stack,
-        ByteSize::new(8),
-    );
-    state.caller_stack_ids.insert(new_id("callsite", "RSP"));
-    // check the state before merging to the caller stack
-    assert_eq!(
-        state.register.get(&register("RSP")).unwrap(),
-        &Data::from_target(new_id("callee", "RSP"), bv(0))
-    );
-    assert_eq!(state.memory.get_all_object_ids().len(), 2);
-    // check state after merging to the caller stack
-    state.merge_callee_stack_to_caller_stack(
-        &new_id("callee", "RSP"),
-        &new_id("callsite", "RSP"),
-        &bv(-52),
-    );
-    assert_eq!(
-        state.register.get(&register("RSP")).unwrap(),
-        &Data::from_target(new_id("callsite", "RSP"), bv(52))
-    );
-    assert_eq!(state.memory.get_all_object_ids().len(), 1);
-}
-
-#[test]
-fn remove_and_restore_callee_saved_register() {
-    let mut state = State::new(&register("RSP"), Tid::new("func_tid"));
-    let value: Data = Bitvector::from_u64(42).into();
-    let cconv = CallingConvention::mock_x64();
-    state.set_register(&register("RBP"), value.clone());
-    state.set_register(&register("RAX"), value.clone());
-
-    let mut callee_state = state.clone();
-    callee_state.remove_callee_saved_register(&cconv);
-    assert_eq!(
-        callee_state.get_register(&register("RBP")),
-        Data::new_top(ByteSize::new(8))
-    );
-    assert_eq!(callee_state.get_register(&register("RAX")), value.clone());
-
-    let other_value: Data = Bitvector::from_u64(13).into();
-    callee_state.set_register(&register("RAX"), other_value.clone());
-    callee_state.restore_callee_saved_register(&state, &cconv, &register("RSP"));
-    assert_eq!(callee_state.get_register(&register("RBP")), value);
-    assert_eq!(callee_state.get_register(&register("RAX")), other_value);
-}
-
-#[test]
 fn reachable_ids_under_and_overapproximation() {
     let global_memory = RuntimeMemoryImage::mock();
     let mut state = State::new(&register("RSP"), Tid::new("func_tid"));
@@ -366,12 +206,9 @@ fn reachable_ids_under_and_overapproximation() {
     let stack_address: Data = Data::from_target(stack_id.clone(), Bitvector::from_i64(-8).into());
     let heap_address: Data = Data::from_target(heap_id.clone(), Bitvector::from_i64(0).into());
     // Add the heap object to the state, so that it can be recursively searched.
-    state.memory.add_abstract_object(
-        heap_id.clone(),
-        Bitvector::from_i64(0).into(),
-        crate::analysis::pointer_inference::object::ObjectType::Heap,
-        ByteSize::new(8),
-    );
+    state
+        .memory
+        .add_abstract_object(heap_id.clone(), ByteSize::new(8), Some(ObjectType::Heap));
 
     state
         .store_value(&stack_address, &heap_address, &global_memory)
@@ -998,26 +835,14 @@ fn specialize_by_unsigned_comparison_op() {
 }
 
 #[test]
-fn stack_pointer_with_nonnegative_offset() {
-    let state = State::new(&register("RSP"), Tid::new("func_tid"));
-    let pointer = Data::from_target(state.stack_id.clone(), Bitvector::from_i64(-1).into());
-    assert!(!state.is_stack_pointer_with_nonnegative_offset(&pointer));
-    let pointer = Data::from_target(state.stack_id.clone(), Bitvector::from_i64(5).into());
-    assert!(state.is_stack_pointer_with_nonnegative_offset(&pointer));
-    let pointer = Data::from_target(state.stack_id.clone(), IntervalDomain::mock(2, 3));
-    assert!(!state.is_stack_pointer_with_nonnegative_offset(&pointer)); // The offset is not a constant
-}
-
-#[test]
 fn out_of_bounds_access_recognition() {
     let mut state = State::new(&register("RSP"), Tid::new("func_tid"));
     let global_data = RuntimeMemoryImage::mock();
     let heap_obj_id = new_id("heap_malloc", "RAX");
     state.memory.add_abstract_object(
         heap_obj_id.clone(),
-        Bitvector::from_u64(0).into(),
-        crate::analysis::pointer_inference::object::ObjectType::Heap,
         ByteSize::new(8),
+        Some(ObjectType::Heap),
     );
     state
         .memory
@@ -1050,7 +875,7 @@ fn out_of_bounds_access_recognition() {
     let address = Data::from_target(heap_obj_id.clone(), Bitvector::from_u64(1).into());
     state.set_register(&Variable::mock("RAX", 8), address);
     assert!(state.contains_out_of_bounds_mem_access(&load_def.term, &global_data));
-    let address = Data::from_target(state.stack_id.clone(), Bitvector::from_u64(8).into());
+    let address = Data::from_target(state.stack_id.clone(), Bitvector::from_i64(-8).into());
     state.set_register(&Variable::mock("RAX", 8), address);
     assert!(!state.contains_out_of_bounds_mem_access(&load_def.term, &global_data));
 }
@@ -1119,11 +944,81 @@ fn test_check_def_for_null_dereferences() {
 }
 
 #[test]
-fn test_new_with_generic_parameter_objects() {
-    let params = vec![Variable::mock("param1", 8), Variable::mock("param2", 8)];
-    let state =
-        State::new_with_generic_parameter_objects(&register("RSP"), Tid::new("func_tid"), &params);
-    assert_eq!(state.memory.get_num_objects(), 3);
-    assert!(!state.get_register(&Variable::mock("param1", 8)).is_top());
-    assert!(!state.get_register(&Variable::mock("param1", 8)).is_top());
+fn from_fn_sig() {
+    let fn_sig = FunctionSignature::mock_x64();
+    let state = State::from_fn_sig(&fn_sig, &Variable::mock("RSP", 8), Tid::new("func"));
+
+    assert_eq!(state.memory.get_num_objects(), 2);
+    assert_eq!(
+        *state.memory.get_object(&new_id("func", "RSI")).unwrap(),
+        AbstractObject::new(None, ByteSize::new(8))
+    );
+    assert_eq!(
+        state.get_register(&Variable::mock("RSP", 8)),
+        Data::from_target(new_id("func", "RSP"), bv(0).into())
+    );
+    assert_eq!(
+        state.get_register(&Variable::mock("RDI", 8)),
+        Data::from_target(new_id("func", "RDI"), bv(0).into())
+    );
+    assert_eq!(
+        state.get_register(&Variable::mock("RSI", 8)),
+        Data::from_target(new_id("func", "RSI"), bv(0).into())
+    );
+}
+
+#[test]
+fn add_param_object_from_callee() {
+    let global_memory = RuntimeMemoryImage::empty(true);
+    let mut generic_state = State::new(&Variable::mock("RSP", 8), Tid::new("func"));
+    generic_state
+        .write_to_address(
+            &Expression::Var(Variable::mock("RSP", 8)).plus_const(-8),
+            &bv(1).into(),
+            &global_memory,
+        )
+        .unwrap();
+    let mut param_object = AbstractObject::new(None, ByteSize::new(8));
+    param_object.set_value(bv(2).into(), &bv(0).into()).unwrap();
+    let mut param_value = Data::from_target(new_id("func", "RSP"), bv(-16).into());
+
+    // Testcase 1: param object is unique
+    let mut state = generic_state.clone();
+    state
+        .add_param_object_from_callee(param_object.clone(), &param_value)
+        .unwrap();
+    let value = state
+        .load_value(
+            &Expression::Var(Variable::mock("RSP", 8)).plus_const(-8),
+            ByteSize::new(8),
+            &global_memory,
+        )
+        .unwrap();
+    assert_eq!(value.get_absolute_value().unwrap(), &bv(1).into());
+    assert!(value.contains_top());
+    let value = state
+        .load_value(
+            &Expression::Var(Variable::mock("RSP", 8)).plus_const(-16),
+            ByteSize::new(8),
+            &global_memory,
+        )
+        .unwrap();
+    assert_eq!(value.get_absolute_value().unwrap(), &bv(2).into());
+    assert!(!value.contains_top());
+
+    // Testcase 2: param object is not unique
+    let mut state = generic_state.clone();
+    param_value.set_contains_top_flag();
+    state
+        .add_param_object_from_callee(param_object.clone(), &param_value)
+        .unwrap();
+    let value = state
+        .load_value(
+            &Expression::Var(Variable::mock("RSP", 8)).plus_const(-16),
+            ByteSize::new(8),
+            &global_memory,
+        )
+        .unwrap();
+    assert_eq!(value.get_absolute_value().unwrap(), &bv(2).into());
+    assert!(value.contains_top());
 }
