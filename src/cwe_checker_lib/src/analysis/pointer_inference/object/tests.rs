@@ -75,45 +75,6 @@ fn abstract_object() {
 }
 
 #[test]
-fn replace_id() {
-    use std::collections::BTreeMap;
-    let mut object = new_abstract_object();
-    let mut target_map = BTreeMap::new();
-    target_map.insert(new_id("time_1", "RAX"), bv(20));
-    target_map.insert(new_id("time_234", "RAX"), bv(30));
-    target_map.insert(new_id("time_1", "RBX"), bv(40));
-    let pointer = DataDomain::mock_from_target_map(target_map.clone());
-    object.set_value(pointer, &bv(-15)).unwrap();
-    assert_eq!(object.get_referenced_ids_overapproximation().len(), 3);
-
-    object.replace_abstract_id(
-        &new_id("time_1", "RAX"),
-        &new_id("time_234", "RAX"),
-        &bv(10),
-    );
-    target_map.remove(&new_id("time_1", "RAX"));
-    let modified_pointer = DataDomain::mock_from_target_map(target_map);
-    assert_eq!(
-        object.get_value(Bitvector::from_i64(-15), ByteSize::new(8)),
-        modified_pointer
-    );
-
-    object.replace_abstract_id(
-        &new_id("time_1", "RBX"),
-        &new_id("time_234", "RBX"),
-        &bv(10),
-    );
-    let mut target_map = BTreeMap::new();
-    target_map.insert(new_id("time_234", "RAX"), bv(30));
-    target_map.insert(new_id("time_234", "RBX"), bv(50));
-    let modified_pointer = DataDomain::mock_from_target_map(target_map);
-    assert_eq!(
-        object.get_value(Bitvector::from_i64(-15), ByteSize::new(8)),
-        modified_pointer
-    );
-}
-
-#[test]
 fn remove_ids() {
     use std::collections::BTreeMap;
     let mut object = new_abstract_object();

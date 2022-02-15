@@ -4,12 +4,8 @@
 use super::*;
 
 impl AbstractObjectList {
-    /// Remove the memory object that `object_id` points to from the object list.
-    pub fn remove_object(&mut self, object_id: &AbstractIdentifier) {
-        self.objects.remove(object_id);
-    }
-
     /// Get a reference to the object corresponding to the given ID.
+    #[cfg(test)]
     pub fn get_object(&self, id: &AbstractIdentifier) -> Option<&AbstractObject> {
         self.objects.get(id)
     }
@@ -34,7 +30,7 @@ impl AbstractObjectList {
         }
     }
 
-    /// Insert an object to the object list.
+    /// Insert an existing object to the object list.
     /// If the object identifier already exists, the object is marked as non-unique
     /// and merged with the corresponding object already present in the object list.
     pub fn insert(&mut self, id: AbstractIdentifier, object: AbstractObject) {
@@ -72,18 +68,5 @@ impl AbstractObjectList {
     #[cfg(test)]
     pub fn get_num_objects(&self) -> usize {
         self.objects.len()
-    }
-
-    /// Remove the provided IDs as targets from all pointers in all objects.
-    /// Also remove the objects, that these IDs point to.
-    pub fn remove_ids(&mut self, ids_to_remove: &BTreeSet<AbstractIdentifier>) {
-        for id in ids_to_remove {
-            if self.objects.get(id).is_some() {
-                self.objects.remove(id);
-            }
-        }
-        for object in self.objects.values_mut() {
-            object.remove_ids(ids_to_remove);
-        }
     }
 }

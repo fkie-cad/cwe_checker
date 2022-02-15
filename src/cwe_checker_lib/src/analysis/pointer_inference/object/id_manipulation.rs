@@ -19,25 +19,6 @@ impl AbstractObject {
         referenced_ids
     }
 
-    /// For pointer values replace an abstract identifier with another one and add the offset_adjustment to the pointer offsets.
-    /// This is needed to adjust stack pointers on call and return instructions.
-    pub fn replace_abstract_id(
-        &mut self,
-        old_id: &AbstractIdentifier,
-        new_id: &AbstractIdentifier,
-        offset_adjustment: &ValueDomain,
-    ) {
-        let inner = Arc::make_mut(&mut self.inner);
-        for elem in inner.memory.values_mut() {
-            elem.replace_abstract_id(old_id, new_id, offset_adjustment);
-        }
-        inner.memory.clear_top_values();
-        if inner.pointer_targets.get(old_id).is_some() {
-            inner.pointer_targets.remove(old_id);
-            inner.pointer_targets.insert(new_id.clone());
-        }
-    }
-
     /// Remove the provided IDs from the target lists of all pointers in the memory object.
     /// Also remove them from the pointer_targets list.
     ///

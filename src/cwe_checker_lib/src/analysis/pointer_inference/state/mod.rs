@@ -202,41 +202,6 @@ impl State {
         self.memory.mark_mem_object_as_freed(object_pointer)
     }
 
-    /// Remove all virtual register from the state.
-    /// This should only be done in cases where it is known that no virtual registers can be alive.
-    ///
-    /// Example: At the start of a basic block no virtual registers should be alive.
-    pub fn remove_virtual_register(&mut self) {
-        self.register = self
-            .register
-            .iter()
-            .filter(|(register, _value)| !register.is_temp)
-            .map(|(reg, val)| (reg.clone(), val.clone()))
-            .collect();
-    }
-
-    /// Restore the content of callee-saved registers from the caller state
-    /// with the exception of the stack register.
-    ///
-    /// This function does not check what the callee state currently contains in these registers.
-    /// If the callee does not adhere to the given calling convention, this may introduce analysis errors!
-    /// It will also mask cases
-    /// where a callee-saved register was incorrectly modified (e.g. because of a bug in the callee).
-    pub fn restore_callee_saved_register(
-        &mut self,
-        caller_state: &State,
-        cconv: &CallingConvention,
-        stack_register: &Variable,
-    ) {
-        for register in cconv
-            .callee_saved_register
-            .iter()
-            .filter(|reg| *reg != stack_register)
-        {
-            self.set_register(register, caller_state.get_register(register));
-        }
-    }
-
     /// Remove all knowledge about the contents of non-callee-saved registers from the state.
     pub fn remove_non_callee_saved_register(&mut self, cconv: &CallingConvention) {
         let mut callee_saved_register = BTreeMap::new();

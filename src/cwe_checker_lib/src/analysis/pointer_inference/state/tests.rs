@@ -198,25 +198,6 @@ fn clear_parameters_on_the_stack_on_extern_calls() {
 }
 
 #[test]
-fn test_restore_callee_saved_register() {
-    let mut state = State::new(&register("RSP"), Tid::new("func_tid"));
-    let value: Data = Bitvector::from_u64(42).into();
-    let cconv = CallingConvention::mock_x64();
-    state.set_register(&register("RBP"), value.clone());
-
-    let mut state_after_return = State::new(&register("RSP"), Tid::new("func_tid"));
-
-    let other_value: Data = Bitvector::from_u64(13).into();
-    state_after_return.set_register(&register("RAX"), other_value.clone());
-    state_after_return.restore_callee_saved_register(&state, &cconv, &register("RSP"));
-    assert_eq!(state_after_return.get_register(&register("RBP")), value);
-    assert_eq!(
-        state_after_return.get_register(&register("RAX")),
-        other_value
-    );
-}
-
-#[test]
 fn reachable_ids_under_and_overapproximation() {
     let global_memory = RuntimeMemoryImage::mock();
     let mut state = State::new(&register("RSP"), Tid::new("func_tid"));
@@ -851,17 +832,6 @@ fn specialize_by_unsigned_comparison_op() {
         state.get_register(&register("RAX")),
         IntervalDomain::mock_with_bounds(Some(-19), -5, -1, None).into()
     );
-}
-
-#[test]
-fn stack_pointer_with_nonnegative_offset() {
-    let state = State::new(&register("RSP"), Tid::new("func_tid"));
-    let pointer = Data::from_target(state.stack_id.clone(), Bitvector::from_i64(-1).into());
-    assert!(!state.is_stack_pointer_with_nonnegative_offset(&pointer));
-    let pointer = Data::from_target(state.stack_id.clone(), Bitvector::from_i64(5).into());
-    assert!(state.is_stack_pointer_with_nonnegative_offset(&pointer));
-    let pointer = Data::from_target(state.stack_id.clone(), IntervalDomain::mock(2, 3));
-    assert!(!state.is_stack_pointer_with_nonnegative_offset(&pointer)); // The offset is not a constant
 }
 
 #[test]

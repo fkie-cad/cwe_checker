@@ -230,21 +230,6 @@ impl State {
             .is_out_of_bounds_mem_access(&data, ByteSize::new(1), global_data)
     }
 
-    /// Return `true` if `data` is a pointer to the current stack frame with a constant positive address,
-    /// i.e. if it accesses a stack parameter (or the return-to address for x86) of the current function.
-    pub fn is_stack_pointer_with_nonnegative_offset(&self, data: &Data) -> bool {
-        if let Some((target, offset)) = data.get_if_unique_target() {
-            if *target == self.stack_id {
-                if let Ok(offset_val) = offset.try_to_offset() {
-                    if offset_val >= 0 {
-                        return true;
-                    }
-                }
-            }
-        }
-        false
-    }
-
     /// Check whether the given `def` could result in a memory access through a NULL pointer.
     ///
     /// If no NULL pointer dereference is detected then `Ok(false)` is returned.
