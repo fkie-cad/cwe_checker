@@ -70,8 +70,11 @@ impl State {
     ) -> Result<(), Error> {
         if let Some((caller_id, offset)) = param_value_at_call.get_if_unique_target() {
             // The corresponding caller object is unique
-            let caller_object = self.memory.get_object_mut(caller_id).unwrap();
-            caller_object.overwrite_with(&param_object, offset);
+            if let Some(caller_object) = self.memory.get_object_mut(caller_id) {
+                caller_object.overwrite_with(&param_object, offset);
+            } else {
+                return Err(anyhow!("Missing caller memory object"));
+            }
         } else {
             // We cannot exactly identify to which caller object the callee object corresponds.
             for (caller_id, offset) in param_value_at_call.get_relative_values() {
