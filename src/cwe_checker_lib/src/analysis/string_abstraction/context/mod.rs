@@ -52,7 +52,7 @@ pub struct Context<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<
     /// The keys are of the form `(Def-TID, Current-Sub-TID)`
     /// to distinguish the nodes for blocks contained in more than one function.
     pub block_first_def_set: HashSet<(Tid, Tid)>,
-    /// A map to get the node index of the `BlkEnd` node containing a given [`Jmp`].
+    /// A map to get the node index of the `BlkEnd` node containing a given [`Jmp`](crate::intermediate_representation::Jmp).
     /// The keys are of the form `(Jmp-TID, Current-Sub-TID)`
     /// to distinguish the nodes for blocks contained in more than one function.
     pub jmp_to_blk_end_node_map: HashMap<(Tid, Tid), NodeIndex>,
