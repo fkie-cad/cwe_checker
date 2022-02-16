@@ -2,6 +2,18 @@
 ====
 
 -   Add support for analysis of bare-metal binaries (PR #203)
+-   Improve expressiveness of DataDomain (PRs #209, #211)
+-   Add `--statistics` and `--verbose` commandline flags (PRs #210, #216)
+-   Improve handling of MIPS binaries (PR #213)
+-   Sort generated CWE warnings by address (PR #221)
+-   Publish Docker images on ghcr.io in addition to Dockerhub (PR #222, #225)
+-   Correctly classify some CWEs as Null dereferences instead of buffer overflows (PR #226)
+-   Implement abstract domains for strings and rewrite CWE-78 check using them (PR #235)
+-   Updated dependencies (PRs #206, #264, #266, #282)
+-   Implement function signature analysis (PR #267, #277)
+-   Update cwe_checker_to_ida script (PRs #279, #281)
+-   New installer script that can search for the Ghidra installation path for you (PR #278)
+-   Refactor handling of caller stacks in PointerInference analysis (PR #287)
 
 0.5 (2021-07)
 ====
