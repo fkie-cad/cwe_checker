@@ -65,7 +65,7 @@ impl Project {
     }
 
     /// Generate a map from all `Sub` TIDs to the set TIDs of all contained blocks in the `Sub`.
-    /// Used for the [`Project::make_block_to_sub_mapping_unique`] normalization pass,
+    /// Used for the [`make_block_to_sub_mapping_unique`] normalization pass,
     /// as this function assumes that there may exist blocks contained in more than one `Sub`.
     fn generate_sub_tid_to_contained_block_tids_map(
         &self,
@@ -110,7 +110,7 @@ impl Project {
     /// The TIDs of jump and return targets are not adjusted in this function.
     /// The returned map maps the TID of a `Sub` to the newly created blocks for that `Sub`.
     ///
-    /// This function is part of the [`Project::make_block_to_sub_mapping_unique`] normalization pass
+    /// This function is part of the [`make_block_to_sub_mapping_unique`] normalization pass
     /// and should not be used for other purposes.
     fn duplicate_blocks_contained_in_several_subs(
         &self,
@@ -141,7 +141,7 @@ impl Project {
     /// if the target block was duplicated by the [`Project::duplicate_blocks_contained_in_several_subs`] function,
     /// so that the jumps target the correct blocks again.
     ///
-    /// This function is part of the [`Project::make_block_to_sub_mapping_unique`] normalization pass
+    /// This function is part of the [`make_block_to_sub_mapping_unique`] normalization pass
     /// and should not be used for other purposes.
     fn append_jump_targets_with_sub_suffix_when_target_block_was_duplicated(
         &mut self,

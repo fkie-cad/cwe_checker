@@ -1,5 +1,4 @@
-use super::{Def, Jmp};
-use crate::prelude::*;
+use super::*;
 use crate::utils::log::LogMessage;
 use std::collections::HashSet;
 
@@ -34,7 +33,7 @@ pub struct Blk {
     /// this field contains possible jump target addresses for the jump.
     ///
     /// Note that possible targets of indirect calls are *not* contained,
-    /// since the [`Project::make_block_to_sub_mapping_unique`] normalization pass assumes
+    /// since the [`Project` normalization passes](Project::normalize) assume
     /// that only intraprocedural jump targets are contained in this field.
     pub indirect_jmp_targets: Vec<Tid>,
 }
@@ -75,9 +74,9 @@ impl Term<Blk> {
     /// Note that substitution is only possible
     /// if the input variables of the input expression itself did not change since the definition of said variable.
     ///
-    /// The expression propagation allows the [`Project::substitute_trivial_expressions`] normalization pass
+    /// The expression propagation allows the corresponding [`Project` normalization pass](Project::normalize)
     /// to further simplify the generated expressions
-    /// and allows more dead stores to be removed during [dead variable elimination](`crate::analysis::dead_variable_elimination`).
+    /// and allows more dead stores to be removed during [dead variable elimination](crate::analysis::dead_variable_elimination).
     pub fn propagate_input_expressions(&mut self) {
         let mut insertable_expressions = Vec::new();
         for def in self.term.defs.iter_mut() {
@@ -143,7 +142,7 @@ impl Term<Blk> {
     /// Merge subsequent assignments to the same variable to a single assignment to that variable.
     ///
     /// The value expressions of merged assignments can often be simplified later on
-    /// in the [`Project::substitute_trivial_expressions`] normalization pass.
+    /// in the corresponding [`Project` normalization pass](Project::normalize).
     pub fn merge_def_assignments_to_same_var(&mut self) {
         let mut new_defs = Vec::new();
         let mut last_def_opt = None;
