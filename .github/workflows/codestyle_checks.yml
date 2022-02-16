@@ -51,7 +51,7 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
-          components: doc
+          components: rust-docs
       - uses: actions-rs/cargo@v1
         with:
           command: doc
