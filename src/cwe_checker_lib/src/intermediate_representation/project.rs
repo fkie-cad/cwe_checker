@@ -266,6 +266,32 @@ mod tests {
                 datatype_properties: DatatypeProperties::mock(),
             }
         }
+        /// Returns project with x64 calling convention and mocked program.
+        pub fn mock_x64() -> Project {
+            let mut none_cconv_register: Vec<Variable> = vec![
+                "RAX", "RBX", "RSP", "RBP", "R10", "R11", "R12", "R13", "R14", "R15",
+            ]
+            .into_iter()
+            .map(|name| Variable::mock(name, ByteSize::new(8)))
+            .collect();
+            let mut integer_register = CallingConvention::mock_x64().integer_parameter_register;
+            integer_register.append(&mut none_cconv_register);
+
+            let calling_conventions: BTreeMap<String, CallingConvention> =
+                BTreeMap::from([("__stdcall".to_string(), CallingConvention::mock_x64())]);
+
+            Project {
+                program: Term {
+                    tid: Tid::new("program_tid"),
+                    term: Program::mock(),
+                },
+                cpu_architecture: "x86_64".to_string(),
+                stack_pointer_register: Variable::mock("RSP", 8u64),
+                calling_conventions,
+                register_set: integer_register.iter().cloned().collect(),
+                datatype_properties: DatatypeProperties::mock_x64(),
+            }
+        }
     }
 
     #[test]

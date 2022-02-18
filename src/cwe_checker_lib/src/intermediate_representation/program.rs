@@ -37,6 +37,7 @@ impl Program {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
 
     impl Program {
@@ -46,6 +47,50 @@ mod tests {
                 extern_symbols: BTreeMap::new(),
                 entry_points: BTreeSet::new(),
                 address_base_offset: 0,
+            }
+        }
+        /// Returns Program with malloc, free and other_function
+        pub fn mock() -> Program {
+            let malloc = ExternSymbol {
+                tid: Tid::new("malloc"),
+                addresses: vec![],
+                name: "malloc".to_string(),
+                calling_convention: None,
+                parameters: vec![],
+                return_values: vec![],
+                no_return: false,
+                has_var_args: false,
+            };
+            let free = ExternSymbol {
+                tid: Tid::new("free"),
+                addresses: vec![],
+                name: "free".to_string(),
+                calling_convention: None,
+                parameters: vec![],
+                return_values: vec![],
+                no_return: false,
+                has_var_args: false,
+            };
+            let other_function = ExternSymbol {
+                tid: Tid::new("other_function"),
+                addresses: vec![],
+                name: "other_function".to_string(),
+                calling_convention: None,
+                parameters: vec![],
+                return_values: vec![],
+                no_return: false,
+                has_var_args: false,
+            };
+
+            Program {
+                subs: BTreeMap::new(),
+                extern_symbols: BTreeMap::from([
+                    (malloc.tid.clone(), malloc),
+                    (free.tid.clone(), free),
+                    (other_function.tid.clone(), other_function),
+                ]),
+                entry_points: BTreeSet::new(),
+                address_base_offset: 0x1000u64,
             }
         }
     }

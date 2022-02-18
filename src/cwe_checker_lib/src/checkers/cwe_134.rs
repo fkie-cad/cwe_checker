@@ -184,7 +184,7 @@ pub mod tests {
     use super::*;
 
     fn mock_project() -> Project {
-        let mut project = Project::mock_empty();
+        let mut project = Project::mock_x64();
         let mut sub = Sub::mock("func");
         let mut block1 = Blk::mock_with_tid("block1");
         let block2 = Blk::mock_with_tid("block2");
