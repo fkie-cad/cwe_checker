@@ -266,7 +266,7 @@ mod tests {
             Project {
                 program: Term {
                     tid: Tid::new("program_tid"),
-                    term: Program::mock(),
+                    term: Program::mock_x64(),
                 },
                 cpu_architecture: "x86_64".to_string(),
                 stack_pointer_register: Variable::mock("RSP", 8u64),
@@ -301,10 +301,10 @@ mod tests {
             Project {
                 program: Term {
                     tid: Tid::new("program_tid"),
-                    term: Program::mock(),
+                    term: Program::mock_x64(),
                 },
                 cpu_architecture: "arm32".to_string(),
-                stack_pointer_register: Variable::mock("r13", 4u64),
+                stack_pointer_register: Variable::mock("sp", 4u64),
                 calling_conventions: BTreeMap::from([(
                     "__stdcall".to_string(),
                     CallingConvention::mock_arm32(),

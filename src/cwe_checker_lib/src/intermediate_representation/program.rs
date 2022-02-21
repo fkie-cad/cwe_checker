@@ -37,26 +37,26 @@ impl Program {
 
 #[cfg(test)]
 mod tests {
+    use crate::intermediate_representation::{Arg, CallingConvention, Datatype};
+
     use super::*;
 
     impl Program {
-        pub fn mock_empty() -> Program {
-            Program {
-                subs: BTreeMap::new(),
-                extern_symbols: BTreeMap::new(),
-                entry_points: BTreeSet::new(),
-                address_base_offset: 0,
-            }
-        }
         /// Returns Program with malloc, free and other_function
-        pub fn mock() -> Program {
+        pub fn mock_x64() -> Program {
             let malloc = ExternSymbol {
                 tid: Tid::new("malloc"),
                 addresses: vec![],
                 name: "malloc".to_string(),
-                calling_convention: None,
-                parameters: vec![],
-                return_values: vec![],
+                calling_convention: Some("__stdcall".to_string()),
+                parameters: vec![Arg::from_var(
+                    CallingConvention::mock_x64().integer_parameter_register[0].clone(),
+                    Some(Datatype::Integer),
+                )],
+                return_values: vec![Arg::from_var(
+                    CallingConvention::mock_x64().integer_return_register[0].clone(),
+                    Some(Datatype::Pointer),
+                )],
                 no_return: false,
                 has_var_args: false,
             };
@@ -64,8 +64,11 @@ mod tests {
                 tid: Tid::new("free"),
                 addresses: vec![],
                 name: "free".to_string(),
-                calling_convention: None,
-                parameters: vec![],
+                calling_convention: Some("__stdcall".to_string()),
+                parameters: vec![Arg::from_var(
+                    CallingConvention::mock_x64().integer_parameter_register[0].clone(),
+                    Some(Datatype::Pointer),
+                )],
                 return_values: vec![],
                 no_return: false,
                 has_var_args: false,
@@ -91,6 +94,30 @@ mod tests {
                 entry_points: BTreeSet::new(),
                 address_base_offset: 0x1000u64,
             }
+        }
+        /// Returns Program with malloc, free and other_function
+        pub fn mock_arm32() -> Program {
+            // Creates arm32 program by altering x64 program
+            let mut prog = Program::mock_x64();
+            for symbol in prog.extern_symbols.values_mut() {
+                if symbol.name == "malloc".to_string() {
+                    symbol.parameters = vec![Arg::from_var(
+                        CallingConvention::mock_arm32().integer_parameter_register[0].clone(),
+                        Some(Datatype::Integer),
+                    )];
+                    symbol.return_values = vec![Arg::from_var(
+                        CallingConvention::mock_arm32().integer_return_register[0].clone(),
+                        Some(Datatype::Pointer),
+                    )];
+                }
+                if symbol.name == "free".to_string() {
+                    symbol.parameters = vec![Arg::from_var(
+                        CallingConvention::mock_arm32().integer_parameter_register[0].clone(),
+                        Some(Datatype::Pointer),
+                    )];
+                }
+            }
+            prog
         }
     }
 }
