@@ -37,7 +37,6 @@ impl Program {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
     impl Program {
