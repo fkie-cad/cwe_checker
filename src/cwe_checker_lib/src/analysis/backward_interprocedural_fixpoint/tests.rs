@@ -142,18 +142,8 @@ fn mock_program() -> Term<Program> {
 
 #[test]
 fn backward_fixpoint() {
-    let project = Project {
-        program: mock_program(),
-        cpu_architecture: String::from("x86_64"),
-        stack_pointer_register: Variable {
-            name: String::from("RSP"),
-            size: ByteSize::new(8),
-            is_temp: false,
-        },
-        calling_conventions: BTreeMap::new(),
-        register_set: BTreeSet::new(),
-        datatype_properties: DatatypeProperties::mock(),
-    };
+    let mut project = Project::mock_x64();
+    project.program = mock_program();
 
     let mock_con = Context::new(&project);
     let mut computation = create_computation(mock_con.clone(), None);

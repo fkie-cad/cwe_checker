@@ -106,7 +106,7 @@ fn test_parse_format_string_parameters() {
         "%s: Unable to open \'%s\', errno=%d\n",
         "%s %lli",
     ];
-    let properties = DatatypeProperties::mock();
+    let properties = DatatypeProperties::mock_x64();
     let expected_outputs: Vec<Vec<(Datatype, ByteSize)>> = vec![
         vec![
             (Datatype::from("s".to_string()), properties.pointer_size),

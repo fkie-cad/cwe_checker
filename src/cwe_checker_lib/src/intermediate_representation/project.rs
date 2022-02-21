@@ -249,23 +249,6 @@ mod tests {
     use super::*;
 
     impl Project {
-        pub fn mock_empty() -> Project {
-            let register_set = vec!["RAX", "RCX", "RDX", "RBX", "RSP", "RBP", "RSI", "RDI"]
-                .into_iter()
-                .map(|name| Variable::mock(name, ByteSize::new(8)))
-                .collect();
-            Project {
-                program: Term {
-                    tid: Tid::new("program_tid"),
-                    term: Program::mock_empty(),
-                },
-                cpu_architecture: "x86_64".to_string(),
-                stack_pointer_register: Variable::mock("RSP", 8u64),
-                calling_conventions: BTreeMap::new(),
-                register_set,
-                datatype_properties: DatatypeProperties::mock(),
-            }
-        }
         /// Returns project with x64 calling convention and mocked program.
         pub fn mock_x64() -> Project {
             let mut none_cconv_register: Vec<Variable> = vec![
@@ -293,7 +276,7 @@ mod tests {
             }
         }
 
-        pub fn arm32() -> Project {
+        pub fn mock_arm32() -> Project {
             let none_cconv_4byte_register: Vec<Variable> = vec!["r12", "r14", "r15"]
                 .into_iter()
                 .map(|name| Variable::mock(name, ByteSize::new(4)))
