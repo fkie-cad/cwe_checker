@@ -42,82 +42,102 @@ mod tests {
     use super::*;
 
     impl Program {
-        /// Returns Program with malloc, free and other_function
-        pub fn mock_x64() -> Program {
-            let malloc = ExternSymbol {
-                tid: Tid::new("malloc"),
+        /// Returns extern symbol with argument/return register according to calling convention
+        fn create_extern_symbol(
+            name: &str,
+            cconv: CallingConvention,
+            arg_type: Option<Datatype>,
+            return_type: Option<Datatype>,
+        ) -> ExternSymbol {
+            ExternSymbol {
+                tid: Tid::new(name),
                 addresses: vec![],
-                name: "malloc".to_string(),
-                calling_convention: Some("__stdcall".to_string()),
-                parameters: vec![Arg::from_var(
-                    CallingConvention::mock_x64().integer_parameter_register[0].clone(),
-                    Some(Datatype::Integer),
-                )],
-                return_values: vec![Arg::from_var(
-                    CallingConvention::mock_x64().integer_return_register[0].clone(),
-                    Some(Datatype::Pointer),
-                )],
+                name: name.to_string(),
+                calling_convention: Some(cconv.name),
+                parameters: match arg_type {
+                    Some(data_type) => {
+                        vec![Arg::from_var(
+                            cconv.integer_parameter_register[0].clone(),
+                            Some(data_type),
+                        )]
+                    }
+                    None => vec![],
+                },
+                return_values: match return_type {
+                    Some(data_type) => {
+                        vec![Arg::from_var(
+                            cconv.integer_return_register[0].clone(),
+                            Some(data_type),
+                        )]
+                    }
+                    None => vec![],
+                },
                 no_return: false,
                 has_var_args: false,
-            };
-            let free = ExternSymbol {
-                tid: Tid::new("free"),
-                addresses: vec![],
-                name: "free".to_string(),
-                calling_convention: Some("__stdcall".to_string()),
-                parameters: vec![Arg::from_var(
-                    CallingConvention::mock_x64().integer_parameter_register[0].clone(),
-                    Some(Datatype::Pointer),
-                )],
-                return_values: vec![],
-                no_return: false,
-                has_var_args: false,
-            };
-            let other_function = ExternSymbol {
-                tid: Tid::new("other_function"),
-                addresses: vec![],
-                name: "other_function".to_string(),
-                calling_convention: None,
-                parameters: vec![],
-                return_values: vec![],
-                no_return: false,
-                has_var_args: false,
-            };
+            }
+        }
 
+        fn add_extern_symbols_to_program(a: Vec<(Tid, ExternSymbol)>) -> Program {
             Program {
                 subs: BTreeMap::new(),
-                extern_symbols: BTreeMap::from([
-                    (malloc.tid.clone(), malloc),
-                    (free.tid.clone(), free),
-                    (other_function.tid.clone(), other_function),
-                ]),
+                extern_symbols: BTreeMap::from_iter(a),
                 entry_points: BTreeSet::new(),
                 address_base_offset: 0x1000u64,
             }
         }
         /// Returns Program with malloc, free and other_function
+        pub fn mock_x64() -> Program {
+            let malloc = Program::create_extern_symbol(
+                "malloc",
+                CallingConvention::mock_x64(),
+                Some(Datatype::Integer),
+                Some(Datatype::Pointer),
+            );
+            let free = Program::create_extern_symbol(
+                "free",
+                CallingConvention::mock_x64(),
+                Some(Datatype::Pointer),
+                None,
+            );
+            let other_function = Program::create_extern_symbol(
+                "other_function",
+                CallingConvention::mock_x64(),
+                None,
+                None,
+            );
+
+            Program::add_extern_symbols_to_program(vec![
+                (malloc.tid.clone(), malloc),
+                (free.tid.clone(), free),
+                (other_function.tid.clone(), other_function),
+            ])
+        }
+        /// Returns Program with malloc, free and other_function
         pub fn mock_arm32() -> Program {
-            // Creates arm32 program by altering x64 program
-            let mut prog = Program::mock_x64();
-            for symbol in prog.extern_symbols.values_mut() {
-                if symbol.name == "malloc".to_string() {
-                    symbol.parameters = vec![Arg::from_var(
-                        CallingConvention::mock_arm32().integer_parameter_register[0].clone(),
-                        Some(Datatype::Integer),
-                    )];
-                    symbol.return_values = vec![Arg::from_var(
-                        CallingConvention::mock_arm32().integer_return_register[0].clone(),
-                        Some(Datatype::Pointer),
-                    )];
-                }
-                if symbol.name == "free".to_string() {
-                    symbol.parameters = vec![Arg::from_var(
-                        CallingConvention::mock_arm32().integer_parameter_register[0].clone(),
-                        Some(Datatype::Pointer),
-                    )];
-                }
-            }
-            prog
+            let malloc = Program::create_extern_symbol(
+                "malloc",
+                CallingConvention::mock_arm32(),
+                Some(Datatype::Integer),
+                Some(Datatype::Pointer),
+            );
+            let free = Program::create_extern_symbol(
+                "free",
+                CallingConvention::mock_arm32(),
+                Some(Datatype::Pointer),
+                None,
+            );
+            let other_function = Program::create_extern_symbol(
+                "other_function",
+                CallingConvention::mock_arm32(),
+                None,
+                None,
+            );
+
+            Program::add_extern_symbols_to_program(vec![
+                (malloc.tid.clone(), malloc),
+                (free.tid.clone(), free),
+                (other_function.tid.clone(), other_function),
+            ])
         }
     }
 }
