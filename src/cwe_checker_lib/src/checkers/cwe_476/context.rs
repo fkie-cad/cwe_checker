@@ -444,7 +444,7 @@ mod tests {
 
     #[test]
     fn check_parameter_arg_for_taint() {
-        let project = Project::mock_empty();
+        let project = Project::mock_x64();
         let runtime_memory_image = RuntimeMemoryImage::mock();
         let pi_results = PointerInferenceComputation::mock(&project);
         let context = Context::mock(&project, &runtime_memory_image, &pi_results);
@@ -475,7 +475,7 @@ mod tests {
 
     #[test]
     fn handle_generic_call() {
-        let project = Project::mock_empty();
+        let project = Project::mock_x64();
         let runtime_memory_image = RuntimeMemoryImage::mock();
         let pi_results = PointerInferenceComputation::mock(&project);
         let context = Context::mock(&project, &runtime_memory_image, &pi_results);
@@ -496,7 +496,7 @@ mod tests {
 
     #[test]
     fn update_def() {
-        let project = Project::mock_empty();
+        let project = Project::mock_x64();
         let runtime_memory_image = RuntimeMemoryImage::mock();
         let pi_results = PointerInferenceComputation::mock(&project);
         let context = Context::mock(&project, &runtime_memory_image, &pi_results);
@@ -549,7 +549,7 @@ mod tests {
 
     #[test]
     fn update_jump() {
-        let project = Project::mock_empty();
+        let project = Project::mock_x64();
         let runtime_memory_image = RuntimeMemoryImage::mock();
         let pi_results = PointerInferenceComputation::mock(&project);
         let context = Context::mock(&project, &runtime_memory_image, &pi_results);

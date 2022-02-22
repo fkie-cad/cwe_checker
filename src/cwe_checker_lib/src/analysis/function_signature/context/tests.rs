@@ -3,8 +3,7 @@ use std::collections::HashSet;
 
 #[test]
 fn test_compute_return_values_of_call() {
-    let project = Project::mock_empty();
-    let cconv = CallingConvention::mock_x64();
+    let project = Project::mock_x64();
     let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
 
     let context = Context::new(&project, &graph);
@@ -19,8 +18,12 @@ fn test_compute_return_values_of_call() {
         },
     };
     // Test returning a value of unknown origin (since RAX does not contain a reference to the input register).
-    let return_values =
-        context.compute_return_values_of_call(&mut caller_state, &callee_state, &cconv, &call);
+    let return_values = context.compute_return_values_of_call(
+        &mut caller_state,
+        &callee_state,
+        project.get_standard_calling_convention().unwrap(),
+        &call,
+    );
     let expected_val = DataDomain::from_target(
         AbstractIdentifier::from_var(Tid::new("call_tid"), &Variable::mock("RAX", 8)),
         Bitvector::from_i64(0).into(),
@@ -37,8 +40,12 @@ fn test_compute_return_values_of_call() {
         AbstractIdentifier::from_var(Tid::new("caller"), &Variable::mock("RDI", 8)),
         Bitvector::from_i64(0).into(),
     );
-    let return_values =
-        context.compute_return_values_of_call(&mut caller_state, &callee_state, &cconv, &call);
+    let return_values = context.compute_return_values_of_call(
+        &mut caller_state,
+        &callee_state,
+        project.get_standard_calling_convention().unwrap(),
+        &call,
+    );
     assert_eq!(return_values.iter().len(), 3);
     assert_eq!(return_values[0], (&Variable::mock("RAX", 8), expected_val));
 }

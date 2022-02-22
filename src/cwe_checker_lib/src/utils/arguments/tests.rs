@@ -1,6 +1,4 @@
 use crate::intermediate_representation::{Bitvector, Tid};
-use std::collections::BTreeMap;
-use std::iter::FromIterator;
 
 use super::*;
 
@@ -21,9 +19,7 @@ fn test_get_variable_parameters() {
         &Variable::mock("RSI", 8 as u64),
         IntervalDomain::new(global_address.clone(), global_address).into(),
     );
-    let mut project = Project::mock_empty();
-    let cconv = CallingConvention::mock_x64();
-    project.calling_conventions = BTreeMap::from_iter([(cconv.name.clone(), cconv)]);
+    let project = Project::mock_x64();
 
     let mut output: Vec<Arg> = Vec::new();
     output.push(Arg::from_var(
@@ -110,7 +106,7 @@ fn test_parse_format_string_parameters() {
         "%s: Unable to open \'%s\', errno=%d\n",
         "%s %lli",
     ];
-    let properties = DatatypeProperties::mock();
+    let properties = DatatypeProperties::mock_x64();
     let expected_outputs: Vec<Vec<(Datatype, ByteSize)>> = vec![
         vec![
             (Datatype::from("s".to_string()), properties.pointer_size),

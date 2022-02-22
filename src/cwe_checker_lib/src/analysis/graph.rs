@@ -622,7 +622,7 @@ mod tests {
                 calling_convention: None,
             },
         };
-        let mut program = Program::mock_empty();
+        let mut program = Program::mock_x64();
         program.subs.insert(sub_term.tid.clone(), sub_term);
         let program_term = Term {
             tid: Tid::new("program".to_string()),

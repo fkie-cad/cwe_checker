@@ -257,7 +257,7 @@ mod tests {
         let sub_1_tid = &sub_1.tid;
         let sub_2_tid = &sub_2.tid;
         let sub_3_tid = &sub_3.tid;
-        let mut project = Project::mock_empty();
+        let mut project = Project::mock_x64();
         project.program.term.subs = BTreeMap::from_iter([
             (sub_1_tid.clone(), sub_1.clone()),
             (sub_2_tid.clone(), sub_2.clone()),

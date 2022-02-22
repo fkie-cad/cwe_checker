@@ -201,6 +201,34 @@ mod tests {
                 short_size: ByteSize::new(2),
             }
         }
+        /// Datatype sizes according to System V ABI
+        pub fn mock_x64() -> DatatypeProperties {
+            DatatypeProperties {
+                char_size: ByteSize::new(1),
+                double_size: ByteSize::new(8),
+                float_size: ByteSize::new(4),
+                integer_size: ByteSize::new(4),
+                long_double_size: ByteSize::new(16),
+                long_long_size: ByteSize::new(8),
+                long_size: ByteSize::new(8),
+                pointer_size: ByteSize::new(8),
+                short_size: ByteSize::new(2),
+            }
+        }
+
+        pub fn mock_arm32() -> DatatypeProperties {
+            DatatypeProperties {
+                char_size: ByteSize::new(1),
+                double_size: ByteSize::new(8),
+                float_size: ByteSize::new(4),
+                integer_size: ByteSize::new(4),
+                long_double_size: ByteSize::new(8),
+                long_long_size: ByteSize::new(8),
+                long_size: ByteSize::new(4),
+                pointer_size: ByteSize::new(4),
+                short_size: ByteSize::new(2),
+            }
+        }
     }
 
     #[test]

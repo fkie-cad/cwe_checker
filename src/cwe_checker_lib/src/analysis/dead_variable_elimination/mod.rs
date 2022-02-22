@@ -163,7 +163,7 @@ mod tests {
                 calling_convention: None,
             },
         };
-        let mut project = Project::mock_empty();
+        let mut project = Project::mock_x64();
         project.program.term.subs.insert(sub.tid.clone(), sub);
         remove_dead_var_assignments(&mut project);
 

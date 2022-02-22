@@ -591,7 +591,7 @@ pub fn mock_project_with_intraprocedural_control_flow(
     symbol_call_config: Vec<(ExternSymbol, Vec<bool>)>,
     sub_name: &str,
 ) -> Project {
-    let mut program = Program::mock_empty();
+    let mut program = Program::mock_x64();
     let mocked_sub = mock_sub_with_name_and_symbol_calls(sub_name, symbol_call_config);
 
     program.subs.insert(mocked_sub.tid.clone(), mocked_sub);
