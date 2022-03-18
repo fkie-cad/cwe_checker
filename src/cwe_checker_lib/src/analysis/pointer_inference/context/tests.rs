@@ -82,24 +82,16 @@ fn mock_project() -> (Project, Config) {
         entry_points: BTreeSet::new(),
         address_base_offset: 0,
     };
+
     let program_term = Term {
         tid: Tid::new("program"),
         term: program,
     };
-    let cconv = CallingConvention::mock_x64();
-    let register_set = vec!["RAX", "RCX", "RDX", "RBX", "RSP", "RBP", "RSI", "RDI"]
-        .into_iter()
-        .map(|name| Variable::mock(name, ByteSize::new(8)))
-        .collect();
+    let mut project = Project::mock_x64();
+    //project.program = program_term;
+
     (
-        Project {
-            program: program_term,
-            cpu_architecture: "x86_64".to_string(),
-            stack_pointer_register: register("RSP"),
-            calling_conventions: BTreeMap::from_iter([(cconv.name.clone(), cconv)]),
-            register_set,
-            datatype_properties: DatatypeProperties::mock(),
-        },
+        project,
         Config {
             allocation_symbols: vec!["malloc".into()],
             deallocation_symbols: vec!["free".into()],
