@@ -1,5 +1,4 @@
 use crate::intermediate_representation::*;
-use std::{collections::BTreeMap, iter::FromIterator};
 
 pub struct Setup;
 
@@ -466,25 +465,6 @@ impl ExternSymbol {
             Some(Datatype::Integer),
             Some(Datatype::Pointer),
         )
-    }
-}
-
-impl CallingConvention {
-    pub fn mock_standard_arm_32() -> CallingConvention {
-        CallingConvention {
-            name: "__stdcall".to_string(), // so that the mock is useable as standard calling convention in tests
-            integer_parameter_register: ["r0", "r1", "r2", "r3"]
-                .iter()
-                .map(|s| Variable::mock(s, 4))
-                .collect(),
-            float_parameter_register: ["s0", "s1", "s2", "s3"]
-                .iter()
-                .map(|s| Expression::Var(Variable::mock(s, 4)))
-                .collect(),
-            integer_return_register: vec![Variable::mock("r0", 4)],
-            float_return_register: vec![],
-            callee_saved_register: vec![Variable::mock("r11", 4)],
-        }
     }
 }
 

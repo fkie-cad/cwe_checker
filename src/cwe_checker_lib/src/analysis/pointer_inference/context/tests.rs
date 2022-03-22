@@ -1,5 +1,4 @@
 use super::*;
-use crate::intermediate_representation::DatatypeProperties;
 
 fn bv(value: i64) -> ValueDomain {
     ValueDomain::from(Bitvector::from_i64(value))
@@ -9,24 +8,6 @@ fn new_id(time: &str, reg_name: &str) -> AbstractIdentifier {
     AbstractIdentifier::new(
         Tid::new(time),
         AbstractLocation::Register(Variable::mock(reg_name, ByteSize::new(8))),
-    )
-}
-
-fn mock_extern_symbol(name: &str) -> (Tid, ExternSymbol) {
-    let arg = Arg::from_var(register("RDX"), None);
-    let tid = Tid::new("extern_".to_string() + name);
-    (
-        tid.clone(),
-        ExternSymbol {
-            tid,
-            addresses: vec![],
-            name: name.into(),
-            calling_convention: None,
-            parameters: vec![arg.clone()],
-            return_values: vec![arg],
-            no_return: false,
-            has_var_args: false,
-        },
     )
 }
 
