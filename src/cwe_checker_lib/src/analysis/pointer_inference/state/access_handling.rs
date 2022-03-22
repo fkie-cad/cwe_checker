@@ -245,8 +245,7 @@ impl State {
         let mut address_val = self.eval(address_expr);
         if let Some((start_index, end_index)) = address_val
             .get_absolute_value()
-            .map(|val| val.try_to_offset_interval().ok())
-            .flatten()
+            .and_then(|val| val.try_to_offset_interval().ok())
         {
             if (start_index > -1024 && start_index < 1024)
                 || (end_index > -1024 && end_index < 1024)

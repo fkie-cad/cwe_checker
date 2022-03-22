@@ -29,8 +29,7 @@ impl Program {
     pub fn find_block(&self, tid: &Tid) -> Option<&Term<Blk>> {
         self.subs
             .iter()
-            .map(|(_, sub)| sub.term.blocks.iter())
-            .flatten()
+            .flat_map(|(_, sub)| sub.term.blocks.iter())
             .find(|block| block.tid == *tid)
     }
 }
