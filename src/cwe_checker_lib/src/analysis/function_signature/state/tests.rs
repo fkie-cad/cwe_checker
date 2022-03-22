@@ -57,7 +57,10 @@ fn test_new() {
     for (id, access_pattern) in state.tracked_ids.iter() {
         assert_eq!(
             state.get_register(id.unwrap_register()),
-            DataDomain::from_target(id.clone(), Bitvector::zero(ByteSize::new(4).into()).into())
+            DataDomain::from_target(
+                id.clone(),
+                Bitvector::zero(id.unwrap_register().size.into()).into()
+            )
         );
         assert_eq!(access_pattern, &AccessPattern::new());
     }
