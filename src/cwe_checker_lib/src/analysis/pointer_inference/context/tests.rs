@@ -1,5 +1,4 @@
 use super::*;
-use crate::intermediate_representation::DatatypeProperties;
 
 fn bv(value: i64) -> ValueDomain {
     ValueDomain::from(Bitvector::from_i64(value))
@@ -9,24 +8,6 @@ fn new_id(time: &str, reg_name: &str) -> AbstractIdentifier {
     AbstractIdentifier::new(
         Tid::new(time),
         AbstractLocation::Register(Variable::mock(reg_name, ByteSize::new(8))),
-    )
-}
-
-fn mock_extern_symbol(name: &str) -> (Tid, ExternSymbol) {
-    let arg = Arg::from_var(register("RDX"), None);
-    let tid = Tid::new("extern_".to_string() + name);
-    (
-        tid.clone(),
-        ExternSymbol {
-            tid,
-            addresses: vec![],
-            name: name.into(),
-            calling_convention: None,
-            parameters: vec![arg.clone()],
-            return_values: vec![arg],
-            no_return: false,
-            has_var_args: false,
-        },
     )
 }
 
@@ -70,36 +51,9 @@ fn return_term(target_name: &str) -> Term<Jmp> {
 }
 
 fn mock_project() -> (Project, Config) {
-    let program = Program {
-        subs: BTreeMap::new(),
-        extern_symbols: vec![
-            mock_extern_symbol("malloc"),
-            mock_extern_symbol("free"),
-            mock_extern_symbol("other"),
-        ]
-        .into_iter()
-        .collect(),
-        entry_points: BTreeSet::new(),
-        address_base_offset: 0,
-    };
-    let program_term = Term {
-        tid: Tid::new("program"),
-        term: program,
-    };
-    let cconv = CallingConvention::mock_x64();
-    let register_set = vec!["RAX", "RCX", "RDX", "RBX", "RSP", "RBP", "RSI", "RDI"]
-        .into_iter()
-        .map(|name| Variable::mock(name, ByteSize::new(8)))
-        .collect();
+    let project = Project::mock_x64();
     (
-        Project {
-            program: program_term,
-            cpu_architecture: "x86_64".to_string(),
-            stack_pointer_register: register("RSP"),
-            calling_conventions: BTreeMap::from_iter([(cconv.name.clone(), cconv)]),
-            register_set,
-            datatype_properties: DatatypeProperties::mock(),
-        },
+        project,
         Config {
             allocation_symbols: vec!["malloc".into()],
             deallocation_symbols: vec!["free".into()],
@@ -160,11 +114,11 @@ fn context_problem_implementation() {
     state.set_register(&register("RBP"), bv(13).into());
     state.set_register(&register("RSI"), bv(14).into());
 
-    let malloc = call_term("extern_malloc");
+    let malloc = call_term("malloc");
     let mut state_after_malloc = context.update_call_stub(&state, &malloc).unwrap();
     assert_eq!(
-        state_after_malloc.get_register(&register("RDX")),
-        Data::from_target(new_id("call_extern_malloc", "RDX"), bv(0))
+        state_after_malloc.get_register(&register("RAX")),
+        Data::from_target(new_id("call_malloc", "RAX"), bv(0))
     );
     assert_eq!(state_after_malloc.memory.get_num_objects(), 2);
     assert_eq!(
@@ -181,9 +135,9 @@ fn context_problem_implementation() {
 
     state_after_malloc.set_register(
         &register("RBP"),
-        Data::from_target(new_id("call_extern_malloc", "RDX"), bv(0)),
+        Data::from_target(new_id("call_malloc", "RAX"), bv(0)),
     );
-    let free = call_term("extern_free");
+    let free = call_term("free");
     let state_after_free = context
         .update_call_stub(&state_after_malloc, &free)
         .unwrap();
@@ -191,10 +145,10 @@ fn context_problem_implementation() {
     assert_eq!(state_after_free.memory.get_num_objects(), 2);
     assert_eq!(
         state_after_free.get_register(&register("RBP")),
-        Data::from_target(new_id("call_extern_malloc", "RDX"), bv(0))
+        Data::from_target(new_id("call_malloc", "RAX"), bv(0))
     );
 
-    let other_extern_fn = call_term("extern_other");
+    let other_extern_fn = call_term("other_function");
     let state_after_other_fn = context.update_call_stub(&state, &other_extern_fn).unwrap();
 
     assert_eq!(

@@ -29,54 +29,18 @@ impl Program {
     pub fn find_block(&self, tid: &Tid) -> Option<&Term<Blk>> {
         self.subs
             .iter()
-            .map(|(_, sub)| sub.term.blocks.iter())
-            .flatten()
+            .flat_map(|(_, sub)| sub.term.blocks.iter())
             .find(|block| block.tid == *tid)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::intermediate_representation::{Arg, CallingConvention, Datatype};
+    use crate::intermediate_representation::{CallingConvention, Datatype};
 
     use super::*;
 
     impl Program {
-        /// Returns extern symbol with argument/return register according to calling convention
-        fn create_extern_symbol(
-            name: &str,
-            cconv: CallingConvention,
-            arg_type: Option<Datatype>,
-            return_type: Option<Datatype>,
-        ) -> ExternSymbol {
-            ExternSymbol {
-                tid: Tid::new(name),
-                addresses: vec![],
-                name: name.to_string(),
-                calling_convention: Some(cconv.name),
-                parameters: match arg_type {
-                    Some(data_type) => {
-                        vec![Arg::from_var(
-                            cconv.integer_parameter_register[0].clone(),
-                            Some(data_type),
-                        )]
-                    }
-                    None => vec![],
-                },
-                return_values: match return_type {
-                    Some(data_type) => {
-                        vec![Arg::from_var(
-                            cconv.integer_return_register[0].clone(),
-                            Some(data_type),
-                        )]
-                    }
-                    None => vec![],
-                },
-                no_return: false,
-                has_var_args: false,
-            }
-        }
-
         fn add_extern_symbols_to_program(a: Vec<(Tid, ExternSymbol)>) -> Program {
             Program {
                 subs: BTreeMap::new(),
@@ -87,19 +51,19 @@ mod tests {
         }
         /// Returns Program with malloc, free and other_function
         pub fn mock_x64() -> Program {
-            let malloc = Program::create_extern_symbol(
+            let malloc = ExternSymbol::create_extern_symbol(
                 "malloc",
                 CallingConvention::mock_x64(),
                 Some(Datatype::Integer),
                 Some(Datatype::Pointer),
             );
-            let free = Program::create_extern_symbol(
+            let free = ExternSymbol::create_extern_symbol(
                 "free",
                 CallingConvention::mock_x64(),
                 Some(Datatype::Pointer),
                 None,
             );
-            let other_function = Program::create_extern_symbol(
+            let other_function = ExternSymbol::create_extern_symbol(
                 "other_function",
                 CallingConvention::mock_x64(),
                 None,
@@ -114,19 +78,19 @@ mod tests {
         }
         /// Returns Program with malloc, free and other_function
         pub fn mock_arm32() -> Program {
-            let malloc = Program::create_extern_symbol(
+            let malloc = ExternSymbol::create_extern_symbol(
                 "malloc",
                 CallingConvention::mock_arm32(),
                 Some(Datatype::Integer),
                 Some(Datatype::Pointer),
             );
-            let free = Program::create_extern_symbol(
+            let free = ExternSymbol::create_extern_symbol(
                 "free",
                 CallingConvention::mock_arm32(),
                 Some(Datatype::Pointer),
                 None,
             );
-            let other_function = Program::create_extern_symbol(
+            let other_function = ExternSymbol::create_extern_symbol(
                 "other_function",
                 CallingConvention::mock_arm32(),
                 None,

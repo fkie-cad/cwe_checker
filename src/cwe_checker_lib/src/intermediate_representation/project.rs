@@ -301,7 +301,7 @@ mod tests {
             Project {
                 program: Term {
                     tid: Tid::new("program_tid"),
-                    term: Program::mock_x64(),
+                    term: Program::mock_arm32(),
                 },
                 cpu_architecture: "arm32".to_string(),
                 stack_pointer_register: Variable::mock("sp", 4u64),
