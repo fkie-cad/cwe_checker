@@ -153,13 +153,8 @@ impl AbstractObject {
     }
 
     /// Mark the memory object as freed.
-    /// Returns an error if a possible double free is detected
-    /// or the memory object may not be a heap object.
+    /// Returns an error if a possible double free is detected.
     pub fn mark_as_freed(&mut self) -> Result<(), Error> {
-        if self.inner.type_ != Some(ObjectType::Heap) {
-            self.set_state(ObjectState::Flagged);
-            return Err(anyhow!("Free operation on possibly non-heap memory object"));
-        }
         let inner = Arc::make_mut(&mut self.inner);
         match (inner.is_unique, inner.state) {
             (true, ObjectState::Alive) | (true, ObjectState::Flagged) => {
@@ -182,13 +177,8 @@ impl AbstractObject {
     }
 
     /// Mark the memory object as possibly (but not definitely) freed.
-    /// Returns an error if the object was definitely freed before
-    /// or if the object may not be a heap object.
+    /// Returns an error if the object was definitely freed before.
     pub fn mark_as_maybe_freed(&mut self) -> Result<(), Error> {
-        if self.inner.type_ != Some(ObjectType::Heap) {
-            self.set_state(ObjectState::Flagged);
-            return Err(anyhow!("Free operation on possibly non-heap memory object"));
-        }
         let inner = Arc::make_mut(&mut self.inner);
         match inner.state {
             ObjectState::Dangling => {
