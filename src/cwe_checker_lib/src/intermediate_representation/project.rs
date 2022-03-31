@@ -192,6 +192,7 @@ impl Project {
         self.propagate_input_expressions();
         self.substitute_trivial_expressions();
         crate::analysis::dead_variable_elimination::remove_dead_var_assignments(self);
+        crate::analysis::stack_alignment_substitution::substitute_and_on_stackpointer(self);
         logs
     }
 }
