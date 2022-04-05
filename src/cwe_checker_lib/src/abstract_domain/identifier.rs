@@ -119,9 +119,14 @@ impl AbstractIdentifier {
         &self.time
     }
 
-    /// Get the location component of the abstract ID
+    /// Get the location component of the abstract ID.
     pub fn get_location(&self) -> &AbstractLocation {
         &self.location
+    }
+
+    /// Get the bytesize of the value represented by the abstract ID.
+    pub fn bytesize(&self) -> ByteSize {
+        self.location.bytesize()
     }
 }
 
@@ -187,6 +192,14 @@ impl AbstractLocation {
         let stack_pos = AbstractMemoryLocation::Location { offset, size };
         AbstractLocation::Pointer(stack_register.clone(), stack_pos)
     }
+
+    /// Get the bytesize of the value represented by the abstract location.
+    pub fn bytesize(&self) -> ByteSize {
+        match self {
+            Self::Register(var) => var.size,
+            Self::Pointer(_pointer_var, mem_location) => mem_location.bytesize(),
+        }
+    }
 }
 
 /// An abstract memory location is either an offset from the given location, where the actual value can be found,
@@ -210,6 +223,16 @@ pub enum AbstractMemoryLocation {
         /// The memory location inside the target of the pointer that this memory location points to.
         target: Box<AbstractMemoryLocation>,
     },
+}
+
+impl AbstractMemoryLocation {
+    /// Get the bytesize of the value represented by the abstract memory location.
+    pub fn bytesize(&self) -> ByteSize {
+        match self {
+            Self::Location { size, .. } => *size,
+            Self::Pointer { target, .. } => target.bytesize(),
+        }
+    }
 }
 
 impl std::fmt::Display for AbstractMemoryLocation {
@@ -242,5 +265,13 @@ mod tests {
         let id = id.with_path_hint(Tid::new("first_hint")).unwrap();
         let id = id.with_path_hint(Tid::new("second_hint")).unwrap();
         assert!(id.with_path_hint(Tid::new("first_hint")).is_err());
+    }
+
+    #[test]
+    fn test_bytesize() {
+        let location =
+            AbstractLocation::from_stack_position(&Variable::mock("RSP", 8), 10, ByteSize::new(4));
+        let id = AbstractIdentifier::new(Tid::new("id"), location);
+        assert_eq!(id.bytesize(), ByteSize::new(4));
     }
 }
