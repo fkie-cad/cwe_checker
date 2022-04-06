@@ -8,16 +8,13 @@ fn intersect_relative_values<T: SpecializeByConditional + RegisterDomain>(
     values_left
         .iter()
         .filter_map(|(id, offset)| {
-            values_right
-                .get(id)
-                .map(|other_offset| {
-                    if let Ok(intersected_offset) = offset.clone().intersect(other_offset) {
-                        Some((id.clone(), intersected_offset))
-                    } else {
-                        None
-                    }
-                })
-                .flatten()
+            values_right.get(id).and_then(|other_offset| {
+                if let Ok(intersected_offset) = offset.clone().intersect(other_offset) {
+                    Some((id.clone(), intersected_offset))
+                } else {
+                    None
+                }
+            })
         })
         .collect()
 }
@@ -26,8 +23,7 @@ impl<T: SpecializeByConditional + RegisterDomain> SpecializeByConditional for Da
     fn add_signed_less_equal_bound(mut self, bound: &Bitvector) -> Result<Self, Error> {
         self.absolute_value = self
             .absolute_value
-            .map(|value| value.add_signed_less_equal_bound(bound).ok())
-            .flatten();
+            .and_then(|value| value.add_signed_less_equal_bound(bound).ok());
         if self.is_empty() {
             Err(anyhow!("Empty value"))
         } else {
@@ -38,8 +34,7 @@ impl<T: SpecializeByConditional + RegisterDomain> SpecializeByConditional for Da
     fn add_unsigned_less_equal_bound(mut self, bound: &Bitvector) -> Result<Self, Error> {
         self.absolute_value = self
             .absolute_value
-            .map(|value| value.add_unsigned_less_equal_bound(bound).ok())
-            .flatten();
+            .and_then(|value| value.add_unsigned_less_equal_bound(bound).ok());
         if self.is_empty() {
             Err(anyhow!("Empty value"))
         } else {
@@ -50,8 +45,7 @@ impl<T: SpecializeByConditional + RegisterDomain> SpecializeByConditional for Da
     fn add_signed_greater_equal_bound(mut self, bound: &Bitvector) -> Result<Self, Error> {
         self.absolute_value = self
             .absolute_value
-            .map(|value| value.add_signed_greater_equal_bound(bound).ok())
-            .flatten();
+            .and_then(|value| value.add_signed_greater_equal_bound(bound).ok());
         if self.is_empty() {
             Err(anyhow!("Empty value"))
         } else {
@@ -62,8 +56,7 @@ impl<T: SpecializeByConditional + RegisterDomain> SpecializeByConditional for Da
     fn add_unsigned_greater_equal_bound(mut self, bound: &Bitvector) -> Result<Self, Error> {
         self.absolute_value = self
             .absolute_value
-            .map(|value| value.add_unsigned_greater_equal_bound(bound).ok())
-            .flatten();
+            .and_then(|value| value.add_unsigned_greater_equal_bound(bound).ok());
         if self.is_empty() {
             Err(anyhow!("Empty value"))
         } else {
@@ -74,8 +67,7 @@ impl<T: SpecializeByConditional + RegisterDomain> SpecializeByConditional for Da
     fn add_not_equal_bound(mut self, bound: &Bitvector) -> Result<Self, Error> {
         self.absolute_value = self
             .absolute_value
-            .map(|value| value.add_not_equal_bound(bound).ok())
-            .flatten();
+            .and_then(|value| value.add_not_equal_bound(bound).ok());
         if self.is_empty() {
             Err(anyhow!("Empty value"))
         } else {

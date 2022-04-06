@@ -1,5 +1,4 @@
 use crate::intermediate_representation::*;
-use std::{collections::BTreeMap, iter::FromIterator};
 
 pub struct Setup;
 
@@ -394,133 +393,78 @@ fn mock_defs_for_memcpy(copy_from_global: bool, blk_num: usize) -> Vec<Term<Def>
 
 impl ExternSymbol {
     pub fn mock_memcpy_symbol_arm() -> ExternSymbol {
-        ExternSymbol {
-            tid: Tid::new("memcpy"),
-            addresses: vec!["UNKNOWN".to_string()],
-            name: "memcpy".to_string(),
-            calling_convention: Some("__stdcall".to_string()),
-            parameters: vec![
-                Arg::mock_register("r0", 4),
-                Arg::mock_register("r1", 4),
-                Arg::mock_register("r2", 4),
-            ],
-            return_values: vec![Arg::mock_register("r0", 4)],
-            no_return: false,
-            has_var_args: true,
-        }
+        let mut ex = ExternSymbol::create_extern_symbol(
+            "memcpy",
+            CallingConvention::mock_arm32(),
+            None,
+            None,
+        );
+        ex.parameters = vec![
+            Arg::mock_register("r0", 4),
+            Arg::mock_register("r1", 4),
+            Arg::mock_register("r2", 4),
+        ];
+        ex
     }
 
     pub fn mock_sprintf_symbol_arm() -> ExternSymbol {
-        ExternSymbol {
-            tid: Tid::new("sprintf"),
-            addresses: vec!["UNKNOWN".to_string()],
-            name: "sprintf".to_string(),
-            calling_convention: Some("__stdcall".to_string()),
-            parameters: vec![Arg::mock_register("r0", 4), Arg::mock_register("r1", 4)],
-            return_values: vec![Arg::mock_register("r0", 4)],
-            no_return: false,
-            has_var_args: true,
-        }
+        let mut ex = ExternSymbol::create_extern_symbol(
+            "sprintf",
+            CallingConvention::mock_arm32(),
+            None,
+            None,
+        );
+        ex.parameters = vec![Arg::mock_register("r0", 4), Arg::mock_register("r1", 4)];
+        ex
     }
 
     pub fn mock_scanf_symbol_arm() -> ExternSymbol {
-        ExternSymbol {
-            tid: Tid::new("scanf"),
-            addresses: vec!["UNKNOWN".to_string()],
-            name: "scanf".to_string(),
-            calling_convention: Some("__stdcall".to_string()),
-            parameters: vec![Arg::mock_register("r0", 4)],
-            return_values: vec![Arg::mock_register("r0", 4)],
-            no_return: false,
-            has_var_args: true,
-        }
+        ExternSymbol::create_extern_symbol(
+            "scanf",
+            CallingConvention::mock_arm32(),
+            Some(Datatype::Pointer),
+            Some(Datatype::Integer),
+        )
     }
 
     pub fn mock_sscanf_symbol_arm() -> ExternSymbol {
-        ExternSymbol {
-            tid: Tid::new("sscanf"),
-            addresses: vec!["UNKNOWN".to_string()],
-            name: "sscanf".to_string(),
-            calling_convention: Some("__stdcall".to_string()),
-            parameters: vec![Arg::mock_register("r0", 4), Arg::mock_register("r1", 4)],
-            return_values: vec![Arg::mock_register("r0", 4)],
-            no_return: false,
-            has_var_args: true,
-        }
+        let mut ex = ExternSymbol::create_extern_symbol(
+            "sscanf",
+            CallingConvention::mock_arm32(),
+            None,
+            None,
+        );
+        ex.parameters = vec![Arg::mock_register("r0", 4), Arg::mock_register("r1", 4)];
+        ex
     }
 
     pub fn mock_strcat_symbol_arm() -> ExternSymbol {
-        ExternSymbol {
-            tid: Tid::new("strcat"),
-            addresses: vec!["UNKNOWN".to_string()],
-            name: "strcat".to_string(),
-            calling_convention: Some("__stdcall".to_string()),
-            parameters: vec![Arg::mock_register("r0", 4), Arg::mock_register("r1", 4)],
-            return_values: vec![Arg::mock_register("r0", 4)],
-            no_return: false,
-            has_var_args: false,
-        }
+        let mut ex = ExternSymbol::create_extern_symbol(
+            "strcat",
+            CallingConvention::mock_arm32(),
+            None,
+            None,
+        );
+        ex.parameters = vec![Arg::mock_register("r0", 4), Arg::mock_register("r1", 4)];
+        ex
     }
 
     pub fn mock_free_symbol_arm() -> ExternSymbol {
-        ExternSymbol {
-            tid: Tid::new("free"),
-            addresses: vec!["UNKNOWN".to_string()],
-            name: "free".to_string(),
-            calling_convention: Some("__stdcall".to_string()),
-            parameters: vec![Arg::mock_register("r0", 4)],
-            return_values: vec![],
-            no_return: false,
-            has_var_args: false,
-        }
+        ExternSymbol::create_extern_symbol(
+            "free",
+            CallingConvention::mock_arm32(),
+            Some(Datatype::Pointer),
+            None,
+        )
     }
 
     pub fn mock_malloc_symbol_arm() -> ExternSymbol {
-        ExternSymbol {
-            tid: Tid::new("malloc"),
-            addresses: vec!["UNKNOWN".to_string()],
-            name: "malloc".to_string(),
-            calling_convention: Some("__stdcall".to_string()),
-            parameters: vec![Arg::mock_register("r0", 4)],
-            return_values: vec![Arg::mock_register("r0", 4)],
-            no_return: false,
-            has_var_args: false,
-        }
-    }
-}
-
-impl CallingConvention {
-    pub fn mock_standard_arm_32() -> CallingConvention {
-        CallingConvention {
-            name: "__stdcall".to_string(), // so that the mock is useable as standard calling convention in tests
-            integer_parameter_register: ["r0", "r1", "r2", "r3"]
-                .iter()
-                .map(|s| Variable::mock(s, 4))
-                .collect(),
-            float_parameter_register: ["s0", "s1", "s2", "s3"]
-                .iter()
-                .map(|s| Expression::Var(Variable::mock(s, 4)))
-                .collect(),
-            integer_return_register: vec![Variable::mock("r0", 4)],
-            float_return_register: vec![],
-            callee_saved_register: vec![Variable::mock("r11", 4)],
-        }
-    }
-}
-
-impl DatatypeProperties {
-    pub fn mock_standard_arm_32() -> DatatypeProperties {
-        DatatypeProperties {
-            char_size: ByteSize::new(1),
-            double_size: ByteSize::new(8),
-            float_size: ByteSize::new(4),
-            integer_size: ByteSize::new(4),
-            long_double_size: ByteSize::new(8),
-            long_long_size: ByteSize::new(8),
-            long_size: ByteSize::new(4),
-            pointer_size: ByteSize::new(4),
-            short_size: ByteSize::new(2),
-        }
+        ExternSymbol::create_extern_symbol(
+            "malloc",
+            CallingConvention::mock_arm32(),
+            Some(Datatype::Integer),
+            Some(Datatype::Pointer),
+        )
     }
 }
 
@@ -591,7 +535,7 @@ pub fn mock_project_with_intraprocedural_control_flow(
     symbol_call_config: Vec<(ExternSymbol, Vec<bool>)>,
     sub_name: &str,
 ) -> Project {
-    let mut program = Program::mock_x64();
+    let mut program = Program::mock_arm32();
     let mocked_sub = mock_sub_with_name_and_symbol_calls(sub_name, symbol_call_config);
 
     program.subs.insert(mocked_sub.tid.clone(), mocked_sub);
@@ -611,21 +555,7 @@ pub fn mock_project_with_intraprocedural_control_flow(
     program.extern_symbols.insert(malloc.tid.clone(), malloc);
     program.entry_points.insert(Tid::new(sub_name));
 
-    let register_set = ["r0", "r1", "r2", "r3", "r11", "sp"]
-        .iter()
-        .map(|name| Variable::mock(name, ByteSize::new(4)))
-        .collect();
-    let cconv = CallingConvention::mock_standard_arm_32();
-
-    Project {
-        program: Term {
-            tid: Tid::new("program"),
-            term: program,
-        },
-        cpu_architecture: "arm_32".to_string(),
-        stack_pointer_register: Variable::mock("sp", 4u64),
-        calling_conventions: BTreeMap::from_iter([(cconv.name.clone(), cconv)]),
-        register_set,
-        datatype_properties: DatatypeProperties::mock_standard_arm_32(),
-    }
+    let mut project = Project::mock_arm32();
+    project.program.term = program;
+    project
 }

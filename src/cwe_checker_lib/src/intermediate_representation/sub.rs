@@ -387,5 +387,40 @@ mod tests {
                 has_var_args: true,
             }
         }
+
+        /// Returns extern symbol with argument/return register according to calling convention
+        pub fn create_extern_symbol(
+            name: &str,
+            cconv: CallingConvention,
+            arg_type: Option<Datatype>,
+            return_type: Option<Datatype>,
+        ) -> ExternSymbol {
+            ExternSymbol {
+                tid: Tid::new(name),
+                addresses: vec![],
+                name: name.to_string(),
+                calling_convention: Some(cconv.name),
+                parameters: match arg_type {
+                    Some(data_type) => {
+                        vec![Arg::from_var(
+                            cconv.integer_parameter_register[0].clone(),
+                            Some(data_type),
+                        )]
+                    }
+                    None => vec![],
+                },
+                return_values: match return_type {
+                    Some(data_type) => {
+                        vec![Arg::from_var(
+                            cconv.integer_return_register[0].clone(),
+                            Some(data_type),
+                        )]
+                    }
+                    None => vec![],
+                },
+                no_return: false,
+                has_var_args: false,
+            }
+        }
     }
 }
