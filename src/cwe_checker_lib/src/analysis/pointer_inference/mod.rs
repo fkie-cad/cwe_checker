@@ -271,7 +271,7 @@ impl<'a> PointerInference<'a> {
                             }
                             Def::Load { var, address } => {
                                 let loaded_value = state
-                                    .load_value(address, var.size, &context.runtime_memory_image)
+                                    .load_value(address, var.size, context.runtime_memory_image)
                                     .unwrap_or_else(|_| Data::new_top(var.size));
                                 self.values_at_defs.insert(def.tid.clone(), loaded_value);
                                 self.addresses_at_defs
@@ -438,6 +438,18 @@ mod tests {
         pub fn set_node_value(&mut self, node_value: State, node_index: NodeIndex) {
             self.computation
                 .set_node_value(node_index, NodeValue::Value(node_value));
+        }
+
+        pub fn get_mut_values_at_defs(&mut self) -> &mut HashMap<Tid, Data> {
+            &mut self.values_at_defs
+        }
+
+        pub fn get_mut_addresses_at_defs(&mut self) -> &mut HashMap<Tid, Data> {
+            &mut self.addresses_at_defs
+        }
+
+        pub fn get_mut_states_at_tids(&mut self) -> &mut HashMap<Tid, State> {
+            &mut self.states_at_tids
         }
     }
 }

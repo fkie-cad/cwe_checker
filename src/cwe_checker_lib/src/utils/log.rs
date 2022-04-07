@@ -299,7 +299,7 @@ impl LogThread {
     /// I.e. the function should receive messages through the given receiver until the channel disconnects
     /// or until it receives a [`LogThreadMsg::Terminate`] message.
     /// After that it should return the logs collected up to that point.
-    /// 
+    ///
     /// See [`LogThread::collect_and_deduplicate`] for a standard collector function that can be used here.
     pub fn spawn<F>(collector_func: F) -> LogThread
     where
@@ -345,7 +345,7 @@ impl LogThread {
     /// In such a case only the last message received is kept.
     /// If a CWE message has more than one address only the first address is considered when deduplicating.
     /// Note that this may lead to information loss if log messages with the same origin address that are not duplicates are generated.
-    /// 
+    ///
     /// This function can be used as a standard collector function for [`LogThread::spawn`].
     pub fn collect_and_deduplicate(
         receiver: crossbeam_channel::Receiver<LogThreadMsg>,

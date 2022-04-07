@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 
 /// The state consists of the abstract identifier for the current stack frame
 /// and lists of the lower and upper bounds for all known memory objects.
-/// 
+///
 /// The bounds of memory objects are computed the first time an access to it is observed.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct State {
@@ -23,9 +23,9 @@ pub struct State {
 impl State {
     /// Create a new state representing the state at the start of the function
     /// given by the `function_tid` and corresponding function signature.
-    /// 
+    ///
     /// Only the bounds of the current stack frame are known in this state,
-    /// since there are no memory accesses to observe prior to the function start. 
+    /// since there are no memory accesses to observe prior to the function start.
     pub fn new(function_tid: &Tid, function_sig: &FunctionSignature, project: &Project) -> State {
         let stack_id =
             AbstractIdentifier::from_var(function_tid.clone(), &project.stack_pointer_register);
@@ -230,13 +230,67 @@ impl AbstractDomain for State {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use crate::intermediate_representation::Variable;
 
     #[test]
     fn test_new() {
         let context = Context::mock_x64();
-        let state = State::new(&Tid::new("func"), &FunctionSignature::mock_x64(), context.project);
+        let state = State::new(
+            &Tid::new("func"),
+            &FunctionSignature::mock_x64(),
+            context.project,
+        );
+        let stack_id = AbstractIdentifier::from_var(Tid::new("func"), &Variable::mock("RSP", 8));
 
-        dbg!(state);
+        assert_eq!(state.stack_id, stack_id);
+        assert_eq!(state.object_lower_bounds.len(), 1);
+        assert_eq!(state.object_upper_bounds.len(), 1);
+        assert_eq!(
+            *state.object_lower_bounds.get(&stack_id).unwrap(),
+            BitvectorDomain::new_top(ByteSize::new(8))
+        );
+        assert_eq!(
+            *state.object_upper_bounds.get(&stack_id).unwrap(),
+            Bitvector::from_i64(8).into()
+        );
+    }
+
+    #[test]
+    fn test_check_address_access() {
+        let context = Context::mock_x64();
+        let mut state = State::new(
+            &Tid::new("func"),
+            &FunctionSignature::mock_x64(),
+            context.project,
+        );
+        let stack_id = AbstractIdentifier::from_var(Tid::new("func"), &Variable::mock("RSP", 8));
+        // access in bounds
+        let address = Data::from_target(stack_id.clone(), Bitvector::from_i64(-12).into());
+        assert!(state
+            .check_address_access(&address, ByteSize::new(8), &context)
+            .is_empty());
+        // access out of bounds
+        let address = Data::from_target(stack_id.clone(), Bitvector::from_i64(4).into());
+        assert_eq!(
+            state
+                .check_address_access(&address, ByteSize::new(8), &context)
+                .len(),
+            1
+        );
+        // subsequent errors are suppressed
+        let address = Data::from_target(stack_id, Bitvector::from_i64(8).into());
+        assert!(state
+            .check_address_access(&address, ByteSize::new(8), &context)
+            .is_empty());
+    }
+
+    #[test]
+    fn test_compute_bounds_of_id() {
+        todo!()
+    }
+
+    #[test]
+    fn test_compute_bounds_of_param_id() {
         todo!()
     }
 }

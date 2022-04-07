@@ -1,30 +1,30 @@
 //! This module implements a check for CWE-119: Buffer Overflow
 //! and its variants CWE-125: Out-of-bounds Read and CWE-787: Out-of-bounds Write.
-//! 
+//!
 //! Arrays or buffers of any kind are often accessed through indices.
 //! If the index of an access is outside of the bounds of the buffer this can lead to severe consequences.
 //! In the case of out-of-bounds read accesses this often leads to exposure of sensitive information to an attacker.
 //! Out-of-bounds write accesses can often be used to hijack the control flow of a program
 //! and thus may lead to arbitrary code execution.
-//! 
+//!
 //! See <https://cwe.mitre.org/data/definitions/119.html> for a detailed description.
-//! 
+//!
 //! ## How the check works
-//! 
+//!
 //! The check uses the results of the [Pointer Inference analysis](`crate::analysis::pointer_inference`)
 //! to check whether any memory accesses may point outside of the bounds of the corresponding memory objects.
 //! For this the results of the Pointer Inference analysis are aggregated interprocedurally.
 //! Additionally, the check uses a lightweight intraprocedural dataflow fixpoint computation
 //! to ensure that for each memory object only the first access outside of its bounds is flagged as a CWE.
-//! 
+//!
 //! ## False Positives
-//! 
+//!
 //! - Any analysis imprecision of the Pointer Inference analysis may lead to false positive results in this check.
 //! - If no exact bounds for a memory object could be inferred then the strictest bounds found are used,
 //! which can lead to false positive warnings.
-//! 
+//!
 //! ## False Negatives
-//! 
+//!
 //! - In cases where the Pointer Inference analysis could not infer any bounds at all for the memory object or the access index
 //! this check generally assumes analysis imprecision as the culprit and will not flag them as CWEs.
 //! This leads to false negatives, especially in cases where the bounds directly depend on user input.
@@ -53,7 +53,7 @@ pub static CWE_MODULE: CweModule = CweModule {
 };
 
 /// Run the check for CWE-119: Buffer Overflows.
-/// 
+///
 /// This function prepares the fixpoint computation that computes the CWE warnings by setting the start states for all function starts.
 /// Then the fixpoint computation is executed.
 /// Afterwards, the collected logs and CWE warnings are collected from a separate logging thread and returned.

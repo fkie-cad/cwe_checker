@@ -140,7 +140,7 @@ impl<'a> Context<'a> {
                 };
                 merged_data = merged_data
                     .map(|val| val.merge(value_at_callsite))
-                    .or(Some(value_at_callsite.clone()));
+                    .or_else(|| Some(value_at_callsite.clone()));
             }
         }
         let merged_data = merged_data.unwrap_or_else(|| Data::new_top(param_id.bytesize()));
@@ -306,7 +306,7 @@ impl<'a> Context<'a> {
 /// Compute a map that maps the TIDs of functions to the set of TIDs of all known callsites to the corresponding function.
 fn compute_callee_to_call_sites_map(project: &Project) -> HashMap<Tid, HashSet<Tid>> {
     let mut callee_to_call_sites_map: HashMap<Tid, HashSet<Tid>> = HashMap::new();
-    for (_sub_tid, sub) in &project.program.term.subs {
+    for sub in project.program.term.subs.values() {
         for blk in &sub.term.blocks {
             for jmp in &blk.term.jmps {
                 match &jmp.term {
@@ -329,7 +329,7 @@ fn compute_param_replacement_map(
     analysis_results: &AnalysisResults,
 ) -> HashMap<AbstractIdentifier, Data> {
     let mut param_replacement_map = HashMap::new();
-    for (_sub_tid, sub) in &analysis_results.project.program.term.subs {
+    for sub in analysis_results.project.program.term.subs.values() {
         for blk in &sub.term.blocks {
             for jmp in &blk.term.jmps {
                 match &jmp.term {
@@ -363,7 +363,7 @@ fn add_param_replacements_for_call(
         .unwrap()
         .get(callee_tid)
     {
-        for (param_arg, _access_pattern) in &fn_sig.parameters {
+        for param_arg in fn_sig.parameters.keys() {
             if let Some(param_value) = vsa_results.eval_parameter_arg_at_call(&call.tid, param_arg)
             {
                 let param_id = AbstractIdentifier::from_arg(&call.tid, param_arg);
@@ -393,22 +393,19 @@ fn compute_size_values_of_malloc_calls(analysis_results: &AnalysisResults) -> Ha
     let project = analysis_results.project;
     let pointer_inference = analysis_results.pointer_inference.unwrap();
     let mut malloc_size_map = HashMap::new();
-    for (_sub_tid, sub) in &analysis_results.project.program.term.subs {
+    for sub in analysis_results.project.program.term.subs.values() {
         for blk in &sub.term.blocks {
             for jmp in &blk.term.jmps {
-                match &jmp.term {
-                    Jmp::Call { target, .. } => {
-                        if let Some(symbol) = project.program.term.extern_symbols.get(target) {
-                            if let Some(size_value) = compute_size_value_of_malloc_like_call(
-                                &jmp.tid,
-                                symbol,
-                                pointer_inference,
-                            ) {
-                                malloc_size_map.insert(jmp.tid.clone(), size_value);
-                            }
+                if let Jmp::Call { target, .. } = &jmp.term {
+                    if let Some(symbol) = project.program.term.extern_symbols.get(target) {
+                        if let Some(size_value) = compute_size_value_of_malloc_like_call(
+                            &jmp.tid,
+                            symbol,
+                            pointer_inference,
+                        ) {
+                            malloc_size_map.insert(jmp.tid.clone(), size_value);
                         }
                     }
-                    _ => (),
                 }
             }
         }
@@ -418,7 +415,7 @@ fn compute_size_values_of_malloc_calls(analysis_results: &AnalysisResults) -> Ha
 
 /// Compute the size value of a call to a malloc-like function according to the pointer inference and return it.
 /// Returns `None` if the called symbol is not an allocating function or the size computation for the symbol is not yet implemented.
-/// 
+///
 /// Currently this function computes the size values for the symbols `malloc`, `realloc` and `calloc`.
 fn compute_size_value_of_malloc_like_call(
     jmp_tid: &Tid,
@@ -428,14 +425,14 @@ fn compute_size_value_of_malloc_like_call(
     match called_symbol.name.as_str() {
         "malloc" => {
             let size_param = &called_symbol.parameters[0];
-            match pointer_inference.eval_parameter_arg_at_call(&jmp_tid, size_param) {
+            match pointer_inference.eval_parameter_arg_at_call(jmp_tid, size_param) {
                 Some(size_value) => Some(size_value),
                 None => Some(Data::new_top(size_param.bytesize())),
             }
         }
         "realloc" => {
             let size_param = &called_symbol.parameters[1];
-            match pointer_inference.eval_parameter_arg_at_call(&jmp_tid, size_param) {
+            match pointer_inference.eval_parameter_arg_at_call(jmp_tid, size_param) {
                 Some(size_value) => Some(size_value),
                 None => Some(Data::new_top(size_param.bytesize())),
             }
@@ -444,8 +441,8 @@ fn compute_size_value_of_malloc_like_call(
             let count_param = &called_symbol.parameters[0];
             let size_param = &called_symbol.parameters[1];
             match (
-                pointer_inference.eval_parameter_arg_at_call(&jmp_tid, count_param),
-                pointer_inference.eval_parameter_arg_at_call(&jmp_tid, size_param),
+                pointer_inference.eval_parameter_arg_at_call(jmp_tid, count_param),
+                pointer_inference.eval_parameter_arg_at_call(jmp_tid, size_param),
             ) {
                 (Some(count_value), Some(size_value)) => {
                     Some(count_value.bin_op(BinOpType::IntMult, &size_value))
