@@ -245,8 +245,22 @@ impl std::fmt::Display for AbstractMemoryLocation {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
+
+    impl AbstractIdentifier {
+        /// Mock an abstract identifier with the given TID name and pointing to the value in the given register name.
+        pub fn mock(
+            tid: impl ToString,
+            register: impl ToString,
+            size_in_bytes: u64,
+        ) -> AbstractIdentifier {
+            AbstractIdentifier::new(
+                Tid::new(tid.to_string()),
+                AbstractLocation::from_var(&Variable::mock(register, size_in_bytes)).unwrap(),
+            )
+        }
+    }
 
     #[test]
     fn test_constraint_enforcements() {

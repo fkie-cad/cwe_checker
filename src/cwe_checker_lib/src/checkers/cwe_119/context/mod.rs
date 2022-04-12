@@ -31,6 +31,8 @@ pub struct Context<'a> {
     /// A map that maps the TIDs of calls to allocatingfunctions (like malloc, realloc and calloc)
     /// to the value representing the size of the allocated memory object according to the pointer inference analysis.
     pub malloc_tid_to_object_size_map: HashMap<Tid, Data>,
+    /// A map that maps the TIDs of jump instructions to the function TID of the caller.
+    pub call_to_caller_fn_map: HashMap<Tid, Tid>,
     /// A sender channel that can be used to collect logs in the corresponding logging thread.
     pub log_collector: crossbeam_channel::Sender<LogThreadMsg>,
 }
@@ -53,6 +55,7 @@ impl<'a> Context<'a> {
             callee_to_callsites_map: compute_callee_to_call_sites_map(project),
             param_replacement_map: compute_param_replacement_map(analysis_results),
             malloc_tid_to_object_size_map: compute_size_values_of_malloc_calls(analysis_results),
+            call_to_caller_fn_map: compute_call_to_caller_map(project),
             log_collector,
         }
     }
@@ -75,13 +78,7 @@ impl<'a> Context<'a> {
     /// If more than one possible absolute value for the size is found then the minimum value for the size is returned.
     pub fn compute_size_of_heap_object(&self, object_id: &AbstractIdentifier) -> BitvectorDomain {
         if let Some(object_size) = self.malloc_tid_to_object_size_map.get(object_id.get_tid()) {
-            let fn_tid_at_malloc_call = self
-                .pointer_inference
-                .get_state_at_jmp_tid(object_id.get_tid())
-                .unwrap()
-                .stack_id
-                .get_tid()
-                .clone();
+            let fn_tid_at_malloc_call = self.call_to_caller_fn_map[object_id.get_tid()].clone();
             let object_size = self.recursively_substitute_param_values_context_sensitive(
                 object_size,
                 &fn_tid_at_malloc_call,
@@ -177,7 +174,10 @@ impl<'a> Context<'a> {
                     has_stabilized = false;
                     let (caller_absolute_value, caller_data) = self.substitute_param_values(&id);
                     replacement_map.insert(id, caller_data);
-                    merged_absolute_value = match (merged_absolute_value, caller_absolute_value) {
+                    merged_absolute_value = match (
+                        merged_absolute_value,
+                        caller_absolute_value.map(|val| val + offset),
+                    ) {
                         (Some(val_left), Some(val_right)) => {
                             Some(val_left.signed_merge(&val_right))
                         }
@@ -210,7 +210,7 @@ impl<'a> Context<'a> {
                 if let Some(value_at_callsite) =
                     self.param_replacement_map.get(&param_id_at_callsite)
                 {
-                    replacement_map.insert(id, value_at_callsite.clone() + offset.into());
+                    replacement_map.insert(id, value_at_callsite.clone());
                 } // Else it is a pointer to the current stack frame, which is invalid in the caller.
             } else {
                 // Not a function param.
@@ -245,13 +245,7 @@ impl<'a> Context<'a> {
                 &current_fn_tid,
             );
             // Now set the new current_fn_tid to the TID of the caller function.
-            current_fn_tid = self
-                .pointer_inference
-                .get_state_at_jmp_tid(call_tid)
-                .unwrap()
-                .stack_id
-                .get_tid()
-                .clone();
+            current_fn_tid = self.call_to_caller_fn_map[call_tid].clone();
         }
         substituted_value
     }
@@ -452,6 +446,24 @@ fn compute_size_value_of_malloc_like_call(
         }
         _ => None,
     }
+}
+
+/// Compute a map that maps the TIDs of call instructions to the TID of the caller function.
+fn compute_call_to_caller_map(project: &Project) -> HashMap<Tid, Tid> {
+    let mut call_to_caller_map = HashMap::new();
+    for (sub_tid, sub) in &project.program.term.subs {
+        for block in &sub.term.blocks {
+            for jmp in &block.term.jmps {
+                match &jmp.term {
+                    Jmp::Call { .. } | Jmp::CallInd { .. } | Jmp::CallOther { .. } => {
+                        call_to_caller_map.insert(jmp.tid.clone(), sub_tid.clone());
+                    }
+                    _ => (),
+                }
+            }
+        }
+    }
+    call_to_caller_map
 }
 
 #[cfg(test)]

@@ -231,6 +231,7 @@ impl AbstractDomain for State {
 pub mod tests {
     use super::*;
     use crate::intermediate_representation::Variable;
+    use std::collections::{HashMap, HashSet};
 
     #[test]
     fn test_new() {
@@ -286,11 +287,67 @@ pub mod tests {
 
     #[test]
     fn test_compute_bounds_of_id() {
-        todo!()
+        let mut context = Context::mock_x64();
+        context
+            .malloc_tid_to_object_size_map
+            .insert(Tid::new("malloc_call"), Data::from(Bitvector::from_i64(42)));
+        context
+            .call_to_caller_fn_map
+            .insert(Tid::new("malloc_call"), Tid::new("main"));
+        let mut state = State::new(
+            &Tid::new("func"),
+            &FunctionSignature::mock_x64(),
+            context.project,
+        );
+
+        state.compute_bounds_of_id(&AbstractIdentifier::mock("malloc_call", "RAX", 8), &context);
+        assert_eq!(state.object_lower_bounds.len(), 2);
+        assert_eq!(
+            state.object_lower_bounds[&AbstractIdentifier::mock("malloc_call", "RAX", 8)],
+            Bitvector::from_i64(0).into()
+        );
+        assert_eq!(
+            state.object_upper_bounds[&AbstractIdentifier::mock("malloc_call", "RAX", 8)],
+            Bitvector::from_i64(42).into()
+        );
     }
 
     #[test]
     fn test_compute_bounds_of_param_id() {
-        todo!()
+        let mut context = Context::mock_x64();
+        let param_id = AbstractIdentifier::mock("func", "RDI", 8);
+        let callsite_id = AbstractIdentifier::mock("callsite_id", "RDI", 8);
+
+        let malloc_call_id = AbstractIdentifier::mock("malloc_call", "RAX", 8);
+
+        let param_value = Data::from_target(malloc_call_id.clone(), Bitvector::from_i64(2).into());
+        let param_replacement_map = HashMap::from([(callsite_id, param_value.clone())]);
+        let callee_to_callsites_map =
+            HashMap::from([(Tid::new("func"), HashSet::from([Tid::new("callsite_id")]))]);
+        context.param_replacement_map = param_replacement_map;
+        context.callee_to_callsites_map = callee_to_callsites_map;
+        context
+            .malloc_tid_to_object_size_map
+            .insert(Tid::new("malloc_call"), Data::from(Bitvector::from_i64(42)));
+        context.call_to_caller_fn_map = HashMap::from([
+            (Tid::new("malloc_call"), Tid::new("main")),
+            (Tid::new("callsite_id"), Tid::new("main")),
+        ]);
+        let mut state = State::new(
+            &Tid::new("func"),
+            &FunctionSignature::mock_x64(),
+            context.project,
+        );
+
+        state.compute_bounds_of_param_id(&param_id, &context);
+        assert_eq!(state.object_lower_bounds.len(), 2);
+        assert_eq!(
+            state.object_lower_bounds[&AbstractIdentifier::mock("func", "RDI", 8)],
+            Bitvector::from_i64(-2).into()
+        );
+        assert_eq!(
+            state.object_upper_bounds[&AbstractIdentifier::mock("func", "RDI", 8)],
+            Bitvector::from_i64(40).into()
+        );
     }
 }
