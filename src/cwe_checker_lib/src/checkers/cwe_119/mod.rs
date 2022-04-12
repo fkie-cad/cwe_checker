@@ -34,6 +34,8 @@
 //! - For parameters of extern function calls the check only checks whether the parameter itself may point outside of the boundaries of a memory object.
 //! But since we generally do not know what size the called function expects the pointed-to object to have
 //! this still may miss buffer overflows occuring in the called function.
+//! - Right now the check only considers buffers on the stack or the heap, but not buffers in global memory.
+//! Thus corresponding overflows of buffers in global memory are not detected.
 
 use crate::analysis::pointer_inference::Data;
 use crate::prelude::*;
