@@ -269,7 +269,10 @@ mod tests {
         mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
         mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.
 
+        mark_skipped(&mut tests, "ppc", "gcc"); // Needs tracking of linear dependencies between register values.
+
         mark_skipped(&mut tests, "x86", "gcc"); // Loss of stack register value since we do not track pointer alignment yet.
+        mark_skipped(&mut tests, "x86", "clang"); // Unrelated third CWE hit in `__libc_csu_init`
 
         mark_compiler_skipped(&mut tests, "mingw32-gcc"); // TODO: Check reason for failure!
 

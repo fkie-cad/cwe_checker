@@ -227,6 +227,35 @@ impl AbstractDomain for State {
     }
 }
 
+impl State {
+    /// Get a json-representation of the state.
+    /// Intended for pretty printing, not useable for serialization/deserialization.
+    #[allow(dead_code)]
+    pub fn to_json_compact(&self) -> serde_json::Value {
+        use serde_json::*;
+        let mut state_map = Map::new();
+        state_map.insert(
+            "stack_id".to_string(),
+            Value::String(self.stack_id.to_string()),
+        );
+
+        let lower_bounds: Vec<_> = self
+            .object_lower_bounds
+            .iter()
+            .map(|(id, bound)| Value::String(format!("{}: {}", id, bound)))
+            .collect();
+        state_map.insert("lower_bounds".to_string(), Value::Array(lower_bounds));
+        let upper_bounds: Vec<_> = self
+            .object_upper_bounds
+            .iter()
+            .map(|(id, bound)| Value::String(format!("{}: {}", id, bound)))
+            .collect();
+        state_map.insert("upper_bounds".to_string(), Value::Array(upper_bounds));
+
+        Value::Object(state_map)
+    }
+}
+
 #[cfg(test)]
 pub mod tests {
     use super::*;
