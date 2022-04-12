@@ -85,7 +85,7 @@ impl CweTestCase {
 }
 
 /// Mark test cases using the given CPU architecture as `skipped`.
-pub fn mark_architecture_skipped(test_cases: &mut Vec<CweTestCase>, arch: &str) {
+pub fn mark_architecture_skipped(test_cases: &mut [CweTestCase], arch: &str) {
     for test in test_cases.iter_mut() {
         if test.architecture == arch {
             test.skipped = true;
@@ -94,7 +94,7 @@ pub fn mark_architecture_skipped(test_cases: &mut Vec<CweTestCase>, arch: &str) 
 }
 
 /// Mark test cases using the given compiler as `skipped`.
-pub fn mark_compiler_skipped(test_cases: &mut Vec<CweTestCase>, comp: &str) {
+pub fn mark_compiler_skipped(test_cases: &mut [CweTestCase], comp: &str) {
     for test in test_cases.iter_mut() {
         if test.compiler == comp {
             test.skipped = true;
@@ -103,7 +103,7 @@ pub fn mark_compiler_skipped(test_cases: &mut Vec<CweTestCase>, comp: &str) {
 }
 
 /// Mark test cases using the given CPU architecture + compiler combination as `skipped`.
-pub fn mark_skipped(test_cases: &mut Vec<CweTestCase>, value1: &str, value2: &str) {
+pub fn mark_skipped(test_cases: &mut [CweTestCase], value1: &str, value2: &str) {
     for test in test_cases.iter_mut() {
         if (test.architecture == value1 && test.compiler == value2)
             || (test.architecture == value2 && test.compiler == value1)
