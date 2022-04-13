@@ -85,7 +85,7 @@ impl CweTestCase {
 }
 
 /// Mark test cases using the given CPU architecture as `skipped`.
-pub fn mark_architecture_skipped(test_cases: &mut Vec<CweTestCase>, arch: &str) {
+pub fn mark_architecture_skipped(test_cases: &mut [CweTestCase], arch: &str) {
     for test in test_cases.iter_mut() {
         if test.architecture == arch {
             test.skipped = true;
@@ -94,7 +94,7 @@ pub fn mark_architecture_skipped(test_cases: &mut Vec<CweTestCase>, arch: &str) 
 }
 
 /// Mark test cases using the given compiler as `skipped`.
-pub fn mark_compiler_skipped(test_cases: &mut Vec<CweTestCase>, comp: &str) {
+pub fn mark_compiler_skipped(test_cases: &mut [CweTestCase], comp: &str) {
     for test in test_cases.iter_mut() {
         if test.compiler == comp {
             test.skipped = true;
@@ -103,7 +103,7 @@ pub fn mark_compiler_skipped(test_cases: &mut Vec<CweTestCase>, comp: &str) {
 }
 
 /// Mark test cases using the given CPU architecture + compiler combination as `skipped`.
-pub fn mark_skipped(test_cases: &mut Vec<CweTestCase>, value1: &str, value2: &str) {
+pub fn mark_skipped(test_cases: &mut [CweTestCase], value1: &str, value2: &str) {
     for test in test_cases.iter_mut() {
         if (test.architecture == value1 && test.compiler == value2)
             || (test.architecture == value2 && test.compiler == value1)
@@ -239,7 +239,7 @@ mod tests {
     #[ignore]
     fn cwe_119() {
         let mut error_log = Vec::new();
-        let mut tests = all_test_cases("cwe_119", "Memory");
+        let mut tests = all_test_cases("cwe_119", "CWE119");
 
         mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
         mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.
@@ -264,21 +264,20 @@ mod tests {
     #[ignore]
     fn cwe_125() {
         let mut error_log = Vec::new();
-        let mut tests = all_test_cases("cwe_119", "Memory");
-
-        mark_architecture_skipped(&mut tests, "mips"); // A second unrelated instance is found in "__do_global_ctors_aux".
-        mark_architecture_skipped(&mut tests, "mipsel"); // A second unrelated instance is found in "__do_global_ctors_aux".
+        let mut tests = all_test_cases("cwe_119", "CWE119");
 
         mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
         mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.
 
+        mark_skipped(&mut tests, "ppc", "gcc"); // Needs tracking of linear dependencies between register values.
+
         mark_skipped(&mut tests, "x86", "gcc"); // Loss of stack register value since we do not track pointer alignment yet.
-        mark_skipped(&mut tests, "x86", "clang"); // A second unrelated instance is found in "__do_global_ctors_aux".
+        mark_skipped(&mut tests, "x86", "clang"); // Unrelated third CWE hit in `__libc_csu_init`
 
         mark_compiler_skipped(&mut tests, "mingw32-gcc"); // TODO: Check reason for failure!
 
         for test_case in tests {
-            let num_expected_occurences = 1;
+            let num_expected_occurences = 2;
             if let Err(error) = test_case.run_test("[CWE125]", num_expected_occurences) {
                 error_log.push((test_case.get_filepath(), error));
             }
@@ -626,7 +625,7 @@ mod tests {
     #[ignore]
     fn cwe_787() {
         let mut error_log = Vec::new();
-        let mut tests = all_test_cases("cwe_119", "Memory");
+        let mut tests = all_test_cases("cwe_119", "CWE119");
 
         mark_skipped(&mut tests, "arm", "gcc"); // Needs tracking of linear dependencies between register values.
         mark_skipped(&mut tests, "mips64", "gcc"); // Needs tracking of linear dependencies between register values.
@@ -645,7 +644,7 @@ mod tests {
         mark_compiler_skipped(&mut tests, "mingw32-gcc"); // TODO: Check reason for failure!
 
         for test_case in tests {
-            let num_expected_occurences = 1;
+            let num_expected_occurences = 2;
             if let Err(error) = test_case.run_test("[CWE787]", num_expected_occurences) {
                 error_log.push((test_case.get_filepath(), error));
             }

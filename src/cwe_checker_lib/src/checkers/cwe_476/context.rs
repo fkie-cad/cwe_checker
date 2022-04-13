@@ -453,7 +453,7 @@ mod tests {
         assert_eq!(
             context.check_parameters_for_taint(
                 &state,
-                &ExternSymbol::mock_x64(),
+                &ExternSymbol::mock_x64("mock_symbol"),
                 NodeIndex::new(0)
             ),
             false
@@ -466,7 +466,7 @@ mod tests {
         assert_eq!(
             context.check_parameters_for_taint(
                 &state,
-                &ExternSymbol::mock_x64(),
+                &ExternSymbol::mock_x64("mock_symbol"),
                 NodeIndex::new(0)
             ),
             true

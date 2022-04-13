@@ -349,11 +349,11 @@ mod tests {
     }
 
     impl ExternSymbol {
-        pub fn mock_x64() -> ExternSymbol {
+        pub fn mock_x64(name: impl ToString) -> ExternSymbol {
             ExternSymbol {
-                tid: Tid::new("mock_symbol"),
+                tid: Tid::new(name.to_string()),
                 addresses: vec!["UNKNOWN".to_string()],
-                name: "mock_symbol".to_string(),
+                name: name.to_string(),
                 calling_convention: Some("__stdcall".to_string()),
                 parameters: vec![Arg::mock_register("RDI", 8)],
                 return_values: vec![Arg::mock_register("RAX", 8)],
@@ -362,11 +362,11 @@ mod tests {
             }
         }
 
-        pub fn mock_arm32() -> ExternSymbol {
+        pub fn mock_arm32(name: impl ToString) -> ExternSymbol {
             ExternSymbol {
-                tid: Tid::new("mock_symbol"),
+                tid: Tid::new(name.to_string()),
                 addresses: vec!["UNKNOWN".to_string()],
-                name: "mock_symbol".to_string(),
+                name: name.to_string(),
                 calling_convention: Some("__stdcall".to_string()),
                 parameters: vec![Arg::mock_register("r0", 4)],
                 return_values: vec![Arg::mock_register("r0", 4)],

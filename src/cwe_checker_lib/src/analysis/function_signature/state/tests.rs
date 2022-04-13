@@ -143,7 +143,7 @@ fn test_eval() {
 #[test]
 fn test_extern_symbol_handling() {
     let mut state = State::mock_arm32();
-    let extern_symbol = ExternSymbol::mock_arm32();
+    let extern_symbol = ExternSymbol::mock_arm32("mock_symbol");
     let cconv = CallingConvention::mock_arm32();
     let call = Term {
         tid: Tid::new("call_tid"),

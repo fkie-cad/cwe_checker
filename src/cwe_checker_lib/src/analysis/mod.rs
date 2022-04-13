@@ -10,3 +10,4 @@ pub mod graph;
 pub mod interprocedural_fixpoint_generic;
 pub mod pointer_inference;
 pub mod string_abstraction;
+pub mod vsa_results;

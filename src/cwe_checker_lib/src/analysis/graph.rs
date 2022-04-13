@@ -494,6 +494,22 @@ pub fn get_program_cfg(program: &Term<Program>, extern_subs: HashSet<Tid>) -> Gr
     builder.build()
 }
 
+/// Returns a map from function TIDs to the node index of the `BlkStart` node of the first block in the function.
+pub fn get_entry_nodes_of_subs(graph: &Graph) -> HashMap<Tid, NodeIndex> {
+    let mut sub_to_entry_node_map: HashMap<Tid, NodeIndex> = HashMap::new();
+    for node in graph.node_indices() {
+        if let Node::BlkStart(block, sub) = graph[node] {
+            if let Some(entry_block) = sub.term.blocks.get(0) {
+                if block.tid == entry_block.tid {
+                    sub_to_entry_node_map.insert(sub.tid.clone(), node);
+                }
+            }
+        }
+    }
+
+    sub_to_entry_node_map
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

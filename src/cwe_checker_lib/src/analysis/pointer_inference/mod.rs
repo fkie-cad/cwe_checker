@@ -29,20 +29,22 @@
 use super::fixpoint::Computation;
 use super::forward_interprocedural_fixpoint::GeneralizedContext;
 use super::interprocedural_fixpoint_generic::NodeValue;
-use crate::abstract_domain::{DataDomain, IntervalDomain};
+use crate::abstract_domain::{DataDomain, IntervalDomain, SizedDomain};
+use crate::analysis::forward_interprocedural_fixpoint::Context as _;
 use crate::analysis::graph::{Graph, Node};
 use crate::intermediate_representation::*;
 use crate::prelude::*;
 use crate::utils::log::*;
 use petgraph::graph::NodeIndex;
 use petgraph::visit::IntoNodeReferences;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 
 mod context;
 pub mod object;
 mod object_list;
 mod state;
 mod statistics;
+mod vsa_result_impl;
 
 use context::Context;
 pub use state::State;
@@ -77,11 +79,23 @@ pub struct Config {
 }
 
 /// A wrapper struct for the pointer inference computation object.
+/// Also contains different analysis results computed through the fixpoint computation including generated log messages.
 pub struct PointerInference<'a> {
+    /// The pointer inference fixpoint computation object.
     computation: Computation<GeneralizedContext<'a, Context<'a>>>,
+    /// A sender channel that can be used to collect logs in the corresponding log thread.
     log_collector: crossbeam_channel::Sender<LogThreadMsg>,
     /// The log messages and CWE warnings that have been generated during the pointer inference analysis.
     pub collected_logs: (Vec<LogMessage>, Vec<CweWarning>),
+    /// Maps the TIDs of assignment, load or store [`Def`] instructions to the computed value data.
+    /// The map will be filled after the fixpoint computation finished.
+    values_at_defs: HashMap<Tid, Data>,
+    /// Maps the TIDs of load or store [`Def`] instructions to the computed address data.
+    /// The map will be filled after the fixpoint computation finished.
+    addresses_at_defs: HashMap<Tid, Data>,
+    /// Maps certain TIDs like the TIDs of [`Jmp`] instructions to the pointer inference state at that TID.
+    /// The map will be filled after the fixpoint computation finished.
+    states_at_tids: HashMap<Tid, State>,
 }
 
 impl<'a> PointerInference<'a> {
@@ -95,27 +109,8 @@ impl<'a> PointerInference<'a> {
         let context = Context::new(analysis_results, config, log_sender.clone());
         let project = analysis_results.project;
         let function_signatures = analysis_results.function_signatures.unwrap();
+        let sub_to_entry_node_map = crate::analysis::graph::get_entry_nodes_of_subs(context.graph);
 
-        let mut sub_to_entry_blocks_map = HashMap::new();
-        for (sub_tid, sub) in project.program.term.subs.iter() {
-            if let Some(entry_block) = sub.term.blocks.get(0) {
-                sub_to_entry_blocks_map.insert(sub_tid, entry_block.tid.clone());
-            }
-        }
-        let mut tid_to_graph_indices_map = HashMap::new();
-        for node in context.graph.node_indices() {
-            if let super::graph::Node::BlkStart(block, sub) = context.graph[node] {
-                tid_to_graph_indices_map.insert((block.tid.clone(), sub.tid.clone()), node);
-            }
-        }
-        let sub_to_entry_node_map: HashMap<Tid, NodeIndex> = sub_to_entry_blocks_map
-            .into_iter()
-            .filter_map(|(sub_tid, block_tid)| {
-                tid_to_graph_indices_map
-                    .get(&(block_tid, sub_tid.clone()))
-                    .map(|start_node_index| (sub_tid.clone(), *start_node_index))
-            })
-            .collect();
         let mut fixpoint_computation =
             super::forward_interprocedural_fixpoint::create_computation_with_alternate_worklist_order(context, None);
         if print_stats {
@@ -147,6 +142,9 @@ impl<'a> PointerInference<'a> {
             computation: fixpoint_computation,
             log_collector: log_sender,
             collected_logs: (Vec::new(), Vec::new()),
+            values_at_defs: HashMap::new(),
+            addresses_at_defs: HashMap::new(),
+            states_at_tids: HashMap::new(),
         }
     }
 
@@ -247,9 +245,66 @@ impl<'a> PointerInference<'a> {
         ));
     }
 
+    /// Send an info log message to the log collector.
     fn log_info(&self, msg: impl Into<String>) {
         let log_msg = LogMessage::new_info(msg.into()).source("Pointer Inference");
         let _ = self.log_collector.send(LogThreadMsg::Log(log_msg));
+    }
+
+    /// Fill the various result maps of `self` that are needed for the [`VsaResult`](crate::analysis::vsa_results::VsaResult) trait implementation.
+    fn fill_vsa_result_maps(&mut self) {
+        let context = self.computation.get_context().get_context();
+        let graph = self.computation.get_graph();
+        for node in graph.node_indices() {
+            let node_state = match self.computation.get_node_value(node) {
+                Some(NodeValue::Value(value)) => value,
+                _ => continue,
+            };
+            match graph[node] {
+                Node::BlkStart(blk, _sub) => {
+                    let mut state = node_state.clone();
+                    for def in &blk.term.defs {
+                        match &def.term {
+                            Def::Assign { var: _, value } => {
+                                self.values_at_defs
+                                    .insert(def.tid.clone(), state.eval(value));
+                            }
+                            Def::Load { var, address } => {
+                                let loaded_value = state
+                                    .load_value(address, var.size, context.runtime_memory_image)
+                                    .unwrap_or_else(|_| Data::new_top(var.size));
+                                self.values_at_defs.insert(def.tid.clone(), loaded_value);
+                                self.addresses_at_defs
+                                    .insert(def.tid.clone(), state.eval(address));
+                            }
+                            Def::Store { address, value } => {
+                                self.values_at_defs
+                                    .insert(def.tid.clone(), state.eval(value));
+                                self.addresses_at_defs
+                                    .insert(def.tid.clone(), state.eval(address));
+                            }
+                        }
+                        state = match context.update_def(&state, def) {
+                            Some(new_state) => new_state,
+                            None => break,
+                        }
+                    }
+                }
+                Node::BlkEnd(blk, _sub) => {
+                    for jmp in &blk.term.jmps {
+                        self.states_at_tids
+                            .insert(jmp.tid.clone(), node_state.clone());
+                    }
+                }
+                Node::CallSource { .. } | Node::CallReturn { .. } => (),
+            }
+        }
+    }
+
+    /// Get the state of the fixpoint computation at the block end node before the given jump instruction.
+    /// This function only yields results after the fixpoint has been computed.
+    pub fn get_state_at_jmp_tid(&self, jmp_tid: &Tid) -> Option<&State> {
+        self.states_at_tids.get(jmp_tid)
     }
 
     /// Print information on dead ends in the control flow graph for debugging purposes.
@@ -343,7 +398,7 @@ pub fn run<'a>(
     print_debug: bool,
     print_stats: bool,
 ) -> PointerInference<'a> {
-    let logging_thread = LogThread::spawn(collect_all_logs);
+    let logging_thread = LogThread::spawn(LogThread::collect_and_deduplicate);
 
     let mut computation = PointerInference::new(
         analysis_results,
@@ -353,6 +408,7 @@ pub fn run<'a>(
     );
 
     computation.compute(print_stats);
+    computation.fill_vsa_result_maps();
 
     if print_debug {
         computation.print_compact_json();
@@ -361,47 +417,6 @@ pub fn run<'a>(
     // save the logs and CWE warnings
     computation.collected_logs = logging_thread.collect();
     computation
-}
-
-/// This function is responsible for collecting logs and CWE warnings.
-/// For warnings with the same origin address only the last one is kept.
-/// This prevents duplicates but may suppress some log messages
-/// in the rare case that several different log messages with the same origin address are generated.
-fn collect_all_logs(
-    receiver: crossbeam_channel::Receiver<LogThreadMsg>,
-) -> (Vec<LogMessage>, Vec<CweWarning>) {
-    let mut logs_with_address = BTreeMap::new();
-    let mut general_logs = Vec::new();
-    let mut collected_cwes = BTreeMap::new();
-
-    while let Ok(log_thread_msg) = receiver.recv() {
-        match log_thread_msg {
-            LogThreadMsg::Log(log_message) => {
-                if let Some(ref tid) = log_message.location {
-                    logs_with_address.insert(tid.address.clone(), log_message);
-                } else {
-                    general_logs.push(log_message);
-                }
-            }
-            LogThreadMsg::Cwe(cwe_warning) => match &cwe_warning.addresses[..] {
-                [] => panic!("Unexpected CWE warning without origin address"),
-                [address, ..] => {
-                    collected_cwes.insert(address.clone(), cwe_warning);
-                }
-            },
-            LogThreadMsg::Terminate => break,
-        }
-    }
-    let logs = logs_with_address
-        .values()
-        .cloned()
-        .chain(general_logs.into_iter())
-        .collect();
-    let cwes = collected_cwes
-        .into_iter()
-        .map(|(_key, value)| value)
-        .collect();
-    (logs, cwes)
 }
 
 #[cfg(test)]
@@ -423,6 +438,18 @@ mod tests {
         pub fn set_node_value(&mut self, node_value: State, node_index: NodeIndex) {
             self.computation
                 .set_node_value(node_index, NodeValue::Value(node_value));
+        }
+
+        pub fn get_mut_values_at_defs(&mut self) -> &mut HashMap<Tid, Data> {
+            &mut self.values_at_defs
+        }
+
+        pub fn get_mut_addresses_at_defs(&mut self) -> &mut HashMap<Tid, Data> {
+            &mut self.addresses_at_defs
+        }
+
+        pub fn get_mut_states_at_tids(&mut self) -> &mut HashMap<Tid, State> {
+            &mut self.states_at_tids
         }
     }
 }
