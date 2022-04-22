@@ -10,38 +10,42 @@ fn substitute(
     mut journaled_sp: u32,
     tid: Tid,
 ) -> Vec<LogMessage> {
-    dbg!(&journaled_sp);
-    dbg!("IN: ", &exp);
     let mut log: Vec<LogMessage> = vec![];
 
     if let Expression::BinOp { op, lhs: _, rhs } = exp {
         if let Expression::Const(a) = &**rhs {
-            let offset: u32 =
-                dbg!(journaled_sp % ApInt::try_to_u32(&ApInt::into_negate(a.clone())).unwrap());
-            if offset != alignment {
-                log.push(LogMessage::new_info("Unexpected alignment").location(tid.clone()))
-            }
+            let bitmask: u32 = ApInt::try_to_u32(&ApInt::into_negate(a.clone())).unwrap();
+
+            let offset = journaled_sp.checked_rem(bitmask).unwrap_or(0);
+
             match op {
                 BinOpType::IntAnd => {
                     *op = BinOpType::IntSub;
                     journaled_sp -= offset;
+                    if bitmask != alignment {
+                        log.push(
+                            LogMessage::new_info("Unexpected alignment").location(tid),
+                        );
+                    }
                 }
                 BinOpType::IntOr => {
                     *op = BinOpType::IntAdd;
                     journaled_sp += offset;
+                    if bitmask != alignment {
+                        log.push(
+                            LogMessage::new_info("Unexpected alignment").location(tid),
+                        );
+                    }
                 }
                 _ => log.push(
-                    LogMessage::new_info("Unsubstitutable Operation on SP").location(tid.clone()),
+                    LogMessage::new_info("Unsubstitutable Operation on SP").location(tid),
                 ),
             };
             *rhs = Box::new(Expression::Const(ApInt::from_u32(offset)));
         }
     } else {
-        log.push(LogMessage::new_info("Unsubstitutable Operation on SP").location(tid.clone()))
+        log.push(LogMessage::new_info("Unsubstitutable Operation on SP").location(tid))
     }
-
-    dbg!("OUT: ", &exp);
-    dbg!(&journaled_sp);
     log
 }
 
@@ -54,7 +58,6 @@ fn journal_sp_value(sp: &mut u32, is_plus: bool, val: &Expression) {
             } else {
                 *sp -= con.try_to_u32().unwrap()
             }
-            dbg!(&sp);
         }
         _ => todo!(),
     }
@@ -71,7 +74,7 @@ pub fn substitute_and_on_stackpointer(project: &mut Project) -> Vec<LogMessage> 
         _ => 0,
     };
 
-    let mut journaled_sp: u32 = 10000000;
+    let mut journaled_sp: u32 = 10000000; //128-Byte aligned
     let mut log: Vec<LogMessage> = vec![];
 
     for sub in project.program.term.subs.values_mut() {
@@ -107,5 +110,194 @@ pub fn substitute_and_on_stackpointer(project: &mut Project) -> Vec<LogMessage> 
             }
         }
     }
-    dbg!(log)
+    log
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use std::borrow::BorrowMut;
+
+    /// Creates a x64 Project for easy addidion of assignments.
+    fn setup(mut defs: Vec<Term<Def>>) -> Project {
+        let mut proj = Project::mock_x64();
+        let mut blk = Blk::mock();
+        blk.term.defs.append(defs.as_mut());
+        let mut sub = Sub::mock("Sub");
+        sub.term.blocks.push(blk);
+        proj.program.term.subs.insert(Tid::new("sub_tid"), sub);
+
+        proj
+    }
+
+    #[test]
+    /// Tests the return of log messages for all alignments, that are unexpected for x64.
+    fn unexpected_alignment() {
+        for i in 0..31 {
+            let def = vec![Def::assign(
+                "tid1",
+                Project::mock_x64().stack_pointer_register.clone(),
+                Expression::BinOp {
+                    op: BinOpType::IntAnd,
+                    lhs: Box::new(Expression::Var(
+                        Project::mock_x64().stack_pointer_register.clone(),
+                    )),
+                    rhs: Box::new(Expression::const_from_apint(ApInt::from_u32(
+                        0xFFFFFFFF << i,
+                    ))),
+                },
+            )];
+
+            let mut proj = setup(def);
+            let log = substitute_and_on_stackpointer(proj.borrow_mut());
+
+            if 2_i32.pow(i) == 16 {
+                assert!(log.is_empty());
+            } else {
+                assert!(!log.is_empty());
+                for msg in log {
+                    assert!(msg.text.contains("Unexpected alignment"));
+                }
+            }
+        }
+    }
+
+    #[test]
+    /// Tests the substituted offset meets the alignment.
+    fn compute_correct_offset() {
+        for i in 0..=33 {
+            let sub_from_sp = Def::assign(
+                "tid_alter_sp",
+                Project::mock_x64().stack_pointer_register.clone(),
+                Expression::BinOp {
+                    op: BinOpType::IntSub,
+                    lhs: Box::new(Expression::Var(
+                        Project::mock_x64().stack_pointer_register.clone(),
+                    )),
+                    rhs: Box::new(Expression::const_from_apint(ApInt::from_u32(i))),
+                },
+            );
+            let byte_alignment_as_and = Def::assign(
+                "tid_to_be_substituted",
+                Project::mock_x64().stack_pointer_register.clone(),
+                Expression::BinOp {
+                    op: BinOpType::IntAnd,
+                    lhs: Box::new(Expression::Var(
+                        Project::mock_x64().stack_pointer_register.clone(),
+                    )),
+                    rhs: Box::new(Expression::const_from_apint(ApInt::from_u32(
+                        0xFFFFFFFF << 4,
+                    ))),
+                },
+            );
+
+            let mut proj = setup(vec![sub_from_sp.clone(), byte_alignment_as_and.clone()]);
+
+            let log = substitute_and_on_stackpointer(proj.borrow_mut());
+
+            for sub in proj.program.term.subs.into_values() {
+                for blk in sub.term.blocks {
+                    for def in blk.term.defs {
+                        if def.tid == byte_alignment_as_and.tid.clone() {
+                            let expected_offset = match i % 16 {
+                                0 => 0,
+                                _ => 16 - (i % 16),
+                            };
+
+                            let expected_def = Def::Assign {
+                                var: proj.stack_pointer_register.clone(),
+                                value: Expression::BinOp {
+                                    op: BinOpType::IntSub,
+                                    lhs: Box::new(Expression::Var(
+                                        proj.stack_pointer_register.clone(),
+                                    )),
+                                    rhs: Box::new(Expression::const_from_apint(ApInt::from_u32(
+                                        expected_offset,
+                                    ))),
+                                },
+                            };
+
+                            assert_eq!(expected_def, def.term);
+                            assert!(log.is_empty());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    /// Checks behaviour on all operations, mostly unsupported operations.
+    fn check_all_operations() {
+        for biopty in vec![
+            BinOpType::Piece,
+            BinOpType::IntEqual,
+            BinOpType::IntNotEqual,
+            BinOpType::IntLess,
+            BinOpType::IntSLess,
+            BinOpType::IntLessEqual,
+            BinOpType::IntSLessEqual,
+            BinOpType::IntAdd,
+            BinOpType::IntSub,
+            BinOpType::IntCarry,
+            BinOpType::IntSCarry,
+            BinOpType::IntSBorrow,
+            BinOpType::IntXOr,
+            BinOpType::IntAnd,
+            BinOpType::IntOr,
+            BinOpType::IntLeft,
+            BinOpType::IntRight,
+            BinOpType::IntSRight,
+            BinOpType::IntMult,
+            BinOpType::IntDiv,
+            BinOpType::IntRem,
+            BinOpType::IntSDiv,
+            BinOpType::IntSRem,
+            BinOpType::BoolXOr,
+            BinOpType::BoolAnd,
+            BinOpType::BoolOr,
+            BinOpType::FloatEqual,
+            BinOpType::FloatNotEqual,
+            BinOpType::FloatLess,
+            BinOpType::FloatLessEqual,
+            BinOpType::FloatAdd,
+            BinOpType::FloatSub,
+            BinOpType::FloatMult,
+            BinOpType::FloatDiv,
+        ] {
+            let unsupported_def = Def::assign(
+                "tid_to_be_substituted",
+                Project::mock_x64().stack_pointer_register.clone(),
+                Expression::BinOp {
+                    op: biopty,
+                    lhs: Box::new(Expression::Var(
+                        Project::mock_x64().stack_pointer_register.clone(),
+                    )),
+                    rhs: Box::new(Expression::const_from_i32(0)),
+                },
+            );
+            let mut proj = setup(vec![unsupported_def.clone()]);
+            let mut log = substitute_and_on_stackpointer(proj.borrow_mut());
+
+            match biopty {
+                BinOpType::IntAnd | BinOpType::IntOr => {
+                    assert_eq!(log.len(), 1);
+                    assert!(log.pop().unwrap().text.contains("Unexpected alignment"));
+                }
+                BinOpType::IntAdd | BinOpType::IntSub => {
+                    assert_eq!(log.len(), 0)
+                }
+
+                _ => {
+                    assert_eq!(log.len(), 1);
+                    assert!(log
+                        .pop()
+                        .unwrap()
+                        .text
+                        .contains("Unsubstitutable Operation on SP"));
+                }
+            }
+        }
+    }
 }
