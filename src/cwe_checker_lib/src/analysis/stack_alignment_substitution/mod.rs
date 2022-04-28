@@ -1,46 +1,45 @@
+//! Substitutes stack pointer alignment operations utilising logical AND with an arithmetic SUB operation.
+//!
+//! The first basic block of every function is searched for a logical AND operation on the stack pointer.
+//! By journeling changes to the stack pointer an offset is calculated which is going to be used to alter the operation
+//! into a subtraction.
+//!
+//! # Log Messages
+//! Following cases trigger log messages:
+//! - alignment is untypical for the architecture
+//! - the argument for the AND operation is not a constant
+//! - an operation alters the stack pointer, which can not be journeled.
+
 use apint::ApInt;
 use itertools::Itertools;
 
 use crate::{intermediate_representation::*, utils::log::LogMessage};
 
-/// Substitutes AND (OR) operation by SUB (ADD) operation with calculated constants.
+/// Substitutes AND operation by SUB operation with calculated constants.
 /// Constants are derived by a journaled stackpointer value and the bitmask provided by the operation.
 fn substitute(
     exp: &mut Expression,
-    expected_alignment: u64,
-    journaled_sp: &mut u64,
+    expected_alignment: i64,
+    journaled_sp: &mut i64,
     tid: Tid,
 ) -> Vec<LogMessage> {
     let mut log: Vec<LogMessage> = vec![];
 
     if let Expression::BinOp { op, lhs: _, rhs } = exp {
         if let Expression::Const(bitmask) = &**rhs {
-            let alignment = ApInt::try_to_u64(&ApInt::into_negate(bitmask.clone())).unwrap();
-
-            let offset = journaled_sp.checked_rem(alignment).unwrap_or(0);
-
-            match op {
-                BinOpType::IntAnd => {
-                    *op = BinOpType::IntSub;
-                    *journaled_sp -= offset;
-                    if alignment != expected_alignment {
-                        log.push(LogMessage::new_info("Unexpected alignment").location(tid));
-                    }
+            if let BinOpType::IntAnd = op {
+                let alignment = ApInt::try_to_i64(&ApInt::into_negate(bitmask.clone())).unwrap();
+                let offset = journaled_sp.checked_rem_euclid(alignment).unwrap_or(0);
+                *op = BinOpType::IntSub;
+                *rhs = Box::new(Expression::Const(
+                    (ApInt::from_i64(offset)).into_resize_unsigned(bitmask.bytesize()),
+                ));
+                if alignment != expected_alignment {
+                    log.push(LogMessage::new_info("Unexpected alignment").location(tid));
                 }
-                BinOpType::IntOr => {
-                    *op = BinOpType::IntAdd;
-                    *journaled_sp += offset;
-                    if alignment != expected_alignment {
-                        log.push(LogMessage::new_info("Unexpected alignment").location(tid));
-                    }
-                }
-                _ => {
-                    log.push(LogMessage::new_info("Unsubstitutable Operation on SP").location(tid))
-                }
+            } else {
+                log.push(LogMessage::new_info("Unsubstitutable Operation on SP").location(tid))
             };
-            *rhs = Box::new(Expression::Const(
-                (ApInt::from_u64(offset)).into_resize_unsigned(bitmask.bytesize()),
-            ));
         } else {
             log.push(
                 LogMessage::new_info(
@@ -56,20 +55,17 @@ fn substitute(
 }
 
 /// Updates current stackpointer value by given Constant.
-fn journal_sp_value(sp: &mut u64, is_plus: bool, val: &Expression) {
-    match val {
-        Expression::Const(con) => {
-            if is_plus {
-                *sp += con.try_to_u64().unwrap()
-            } else {
-                *sp -= con.try_to_u64().unwrap()
-            }
+fn journal_sp_value(sp: &mut i64, is_plus: bool, val: &Expression) {
+    if let Expression::Const(con) = val {
+        if is_plus {
+            *sp += con.try_to_i64().unwrap()
+        } else {
+            *sp -= con.try_to_i64().unwrap()
         }
-        _ => todo!(),
     }
 }
 
-/// Substitutes logical AND and OR on the stackpointer register by SUB and ADD.
+/// Substitutes logical AND on the stackpointer register by SUB.
 /// Expressions are changed to use constants w.r.t the provided bit mask.
 pub fn substitute_and_on_stackpointer(project: &mut Project) -> Vec<LogMessage> {
     // for sanity check
@@ -82,10 +78,10 @@ pub fn substitute_and_on_stackpointer(project: &mut Project) -> Vec<LogMessage> 
 
     let mut log: Vec<LogMessage> = vec![];
 
-    for sub in project.program.term.subs.values_mut() {
-        let journaled_sp: &mut u64 = &mut 10000000; // 128-Byte aligned
-                                                    // only for the first block SP can be reasonable tracked
-        'blk_loop: for blk in sub.term.blocks.first_mut() {
+    'sub_loop: for sub in project.program.term.subs.values_mut() {
+        let journaled_sp: &mut i64 = &mut 0;
+        // only for the first block SP can be reasonable tracked
+        if let Some(blk) = sub.term.blocks.first_mut() {
             for def in blk.term.defs.iter_mut() {
                 if let Def::Assign { var, value } = &mut def.term {
                     if *var == project.stack_pointer_register {
@@ -104,9 +100,9 @@ pub fn substitute_and_on_stackpointer(project: &mut Project) -> Vec<LogMessage> 
                                             journaled_sp,
                                             def.tid.clone(),
                                         );
-                                        log.append(msg.as_mut());
-                                        if !msg
-                                            .into_iter()
+                                        log.append(&mut msg);
+                                        if !log
+                                            .iter()
                                             .filter(|x| {
                                                 x.text.contains("Unsubstitutable Operation on SP")
                                             })
@@ -114,7 +110,7 @@ pub fn substitute_and_on_stackpointer(project: &mut Project) -> Vec<LogMessage> 
                                             .is_empty()
                                         {
                                             // Lost track of SP
-                                            break 'blk_loop;
+                                            continue 'sub_loop;
                                         }
                                     }
                                 }

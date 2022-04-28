@@ -229,7 +229,7 @@ fn check_bin_operations() {
 
         for mut log in vec![log_arm32, log_x64] {
             match biopty {
-                BinOpType::IntAnd | BinOpType::IntOr => {
+                BinOpType::IntAnd => {
                     assert_eq!(log.len(), 1);
                     assert!(log.pop().unwrap().text.contains("Unexpected alignment"));
                 }
@@ -246,6 +246,77 @@ fn check_bin_operations() {
                         .contains("Unsubstitutable Operation on SP"));
                 }
             }
+        }
+    }
+}
+
+#[test]
+/// Checks if the substitution on logical operations ends if an unsubstitutable operation occured.
+fn substitution_ends_if_unsubstituable() {
+    let alignment_16_byte_as_and = Def::assign(
+        "tid_to_be_substituted",
+        Project::mock_x64().stack_pointer_register.clone(),
+        Expression::BinOp {
+            op: BinOpType::IntAnd,
+            lhs: Box::new(Expression::Var(
+                Project::mock_x64().stack_pointer_register.clone(),
+            )),
+            rhs: Box::new(Expression::const_from_apint(ApInt::from_u64(
+                0xFFFFFFFF_FFFFFFFF << 4, // 16 Byte alignment
+            ))),
+        },
+    );
+
+    let unsubstitutable = Def::assign(
+        "tid_unsubstitutable",
+        Project::mock_x64().stack_pointer_register.clone(),
+        Expression::BinOp {
+            op: BinOpType::Piece,
+            lhs: Box::new(Expression::Var(
+                Project::mock_x64().stack_pointer_register.clone(),
+            )),
+            rhs: Box::new(Expression::const_from_i64(0)),
+        },
+    );
+    let mut proj = setup(
+        vec![
+            alignment_16_byte_as_and.clone(),
+            unsubstitutable.clone(),
+            alignment_16_byte_as_and.clone(),
+        ],
+        true,
+    );
+    let mut log = substitute_and_on_stackpointer(proj.borrow_mut());
+
+    assert!(!log.is_empty());
+    assert!(log
+        .pop()
+        .unwrap()
+        .text
+        .contains("Unsubstitutable Operation on SP"));
+
+    let exp_16_byte_alignment_substituted = Def::assign(
+        "tid_to_be_substituted",
+        Project::mock_x64().stack_pointer_register.clone(),
+        Expression::BinOp {
+            op: BinOpType::IntSub,
+            lhs: Box::new(Expression::Var(
+                Project::mock_x64().stack_pointer_register.clone(),
+            )),
+            rhs: Box::new(Expression::const_from_apint(ApInt::from_u64(0))),
+        },
+    );
+
+    for sub in proj.program.term.subs.into_values() {
+        for blk in sub.term.blocks {
+            assert_eq!(
+                blk.term.defs,
+                vec![
+                    exp_16_byte_alignment_substituted.clone(),
+                    unsubstitutable.clone(),
+                    alignment_16_byte_as_and.clone()
+                ]
+            );
         }
     }
 }
