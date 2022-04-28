@@ -29,7 +29,7 @@
 use super::fixpoint::Computation;
 use super::forward_interprocedural_fixpoint::GeneralizedContext;
 use super::interprocedural_fixpoint_generic::NodeValue;
-use crate::abstract_domain::{DataDomain, IntervalDomain, SizedDomain};
+use crate::abstract_domain::{AbstractIdentifier, DataDomain, IntervalDomain, SizedDomain};
 use crate::analysis::forward_interprocedural_fixpoint::Context as _;
 use crate::analysis::graph::{Graph, Node};
 use crate::intermediate_representation::*;
@@ -37,7 +37,7 @@ use crate::prelude::*;
 use crate::utils::log::*;
 use petgraph::graph::NodeIndex;
 use petgraph::visit::IntoNodeReferences;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 mod context;
 pub mod object;
@@ -96,6 +96,9 @@ pub struct PointerInference<'a> {
     /// Maps certain TIDs like the TIDs of [`Jmp`] instructions to the pointer inference state at that TID.
     /// The map will be filled after the fixpoint computation finished.
     states_at_tids: HashMap<Tid, State>,
+    /// Maps the TIDs of call instructions to a map mapping callee IDs to the corresponding value in the caller.
+    /// The map will be filled after the fixpoint computation finished.
+    id_renaming_maps_at_calls: HashMap<Tid, BTreeMap<AbstractIdentifier, Data>>,
 }
 
 impl<'a> PointerInference<'a> {
@@ -145,6 +148,7 @@ impl<'a> PointerInference<'a> {
             values_at_defs: HashMap::new(),
             addresses_at_defs: HashMap::new(),
             states_at_tids: HashMap::new(),
+            id_renaming_maps_at_calls: HashMap::new(),
         }
     }
 
@@ -256,12 +260,12 @@ impl<'a> PointerInference<'a> {
         let context = self.computation.get_context().get_context();
         let graph = self.computation.get_graph();
         for node in graph.node_indices() {
-            let node_state = match self.computation.get_node_value(node) {
-                Some(NodeValue::Value(value)) => value,
-                _ => continue,
-            };
             match graph[node] {
                 Node::BlkStart(blk, _sub) => {
+                    let node_state = match self.computation.get_node_value(node) {
+                        Some(NodeValue::Value(value)) => value,
+                        _ => continue,
+                    };
                     let mut state = node_state.clone();
                     for def in &blk.term.defs {
                         match &def.term {
@@ -291,12 +295,40 @@ impl<'a> PointerInference<'a> {
                     }
                 }
                 Node::BlkEnd(blk, _sub) => {
+                    let node_state = match self.computation.get_node_value(node) {
+                        Some(NodeValue::Value(value)) => value,
+                        _ => continue,
+                    };
                     for jmp in &blk.term.jmps {
                         self.states_at_tids
                             .insert(jmp.tid.clone(), node_state.clone());
                     }
                 }
-                Node::CallSource { .. } | Node::CallReturn { .. } => (),
+                Node::CallSource { .. } => (),
+                Node::CallReturn {
+                    call: (caller_blk, _caller_sub),
+                    return_: _,
+                } => {
+                    let call_tid = match caller_blk.term.jmps.get(0) {
+                        Some(call) => &call.tid,
+                        _ => continue,
+                    };
+                    let (state_before_call, state_before_return) =
+                        match self.computation.get_node_value(node) {
+                            Some(NodeValue::CallFlowCombinator {
+                                call_stub: Some(state_before_call),
+                                interprocedural_flow: Some(state_before_return),
+                            }) => (state_before_call, state_before_return),
+                            _ => continue,
+                        };
+                    let id_to_data_map = context.create_callee_id_to_caller_data_map(
+                        state_before_call,
+                        state_before_return,
+                        call_tid,
+                    );
+                    self.id_renaming_maps_at_calls
+                        .insert(call_tid.clone(), id_to_data_map);
+                }
             }
         }
     }
@@ -305,6 +337,18 @@ impl<'a> PointerInference<'a> {
     /// This function only yields results after the fixpoint has been computed.
     pub fn get_state_at_jmp_tid(&self, jmp_tid: &Tid) -> Option<&State> {
         self.states_at_tids.get(jmp_tid)
+    }
+
+    /// Get the mapping from callee IDs to caller values for the given call.
+    /// This function only yields results after the fixpoint has been computed.
+    ///
+    /// Note that the maps may contain mappings from callee IDs to temporary caller IDs that get instantly removed from the caller
+    /// since they are not referenced in any caller object.
+    pub fn get_id_renaming_map_at_call_tid(
+        &self,
+        call_tid: &Tid,
+    ) -> Option<&BTreeMap<AbstractIdentifier, Data>> {
+        self.id_renaming_maps_at_calls.get(call_tid)
     }
 
     /// Print information on dead ends in the control flow graph for debugging purposes.

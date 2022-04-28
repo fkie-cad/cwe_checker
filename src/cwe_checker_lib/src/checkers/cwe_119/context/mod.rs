@@ -39,19 +39,19 @@ pub struct Context<'a> {
 
 impl<'a> Context<'a> {
     /// Create a new context object.
-    pub fn new(
-        project: &'a Project,
-        graph: &'a Graph<'a>,
-        pointer_inference: &'a PointerInference<'a>,
-        function_signatures: &'a BTreeMap<Tid, FunctionSignature>,
-        analysis_results: &AnalysisResults,
+    pub fn new<'b>(
+        analysis_results: &'b AnalysisResults<'a>,
         log_collector: crossbeam_channel::Sender<LogThreadMsg>,
-    ) -> Self {
+    ) -> Context<'a>
+    where
+        'a: 'b,
+    {
+        let project = analysis_results.project;
         Context {
             project,
-            graph,
-            pointer_inference,
-            function_signatures,
+            graph: analysis_results.control_flow_graph,
+            pointer_inference: analysis_results.pointer_inference.unwrap(),
+            function_signatures: analysis_results.function_signatures.unwrap(),
             callee_to_callsites_map: compute_callee_to_call_sites_map(project),
             param_replacement_map: compute_param_replacement_map(analysis_results),
             malloc_tid_to_object_size_map: compute_size_values_of_malloc_calls(analysis_results),

@@ -123,6 +123,7 @@ pub fn get_modules() -> Vec<&'static CweModule> {
         &crate::checkers::cwe_243::CWE_MODULE,
         &crate::checkers::cwe_332::CWE_MODULE,
         &crate::checkers::cwe_367::CWE_MODULE,
+        &crate::checkers::cwe_416::CWE_MODULE,
         &crate::checkers::cwe_426::CWE_MODULE,
         &crate::checkers::cwe_467::CWE_MODULE,
         &crate::checkers::cwe_476::CWE_MODULE,

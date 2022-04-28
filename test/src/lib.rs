@@ -423,7 +423,7 @@ mod tests {
     #[ignore]
     fn cwe_415() {
         let mut error_log = Vec::new();
-        let mut tests = all_test_cases("cwe_415", "Memory");
+        let mut tests = all_test_cases("cwe_415", "CWE416");
 
         mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
         mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.
@@ -451,7 +451,7 @@ mod tests {
     #[ignore]
     fn cwe_416() {
         let mut error_log = Vec::new();
-        let mut tests = all_test_cases("cwe_416", "Memory");
+        let mut tests = all_test_cases("cwe_416", "CWE416");
 
         mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
         mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.

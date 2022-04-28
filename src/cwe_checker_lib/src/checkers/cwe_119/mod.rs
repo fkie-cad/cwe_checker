@@ -65,14 +65,7 @@ pub fn check_cwe(
 ) -> (Vec<LogMessage>, Vec<CweWarning>) {
     let log_thread = LogThread::spawn(LogThread::collect_and_deduplicate);
 
-    let context = Context::new(
-        analysis_results.project,
-        analysis_results.control_flow_graph,
-        analysis_results.pointer_inference.unwrap(),
-        analysis_results.function_signatures.unwrap(),
-        analysis_results,
-        log_thread.get_msg_sender(),
-    );
+    let context = Context::new(analysis_results, log_thread.get_msg_sender());
 
     let mut fixpoint_computation =
         crate::analysis::forward_interprocedural_fixpoint::create_computation(context, None);
@@ -91,5 +84,7 @@ pub fn check_cwe(
 
     fixpoint_computation.compute_with_max_steps(100);
 
-    log_thread.collect()
+    let (logs, mut cwe_warnings) = log_thread.collect();
+    cwe_warnings.sort();
+    (logs, cwe_warnings)
 }

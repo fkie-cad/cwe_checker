@@ -18,14 +18,7 @@ impl<'a> Context<'a> {
         let analysis_results = Box::leak(analysis_results);
         let (log_collector, _) = crossbeam_channel::unbounded();
 
-        Context::new(
-            analysis_results.project,
-            analysis_results.control_flow_graph,
-            analysis_results.pointer_inference.unwrap(),
-            analysis_results.function_signatures.unwrap(),
-            analysis_results,
-            log_collector,
-        )
+        Context::new(analysis_results, log_collector)
     }
 }
 
