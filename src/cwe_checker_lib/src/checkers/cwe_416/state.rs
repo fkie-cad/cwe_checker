@@ -41,13 +41,15 @@ impl AbstractDomain for ObjectState {
 /// together with the corresponding object states.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct State {
+    pub current_fn_tid: Tid,
     dangling_objects: DomainMap<AbstractIdentifier, ObjectState, UnionMergeStrategy>,
 }
 
 impl State {
     /// Create a new, empty state, i.e. a state without any object marked as already freed.
-    pub fn new() -> State {
+    pub fn new(current_fn_tid: Tid) -> State {
         State {
+            current_fn_tid,
             dangling_objects: BTreeMap::new().into(),
         }
     }
@@ -120,8 +122,7 @@ impl State {
         id_replacement_map: &BTreeMap<AbstractIdentifier, Data>,
         call_tid: &Tid,
         pi_state: &PiState,
-    ) -> Option<Vec<String>> {
-        let mut warnings = Vec::new();
+    ) {
         for (callee_id, callee_object_state) in state_before_return.dangling_objects.iter() {
             if let Some(caller_value) = id_replacement_map.get(callee_id) {
                 for caller_id in caller_value.get_relative_values().keys() {
@@ -129,6 +130,7 @@ impl State {
                         // FIXME: We cannot distinguish different objects represented by the same ID.
                         // So to avoid producing lots of false positive warnings we ignore these cases.
                         match (callee_object_state, self.dangling_objects.get(caller_id)) {
+                            // Case 1: The dangling object is unknown to the caller, so we add it.
                             (ObjectState::Dangling(_), None)
                             | (ObjectState::AlreadyFlagged, None) => {
                                 self.dangling_objects.insert(
@@ -136,22 +138,15 @@ impl State {
                                     ObjectState::Dangling(call_tid.clone()),
                                 );
                             }
-                            (ObjectState::Dangling(_), Some(ObjectState::Dangling(_)))
-                            | (ObjectState::AlreadyFlagged, Some(&ObjectState::Dangling(_))) => {
-                                warnings.push(format!("Callee ID {} corresponding to caller ID {} may be freed in the callee", callee_id, caller_id));
-                                self.dangling_objects
-                                    .insert(caller_id.clone(), ObjectState::AlreadyFlagged);
-                            }
-                            (_, Some(&ObjectState::AlreadyFlagged)) => (), // To avoid subsequent errors we do not flag this case separately.
+                            // Case 2: The dangling object is already known to the caller.
+                            // If this were a case of Use-After-Free, then this should have been flagged when checking the call parameters.
+                            // Thus we can simply leave the object state as it is.
+                            (_, Some(ObjectState::Dangling(_)))
+                            | (_, Some(&ObjectState::AlreadyFlagged)) => (),
                         }
                     }
                 }
             }
-        }
-        if !warnings.is_empty() {
-            Some(warnings)
-        } else {
-            None
         }
     }
 }
@@ -160,6 +155,7 @@ impl AbstractDomain for State {
     /// Merge two states.
     fn merge(&self, other: &Self) -> Self {
         State {
+            current_fn_tid: self.current_fn_tid.clone(),
             dangling_objects: self.dangling_objects.merge(&other.dangling_objects),
         }
     }
@@ -178,7 +174,7 @@ pub mod tests {
 
     #[test]
     fn test_check_address_for_use_after_free() {
-        let mut state = State::new();
+        let mut state = State::new(Tid::new("current_fn"));
         state.dangling_objects.insert(
             AbstractIdentifier::mock("obj_id", "RAX", 8),
             ObjectState::Dangling(Tid::new("free_call")),
@@ -224,7 +220,7 @@ pub mod tests {
 
     #[test]
     fn test_handle_param_of_free_call() {
-        let mut state = State::new();
+        let mut state = State::new(Tid::new("current_fn"));
         let param = Data::from_target(
             AbstractIdentifier::mock("obj_id", "RAX", 8),
             Bitvector::from_i64(0).into(),
@@ -249,15 +245,15 @@ pub mod tests {
 
     #[test]
     fn test_collect_freed_objects_from_called_function() {
-        let mut state = State::new();
-        let mut state_before_return = State::new();
+        let mut state = State::new(Tid::new("current_fn"));
+        let mut state_before_return = State::new(Tid::new("callee_fn_tid"));
         state_before_return.dangling_objects.insert(
-            AbstractIdentifier::mock("callee_tid", "RAX", 8),
+            AbstractIdentifier::mock("callee_obj_tid", "RAX", 8),
             ObjectState::Dangling(Tid::new("free_tid")),
         );
         let pi_state = PiState::new(&Variable::mock("RSP", 8), Tid::new("call"));
         let id_replacement_map = BTreeMap::from([(
-            AbstractIdentifier::mock("callee_tid", "RAX", 8),
+            AbstractIdentifier::mock("callee_obj_tid", "RAX", 8),
             Data::from_target(
                 AbstractIdentifier::mock("caller_tid", "RBX", 8),
                 Bitvector::from_i64(42).into(),

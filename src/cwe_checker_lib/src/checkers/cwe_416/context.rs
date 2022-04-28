@@ -85,6 +85,51 @@ impl<'a> Context<'a> {
         }
     }
 
+    /// Check the parameters of an internal function call for dangling pointers and report CWE warnings accordingly.
+    fn check_internal_call_params_for_use_after_free(
+        &self,
+        state: &mut State,
+        callee_sub_tid: &Tid,
+        call_tid: &Tid,
+    ) {
+        let function_signature = match self.function_signatures.get(callee_sub_tid) {
+            Some(fn_sig) => fn_sig,
+            None => return,
+        };
+        let mut warnings = Vec::new();
+        for (arg, access_pattern) in &function_signature.parameters {
+            if access_pattern.is_dereferenced() {
+                if let Some(arg_value) = self
+                    .pointer_inference
+                    .eval_parameter_arg_at_call(call_tid, arg)
+                {
+                    if let Some(mut warning_causes) =
+                        state.check_address_for_use_after_free(&arg_value)
+                    {
+                        warnings.append(&mut warning_causes);
+                    }
+                }
+            }
+        }
+        let callee_sub_name = &self.project.program.term.subs[callee_sub_tid].term.name;
+        if !warnings.is_empty() {
+            let cwe_warning = CweWarning {
+                name: "CWE416".to_string(),
+                version: CWE_MODULE.version.to_string(),
+                addresses: vec![call_tid.address.clone()],
+                tids: vec![format!("{}", call_tid)],
+                symbols: Vec::new(),
+                other: vec![warnings],
+                description: format!(
+                    "(Use After Free) Call to {} at {} may access dangling pointers through its parameters",
+                    callee_sub_name,
+                    call_tid.address
+                    ),
+            };
+            self.log_collector.send(cwe_warning.into()).unwrap();
+        }
+    }
+
     /// Handle a call to `free` by marking the corresponding memory object IDs as dangling and detecting possible double frees.
     fn handle_call_to_free(&self, state: &mut State, call_tid: &Tid, free_symbol: &ExternSymbol) {
         if free_symbol.parameters.is_empty() {
@@ -183,48 +228,14 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
             Node::BlkStart(_, sub) => sub,
             _ => return None,
         };
-        let function_signature = match self.function_signatures.get(&sub.tid) {
-            Some(fn_sig) => fn_sig,
-            None => return None,
-        };
         let mut state = state.clone();
-        let mut warnings = Vec::new();
-        for (arg, access_pattern) in &function_signature.parameters {
-            if access_pattern.is_dereferenced() {
-                if let Some(arg_value) = self
-                    .pointer_inference
-                    .eval_parameter_arg_at_call(&call.tid, arg)
-                {
-                    if let Some(mut warning_causes) =
-                        state.check_address_for_use_after_free(&arg_value)
-                    {
-                        warnings.append(&mut warning_causes);
-                    }
-                }
-            }
-        }
-        if !warnings.is_empty() {
-            let cwe_warning = CweWarning {
-                name: "CWE416".to_string(),
-                version: CWE_MODULE.version.to_string(),
-                addresses: vec![call.tid.address.clone()],
-                tids: vec![format!("{}", call.tid)],
-                symbols: Vec::new(),
-                other: vec![warnings],
-                description: format!(
-                    "(Use After Free) Call to {} at {} may access dangling pointers through its parameters",
-                    sub.term.name,
-                    call.tid.address
-                    ),
-            };
-            self.log_collector.send(cwe_warning.into()).unwrap();
-        }
+        self.check_internal_call_params_for_use_after_free(&mut state, &sub.tid, &call.tid);
         // No information flows from caller to callee, so we return `None` regardless.
         None
     }
 
     /// Collect the IDs of objects freed in the callee and mark the corresponding objects in the caller as freed.
-    /// If a possible double free is detected this way then generate a corresponding CWE warning.
+    /// Also check the call parameters for Use-After-Frees.
     fn update_return(
         &self,
         state: Option<&State>,
@@ -250,30 +261,24 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
             Some(pi_state) => pi_state,
             None => return None,
         };
-        let mut state_after_return = state_before_call.clone();
-        if let Some(double_free_causes) = state_after_return
-            .collect_freed_objects_from_called_function(
-                state_before_return,
-                id_replacement_map,
-                &call.tid,
-                pi_state_before_call,
-            )
-        {
-            let cwe_warning = CweWarning {
-                name: "CWE415".to_string(),
-                version: CWE_MODULE.version.to_string(),
-                addresses: vec![call.tid.address.clone()],
-                tids: vec![format!("{}", call.tid)],
-                symbols: Vec::new(),
-                other: vec![double_free_causes],
-                description: format!(
-                    "(Double Free) Call at {} may free an object that has already been freed in the caller.",
-                    call.tid.address
-                    ),
-            };
-            self.log_collector.send(cwe_warning.into()).unwrap();
-        }
 
+        let mut state_after_return = state_before_call.clone();
+        // Check for Use-After-Frees through function parameters.
+        // FIXME: This is actually done twice, since the `update_call` method uses the same check.
+        // But to remove the check there we would have to know the callee function TID here
+        // even in the case when the call does not actually return at all.
+        self.check_internal_call_params_for_use_after_free(
+            &mut state_after_return,
+            &state_before_return.current_fn_tid,
+            &call.tid,
+        );
+        // Add object IDs of objects that may have been freed in the callee.
+        state_after_return.collect_freed_objects_from_called_function(
+            state_before_return,
+            id_replacement_map,
+            &call.tid,
+            pi_state_before_call,
+        );
         Some(state_after_return)
     }
 

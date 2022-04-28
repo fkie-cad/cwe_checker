@@ -67,10 +67,10 @@ pub fn check_cwe(
     let mut fixpoint_computation =
         crate::analysis::forward_interprocedural_fixpoint::create_computation(context, None);
 
-    for (_sub_tid, entry_node_of_sub) in
+    for (sub_tid, entry_node_of_sub) in
         crate::analysis::graph::get_entry_nodes_of_subs(analysis_results.control_flow_graph)
     {
-        let fn_start_state = State::new();
+        let fn_start_state = State::new(sub_tid);
         fixpoint_computation.set_node_value(
             entry_node_of_sub,
             crate::analysis::interprocedural_fixpoint_generic::NodeValue::Value(fn_start_state),
