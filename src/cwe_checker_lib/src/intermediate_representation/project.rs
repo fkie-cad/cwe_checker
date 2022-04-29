@@ -37,6 +37,7 @@ impl Project {
         self.calling_conventions
             .get("__stdcall")
             .or_else(|| self.calling_conventions.get("__cdecl"))
+            .or_else(|| self.calling_conventions.get("__thiscall")) // for x86_64 Microsoft Windows binaries.
     }
 
     /// Try to find a specific calling convention in the list of calling conventions in the project.
