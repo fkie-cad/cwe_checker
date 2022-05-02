@@ -173,8 +173,22 @@ impl BitvectorExtended for Bitvector {
                     Ok(self.clone().into_checked_sdiv(rhs)?)
                 }
             }
-            IntRem => Ok(self.clone().into_checked_urem(rhs)?),
-            IntSRem => Ok(self.clone().into_checked_srem(rhs)?),
+            IntRem => {
+                // FIXME: Division for bitvectors larger than 8 bytes is not yet implemented in the `apint` crate (version 0.2).
+                if self.width().to_usize() > 64 {
+                    Err(anyhow!("Multiplication and division of integers larger than 8 bytes not yet implemented."))
+                } else {
+                    Ok(self.clone().into_checked_urem(rhs)?)
+                }
+            }
+            IntSRem => {
+                // FIXME: Division for bitvectors larger than 8 bytes is not yet implemented in the `apint` crate (version 0.2).
+                if self.width().to_usize() > 64 {
+                    Err(anyhow!("Multiplication and division of integers larger than 8 bytes not yet implemented."))
+                } else {
+                    Ok(self.clone().into_checked_srem(rhs)?)
+                }
+            }
             IntLeft => {
                 let shift_amount = rhs.try_to_u64().unwrap() as usize;
                 if shift_amount < self.width().to_usize() {

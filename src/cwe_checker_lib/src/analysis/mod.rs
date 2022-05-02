@@ -11,3 +11,4 @@ pub mod interprocedural_fixpoint_generic;
 pub mod pointer_inference;
 pub mod stack_alignment_substitution;
 pub mod string_abstraction;
+pub mod vsa_results;

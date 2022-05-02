@@ -248,6 +248,18 @@ pub enum LogThreadMsg {
     Terminate,
 }
 
+impl From<LogMessage> for LogThreadMsg {
+    fn from(msg: LogMessage) -> Self {
+        Self::Log(msg)
+    }
+}
+
+impl From<CweWarning> for LogThreadMsg {
+    fn from(warning: CweWarning) -> Self {
+        Self::Cwe(warning)
+    }
+}
+
 /// A type for managing threads for collecting log messages.
 ///
 /// With [`LogThread::spawn()`] one can create a new log thread
@@ -287,6 +299,8 @@ impl LogThread {
     /// I.e. the function should receive messages through the given receiver until the channel disconnects
     /// or until it receives a [`LogThreadMsg::Terminate`] message.
     /// After that it should return the logs collected up to that point.
+    ///
+    /// See [`LogThread::collect_and_deduplicate`] for a standard collector function that can be used here.
     pub fn spawn<F>(collector_func: F) -> LogThread
     where
         F: FnOnce(crossbeam_channel::Receiver<LogThreadMsg>) -> (Vec<LogMessage>, Vec<CweWarning>)
@@ -322,5 +336,51 @@ impl LogThread {
         } else {
             (Vec::new(), Vec::new())
         }
+    }
+
+    /// This function is collects logs from the given receiver until a [`LogThreadMsg::Terminate`] signal is received.
+    /// All collected logs are deduplicated before being returned.
+    ///
+    /// CWE warnings and log messages are deduplicated if two messages share the same address of origin.
+    /// In such a case only the last message received is kept.
+    /// If a CWE message has more than one address only the first address is considered when deduplicating.
+    /// Note that this may lead to information loss if log messages with the same origin address that are not duplicates are generated.
+    ///
+    /// This function can be used as a standard collector function for [`LogThread::spawn`].
+    pub fn collect_and_deduplicate(
+        receiver: crossbeam_channel::Receiver<LogThreadMsg>,
+    ) -> (Vec<LogMessage>, Vec<CweWarning>) {
+        let mut logs_with_address = BTreeMap::new();
+        let mut general_logs = Vec::new();
+        let mut collected_cwes = BTreeMap::new();
+
+        while let Ok(log_thread_msg) = receiver.recv() {
+            match log_thread_msg {
+                LogThreadMsg::Log(log_message) => {
+                    if let Some(ref tid) = log_message.location {
+                        logs_with_address.insert(tid.address.clone(), log_message);
+                    } else {
+                        general_logs.push(log_message);
+                    }
+                }
+                LogThreadMsg::Cwe(cwe_warning) => match &cwe_warning.addresses[..] {
+                    [] => panic!("Unexpected CWE warning without origin address"),
+                    [address, ..] => {
+                        collected_cwes.insert(address.clone(), cwe_warning);
+                    }
+                },
+                LogThreadMsg::Terminate => break,
+            }
+        }
+        let logs = logs_with_address
+            .values()
+            .cloned()
+            .chain(general_logs.into_iter())
+            .collect();
+        let cwes = collected_cwes
+            .into_iter()
+            .map(|(_key, value)| value)
+            .collect();
+        (logs, cwes)
     }
 }

@@ -5,12 +5,14 @@
 //! but directly incorporated into the [`pointer_inference`](crate::analysis::pointer_inference) module.
 //! See there for detailed information about this check.
 
+pub mod cwe_119;
 pub mod cwe_134;
 pub mod cwe_190;
 pub mod cwe_215;
 pub mod cwe_243;
 pub mod cwe_332;
 pub mod cwe_367;
+pub mod cwe_416;
 pub mod cwe_426;
 pub mod cwe_467;
 pub mod cwe_476;

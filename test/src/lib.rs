@@ -239,7 +239,7 @@ mod tests {
     #[ignore]
     fn cwe_119() {
         let mut error_log = Vec::new();
-        let mut tests = all_test_cases("cwe_119", "Memory");
+        let mut tests = all_test_cases("cwe_119", "CWE119");
 
         mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
         mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.
@@ -264,21 +264,20 @@ mod tests {
     #[ignore]
     fn cwe_125() {
         let mut error_log = Vec::new();
-        let mut tests = all_test_cases("cwe_119", "Memory");
-
-        mark_architecture_skipped(&mut tests, "mips"); // A second unrelated instance is found in "__do_global_ctors_aux".
-        mark_architecture_skipped(&mut tests, "mipsel"); // A second unrelated instance is found in "__do_global_ctors_aux".
+        let mut tests = all_test_cases("cwe_119", "CWE119");
 
         mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
         mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.
 
+        mark_skipped(&mut tests, "ppc", "gcc"); // Needs tracking of linear dependencies between register values.
+
         mark_skipped(&mut tests, "x86", "gcc"); // Loss of stack register value since we do not track pointer alignment yet.
-        mark_skipped(&mut tests, "x86", "clang"); // A second unrelated instance is found in "__do_global_ctors_aux".
+        mark_skipped(&mut tests, "x86", "clang"); // Unrelated third CWE hit in `__libc_csu_init`
 
         mark_compiler_skipped(&mut tests, "mingw32-gcc"); // TODO: Check reason for failure!
 
         for test_case in tests {
-            let num_expected_occurences = 1;
+            let num_expected_occurences = 2;
             if let Err(error) = test_case.run_test("[CWE125]", num_expected_occurences) {
                 error_log.push((test_case.get_filepath(), error));
             }
@@ -424,7 +423,7 @@ mod tests {
     #[ignore]
     fn cwe_415() {
         let mut error_log = Vec::new();
-        let mut tests = all_test_cases("cwe_415", "Memory");
+        let mut tests = all_test_cases("cwe_415", "CWE416");
 
         mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
         mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.
@@ -452,7 +451,7 @@ mod tests {
     #[ignore]
     fn cwe_416() {
         let mut error_log = Vec::new();
-        let mut tests = all_test_cases("cwe_416", "Memory");
+        let mut tests = all_test_cases("cwe_416", "CWE416");
 
         mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
         mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.
@@ -626,7 +625,7 @@ mod tests {
     #[ignore]
     fn cwe_787() {
         let mut error_log = Vec::new();
-        let mut tests = all_test_cases("cwe_119", "Memory");
+        let mut tests = all_test_cases("cwe_119", "CWE119");
 
         mark_skipped(&mut tests, "arm", "gcc"); // Needs tracking of linear dependencies between register values.
         mark_skipped(&mut tests, "mips64", "gcc"); // Needs tracking of linear dependencies between register values.
@@ -645,7 +644,7 @@ mod tests {
         mark_compiler_skipped(&mut tests, "mingw32-gcc"); // TODO: Check reason for failure!
 
         for test_case in tests {
-            let num_expected_occurences = 1;
+            let num_expected_occurences = 2;
             if let Err(error) = test_case.run_test("[CWE787]", num_expected_occurences) {
                 error_log.push((test_case.get_filepath(), error));
             }
