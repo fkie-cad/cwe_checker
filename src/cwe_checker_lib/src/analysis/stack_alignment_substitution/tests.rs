@@ -38,10 +38,10 @@ fn unexpected_alignment() {
         let mut proj_x64 = setup(def_x64, true);
         let log = substitute_and_on_stackpointer(proj_x64.borrow_mut());
         if 2_i32.pow(i) == 16 {
-            assert!(log.is_empty());
+            assert!(log.is_none());
         } else {
-            assert!(!log.is_empty());
-            for msg in log {
+            assert!(log.is_some());
+            for msg in log.unwrap() {
                 assert!(msg.text.contains("Unexpected alignment"));
             }
         }
@@ -63,10 +63,10 @@ fn unexpected_alignment() {
         let mut proj_arm = setup(def_arm, false);
         let log = substitute_and_on_stackpointer(proj_arm.borrow_mut());
         if 2_i32.pow(i) == 4 {
-            assert!(log.is_empty());
+            assert!(log.is_none());
         } else {
-            assert!(!log.is_empty());
-            for msg in log {
+            assert!(log.is_some());
+            for msg in log.unwrap() {
                 assert!(msg.text.contains("Unexpected alignment"));
             }
         }
@@ -124,7 +124,7 @@ fn compute_correct_offset_x64() {
                             },
                         };
                         assert_eq!(expected_def, def.term);
-                        assert!(log.is_empty());
+                        assert!(log.is_none());
                     }
                 }
             }
@@ -182,7 +182,7 @@ fn compute_correct_offset_arm32() {
                             },
                         };
                         assert_eq!(expected_def, def.term);
-                        assert!(log.is_empty());
+                        assert!(log.is_none());
                     }
                 }
             }
@@ -227,19 +227,25 @@ fn check_bin_operations() {
         let mut proj_arm32 = setup(vec![unsupported_def_arm32.clone()], false);
         let log_arm32 = substitute_and_on_stackpointer(proj_arm32.borrow_mut());
 
-        for mut log in vec![log_arm32, log_x64] {
+        for log in vec![log_arm32, log_x64] {
             match biopty {
                 BinOpType::IntAnd => {
-                    assert_eq!(log.len(), 1);
-                    assert!(log.pop().unwrap().text.contains("Unexpected alignment"));
+                    assert_eq!(log.clone().unwrap().len(), 1);
+                    assert!(log
+                        .unwrap()
+                        .pop()
+                        .unwrap()
+                        .text
+                        .contains("Unexpected alignment"));
                 }
                 BinOpType::IntAdd | BinOpType::IntSub => {
-                    assert_eq!(log.len(), 0)
+                    assert!(log.is_none())
                 }
 
                 _ => {
-                    assert_eq!(log.len(), 1);
+                    assert_eq!(log.clone().unwrap().len(), 1);
                     assert!(log
+                        .unwrap()
                         .pop()
                         .unwrap()
                         .text
@@ -286,10 +292,11 @@ fn substitution_ends_if_unsubstituable() {
         ],
         true,
     );
-    let mut log = substitute_and_on_stackpointer(proj.borrow_mut());
+    let log = substitute_and_on_stackpointer(proj.borrow_mut());
 
-    assert!(!log.is_empty());
+    assert!(log.is_some());
     assert!(log
+        .unwrap()
         .pop()
         .unwrap()
         .text
@@ -317,6 +324,61 @@ fn substitution_ends_if_unsubstituable() {
                     alignment_16_byte_as_and.clone()
                 ]
             );
+        }
+    }
+}
+
+#[test]
+/// Tests if the substitution supports commutativity of the expression.
+fn supports_commutative_and() {
+    let var_and_bitmask = Def::assign(
+        "tid_to_be_substituted",
+        Project::mock_x64().stack_pointer_register.clone(),
+        Expression::BinOp {
+            op: BinOpType::IntAnd,
+            lhs: Box::new(Expression::Var(
+                Project::mock_x64().stack_pointer_register.clone(),
+            )),
+            rhs: Box::new(Expression::const_from_apint(ApInt::from_u64(
+                0xFFFFFFFF_FFFFFFFF << 4, // 16 Byte alignment
+            ))),
+        },
+    );
+    let bitmask_and_var = Def::assign(
+        "tid_to_be_substituted",
+        Project::mock_x64().stack_pointer_register.clone(),
+        Expression::BinOp {
+            op: BinOpType::IntAnd,
+            lhs: Box::new(Expression::const_from_apint(ApInt::from_u64(
+                0xFFFFFFFF_FFFFFFFF << 4, // 16 Byte alignment
+            ))),
+            rhs: Box::new(Expression::Var(
+                Project::mock_x64().stack_pointer_register.clone(),
+            )),
+        },
+    );
+
+    let mut proj = setup(vec![bitmask_and_var], true);
+    let log = substitute_and_on_stackpointer(proj.borrow_mut());
+    assert!(log.is_none());
+
+    let expected_def = Def::assign(
+        "tid_to_be_substituted",
+        Project::mock_x64().stack_pointer_register.clone(),
+        Expression::BinOp {
+            op: BinOpType::IntSub,
+            lhs: Box::new(Expression::Var(
+                Project::mock_x64().stack_pointer_register.clone(),
+            )),
+            rhs: Box::new(Expression::const_from_apint(ApInt::from_u64(0))),
+        },
+    );
+
+    for sub in proj.program.term.subs.into_values() {
+        for blk in sub.term.blocks {
+            for def in blk.term.defs {
+                assert_eq!(def, expected_def);
+            }
         }
     }
 }

@@ -10,6 +10,7 @@
 //! - the argument for the AND operation is not a constant
 //! - an operation alters the stack pointer, which can not be journeled.
 
+use anyhow::{anyhow, Result};
 use apint::ApInt;
 use itertools::Itertools;
 
@@ -25,28 +26,35 @@ fn substitute(
 ) -> Vec<LogMessage> {
     let mut log: Vec<LogMessage> = vec![];
 
-    if let Expression::BinOp { op, lhs: _, rhs } = exp {
-        if let Expression::Const(bitmask) = &**rhs {
-            if let BinOpType::IntAnd = op {
-                let alignment = ApInt::try_to_i64(&ApInt::into_negate(bitmask.clone())).unwrap();
-                let offset = journaled_sp.checked_rem_euclid(alignment).unwrap_or(0);
-                *op = BinOpType::IntSub;
-                *rhs = Box::new(Expression::Const(
-                    (ApInt::from_i64(offset)).into_resize_unsigned(bitmask.bytesize()),
-                ));
-                if alignment != expected_alignment {
-                    log.push(LogMessage::new_info("Unexpected alignment").location(tid));
-                }
-            } else {
-                log.push(LogMessage::new_info("Unsubstitutable Operation on SP").location(tid))
-            };
-        } else {
-            log.push(
+    if let Expression::BinOp { op, lhs, rhs } = exp {
+        match (&**lhs, &**rhs) {
+            (Expression::Var(sp), Expression::Const(bitmask))
+            | (Expression::Const(bitmask), Expression::Var(sp)) => {
+                if let BinOpType::IntAnd = op {
+                    if ApInt::try_to_i64(&ApInt::into_negate(bitmask.clone())).unwrap()
+                        != expected_alignment
+                    {
+                        log.push(LogMessage::new_info("Unexpected alignment").location(tid));
+                    }
+                    let offset =
+                        *journaled_sp - (*journaled_sp & bitmask.clone().try_to_i64().unwrap());
+                    let sp = sp.clone();
+                    *op = BinOpType::IntSub;
+
+                    *rhs = Box::new(Expression::Const(
+                        (ApInt::from_i64(offset)).into_resize_unsigned(bitmask.bytesize()),
+                    ));
+                    *lhs = Box::new(Expression::Var(sp));
+                } else {
+                    log.push(LogMessage::new_info("Unsubstitutable Operation on SP").location(tid))
+                };
+            }
+            _ => log.push(
                 LogMessage::new_info(
-                    "Unsubstitutable Operation on SP. Right side is not a constant",
+                    "Unsubstitutable Operation on SP. Operants are not register and constant.",
                 )
                 .location(tid),
-            )
+            ),
         }
     } else {
         log.push(LogMessage::new_info("Unsubstitutable Operation on SP").location(tid))
@@ -55,19 +63,32 @@ fn substitute(
 }
 
 /// Updates current stackpointer value by given Constant.
-fn journal_sp_value(sp: &mut i64, is_plus: bool, val: &Expression) {
-    if let Expression::Const(con) = val {
-        if is_plus {
-            *sp += con.try_to_i64().unwrap()
-        } else {
-            *sp -= con.try_to_i64().unwrap()
+fn journal_sp_value(
+    journaled_sp: &mut i64,
+    is_plus: bool,
+    (rhs, lhs): (&Expression, &Expression),
+    sp_register: &Variable,
+) -> Result<()> {
+    match (rhs, lhs) {
+        (Expression::Var(sp), Expression::Const(constant))
+        | (Expression::Const(constant), Expression::Var(sp)) => {
+            if sp == sp_register {
+                match is_plus {
+                    true => *journaled_sp += constant.try_to_i64().unwrap(),
+                    false => *journaled_sp -= constant.try_to_i64().unwrap(),
+                }
+                Ok(())
+            } else {
+                Err(anyhow!("Input not stackpointer register and constant."))
+            }
         }
+        _ => Err(anyhow!("Input not register and constant.")),
     }
 }
 
 /// Substitutes logical AND on the stackpointer register by SUB.
 /// Expressions are changed to use constants w.r.t the provided bit mask.
-pub fn substitute_and_on_stackpointer(project: &mut Project) -> Vec<LogMessage> {
+pub fn substitute_and_on_stackpointer(project: &mut Project) -> Option<Vec<LogMessage>> {
     // for sanity check
     let sp_alignment = match project.cpu_architecture.as_str() {
         "x86_32" => 16,
@@ -86,32 +107,49 @@ pub fn substitute_and_on_stackpointer(project: &mut Project) -> Vec<LogMessage> 
                 if let Def::Assign { var, value } = &mut def.term {
                     if *var == project.stack_pointer_register {
                         if let Expression::BinOp { op, lhs, rhs } = value {
-                            if *lhs
-                                == Box::new(Expression::Var(project.stack_pointer_register.clone()))
-                            // Looking for operations on SP
-                            {
-                                match op {
-                                    BinOpType::IntAdd => journal_sp_value(journaled_sp, true, rhs),
-                                    BinOpType::IntSub => journal_sp_value(journaled_sp, false, rhs),
-                                    _ => {
-                                        let mut msg = substitute(
-                                            value,
-                                            sp_alignment,
-                                            journaled_sp,
-                                            def.tid.clone(),
-                                        );
-                                        log.append(&mut msg);
-                                        if !log
-                                            .iter()
-                                            .filter(|x| {
-                                                x.text.contains("Unsubstitutable Operation on SP")
-                                            })
-                                            .collect_vec()
-                                            .is_empty()
-                                        {
-                                            // Lost track of SP
-                                            continue 'sub_loop;
-                                        }
+                            match op {
+                                BinOpType::IntAdd => {
+                                    if journal_sp_value(
+                                        journaled_sp,
+                                        true,
+                                        (lhs, rhs),
+                                        &project.stack_pointer_register,
+                                    )
+                                    .is_err()
+                                    {
+                                        continue 'sub_loop;
+                                    }
+                                }
+                                BinOpType::IntSub => {
+                                    if journal_sp_value(
+                                        journaled_sp,
+                                        false,
+                                        (lhs, rhs),
+                                        &project.stack_pointer_register,
+                                    )
+                                    .is_err()
+                                    {
+                                        continue 'sub_loop;
+                                    }
+                                }
+                                _ => {
+                                    let mut msg = substitute(
+                                        value,
+                                        sp_alignment,
+                                        journaled_sp,
+                                        def.tid.clone(),
+                                    );
+                                    log.append(&mut msg);
+                                    if !log
+                                        .iter()
+                                        .filter(|x| {
+                                            x.text.contains("Unsubstitutable Operation on SP")
+                                        })
+                                        .collect_vec()
+                                        .is_empty()
+                                    {
+                                        // Lost track of SP
+                                        continue 'sub_loop;
                                     }
                                 }
                             }
@@ -119,14 +157,18 @@ pub fn substitute_and_on_stackpointer(project: &mut Project) -> Vec<LogMessage> 
                             log.push(
                                 LogMessage::new_info("Unexpected assignment on SP")
                                     .location(def.tid.clone()),
-                            )
+                            );
+                            continue 'sub_loop;
                         }
                     }
                 }
             }
         }
     }
-    log
+    if log.is_empty() {
+        return None;
+    }
+    Some(log)
 }
 
 #[cfg(test)]

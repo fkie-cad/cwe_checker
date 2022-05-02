@@ -227,13 +227,15 @@ impl Project {
     /// - Remove dead register assignments
     #[must_use]
     pub fn normalize(&mut self) -> Vec<LogMessage> {
-        let logs = self.remove_references_to_nonexisting_tids_and_retarget_non_returning_calls();
+        let mut logs =
+            self.remove_references_to_nonexisting_tids_and_retarget_non_returning_calls();
         make_block_to_sub_mapping_unique(self);
         self.propagate_input_expressions();
         self.substitute_trivial_expressions();
         crate::analysis::dead_variable_elimination::remove_dead_var_assignments(self);
         logs.append(
             crate::analysis::stack_alignment_substitution::substitute_and_on_stackpointer(self)
+                .unwrap_or_else(|| vec![])
                 .as_mut(),
         );
         logs
