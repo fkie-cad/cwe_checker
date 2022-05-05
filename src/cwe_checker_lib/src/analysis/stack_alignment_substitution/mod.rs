@@ -1,7 +1,7 @@
 //! Substitutes stack pointer alignment operations utilising logical AND with an arithmetic SUB operation.
 //!
 //! The first basic block of every function is searched for a logical AND operation on the stack pointer.
-//! By journeling changes to the stack pointer an offset is calculated which is going to be used to alter the operation
+//! By journaling changes to the stack pointer an offset is calculated which is going to be used to alter the operation
 //! into a subtraction.
 //!
 //! # Log Messages
