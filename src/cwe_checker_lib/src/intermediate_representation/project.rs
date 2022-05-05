@@ -235,9 +235,7 @@ impl Project {
         crate::analysis::dead_variable_elimination::remove_dead_var_assignments(self);
         logs.append(
             crate::analysis::stack_alignment_substitution::substitute_and_on_stackpointer(self)
-                .unwrap_or_else(|| vec![])
-                .as_mut(),
-        );
+                .unwrap_or_default().as_mut());
         logs
     }
 }

@@ -8,7 +8,7 @@
 //! Following cases trigger log messages:
 //! - alignment is untypical for the architecture
 //! - the argument for the AND operation is not a constant
-//! - an operation alters the stack pointer, which can not be journeled.
+//! - an operation alters the stack pointer, which can not be journaled.
 
 use anyhow::{anyhow, Result};
 use apint::ApInt;
