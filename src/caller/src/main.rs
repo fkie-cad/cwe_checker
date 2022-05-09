@@ -174,12 +174,7 @@ fn run_with_ghidra(args: &CmdlineArgs) {
         .collect();
     let control_flow_graph = graph::get_program_cfg(&project.program, extern_sub_tids);
 
-    let analysis_results = AnalysisResults::new(
-        &binary,
-        &project.runtime_memory_image,
-        &control_flow_graph,
-        &project,
-    );
+    let analysis_results = AnalysisResults::new(&binary, &control_flow_graph, &project);
 
     let modules_depending_on_string_abstraction = BTreeSet::from_iter(["CWE78"]);
     let modules_depending_on_pointer_inference =

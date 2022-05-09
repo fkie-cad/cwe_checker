@@ -91,7 +91,7 @@ pub fn check_cwe(
                         symbol,
                         &format_string_index,
                         pointer_inference_results,
-                        analysis_results.runtime_memory_image,
+                        &analysis_results.project.runtime_memory_image,
                     );
 
                     if matches!(

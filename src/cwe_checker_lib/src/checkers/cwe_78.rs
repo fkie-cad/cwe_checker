@@ -117,7 +117,10 @@ pub fn check_cwe(
                                     &jmp.tid,
                                     &cwe_sender,
                                     &log_sender,
-                                    string_abstraction.get_context().runtime_memory_image,
+                                    &string_abstraction
+                                        .get_context()
+                                        .project
+                                        .runtime_memory_image,
                                 )
                             }
                         }

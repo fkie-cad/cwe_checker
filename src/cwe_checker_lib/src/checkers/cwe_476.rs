@@ -87,7 +87,7 @@ pub fn check_cwe(
     let symbol_map = crate::utils::symbol_utils::get_symbol_map(project, &config.symbols[..]);
     let general_context = Context::new(
         project,
-        analysis_results.runtime_memory_image,
+        &analysis_results.project.runtime_memory_image,
         pointer_inference_results,
         cwe_sender,
     );

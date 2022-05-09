@@ -54,7 +54,7 @@ impl<'a> Context<'a> {
         Context {
             graph: analysis_results.control_flow_graph,
             project: analysis_results.project,
-            runtime_memory_image: analysis_results.runtime_memory_image,
+            runtime_memory_image: &analysis_results.project.runtime_memory_image,
             extern_symbol_map: &analysis_results.project.program.term.extern_symbols,
             fn_signatures: analysis_results.function_signatures.unwrap(),
             log_collector,

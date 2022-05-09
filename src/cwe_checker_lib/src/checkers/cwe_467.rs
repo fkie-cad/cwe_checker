@@ -122,7 +122,7 @@ pub fn check_cwe(
         for (block, jmp, symbol) in get_callsites(sub, &symbol_map) {
             if check_for_pointer_sized_arg(
                 project,
-                analysis_results.runtime_memory_image,
+                &analysis_results.project.runtime_memory_image,
                 block,
                 symbol,
             ) {
