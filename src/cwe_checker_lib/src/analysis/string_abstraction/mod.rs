@@ -8,9 +8,8 @@ use std::{
 
 use crate::{
     abstract_domain::{AbstractDomain, DomainInsertion, HasTop},
-    intermediate_representation::Project,
+    intermediate_representation::{Project, RuntimeMemoryImage},
     prelude::*,
-    utils::binary::RuntimeMemoryImage,
 };
 
 use self::state::State;

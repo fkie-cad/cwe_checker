@@ -45,9 +45,9 @@ use crate::intermediate_representation::Arg;
 use crate::intermediate_representation::Expression;
 use crate::intermediate_representation::ExternSymbol;
 use crate::intermediate_representation::Jmp;
+use crate::intermediate_representation::RuntimeMemoryImage;
 use crate::intermediate_representation::Sub;
 use crate::prelude::*;
-use crate::utils::binary::RuntimeMemoryImage;
 use crate::utils::log::CweWarning;
 use crate::utils::log::LogMessage;
 

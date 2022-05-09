@@ -30,6 +30,8 @@ mod program;
 pub use program::*;
 mod project;
 pub use project::*;
+mod runtime_memory_image;
+pub use runtime_memory_image::*;
 
 /// An unsigned number of bytes.
 ///

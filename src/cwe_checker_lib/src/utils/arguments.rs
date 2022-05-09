@@ -1,6 +1,5 @@
 //! Handles argument detection by parsing format string arguments during a function call. (e.g. sprintf)
 
-use super::binary::RuntimeMemoryImage;
 use crate::prelude::*;
 use crate::{
     abstract_domain::{IntervalDomain, TryToBitvec},

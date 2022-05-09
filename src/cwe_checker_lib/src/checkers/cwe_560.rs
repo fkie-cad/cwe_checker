@@ -24,9 +24,9 @@
 
 use crate::abstract_domain::TryToBitvec;
 use crate::analysis::pointer_inference::State;
+use crate::intermediate_representation::RuntimeMemoryImage;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
-use crate::utils::binary::RuntimeMemoryImage;
 use crate::utils::log::{CweWarning, LogMessage};
 use crate::utils::symbol_utils::{get_callsites, get_symbol_map};
 use crate::CweModule;

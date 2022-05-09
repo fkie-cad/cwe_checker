@@ -7,8 +7,8 @@ use crate::analysis::graph::{Graph, Node};
 use crate::analysis::interprocedural_fixpoint_generic::NodeValue;
 use crate::analysis::pointer_inference::PointerInference as PointerInferenceComputation;
 use crate::analysis::pointer_inference::State as PointerInferenceState;
+use crate::intermediate_representation::RuntimeMemoryImage;
 use crate::intermediate_representation::*;
-use crate::utils::binary::RuntimeMemoryImage;
 use crate::utils::log::CweWarning;
 use petgraph::graph::NodeIndex;
 use petgraph::visit::IntoNodeReferences;
@@ -417,7 +417,7 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::binary::RuntimeMemoryImage;
+    use crate::intermediate_representation::RuntimeMemoryImage;
 
     impl<'a> Context<'a> {
         pub fn mock(

@@ -16,8 +16,7 @@ use crate::{
         pointer_inference::PointerInference as PointerInferenceComputation,
         pointer_inference::State as PointerInferenceState,
     },
-    intermediate_representation::{Def, ExternSymbol, Project, Term, Tid},
-    utils::binary::RuntimeMemoryImage,
+    intermediate_representation::{Def, ExternSymbol, Project, RuntimeMemoryImage, Term, Tid},
 };
 
 use super::{state::State, Config};

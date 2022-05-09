@@ -1,9 +1,9 @@
+use crate::abstract_domain::*;
 use crate::analysis::function_signature::FunctionSignature;
 use crate::analysis::graph::Graph;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
 use crate::utils::log::*;
-use crate::{abstract_domain::*, utils::binary::RuntimeMemoryImage};
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::state::State;

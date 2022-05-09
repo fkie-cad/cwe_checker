@@ -2,6 +2,8 @@
 //! or check whether they are violated.
 //! E.g. checks for use-after-free or buffer overflow checks.
 
+use crate::intermediate_representation::RuntimeMemoryImage;
+
 use super::*;
 
 impl AbstractObjectList {

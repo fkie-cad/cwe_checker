@@ -1,7 +1,7 @@
 use super::object::*;
 use super::{Data, ValueDomain};
+use crate::abstract_domain::*;
 use crate::prelude::*;
-use crate::{abstract_domain::*, utils::binary::RuntimeMemoryImage};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 

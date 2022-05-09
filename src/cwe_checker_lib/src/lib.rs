@@ -74,8 +74,8 @@ use analysis::function_signature::FunctionSignature;
 use analysis::graph::Graph;
 use analysis::pointer_inference::PointerInference;
 use analysis::string_abstraction::StringAbstraction;
-use intermediate_representation::Project;
-use utils::binary::RuntimeMemoryImage;
+
+use intermediate_representation::{Project, RuntimeMemoryImage};
 use utils::log::{CweWarning, LogMessage};
 
 mod prelude {

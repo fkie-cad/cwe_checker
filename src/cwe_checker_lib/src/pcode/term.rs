@@ -13,6 +13,7 @@ use crate::intermediate_representation::ExternSymbol as IrExternSymbol;
 use crate::intermediate_representation::Jmp as IrJmp;
 use crate::intermediate_representation::Program as IrProgram;
 use crate::intermediate_representation::Project as IrProject;
+use crate::intermediate_representation::RuntimeMemoryImage;
 use crate::intermediate_representation::Sub as IrSub;
 use crate::intermediate_representation::Variable as IrVariable;
 use crate::prelude::*;
@@ -870,6 +871,7 @@ impl Project {
             calling_conventions,
             register_set,
             datatype_properties: self.datatype_properties.clone(),
+            runtime_memory_image: RuntimeMemoryImage::empty(true),
         }
     }
 }
