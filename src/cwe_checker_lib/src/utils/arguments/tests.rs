@@ -18,8 +18,7 @@ fn test_get_variable_parameters() {
         &Variable::mock("RSI", 8 as u64),
         IntervalDomain::new(global_address.clone(), global_address).into(),
     );
-    let mut project = Project::mock_x64();
-    project.runtime_memory_image = RuntimeMemoryImage::mock();
+    let project = Project::mock_x64();
 
     let mut output: Vec<Arg> = Vec::new();
     output.push(Arg::from_var(

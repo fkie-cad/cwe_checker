@@ -162,7 +162,6 @@ fn run_with_ghidra(args: &CmdlineArgs) {
     }
 
     project.runtime_memory_image = runtime_memory_image;
-    dbg!(&project.runtime_memory_image);
 
     // Generate the control flow graph of the program
     let extern_sub_tids = project

@@ -24,7 +24,6 @@ fn test_update_def() {
         vec![(memcpy_symbol.clone(), vec![true])],
         "func",
     );
-    let mem_image = RuntimeMemoryImage::mock();
     let mut pi_results = PointerInferenceComputation::mock(&project);
     pi_results.compute(false);
 
@@ -63,7 +62,7 @@ fn test_update_def() {
     let _ = setup.pi_state_before_symbol_call.store_value(
         &pointer_to_pointer,
         &loaded_pointer,
-        &mem_image,
+        &project.runtime_memory_image,
     );
 
     let r2_reg = Variable {
