@@ -12,9 +12,7 @@ use crate::{
             tests::mock_project_with_intraprocedural_control_flow, tests::Setup as ProjectSetup,
         },
     },
-    intermediate_representation::{
-        Bitvector, Blk, ByteSize, ExternSymbol, Jmp, RuntimeMemoryImage, Tid, Variable,
-    },
+    intermediate_representation::{Bitvector, Blk, ByteSize, ExternSymbol, Jmp, Tid, Variable},
 };
 
 #[test]
