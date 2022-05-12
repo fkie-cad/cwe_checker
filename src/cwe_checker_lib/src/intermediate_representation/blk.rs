@@ -194,6 +194,7 @@ mod tests {
     use crate::intermediate_representation::{Def, Expression, Variable};
 
     impl Blk {
+        /// Creates empty block with tid "block".
         pub fn mock() -> Term<Blk> {
             Term {
                 tid: Tid::new("block"),
