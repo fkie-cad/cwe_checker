@@ -1,6 +1,5 @@
 //! Handles argument detection by parsing format string arguments during a function call. (e.g. sprintf)
 
-use super::binary::RuntimeMemoryImage;
 use crate::prelude::*;
 use crate::{
     abstract_domain::{IntervalDomain, TryToBitvec},
@@ -105,7 +104,6 @@ pub fn get_variable_parameters(
     pi_state: &PointerInferenceState,
     extern_symbol: &ExternSymbol,
     format_string_index_map: &HashMap<String, usize>,
-    runtime_memory_image: &RuntimeMemoryImage,
 ) -> Result<Vec<Arg>, Error> {
     let format_string_index = match format_string_index_map.get(&extern_symbol.name) {
         Some(index) => *index,
@@ -116,7 +114,7 @@ pub fn get_variable_parameters(
         pi_state,
         extern_symbol,
         format_string_index,
-        runtime_memory_image,
+        &project.runtime_memory_image,
     );
 
     if let Ok(format_string) = format_string_results.as_ref() {

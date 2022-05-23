@@ -275,7 +275,11 @@ impl<'a> PointerInference<'a> {
                             }
                             Def::Load { var, address } => {
                                 let loaded_value = state
-                                    .load_value(address, var.size, context.runtime_memory_image)
+                                    .load_value(
+                                        address,
+                                        var.size,
+                                        &context.project.runtime_memory_image,
+                                    )
                                     .unwrap_or_else(|_| Data::new_top(var.size));
                                 self.values_at_defs.insert(def.tid.clone(), loaded_value);
                                 self.addresses_at_defs

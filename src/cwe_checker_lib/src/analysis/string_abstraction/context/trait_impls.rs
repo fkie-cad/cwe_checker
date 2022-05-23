@@ -46,7 +46,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>>
                 new_state.handle_assign_and_load(
                     output,
                     input,
-                    self.runtime_memory_image,
+                    &self.project.runtime_memory_image,
                     &self.block_first_def_set,
                     true,
                 );
@@ -58,7 +58,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>>
                 new_state.handle_assign_and_load(
                     output,
                     input,
-                    self.runtime_memory_image,
+                    &self.project.runtime_memory_image,
                     &self.block_first_def_set,
                     false,
                 );
@@ -66,7 +66,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>>
             Def::Store { address, value } => new_state.handle_store(
                 address,
                 value,
-                self.runtime_memory_image,
+                &self.project.runtime_memory_image,
                 &self.block_first_def_set,
             ),
         }

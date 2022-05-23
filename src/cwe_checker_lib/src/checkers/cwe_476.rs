@@ -85,12 +85,7 @@ pub fn check_cwe(
 
     let config: Config = serde_json::from_value(cwe_params.clone()).unwrap();
     let symbol_map = crate::utils::symbol_utils::get_symbol_map(project, &config.symbols[..]);
-    let general_context = Context::new(
-        project,
-        analysis_results.runtime_memory_image,
-        pointer_inference_results,
-        cwe_sender,
-    );
+    let general_context = Context::new(project, pointer_inference_results, cwe_sender);
 
     for edge in general_context.get_graph().edge_references() {
         if let Edge::ExternCallStub(jmp) = edge.weight() {

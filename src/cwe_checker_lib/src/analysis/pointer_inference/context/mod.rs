@@ -1,9 +1,9 @@
+use crate::abstract_domain::*;
 use crate::analysis::function_signature::FunctionSignature;
 use crate::analysis::graph::Graph;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
 use crate::utils::log::*;
-use crate::{abstract_domain::*, utils::binary::RuntimeMemoryImage};
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::state::State;
@@ -24,9 +24,6 @@ pub struct Context<'a> {
     pub graph: &'a Graph<'a>,
     /// A reference to the `Project` object representing the binary
     pub project: &'a Project,
-    /// The runtime memory image for reading global read-only variables.
-    /// Note that values of writeable global memory segments are not tracked.
-    pub runtime_memory_image: &'a RuntimeMemoryImage,
     /// Maps the TIDs of functions that shall be treated as extern symbols to the `ExternSymbol` object representing it.
     pub extern_symbol_map: &'a BTreeMap<Tid, ExternSymbol>,
     /// Maps the TIDs of internal functions to the function signatures computed for it.
@@ -54,7 +51,6 @@ impl<'a> Context<'a> {
         Context {
             graph: analysis_results.control_flow_graph,
             project: analysis_results.project,
-            runtime_memory_image: analysis_results.runtime_memory_image,
             extern_symbol_map: &analysis_results.project.program.term.extern_symbols,
             fn_signatures: analysis_results.function_signatures.unwrap(),
             log_collector,
@@ -73,7 +69,9 @@ impl<'a> Context<'a> {
         address: &Expression,
     ) -> bool {
         if self.project.cpu_architecture.contains("MIPS") && var.name == "gp" {
-            if let Ok(gp_val) = state.load_value(address, var.size, self.runtime_memory_image) {
+            if let Ok(gp_val) =
+                state.load_value(address, var.size, &self.project.runtime_memory_image)
+            {
                 gp_val.is_top()
             } else {
                 true
@@ -137,23 +135,23 @@ impl<'a> Context<'a> {
             "malloc" => {
                 let size_parameter = extern_symbol.parameters.get(0).unwrap();
                 state
-                    .eval_parameter_arg(size_parameter, self.runtime_memory_image)
+                    .eval_parameter_arg(size_parameter, &self.project.runtime_memory_image)
                     .unwrap_or_else(|_| Data::new_top(address_bytesize))
             }
             "realloc" => {
                 let size_parameter = extern_symbol.parameters.get(1).unwrap();
                 state
-                    .eval_parameter_arg(size_parameter, self.runtime_memory_image)
+                    .eval_parameter_arg(size_parameter, &self.project.runtime_memory_image)
                     .unwrap_or_else(|_| Data::new_top(address_bytesize))
             }
             "calloc" => {
                 let size_param1 = extern_symbol.parameters.get(0).unwrap();
                 let size_param2 = extern_symbol.parameters.get(1).unwrap();
                 let param1_value = state
-                    .eval_parameter_arg(size_param1, self.runtime_memory_image)
+                    .eval_parameter_arg(size_param1, &self.project.runtime_memory_image)
                     .unwrap_or_else(|_| Data::new_top(address_bytesize));
                 let param2_value = state
-                    .eval_parameter_arg(size_param2, self.runtime_memory_image)
+                    .eval_parameter_arg(size_param2, &self.project.runtime_memory_image)
                     .unwrap_or_else(|_| Data::new_top(address_bytesize));
                 param1_value.bin_op(BinOpType::IntMult, &param2_value)
             }
@@ -225,7 +223,7 @@ impl<'a> Context<'a> {
         match extern_symbol.get_unique_parameter() {
             Ok(parameter) => {
                 let parameter_value =
-                    state.eval_parameter_arg(parameter, self.runtime_memory_image);
+                    state.eval_parameter_arg(parameter, &self.project.runtime_memory_image);
                 match parameter_value {
                     Ok(memory_object_pointer) => {
                         if let Err(possible_double_frees) =
@@ -275,7 +273,7 @@ impl<'a> Context<'a> {
         I: Iterator<Item = &'iter Arg>,
     {
         for parameter in parameters {
-            match state.eval_parameter_arg(parameter, self.runtime_memory_image) {
+            match state.eval_parameter_arg(parameter, &self.project.runtime_memory_image) {
                 Ok(value) => {
                     if state.memory.is_dangling_pointer(&value, true) {
                         state
@@ -317,10 +315,12 @@ impl<'a> Context<'a> {
         extern_symbol: &ExternSymbol,
     ) {
         for parameter in extern_symbol.parameters.iter() {
-            match state.eval_parameter_arg(parameter, self.runtime_memory_image) {
+            match state.eval_parameter_arg(parameter, &self.project.runtime_memory_image) {
                 Ok(data) => {
-                    if state.pointer_contains_out_of_bounds_target(&data, self.runtime_memory_image)
-                    {
+                    if state.pointer_contains_out_of_bounds_target(
+                        &data,
+                        &self.project.runtime_memory_image,
+                    ) {
                         let warning = CweWarning {
                             name: "CWE119".to_string(),
                             version: VERSION.to_string(),
@@ -394,7 +394,7 @@ impl<'a> Context<'a> {
         extern_symbol: &ExternSymbol,
     ) -> State {
         self.log_debug(
-            new_state.clear_stack_parameter(extern_symbol, self.runtime_memory_image),
+            new_state.clear_stack_parameter(extern_symbol, &self.project.runtime_memory_image),
             Some(&call.tid),
         );
         let calling_conv = self.project.get_calling_convention(extern_symbol);
@@ -413,7 +413,9 @@ impl<'a> Context<'a> {
             }
         } else {
             for parameter in extern_symbol.parameters.iter() {
-                if let Ok(data) = state.eval_parameter_arg(parameter, self.runtime_memory_image) {
+                if let Ok(data) =
+                    state.eval_parameter_arg(parameter, &self.project.runtime_memory_image)
+                {
                     possible_referenced_ids.extend(data.referenced_ids().cloned());
                 }
             }

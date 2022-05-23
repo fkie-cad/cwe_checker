@@ -4,7 +4,8 @@
 extern crate cwe_checker_lib; // Needed for the docstring-link to work
 
 use cwe_checker_lib::analysis::graph;
-use cwe_checker_lib::utils::binary::{BareMetalConfig, RuntimeMemoryImage};
+use cwe_checker_lib::intermediate_representation::RuntimeMemoryImage;
+use cwe_checker_lib::utils::binary::BareMetalConfig;
 use cwe_checker_lib::utils::log::{print_all_messages, LogLevel};
 use cwe_checker_lib::utils::{get_ghidra_plugin_path, read_config_file};
 use cwe_checker_lib::AnalysisResults;
@@ -159,6 +160,9 @@ fn run_with_ghidra(args: &CmdlineArgs) {
         // so that other analyses do not have to adjust their addresses.
         runtime_memory_image.add_global_memory_offset(project.program.term.address_base_offset);
     }
+
+    project.runtime_memory_image = runtime_memory_image;
+
     // Generate the control flow graph of the program
     let extern_sub_tids = project
         .program
@@ -169,12 +173,7 @@ fn run_with_ghidra(args: &CmdlineArgs) {
         .collect();
     let control_flow_graph = graph::get_program_cfg(&project.program, extern_sub_tids);
 
-    let analysis_results = AnalysisResults::new(
-        &binary,
-        &runtime_memory_image,
-        &control_flow_graph,
-        &project,
-    );
+    let analysis_results = AnalysisResults::new(&binary, &control_flow_graph, &project);
 
     let modules_depending_on_string_abstraction = BTreeSet::from_iter(["CWE78"]);
     let modules_depending_on_pointer_inference =

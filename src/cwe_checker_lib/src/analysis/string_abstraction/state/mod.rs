@@ -9,14 +9,13 @@ use itertools::Itertools;
 use petgraph::graph::NodeIndex;
 
 use crate::abstract_domain::{DataDomain, DomainInsertion, HasTop, TryToBitvec};
-use crate::intermediate_representation::{ExternSymbol, Project};
+use crate::intermediate_representation::{ExternSymbol, Project, RuntimeMemoryImage};
 use crate::{abstract_domain::IntervalDomain, prelude::*};
 use crate::{
     abstract_domain::{AbstractDomain, AbstractIdentifier},
     analysis::pointer_inference::PointerInference as PointerInferenceComputation,
     analysis::pointer_inference::State as PointerInferenceState,
     intermediate_representation::{Expression, Sub, Variable},
-    utils::binary::RuntimeMemoryImage,
 };
 
 /// Contains all information known about the state of a program at a specific point of time.
