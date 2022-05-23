@@ -164,6 +164,8 @@ impl<'a> Context<'a> {
                 if !already_handled_ids.insert(id.clone())
                     || !id.get_path_hints().is_empty()
                     || !subs_list.contains_key(id.get_tid())
+                    || *id.get_location()
+                        == AbstractLocation::Register(self.project.stack_pointer_register.clone())
                 {
                     // ID was already present in `already_handled_ids` or it is not a parameter ID
                     replacement_map.insert(
