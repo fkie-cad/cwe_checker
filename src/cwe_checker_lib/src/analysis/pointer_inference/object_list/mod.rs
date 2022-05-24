@@ -1,11 +1,10 @@
 use super::object::*;
-use super::{Data, ValueDomain};
+use super::Data;
+use crate::abstract_domain::*;
 use crate::prelude::*;
-use crate::{abstract_domain::*, utils::binary::RuntimeMemoryImage};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
-mod cwe_helpers;
 mod id_manipulation;
 mod list_manipulation;
 
@@ -30,8 +29,7 @@ impl AbstractObjectList {
         address_bytesize: ByteSize,
     ) -> AbstractObjectList {
         let mut objects = BTreeMap::new();
-        let mut stack_object = AbstractObject::new(Some(ObjectType::Stack), address_bytesize);
-        stack_object.set_upper_index_bound(Bitvector::zero(address_bytesize.into()).into());
+        let stack_object = AbstractObject::new(Some(ObjectType::Stack), address_bytesize);
         objects.insert(stack_id, stack_object);
         AbstractObjectList { objects }
     }

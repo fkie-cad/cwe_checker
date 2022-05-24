@@ -835,52 +835,6 @@ fn specialize_by_unsigned_comparison_op() {
 }
 
 #[test]
-fn out_of_bounds_access_recognition() {
-    let mut state = State::new(&register("RSP"), Tid::new("func_tid"));
-    let global_data = RuntimeMemoryImage::mock();
-    let heap_obj_id = new_id("heap_malloc", "RAX");
-    state.memory.add_abstract_object(
-        heap_obj_id.clone(),
-        ByteSize::new(8),
-        Some(ObjectType::Heap),
-    );
-    state
-        .memory
-        .set_lower_index_bound(&heap_obj_id, &Bitvector::from_u64(0).into());
-    state
-        .memory
-        .set_upper_index_bound(&heap_obj_id, &Bitvector::from_u64(7).into());
-
-    let pointer = Data::from_target(heap_obj_id.clone(), Bitvector::from_i64(-1).into());
-    assert!(state.pointer_contains_out_of_bounds_target(&pointer, &global_data));
-    let pointer = Data::from_target(heap_obj_id.clone(), Bitvector::from_u64(0).into());
-    assert!(!state.pointer_contains_out_of_bounds_target(&pointer, &global_data));
-    let pointer = Data::from_target(heap_obj_id.clone(), Bitvector::from_u64(7).into());
-    assert!(!state.pointer_contains_out_of_bounds_target(&pointer, &global_data));
-    let pointer = Data::from_target(heap_obj_id.clone(), Bitvector::from_u64(8).into());
-    assert!(state.pointer_contains_out_of_bounds_target(&pointer, &global_data));
-
-    let address = Data::from_target(heap_obj_id.clone(), Bitvector::from_u64(0).into());
-    state.set_register(&Variable::mock("RAX", 8), address);
-    let load_def = Def::load(
-        "tid",
-        Variable::mock("RBX", 8),
-        Expression::Var(Variable::mock("RAX", 8)),
-    );
-    assert!(!state.contains_out_of_bounds_mem_access(&load_def.term, &global_data));
-
-    let address = Data::from_target(heap_obj_id.clone(), Bitvector::from_u64(0).into());
-    state.set_register(&Variable::mock("RAX", 8), address);
-    assert!(!state.contains_out_of_bounds_mem_access(&load_def.term, &global_data));
-    let address = Data::from_target(heap_obj_id.clone(), Bitvector::from_u64(1).into());
-    state.set_register(&Variable::mock("RAX", 8), address);
-    assert!(state.contains_out_of_bounds_mem_access(&load_def.term, &global_data));
-    let address = Data::from_target(state.stack_id.clone(), Bitvector::from_i64(-8).into());
-    state.set_register(&Variable::mock("RAX", 8), address);
-    assert!(!state.contains_out_of_bounds_mem_access(&load_def.term, &global_data));
-}
-
-#[test]
 fn specialize_pointer_comparison() {
     let mut state = State::new(&register("RSP"), Tid::new("func_tid"));
     let interval = IntervalDomain::mock(-5, 10);

@@ -8,8 +8,6 @@ fn new_abstract_object() -> AbstractObject {
         is_unique: true,
         type_: Some(ObjectType::Heap),
         memory: MemRegion::new(ByteSize::new(8)),
-        lower_index_bound: Bitvector::from_u64(0).into(),
-        upper_index_bound: Bitvector::from_u64(99).into(),
     };
     inner.into()
 }
@@ -95,15 +93,6 @@ fn remove_ids() {
             .into_iter()
             .collect()
     );
-}
-
-#[test]
-fn access_contained_in_bounds() {
-    let object = new_abstract_object();
-    assert!(object.access_contained_in_bounds(&IntervalDomain::mock(0, 99), ByteSize::new(1)));
-    assert!(!object.access_contained_in_bounds(&IntervalDomain::mock(-1, -1), ByteSize::new(8)));
-    assert!(object.access_contained_in_bounds(&IntervalDomain::mock(92, 92), ByteSize::new(8)));
-    assert!(!object.access_contained_in_bounds(&IntervalDomain::mock(93, 93), ByteSize::new(8)));
 }
 
 #[test]

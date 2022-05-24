@@ -25,36 +25,6 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
             Ok(true) => self.report_null_deref(&def.tid),
             Ok(false) => (), // no null dereference detected
         }
-        // check for out-of-bounds memory access
-        if new_state.contains_out_of_bounds_mem_access(&def.term, self.runtime_memory_image) {
-            let (warning_name, warning_description) = match &def.term {
-                Def::Load { .. } => (
-                    "CWE125",
-                    format!(
-                        "(Out-of-bounds Read) Memory load at {} may be out of bounds",
-                        def.tid.address,
-                    ),
-                ),
-                Def::Store { .. } => (
-                    "CWE787",
-                    format!(
-                        "(Out-of-bounds Write) Memory write at {} may be out of bounds",
-                        def.tid.address,
-                    ),
-                ),
-                Def::Assign { .. } => panic!(),
-            };
-            let warning = CweWarning {
-                name: warning_name.to_string(),
-                version: VERSION.to_string(),
-                addresses: vec![def.tid.address.clone()],
-                tids: vec![format!("{}", def.tid)],
-                symbols: Vec::new(),
-                other: Vec::new(),
-                description: warning_description,
-            };
-            let _ = self.log_collector.send(LogThreadMsg::Cwe(warning));
-        }
 
         match &def.term {
             Def::Store { address, value } => {
@@ -258,8 +228,6 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
         };
         let mut new_state = state.clone();
         if let Some(extern_symbol) = self.extern_symbol_map.get(call_target) {
-            // Generate a CWE-message if some argument is an out-of-bounds pointer.
-            self.check_parameter_register_for_out_of_bounds_pointer(state, call, extern_symbol);
             // Clear non-callee-saved registers from the state.
             let cconv = self.project.get_calling_convention(extern_symbol);
             new_state.clear_non_callee_saved_register(&cconv.callee_saved_register[..]);
@@ -269,7 +237,6 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
             match extern_symbol.name.as_str() {
                 malloc_like_fn if self.allocation_symbols.iter().any(|x| x == malloc_like_fn) => {
                     Some(self.add_new_object_in_call_return_register(
-                        state,
                         new_state,
                         call,
                         extern_symbol,

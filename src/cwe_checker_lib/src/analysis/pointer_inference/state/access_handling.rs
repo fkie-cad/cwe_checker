@@ -182,36 +182,6 @@ impl State {
         }
     }
 
-    /// Returns `true` if the given `Def` is a load or store instruction
-    /// which may access a memory object outside its bounds.
-    pub fn contains_out_of_bounds_mem_access(
-        &self,
-        def: &Def,
-        global_data: &RuntimeMemoryImage,
-    ) -> bool {
-        let (address, size) = match def {
-            Def::Load { address, var } => (self.eval(address), var.size),
-            Def::Store { address, value } => (self.eval(address), value.bytesize()),
-            _ => return false,
-        };
-        self.memory
-            .is_out_of_bounds_mem_access(&address, size, global_data)
-    }
-
-    /// Returns `true` if `data` is a pointer pointing outside of the bounds of a memory buffer.
-    /// Does not check whether `data` may represent an out-of-bounds access to global memory,
-    /// since this function assumes that all absolute values are not pointers.
-    pub fn pointer_contains_out_of_bounds_target(
-        &self,
-        data: &Data,
-        global_data: &RuntimeMemoryImage,
-    ) -> bool {
-        let mut data = data.clone();
-        data.set_absolute_value(None); // Do not check absolute_values
-        self.memory
-            .is_out_of_bounds_mem_access(&data, ByteSize::new(1), global_data)
-    }
-
     /// Check whether the given `def` could result in a memory access through a NULL pointer.
     ///
     /// If no NULL pointer dereference is detected then `Ok(false)` is returned.

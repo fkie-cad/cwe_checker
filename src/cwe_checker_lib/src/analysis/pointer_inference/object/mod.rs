@@ -41,14 +41,6 @@ struct Inner {
     type_: Option<ObjectType>,
     /// The actual content of the memory object
     memory: MemRegion<Data>,
-    /// The smallest index still contained in the memory region.
-    /// A `Top` value represents an unknown bound.
-    /// The bound is not enforced, i.e. reading and writing to indices violating the bound is still allowed.
-    lower_index_bound: BitvectorDomain,
-    /// The largest index still contained in the memory region.
-    /// A `Top` value represents an unknown bound.
-    /// The bound is not enforced, i.e. reading and writing to indices violating the bound is still allowed.
-    upper_index_bound: BitvectorDomain,
 }
 
 /// An object is either a stack or a heap object.
@@ -58,20 +50,6 @@ pub enum ObjectType {
     Stack,
     /// A memory object located on the heap.
     Heap,
-}
-
-/// An object is either alive or dangling (because the memory was freed or a function return invalidated the stack frame).
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy, PartialOrd, Ord)]
-pub enum ObjectState {
-    /// The object is alive.
-    Alive,
-    /// The object is dangling, i.e. the memory has been freed already.
-    Dangling,
-    /// The state of the object is unknown (due to merging different object states).
-    Unknown,
-    /// The object was referenced in an "use-after-free" or "double-free" CWE-warning.
-    /// This state is meant to be temporary to prevent obvious subsequent CWE-warnings with the same root cause.
-    Flagged,
 }
 
 #[allow(clippy::from_over_into)]
@@ -91,8 +69,6 @@ impl AbstractObject {
             is_unique: true,
             type_,
             memory: MemRegion::new(address_bytesize),
-            lower_index_bound: BitvectorDomain::Top(address_bytesize),
-            upper_index_bound: BitvectorDomain::Top(address_bytesize),
         };
         inner.into()
     }
@@ -107,26 +83,6 @@ impl AbstractObject {
     pub fn mark_as_not_unique(&mut self) {
         let inner = Arc::make_mut(&mut self.inner);
         inner.is_unique = false;
-    }
-
-    /// Set the lower index bound that is still considered to be contained in the abstract object.
-    pub fn set_lower_index_bound(&mut self, lower_bound: BitvectorDomain) {
-        let inner = Arc::make_mut(&mut self.inner);
-        inner.lower_index_bound = lower_bound;
-    }
-
-    /// Set the upper index bound that is still considered to be contained in the abstract object.
-    pub fn set_upper_index_bound(&mut self, upper_bound: BitvectorDomain) {
-        let inner = Arc::make_mut(&mut self.inner);
-        inner.upper_index_bound = upper_bound;
-    }
-
-    /// Add an offset to the upper index bound that is still considered to be contained in the abstract object.
-    pub fn add_to_upper_index_bound(&mut self, offset: i64) {
-        let inner = Arc::make_mut(&mut self.inner);
-        let offset =
-            Bitvector::from_i64(offset).into_resize_signed(inner.upper_index_bound.bytesize());
-        inner.upper_index_bound = inner.upper_index_bound.clone() + offset.into();
     }
 
     /// Get the type of the memory object.
@@ -146,8 +102,6 @@ impl AbstractObject {
     /// This approximates the fact that we currently do not track exactly which indices
     /// in `other` were overwritten with a `Top` element and which indices simply were not
     /// accessed at all in `other`.
-    ///
-    /// The upper and lower index bounds of `self` are kept and not overwritten.
     pub fn overwrite_with(&mut self, other: &AbstractObject, offset_other: &ValueDomain) {
         if let Ok(obj_offset) = offset_other.try_to_offset() {
             if self.inner.is_unique {
@@ -164,7 +118,6 @@ impl AbstractObject {
                 inner
                     .pointer_targets
                     .append(&mut other.inner.pointer_targets.clone());
-                // TODO: We should log cases where the index bounds are violated by `other`.
             } else {
                 let inner = Arc::make_mut(&mut self.inner);
                 let mut other = other.clone();
@@ -176,7 +129,6 @@ impl AbstractObject {
                 inner
                     .pointer_targets
                     .append(&mut other.inner.pointer_targets.clone());
-                // TODO: We should log cases where the index bounds are violated by `other`.
             }
         } else {
             let inner = Arc::make_mut(&mut self.inner);
@@ -189,19 +141,12 @@ impl AbstractObject {
     }
 
     /// Add an offset to all values contained in the abstract object.
-    /// The offset is also added to the lower and upper index bounds.
     pub fn add_offset_to_all_indices(&mut self, offset: &ValueDomain) {
         let inner = Arc::make_mut(&mut self.inner);
         if let Ok(offset) = offset.try_to_offset() {
             inner.memory.add_offset_to_all_indices(offset);
-            let offset =
-                Bitvector::from_i64(offset).into_resize_signed(inner.lower_index_bound.bytesize());
-            inner.lower_index_bound = inner.lower_index_bound.clone() + offset.clone().into();
-            inner.upper_index_bound = inner.upper_index_bound.clone() + offset.into();
         } else {
             inner.memory = MemRegion::new(inner.memory.get_address_bytesize());
-            inner.lower_index_bound = inner.lower_index_bound.top();
-            inner.upper_index_bound = inner.upper_index_bound.top();
         }
     }
 }
@@ -222,14 +167,6 @@ impl AbstractDomain for AbstractObject {
                 is_unique: self.inner.is_unique && other.inner.is_unique,
                 type_: same_or_none(&self.inner.type_, &other.inner.type_),
                 memory: self.inner.memory.merge(&other.inner.memory),
-                lower_index_bound: self
-                    .inner
-                    .lower_index_bound
-                    .merge(&other.inner.lower_index_bound),
-                upper_index_bound: self
-                    .inner
-                    .upper_index_bound
-                    .merge(&other.inner.upper_index_bound),
             }
             .into()
         }
@@ -254,14 +191,6 @@ impl AbstractObject {
                 "type".to_string(),
                 serde_json::Value::String(format!("{:?}", self.inner.type_)),
             ),
-            (
-                "lower_index_bound".to_string(),
-                serde_json::Value::String(format!("{}", self.inner.lower_index_bound)),
-            ),
-            (
-                "upper_index_bound".to_string(),
-                serde_json::Value::String(format!("{}", self.inner.upper_index_bound)),
-            ),
         ];
         let memory = self
             .inner
@@ -282,21 +211,6 @@ fn same_or_none<T: Eq + Clone>(left: &Option<T>, right: &Option<T>) -> Option<T>
         Some(left.as_ref().unwrap().clone())
     } else {
         None
-    }
-}
-
-impl ObjectState {
-    /// Merge two object states.
-    /// If one of the two states is `Flagged`, then the resulting state is the other object state.
-    pub fn merge(self, other: Self) -> Self {
-        use ObjectState::*;
-        match (self, other) {
-            (Flagged, state) | (state, Flagged) => state,
-            (Unknown, _) | (_, Unknown) => Unknown,
-            (Alive, Alive) => Alive,
-            (Dangling, Dangling) => Dangling,
-            (Alive, Dangling) | (Dangling, Alive) => Unknown,
-        }
     }
 }
 

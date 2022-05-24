@@ -1,3 +1,4 @@
+use super::super::ValueDomain;
 use super::*;
 
 fn bv(value: i64) -> ValueDomain {
