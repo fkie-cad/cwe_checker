@@ -29,7 +29,7 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
         match &def.term {
             Def::Store { address, value } => {
                 self.log_debug(
-                    new_state.handle_store(address, value, self.runtime_memory_image),
+                    new_state.handle_store(address, value, &self.project.runtime_memory_image),
                     Some(&def.tid),
                 );
                 Some(new_state)
@@ -41,7 +41,7 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
             Def::Load { var, address } => {
                 if !self.is_mips_gp_load_to_top_value(state, var, address) {
                     self.log_debug(
-                        new_state.handle_load(var, address, self.runtime_memory_image),
+                        new_state.handle_load(var, address, &self.project.runtime_memory_image),
                         Some(&def.tid),
                     );
                 }

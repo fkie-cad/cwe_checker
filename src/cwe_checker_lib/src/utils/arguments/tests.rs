@@ -9,7 +9,6 @@ fn mock_pi_state() -> PointerInferenceState {
 #[test]
 /// Tests extraction of format string parameters '/dev/sd%c%d' and 'cat %s'.
 fn test_get_variable_parameters() {
-    let mem_image = RuntimeMemoryImage::mock();
     let mut pi_state = mock_pi_state();
     let sprintf_symbol = ExternSymbol::mock_string();
     let mut format_string_index_map: HashMap<String, usize> = HashMap::new();
@@ -38,7 +37,6 @@ fn test_get_variable_parameters() {
             &pi_state,
             &sprintf_symbol,
             &format_string_index_map,
-            &mem_image,
         )
         .unwrap()
     );
@@ -61,7 +59,6 @@ fn test_get_variable_parameters() {
             &pi_state,
             &sprintf_symbol,
             &format_string_index_map,
-            &mem_image,
         )
         .unwrap()
     );

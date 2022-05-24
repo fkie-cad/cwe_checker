@@ -17,7 +17,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
         if let Some(pi_state) = state.get_pointer_inference_state() {
             if let Some(return_arg) = extern_symbol.parameters.first() {
                 if let Ok(return_pointer) =
-                    pi_state.eval_parameter_arg(return_arg, self.runtime_memory_image)
+                    pi_state.eval_parameter_arg(return_arg, &self.project.runtime_memory_image)
                 {
                     if !return_pointer.get_relative_values().is_empty() {
                         let target_domain =
@@ -64,7 +64,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
         let mut input_domain = T::create_top_value_domain();
         if let Some(input_arg) = extern_symbol.parameters.get(1) {
             if let Ok(input_value) =
-                pi_state.eval_parameter_arg(input_arg, self.runtime_memory_image)
+                pi_state.eval_parameter_arg(input_arg, &self.project.runtime_memory_image)
             {
                 // Check whether the second input string is in read only memory or on stack/heap.
                 if !input_value.get_relative_values().is_empty() {
@@ -78,6 +78,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
                 if let Some(value) = input_value.get_absolute_value() {
                     if let Ok(global_address) = value.try_to_bitvec() {
                         if let Ok(input_string) = self
+                            .project
                             .runtime_memory_image
                             .read_string_until_null_terminator(&global_address)
                         {

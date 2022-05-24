@@ -6,7 +6,6 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
         string_symbols: HashMap<Tid, &'a ExternSymbol>,
         format_string_index: HashMap<String, usize>,
         pointer_inference_results: &'a PointerInferenceComputation<'a>,
-        runtime_memory_image: &'a RuntimeMemoryImage,
     ) -> Self {
         let mut extern_symbol_map = HashMap::new();
         for (tid, symbol) in project.program.term.extern_symbols.iter() {
@@ -35,7 +34,6 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
 
         Context {
             project,
-            runtime_memory_image,
             pointer_inference_results,
             string_symbol_map: string_symbols,
             extern_symbol_map,

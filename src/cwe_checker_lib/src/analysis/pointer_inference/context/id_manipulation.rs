@@ -22,7 +22,7 @@ impl<'a> Context<'a> {
         for param in callee_fn_sig.parameters.keys() {
             let param_id = AbstractIdentifier::from_arg(callee_tid, param);
             if let Ok(param_value) =
-                state_before_call.eval_parameter_arg(param, self.runtime_memory_image)
+                state_before_call.eval_parameter_arg(param, &self.project.runtime_memory_image)
             {
                 id_map.insert(param_id, param_value);
             } else {

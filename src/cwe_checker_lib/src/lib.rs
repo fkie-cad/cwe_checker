@@ -74,8 +74,8 @@ use analysis::function_signature::FunctionSignature;
 use analysis::graph::Graph;
 use analysis::pointer_inference::PointerInference;
 use analysis::string_abstraction::StringAbstraction;
+
 use intermediate_representation::Project;
-use utils::binary::RuntimeMemoryImage;
 use utils::log::{CweWarning, LogMessage};
 
 mod prelude {
@@ -140,8 +140,6 @@ pub fn get_modules() -> Vec<&'static CweModule> {
 pub struct AnalysisResults<'a> {
     /// The content of the binary file
     pub binary: &'a [u8],
-    /// A representation of the runtime memory image of the binary.
-    pub runtime_memory_image: &'a RuntimeMemoryImage,
     /// The computed control flow graph of the program.
     pub control_flow_graph: &'a Graph<'a>,
     /// A pointer to the project struct
@@ -158,13 +156,11 @@ impl<'a> AnalysisResults<'a> {
     /// Create a new `AnalysisResults` struct with only the project itself known.
     pub fn new(
         binary: &'a [u8],
-        runtime_memory_image: &'a RuntimeMemoryImage,
         control_flow_graph: &'a Graph<'a>,
         project: &'a Project,
     ) -> AnalysisResults<'a> {
         AnalysisResults {
             binary,
-            runtime_memory_image,
             control_flow_graph,
             project,
             function_signatures: None,
@@ -231,7 +227,6 @@ impl<'a> AnalysisResults<'a> {
     ) -> StringAbstraction<BricksDomain> {
         crate::analysis::string_abstraction::run(
             self.project,
-            self.runtime_memory_image,
             self.control_flow_graph,
             pi_results.unwrap(),
             serde_json::from_value(config.clone()).unwrap(),
@@ -264,11 +259,8 @@ mod tests {
                 HashSet::from_iter(project.program.term.extern_symbols.keys().cloned());
             let graph = Box::new(get_program_cfg(&project.program, extern_subs));
             let graph: &'a Graph = Box::leak(graph);
-            let runtime_mem_image = Box::new(RuntimeMemoryImage::mock());
-            let runtime_mem_image: &'a RuntimeMemoryImage = Box::leak(runtime_mem_image);
             let binary: &'a Vec<u8> = Box::leak(Box::new(Vec::new()));
-
-            let analysis_results = AnalysisResults::new(binary, runtime_mem_image, graph, project);
+            let analysis_results = AnalysisResults::new(binary, graph, project);
             let (fn_sigs, _) = analysis_results.compute_function_signatures();
             let fn_sigs: &'a BTreeMap<_, _> = Box::leak(Box::new(fn_sigs));
             let analysis_results = analysis_results.with_function_signatures(Some(fn_sigs));

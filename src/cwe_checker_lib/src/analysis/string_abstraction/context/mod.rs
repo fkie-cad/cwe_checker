@@ -17,7 +17,6 @@ use crate::{
         pointer_inference::State as PointerInferenceState,
     },
     intermediate_representation::{Def, ExternSymbol, Project, Term, Tid},
-    utils::binary::RuntimeMemoryImage,
 };
 
 use super::{state::State, Config};
@@ -31,9 +30,6 @@ mod trait_impls;
 pub struct Context<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> {
     /// A reference to the `Project` object representing the binary
     pub project: &'a Project,
-    /// The runtime memory image for reading global read-only variables.
-    /// Note that values of writeable global memory segments are not tracked.
-    pub runtime_memory_image: &'a RuntimeMemoryImage,
     /// A pointer to the results of the pointer inference analysis.
     /// They are used to determine the targets of pointers to memory,
     /// which in turn is used to keep track of taint on the stack or on the heap.
@@ -62,7 +58,6 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String> + DomainInsertion> Conte
     /// Create a new context object for a given project.
     pub fn new(
         project: &'a Project,
-        runtime_memory_image: &'a RuntimeMemoryImage,
         pointer_inference_results: &'a PointerInferenceComputation<'a>,
         config: Config,
     ) -> Context<'a, T> {
@@ -95,7 +90,6 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String> + DomainInsertion> Conte
 
         Context {
             project,
-            runtime_memory_image,
             pointer_inference_results,
             format_string_index_map: config.format_string_index.into_iter().collect(),
             string_symbol_map,

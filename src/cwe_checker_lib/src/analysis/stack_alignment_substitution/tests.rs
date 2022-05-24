@@ -358,7 +358,7 @@ fn supports_commutative_and() {
         },
     );
 
-    let mut proj = setup(vec![bitmask_and_var], true);
+    let mut proj = setup(vec![bitmask_and_var, var_and_bitmask], true);
     let log = substitute_and_on_stackpointer(proj.borrow_mut());
     assert!(log.is_none());
 

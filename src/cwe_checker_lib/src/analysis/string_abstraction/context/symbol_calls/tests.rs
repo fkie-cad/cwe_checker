@@ -61,7 +61,6 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String> + Debu
             mock_string_symbol_map(&pi_context.project),
             mock_format_index_map(),
             &pi_results,
-            &pi_context.runtime_memory_image,
         );
 
         let state_before_call: State<T> = State::mock_with_given_pi_state(

@@ -10,7 +10,6 @@ use crate::{
     abstract_domain::{AbstractDomain, DomainInsertion, HasTop},
     intermediate_representation::Project,
     prelude::*,
-    utils::binary::RuntimeMemoryImage,
 };
 
 use self::state::State;
@@ -49,17 +48,11 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>>
     /// Generate a new string abstraction computation for a project.
     pub fn new(
         project: &'a Project,
-        runtime_memory_image: &'a RuntimeMemoryImage,
         control_flow_graph: &'a Graph<'a>,
         pointer_inference_results: &'a PointerInferenceComputation<'a>,
         config: Config,
     ) -> StringAbstraction<'a, T> {
-        let context = Context::new(
-            project,
-            runtime_memory_image,
-            pointer_inference_results,
-            config,
-        );
+        let context = Context::new(project, pointer_inference_results, config);
 
         let mut sub_to_entry_blocks_map = HashMap::new();
         for sub in project.program.term.subs.values() {
@@ -132,18 +125,12 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>>
 /// Compute the string abstraction and return its results.
 pub fn run<'a, T: AbstractDomain + HasTop + Eq + From<String> + DomainInsertion>(
     project: &'a Project,
-    runtime_memory_image: &'a RuntimeMemoryImage,
     control_flow_graph: &'a Graph<'a>,
     pointer_inference: &'a PointerInferenceComputation<'a>,
     config: Config,
 ) -> StringAbstraction<'a, T> {
-    let mut string_abstraction = StringAbstraction::new(
-        project,
-        runtime_memory_image,
-        control_flow_graph,
-        pointer_inference,
-        config,
-    );
+    let mut string_abstraction =
+        StringAbstraction::new(project, control_flow_graph, pointer_inference, config);
 
     string_abstraction.compute();
 

@@ -4,7 +4,6 @@ use crate::abstract_domain::*;
 use crate::analysis::function_signature::FunctionSignature;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
-use crate::utils::binary::RuntimeMemoryImage;
 use std::collections::{BTreeMap, BTreeSet};
 
 mod access_handling;

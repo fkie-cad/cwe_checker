@@ -27,7 +27,7 @@ impl<'a> VsaResult for PointerInference<'a> {
         let state = self.states_at_tids.get(jmp_tid)?;
         let context = self.computation.get_context().get_context();
         state
-            .eval_parameter_arg(parameter, context.runtime_memory_image)
+            .eval_parameter_arg(parameter, &context.project.runtime_memory_image)
             .ok()
     }
 }

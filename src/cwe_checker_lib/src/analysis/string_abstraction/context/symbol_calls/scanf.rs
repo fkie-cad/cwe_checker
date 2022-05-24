@@ -25,7 +25,6 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
                 pi_state,
                 extern_symbol,
                 &self.format_string_index_map,
-                self.runtime_memory_image,
             ) {
                 self.create_abstract_domain_entries_for_function_return_values(
                     pi_state,
@@ -47,7 +46,8 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
     ) {
         for (argument, value) in arg_to_value_map.into_iter() {
             if argument.get_data_type().unwrap() == Datatype::Pointer {
-                if let Ok(data) = pi_state.eval_parameter_arg(&argument, self.runtime_memory_image)
+                if let Ok(data) =
+                    pi_state.eval_parameter_arg(&argument, &self.project.runtime_memory_image)
                 {
                     if !data.get_relative_values().is_empty() {
                         Context::add_constant_or_top_value_to_return_locations(
@@ -91,8 +91,8 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
         let mut new_state = state.clone();
         if let Some(pi_state) = state.get_pointer_inference_state() {
             if let Some(source_string_arg) = extern_symbol.parameters.first() {
-                if let Ok(source_string) =
-                    pi_state.eval_parameter_arg(source_string_arg, self.runtime_memory_image)
+                if let Ok(source_string) = pi_state
+                    .eval_parameter_arg(source_string_arg, &self.project.runtime_memory_image)
                 {
                     if self.source_string_mapped_to_return_locations(
                         pi_state,
@@ -120,11 +120,15 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
         extern_symbol: &ExternSymbol,
     ) -> bool {
         if let Some(global_address) = source_string.get_absolute_value() {
-            if let Ok(source_string) = self.runtime_memory_image.read_string_until_null_terminator(
-                &global_address
-                    .try_to_bitvec()
-                    .expect("Could not translate interval address to bitvector."),
-            ) {
+            if let Ok(source_string) = self
+                .project
+                .runtime_memory_image
+                .read_string_until_null_terminator(
+                    &global_address
+                        .try_to_bitvec()
+                        .expect("Could not translate interval address to bitvector."),
+                )
+            {
                 if let Ok(source_return_string_map) = self
                     .map_source_string_parameters_to_return_arguments(
                         pi_state,
@@ -158,7 +162,6 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
             pi_state,
             extern_symbol,
             &self.format_string_index_map,
-            self.runtime_memory_image,
         ) {
             let return_values: Vec<String> =
                 source_string.split(' ').map(|s| s.to_string()).collect();

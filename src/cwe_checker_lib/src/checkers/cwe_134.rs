@@ -31,8 +31,8 @@ use crate::analysis::interprocedural_fixpoint_generic::NodeValue;
 use crate::analysis::pointer_inference::PointerInference;
 use crate::intermediate_representation::ExternSymbol;
 use crate::intermediate_representation::Jmp;
+use crate::intermediate_representation::RuntimeMemoryImage;
 use crate::prelude::*;
-use crate::utils::binary::RuntimeMemoryImage;
 use crate::utils::log::CweWarning;
 use crate::utils::log::LogMessage;
 use crate::CweModule;
@@ -91,7 +91,7 @@ pub fn check_cwe(
                         symbol,
                         &format_string_index,
                         pointer_inference_results,
-                        analysis_results.runtime_memory_image,
+                        &analysis_results.project.runtime_memory_image,
                     );
 
                     if matches!(
@@ -219,7 +219,6 @@ pub mod tests {
     #[test]
     fn test_locate_format_string() {
         let sprintf_symbol = ExternSymbol::mock_string();
-        let runtime_memory_image = RuntimeMemoryImage::mock();
         let project = mock_project();
         let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
         let mut pi_results = PointerInferenceComputation::mock(&project);
@@ -241,7 +240,7 @@ pub mod tests {
                 &sprintf_symbol,
                 &format_string_index,
                 &pi_results,
-                &runtime_memory_image,
+                &project.runtime_memory_image,
             ),
             StringLocation::GlobalReadable
         );

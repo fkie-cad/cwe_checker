@@ -169,7 +169,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
 
     /// Inserts a char constant into the format string.
     pub fn get_constant_char_domain(&self, constant: Bitvector) -> Option<T> {
-        if let Ok(Some(char_code)) = self.runtime_memory_image.read(
+        if let Ok(Some(char_code)) = self.project.runtime_memory_image.read(
             &constant,
             self.project
                 .datatype_properties
@@ -199,6 +199,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
     /// Inserts a string constant into the format string.
     pub fn get_constant_string_domain(&self, constant: Bitvector) -> Option<T> {
         if let Ok(string) = self
+            .project
             .runtime_memory_image
             .read_string_until_null_terminator(&constant)
         {
@@ -218,7 +219,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> Conte
         if let Some(dest_arg) = extern_symbol.parameters.first() {
             if let Some(pi_state) = state.get_pointer_inference_state() {
                 if let Ok(pointer) =
-                    pi_state.eval_parameter_arg(dest_arg, self.runtime_memory_image)
+                    pi_state.eval_parameter_arg(dest_arg, &self.project.runtime_memory_image)
                 {
                     let heap_to_string_map = state.get_heap_to_string_map();
                     for (target, _) in pointer.get_relative_values().iter() {

@@ -1,8 +1,7 @@
 use super::*;
-use crate::utils::log::LogMessage;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-
 mod block_duplication_normalization;
+use crate::utils::log::LogMessage;
 use block_duplication_normalization::*;
 
 /// The `Project` struct is the main data structure representing a binary.
@@ -24,6 +23,8 @@ pub struct Project {
     pub register_set: BTreeSet<Variable>,
     /// Contains the properties of C data types. (e.g. size)
     pub datatype_properties: DatatypeProperties,
+    /// Represents the memory after loading the binary.
+    pub runtime_memory_image: RuntimeMemoryImage,
 }
 
 impl Project {
@@ -319,6 +320,7 @@ mod tests {
                 calling_conventions,
                 register_set: integer_register.iter().cloned().collect(),
                 datatype_properties: DatatypeProperties::mock_x64(),
+                runtime_memory_image: RuntimeMemoryImage::mock(),
             }
         }
 
@@ -357,6 +359,7 @@ mod tests {
                 )]),
                 register_set: integer_register.collect(),
                 datatype_properties: DatatypeProperties::mock_arm32(),
+                runtime_memory_image: RuntimeMemoryImage::mock(),
             }
         }
     }

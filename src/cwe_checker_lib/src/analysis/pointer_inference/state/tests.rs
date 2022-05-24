@@ -1,7 +1,6 @@
 use super::super::ValueDomain;
 use super::*;
 use crate::analysis::pointer_inference::object::*;
-use crate::utils::binary::RuntimeMemoryImage;
 use Expression::*;
 
 fn bv(value: i64) -> ValueDomain {
