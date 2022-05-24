@@ -6,7 +6,6 @@ fn new_abstract_object() -> AbstractObject {
     let inner = Inner {
         pointer_targets: BTreeSet::new(),
         is_unique: true,
-        state: ObjectState::Alive,
         type_: Some(ObjectType::Heap),
         memory: MemRegion::new(ByteSize::new(8)),
         lower_index_bound: Bitvector::from_u64(0).into(),

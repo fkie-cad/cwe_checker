@@ -71,11 +71,6 @@ pub struct Config {
     /// Names of extern functions that are `malloc`-like,
     /// i.e. the unique return value is a pointer to a newly allocated chunk of memory or a NULL pointer.
     pub allocation_symbols: Vec<String>,
-    /// Names of extern functions that are `free`-like,
-    /// i.e. the memory chunk that the unique parameter of the function points to gets deallocated.
-    /// Note that the analysis currently does not detect mismatching allocation-deallocation pairs,
-    /// i.e. it cannot distinguish between memory allocated by `malloc` and memory allocated by `new`.
-    pub deallocation_symbols: Vec<String>,
 }
 
 /// A wrapper struct for the pointer inference computation object.
@@ -473,7 +468,6 @@ mod tests {
             let analysis_results: &'a AnalysisResults = Box::leak(analysis_results);
             let config = Config {
                 allocation_symbols: vec!["malloc".to_string()],
-                deallocation_symbols: vec!["free".to_string()],
             };
             let (log_sender, _) = crossbeam_channel::unbounded();
             PointerInference::new(analysis_results, config, log_sender, false)

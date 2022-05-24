@@ -190,18 +190,6 @@ impl State {
         self.memory.remove_unused_objects(&referenced_ids);
     }
 
-    /// Mark a memory object as already freed (i.e. pointers to it are dangling).
-    /// If the object cannot be identified uniquely, all possible targets are marked as having an unknown status.
-    ///
-    /// If this may cause double frees (i.e. the object in question may have been freed already),
-    /// an error with the list of possibly already freed objects is returned.
-    pub fn mark_mem_object_as_freed(
-        &mut self,
-        object_pointer: &Data,
-    ) -> Result<(), Vec<(AbstractIdentifier, Error)>> {
-        self.memory.mark_mem_object_as_freed(object_pointer)
-    }
-
     /// Remove all knowledge about the contents of non-callee-saved registers from the state.
     pub fn remove_non_callee_saved_register(&mut self, cconv: &CallingConvention) {
         let mut callee_saved_register = BTreeMap::new();

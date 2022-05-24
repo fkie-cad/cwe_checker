@@ -37,8 +37,6 @@ struct Inner {
     pointer_targets: BTreeSet<AbstractIdentifier>,
     /// Tracks whether this may represent more than one actual memory object.
     is_unique: bool,
-    /// Is the object alive or already destroyed
-    state: ObjectState,
     /// Is the object a stack frame or a heap object
     type_: Option<ObjectType>,
     /// The actual content of the memory object
@@ -91,7 +89,6 @@ impl AbstractObject {
         let inner = Inner {
             pointer_targets: BTreeSet::new(),
             is_unique: true,
-            state: ObjectState::Alive,
             type_,
             memory: MemRegion::new(address_bytesize),
             lower_index_bound: BitvectorDomain::Top(address_bytesize),
@@ -132,64 +129,9 @@ impl AbstractObject {
         inner.upper_index_bound = inner.upper_index_bound.clone() + offset.into();
     }
 
-    /// Get the state of the memory object.
-    pub fn get_state(&self) -> ObjectState {
-        self.inner.state
-    }
-
-    /// If `self.is_unique()==true`, set the state of the object. Else merge the new state with the old.
-    pub fn set_state(&mut self, new_state: ObjectState) {
-        let inner = Arc::make_mut(&mut self.inner);
-        if inner.is_unique {
-            inner.state = new_state;
-        } else {
-            inner.state = inner.state.merge(new_state);
-        }
-    }
-
     /// Get the type of the memory object.
     pub fn get_object_type(&self) -> Option<ObjectType> {
         self.inner.type_
-    }
-
-    /// Mark the memory object as freed.
-    /// Returns an error if a possible double free is detected.
-    pub fn mark_as_freed(&mut self) -> Result<(), Error> {
-        let inner = Arc::make_mut(&mut self.inner);
-        match (inner.is_unique, inner.state) {
-            (true, ObjectState::Alive) | (true, ObjectState::Flagged) => {
-                inner.state = ObjectState::Dangling;
-                Ok(())
-            }
-            (false, ObjectState::Flagged) => {
-                inner.state = ObjectState::Unknown;
-                Ok(())
-            }
-            (true, _) | (false, ObjectState::Dangling) => {
-                inner.state = ObjectState::Flagged;
-                Err(anyhow!("Object may already have been freed"))
-            }
-            (false, _) => {
-                inner.state = ObjectState::Unknown;
-                Ok(())
-            }
-        }
-    }
-
-    /// Mark the memory object as possibly (but not definitely) freed.
-    /// Returns an error if the object was definitely freed before.
-    pub fn mark_as_maybe_freed(&mut self) -> Result<(), Error> {
-        let inner = Arc::make_mut(&mut self.inner);
-        match inner.state {
-            ObjectState::Dangling => {
-                inner.state = ObjectState::Flagged;
-                Err(anyhow!("Object may already have been freed"))
-            }
-            _ => {
-                inner.state = ObjectState::Unknown;
-                Ok(())
-            }
-        }
     }
 
     /// Overwrite the values in `self` with those in `other`
@@ -219,7 +161,6 @@ impl AbstractObject {
                 }
                 // Merge all other properties with those of other.
                 inner.is_unique &= other.inner.is_unique;
-                inner.state = inner.state.merge(other.inner.state);
                 inner
                     .pointer_targets
                     .append(&mut other.inner.pointer_targets.clone());
@@ -232,7 +173,6 @@ impl AbstractObject {
 
                 inner.memory = inner.memory.merge(&other_inner.memory);
                 inner.is_unique &= other.inner.is_unique;
-                inner.state = inner.state.merge(other.inner.state);
                 inner
                     .pointer_targets
                     .append(&mut other.inner.pointer_targets.clone());
@@ -242,7 +182,6 @@ impl AbstractObject {
             let inner = Arc::make_mut(&mut self.inner);
             inner.memory.mark_all_values_as_top();
             inner.is_unique &= other.inner.is_unique;
-            inner.state = inner.state.merge(other.inner.state);
             inner
                 .pointer_targets
                 .append(&mut other.inner.pointer_targets.clone());
@@ -281,7 +220,6 @@ impl AbstractDomain for AbstractObject {
                     .cloned()
                     .collect(),
                 is_unique: self.inner.is_unique && other.inner.is_unique,
-                state: self.inner.state.merge(other.inner.state),
                 type_: same_or_none(&self.inner.type_, &other.inner.type_),
                 memory: self.inner.memory.merge(&other.inner.memory),
                 lower_index_bound: self
@@ -311,10 +249,6 @@ impl AbstractObject {
             (
                 "is_unique".to_string(),
                 serde_json::Value::String(format!("{}", self.inner.is_unique)),
-            ),
-            (
-                "state".to_string(),
-                serde_json::Value::String(format!("{:?}", self.inner.state)),
             ),
             (
                 "type".to_string(),

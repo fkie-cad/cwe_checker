@@ -16,22 +16,6 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
     /// Update the state according to the effects of the given `Def` term.
     fn update_def(&self, state: &Self::Value, def: &Term<Def>) -> Option<Self::Value> {
         let mut new_state = state.clone();
-        // first check for use-after-frees
-        if new_state.contains_access_of_dangling_memory(&def.term) {
-            let warning = CweWarning {
-                name: "CWE416".to_string(),
-                version: VERSION.to_string(),
-                addresses: vec![def.tid.address.clone()],
-                tids: vec![format!("{}", def.tid)],
-                symbols: Vec::new(),
-                other: Vec::new(),
-                description: format!(
-                    "(Use After Free) Access through a dangling pointer at {}",
-                    def.tid.address
-                ),
-            };
-            let _ = self.log_collector.send(LogThreadMsg::Cwe(warning));
-        }
         // check for null dereferences
         match new_state.check_def_for_null_dereferences(def) {
             Err(_) => {
@@ -116,23 +100,12 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
     /// The resulting state is the state at the start of the call target function.
     fn update_call(
         &self,
-        state: &State,
+        _state: &State,
         call_term: &Term<Jmp>,
         _target_node: &crate::analysis::graph::Node,
         _calling_convention: &Option<String>,
     ) -> Option<State> {
-        if let Jmp::Call {
-            target: ref callee_tid,
-            return_: _,
-        } = call_term.term
-        {
-            // Check call parameters for dangling pointers
-            let callee_fn_sig = self.fn_signatures.get(callee_tid).unwrap();
-            self.check_parameter_register_for_dangling_pointer(
-                &mut state.clone(),
-                call_term,
-                callee_fn_sig.parameters.keys(),
-            );
+        if let Jmp::Call { .. } = call_term.term {
             // No information flows from caller to the callee in the analysis.
             None
         } else if let Jmp::CallInd { .. } = call_term.term {
@@ -287,18 +260,6 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
         if let Some(extern_symbol) = self.extern_symbol_map.get(call_target) {
             // Generate a CWE-message if some argument is an out-of-bounds pointer.
             self.check_parameter_register_for_out_of_bounds_pointer(state, call, extern_symbol);
-            // Check parameter for possible use-after-frees (except for possible double frees, which are handled later)
-            if !self
-                .deallocation_symbols
-                .iter()
-                .any(|free_like_fn| free_like_fn == extern_symbol.name.as_str())
-            {
-                self.check_parameter_register_for_dangling_pointer(
-                    &mut new_state,
-                    call,
-                    extern_symbol.parameters.iter(),
-                );
-            }
             // Clear non-callee-saved registers from the state.
             let cconv = self.project.get_calling_convention(extern_symbol);
             new_state.clear_non_callee_saved_register(&cconv.callee_saved_register[..]);
@@ -313,9 +274,6 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
                         call,
                         extern_symbol,
                     ))
-                }
-                free_like_fn if self.deallocation_symbols.iter().any(|x| x == free_like_fn) => {
-                    Some(self.mark_parameter_object_as_freed(state, new_state, call, extern_symbol))
                 }
                 _ => Some(self.handle_generic_extern_call(state, new_state, call, extern_symbol)),
             }

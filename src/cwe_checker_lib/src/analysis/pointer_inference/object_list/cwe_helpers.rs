@@ -5,45 +5,6 @@
 use super::*;
 
 impl AbstractObjectList {
-    /// Check the state of a memory object at a given address.
-    /// Returns `true` if at least one of the targets of the pointer is dangling.
-    /// If `report_unknown_states` is `true`,
-    /// then objects with unknown states get reported if they are unique.
-    /// I.e. objects representing more than one actual object (e.g. an array of object) will not get reported,
-    /// even if their state is unknown and `report_unknown_states` is `true`.
-    pub fn is_dangling_pointer(&self, address: &Data, report_unknown_states: bool) -> bool {
-        for id in address.referenced_ids() {
-            if let Some(object) = self.objects.get(id) {
-                match (report_unknown_states, object.get_state()) {
-                    (_, ObjectState::Dangling) => return true,
-                    (true, ObjectState::Unknown) => {
-                        if object.is_unique() {
-                            return true;
-                        }
-                    }
-                    _ => (),
-                }
-            }
-        }
-        // No dangling pointer found
-        false
-    }
-
-    /// Mark all memory objects targeted by the given `address` pointer,
-    /// whose state is either dangling or unknown,
-    /// as flagged.
-    pub fn mark_dangling_pointer_targets_as_flagged(&mut self, address: &Data) {
-        for id in address.referenced_ids() {
-            let object = self.objects.get_mut(id).unwrap();
-            if matches!(
-                object.get_state(),
-                ObjectState::Unknown | ObjectState::Dangling
-            ) {
-                object.set_state(ObjectState::Flagged);
-            }
-        }
-    }
-
     /// Check whether a memory access at the given address (and accessing `size` many bytes)
     /// may be an out-of-bounds memory access.
     ///
@@ -104,36 +65,5 @@ impl AbstractObjectList {
             .map(|bitvec| bitvec.into())
             .unwrap_or_else(|_| BitvectorDomain::new_top(bound.bytesize()));
         object.set_upper_index_bound(bound);
-    }
-
-    /// Mark a memory object as already freed (i.e. pointers to it are dangling).
-    ///
-    /// If the object cannot be identified uniquely, all possible targets are marked as having an unknown status.
-    /// Returns either a non-empty list of detected errors (like possible double frees) or `OK(())` if no errors were found.
-    pub fn mark_mem_object_as_freed(
-        &mut self,
-        object_pointer: &Data,
-    ) -> Result<(), Vec<(AbstractIdentifier, Error)>> {
-        let ids: Vec<AbstractIdentifier> = object_pointer.referenced_ids().cloned().collect();
-        let mut possible_double_free_ids = Vec::new();
-        if ids.len() > 1
-            || object_pointer.contains_top()
-            || object_pointer.get_absolute_value().is_some()
-        {
-            for id in ids {
-                if let Err(error) = self.objects.get_mut(&id).unwrap().mark_as_maybe_freed() {
-                    possible_double_free_ids.push((id.clone(), error));
-                }
-            }
-        } else if let Some(id) = ids.get(0) {
-            if let Err(error) = self.objects.get_mut(id).unwrap().mark_as_freed() {
-                possible_double_free_ids.push((id.clone(), error));
-            }
-        }
-        if possible_double_free_ids.is_empty() {
-            Ok(())
-        } else {
-            Err(possible_double_free_ids)
-        }
     }
 }

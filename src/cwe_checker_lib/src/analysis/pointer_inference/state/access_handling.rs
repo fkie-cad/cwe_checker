@@ -182,24 +182,6 @@ impl State {
         }
     }
 
-    /// Check if an expression contains a use-after-free.
-    /// If yes, mark the corresponding memory objects as flagged.
-    pub fn contains_access_of_dangling_memory(&mut self, def: &Def) -> bool {
-        match def {
-            Def::Load { address, .. } | Def::Store { address, .. } => {
-                let address_value = self.eval(address);
-                if self.memory.is_dangling_pointer(&address_value, true) {
-                    self.memory
-                        .mark_dangling_pointer_targets_as_flagged(&address_value);
-                    true
-                } else {
-                    false
-                }
-            }
-            _ => false,
-        }
-    }
-
     /// Returns `true` if the given `Def` is a load or store instruction
     /// which may access a memory object outside its bounds.
     pub fn contains_out_of_bounds_mem_access(

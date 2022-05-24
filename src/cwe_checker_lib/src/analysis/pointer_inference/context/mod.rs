@@ -39,8 +39,6 @@ pub struct Context<'a> {
     pub log_collector: crossbeam_channel::Sender<LogThreadMsg>,
     /// Names of `malloc`-like extern functions.
     pub allocation_symbols: Vec<String>,
-    /// Names of `free`-like extern functions.
-    pub deallocation_symbols: Vec<String>,
 }
 
 impl<'a> Context<'a> {
@@ -59,7 +57,6 @@ impl<'a> Context<'a> {
             fn_signatures: analysis_results.function_signatures.unwrap(),
             log_collector,
             allocation_symbols: config.allocation_symbols,
-            deallocation_symbols: config.deallocation_symbols,
         }
     }
 
@@ -208,101 +205,6 @@ impl<'a> Context<'a> {
                 // We cannot track the new object, since we do not know where to store the pointer to it.
                 self.log_debug(Err(err), Some(&call.tid));
                 new_state
-            }
-        }
-    }
-
-    /// Mark the object that the parameter of a call is pointing to as freed.
-    /// If the object may have been already freed, generate a CWE warning.
-    /// This models the behaviour of `free` and similar functions.
-    fn mark_parameter_object_as_freed(
-        &self,
-        state: &State,
-        mut new_state: State,
-        call: &Term<Jmp>,
-        extern_symbol: &ExternSymbol,
-    ) -> State {
-        match extern_symbol.get_unique_parameter() {
-            Ok(parameter) => {
-                let parameter_value =
-                    state.eval_parameter_arg(parameter, self.runtime_memory_image);
-                match parameter_value {
-                    Ok(memory_object_pointer) => {
-                        if let Err(possible_double_frees) =
-                            new_state.mark_mem_object_as_freed(&memory_object_pointer)
-                        {
-                            let warning = CweWarning {
-                                name: "CWE415".to_string(),
-                                version: VERSION.to_string(),
-                                addresses: vec![call.tid.address.clone()],
-                                tids: vec![format!("{}", call.tid)],
-                                symbols: Vec::new(),
-                                other: vec![possible_double_frees
-                                    .into_iter()
-                                    .map(|(id, err)| format!("{}: {}", id, err))
-                                    .collect()],
-                                description: format!(
-                                    "(Double Free) Object may have been freed before at {}",
-                                    call.tid.address
-                                ),
-                            };
-                            let _ = self.log_collector.send(LogThreadMsg::Cwe(warning));
-                        }
-                        new_state.remove_unreferenced_objects();
-                        new_state
-                    }
-                    Err(err) => {
-                        self.log_debug(Err(err), Some(&call.tid));
-                        new_state
-                    }
-                }
-            }
-            Err(err) => {
-                // We do not know which memory object to free
-                self.log_debug(Err(err), Some(&call.tid));
-                new_state
-            }
-        }
-    }
-
-    /// Check all parameter registers of a call for dangling pointers and report possible use-after-frees.
-    fn check_parameter_register_for_dangling_pointer<'iter, I>(
-        &self,
-        state: &mut State,
-        call: &Term<Jmp>,
-        parameters: I,
-    ) where
-        I: Iterator<Item = &'iter Arg>,
-    {
-        for parameter in parameters {
-            match state.eval_parameter_arg(parameter, self.runtime_memory_image) {
-                Ok(value) => {
-                    if state.memory.is_dangling_pointer(&value, true) {
-                        state
-                            .memory
-                            .mark_dangling_pointer_targets_as_flagged(&value);
-                        let warning = CweWarning {
-                            name: "CWE416".to_string(),
-                            version: VERSION.to_string(),
-                            addresses: vec![call.tid.address.clone()],
-                            tids: vec![format!("{}", call.tid)],
-                            symbols: Vec::new(),
-                            other: Vec::new(),
-                            description: format!(
-                                "(Use After Free) Call at {} may access freed memory",
-                                call.tid.address
-                            ),
-                        };
-                        let _ = self.log_collector.send(LogThreadMsg::Cwe(warning));
-                    }
-                }
-                Err(err) => self.log_debug(
-                    Err(err.context(format!(
-                        "Function parameter {:?} could not be evaluated",
-                        parameter
-                    ))),
-                    Some(&call.tid),
-                ),
             }
         }
     }
