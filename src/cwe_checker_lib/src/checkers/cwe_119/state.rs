@@ -182,8 +182,8 @@ impl State {
                     .unwrap()
                     .get_stack_params_total_size();
                 upper_bound = upper_bound
-                    .map(|old_bound| std::cmp::min(old_bound, stack_frame_upper_bound))
-                    .or(Some(stack_frame_upper_bound));
+                    .map(|old_bound| std::cmp::min(old_bound, stack_frame_upper_bound - offset))
+                    .or(Some(stack_frame_upper_bound - offset));
                 // We do not set a lower bound since we do not know the concrete call site for stack pointers,
                 // which we would need to determine a correct lower bound.
             }
@@ -345,12 +345,19 @@ pub mod tests {
     fn test_compute_bounds_of_param_id() {
         let mut context = Context::mock_x64();
         let param_id = AbstractIdentifier::mock("func", "RDI", 8);
+        let param_id_2 = AbstractIdentifier::mock("func", "RSI", 8);
         let callsite_id = AbstractIdentifier::mock("callsite_id", "RDI", 8);
-
+        let callsite_id_2 = AbstractIdentifier::mock("callsite_id", "RSI", 8);
         let malloc_call_id = AbstractIdentifier::mock("malloc_call", "RAX", 8);
+        let main_stack_id = AbstractIdentifier::mock("main", "RSP", 8);
 
         let param_value = Data::from_target(malloc_call_id.clone(), Bitvector::from_i64(2).into());
-        let param_replacement_map = HashMap::from([(callsite_id, param_value.clone())]);
+        let param_value_2 =
+            Data::from_target(main_stack_id.clone(), Bitvector::from_i64(-10).into());
+        let param_replacement_map = HashMap::from([
+            (callsite_id, param_value.clone()),
+            (callsite_id_2, param_value_2.clone()),
+        ]);
         let callee_to_callsites_map =
             HashMap::from([(Tid::new("func"), HashSet::from([Tid::new("callsite_id")]))]);
         context.param_replacement_map = param_replacement_map;
@@ -367,7 +374,7 @@ pub mod tests {
             &FunctionSignature::mock_x64(),
             context.project,
         );
-
+        // Test bound computation if the param gets resolved to a heap object
         state.compute_bounds_of_param_id(&param_id, &context);
         assert_eq!(state.object_lower_bounds.len(), 2);
         assert_eq!(
@@ -377,6 +384,16 @@ pub mod tests {
         assert_eq!(
             state.object_upper_bounds[&AbstractIdentifier::mock("func", "RDI", 8)],
             Bitvector::from_i64(40).into()
+        );
+        // Test bound computation if the param gets resolved to a caller stack frame
+        state.compute_bounds_of_param_id(&param_id_2, &context);
+        assert_eq!(
+            state.object_lower_bounds[&AbstractIdentifier::mock("func", "RSI", 8)],
+            BitvectorDomain::new_top(ByteSize::new(8))
+        );
+        assert_eq!(
+            state.object_upper_bounds[&AbstractIdentifier::mock("func", "RSI", 8)],
+            Bitvector::from_i64(10).into()
         );
     }
 }
