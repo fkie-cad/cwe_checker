@@ -1,52 +1,6 @@
 use super::*;
 
 impl AbstractObject {
-    /// Check whether a memory access to the abstract object at the given offset
-    /// and with the given size of the accessed value is contained in the bounds of the memory object.
-    /// If `offset` contains more than one possible index value,
-    /// then only return `true` if the access is contained in the abstract object for all possible offset values.
-    ///
-    /// If `offset` is a `Top` value, then the function assumes this to be due to analysis inaccuracies
-    /// and does not flag them as possible out-of-bounds access.
-    pub fn access_contained_in_bounds(&self, offset: &ValueDomain, size: ByteSize) -> bool {
-        if offset.is_top() {
-            // Currently TOP offsets happen a lot due to inaccuracies in the analysis.
-            // So for the time being we do not flag them as possible CWEs.
-            return true;
-        }
-        if let Ok(offset_interval) = offset.try_to_interval() {
-            if let Ok(lower_bound) = self.inner.lower_index_bound.try_to_bitvec() {
-                if lower_bound.checked_sgt(&offset_interval.start).unwrap() {
-                    return false;
-                }
-            }
-            if let Ok(upper_bound) = self.inner.upper_index_bound.try_to_bitvec() {
-                let mut size_as_bitvec = Bitvector::from_u64(u64::from(size));
-                match offset.bytesize().cmp(&size_as_bitvec.bytesize()) {
-                    std::cmp::Ordering::Less => size_as_bitvec.truncate(offset.bytesize()).unwrap(),
-                    std::cmp::Ordering::Greater => {
-                        size_as_bitvec.sign_extend(offset.bytesize()).unwrap()
-                    }
-                    std::cmp::Ordering::Equal => (),
-                }
-                let max_index = if let Some(val) = offset_interval
-                    .end
-                    .signed_add_overflow_checked(&size_as_bitvec)
-                {
-                    val - &Bitvector::one(offset.bytesize().into())
-                } else {
-                    return false; // The max index already causes an integer overflow
-                };
-                if upper_bound.checked_slt(&max_index).unwrap() {
-                    return false;
-                }
-            }
-            true
-        } else {
-            false
-        }
-    }
-
     /// Read the value at the given offset of the given size inside the memory region.
     pub fn get_value(&self, offset: Bitvector, bytesize: ByteSize) -> Data {
         self.inner.memory.get(offset, bytesize)

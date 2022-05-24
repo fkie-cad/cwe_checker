@@ -1,5 +1,6 @@
 use crate::intermediate_representation::Variable;
 
+use super::super::ValueDomain;
 use super::*;
 
 fn bv(value: i64) -> ValueDomain {
@@ -99,18 +100,5 @@ fn abstract_object_list() {
     assert_eq!(
         other_obj_list.objects.iter().next().unwrap().0,
         &new_id("RAX".into())
-    );
-
-    assert_eq!(
-        other_obj_list.objects.values().next().unwrap().get_state(),
-        crate::analysis::pointer_inference::object::ObjectState::Alive
-    );
-    let modified_heap_pointer = DataDomain::from_target(new_id("RAX".into()), bv(8));
-    other_obj_list
-        .mark_mem_object_as_freed(&modified_heap_pointer)
-        .unwrap();
-    assert_eq!(
-        other_obj_list.objects.values().next().unwrap().get_state(),
-        crate::analysis::pointer_inference::object::ObjectState::Dangling
     );
 }

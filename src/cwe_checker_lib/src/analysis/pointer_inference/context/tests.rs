@@ -1,3 +1,4 @@
+use super::super::ValueDomain;
 use super::*;
 
 fn bv(value: i64) -> ValueDomain {
@@ -56,7 +57,6 @@ fn mock_project() -> (Project, Config) {
         project,
         Config {
             allocation_symbols: vec!["malloc".into()],
-            deallocation_symbols: vec!["free".into()],
         },
     )
 }

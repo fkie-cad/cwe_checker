@@ -228,9 +228,6 @@
       "calloc",
       "realloc",
       "xmalloc"
-    ],
-    "deallocation_symbols": [
-      "free"
     ]
   },
   "StringAbstraction": {

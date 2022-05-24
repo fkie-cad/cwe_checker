@@ -2,21 +2,19 @@
 //!
 //! The goal of the pointer inference analysis is to keep track of all memory objects and pointers
 //! that the program knows about at specific program points during execution.
+//! It is a combination of a points-to-analysis and a value-set-analysis.
+//! The results of the pointer inference analysis are made available to other analyses,
+//! which can use them to look up points-to and value set information.
+//!
 //! If the **Memory** check is enabled,
-//! then the analysis also detects and reports possible memory management errors,
-//! like "Use after free"-errors, to the user.
-//! The result of the pointer inference analysis is also used as input for other analyses,
-//! which allows them to keep track of memory objects and pointers.
+//! then the analysis also reports some possible memory management errors,
+//! like Null pointer dereferences, to the user.
 //!
 //! ## The Memory Check
 //!
-//! If the **Memory** check is enabled, the pointer inference detects instances of the following CWEs:
-//! - [CWE-119](https://cwe.mitre.org/data/definitions/119.html) Buffer Overflow (generic case)
-//! - [CWE-125](https://cwe.mitre.org/data/definitions/125.html) Buffer Overflow: Out-of-bounds Read
-//! - [CWE-415](https://cwe.mitre.org/data/definitions/415.html): Double Free
-//! - [CWE-416](https://cwe.mitre.org/data/definitions/416.html): Use After Free
-//! - [CWE-476](https://cwe.mitre.org/data/definitions/476.html): NULL Pointer Dereference
-//! - [CWE-787](https://cwe.mitre.org/data/definitions/787.html): Buffer Overflow: Out-of-bounds Write
+//! If the **Memory** check is enabled, the pointer inference reports instances
+//! of [CWE-476](https://cwe.mitre.org/data/definitions/476.html) (NULL Pointer Dereference)
+//! that were detected during the analysis.
 //!
 //! The analysis operates on a best-effort basis.
 //! In cases where we cannot know
@@ -71,11 +69,6 @@ pub struct Config {
     /// Names of extern functions that are `malloc`-like,
     /// i.e. the unique return value is a pointer to a newly allocated chunk of memory or a NULL pointer.
     pub allocation_symbols: Vec<String>,
-    /// Names of extern functions that are `free`-like,
-    /// i.e. the memory chunk that the unique parameter of the function points to gets deallocated.
-    /// Note that the analysis currently does not detect mismatching allocation-deallocation pairs,
-    /// i.e. it cannot distinguish between memory allocated by `malloc` and memory allocated by `new`.
-    pub deallocation_symbols: Vec<String>,
 }
 
 /// A wrapper struct for the pointer inference computation object.
@@ -477,7 +470,6 @@ mod tests {
             let analysis_results: &'a AnalysisResults = Box::leak(analysis_results);
             let config = Config {
                 allocation_symbols: vec!["malloc".to_string()],
-                deallocation_symbols: vec!["free".to_string()],
             };
             let (log_sender, _) = crossbeam_channel::unbounded();
             PointerInference::new(analysis_results, config, log_sender, false)
