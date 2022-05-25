@@ -45,13 +45,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # The linux/arm64 platform target has been temporarily disabled due to memory exhaustion problems in the CI
       - name: Build and push Docker image
         uses: docker/build-push-action@v3
         with:
           context: .
           platforms: |
             linux/amd64
-            # linux/arm64  # temporarily disabled due to memory exhaustion problems in the CI
           push: true
           tags: |
             fkiecad/cwe_checker:stable
