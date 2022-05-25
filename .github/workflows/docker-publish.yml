@@ -2,7 +2,7 @@ name: Publish Docker image based on master branch
 
 on:
   push:
-    branches: ['master', 'update_docker_action']
+    branches: ['master']
 
 jobs:
   build-and-publish-image:
