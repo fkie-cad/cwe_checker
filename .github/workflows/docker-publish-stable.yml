@@ -51,7 +51,7 @@ jobs:
           context: .
           platforms: |
             linux/amd64
-            linux/arm64
+            # linux/arm64  # temporarily disabled due to memory exhaustion problems in the CI
           push: true
           tags: |
             fkiecad/cwe_checker:stable
