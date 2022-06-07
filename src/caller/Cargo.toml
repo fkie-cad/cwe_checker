@@ -9,4 +9,4 @@ structopt = "0.3"
 cwe_checker_lib = { path = "../cwe_checker_lib" }
 serde_json = "1.0"
 directories = "4.0.1"
-nix = "0.23.0"
+nix = "0.24.1"
