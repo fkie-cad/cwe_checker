@@ -6,19 +6,19 @@ edition = "2021"
 
 [dependencies]
 apint = "0.2"
-regex = "1.4.5"
+regex = "1.5.5"
 serde = {version = "1.0", features = ["derive", "rc"]}
 serde_json = "1.0"
 serde_yaml = "0.8"
 petgraph = { version = "0.6", features = ["default", "serde-1"] }
 fnv = "1.0" # a faster hash function for small keys like integers
 anyhow = "1.0" # for easy error types
-crossbeam-channel = "0.5.1"
+crossbeam-channel = "0.5.4"
 derive_more = "0.99"
 directories = "4.0.1"
-goblin = "0.4.2"
-itertools = "0.10.0"
-gcd = "2.0"
+goblin = "0.5.1"
+itertools = "0.10.3"
+gcd = "2.1.0"
 
 [lib]
 name = "cwe_checker_lib"
