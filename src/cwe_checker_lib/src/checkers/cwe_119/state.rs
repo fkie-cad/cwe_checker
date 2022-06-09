@@ -1,3 +1,4 @@
+use super::context::BoundsMetadata;
 use super::Context;
 use super::Data;
 use crate::abstract_domain::*;
@@ -77,6 +78,16 @@ impl State {
                             lower_offset,
                             lower_bound,
                         ));
+                        if let (
+                            Some(BoundsMetadata {
+                                source: Some(source),
+                                ..
+                            }),
+                            _,
+                        ) = context.compute_bounds_of_id(id, &self.stack_id)
+                        {
+                            out_of_bounds_access_warnings.push(format!("The object bound is based on the possible source value {:#} for the object ID.", source.to_json_compact()));
+                        }
                         // Replace the bound with `Top` to prevent duplicate CWE warnings with the same root cause.
                         self.object_lower_bounds
                             .insert(id.clone(), BitvectorDomain::new_top(address.bytesize()));
@@ -84,11 +95,22 @@ impl State {
                 }
                 if let Ok(upper_bound) = self.object_upper_bounds.get(id).unwrap().try_to_offset() {
                     if upper_bound < upper_offset + (u64::from(value_size) as i64) {
-                        out_of_bounds_access_warnings.push(format!("For the object ID {} access to the offset {} may be larger than the upper object bound of {}.",
+                        out_of_bounds_access_warnings.push(format!("For the object ID {} access to the offset {} (size {}) may overflow the upper object bound of {}.",
                             id,
-                            upper_offset + (u64::from(value_size) as i64),
+                            upper_offset,
+                            u64::from(value_size),
                             upper_bound,
                         ));
+                        if let (
+                            _,
+                            Some(BoundsMetadata {
+                                source: Some(source),
+                                ..
+                            }),
+                        ) = context.compute_bounds_of_id(id, &self.stack_id)
+                        {
+                            out_of_bounds_access_warnings.push(format!("The object bound is based on the possible source value {:#} for the object ID.", source.to_json_compact()));
+                        }
                         // Replace the bound with `Top` to prevent duplicate CWE warnings with the same root cause.
                         self.object_upper_bounds
                             .insert(id.clone(), BitvectorDomain::new_top(address.bytesize()));
@@ -107,107 +129,23 @@ impl State {
     /// For bounds that could not be determined (e.g. because the source for the object ID is unknown)
     /// we insert `Top` bounds into the bounds maps.
     fn compute_bounds_of_id(&mut self, object_id: &AbstractIdentifier, context: &Context) {
-        if context
-            .malloc_tid_to_object_size_map
-            .contains_key(object_id.get_tid())
-        {
-            let object_size = context.compute_size_of_heap_object(object_id);
-            self.object_lower_bounds.insert(
-                object_id.clone(),
-                Bitvector::zero(object_id.bytesize().into()).into(),
-            );
-            self.object_upper_bounds
-                .insert(object_id.clone(), object_size);
-        } else if *object_id == self.stack_id {
-            panic!("Current stack frame bounds not set.");
-        } else if object_id.get_tid() == self.stack_id.get_tid()
-            && object_id.get_path_hints().is_empty()
-        {
-            // Handle parameter IDs
-            self.compute_bounds_of_param_id(object_id, context);
-        } else {
-            // The type of object is unknown, thus the size restrictions are also unknown.
-            self.object_lower_bounds.insert(
-                object_id.clone(),
-                BitvectorDomain::new_top(object_id.bytesize()),
-            );
-            self.object_upper_bounds.insert(
-                object_id.clone(),
-                BitvectorDomain::new_top(object_id.bytesize()),
-            );
-        }
-    }
-
-    /// Compute the bounds of the memory object associated with the given parameter ID
-    /// and add the results to the known object bounds of `self`.
-    ///
-    /// Since the memory object associated to a parameter may not be unique
-    /// the bounds are only approximated from those objects where exact bounds could be determined.
-    /// If different objects were found the bounds are approximated by the strictest bounds that were found.
-    fn compute_bounds_of_param_id(
-        &mut self,
-        param_object_id: &AbstractIdentifier,
-        context: &Context,
-    ) {
-        let object_data = context.recursively_substitute_param_values(&DataDomain::from_target(
-            param_object_id.clone(),
-            Bitvector::zero(param_object_id.bytesize().into()).into(),
-        ));
-        let mut lower_bound = None;
-        let mut upper_bound = None;
-
-        for (id, offset) in object_data.get_relative_values() {
-            // Right now we ignore cases where we do not know the exact offset into the object.
-            let offset = match offset.try_to_offset() {
-                Ok(offset) => offset,
-                Err(_) => continue,
-            };
-            if context
-                .malloc_tid_to_object_size_map
-                .contains_key(id.get_tid())
-            {
-                let object_size = context.compute_size_of_heap_object(id);
-                lower_bound = lower_bound
-                    .map(|old_bound| std::cmp::max(old_bound, -offset))
-                    .or(Some(-offset));
-                if let Ok(concrete_object_size) = object_size.try_to_offset() {
-                    upper_bound = upper_bound
-                        .map(|old_bound| std::cmp::min(old_bound, concrete_object_size - offset))
-                        .or(Some(concrete_object_size - offset));
-                }
-            } else if context.is_stack_frame_id(id) {
-                let stack_frame_upper_bound = context
-                    .function_signatures
-                    .get(id.get_tid())
-                    .unwrap()
-                    .get_stack_params_total_size();
-                upper_bound = upper_bound
-                    .map(|old_bound| std::cmp::min(old_bound, stack_frame_upper_bound - offset))
-                    .or(Some(stack_frame_upper_bound - offset));
-                // We do not set a lower bound since we do not know the concrete call site for stack pointers,
-                // which we would need to determine a correct lower bound.
-            }
-            // FIXME: Cases not handled here include unresolved parameter IDs, unknown IDs and global pointers.
-            // For the first two we do not have any size information.
-            // For global pointers we need some kind of pre-analysis so that we do not have to assume
-            // that the pointer may address the complete range of global data addresses.
-        }
+        let (lower_bound, upper_bound) = context.compute_bounds_of_id(object_id, &self.stack_id);
         let lower_bound = match lower_bound {
-            Some(bound) => Bitvector::from_i64(bound)
-                .into_resize_signed(param_object_id.bytesize())
+            Some(bound_metadata) => Bitvector::from_i64(bound_metadata.resulting_bound)
+                .into_resize_signed(object_id.bytesize())
                 .into(),
-            None => BitvectorDomain::new_top(param_object_id.bytesize()),
+            None => BitvectorDomain::new_top(object_id.bytesize()),
         };
         let upper_bound = match upper_bound {
-            Some(bound) => Bitvector::from_i64(bound)
-                .into_resize_signed(param_object_id.bytesize())
+            Some(bound_metadata) => Bitvector::from_i64(bound_metadata.resulting_bound)
+                .into_resize_signed(object_id.bytesize())
                 .into(),
-            None => BitvectorDomain::new_top(param_object_id.bytesize()),
+            None => BitvectorDomain::new_top(object_id.bytesize()),
         };
         self.object_lower_bounds
-            .insert(param_object_id.clone(), lower_bound);
+            .insert(object_id.clone(), lower_bound);
         self.object_upper_bounds
-            .insert(param_object_id.clone(), upper_bound);
+            .insert(object_id.clone(), upper_bound);
     }
 }
 
@@ -260,7 +198,6 @@ impl State {
 pub mod tests {
     use super::*;
     use crate::intermediate_representation::Variable;
-    use std::collections::{HashMap, HashSet};
 
     #[test]
     fn test_new() {
@@ -338,62 +275,6 @@ pub mod tests {
         assert_eq!(
             state.object_upper_bounds[&AbstractIdentifier::mock("malloc_call", "RAX", 8)],
             Bitvector::from_i64(42).into()
-        );
-    }
-
-    #[test]
-    fn test_compute_bounds_of_param_id() {
-        let mut context = Context::mock_x64();
-        let param_id = AbstractIdentifier::mock("func", "RDI", 8);
-        let param_id_2 = AbstractIdentifier::mock("func", "RSI", 8);
-        let callsite_id = AbstractIdentifier::mock("callsite_id", "RDI", 8);
-        let callsite_id_2 = AbstractIdentifier::mock("callsite_id", "RSI", 8);
-        let malloc_call_id = AbstractIdentifier::mock("malloc_call", "RAX", 8);
-        let main_stack_id = AbstractIdentifier::mock("main", "RSP", 8);
-
-        let param_value = Data::from_target(malloc_call_id.clone(), Bitvector::from_i64(2).into());
-        let param_value_2 =
-            Data::from_target(main_stack_id.clone(), Bitvector::from_i64(-10).into());
-        let param_replacement_map = HashMap::from([
-            (callsite_id, param_value.clone()),
-            (callsite_id_2, param_value_2.clone()),
-        ]);
-        let callee_to_callsites_map =
-            HashMap::from([(Tid::new("func"), HashSet::from([Tid::new("callsite_id")]))]);
-        context.param_replacement_map = param_replacement_map;
-        context.callee_to_callsites_map = callee_to_callsites_map;
-        context
-            .malloc_tid_to_object_size_map
-            .insert(Tid::new("malloc_call"), Data::from(Bitvector::from_i64(42)));
-        context.call_to_caller_fn_map = HashMap::from([
-            (Tid::new("malloc_call"), Tid::new("main")),
-            (Tid::new("callsite_id"), Tid::new("main")),
-        ]);
-        let mut state = State::new(
-            &Tid::new("func"),
-            &FunctionSignature::mock_x64(),
-            context.project,
-        );
-        // Test bound computation if the param gets resolved to a heap object
-        state.compute_bounds_of_param_id(&param_id, &context);
-        assert_eq!(state.object_lower_bounds.len(), 2);
-        assert_eq!(
-            state.object_lower_bounds[&AbstractIdentifier::mock("func", "RDI", 8)],
-            Bitvector::from_i64(-2).into()
-        );
-        assert_eq!(
-            state.object_upper_bounds[&AbstractIdentifier::mock("func", "RDI", 8)],
-            Bitvector::from_i64(40).into()
-        );
-        // Test bound computation if the param gets resolved to a caller stack frame
-        state.compute_bounds_of_param_id(&param_id_2, &context);
-        assert_eq!(
-            state.object_lower_bounds[&AbstractIdentifier::mock("func", "RSI", 8)],
-            BitvectorDomain::new_top(ByteSize::new(8))
-        );
-        assert_eq!(
-            state.object_upper_bounds[&AbstractIdentifier::mock("func", "RSI", 8)],
-            Bitvector::from_i64(10).into()
         );
     }
 }

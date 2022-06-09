@@ -9,6 +9,9 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use super::state::State;
 
+/// Methods of [`Context`] related to computing bounds of memory objects.
+mod bounds_computation;
+pub use bounds_computation::BoundsMetadata;
 /// Methods of [`Context`] and other helper functions related to replacing parameter IDs with possible caller values.
 mod param_replacement;
 /// Trait implementations for the [`Context`] struct,
