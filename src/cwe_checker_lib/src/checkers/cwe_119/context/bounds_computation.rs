@@ -2,7 +2,6 @@ use super::Context;
 use crate::abstract_domain::{AbstractIdentifier, DataDomain, IntervalDomain, TryToBitvec};
 use crate::prelude::*;
 
-
 /// This struct contains the computed bound for an object.
 /// If the object is a parameter object,
 /// it also contains metadata about the source object used to determine the bound for the parameter object.
