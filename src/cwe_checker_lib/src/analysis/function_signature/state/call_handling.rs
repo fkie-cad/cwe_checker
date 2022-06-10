@@ -85,7 +85,7 @@ impl State {
         self.register.retain(|var, _| callee_saved.contains(var));
     }
 
-    /// Fill every return register that might be a pointer with a value that may point to any input ID
+    /// Fill every return register that might be a pointer with a value that may point to any pointer-sized input ID
     /// or to an output ID specific to the call and output register.
     fn generate_return_values_for_call(
         &mut self,
@@ -93,12 +93,13 @@ impl State {
         return_args: &[Arg],
         call_tid: &Tid,
     ) {
-        // Fill every output register with a value that may point to any input ID
+        // Fill every output register with a value that may point to any pointer-sized input ID
         // or to an output ID specific to the call and output register.
         let generic_pointer_size = self.stack_id.unwrap_register().size;
         let generic_output_relative_values: BTreeMap<AbstractIdentifier, BitvectorDomain> =
             input_ids
                 .iter()
+                .filter(|id| id.bytesize() == generic_pointer_size)
                 .map(|id| (id.clone(), BitvectorDomain::new_top(generic_pointer_size)))
                 .collect();
         let mut generic_output = DataDomain::new_top(generic_pointer_size);
