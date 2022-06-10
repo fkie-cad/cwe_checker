@@ -1,4 +1,4 @@
-0.6-dev
+0.6 (2022-06)
 ====
 
 -   Add support for analysis of bare-metal binaries (PR #203)
@@ -14,6 +14,11 @@
 -   Update cwe_checker_to_ida script (PRs #279, #281)
 -   New installer script that can search for the Ghidra installation path for you (PR #278)
 -   Refactor handling of caller stacks in PointerInference analysis (PR #287)
+-   Project struct refactorings (PRs #291, #301, #324)
+-   New improved implementation of CWE-416 Use-After-Free check (PRs #311, #318, #328)
+-   New improved implementation of CWE-119 Buffer Overflow check (PRs #315, #326, #328, #333)
+-   Use information on non-returning functions in CFG generation (PR #319)
+-   Handle stack manipulation based on stack alignment for x86 (PRs #317, #323)
 
 0.5 (2021-07)
 ====

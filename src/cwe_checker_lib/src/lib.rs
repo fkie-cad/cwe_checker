@@ -5,12 +5,12 @@ The main library of the cwe_checker containing all CWE checks and analysis modul
 
 The cwe_checker is a tool for finding common bug classes on binaries using static analysis.
 These bug classes are formally known as [Common Weakness Enumerations](https://cwe.mitre.org/) (CWEs).
-Its main goal is to aid analysts to quickly find vulnerable code paths.
+Its main goal is to aid analysts to quickly find potentially vulnerable code paths.
 
 Currently its main focus are ELF binaries that are commonly found on Linux and Unix operating systems.
 The cwe_checker uses [Ghidra](https://ghidra-sre.org/) to disassemble binaries into one common intermediate representation
 and implements its own analyses on this IR.
-Hence, the analyses can be run on all CPU architectures that Ghidra can disassemble,
+Hence, the analyses can be run on most CPU architectures that Ghidra can disassemble,
 which makes the *cwe_checker* a valuable tool for firmware analysis.
 
 # Usage

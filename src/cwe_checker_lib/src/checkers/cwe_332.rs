@@ -1,4 +1,4 @@
-//! This module implements a check for CWE332: Insufficient Entropy in PRNG.
+//! This module implements a check for CWE-332: Insufficient Entropy in PRNG.
 //!
 //! This can happen, for instance, if the PRNG is not seeded. A classical example
 //! would be calling rand without srand. This could lead to predictable random
