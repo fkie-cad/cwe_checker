@@ -9,14 +9,15 @@
 [![Documentation](https://img.shields.io/badge/doc-stable-green.svg)](https://fkie-cad.github.io/cwe_checker/index.html)
 
 ## What is cwe_checker? ##
-cwe_checker is a suite of checks to detect common bug classes such as use of dangerous functions and simple integer overflows.
+cwe_checker is a suite of checks to detect common bug classes such as Null pointer dereferences and buffer overflows.
 These bug classes are formally known as [Common Weakness Enumerations](https://cwe.mitre.org/) (CWEs).
-Its main goal is to aid analysts to quickly find vulnerable code paths.
+The checks are based on a variety of anaylsis techniques ranging from simple heuristics to abstract interpretation-based data-flow analysis.
+Its main goal is to aid analysts to quickly find potentially vulnerable code paths.
 
 Its main focus are ELF binaries that are commonly found on Linux and Unix operating systems.
 The cwe_checker uses [Ghidra](https://ghidra-sre.org/) to disassemble binaries into one common intermediate representation
 and implements its own analyses on this IR.
-Hence, the analyses can be run on all CPU architectures that Ghidra can disassemble,
+Hence, the analyses can be run on most CPU architectures that Ghidra can disassemble,
 which makes the *cwe_checker* a valuable tool for firmware analysis.
 
 The following arguments should convince you to give *cwe_checker* a try:
@@ -45,9 +46,10 @@ If you want to build the docker image yourself, just run `docker build -t cwe_ch
 
 The following dependencies must be installed in order to build and install the *cwe_checker* locally:
 -   [Rust](https://www.rust-lang.org) >= 1.57
--   [Ghidra](https://ghidra-sre.org/) >= 9.2
+-   [Ghidra](https://ghidra-sre.org/) >= 10.1.2
 
 Run `make all GHIDRA_PATH=/path/to/ghidra_folder` (with the correct path to the local Ghidra installation inserted) to compile and install the cwe_checker.
+If you omit the `GHIDRA_PATH` argument the installer will search your file system for a local installation of Ghidra.
 
 ## Usage ##
 
@@ -76,8 +78,7 @@ For that one needs to provide a bare metal configuration file via the `--bare-me
 An example for such a configuration file can be found at `bare_metal/stm32f407vg.json`
 (which was created and tested for an STM32F407VG MCU).
 
-For more information build and read the documentation locally via `make documentation`.
-Note that this analysis mode is not yet included in the stable version of the cwe_checker.
+For more information take a look at the [online documentation](https://fkie-cad.github.io/cwe_checker/index.html).
 
 ## Documentation and Tests ##
 
@@ -96,8 +97,7 @@ So far the following analyses are implemented:
 -   [CWE-243](https://cwe.mitre.org/data/definitions/243.html): Creation of chroot Jail Without Changing Working Directory
 -   [CWE-332](https://cwe.mitre.org/data/definitions/332.html): Insufficient Entropy in PRNG
 -   [CWE-367](https://cwe.mitre.org/data/definitions/367.html): Time-of-check Time-of-use (TOCTOU) Race Condition
--   [CWE-415](https://cwe.mitre.org/data/definitions/415.html): Double Free
--   [CWE-416](https://cwe.mitre.org/data/definitions/416.html): Use After Free
+-   [CWE-416](https://cwe.mitre.org/data/definitions/416.html): Use After Free and its variant [CWE-415](https://cwe.mitre.org/data/definitions/415.html): Double Free
 -   [CWE-426](https://cwe.mitre.org/data/definitions/426.html): Untrusted Search Path
 -   [CWE-467](https://cwe.mitre.org/data/definitions/467.html): Use of sizeof() on a Pointer Type
 -   [CWE-476](https://cwe.mitre.org/data/definitions/476.html): NULL Pointer Dereference
@@ -105,8 +105,8 @@ So far the following analyses are implemented:
 -   [CWE-676](https://cwe.mitre.org/data/definitions/676.html): Use of Potentially Dangerous Function
 -   [CWE-782](https://cwe.mitre.org/data/definitions/782.html): Exposed IOCTL with Insufficient Access Control
 
-Please note that some of the above analyses are only partially implemented at the moment.
-Furthermore, both false positives and false negatives are to be expected due to shortcuts and the nature of static analysis as well as over-approximation.
+Please note that both false positives and false negatives are to be expected due to shortcuts and the nature of static analysis as well as over-approximation.
+You can find information on the inner workings of each check as well as known reasons for false positives and false negatives on the [check-specific documentation pages](https://fkie-cad.github.io/cwe_checker/doc/html/cwe_checker_lib/checkers/index.html).
 
 ## Integration into other tools ##
 

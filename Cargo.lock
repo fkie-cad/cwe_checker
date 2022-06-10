@@ -128,7 +128,7 @@ dependencies = [
 
 [[package]]
 name = "cwe_checker"
-version = "0.6.0-dev"
+version = "0.6.0"
 dependencies = [
  "cwe_checker_lib",
  "directories",
@@ -151,7 +151,7 @@ dependencies = [
 
 [[package]]
 name = "cwe_checker_lib"
-version = "0.6.0-dev"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "apint",
