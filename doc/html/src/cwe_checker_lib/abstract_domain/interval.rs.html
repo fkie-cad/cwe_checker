@@ -1,7 +1,9 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/abstract_domain/interval.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>interval.rs - source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../favicon.svg">
-<link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../../cwe_checker_lib/index.html'><div class='logo-container rust-logo'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
-                <a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/abstract_domain/interval.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>interval.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><script defer src="../../../main.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script>
+    <noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../cwe_checker_lib/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../../cwe_checker_lib/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../cwe_checker_lib/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><div class="theme-picker hidden"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="22" height="22" alt="Pick another theme!" src="../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
 <span id="4">  4</span>
@@ -802,11 +804,10 @@
 <span id="799">799</span>
 <span id="800">800</span>
 <span id="801">801</span>
-</pre><div class="example-wrap"><pre class="rust ">
-<span class="kw">use</span> <span class="ident">std::fmt::Display</span>;
+</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std::fmt::Display</span>;
 
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::intermediate_representation</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::prelude</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::intermediate_representation</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::prelude</span>::<span class="kw-2">*</span>;
 
 <span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">AbstractDomain</span>, <span class="ident">HasTop</span>, <span class="ident">RegisterDomain</span>, <span class="ident">SizedDomain</span>, <span class="ident">SpecializeByConditional</span>};
 <span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">TryToBitvec</span>, <span class="ident">TryToInterval</span>};
@@ -843,7 +844,7 @@
 
 <span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Interval</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">IntervalDomain</span> {
     <span class="doccomment">/// Generate an interval domain without widening hints.</span>
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">interval</span>: <span class="ident">Interval</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">IntervalDomain</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">interval</span>: <span class="ident">Interval</span>) -&gt; <span class="ident">IntervalDomain</span> {
         <span class="ident">IntervalDomain</span> {
             <span class="ident">interval</span>,
             <span class="ident">widening_lower_bound</span>: <span class="prelude-val">None</span>,
@@ -858,7 +859,7 @@
     <span class="doccomment">///</span>
     <span class="doccomment">/// Both `start` and `end` are inclusive, i.e. contained in the interval.</span>
     <span class="doccomment">/// The widening hints are set to `None` and the stride is set to 1 if `start != end`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">start</span>: <span class="ident">Bitvector</span>, <span class="ident">end</span>: <span class="ident">Bitvector</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">start</span>: <span class="ident">Bitvector</span>, <span class="ident">end</span>: <span class="ident">Bitvector</span>) -&gt; <span class="self">Self</span> {
         <span class="ident">IntervalDomain</span> {
             <span class="ident">interval</span>: <span class="ident">Interval::new</span>(<span class="ident">start</span>, <span class="ident">end</span>, <span class="number">1</span>),
             <span class="ident">widening_upper_bound</span>: <span class="prelude-val">None</span>,
@@ -869,18 +870,18 @@
 
     <span class="doccomment">/// Returns true if the two intervals represent the same value sets.</span>
     <span class="doccomment">/// This function ignores differences in the widening hints of the two intervals.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">equal_as_value_sets</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">IntervalDomain</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">interval</span> <span class="op">=</span><span class="op">=</span> <span class="ident">other</span>.<span class="ident">interval</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">equal_as_value_sets</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">IntervalDomain</span>) -&gt; <span class="ident">bool</span> {
+        <span class="self">self</span>.<span class="ident">interval</span> <span class="op">==</span> <span class="ident">other</span>.<span class="ident">interval</span>
     }
 
     <span class="doccomment">/// If `bound` is more exact/restrictive than the current lower bound of `self`,</span>
     <span class="doccomment">/// set the lower bound to `bound`.</span>
     <span class="doccomment">/// Otherwise keep the old lower bound.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">update_widening_lower_bound</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">bound</span>: <span class="kw-2">&amp;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Bitvector</span><span class="op">&gt;</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">update_widening_lower_bound</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">bound</span>: <span class="kw-2">&amp;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Bitvector</span><span class="op">&gt;</span>) {
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">bound_value</span>) <span class="op">=</span> <span class="ident">bound</span> {
             <span class="kw">let</span> <span class="ident">bound_value</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">bound_value</span>.<span class="ident">clone</span>().<span class="ident">round_up_to_stride_of</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">interval</span>) {
-                <span class="prelude-val">Some</span>(<span class="ident">bound</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">bound</span>,
-                <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span>,
+                <span class="prelude-val">Some</span>(<span class="ident">bound</span>) =&gt; <span class="ident">bound</span>,
+                <span class="prelude-val">None</span> =&gt; <span class="kw">return</span>,
             };
             <span class="kw">if</span> <span class="ident">bound_value</span>.<span class="ident">checked_slt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">start</span>).<span class="ident">unwrap</span>() {
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">previous_bound</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">widening_lower_bound</span> {
@@ -897,11 +898,11 @@
     <span class="doccomment">/// If `bound` is more exact/restrictive than the current upper bound of `self`,</span>
     <span class="doccomment">/// set the upper bound to `bound`.</span>
     <span class="doccomment">/// Otherwise keep the old upper bound.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">update_widening_upper_bound</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">bound</span>: <span class="kw-2">&amp;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Bitvector</span><span class="op">&gt;</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">update_widening_upper_bound</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">bound</span>: <span class="kw-2">&amp;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Bitvector</span><span class="op">&gt;</span>) {
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">bound_value</span>) <span class="op">=</span> <span class="ident">bound</span> {
             <span class="kw">let</span> <span class="ident">bound_value</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">bound_value</span>.<span class="ident">clone</span>().<span class="ident">round_down_to_stride_of</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">interval</span>) {
-                <span class="prelude-val">Some</span>(<span class="ident">bound</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">bound</span>,
-                <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span>,
+                <span class="prelude-val">Some</span>(<span class="ident">bound</span>) =&gt; <span class="ident">bound</span>,
+                <span class="prelude-val">None</span> =&gt; <span class="kw">return</span>,
             };
             <span class="kw">if</span> <span class="ident">bound_value</span>.<span class="ident">checked_sgt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">end</span>).<span class="ident">unwrap</span>() {
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">previous_bound</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">widening_upper_bound</span> {
@@ -916,7 +917,7 @@
     }
 
     <span class="doccomment">/// Merge as signed intervals without performing widenings.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">signed_merge</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">IntervalDomain</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">IntervalDomain</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">signed_merge</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">IntervalDomain</span>) -&gt; <span class="ident">IntervalDomain</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">merged_domain</span>: <span class="ident">IntervalDomain</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">signed_merge</span>(<span class="kw-2">&amp;</span><span class="ident">other</span>.<span class="ident">interval</span>).<span class="ident">into</span>();
         <span class="ident">merged_domain</span>.<span class="ident">update_widening_lower_bound</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">widening_lower_bound</span>);
         <span class="ident">merged_domain</span>.<span class="ident">update_widening_lower_bound</span>(<span class="kw-2">&amp;</span><span class="ident">other</span>.<span class="ident">widening_lower_bound</span>);
@@ -954,7 +955,7 @@
     <span class="doccomment">/// If widening bounds for both directions exist, widen up to the bounds in both directions.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// After that the `widening_delay` is set to the length of the resulting interval.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">signed_merge_and_widen</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">IntervalDomain</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">IntervalDomain</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">signed_merge_and_widen</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">IntervalDomain</span>) -&gt; <span class="ident">IntervalDomain</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">merged_domain</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">signed_merge</span>(<span class="ident">other</span>);
         <span class="kw">if</span> <span class="ident">merged_domain</span>.<span class="ident">equal_as_value_sets</span>(<span class="self">self</span>)
             <span class="op">|</span><span class="op">|</span> <span class="ident">merged_domain</span>.<span class="ident">equal_as_value_sets</span>(<span class="ident">other</span>)
@@ -1007,26 +1008,26 @@
     }
 
     <span class="doccomment">/// Zero-extend the values in the interval to the given width.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">zero_extend</span>(<span class="self">self</span>, <span class="ident">width</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">IntervalDomain</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">zero_extend</span>(<span class="self">self</span>, <span class="ident">width</span>: <span class="ident">ByteSize</span>) -&gt; <span class="ident">IntervalDomain</span> {
         <span class="kw">let</span> <span class="ident">lower_bound</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">widening_lower_bound</span> {
             <span class="prelude-val">Some</span>(<span class="ident">bound</span>)
-                <span class="kw">if</span> (<span class="ident">bound</span>.<span class="ident">sign_bit</span>().<span class="ident">to_bool</span>() <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">start</span>.<span class="ident">sign_bit</span>().<span class="ident">to_bool</span>())
+                <span class="kw">if</span> (<span class="ident">bound</span>.<span class="ident">sign_bit</span>().<span class="ident">to_bool</span>() <span class="op">==</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">start</span>.<span class="ident">sign_bit</span>().<span class="ident">to_bool</span>())
                     <span class="op">&amp;&amp;</span> (<span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">start</span>.<span class="ident">sign_bit</span>().<span class="ident">to_bool</span>()
-                        <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">end</span>.<span class="ident">sign_bit</span>().<span class="ident">to_bool</span>()) <span class="op">=</span><span class="op">&gt;</span>
+                        <span class="op">==</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">end</span>.<span class="ident">sign_bit</span>().<span class="ident">to_bool</span>()) =&gt;
             {
                 <span class="prelude-val">Some</span>(<span class="ident">bound</span>.<span class="ident">into_zero_extend</span>(<span class="ident">width</span>).<span class="ident">unwrap</span>())
             }
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">None</span>,
+            <span class="kw">_</span> =&gt; <span class="prelude-val">None</span>,
         };
         <span class="kw">let</span> <span class="ident">upper_bound</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">widening_upper_bound</span> {
             <span class="prelude-val">Some</span>(<span class="ident">bound</span>)
-                <span class="kw">if</span> (<span class="ident">bound</span>.<span class="ident">sign_bit</span>().<span class="ident">to_bool</span>() <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">end</span>.<span class="ident">sign_bit</span>().<span class="ident">to_bool</span>())
+                <span class="kw">if</span> (<span class="ident">bound</span>.<span class="ident">sign_bit</span>().<span class="ident">to_bool</span>() <span class="op">==</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">end</span>.<span class="ident">sign_bit</span>().<span class="ident">to_bool</span>())
                     <span class="op">&amp;&amp;</span> (<span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">start</span>.<span class="ident">sign_bit</span>().<span class="ident">to_bool</span>()
-                        <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">end</span>.<span class="ident">sign_bit</span>().<span class="ident">to_bool</span>()) <span class="op">=</span><span class="op">&gt;</span>
+                        <span class="op">==</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">end</span>.<span class="ident">sign_bit</span>().<span class="ident">to_bool</span>()) =&gt;
             {
                 <span class="prelude-val">Some</span>(<span class="ident">bound</span>.<span class="ident">into_zero_extend</span>(<span class="ident">width</span>).<span class="ident">unwrap</span>())
             }
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">None</span>,
+            <span class="kw">_</span> =&gt; <span class="prelude-val">None</span>,
         };
         <span class="kw">let</span> <span class="ident">new_interval</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">zero_extend</span>(<span class="ident">width</span>);
         <span class="ident">IntervalDomain</span> {
@@ -1038,7 +1039,7 @@
     }
 
     <span class="doccomment">/// Sign-extend the values in the interval to the given width.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">sign_extend</span>(<span class="self">self</span>, <span class="ident">width</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">sign_extend</span>(<span class="self">self</span>, <span class="ident">width</span>: <span class="ident">ByteSize</span>) -&gt; <span class="self">Self</span> {
         <span class="macro">assert!</span>(<span class="self">self</span>.<span class="ident">bytesize</span>() <span class="op">&lt;</span><span class="op">=</span> <span class="ident">width</span>);
         <span class="ident">IntervalDomain</span> {
             <span class="ident">interval</span>: <span class="ident">Interval</span> {
@@ -1056,32 +1057,9 @@
         }
     }
 
-    <span class="doccomment">/// Compute the intersection of two intervals.</span>
-    <span class="doccomment">/// Return an error if the intersection is empty.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">intersect</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">intersected_domain</span>: <span class="ident">IntervalDomain</span> <span class="op">=</span>
-            <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">signed_intersect</span>(<span class="kw-2">&amp;</span><span class="ident">other</span>.<span class="ident">interval</span>)<span class="question-mark">?</span>.<span class="ident">into</span>();
-        <span class="ident">intersected_domain</span>.<span class="ident">update_widening_lower_bound</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">widening_lower_bound</span>);
-        <span class="ident">intersected_domain</span>.<span class="ident">update_widening_lower_bound</span>(<span class="kw-2">&amp;</span><span class="ident">other</span>.<span class="ident">widening_lower_bound</span>);
-        <span class="ident">intersected_domain</span>.<span class="ident">update_widening_upper_bound</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">widening_upper_bound</span>);
-        <span class="ident">intersected_domain</span>.<span class="ident">update_widening_upper_bound</span>(<span class="kw-2">&amp;</span><span class="ident">other</span>.<span class="ident">widening_upper_bound</span>);
-        <span class="ident">intersected_domain</span>.<span class="ident">widening_delay</span> <span class="op">=</span>
-            <span class="ident">std::cmp::max</span>(<span class="self">self</span>.<span class="ident">widening_delay</span>, <span class="ident">other</span>.<span class="ident">widening_delay</span>);
-
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">interval_length</span>) <span class="op">=</span> (<span class="ident">intersected_domain</span>.<span class="ident">interval</span>.<span class="ident">end</span>.<span class="ident">clone</span>()
-            <span class="op">-</span> <span class="kw-2">&amp;</span><span class="ident">intersected_domain</span>.<span class="ident">interval</span>.<span class="ident">start</span>)
-            .<span class="ident">try_to_u64</span>()
-        {
-            <span class="ident">intersected_domain</span>.<span class="ident">widening_delay</span> <span class="op">=</span>
-                <span class="ident">std::cmp::min</span>(<span class="ident">intersected_domain</span>.<span class="ident">widening_delay</span>, <span class="ident">interval_length</span>);
-        }
-
-        <span class="prelude-val">Ok</span>(<span class="ident">intersected_domain</span>)
-    }
-
     <span class="doccomment">/// Check whether all values in the interval are representable by bitvectors of the given `size`.</span>
     <span class="doccomment">/// Does not check whether this is also true for the widening hints.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fits_into_size</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">size</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fits_into_size</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">size</span>: <span class="ident">ByteSize</span>) -&gt; <span class="ident">bool</span> {
         <span class="kw">if</span> <span class="ident">size</span> <span class="op">&gt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">bytesize</span>() {
             <span class="kw">return</span> <span class="bool-val">true</span>;
         }
@@ -1099,7 +1077,7 @@
     <span class="doccomment">/// by removing the least significant bytes lower than the `low_byte` from them.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// The widening delay also is right shifted by the corresponding number of bits.</span>
-    <span class="kw">fn</span> <span class="ident">subpiece_higher</span>(<span class="self">self</span>, <span class="ident">low_byte</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">subpiece_higher</span>(<span class="self">self</span>, <span class="ident">low_byte</span>: <span class="ident">ByteSize</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">let</span> <span class="ident">old_size</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">bytesize</span>();
         <span class="kw">let</span> <span class="ident">interval</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">subpiece_higher</span>(<span class="ident">low_byte</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">lower_bound</span> <span class="op">=</span> <span class="prelude-val">None</span>;
@@ -1126,7 +1104,7 @@
 
     <span class="doccomment">/// Truncate the bitvectors in the interval to `size`,</span>
     <span class="doccomment">/// i.e. the most significant bytes (higher than `size`) are removed from all values.</span>
-    <span class="kw">fn</span> <span class="ident">subpiece_lower</span>(<span class="self">self</span>, <span class="ident">size</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">subpiece_lower</span>(<span class="self">self</span>, <span class="ident">size</span>: <span class="ident">ByteSize</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">let</span> <span class="ident">max_length</span> <span class="op">=</span> <span class="ident">Bitvector::unsigned_max_value</span>(<span class="ident">size</span>.<span class="ident">into</span>())
             .<span class="ident">into_zero_extend</span>(<span class="self">self</span>.<span class="ident">bytesize</span>())
             .<span class="ident">unwrap</span>();
@@ -1174,7 +1152,7 @@
     <span class="doccomment">///</span>
     <span class="doccomment">/// The result retains the widening bounds of `other` if self contains only one value.</span>
     <span class="doccomment">/// Else the result has no widening bounds.</span>
-    <span class="kw">fn</span> <span class="ident">piece</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">IntervalDomain</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">IntervalDomain</span> {
+    <span class="kw">fn</span> <span class="ident">piece</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">IntervalDomain</span>) -&gt; <span class="ident">IntervalDomain</span> {
         <span class="kw">let</span> <span class="ident">pieced_interval</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">piece</span>(<span class="kw-2">&amp;</span><span class="ident">other</span>.<span class="ident">interval</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">lower_bound</span> <span class="op">=</span> <span class="prelude-val">None</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">upper_bound</span> <span class="op">=</span> <span class="prelude-val">None</span>;
@@ -1204,10 +1182,10 @@
 }
 
 <span class="kw">impl</span> <span class="ident">SpecializeByConditional</span> <span class="kw">for</span> <span class="ident">IntervalDomain</span> {
-    <span class="kw">fn</span> <span class="ident">add_signed_less_equal_bound</span>(<span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">bound</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">add_signed_less_equal_bound</span>(<span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">bound</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">bound</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">bound</span>.<span class="ident">clone</span>().<span class="ident">round_down_to_stride_of</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">interval</span>) {
-            <span class="prelude-val">Some</span>(<span class="ident">bound</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">bound</span>,
-            <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">anyhow!</span>(<span class="string">&quot;Empty interval&quot;</span>)),
+            <span class="prelude-val">Some</span>(<span class="ident">bound</span>) =&gt; <span class="ident">bound</span>,
+            <span class="prelude-val">None</span> =&gt; <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">anyhow!</span>(<span class="string">&quot;Empty interval&quot;</span>)),
         };
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">old_upper_bound</span>) <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">widening_upper_bound</span> {
             <span class="kw">if</span> <span class="ident">old_upper_bound</span>.<span class="ident">checked_sle</span>(<span class="kw-2">&amp;</span><span class="ident">bound</span>).<span class="ident">unwrap</span>() {
@@ -1232,10 +1210,10 @@
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">add_signed_greater_equal_bound</span>(<span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">bound</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">add_signed_greater_equal_bound</span>(<span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">bound</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">bound</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">bound</span>.<span class="ident">clone</span>().<span class="ident">round_up_to_stride_of</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">interval</span>) {
-            <span class="prelude-val">Some</span>(<span class="ident">bound</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">bound</span>,
-            <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">anyhow!</span>(<span class="string">&quot;Empty interval&quot;</span>)),
+            <span class="prelude-val">Some</span>(<span class="ident">bound</span>) =&gt; <span class="ident">bound</span>,
+            <span class="prelude-val">None</span> =&gt; <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">anyhow!</span>(<span class="string">&quot;Empty interval&quot;</span>)),
         };
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">old_lower_bound</span>) <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">widening_lower_bound</span> {
             <span class="kw">if</span> <span class="ident">old_lower_bound</span>.<span class="ident">checked_sge</span>(<span class="kw-2">&amp;</span><span class="ident">bound</span>).<span class="ident">unwrap</span>() {
@@ -1260,7 +1238,7 @@
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">add_unsigned_less_equal_bound</span>(<span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">bound</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">add_unsigned_less_equal_bound</span>(<span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">bound</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="ident">bound</span>.<span class="ident">sign_bit</span>().<span class="ident">to_bool</span>() {
             <span class="kw">if</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">end</span>.<span class="ident">sign_bit</span>().<span class="ident">to_bool</span>() {
                 <span class="self">self</span>.<span class="ident">add_signed_less_equal_bound</span>(<span class="ident">bound</span>)
@@ -1275,7 +1253,7 @@
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">add_unsigned_greater_equal_bound</span>(<span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">bound</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">add_unsigned_greater_equal_bound</span>(<span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">bound</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="ident">bound</span>.<span class="ident">sign_bit</span>().<span class="ident">to_bool</span>() {
             <span class="self">self</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">add_signed_less_equal_bound</span>(<span class="kw-2">&amp;</span>(<span class="op">-</span><span class="ident">Bitvector::one</span>(<span class="ident">bound</span>.<span class="ident">width</span>())))<span class="question-mark">?</span>;
             <span class="self">self</span>.<span class="ident">add_signed_greater_equal_bound</span>(<span class="ident">bound</span>)
@@ -1288,19 +1266,19 @@
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">add_not_equal_bound</span>(<span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">bound</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">start</span> <span class="op">=</span><span class="op">=</span> <span class="kw-2">*</span><span class="ident">bound</span> <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">end</span> <span class="op">=</span><span class="op">=</span> <span class="kw-2">*</span><span class="ident">bound</span> {
+    <span class="kw">fn</span> <span class="ident">add_not_equal_bound</span>(<span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">bound</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">start</span> <span class="op">==</span> <span class="kw-2">*</span><span class="ident">bound</span> <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">end</span> <span class="op">==</span> <span class="kw-2">*</span><span class="ident">bound</span> {
             <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">anyhow!</span>(<span class="string">&quot;Empty interval&quot;</span>));
         }
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">start</span>.<span class="ident">checked_sgt</span>(<span class="ident">bound</span>).<span class="ident">unwrap</span>() {
             <span class="self">self</span>.<span class="ident">add_signed_greater_equal_bound</span>(<span class="kw-2">&amp;</span>(<span class="ident">bound</span> <span class="op">+</span> <span class="kw-2">&amp;</span><span class="ident">Bitvector::one</span>(<span class="ident">bound</span>.<span class="ident">width</span>())))
-        } <span class="kw">else</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">start</span> <span class="op">=</span><span class="op">=</span> <span class="kw-2">*</span><span class="ident">bound</span> {
+        } <span class="kw">else</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">start</span> <span class="op">==</span> <span class="kw-2">*</span><span class="ident">bound</span> {
             <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">start</span> <span class="op">+</span><span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">Bitvector::one</span>(<span class="ident">bound</span>.<span class="ident">width</span>());
             <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">adjust_start_to_value_in_stride</span>();
             <span class="prelude-val">Ok</span>(<span class="self">self</span>)
         } <span class="kw">else</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">end</span>.<span class="ident">checked_slt</span>(<span class="ident">bound</span>).<span class="ident">unwrap</span>() {
             <span class="self">self</span>.<span class="ident">add_signed_less_equal_bound</span>(<span class="kw-2">&amp;</span>(<span class="ident">bound</span> <span class="op">-</span> <span class="kw-2">&amp;</span><span class="ident">Bitvector::one</span>(<span class="ident">bound</span>.<span class="ident">width</span>())))
-        } <span class="kw">else</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">end</span> <span class="op">=</span><span class="op">=</span> <span class="kw-2">*</span><span class="ident">bound</span> {
+        } <span class="kw">else</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">end</span> <span class="op">==</span> <span class="kw-2">*</span><span class="ident">bound</span> {
             <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">end</span> <span class="op">-</span><span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">Bitvector::one</span>(<span class="ident">bound</span>.<span class="ident">width</span>());
             <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">adjust_end_to_value_in_stride</span>();
             <span class="prelude-val">Ok</span>(<span class="self">self</span>)
@@ -1308,29 +1286,52 @@
             <span class="prelude-val">Ok</span>(<span class="self">self</span>)
         }
     }
+
+    <span class="doccomment">/// Compute the intersection of two intervals.</span>
+    <span class="doccomment">/// Return an error if the intersection is empty.</span>
+    <span class="kw">fn</span> <span class="ident">intersect</span>(<span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">intersected_domain</span>: <span class="ident">IntervalDomain</span> <span class="op">=</span>
+            <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">signed_intersect</span>(<span class="kw-2">&amp;</span><span class="ident">other</span>.<span class="ident">interval</span>)<span class="question-mark">?</span>.<span class="ident">into</span>();
+        <span class="ident">intersected_domain</span>.<span class="ident">update_widening_lower_bound</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">widening_lower_bound</span>);
+        <span class="ident">intersected_domain</span>.<span class="ident">update_widening_lower_bound</span>(<span class="kw-2">&amp;</span><span class="ident">other</span>.<span class="ident">widening_lower_bound</span>);
+        <span class="ident">intersected_domain</span>.<span class="ident">update_widening_upper_bound</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">widening_upper_bound</span>);
+        <span class="ident">intersected_domain</span>.<span class="ident">update_widening_upper_bound</span>(<span class="kw-2">&amp;</span><span class="ident">other</span>.<span class="ident">widening_upper_bound</span>);
+        <span class="ident">intersected_domain</span>.<span class="ident">widening_delay</span> <span class="op">=</span>
+            <span class="ident">std::cmp::max</span>(<span class="self">self</span>.<span class="ident">widening_delay</span>, <span class="ident">other</span>.<span class="ident">widening_delay</span>);
+
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">interval_length</span>) <span class="op">=</span> (<span class="ident">intersected_domain</span>.<span class="ident">interval</span>.<span class="ident">end</span>.<span class="ident">clone</span>()
+            <span class="op">-</span> <span class="kw-2">&amp;</span><span class="ident">intersected_domain</span>.<span class="ident">interval</span>.<span class="ident">start</span>)
+            .<span class="ident">try_to_u64</span>()
+        {
+            <span class="ident">intersected_domain</span>.<span class="ident">widening_delay</span> <span class="op">=</span>
+                <span class="ident">std::cmp::min</span>(<span class="ident">intersected_domain</span>.<span class="ident">widening_delay</span>, <span class="ident">interval_length</span>);
+        }
+
+        <span class="prelude-val">Ok</span>(<span class="ident">intersected_domain</span>)
+    }
 }
 
 <span class="kw">impl</span> <span class="ident">AbstractDomain</span> <span class="kw">for</span> <span class="ident">IntervalDomain</span> {
     <span class="doccomment">/// Merge two interval domains and perform widening if necessary.</span>
     <span class="doccomment">/// See [`IntervalDomain::signed_merge_and_widen`] for the widening strategy.</span>
-    <span class="kw">fn</span> <span class="ident">merge</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">IntervalDomain</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">IntervalDomain</span> {
+    <span class="kw">fn</span> <span class="ident">merge</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">IntervalDomain</span>) -&gt; <span class="ident">IntervalDomain</span> {
         <span class="self">self</span>.<span class="ident">signed_merge_and_widen</span>(<span class="ident">other</span>)
     }
 
     <span class="doccomment">/// Return `true` if the interval spans all possible values.</span>
-    <span class="kw">fn</span> <span class="ident">is_top</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">fn</span> <span class="ident">is_top</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">is_top</span>()
     }
 }
 
 <span class="kw">impl</span> <span class="ident">SizedDomain</span> <span class="kw">for</span> <span class="ident">IntervalDomain</span> {
     <span class="doccomment">/// Return the size in bytes of the represented values.</span>
-    <span class="kw">fn</span> <span class="ident">bytesize</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ByteSize</span> {
+    <span class="kw">fn</span> <span class="ident">bytesize</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">ByteSize</span> {
         <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">start</span>.<span class="ident">width</span>().<span class="ident">into</span>()
     }
 
     <span class="doccomment">/// Return a new `Top` value with the given bytesize.</span>
-    <span class="kw">fn</span> <span class="ident">new_top</span>(<span class="ident">bytesize</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">new_top</span>(<span class="ident">bytesize</span>: <span class="ident">ByteSize</span>) -&gt; <span class="self">Self</span> {
         <span class="ident">IntervalDomain</span> {
             <span class="ident">interval</span>: <span class="ident">Interval</span> {
                 <span class="ident">start</span>: <span class="ident">Bitvector::signed_min_value</span>(<span class="ident">bytesize</span>.<span class="ident">into</span>()),
@@ -1346,8 +1347,8 @@
 
 <span class="kw">impl</span> <span class="ident">HasTop</span> <span class="kw">for</span> <span class="ident">IntervalDomain</span> {
     <span class="doccomment">/// Return a new interval with the same byte size as `self` and representing the `Top` value of the domain.</span>
-    <span class="kw">fn</span> <span class="ident">top</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="self">Self</span><span class="ident">::new_top</span>(<span class="self">self</span>.<span class="ident">bytesize</span>())
+    <span class="kw">fn</span> <span class="ident">top</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self</span> {
+        <span class="ident"><span class="self">Self</span>::new_top</span>(<span class="self">self</span>.<span class="ident">bytesize</span>())
     }
 }
 
@@ -1356,16 +1357,16 @@
     <span class="doccomment">///</span>
     <span class="doccomment">/// For binary operations that are not explicitly implemented</span>
     <span class="doccomment">/// the result is only exact if both intervals contain exactly one value.</span>
-    <span class="kw">fn</span> <span class="ident">bin_op</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">op</span>: <span class="ident">BinOpType</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">bin_op</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">op</span>: <span class="ident">BinOpType</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">use</span> <span class="ident">BinOpType</span>::<span class="kw-2">*</span>;
         <span class="kw">match</span> <span class="ident">op</span> {
             <span class="ident">IntEqual</span> <span class="op">|</span> <span class="ident">IntNotEqual</span> <span class="op">|</span> <span class="ident">IntLess</span> <span class="op">|</span> <span class="ident">IntSLess</span> <span class="op">|</span> <span class="ident">IntLessEqual</span> <span class="op">|</span> <span class="ident">IntSLessEqual</span>
             <span class="op">|</span> <span class="ident">IntCarry</span> <span class="op">|</span> <span class="ident">IntSCarry</span> <span class="op">|</span> <span class="ident">IntSBorrow</span> <span class="op">|</span> <span class="ident">IntAnd</span> <span class="op">|</span> <span class="ident">IntOr</span> <span class="op">|</span> <span class="ident">IntXOr</span> <span class="op">|</span> <span class="ident">IntRight</span>
             <span class="op">|</span> <span class="ident">IntSRight</span> <span class="op">|</span> <span class="ident">IntDiv</span> <span class="op">|</span> <span class="ident">IntSDiv</span> <span class="op">|</span> <span class="ident">IntRem</span> <span class="op">|</span> <span class="ident">IntSRem</span> <span class="op">|</span> <span class="ident">BoolAnd</span> <span class="op">|</span> <span class="ident">BoolOr</span> <span class="op">|</span> <span class="ident">BoolXOr</span>
             <span class="op">|</span> <span class="ident">FloatEqual</span> <span class="op">|</span> <span class="ident">FloatNotEqual</span> <span class="op">|</span> <span class="ident">FloatLess</span> <span class="op">|</span> <span class="ident">FloatLessEqual</span> <span class="op">|</span> <span class="ident">FloatAdd</span> <span class="op">|</span> <span class="ident">FloatSub</span>
-            <span class="op">|</span> <span class="ident">FloatMult</span> <span class="op">|</span> <span class="ident">FloatDiv</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">let</span> <span class="ident">new_interval</span> <span class="op">=</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">start</span> <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">end</span>
-                    <span class="op">&amp;&amp;</span> <span class="ident">rhs</span>.<span class="ident">interval</span>.<span class="ident">start</span> <span class="op">=</span><span class="op">=</span> <span class="ident">rhs</span>.<span class="ident">interval</span>.<span class="ident">end</span>
+            <span class="op">|</span> <span class="ident">FloatMult</span> <span class="op">|</span> <span class="ident">FloatDiv</span> =&gt; {
+                <span class="kw">let</span> <span class="ident">new_interval</span> <span class="op">=</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">start</span> <span class="op">==</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">end</span>
+                    <span class="op">&amp;&amp;</span> <span class="ident">rhs</span>.<span class="ident">interval</span>.<span class="ident">start</span> <span class="op">==</span> <span class="ident">rhs</span>.<span class="ident">interval</span>.<span class="ident">end</span>
                 {
                     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">bitvec</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">start</span>.<span class="ident">bin_op</span>(<span class="ident">op</span>, <span class="kw-2">&amp;</span><span class="ident">rhs</span>.<span class="ident">interval</span>.<span class="ident">start</span>) {
                         <span class="ident">bitvec</span>.<span class="ident">into</span>()
@@ -1382,19 +1383,19 @@
                     <span class="ident">widening_delay</span>: <span class="ident">std::cmp::max</span>(<span class="self">self</span>.<span class="ident">widening_delay</span>, <span class="ident">rhs</span>.<span class="ident">widening_delay</span>),
                 }
             }
-            <span class="ident">Piece</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">piece</span>(<span class="ident">rhs</span>),
-            <span class="ident">IntAdd</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">add</span>(<span class="ident">rhs</span>),
-            <span class="ident">IntSub</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">sub</span>(<span class="ident">rhs</span>),
-            <span class="ident">IntMult</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">signed_mul</span>(<span class="ident">rhs</span>),
-            <span class="ident">IntLeft</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">shift_left</span>(<span class="ident">rhs</span>),
+            <span class="ident">Piece</span> =&gt; <span class="self">self</span>.<span class="ident">piece</span>(<span class="ident">rhs</span>),
+            <span class="ident">IntAdd</span> =&gt; <span class="self">self</span>.<span class="ident">add</span>(<span class="ident">rhs</span>),
+            <span class="ident">IntSub</span> =&gt; <span class="self">self</span>.<span class="ident">sub</span>(<span class="ident">rhs</span>),
+            <span class="ident">IntMult</span> =&gt; <span class="self">self</span>.<span class="ident">signed_mul</span>(<span class="ident">rhs</span>),
+            <span class="ident">IntLeft</span> =&gt; <span class="self">self</span>.<span class="ident">shift_left</span>(<span class="ident">rhs</span>),
         }
     }
 
     <span class="doccomment">/// Compute the result of an unary operation on the interval domain.</span>
-    <span class="kw">fn</span> <span class="ident">un_op</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">op</span>: <span class="ident">UnOpType</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">un_op</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">op</span>: <span class="ident">UnOpType</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">use</span> <span class="ident">UnOpType</span>::<span class="kw-2">*</span>;
         <span class="kw">match</span> <span class="ident">op</span> {
-            <span class="ident">Int2Comp</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">Int2Comp</span> =&gt; {
                 <span class="kw">let</span> <span class="ident">interval</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">clone</span>().<span class="ident">int_2_comp</span>();
                 <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_upper_bound</span> <span class="op">=</span> <span class="prelude-val">None</span>;
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">bound</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">widening_lower_bound</span>.<span class="ident">clone</span>() {
@@ -1413,15 +1414,15 @@
                     <span class="ident">widening_delay</span>: <span class="self">self</span>.<span class="ident">widening_delay</span>,
                 }
             }
-            <span class="ident">IntNegate</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">IntervalDomain</span> {
+            <span class="ident">IntNegate</span> =&gt; <span class="ident">IntervalDomain</span> {
                 <span class="ident">interval</span>: <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">clone</span>().<span class="ident">bitwise_not</span>(),
                 <span class="ident">widening_lower_bound</span>: <span class="prelude-val">None</span>,
                 <span class="ident">widening_upper_bound</span>: <span class="prelude-val">None</span>,
                 <span class="ident">widening_delay</span>: <span class="self">self</span>.<span class="ident">widening_delay</span>,
             },
-            <span class="ident">BoolNegate</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">start</span> <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">end</span> {
-                    <span class="kw">if</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">start</span> <span class="op">=</span><span class="op">=</span> <span class="ident">Bitvector::zero</span>(<span class="ident">ByteSize::new</span>(<span class="number">1</span>).<span class="ident">into</span>()) {
+            <span class="ident">BoolNegate</span> =&gt; {
+                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">start</span> <span class="op">==</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">end</span> {
+                    <span class="kw">if</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">start</span> <span class="op">==</span> <span class="ident">Bitvector::zero</span>(<span class="ident">ByteSize::new</span>(<span class="number">1</span>).<span class="ident">into</span>()) {
                         <span class="ident">Bitvector::one</span>(<span class="ident">ByteSize::new</span>(<span class="number">1</span>).<span class="ident">into</span>()).<span class="ident">into</span>()
                     } <span class="kw">else</span> {
                         <span class="ident">Bitvector::zero</span>(<span class="ident">ByteSize::new</span>(<span class="number">1</span>).<span class="ident">into</span>()).<span class="ident">into</span>()
@@ -1430,15 +1431,15 @@
                     <span class="ident">IntervalDomain::new_top</span>(<span class="self">self</span>.<span class="ident">bytesize</span>())
                 }
             }
-            <span class="ident">FloatAbs</span> <span class="op">|</span> <span class="ident">FloatCeil</span> <span class="op">|</span> <span class="ident">FloatFloor</span> <span class="op">|</span> <span class="ident">FloatNegate</span> <span class="op">|</span> <span class="ident">FloatRound</span> <span class="op">|</span> <span class="ident">FloatSqrt</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">FloatAbs</span> <span class="op">|</span> <span class="ident">FloatCeil</span> <span class="op">|</span> <span class="ident">FloatFloor</span> <span class="op">|</span> <span class="ident">FloatNegate</span> <span class="op">|</span> <span class="ident">FloatRound</span> <span class="op">|</span> <span class="ident">FloatSqrt</span> =&gt; {
                 <span class="ident">IntervalDomain::new_top</span>(<span class="self">self</span>.<span class="ident">bytesize</span>())
             }
-            <span class="ident">FloatNaN</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">IntervalDomain::new_top</span>(<span class="ident">ByteSize::new</span>(<span class="number">1</span>)),
+            <span class="ident">FloatNaN</span> =&gt; <span class="ident">IntervalDomain::new_top</span>(<span class="ident">ByteSize::new</span>(<span class="number">1</span>)),
         }
     }
 
     <span class="doccomment">/// Take a sub-bitvector of the values in the interval domain.</span>
-    <span class="kw">fn</span> <span class="ident">subpiece</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">low_byte</span>: <span class="ident">ByteSize</span>, <span class="ident">size</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">subpiece</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">low_byte</span>: <span class="ident">ByteSize</span>, <span class="ident">size</span>: <span class="ident">ByteSize</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">interval_domain</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">clone</span>();
         <span class="kw">if</span> <span class="ident">low_byte</span> <span class="op">!</span><span class="op">=</span> <span class="ident">ByteSize::new</span>(<span class="number">0</span>) {
             <span class="ident">interval_domain</span> <span class="op">=</span> <span class="ident">interval_domain</span>.<span class="ident">subpiece_higher</span>(<span class="ident">low_byte</span>);
@@ -1450,22 +1451,22 @@
     }
 
     <span class="doccomment">/// Compute the result of a cast operation on the interval domain.</span>
-    <span class="kw">fn</span> <span class="ident">cast</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">kind</span>: <span class="ident">CastOpType</span>, <span class="ident">width</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">cast</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">kind</span>: <span class="ident">CastOpType</span>, <span class="ident">width</span>: <span class="ident">ByteSize</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">use</span> <span class="ident">CastOpType</span>::<span class="kw-2">*</span>;
         <span class="kw">match</span> <span class="ident">kind</span> {
-            <span class="ident">IntZExt</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">IntZExt</span> =&gt; {
                 <span class="macro">assert!</span>(<span class="self">self</span>.<span class="ident">bytesize</span>() <span class="op">&lt;</span><span class="op">=</span> <span class="ident">width</span>);
-                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">bytesize</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">width</span> {
+                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">bytesize</span>() <span class="op">==</span> <span class="ident">width</span> {
                     <span class="kw">return</span> <span class="self">self</span>.<span class="ident">clone</span>();
                 }
                 <span class="self">self</span>.<span class="ident">clone</span>().<span class="ident">zero_extend</span>(<span class="ident">width</span>)
             }
-            <span class="ident">IntSExt</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">IntSExt</span> =&gt; {
                 <span class="macro">assert!</span>(<span class="self">self</span>.<span class="ident">bytesize</span>() <span class="op">&lt;</span><span class="op">=</span> <span class="ident">width</span>);
                 <span class="self">self</span>.<span class="ident">clone</span>().<span class="ident">sign_extend</span>(<span class="ident">width</span>)
             }
-            <span class="ident">Float2Float</span> <span class="op">|</span> <span class="ident">Int2Float</span> <span class="op">|</span> <span class="ident">Trunc</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">IntervalDomain::new_top</span>(<span class="ident">width</span>),
-            <span class="ident">PopCount</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">Float2Float</span> <span class="op">|</span> <span class="ident">Int2Float</span> <span class="op">|</span> <span class="ident">Trunc</span> =&gt; <span class="ident">IntervalDomain::new_top</span>(<span class="ident">width</span>),
+            <span class="ident">PopCount</span> =&gt; {
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">bitvec</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">try_to_bitvec</span>() {
                     <span class="ident">bitvec</span>.<span class="ident">cast</span>(<span class="ident">kind</span>, <span class="ident">width</span>).<span class="ident">unwrap</span>().<span class="ident">into</span>()
                 } <span class="kw">else</span> {
@@ -1484,7 +1485,7 @@
 <span class="kw">impl</span> <span class="ident">std::ops::Add</span> <span class="kw">for</span> <span class="ident">IntervalDomain</span> {
     <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">IntervalDomain</span>;
 
-    <span class="kw">fn</span> <span class="ident">add</span>(<span class="self">self</span>, <span class="ident">rhs</span>: <span class="self">Self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">add</span>(<span class="self">self</span>, <span class="ident">rhs</span>: <span class="self">Self</span>) -&gt; <span class="self">Self</span> {
         <span class="self">self</span>.<span class="ident">bin_op</span>(<span class="ident">BinOpType::IntAdd</span>, <span class="kw-2">&amp;</span><span class="ident">rhs</span>)
     }
 }
@@ -1492,7 +1493,7 @@
 <span class="kw">impl</span> <span class="ident">std::ops::Sub</span> <span class="kw">for</span> <span class="ident">IntervalDomain</span> {
     <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">IntervalDomain</span>;
 
-    <span class="kw">fn</span> <span class="ident">sub</span>(<span class="self">self</span>, <span class="ident">rhs</span>: <span class="self">Self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">sub</span>(<span class="self">self</span>, <span class="ident">rhs</span>: <span class="self">Self</span>) -&gt; <span class="self">Self</span> {
         <span class="self">self</span>.<span class="ident">bin_op</span>(<span class="ident">BinOpType::IntSub</span>, <span class="kw-2">&amp;</span><span class="ident">rhs</span>)
     }
 }
@@ -1500,14 +1501,14 @@
 <span class="kw">impl</span> <span class="ident">std::ops::Neg</span> <span class="kw">for</span> <span class="ident">IntervalDomain</span> {
     <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">IntervalDomain</span>;
 
-    <span class="kw">fn</span> <span class="ident">neg</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">neg</span>(<span class="self">self</span>) -&gt; <span class="self">Self</span> {
         <span class="self">self</span>.<span class="ident">un_op</span>(<span class="ident">UnOpType::Int2Comp</span>)
     }
 }
 
 <span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Bitvector</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">IntervalDomain</span> {
     <span class="doccomment">/// Create an interval containing only `bitvec`.</span>
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">bitvec</span>: <span class="ident">Bitvector</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">bitvec</span>: <span class="ident">Bitvector</span>) -&gt; <span class="self">Self</span> {
         <span class="ident">IntervalDomain</span> {
             <span class="ident">interval</span>: <span class="ident">bitvec</span>.<span class="ident">into</span>(),
             <span class="ident">widening_lower_bound</span>: <span class="prelude-val">None</span>,
@@ -1519,8 +1520,8 @@
 
 <span class="kw">impl</span> <span class="ident">TryToBitvec</span> <span class="kw">for</span> <span class="ident">IntervalDomain</span> {
     <span class="doccomment">/// If the domain represents an interval of length one, return the contained value.</span>
-    <span class="kw">fn</span> <span class="ident">try_to_bitvec</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Bitvector</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">start</span> <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">end</span> {
+    <span class="kw">fn</span> <span class="ident">try_to_bitvec</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Bitvector</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">start</span> <span class="op">==</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">end</span> {
             <span class="prelude-val">Ok</span>(<span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">start</span>.<span class="ident">clone</span>())
         } <span class="kw">else</span> {
             <span class="prelude-val">Err</span>(<span class="macro">anyhow!</span>(<span class="string">&quot;More than one value in the interval.&quot;</span>))
@@ -1530,7 +1531,7 @@
 
 <span class="kw">impl</span> <span class="ident">TryToInterval</span> <span class="kw">for</span> <span class="ident">IntervalDomain</span> {
     <span class="doccomment">/// If the domain represents a bounded (i.e. not `Top`) interval, return it.</span>
-    <span class="kw">fn</span> <span class="ident">try_to_interval</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Interval</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">try_to_interval</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Interval</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_top</span>() {
             <span class="prelude-val">Err</span>(<span class="macro">anyhow!</span>(<span class="string">&quot;Value is Top&quot;</span>))
         } <span class="kw">else</span> {
@@ -1540,10 +1541,10 @@
 }
 
 <span class="kw">impl</span> <span class="ident">Display</span> <span class="kw">for</span> <span class="ident">IntervalDomain</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">std::fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">std::fmt::Result</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">std::fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">std::fmt::Result</span> {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_top</span>() {
             <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;Top:i{}&quot;</span>, <span class="self">self</span>.<span class="ident">bytesize</span>().<span class="ident">as_bit_length</span>())
-        } <span class="kw">else</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">start</span> <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">end</span> {
+        } <span class="kw">else</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">start</span> <span class="op">==</span> <span class="self">self</span>.<span class="ident">interval</span>.<span class="ident">end</span> {
             <span class="macro">write!</span>(
                 <span class="ident">f</span>,
                 <span class="string">&quot;0x{:016x}:i{}&quot;</span>,
@@ -1568,17 +1569,17 @@
 <span class="doccomment">/// Trait for adjusting a bitvector to the stride of an interval.</span>
 <span class="kw">trait</span> <span class="ident">StrideRounding</span>: <span class="ident">Sized</span> {
     <span class="doccomment">/// Round `self` up to the nearest value that adheres to the stride of `interval`.</span>
-    <span class="kw">fn</span> <span class="ident">round_up_to_stride_of</span>(<span class="self">self</span>, <span class="ident">interval</span>: <span class="kw-2">&amp;</span><span class="ident">Interval</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">round_up_to_stride_of</span>(<span class="self">self</span>, <span class="ident">interval</span>: <span class="kw-2">&amp;</span><span class="ident">Interval</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>;
 
     <span class="doccomment">/// Round `self` down to the nearest value that adheres to the stride of `interval`.</span>
-    <span class="kw">fn</span> <span class="ident">round_down_to_stride_of</span>(<span class="self">self</span>, <span class="ident">interval</span>: <span class="kw-2">&amp;</span><span class="ident">Interval</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">round_down_to_stride_of</span>(<span class="self">self</span>, <span class="ident">interval</span>: <span class="kw-2">&amp;</span><span class="ident">Interval</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>;
 }
 
 <span class="kw">impl</span> <span class="ident">StrideRounding</span> <span class="kw">for</span> <span class="ident">Bitvector</span> {
     <span class="doccomment">/// Round `self` up to the nearest value that adheres to the stride of `interval`.</span>
     <span class="doccomment">/// Returns `None` if rounding would result in an integer overflow.</span>
-    <span class="kw">fn</span> <span class="ident">round_up_to_stride_of</span>(<span class="self">self</span>, <span class="ident">interval</span>: <span class="kw-2">&amp;</span><span class="ident">Interval</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="ident">interval</span>.<span class="ident">stride</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> <span class="op">|</span><span class="op">|</span> <span class="ident">interval</span>.<span class="ident">bytesize</span>() <span class="op">&gt;</span> <span class="ident">ByteSize::new</span>(<span class="number">8</span>) {
+    <span class="kw">fn</span> <span class="ident">round_up_to_stride_of</span>(<span class="self">self</span>, <span class="ident">interval</span>: <span class="kw-2">&amp;</span><span class="ident">Interval</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
+        <span class="kw">if</span> <span class="ident">interval</span>.<span class="ident">stride</span> <span class="op">==</span> <span class="number">0</span> <span class="op">|</span><span class="op">|</span> <span class="ident">interval</span>.<span class="ident">bytesize</span>() <span class="op">&gt;</span> <span class="ident">ByteSize::new</span>(<span class="number">8</span>) {
             <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="self">self</span>);
         }
         <span class="kw">let</span> <span class="ident">diff</span> <span class="op">=</span> <span class="ident">interval</span>.<span class="ident">start</span>.<span class="ident">try_to_i128</span>().<span class="ident">unwrap</span>() <span class="op">-</span> <span class="self">self</span>.<span class="ident">try_to_i128</span>().<span class="ident">unwrap</span>();
@@ -1590,8 +1591,8 @@
 
     <span class="doccomment">/// Round `self` down to the nearest value that adheres to the stride of `interval`.</span>
     <span class="doccomment">/// Returns `None` if rounding would result in an integer overflow.</span>
-    <span class="kw">fn</span> <span class="ident">round_down_to_stride_of</span>(<span class="self">self</span>, <span class="ident">interval</span>: <span class="kw-2">&amp;</span><span class="ident">Interval</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="ident">interval</span>.<span class="ident">stride</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> <span class="op">|</span><span class="op">|</span> <span class="ident">interval</span>.<span class="ident">bytesize</span>() <span class="op">&gt;</span> <span class="ident">ByteSize::new</span>(<span class="number">8</span>) {
+    <span class="kw">fn</span> <span class="ident">round_down_to_stride_of</span>(<span class="self">self</span>, <span class="ident">interval</span>: <span class="kw-2">&amp;</span><span class="ident">Interval</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
+        <span class="kw">if</span> <span class="ident">interval</span>.<span class="ident">stride</span> <span class="op">==</span> <span class="number">0</span> <span class="op">|</span><span class="op">|</span> <span class="ident">interval</span>.<span class="ident">bytesize</span>() <span class="op">&gt;</span> <span class="ident">ByteSize::new</span>(<span class="number">8</span>) {
             <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="self">self</span>);
         }
         <span class="kw">let</span> <span class="ident">diff</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">try_to_i128</span>().<span class="ident">unwrap</span>() <span class="op">-</span> <span class="ident">interval</span>.<span class="ident">end</span>.<span class="ident">try_to_i128</span>().<span class="ident">unwrap</span>();
@@ -1604,6 +1605,6 @@
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
 <span class="kw">mod</span> <span class="ident">tests</span>;
-</pre></div>
-</section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="cwe_checker_lib" data-search-index-js="../../../search-index.js" data-search-js="../../../search.js"></div>
-    <script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script></body></html>
+</code></pre></div>
+</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="cwe_checker_lib" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.60.0 (7737e0b5c 2022-04-04)" ></div>
+</body></html>

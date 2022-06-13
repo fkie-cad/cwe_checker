@@ -1,7 +1,9 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/abstract_domain/bitvector.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>bitvector.rs - source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../favicon.svg">
-<link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../../cwe_checker_lib/index.html'><div class='logo-container rust-logo'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
-                <a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/abstract_domain/bitvector.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>bitvector.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><script defer src="../../../main.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script>
+    <noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../cwe_checker_lib/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../../cwe_checker_lib/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../cwe_checker_lib/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><div class="theme-picker hidden"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="22" height="22" alt="Pick another theme!" src="../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
 <span id="4">  4</span>
@@ -295,11 +297,10 @@
 <span id="292">292</span>
 <span id="293">293</span>
 <span id="294">294</span>
-</pre><div class="example-wrap"><pre class="rust ">
-<span class="kw">use</span> <span class="kw">super</span><span class="ident">::Interval</span>;
+</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::Interval</span>;
 <span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">AbstractDomain</span>, <span class="ident">HasTop</span>, <span class="ident">RegisterDomain</span>, <span class="ident">SizedDomain</span>, <span class="ident">TryToBitvec</span>, <span class="ident">TryToInterval</span>};
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::intermediate_representation</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::prelude</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::intermediate_representation</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::prelude</span>::<span class="kw-2">*</span>;
 
 <span class="doccomment">/// The `BitvectorDomain` is a simple abstract domain describing a bitvector of known length.</span>
 <span class="doccomment">///</span>
@@ -314,8 +315,8 @@
 
 <span class="kw">impl</span> <span class="ident">AbstractDomain</span> <span class="kw">for</span> <span class="ident">BitvectorDomain</span> {
     <span class="doccomment">/// merge two values. Returns *Top* if the values are not equal.</span>
-    <span class="kw">fn</span> <span class="ident">merge</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="kw">if</span> <span class="self">self</span> <span class="op">=</span><span class="op">=</span> <span class="ident">other</span> {
+    <span class="kw">fn</span> <span class="ident">merge</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="self">Self</span> {
+        <span class="kw">if</span> <span class="self">self</span> <span class="op">==</span> <span class="ident">other</span> {
             <span class="self">self</span>.<span class="ident">clone</span>()
         } <span class="kw">else</span> {
             <span class="self">self</span>.<span class="ident">top</span>()
@@ -323,30 +324,30 @@
     }
 
     <span class="doccomment">/// Check if the value is *Top*.</span>
-    <span class="kw">fn</span> <span class="ident">is_top</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="macro">matches!</span>(<span class="self">self</span>, <span class="self">Self</span><span class="ident">::Top</span>(<span class="kw">_</span>))
+    <span class="kw">fn</span> <span class="ident">is_top</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
+        <span class="macro">matches!</span>(<span class="self">self</span>, <span class="ident"><span class="self">Self</span>::Top</span>(<span class="kw">_</span>))
     }
 }
 
 <span class="kw">impl</span> <span class="ident">HasTop</span> <span class="kw">for</span> <span class="ident">BitvectorDomain</span> {
     <span class="doccomment">/// Return a *Top* value with the same bytesize as `self`.</span>
-    <span class="kw">fn</span> <span class="ident">top</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">BitvectorDomain</span> {
+    <span class="kw">fn</span> <span class="ident">top</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">BitvectorDomain</span> {
         <span class="ident">BitvectorDomain::Top</span>(<span class="self">self</span>.<span class="ident">bytesize</span>())
     }
 }
 
 <span class="kw">impl</span> <span class="ident">SizedDomain</span> <span class="kw">for</span> <span class="ident">BitvectorDomain</span> {
     <span class="doccomment">/// Return the bytesize of `self`.</span>
-    <span class="kw">fn</span> <span class="ident">bytesize</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ByteSize</span> {
+    <span class="kw">fn</span> <span class="ident">bytesize</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">ByteSize</span> {
         <span class="kw">use</span> <span class="ident">BitvectorDomain</span>::<span class="kw-2">*</span>;
         <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">Top</span>(<span class="ident">bytesize</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw-2">*</span><span class="ident">bytesize</span>,
-            <span class="ident">Value</span>(<span class="ident">bitvec</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">bitvec</span>.<span class="ident">width</span>().<span class="ident">into</span>(),
+            <span class="ident">Top</span>(<span class="ident">bytesize</span>) =&gt; <span class="kw-2">*</span><span class="ident">bytesize</span>,
+            <span class="ident">Value</span>(<span class="ident">bitvec</span>) =&gt; <span class="ident">bitvec</span>.<span class="ident">width</span>().<span class="ident">into</span>(),
         }
     }
 
     <span class="doccomment">/// Get a *Top* element with the given bitsize.</span>
-    <span class="kw">fn</span> <span class="ident">new_top</span>(<span class="ident">bytesize</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">BitvectorDomain</span> {
+    <span class="kw">fn</span> <span class="ident">new_top</span>(<span class="ident">bytesize</span>: <span class="ident">ByteSize</span>) -&gt; <span class="ident">BitvectorDomain</span> {
         <span class="ident">BitvectorDomain::Top</span>(<span class="ident">bytesize</span>)
     }
 }
@@ -355,44 +356,44 @@
     <span class="doccomment">/// Evaluate the given binary operation.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// For non-shift operations, this function will panic if the operands have different bitsizes.</span>
-    <span class="kw">fn</span> <span class="ident">bin_op</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">op</span>: <span class="ident">BinOpType</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">bin_op</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">op</span>: <span class="ident">BinOpType</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">use</span> <span class="ident">BinOpType</span>::<span class="kw-2">*</span>;
         <span class="kw">match</span> <span class="ident">op</span> {
-            <span class="ident">Piece</span> <span class="op">|</span> <span class="ident">IntLeft</span> <span class="op">|</span> <span class="ident">IntRight</span> <span class="op">|</span> <span class="ident">IntSRight</span> <span class="op">=</span><span class="op">&gt;</span> (),
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">assert_eq!</span>(<span class="self">self</span>.<span class="ident">bytesize</span>(), <span class="ident">rhs</span>.<span class="ident">bytesize</span>()),
+            <span class="ident">Piece</span> <span class="op">|</span> <span class="ident">IntLeft</span> <span class="op">|</span> <span class="ident">IntRight</span> <span class="op">|</span> <span class="ident">IntSRight</span> =&gt; (),
+            <span class="kw">_</span> =&gt; <span class="macro">assert_eq!</span>(<span class="self">self</span>.<span class="ident">bytesize</span>(), <span class="ident">rhs</span>.<span class="ident">bytesize</span>()),
         }
         <span class="kw">match</span> (<span class="self">self</span>, <span class="ident">rhs</span>) {
-            (<span class="ident">BitvectorDomain::Value</span>(<span class="ident">lhs_bitvec</span>), <span class="ident">BitvectorDomain::Value</span>(<span class="ident">rhs_bitvec</span>)) <span class="op">=</span><span class="op">&gt;</span> {
+            (<span class="ident">BitvectorDomain::Value</span>(<span class="ident">lhs_bitvec</span>), <span class="ident">BitvectorDomain::Value</span>(<span class="ident">rhs_bitvec</span>)) =&gt; {
                 <span class="kw">match</span> <span class="ident">lhs_bitvec</span>.<span class="ident">bin_op</span>(<span class="ident">op</span>, <span class="ident">rhs_bitvec</span>) {
-                    <span class="prelude-val">Ok</span>(<span class="ident">val</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">BitvectorDomain::Value</span>(<span class="ident">val</span>),
-                    <span class="prelude-val">Err</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">BitvectorDomain::new_top</span>(<span class="self">self</span>.<span class="ident">bin_op_bytesize</span>(<span class="ident">op</span>, <span class="ident">rhs</span>)),
+                    <span class="prelude-val">Ok</span>(<span class="ident">val</span>) =&gt; <span class="ident">BitvectorDomain::Value</span>(<span class="ident">val</span>),
+                    <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="ident">BitvectorDomain::new_top</span>(<span class="self">self</span>.<span class="ident">bin_op_bytesize</span>(<span class="ident">op</span>, <span class="ident">rhs</span>)),
                 }
             }
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">BitvectorDomain::new_top</span>(<span class="self">self</span>.<span class="ident">bin_op_bytesize</span>(<span class="ident">op</span>, <span class="ident">rhs</span>)),
+            <span class="kw">_</span> =&gt; <span class="ident">BitvectorDomain::new_top</span>(<span class="self">self</span>.<span class="ident">bin_op_bytesize</span>(<span class="ident">op</span>, <span class="ident">rhs</span>)),
         }
     }
 
     <span class="doccomment">/// Evaluate the given unary operation.</span>
-    <span class="kw">fn</span> <span class="ident">un_op</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">op</span>: <span class="ident">UnOpType</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">un_op</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">op</span>: <span class="ident">UnOpType</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">use</span> <span class="ident">UnOpType</span>::<span class="kw-2">*</span>;
         <span class="kw">if</span> <span class="kw">let</span> <span class="ident">BitvectorDomain::Value</span>(<span class="ident">bitvec</span>) <span class="op">=</span> <span class="self">self</span> {
             <span class="kw">match</span> <span class="ident">bitvec</span>.<span class="ident">un_op</span>(<span class="ident">op</span>) {
-                <span class="prelude-val">Ok</span>(<span class="ident">val</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">BitvectorDomain::Value</span>(<span class="ident">val</span>),
-                <span class="prelude-val">Err</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">match</span> <span class="ident">op</span> {
-                    <span class="ident">BoolNegate</span> <span class="op">|</span> <span class="ident">FloatNaN</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">BitvectorDomain::new_top</span>(<span class="ident">ByteSize::new</span>(<span class="number">1</span>)),
-                    <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">BitvectorDomain::new_top</span>(<span class="self">self</span>.<span class="ident">bytesize</span>()),
+                <span class="prelude-val">Ok</span>(<span class="ident">val</span>) =&gt; <span class="ident">BitvectorDomain::Value</span>(<span class="ident">val</span>),
+                <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="kw">match</span> <span class="ident">op</span> {
+                    <span class="ident">BoolNegate</span> <span class="op">|</span> <span class="ident">FloatNaN</span> =&gt; <span class="ident">BitvectorDomain::new_top</span>(<span class="ident">ByteSize::new</span>(<span class="number">1</span>)),
+                    <span class="kw">_</span> =&gt; <span class="ident">BitvectorDomain::new_top</span>(<span class="self">self</span>.<span class="ident">bytesize</span>()),
                 },
             }
         } <span class="kw">else</span> {
             <span class="kw">match</span> <span class="ident">op</span> {
-                <span class="ident">BoolNegate</span> <span class="op">|</span> <span class="ident">FloatNaN</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">BitvectorDomain::new_top</span>(<span class="ident">ByteSize::new</span>(<span class="number">1</span>)),
-                <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">BitvectorDomain::new_top</span>(<span class="self">self</span>.<span class="ident">bytesize</span>()),
+                <span class="ident">BoolNegate</span> <span class="op">|</span> <span class="ident">FloatNaN</span> =&gt; <span class="ident">BitvectorDomain::new_top</span>(<span class="ident">ByteSize::new</span>(<span class="number">1</span>)),
+                <span class="kw">_</span> =&gt; <span class="ident">BitvectorDomain::new_top</span>(<span class="self">self</span>.<span class="ident">bytesize</span>()),
             }
         }
     }
 
     <span class="doccomment">/// Extract a sub-bitvector out of a bitvector</span>
-    <span class="kw">fn</span> <span class="ident">subpiece</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">low_byte</span>: <span class="ident">ByteSize</span>, <span class="ident">size</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">subpiece</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">low_byte</span>: <span class="ident">ByteSize</span>, <span class="ident">size</span>: <span class="ident">ByteSize</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">if</span> <span class="kw">let</span> <span class="ident">BitvectorDomain::Value</span>(<span class="ident">bitvec</span>) <span class="op">=</span> <span class="self">self</span> {
             <span class="ident">BitvectorDomain::Value</span>(<span class="ident">bitvec</span>.<span class="ident">subpiece</span>(<span class="ident">low_byte</span>, <span class="ident">size</span>))
         } <span class="kw">else</span> {
@@ -401,11 +402,11 @@
     }
 
     <span class="doccomment">/// Perform a size-changing cast on a bitvector.</span>
-    <span class="kw">fn</span> <span class="ident">cast</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">kind</span>: <span class="ident">CastOpType</span>, <span class="ident">width</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">cast</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">kind</span>: <span class="ident">CastOpType</span>, <span class="ident">width</span>: <span class="ident">ByteSize</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">if</span> <span class="kw">let</span> <span class="ident">BitvectorDomain::Value</span>(<span class="ident">bitvec</span>) <span class="op">=</span> <span class="self">self</span> {
             <span class="kw">match</span> <span class="ident">bitvec</span>.<span class="ident">cast</span>(<span class="ident">kind</span>, <span class="ident">width</span>) {
-                <span class="prelude-val">Ok</span>(<span class="ident">val</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">BitvectorDomain::Value</span>(<span class="ident">val</span>),
-                <span class="prelude-val">Err</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">BitvectorDomain::new_top</span>(<span class="ident">width</span>),
+                <span class="prelude-val">Ok</span>(<span class="ident">val</span>) =&gt; <span class="ident">BitvectorDomain::Value</span>(<span class="ident">val</span>),
+                <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="ident">BitvectorDomain::new_top</span>(<span class="ident">width</span>),
             }
         } <span class="kw">else</span> {
             <span class="ident">BitvectorDomain::new_top</span>(<span class="ident">width</span>)
@@ -416,7 +417,7 @@
 <span class="kw">impl</span> <span class="ident">std::ops::Add</span> <span class="kw">for</span> <span class="ident">BitvectorDomain</span> {
     <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">BitvectorDomain</span>;
 
-    <span class="kw">fn</span> <span class="ident">add</span>(<span class="self">self</span>, <span class="ident">rhs</span>: <span class="self">Self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">add</span>(<span class="self">self</span>, <span class="ident">rhs</span>: <span class="self">Self</span>) -&gt; <span class="self">Self</span> {
         <span class="self">self</span>.<span class="ident">bin_op</span>(<span class="ident">BinOpType::IntAdd</span>, <span class="kw-2">&amp;</span><span class="ident">rhs</span>)
     }
 }
@@ -424,7 +425,7 @@
 <span class="kw">impl</span> <span class="ident">std::ops::Sub</span> <span class="kw">for</span> <span class="ident">BitvectorDomain</span> {
     <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">BitvectorDomain</span>;
 
-    <span class="kw">fn</span> <span class="ident">sub</span>(<span class="self">self</span>, <span class="ident">rhs</span>: <span class="self">Self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">sub</span>(<span class="self">self</span>, <span class="ident">rhs</span>: <span class="self">Self</span>) -&gt; <span class="self">Self</span> {
         <span class="self">self</span>.<span class="ident">bin_op</span>(<span class="ident">BinOpType::IntSub</span>, <span class="kw-2">&amp;</span><span class="ident">rhs</span>)
     }
 }
@@ -432,42 +433,42 @@
 <span class="kw">impl</span> <span class="ident">std::ops::Neg</span> <span class="kw">for</span> <span class="ident">BitvectorDomain</span> {
     <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">BitvectorDomain</span>;
 
-    <span class="kw">fn</span> <span class="ident">neg</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">neg</span>(<span class="self">self</span>) -&gt; <span class="self">Self</span> {
         <span class="self">self</span>.<span class="ident">un_op</span>(<span class="ident">UnOpType::Int2Comp</span>)
     }
 }
 
 <span class="kw">impl</span> <span class="ident">std::convert::From</span><span class="op">&lt;</span><span class="ident">Bitvector</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">BitvectorDomain</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">bitvector</span>: <span class="ident">Bitvector</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">BitvectorDomain</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">bitvector</span>: <span class="ident">Bitvector</span>) -&gt; <span class="ident">BitvectorDomain</span> {
         <span class="ident">BitvectorDomain::Value</span>(<span class="ident">bitvector</span>)
     }
 }
 
 <span class="kw">impl</span> <span class="ident">TryToBitvec</span> <span class="kw">for</span> <span class="ident">BitvectorDomain</span> {
     <span class="doccomment">/// If the domain represents an absoulute value, return it.</span>
-    <span class="kw">fn</span> <span class="ident">try_to_bitvec</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Bitvector</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">try_to_bitvec</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Bitvector</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
         <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">BitvectorDomain::Value</span>(<span class="ident">val</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="ident">val</span>.<span class="ident">clone</span>()),
-            <span class="ident">BitvectorDomain::Top</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="macro">anyhow!</span>(<span class="string">&quot;Value is Top&quot;</span>)),
+            <span class="ident">BitvectorDomain::Value</span>(<span class="ident">val</span>) =&gt; <span class="prelude-val">Ok</span>(<span class="ident">val</span>.<span class="ident">clone</span>()),
+            <span class="ident">BitvectorDomain::Top</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Err</span>(<span class="macro">anyhow!</span>(<span class="string">&quot;Value is Top&quot;</span>)),
         }
     }
 }
 
 <span class="kw">impl</span> <span class="ident">TryToInterval</span> <span class="kw">for</span> <span class="ident">BitvectorDomain</span> {
     <span class="doccomment">/// If the domain represents an absolute value, return it as an interval of length one.</span>
-    <span class="kw">fn</span> <span class="ident">try_to_interval</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Interval</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">try_to_interval</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Interval</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
         <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">BitvectorDomain::Value</span>(<span class="ident">val</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="ident">val</span>.<span class="ident">clone</span>().<span class="ident">into</span>()),
-            <span class="ident">BitvectorDomain::Top</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="macro">anyhow!</span>(<span class="string">&quot;Value is Top&quot;</span>)),
+            <span class="ident">BitvectorDomain::Value</span>(<span class="ident">val</span>) =&gt; <span class="prelude-val">Ok</span>(<span class="ident">val</span>.<span class="ident">clone</span>().<span class="ident">into</span>()),
+            <span class="ident">BitvectorDomain::Top</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Err</span>(<span class="macro">anyhow!</span>(<span class="string">&quot;Value is Top&quot;</span>)),
         }
     }
 }
 
 <span class="kw">impl</span> <span class="ident">std::fmt::Display</span> <span class="kw">for</span> <span class="ident">BitvectorDomain</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">formatter</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">std::fmt::Formatter</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">std::fmt::Result</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">formatter</span>: <span class="kw-2">&amp;mut</span> <span class="ident">std::fmt::Formatter</span>) -&gt; <span class="ident">std::fmt::Result</span> {
         <span class="kw">match</span> <span class="self">self</span> {
-            <span class="self">Self</span><span class="ident">::Top</span>(<span class="ident">bytesize</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write!</span>(<span class="ident">formatter</span>, <span class="string">&quot;Top:u{}&quot;</span>, <span class="ident">bytesize</span>.<span class="ident">as_bit_length</span>()),
-            <span class="self">Self</span><span class="ident">::Value</span>(<span class="ident">bitvector</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write!</span>(
+            <span class="ident"><span class="self">Self</span>::Top</span>(<span class="ident">bytesize</span>) =&gt; <span class="macro">write!</span>(<span class="ident">formatter</span>, <span class="string">&quot;Top:u{}&quot;</span>, <span class="ident">bytesize</span>.<span class="ident">as_bit_length</span>()),
+            <span class="ident"><span class="self">Self</span>::Value</span>(<span class="ident">bitvector</span>) =&gt; <span class="macro">write!</span>(
                 <span class="ident">formatter</span>,
                 <span class="string">&quot;0x{:016x}:u{:?}&quot;</span>,
                 <span class="ident">bitvector</span>,
@@ -481,7 +482,7 @@
 <span class="kw">mod</span> <span class="ident">tests</span> {
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 
-    <span class="kw">fn</span> <span class="ident">bv</span>(<span class="ident">value</span>: <span class="ident">i64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">BitvectorDomain</span> {
+    <span class="kw">fn</span> <span class="ident">bv</span>(<span class="ident">value</span>: <span class="ident">i64</span>) -&gt; <span class="ident">BitvectorDomain</span> {
         <span class="ident">BitvectorDomain::Value</span>(<span class="ident">Bitvector::from_i64</span>(<span class="ident">value</span>))
     }
 
@@ -590,6 +591,6 @@
         <span class="macro">assert_eq!</span>(<span class="ident">result</span>.<span class="ident">bytesize</span>(), <span class="ident">ByteSize::new</span>(<span class="number">1</span>));
     }
 }
-</pre></div>
-</section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="cwe_checker_lib" data-search-index-js="../../../search-index.js" data-search-js="../../../search.js"></div>
-    <script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script></body></html>
+</code></pre></div>
+</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="cwe_checker_lib" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.60.0 (7737e0b5c 2022-04-04)" ></div>
+</body></html>

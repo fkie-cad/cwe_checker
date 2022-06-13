@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["check_cwe","Run the check for CWE-416: Use After Free."]],"static":[["CWE_MODULE","The module name and version"]]});

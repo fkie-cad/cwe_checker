@@ -1,7 +1,9 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/checkers/cwe_560.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>cwe_560.rs - source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../favicon.svg">
-<link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../../cwe_checker_lib/index.html'><div class='logo-container rust-logo'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
-                <a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/checkers/cwe_560.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>cwe_560.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><script defer src="../../../main.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script>
+    <noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../cwe_checker_lib/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../../cwe_checker_lib/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../cwe_checker_lib/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><div class="theme-picker hidden"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="22" height="22" alt="Pick another theme!" src="../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
 <span id="4">  4</span>
@@ -139,15 +141,7 @@
 <span id="136">136</span>
 <span id="137">137</span>
 <span id="138">138</span>
-<span id="139">139</span>
-<span id="140">140</span>
-<span id="141">141</span>
-<span id="142">142</span>
-<span id="143">143</span>
-<span id="144">144</span>
-<span id="145">145</span>
-</pre><div class="example-wrap"><pre class="rust ">
-<span class="doccomment">//! This module implements a check for CWE-560: Use of umask() with chmod-style Argument.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! This module implements a check for CWE-560: Use of umask() with chmod-style Argument.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! The program uses the system call umask(2) with arguments for chmod(2). For instance,</span>
 <span class="doccomment">//! instead of a reasonable value like 0022 a value like 0666 is passed. This may result in wrong</span>
@@ -171,14 +165,13 @@
 <span class="doccomment">//! - If the input to umask is not defined in the basic block before the call, the check will not see it.</span>
 <span class="doccomment">//! However, a log message will be generated whenever the check is unable to determine the parameter value of umask.</span>
 
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::abstract_domain::TryToBitvec</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::analysis::pointer_inference::State</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::intermediate_representation</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::prelude</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::utils::binary::RuntimeMemoryImage</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::utils::log</span>::{<span class="ident">CweWarning</span>, <span class="ident">LogMessage</span>};
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::utils::symbol_utils</span>::{<span class="ident">get_callsites</span>, <span class="ident">get_symbol_map</span>};
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::CweModule</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::abstract_domain::TryToBitvec</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::analysis::pointer_inference::State</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::intermediate_representation</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::prelude</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::utils::log</span>::{<span class="ident">CweWarning</span>, <span class="ident">LogMessage</span>};
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::utils::symbol_utils</span>::{<span class="ident">get_callsites</span>, <span class="ident">get_symbol_map</span>};
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::CweModule</span>;
 
 <span class="doccomment">/// The module name and version</span>
 <span class="kw">pub</span> <span class="kw">static</span> <span class="ident">CWE_MODULE</span>: <span class="ident">CweModule</span> <span class="op">=</span> <span class="ident">CweModule</span> {
@@ -199,28 +192,26 @@
     <span class="ident">block</span>: <span class="kw-2">&amp;</span><span class="ident">Term</span><span class="op">&lt;</span><span class="ident">Blk</span><span class="op">&gt;</span>,
     <span class="ident">umask_symbol</span>: <span class="kw-2">&amp;</span><span class="ident">ExternSymbol</span>,
     <span class="ident">project</span>: <span class="kw-2">&amp;</span><span class="ident">Project</span>,
-    <span class="ident">global_memory</span>: <span class="kw-2">&amp;</span><span class="ident">RuntimeMemoryImage</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u64</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
+) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u64</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">stack_register</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">project</span>.<span class="ident">stack_pointer_register</span>;
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">state</span> <span class="op">=</span> <span class="ident">State::new</span>(<span class="ident">stack_register</span>, <span class="ident">block</span>.<span class="ident">tid</span>.<span class="ident">clone</span>());
 
     <span class="kw">for</span> <span class="ident">def</span> <span class="kw">in</span> <span class="ident">block</span>.<span class="ident">term</span>.<span class="ident">defs</span>.<span class="ident">iter</span>() {
         <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="ident">def</span>.<span class="ident">term</span> {
-            <span class="ident">Def::Store</span> { <span class="ident">address</span>, <span class="ident">value</span> } <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">state</span>.<span class="ident">handle_store</span>(<span class="ident">address</span>, <span class="ident">value</span>, <span class="ident">global_memory</span>);
+            <span class="ident">Def::Store</span> { <span class="ident">address</span>, <span class="ident">value</span> } =&gt; {
+                <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">state</span>.<span class="ident">handle_store</span>(<span class="ident">address</span>, <span class="ident">value</span>, <span class="kw-2">&amp;</span><span class="ident">project</span>.<span class="ident">runtime_memory_image</span>);
             }
-            <span class="ident">Def::Assign</span> { <span class="ident">var</span>, <span class="ident">value</span> } <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">Def::Assign</span> { <span class="ident">var</span>, <span class="ident">value</span> } =&gt; {
                 <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">state</span>.<span class="ident">handle_register_assign</span>(<span class="ident">var</span>, <span class="ident">value</span>);
             }
-            <span class="ident">Def::Load</span> { <span class="ident">var</span>, <span class="ident">address</span> } <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">state</span>.<span class="ident">handle_load</span>(<span class="ident">var</span>, <span class="ident">address</span>, <span class="ident">global_memory</span>);
+            <span class="ident">Def::Load</span> { <span class="ident">var</span>, <span class="ident">address</span> } =&gt; {
+                <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">state</span>.<span class="ident">handle_load</span>(<span class="ident">var</span>, <span class="ident">address</span>, <span class="kw-2">&amp;</span><span class="ident">project</span>.<span class="ident">runtime_memory_image</span>);
             }
         }
     }
 
     <span class="kw">let</span> <span class="ident">parameter</span> <span class="op">=</span> <span class="ident">umask_symbol</span>.<span class="ident">get_unique_parameter</span>()<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">param_value</span> <span class="op">=</span>
-        <span class="ident">state</span>.<span class="ident">eval_parameter_arg</span>(<span class="ident">parameter</span>, <span class="kw-2">&amp;</span><span class="ident">project</span>.<span class="ident">stack_pointer_register</span>, <span class="ident">global_memory</span>)<span class="question-mark">?</span>;
+    <span class="kw">let</span> <span class="ident">param_value</span> <span class="op">=</span> <span class="ident">state</span>.<span class="ident">eval_parameter_arg</span>(<span class="ident">parameter</span>, <span class="kw-2">&amp;</span><span class="ident">project</span>.<span class="ident">runtime_memory_image</span>)<span class="question-mark">?</span>;
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">umask_arg</span>) <span class="op">=</span> <span class="ident">param_value</span>.<span class="ident">try_to_bitvec</span>() {
         <span class="prelude-val">Ok</span>(<span class="ident">umask_arg</span>.<span class="ident">try_to_u64</span>()<span class="question-mark">?</span>)
     } <span class="kw">else</span> {
@@ -231,12 +222,12 @@
 <span class="doccomment">/// Is the given argument value considered to be a chmod-style argument?</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Note that `0o777` is not considered a chmod-style argument as it also denotes a usually correct umask argument.</span>
-<span class="kw">fn</span> <span class="ident">is_chmod_style_arg</span>(<span class="ident">arg</span>: <span class="ident">u64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+<span class="kw">fn</span> <span class="ident">is_chmod_style_arg</span>(<span class="ident">arg</span>: <span class="ident">u64</span>) -&gt; <span class="ident">bool</span> {
     <span class="ident">arg</span> <span class="op">&gt;</span> <span class="ident">UPPER_BOUND_CORRECT_UMASK_ARG_VALUE</span> <span class="op">&amp;&amp;</span> <span class="ident">arg</span> <span class="op">!</span><span class="op">=</span> <span class="ident">UPPER_BOUND_CORRECT_CHMOD_ARG_VALUE</span>
 }
 
 <span class="doccomment">/// Generate the CWE warning for a detected instance of the CWE.</span>
-<span class="kw">fn</span> <span class="ident">generate_cwe_warning</span>(<span class="ident">sub</span>: <span class="kw-2">&amp;</span><span class="ident">Term</span><span class="op">&lt;</span><span class="ident">Sub</span><span class="op">&gt;</span>, <span class="ident">jmp</span>: <span class="kw-2">&amp;</span><span class="ident">Term</span><span class="op">&lt;</span><span class="ident">Jmp</span><span class="op">&gt;</span>, <span class="ident">permission_const</span>: <span class="ident">u64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">CweWarning</span> {
+<span class="kw">fn</span> <span class="ident">generate_cwe_warning</span>(<span class="ident">sub</span>: <span class="kw-2">&amp;</span><span class="ident">Term</span><span class="op">&lt;</span><span class="ident">Sub</span><span class="op">&gt;</span>, <span class="ident">jmp</span>: <span class="kw-2">&amp;</span><span class="ident">Term</span><span class="op">&lt;</span><span class="ident">Jmp</span><span class="op">&gt;</span>, <span class="ident">permission_const</span>: <span class="ident">u64</span>) -&gt; <span class="ident">CweWarning</span> {
     <span class="ident">CweWarning::new</span>(<span class="ident">CWE_MODULE</span>.<span class="ident">name</span>, <span class="ident">CWE_MODULE</span>.<span class="ident">version</span>,
         <span class="macro">format!</span>(<span class="string">&quot;(Use of umask() with chmod-style Argument) Function {} calls umask with argument {:#o}&quot;</span>, <span class="ident">sub</span>.<span class="ident">term</span>.<span class="ident">name</span>, <span class="ident">permission_const</span>))
         .<span class="ident">tids</span>(<span class="macro">vec!</span>[<span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">jmp</span>.<span class="ident">tid</span>)])
@@ -257,26 +248,21 @@
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">check_cwe</span>(
     <span class="ident">analysis_results</span>: <span class="kw-2">&amp;</span><span class="ident">AnalysisResults</span>,
     <span class="ident">_cwe_params</span>: <span class="kw-2">&amp;</span><span class="ident">serde_json::Value</span>,
-) <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">LogMessage</span><span class="op">&gt;</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">CweWarning</span><span class="op">&gt;</span>) {
+) -&gt; (<span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">LogMessage</span><span class="op">&gt;</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">CweWarning</span><span class="op">&gt;</span>) {
     <span class="kw">let</span> <span class="ident">project</span> <span class="op">=</span> <span class="ident">analysis_results</span>.<span class="ident">project</span>;
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cwes</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">log_messages</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
     <span class="kw">let</span> <span class="ident">umask_symbol_map</span> <span class="op">=</span> <span class="ident">get_symbol_map</span>(<span class="ident">project</span>, <span class="kw-2">&amp;</span>[<span class="string">&quot;umask&quot;</span>.<span class="ident">to_string</span>()]);
     <span class="kw">if</span> <span class="op">!</span><span class="ident">umask_symbol_map</span>.<span class="ident">is_empty</span>() {
-        <span class="kw">for</span> <span class="ident">sub</span> <span class="kw">in</span> <span class="ident">project</span>.<span class="ident">program</span>.<span class="ident">term</span>.<span class="ident">subs</span>.<span class="ident">iter</span>() {
+        <span class="kw">for</span> <span class="ident">sub</span> <span class="kw">in</span> <span class="ident">project</span>.<span class="ident">program</span>.<span class="ident">term</span>.<span class="ident">subs</span>.<span class="ident">values</span>() {
             <span class="kw">for</span> (<span class="ident">block</span>, <span class="ident">jmp</span>, <span class="ident">umask_symbol</span>) <span class="kw">in</span> <span class="ident">get_callsites</span>(<span class="ident">sub</span>, <span class="kw-2">&amp;</span><span class="ident">umask_symbol_map</span>) {
-                <span class="kw">match</span> <span class="ident">get_umask_permission_arg</span>(
-                    <span class="ident">block</span>,
-                    <span class="ident">umask_symbol</span>,
-                    <span class="ident">project</span>,
-                    <span class="ident">analysis_results</span>.<span class="ident">runtime_memory_image</span>,
-                ) {
-                    <span class="prelude-val">Ok</span>(<span class="ident">permission_const</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw">match</span> <span class="ident">get_umask_permission_arg</span>(<span class="ident">block</span>, <span class="ident">umask_symbol</span>, <span class="ident">project</span>) {
+                    <span class="prelude-val">Ok</span>(<span class="ident">permission_const</span>) =&gt; {
                         <span class="kw">if</span> <span class="ident">is_chmod_style_arg</span>(<span class="ident">permission_const</span>) {
                             <span class="ident">cwes</span>.<span class="ident">push</span>(<span class="ident">generate_cwe_warning</span>(<span class="ident">sub</span>, <span class="ident">jmp</span>, <span class="ident">permission_const</span>));
                         }
                     }
-                    <span class="prelude-val">Err</span>(<span class="ident">err</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="prelude-val">Err</span>(<span class="ident">err</span>) =&gt; {
                         <span class="kw">let</span> <span class="ident">log</span> <span class="op">=</span> <span class="ident">LogMessage::new_info</span>(<span class="macro">format!</span>(
                             <span class="string">&quot;Could not determine umask argument: {}&quot;</span>,
                             <span class="ident">err</span>
@@ -290,8 +276,9 @@
         }
     }
 
+    <span class="ident">cwes</span>.<span class="ident">sort</span>();
     (<span class="ident">log_messages</span>, <span class="ident">cwes</span>)
 }
-</pre></div>
-</section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="cwe_checker_lib" data-search-index-js="../../../search-index.js" data-search-js="../../../search.js"></div>
-    <script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script></body></html>
+</code></pre></div>
+</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="cwe_checker_lib" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.60.0 (7737e0b5c 2022-04-04)" ></div>
+</body></html>

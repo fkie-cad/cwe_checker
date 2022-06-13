@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["RuntimeMemoryImage","A representation of the runtime image of a binary after being loaded into memory by the loader."]]});
+initSidebarItems({"fn":[["parse_hex_string_to_u64","A helper function to parse a hex string to an integer."]],"struct":[["BareMetalConfig","Contains all information parsed out of the bare metal configuration JSON file."],["MemorySegment","A continuous segment in the memory image."]]});

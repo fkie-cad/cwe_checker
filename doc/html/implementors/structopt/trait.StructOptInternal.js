@@ -1,3 +1,0 @@
-(function() {var implementors = {};
-implementors["cwe_checker"] = [{"text":"impl StructOptInternal for <a class=\"struct\" href=\"cwe_checker/struct.CmdlineArgs.html\" title=\"struct cwe_checker::CmdlineArgs\">CmdlineArgs</a>","synthetic":false,"types":["cwe_checker::CmdlineArgs"]}];
-if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

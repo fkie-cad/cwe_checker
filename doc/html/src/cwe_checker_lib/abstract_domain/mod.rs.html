@@ -1,7 +1,9 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/abstract_domain/mod.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mod.rs - source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../favicon.svg">
-<link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../../cwe_checker_lib/index.html'><div class='logo-container rust-logo'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
-                <a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/abstract_domain/mod.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mod.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><script defer src="../../../main.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script>
+    <noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../cwe_checker_lib/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../../cwe_checker_lib/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../cwe_checker_lib/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><div class="theme-picker hidden"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="22" height="22" alt="Pick another theme!" src="../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
 <span id="4">  4</span>
@@ -157,21 +159,30 @@
 <span id="154">154</span>
 <span id="155">155</span>
 <span id="156">156</span>
-</pre><div class="example-wrap"><pre class="rust ">
-<span class="doccomment">//! This module defines traits describing general properties of abstract domains</span>
+<span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
+<span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
+<span id="164">164</span>
+<span id="165">165</span>
+<span id="166">166</span>
+<span id="167">167</span>
+<span id="168">168</span>
+<span id="169">169</span>
+</pre><pre class="rust"><code><span class="doccomment">//! This module defines traits describing general properties of abstract domains</span>
 <span class="doccomment">//! as well as several abstract domain types implementing these traits.</span>
 
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::intermediate_representation</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::prelude</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::intermediate_representation</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::prelude</span>::<span class="kw-2">*</span>;
 
 <span class="kw">mod</span> <span class="ident">bitvector</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">bitvector</span>::<span class="kw-2">*</span>;
 
 <span class="kw">mod</span> <span class="ident">identifier</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">identifier</span>::<span class="kw-2">*</span>;
-
-<span class="kw">mod</span> <span class="ident">pointer</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">pointer</span>::<span class="kw-2">*</span>;
 
 <span class="kw">mod</span> <span class="ident">data</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">data</span>::<span class="kw-2">*</span>;
@@ -182,17 +193,30 @@
 <span class="kw">mod</span> <span class="ident">interval</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">interval</span>::<span class="kw-2">*</span>;
 
+<span class="kw">mod</span> <span class="ident">bricks</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">bricks</span>::<span class="kw-2">*</span>;
+
+<span class="kw">mod</span> <span class="ident">character_inclusion</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">character_inclusion</span>::<span class="kw-2">*</span>;
+
+<span class="kw">mod</span> <span class="ident">strings</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">strings</span>::<span class="kw-2">*</span>;
+
+<span class="kw">mod</span> <span class="ident">domain_map</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">domain_map</span>::<span class="kw-2">*</span>;
+
 <span class="doccomment">/// The main trait describing an abstract domain.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Each abstract domain is partially ordered.</span>
 <span class="doccomment">/// Abstract domains of the same type can be merged.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">AbstractDomain</span>: <span class="ident">Sized</span> <span class="op">+</span> <span class="ident">Eq</span> <span class="op">+</span> <span class="ident">Clone</span> {
     <span class="doccomment">/// Return an upper bound (with respect to the partial order on the domain) for the two inputs `self` and `other`.</span>
-    <span class="kw">fn</span> <span class="ident">merge</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span>;
+    <span class="attribute">#[<span class="ident">must_use</span>]</span>
+    <span class="kw">fn</span> <span class="ident">merge</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="self">Self</span>;
 
     <span class="doccomment">/// Returns whether the element represents the top element (i.e. maximal with respect to the partial order) or not.</span>
     <span class="doccomment">/// If a domain has no maximal element, this function should always return false.</span>
-    <span class="kw">fn</span> <span class="ident">is_top</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span>;
+    <span class="kw">fn</span> <span class="ident">is_top</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span>;
 }
 
 <span class="doccomment">/// A trait for types representing values with a fixed size (in bytes).</span>
@@ -202,11 +226,11 @@
 <span class="doccomment">/// since they lie in different posets (one for each bytesize).</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">SizedDomain</span> {
     <span class="doccomment">/// Return the size of the represented value in bytes.</span>
-    <span class="kw">fn</span> <span class="ident">bytesize</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ByteSize</span>;
+    <span class="kw">fn</span> <span class="ident">bytesize</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">ByteSize</span>;
 
     <span class="doccomment">/// Return a new top element with the given bytesize.</span>
     <span class="doccomment">/// The function is expected to panic if the type in question does not also implement the `HasTop` trait.</span>
-    <span class="kw">fn</span> <span class="ident">new_top</span>(<span class="ident">bytesize</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span>;
+    <span class="kw">fn</span> <span class="ident">new_top</span>(<span class="ident">bytesize</span>: <span class="ident">ByteSize</span>) -&gt; <span class="self">Self</span>;
 }
 
 <span class="doccomment">/// An abstract domain implementing this trait has a global maximum, i.e. a *Top* element.</span>
@@ -216,7 +240,7 @@
     <span class="doccomment">/// Since an abstract domain type may represent a whole family of abstract domains,</span>
     <span class="doccomment">/// this function takes an instance of the domain as a parameter,</span>
     <span class="doccomment">/// so it can return the *Top* element of the same family member that the provided instance belongs to.</span>
-    <span class="kw">fn</span> <span class="ident">top</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span>;
+    <span class="kw">fn</span> <span class="ident">top</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self</span>;
 }
 
 <span class="doccomment">/// A trait for abstract domains that can represent values loaded into CPU register.</span>
@@ -226,29 +250,29 @@
 <span class="doccomment">/// It has a *Top* element, which is only characterized by its bytesize.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">RegisterDomain</span>: <span class="ident">AbstractDomain</span> <span class="op">+</span> <span class="ident">SizedDomain</span> <span class="op">+</span> <span class="ident">HasTop</span> {
     <span class="doccomment">/// Compute the (abstract) result of a binary operation</span>
-    <span class="kw">fn</span> <span class="ident">bin_op</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">op</span>: <span class="ident">BinOpType</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span>;
+    <span class="kw">fn</span> <span class="ident">bin_op</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">op</span>: <span class="ident">BinOpType</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="self">Self</span>;
 
     <span class="doccomment">/// Compute the (abstract) result of a unary operation</span>
-    <span class="kw">fn</span> <span class="ident">un_op</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">op</span>: <span class="ident">UnOpType</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span>;
+    <span class="kw">fn</span> <span class="ident">un_op</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">op</span>: <span class="ident">UnOpType</span>) -&gt; <span class="self">Self</span>;
 
     <span class="doccomment">/// Extract a sub-bitvector</span>
-    <span class="kw">fn</span> <span class="ident">subpiece</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">low_byte</span>: <span class="ident">ByteSize</span>, <span class="ident">size</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span>;
+    <span class="kw">fn</span> <span class="ident">subpiece</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">low_byte</span>: <span class="ident">ByteSize</span>, <span class="ident">size</span>: <span class="ident">ByteSize</span>) -&gt; <span class="self">Self</span>;
 
     <span class="doccomment">/// Perform a typecast to extend a bitvector or to cast between integer and floating point types.</span>
-    <span class="kw">fn</span> <span class="ident">cast</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">kind</span>: <span class="ident">CastOpType</span>, <span class="ident">width</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span>;
+    <span class="kw">fn</span> <span class="ident">cast</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">kind</span>: <span class="ident">CastOpType</span>, <span class="ident">width</span>: <span class="ident">ByteSize</span>) -&gt; <span class="self">Self</span>;
 
     <span class="doccomment">/// Return the bytesize of the result of the given binary operation.</span>
     <span class="doccomment">/// Has a generic implementation that should not be overwritten!</span>
-    <span class="kw">fn</span> <span class="ident">bin_op_bytesize</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">op</span>: <span class="ident">BinOpType</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ByteSize</span> {
+    <span class="kw">fn</span> <span class="ident">bin_op_bytesize</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">op</span>: <span class="ident">BinOpType</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="ident">ByteSize</span> {
         <span class="kw">use</span> <span class="ident">BinOpType</span>::<span class="kw-2">*</span>;
         <span class="kw">match</span> <span class="ident">op</span> {
-            <span class="ident">Piece</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">bytesize</span>() <span class="op">+</span> <span class="ident">rhs</span>.<span class="ident">bytesize</span>(),
+            <span class="ident">Piece</span> =&gt; <span class="self">self</span>.<span class="ident">bytesize</span>() <span class="op">+</span> <span class="ident">rhs</span>.<span class="ident">bytesize</span>(),
             <span class="ident">IntAdd</span> <span class="op">|</span> <span class="ident">IntSub</span> <span class="op">|</span> <span class="ident">IntMult</span> <span class="op">|</span> <span class="ident">IntDiv</span> <span class="op">|</span> <span class="ident">IntSDiv</span> <span class="op">|</span> <span class="ident">IntRem</span> <span class="op">|</span> <span class="ident">IntSRem</span> <span class="op">|</span> <span class="ident">IntLeft</span>
             <span class="op">|</span> <span class="ident">IntRight</span> <span class="op">|</span> <span class="ident">IntSRight</span> <span class="op">|</span> <span class="ident">IntAnd</span> <span class="op">|</span> <span class="ident">IntOr</span> <span class="op">|</span> <span class="ident">IntXOr</span> <span class="op">|</span> <span class="ident">FloatAdd</span> <span class="op">|</span> <span class="ident">FloatSub</span> <span class="op">|</span> <span class="ident">FloatMult</span>
-            <span class="op">|</span> <span class="ident">FloatDiv</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">bytesize</span>(),
+            <span class="op">|</span> <span class="ident">FloatDiv</span> =&gt; <span class="self">self</span>.<span class="ident">bytesize</span>(),
             <span class="ident">IntEqual</span> <span class="op">|</span> <span class="ident">IntNotEqual</span> <span class="op">|</span> <span class="ident">IntLess</span> <span class="op">|</span> <span class="ident">IntLessEqual</span> <span class="op">|</span> <span class="ident">IntSLess</span> <span class="op">|</span> <span class="ident">IntSLessEqual</span>
             <span class="op">|</span> <span class="ident">IntCarry</span> <span class="op">|</span> <span class="ident">IntSCarry</span> <span class="op">|</span> <span class="ident">IntSBorrow</span> <span class="op">|</span> <span class="ident">BoolAnd</span> <span class="op">|</span> <span class="ident">BoolOr</span> <span class="op">|</span> <span class="ident">BoolXOr</span> <span class="op">|</span> <span class="ident">FloatEqual</span>
-            <span class="op">|</span> <span class="ident">FloatNotEqual</span> <span class="op">|</span> <span class="ident">FloatLess</span> <span class="op">|</span> <span class="ident">FloatLessEqual</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">ByteSize::new</span>(<span class="number">1</span>),
+            <span class="op">|</span> <span class="ident">FloatNotEqual</span> <span class="op">|</span> <span class="ident">FloatLess</span> <span class="op">|</span> <span class="ident">FloatLessEqual</span> =&gt; <span class="ident">ByteSize::new</span>(<span class="number">1</span>),
         }
     }
 }
@@ -257,12 +281,12 @@
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">TryToBitvec</span> {
     <span class="doccomment">/// If `self` represents a single absolute value, return it.</span>
     <span class="doccomment">/// In all other cases return an error.</span>
-    <span class="kw">fn</span> <span class="ident">try_to_bitvec</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Bitvector</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">try_to_bitvec</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Bitvector</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
 
     <span class="doccomment">/// If `self` represents a single absolute value, try to convert it to a signed integer and return it.</span>
     <span class="doccomment">/// Else return an error.</span>
     <span class="doccomment">/// Note that the conversion loses information about the bytesize of the value.</span>
-    <span class="kw">fn</span> <span class="ident">try_to_offset</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">i64</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">try_to_offset</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">i64</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
         <span class="prelude-val">Ok</span>(<span class="self">self</span>.<span class="ident">try_to_bitvec</span>()<span class="question-mark">?</span>.<span class="ident">try_to_i64</span>()<span class="question-mark">?</span>)
     }
 }
@@ -272,13 +296,13 @@
     <span class="doccomment">/// If `self` represents an interval of absolute values (or can be widened to represent such an interval)</span>
     <span class="doccomment">/// then return it if the interval is bounded.</span>
     <span class="doccomment">/// For unbounded (i.e. `Top`) intervals or if the abstract value does not represent absolute values return an error.</span>
-    <span class="kw">fn</span> <span class="ident">try_to_interval</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Interval</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">try_to_interval</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Interval</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
 
     <span class="doccomment">/// If `self` represents an interval of absolute values (or can be widened to represent such an interval)</span>
     <span class="doccomment">/// then return it as an interval of signed integers if the interval is bounded.</span>
     <span class="doccomment">/// Else return an error.</span>
     <span class="doccomment">/// Note that the conversion loses information about the bytesize of the values contained in the interval.</span>
-    <span class="kw">fn</span> <span class="ident">try_to_offset_interval</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">i64</span>, <span class="ident">i64</span>), <span class="ident">Error</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">try_to_offset_interval</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">i64</span>, <span class="ident">i64</span>), <span class="ident">Error</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">interval</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">try_to_interval</span>()<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>((<span class="ident">interval</span>.<span class="ident">start</span>.<span class="ident">try_to_i64</span>()<span class="question-mark">?</span>, <span class="ident">interval</span>.<span class="ident">end</span>.<span class="ident">try_to_i64</span>()<span class="question-mark">?</span>))
     }
@@ -293,27 +317,30 @@
     <span class="doccomment">/// Return the restriction of `self` to values satisfying `self &lt;= bound`</span>
     <span class="doccomment">/// with `self` and `bound` interpreted as signed integers.</span>
     <span class="doccomment">/// Returns an error if no value represented by `self` can satisfy the comparison.</span>
-    <span class="kw">fn</span> <span class="ident">add_signed_less_equal_bound</span>(<span class="self">self</span>, <span class="ident">bound</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">add_signed_less_equal_bound</span>(<span class="self">self</span>, <span class="ident">bound</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
 
     <span class="doccomment">/// Return the restriction of `self` to values satisfying `self &lt;= bound`</span>
     <span class="doccomment">/// with `self` and `bound` interpreted as unsigned integers.</span>
     <span class="doccomment">/// Returns an error if no value represented by `self` can satisfy the comparison.</span>
-    <span class="kw">fn</span> <span class="ident">add_unsigned_less_equal_bound</span>(<span class="self">self</span>, <span class="ident">bound</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">add_unsigned_less_equal_bound</span>(<span class="self">self</span>, <span class="ident">bound</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
 
     <span class="doccomment">/// Return the restriction of `self` to values satisfying `self &gt;= bound`</span>
     <span class="doccomment">/// with `self` and `bound` interpreted as signed integers.</span>
     <span class="doccomment">/// Returns an error if no value represented by `self` can satisfy the comparison.</span>
-    <span class="kw">fn</span> <span class="ident">add_signed_greater_equal_bound</span>(<span class="self">self</span>, <span class="ident">bound</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">add_signed_greater_equal_bound</span>(<span class="self">self</span>, <span class="ident">bound</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
 
     <span class="doccomment">/// Return the restriction of `self` to values satisfying `self &gt;= bound`</span>
     <span class="doccomment">/// with `self` and `bound` interpreted as unsigned integers.</span>
     <span class="doccomment">/// Returns an error if no value represented by `self` can satisfy the comparison.</span>
-    <span class="kw">fn</span> <span class="ident">add_unsigned_greater_equal_bound</span>(<span class="self">self</span>, <span class="ident">bound</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">add_unsigned_greater_equal_bound</span>(<span class="self">self</span>, <span class="ident">bound</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
 
     <span class="doccomment">/// Return the restriction of `self` to values satisfying `self != bound`</span>
     <span class="doccomment">/// Returns an error if `self` only represents one value for which `self == bound` holds.</span>
-    <span class="kw">fn</span> <span class="ident">add_not_equal_bound</span>(<span class="self">self</span>, <span class="ident">bound</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">add_not_equal_bound</span>(<span class="self">self</span>, <span class="ident">bound</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
+
+    <span class="doccomment">/// Return the intersection of two values or an error if the intersection is empty.</span>
+    <span class="kw">fn</span> <span class="ident">intersect</span>(<span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
 }
-</pre></div>
-</section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="cwe_checker_lib" data-search-index-js="../../../search-index.js" data-search-js="../../../search.js"></div>
-    <script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script></body></html>
+</code></pre></div>
+</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="cwe_checker_lib" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.60.0 (7737e0b5c 2022-04-04)" ></div>
+</body></html>

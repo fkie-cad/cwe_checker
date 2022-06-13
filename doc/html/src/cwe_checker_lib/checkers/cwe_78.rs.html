@@ -1,7 +1,9 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/checkers/cwe_78.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>cwe_78.rs - source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../favicon.svg">
-<link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../../cwe_checker_lib/index.html'><div class='logo-container rust-logo'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
-                <a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/checkers/cwe_78.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>cwe_78.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><script defer src="../../../main.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script>
+    <noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../cwe_checker_lib/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../../cwe_checker_lib/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../cwe_checker_lib/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><div class="theme-picker hidden"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="22" height="22" alt="Pick another theme!" src="../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
 <span id="4">  4</span>
@@ -257,57 +259,7 @@
 <span id="254">254</span>
 <span id="255">255</span>
 <span id="256">256</span>
-<span id="257">257</span>
-<span id="258">258</span>
-<span id="259">259</span>
-<span id="260">260</span>
-<span id="261">261</span>
-<span id="262">262</span>
-<span id="263">263</span>
-<span id="264">264</span>
-<span id="265">265</span>
-<span id="266">266</span>
-<span id="267">267</span>
-<span id="268">268</span>
-<span id="269">269</span>
-<span id="270">270</span>
-<span id="271">271</span>
-<span id="272">272</span>
-<span id="273">273</span>
-<span id="274">274</span>
-<span id="275">275</span>
-<span id="276">276</span>
-<span id="277">277</span>
-<span id="278">278</span>
-<span id="279">279</span>
-<span id="280">280</span>
-<span id="281">281</span>
-<span id="282">282</span>
-<span id="283">283</span>
-<span id="284">284</span>
-<span id="285">285</span>
-<span id="286">286</span>
-<span id="287">287</span>
-<span id="288">288</span>
-<span id="289">289</span>
-<span id="290">290</span>
-<span id="291">291</span>
-<span id="292">292</span>
-<span id="293">293</span>
-<span id="294">294</span>
-<span id="295">295</span>
-<span id="296">296</span>
-<span id="297">297</span>
-<span id="298">298</span>
-<span id="299">299</span>
-<span id="300">300</span>
-<span id="301">301</span>
-<span id="302">302</span>
-<span id="303">303</span>
-<span id="304">304</span>
-<span id="305">305</span>
-</pre><div class="example-wrap"><pre class="rust ">
-<span class="doccomment">//! This module implements a check for CWE-78: Improper Neutralization of Special Elements used in an OS Command (&#39;OS Command Injection&#39;).</span>
+</pre><pre class="rust"><code><span class="doccomment">//! This module implements a check for CWE-78: Improper Neutralization of Special Elements used in an OS Command (&#39;OS Command Injection&#39;).</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! The software constructs all or part of an OS command using externally-influenced input from an upstream component,</span>
 <span class="doccomment">//! but it does not neutralize or incorrectly neutralizes special elements that could modify the intended OS command</span>
@@ -317,28 +269,18 @@
 <span class="doccomment">//!</span>
 <span class="doccomment">//! ## How the check works</span>
 <span class="doccomment">//!</span>
-<span class="doccomment">//! Using backward dataflow analysis we search for an executation path from a system call parameter (string) to an user input</span>
-<span class="doccomment">//! to identify possible command injections.</span>
+<span class="doccomment">//! The check depends entirely on the string abstraction analysis that is run beforehand.</span>
+<span class="doccomment">//! The string abstraction uses a forward fixpoint analysis to determine potential strings at all</span>
+<span class="doccomment">//! nodes in the CFG. More detailed information about the string abstraction can be found in the</span>
+<span class="doccomment">//! corresponding files.</span>
 <span class="doccomment">//!</span>
-<span class="doccomment">//! To find relevant string related functions, such as sprintf, it is assumed that the first input parameter points</span>
-<span class="doccomment">//! to the memory position that will be used as the return location. (e.g. char *strcat(char *dest, const char *src)</span>
-<span class="doccomment">//! where &#39;char *dest&#39; will contain the return value)</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! For instance:</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ```txt</span>
-<span class="doccomment">//! MOV RAX, qword ptr [RBP + local_10]</span>
-<span class="doccomment">//! MOV RDI, RAX                        // RDI is the first input parameter for the strcat call and it points to [RBP + local_10]</span>
-<span class="doccomment">//! CALL strcat</span>
-<span class="doccomment">//! MOV RAX, qword ptr [RBP + local_10] // In the backwards analysis [RBP + local_10] will be tainted and it contains the return value</span>
-<span class="doccomment">//! ```</span>
+<span class="doccomment">//! The BricksDomain, a string abstract domain defining a string as a sequence of substring sets (bricks)</span>
+<span class="doccomment">//! is used for this check. As it considers the order of characters, it can be further used for a manual</span>
+<span class="doccomment">//! post analysis of the commands given to system calls.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! ### Symbols configurable in config.json</span>
 <span class="doccomment">//!</span>
-<span class="doccomment">//! The symbols are the functions which</span>
-<span class="doccomment">//!   1. make system calls (e.g. system)</span>
-<span class="doccomment">//!   2. manipulate strings (e.g. sprintf, strcat, memcpy, etc.)</span>
-<span class="doccomment">//!   3. take user input (e.g. scanf)</span>
+<span class="doccomment">//! The system calls considered in this check can be configured in the config.json.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! ## False Positives</span>
 <span class="doccomment">//!</span>
@@ -347,32 +289,31 @@
 <span class="doccomment">//!</span>
 <span class="doccomment">//! ## False Negatives</span>
 <span class="doccomment">//!</span>
-<span class="doccomment">//! - Missing Taints due to lost track of pointer targets</span>
-<span class="doccomment">//! - Non tracked function parameters cause incomplete taints that could miss possible dangerous inputs</span>
+<span class="doccomment">//! - Missing substrings due to lost track of pointer targets</span>
+<span class="doccomment">//! - Non tracked function parameters cause incomplete strings that could miss possible dangerous inputs</span>
 
-<span class="kw">use</span> <span class="ident">std::collections</span>::{<span class="ident">HashMap</span>, <span class="ident">HashSet</span>};
+<span class="kw">use</span> <span class="ident">petgraph::visit::EdgeRef</span>;
 
-<span class="kw">use</span> <span class="kw">crate</span>::{
-    <span class="ident">analysis</span>::{
-        <span class="ident">backward_interprocedural_fixpoint</span>::{<span class="ident">create_computation</span>, <span class="ident">Context</span> <span class="kw">as</span> <span class="kw">_</span>},
-        <span class="ident">graph</span>::{<span class="self">self</span>, <span class="ident">Edge</span>, <span class="ident">Node</span>},
-        <span class="ident">interprocedural_fixpoint_generic::NodeValue</span>,
-    },
-    <span class="ident">intermediate_representation</span>::{<span class="ident">ExternSymbol</span>, <span class="ident">Jmp</span>, <span class="ident">Project</span>, <span class="ident">Sub</span>},
-    <span class="ident">prelude</span>::<span class="kw-2">*</span>,
-    <span class="ident">utils::log</span>::{<span class="ident">CweWarning</span>, <span class="ident">LogMessage</span>},
-    <span class="ident">AnalysisResults</span>, <span class="ident">CweModule</span>,
-};
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::CweModule</span>;
 
-<span class="kw">use</span> <span class="ident">petgraph</span>::{
-    <span class="ident">graph::NodeIndex</span>,
-    <span class="ident">visit</span>::{<span class="ident">EdgeRef</span>, <span class="ident">IntoNodeReferences</span>},
-};
-<span class="kw">mod</span> <span class="ident">state</span>;
-<span class="kw">use</span> <span class="ident">state</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::abstract_domain::BricksDomain</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::abstract_domain::TryToBitvec</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::analysis::graph::Edge</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::analysis::pointer_inference::State</span> <span class="kw">as</span> <span class="ident">PointerInferenceState</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::analysis::string_abstraction::context::Context</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::analysis::string_abstraction::state::State</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::intermediate_representation::Arg</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::intermediate_representation::Expression</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::intermediate_representation::ExternSymbol</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::intermediate_representation::Jmp</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::intermediate_representation::RuntimeMemoryImage</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::intermediate_representation::Sub</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::prelude</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::utils::log::CweWarning</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::utils::log::LogMessage</span>;
 
-<span class="kw">mod</span> <span class="ident">context</span>;
-<span class="kw">use</span> <span class="ident">context</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident">std::collections::BTreeMap</span>;
+<span class="kw">use</span> <span class="ident">std::fmt::Debug</span>;
 
 <span class="doccomment">/// The module name and version</span>
 <span class="kw">pub</span> <span class="kw">static</span> <span class="ident">CWE_MODULE</span>: <span class="ident">CweModule</span> <span class="op">=</span> <span class="ident">CweModule</span> {
@@ -386,82 +327,62 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Config</span> {
     <span class="doccomment">/// The names of the system call symbols</span>
     <span class="ident">system_symbols</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The names of the string manipulating symbols</span>
-    <span class="ident">string_symbols</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The names of the user input symbols</span>
-    <span class="ident">user_input_symbols</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Contains the index of the format string parameter</span>
-    <span class="doccomment">/// for external symbols.</span>
-    <span class="ident">format_string_index</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">usize</span><span class="op">&gt;</span>,
 }
 
-<span class="doccomment">/// This check searches for system calls and sets their parameters as taint source if available.</span>
-<span class="doccomment">/// Then the fixpoint computation is executed and its result may generate cwe warnings if</span>
-<span class="doccomment">/// the parameters can be tracked back to user inputs</span>
+<span class="doccomment">/// This check checks the string parameter at system calls given by the string abstraction analysis</span>
+<span class="doccomment">/// to find potential OS Command Injection vulnerabilities.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">check_cwe</span>(
     <span class="ident">analysis_results</span>: <span class="kw-2">&amp;</span><span class="ident">AnalysisResults</span>,
     <span class="ident">cwe_params</span>: <span class="kw-2">&amp;</span><span class="ident">serde_json::Value</span>,
-) <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">LogMessage</span><span class="op">&gt;</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">CweWarning</span><span class="op">&gt;</span>) {
-    <span class="kw">let</span> <span class="ident">project</span> <span class="op">=</span> <span class="ident">analysis_results</span>.<span class="ident">project</span>;
-    <span class="kw">let</span> <span class="ident">pointer_inference_results</span> <span class="op">=</span> <span class="ident">analysis_results</span>.<span class="ident">pointer_inference</span>.<span class="ident">unwrap</span>();
-
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cwe_78_graph</span> <span class="op">=</span> <span class="ident">analysis_results</span>.<span class="ident">control_flow_graph</span>.<span class="ident">clone</span>();
-    <span class="ident">cwe_78_graph</span>.<span class="ident">reverse</span>();
-
-    <span class="kw">let</span> (<span class="ident">cwe_sender</span>, <span class="ident">cwe_receiver</span>) <span class="op">=</span> <span class="ident">crossbeam_channel::unbounded</span>();
-
+) -&gt; (<span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">LogMessage</span><span class="op">&gt;</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">CweWarning</span><span class="op">&gt;</span>) {
     <span class="kw">let</span> <span class="ident">config</span>: <span class="ident">Config</span> <span class="op">=</span> <span class="ident">serde_json::from_value</span>(<span class="ident">cwe_params</span>.<span class="ident">clone</span>()).<span class="ident">unwrap</span>();
-    <span class="kw">let</span> <span class="ident">system_symbols</span> <span class="op">=</span>
-        <span class="kw">crate</span><span class="ident">::utils::symbol_utils::get_symbol_map</span>(<span class="ident">project</span>, <span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">system_symbols</span>[..]);
+    <span class="kw">let</span> (<span class="ident">cwe_sender</span>, <span class="ident">cwe_receiver</span>): (
+        <span class="ident">crossbeam_channel::Sender</span><span class="op">&lt;</span><span class="ident">CweWarning</span><span class="op">&gt;</span>,
+        <span class="ident">crossbeam_channel::Receiver</span><span class="op">&lt;</span><span class="ident">CweWarning</span><span class="op">&gt;</span>,
+    ) <span class="op">=</span> <span class="ident">crossbeam_channel::unbounded</span>();
+    <span class="kw">let</span> (<span class="ident">log_sender</span>, <span class="ident">log_receiver</span>): (
+        <span class="ident">crossbeam_channel::Sender</span><span class="op">&lt;</span><span class="ident">LogMessage</span><span class="op">&gt;</span>,
+        <span class="ident">crossbeam_channel::Receiver</span><span class="op">&lt;</span><span class="ident">LogMessage</span><span class="op">&gt;</span>,
+    ) <span class="op">=</span> <span class="ident">crossbeam_channel::unbounded</span>();
+    <span class="kw">let</span> <span class="ident">string_abstraction</span> <span class="op">=</span> <span class="ident">analysis_results</span>.<span class="ident">string_abstraction</span>.<span class="ident">unwrap</span>();
 
-    <span class="kw">let</span> <span class="ident">symbol_maps</span>: <span class="ident">SymbolMaps</span> <span class="op">=</span> <span class="ident">SymbolMaps::new</span>(<span class="ident">project</span>, <span class="kw-2">&amp;</span><span class="ident">config</span>);
-    <span class="kw">let</span> <span class="ident">block_maps</span> <span class="op">=</span> <span class="ident">BlockMaps::new</span>(<span class="ident">analysis_results</span>);
+    <span class="kw">let</span> <span class="ident">system_symbol</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">Tid</span>, <span class="ident">ExternSymbol</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="ident">string_abstraction</span>
+        .<span class="ident">get_context</span>()
+        .<span class="ident">project</span>
+        .<span class="ident">program</span>
+        .<span class="ident">term</span>
+        .<span class="ident">extern_symbols</span>
+        .<span class="ident">clone</span>()
+        .<span class="ident">into_iter</span>()
+        .<span class="ident">find</span>(<span class="op">|</span>(<span class="kw">_</span>, <span class="ident">symbol</span>)<span class="op">|</span> <span class="ident">config</span>.<span class="ident">system_symbols</span>.<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">symbol</span>.<span class="ident">name</span>));
+    <span class="kw">let</span> <span class="ident">string_graph</span> <span class="op">=</span> <span class="ident">string_abstraction</span>.<span class="ident">get_graph</span>();
 
-    <span class="kw">let</span> <span class="ident">general_context</span> <span class="op">=</span> <span class="ident">Context::new</span>(
-        <span class="ident">project</span>,
-        <span class="ident">analysis_results</span>.<span class="ident">runtime_memory_image</span>,
-        <span class="ident">std::sync::Arc::new</span>(<span class="ident">cwe_78_graph</span>),
-        <span class="ident">pointer_inference_results</span>,
-        <span class="ident">std::sync::Arc::new</span>(<span class="ident">symbol_maps</span>),
-        <span class="ident">std::sync::Arc::new</span>(<span class="ident">block_maps</span>),
-        <span class="ident">cwe_sender</span>,
-    );
-
-    <span class="kw">let</span> <span class="ident">entry_sub_to_entry_node_map</span> <span class="op">=</span> <span class="ident">get_entry_sub_to_entry_node_map</span>(<span class="ident">project</span>, <span class="kw-2">&amp;</span><span class="ident">general_context</span>);
-
-    <span class="kw">for</span> <span class="ident">edge</span> <span class="kw">in</span> <span class="ident">general_context</span>.<span class="ident">get_pi_graph</span>().<span class="ident">edge_references</span>() {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="ident">Edge::ExternCallStub</span>(<span class="ident">jmp</span>) <span class="op">=</span> <span class="ident">edge</span>.<span class="ident">weight</span>() {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="ident">Jmp::Call</span> { <span class="ident">target</span>, .. } <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">jmp</span>.<span class="ident">term</span> {
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">symbol</span>) <span class="op">=</span> <span class="ident">system_symbols</span>.<span class="ident">get</span>(<span class="ident">target</span>) {
-                    <span class="kw">let</span> <span class="ident">node</span> <span class="op">=</span> <span class="ident">edge</span>.<span class="ident">source</span>();
-                    <span class="kw">let</span> <span class="ident">current_sub</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">general_context</span>.<span class="ident">get_pi_graph</span>()[<span class="ident">node</span>] {
-                        <span class="ident">Node::BlkEnd</span>(<span class="ident">_blk</span>, <span class="ident">sub</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">sub</span>,
-                        <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic!</span>(),
-                    };
-                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">context</span> <span class="op">=</span> <span class="ident">general_context</span>.<span class="ident">clone</span>();
-                    <span class="ident">context</span>.<span class="ident">set_taint_source</span>(<span class="ident">jmp</span>, <span class="kw-2">&amp;</span><span class="ident">symbol</span>.<span class="ident">name</span>, <span class="ident">current_sub</span>);
-                    <span class="kw">let</span> <span class="ident">pi_state_at_taint_source</span> <span class="op">=</span>
-                        <span class="kw">match</span> <span class="ident">pointer_inference_results</span>.<span class="ident">get_node_value</span>(<span class="ident">node</span>) {
-                            <span class="prelude-val">Some</span>(<span class="ident">NodeValue::Value</span>(<span class="ident">val</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Some</span>(<span class="ident">val</span>.<span class="ident">clone</span>()),
-                            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">None</span>,
-                        };
-                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">computation</span> <span class="op">=</span> <span class="ident">create_computation</span>(<span class="ident">context</span>.<span class="ident">clone</span>(), <span class="prelude-val">None</span>);
-                    <span class="ident">computation</span>.<span class="ident">set_node_value</span>(
-                        <span class="ident">node</span>,
-                        <span class="ident">NodeValue::Value</span>(<span class="ident">State::new</span>(
-                            <span class="ident">symbol</span>,
-                            <span class="kw-2">&amp;</span><span class="ident">project</span>.<span class="ident">stack_pointer_register</span>,
-                            <span class="ident">pi_state_at_taint_source</span>.<span class="ident">as_ref</span>(),
-                            <span class="ident">current_sub</span>,
-                        )),
-                    );
-                    <span class="ident">computation</span>.<span class="ident">compute_with_max_steps</span>(<span class="number">100</span>);
-
-                    <span class="kw">for</span> (<span class="ident">sub_name</span>, <span class="ident">node_index</span>) <span class="kw">in</span> <span class="ident">entry_sub_to_entry_node_map</span>.<span class="ident">iter</span>() {
-                        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">node_weight</span>) <span class="op">=</span> <span class="ident">computation</span>.<span class="ident">get_node_value</span>(<span class="kw-2">*</span><span class="ident">node_index</span>) {
-                            <span class="kw">let</span> <span class="ident">state</span> <span class="op">=</span> <span class="ident">node_weight</span>.<span class="ident">unwrap_value</span>();
-                            <span class="kw">if</span> <span class="op">!</span><span class="ident">state</span>.<span class="ident">is_empty</span>() {
-                                <span class="ident">context</span>.<span class="ident">generate_cwe_warning</span>(<span class="ident">sub_name</span>);
+    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="kw">_</span>, <span class="ident">system</span>)) <span class="op">=</span> <span class="ident">system_symbol</span> {
+        <span class="kw">for</span> <span class="ident">edge</span> <span class="kw">in</span> <span class="ident">string_graph</span>.<span class="ident">edge_references</span>() {
+            <span class="kw">if</span> <span class="kw">let</span> <span class="ident">Edge::ExternCallStub</span>(<span class="ident">jmp</span>) <span class="op">=</span> <span class="ident">edge</span>.<span class="ident">weight</span>() {
+                <span class="kw">if</span> <span class="kw">let</span> <span class="ident">Jmp::Call</span> { <span class="ident">target</span>, .. } <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">jmp</span>.<span class="ident">term</span> {
+                    <span class="kw">if</span> <span class="ident">system</span>.<span class="ident">tid</span> <span class="op">==</span> <span class="kw-2">*</span><span class="ident">target</span> {
+                        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">source_node</span>) <span class="op">=</span> <span class="ident">string_abstraction</span>.<span class="ident">get_node_value</span>(<span class="ident">edge</span>.<span class="ident">source</span>())
+                        {
+                            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">pi_node</span>) <span class="op">=</span> <span class="ident">analysis_results</span>
+                                .<span class="ident">pointer_inference</span>
+                                .<span class="ident">unwrap</span>()
+                                .<span class="ident">get_node_value</span>(<span class="ident">edge</span>.<span class="ident">source</span>())
+                            {
+                                <span class="kw">let</span> <span class="ident">pi_state</span> <span class="op">=</span> <span class="ident">pi_node</span>.<span class="ident">unwrap_value</span>();
+                                <span class="kw">let</span> <span class="ident">source_state</span> <span class="op">=</span> <span class="ident">source_node</span>.<span class="ident">unwrap_value</span>();
+                                <span class="ident">check_system_call_parameter</span>(
+                                    <span class="ident">source_state</span>,
+                                    <span class="ident">pi_state</span>,
+                                    <span class="kw-2">&amp;</span><span class="ident">system</span>,
+                                    <span class="kw-2">&amp;</span><span class="ident">jmp</span>.<span class="ident">tid</span>,
+                                    <span class="kw-2">&amp;</span><span class="ident">cwe_sender</span>,
+                                    <span class="kw-2">&amp;</span><span class="ident">log_sender</span>,
+                                    <span class="kw-2">&amp;</span><span class="ident">string_abstraction</span>
+                                        .<span class="ident">get_context</span>()
+                                        .<span class="ident">project</span>
+                                        .<span class="ident">runtime_memory_image</span>,
+                                )
                             }
                         }
                     }
@@ -470,148 +391,130 @@
         }
     }
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cwe_warnings</span> <span class="op">=</span> <span class="ident">HashMap::new</span>();
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cwe_warnings</span> <span class="op">=</span> <span class="ident">BTreeMap::new</span>();
     <span class="kw">for</span> <span class="ident">cwe</span> <span class="kw">in</span> <span class="ident">cwe_receiver</span>.<span class="ident">try_iter</span>() {
         <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="ident">cwe</span>.<span class="ident">addresses</span>[..] {
-            [<span class="ident">taint_source_address</span>, ..] <span class="op">=</span><span class="op">&gt;</span> <span class="ident">cwe_warnings</span>.<span class="ident">insert</span>(<span class="ident">taint_source_address</span>.<span class="ident">clone</span>(), <span class="ident">cwe</span>),
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic!</span>(),
+            [<span class="ident">taint_source_address</span>, ..] =&gt; <span class="ident">cwe_warnings</span>.<span class="ident">insert</span>(<span class="ident">taint_source_address</span>.<span class="ident">clone</span>(), <span class="ident">cwe</span>),
+            <span class="kw">_</span> =&gt; <span class="macro">panic!</span>(),
         };
     }
+
     <span class="kw">let</span> <span class="ident">cwe_warnings</span> <span class="op">=</span> <span class="ident">cwe_warnings</span>.<span class="ident">into_iter</span>().<span class="ident">map</span>(<span class="op">|</span>(<span class="kw">_</span>, <span class="ident">cwe</span>)<span class="op">|</span> <span class="ident">cwe</span>).<span class="ident">collect</span>();
+    <span class="kw">let</span> <span class="ident">log_messages</span> <span class="op">=</span> <span class="ident">log_receiver</span>.<span class="ident">try_iter</span>().<span class="ident">collect</span>();
 
-    (<span class="ident">Vec::new</span>(), <span class="ident">cwe_warnings</span>)
+    (<span class="ident">log_messages</span>, <span class="ident">cwe_warnings</span>)
 }
 
-<span class="doccomment">/// Returns a map from subroutine names to their corresponding start node index</span>
-<span class="kw">fn</span> <span class="ident">get_entry_sub_to_entry_node_map</span>(
-    <span class="ident">project</span>: <span class="kw-2">&amp;</span><span class="ident">Project</span>,
-    <span class="ident">context</span>: <span class="kw-2">&amp;</span><span class="ident">Context</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">NodeIndex</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">entry_sub_to_entry_blocks_map</span> <span class="op">=</span> <span class="ident">HashMap::new</span>();
-    <span class="kw">let</span> <span class="ident">subs</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">Tid</span>, <span class="kw-2">&amp;</span><span class="ident">Term</span><span class="op">&lt;</span><span class="ident">Sub</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">project</span>
-        .<span class="ident">program</span>
-        .<span class="ident">term</span>
-        .<span class="ident">subs</span>
-        .<span class="ident">iter</span>()
-        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">sub</span><span class="op">|</span> (<span class="ident">sub</span>.<span class="ident">tid</span>.<span class="ident">clone</span>(), <span class="ident">sub</span>))
-        .<span class="ident">collect</span>();
-
-    <span class="kw">for</span> <span class="ident">sub_tid</span> <span class="kw">in</span> <span class="ident">project</span>.<span class="ident">program</span>.<span class="ident">term</span>.<span class="ident">entry_points</span>.<span class="ident">iter</span>() {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">sub</span>) <span class="op">=</span> <span class="ident">subs</span>.<span class="ident">get</span>(<span class="ident">sub_tid</span>) {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">entry_block</span>) <span class="op">=</span> <span class="ident">sub</span>.<span class="ident">term</span>.<span class="ident">blocks</span>.<span class="ident">get</span>(<span class="number">0</span>) {
-                <span class="ident">entry_sub_to_entry_blocks_map</span>.<span class="ident">insert</span>(
-                    (<span class="ident">sub_tid</span>.<span class="ident">clone</span>(), <span class="ident">sub</span>.<span class="ident">term</span>.<span class="ident">name</span>.<span class="ident">clone</span>()),
-                    <span class="ident">entry_block</span>.<span class="ident">tid</span>.<span class="ident">clone</span>(),
-                );
-            }
-        }
-    }
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tid_to_graph_indices_map</span> <span class="op">=</span> <span class="ident">HashMap::new</span>();
-    <span class="kw">for</span> <span class="ident">node</span> <span class="kw">in</span> <span class="ident">context</span>.<span class="ident">get_graph</span>().<span class="ident">node_indices</span>() {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="ident">graph::Node::BlkStart</span>(<span class="ident">block</span>, <span class="ident">sub</span>) <span class="op">=</span> <span class="ident">context</span>.<span class="ident">get_graph</span>()[<span class="ident">node</span>] {
-            <span class="ident">tid_to_graph_indices_map</span>.<span class="ident">insert</span>((<span class="ident">block</span>.<span class="ident">tid</span>.<span class="ident">clone</span>(), <span class="ident">sub</span>.<span class="ident">tid</span>.<span class="ident">clone</span>()), <span class="ident">node</span>);
-        }
-    }
-    <span class="ident">entry_sub_to_entry_blocks_map</span>
-        .<span class="ident">into_iter</span>()
-        .<span class="ident">filter_map</span>(<span class="op">|</span>((<span class="ident">sub_tid</span>, <span class="ident">name</span>), <span class="ident">block_tid</span>)<span class="op">|</span> {
-            <span class="ident">tid_to_graph_indices_map</span>
-                .<span class="ident">get</span>(<span class="kw-2">&amp;</span>(<span class="ident">block_tid</span>, <span class="ident">sub_tid</span>))
-                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">start_node_index</span><span class="op">|</span> (<span class="ident">name</span>, <span class="kw-2">*</span><span class="ident">start_node_index</span>))
-        })
-        .<span class="ident">collect</span>()
-}
-
-<span class="doccomment">/// - string_symbols:</span>
-<span class="doccomment">///     - Maps the TID of an extern string related symbol to the corresponding extern symbol struct.</span>
-<span class="doccomment">/// - user_input_symbols:</span>
-<span class="doccomment">///     - Maps the TID of an extern symbol that take input from the user to the corresponding extern symbol struct.</span>
-<span class="doccomment">/// - extern_symbol_map:</span>
-<span class="doccomment">///     - Maps the TID of an extern symbol to the extern symbol struct.</span>
-<span class="doccomment">/// - format_string_index:</span>
-<span class="doccomment">///     - Maps a symbol name to the index of its format string parameter.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">SymbolMaps</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-    <span class="ident">string_symbol_map</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">Tid</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">ExternSymbol</span><span class="op">&gt;</span>,
-    <span class="ident">user_input_symbol_map</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">Tid</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">ExternSymbol</span><span class="op">&gt;</span>,
-    <span class="ident">extern_symbol_map</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">Tid</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">ExternSymbol</span><span class="op">&gt;</span>,
-    <span class="ident">format_string_index</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">usize</span><span class="op">&gt;</span>,
-}
-
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">SymbolMaps</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Creates a new instance of the symbol maps struct.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">project</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Project</span>, <span class="ident">config</span>: <span class="kw-2">&amp;</span><span class="ident">Config</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">extern_symbol_map</span> <span class="op">=</span> <span class="ident">HashMap::new</span>();
-        <span class="kw">for</span> <span class="ident">symbol</span> <span class="kw">in</span> <span class="ident">project</span>.<span class="ident">program</span>.<span class="ident">term</span>.<span class="ident">extern_symbols</span>.<span class="ident">iter</span>() {
-            <span class="ident">extern_symbol_map</span>.<span class="ident">insert</span>(<span class="ident">symbol</span>.<span class="ident">tid</span>.<span class="ident">clone</span>(), <span class="ident">symbol</span>);
-        }
-        <span class="ident">SymbolMaps</span> {
-            <span class="ident">string_symbol_map</span>: <span class="kw">crate</span><span class="ident">::utils::symbol_utils::get_symbol_map</span>(
-                <span class="ident">project</span>,
-                <span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">string_symbols</span>[..],
-            ),
-            <span class="ident">user_input_symbol_map</span>: <span class="kw">crate</span><span class="ident">::utils::symbol_utils::get_symbol_map</span>(
-                <span class="ident">project</span>,
-                <span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">user_input_symbols</span>[..],
-            ),
-            <span class="ident">extern_symbol_map</span>,
-            <span class="ident">format_string_index</span>: <span class="ident">config</span>.<span class="ident">format_string_index</span>.<span class="ident">clone</span>(),
-        }
-    }
-}
-
-<span class="doccomment">/// - block_first_def_set:</span>
-<span class="doccomment">///       - A set containing a given [`Def`](crate::intermediate_representation::Def) as the first `Def` of the block.</span>
-<span class="doccomment">///       The keys are of the form `(Def-TID, Current-Sub-TID)`</span>
-<span class="doccomment">///       to distinguish the nodes for blocks contained in more than one function.</span>
-<span class="doccomment">/// - block_start_last_def_map:</span>
-<span class="doccomment">///       - A map to get the node index of the `BlkStart` node</span>
-<span class="doccomment">///       containing a given [`Def`](crate::intermediate_representation::Def) as the last `Def` of the block.</span>
-<span class="doccomment">///       The keys are of the form `(Def-TID, Current-Sub-TID)`</span>
-<span class="doccomment">///       to distinguish the nodes for blocks contained in more than one function.</span>
-<span class="doccomment">/// - jmp_to_blk_end_node_map:</span>
-<span class="doccomment">///       - A map to get the node index of the `BlkEnd` node containing a given [`Jmp`].</span>
-<span class="doccomment">///       The keys are of the form `(Jmp-TID, Current-Sub-TID)`</span>
-<span class="doccomment">///       to distinguish the nodes for blocks contained in more than one function.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">BlockMaps</span> {
-    <span class="ident">block_first_def_set</span>: <span class="ident">HashSet</span><span class="op">&lt;</span>(<span class="ident">Tid</span>, <span class="ident">Tid</span>)<span class="op">&gt;</span>,
-    <span class="ident">block_start_last_def_map</span>: <span class="ident">HashMap</span><span class="op">&lt;</span>(<span class="ident">Tid</span>, <span class="ident">Tid</span>), <span class="ident">NodeIndex</span><span class="op">&gt;</span>,
-    <span class="ident">jmp_to_blk_end_node_map</span>: <span class="ident">HashMap</span><span class="op">&lt;</span>(<span class="ident">Tid</span>, <span class="ident">Tid</span>), <span class="ident">NodeIndex</span><span class="op">&gt;</span>,
-}
-
-<span class="kw">impl</span> <span class="ident">BlockMaps</span> {
-    <span class="doccomment">/// Creates a new instance of the block maps struct using the analysis results.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">analysis_results</span>: <span class="kw-2">&amp;</span><span class="ident">AnalysisResults</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">block_first_def_set</span> <span class="op">=</span> <span class="ident">HashSet::new</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">block_start_last_def_map</span> <span class="op">=</span> <span class="ident">HashMap::new</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">jmp_to_blk_end_node_map</span> <span class="op">=</span> <span class="ident">HashMap::new</span>();
-        <span class="kw">for</span> (<span class="ident">node_id</span>, <span class="ident">node</span>) <span class="kw">in</span> <span class="ident">analysis_results</span>.<span class="ident">control_flow_graph</span>.<span class="ident">node_references</span>() {
-            <span class="kw">match</span> <span class="ident">node</span> {
-                <span class="ident">Node::BlkStart</span>(<span class="ident">block</span>, <span class="ident">sub</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">match</span> <span class="ident">block</span>.<span class="ident">term</span>.<span class="ident">defs</span>.<span class="ident">len</span>() {
-                    <span class="number">0</span> <span class="op">=</span><span class="op">&gt;</span> (),
-                    <span class="ident">num_of_defs</span> <span class="op">=</span><span class="op">&gt;</span> {
-                        <span class="kw">let</span> <span class="ident">first_def</span> <span class="op">=</span> <span class="ident">block</span>.<span class="ident">term</span>.<span class="ident">defs</span>.<span class="ident">get</span>(<span class="number">0</span>).<span class="ident">unwrap</span>();
-                        <span class="kw">let</span> <span class="ident">last_def</span> <span class="op">=</span> <span class="ident">block</span>.<span class="ident">term</span>.<span class="ident">defs</span>.<span class="ident">get</span>(<span class="ident">num_of_defs</span> <span class="op">-</span> <span class="number">1</span>).<span class="ident">unwrap</span>();
-                        <span class="ident">block_first_def_set</span>.<span class="ident">insert</span>((<span class="ident">first_def</span>.<span class="ident">tid</span>.<span class="ident">clone</span>(), <span class="ident">sub</span>.<span class="ident">tid</span>.<span class="ident">clone</span>()));
-                        <span class="ident">block_start_last_def_map</span>
-                            .<span class="ident">insert</span>((<span class="ident">last_def</span>.<span class="ident">tid</span>.<span class="ident">clone</span>(), <span class="ident">sub</span>.<span class="ident">tid</span>.<span class="ident">clone</span>()), <span class="ident">node_id</span>);
-                    }
-                },
-                <span class="ident">Node::BlkEnd</span>(<span class="ident">block</span>, <span class="ident">sub</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="kw">for</span> <span class="ident">jmp</span> <span class="kw">in</span> <span class="ident">block</span>.<span class="ident">term</span>.<span class="ident">jmps</span>.<span class="ident">iter</span>() {
-                        <span class="ident">jmp_to_blk_end_node_map</span>.<span class="ident">insert</span>((<span class="ident">jmp</span>.<span class="ident">tid</span>.<span class="ident">clone</span>(), <span class="ident">sub</span>.<span class="ident">tid</span>.<span class="ident">clone</span>()), <span class="ident">node_id</span>);
+<span class="doccomment">/// Checks the system call parameter given by the Bricks Domain.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">check_system_call_parameter</span>(
+    <span class="ident">source_state</span>: <span class="kw-2">&amp;</span><span class="ident">State</span><span class="op">&lt;</span><span class="ident">BricksDomain</span><span class="op">&gt;</span>,
+    <span class="ident">pi_state</span>: <span class="kw-2">&amp;</span><span class="ident">PointerInferenceState</span>,
+    <span class="ident">system_symbol</span>: <span class="kw-2">&amp;</span><span class="ident">ExternSymbol</span>,
+    <span class="ident">jmp_tid</span>: <span class="kw-2">&amp;</span><span class="ident">Tid</span>,
+    <span class="ident">cwe_collector</span>: <span class="kw-2">&amp;</span><span class="ident">crossbeam_channel::Sender</span><span class="op">&lt;</span><span class="ident">CweWarning</span><span class="op">&gt;</span>,
+    <span class="ident">log_collector</span>: <span class="kw-2">&amp;</span><span class="ident">crossbeam_channel::Sender</span><span class="op">&lt;</span><span class="ident">LogMessage</span><span class="op">&gt;</span>,
+    <span class="ident">runtime_memory_image</span>: <span class="kw-2">&amp;</span><span class="ident">RuntimeMemoryImage</span>,
+) {
+    <span class="kw">let</span> <span class="ident">sub</span> <span class="op">=</span> <span class="ident">source_state</span>.<span class="ident">get_current_sub</span>().<span class="ident">unwrap</span>();
+    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">Arg::Register</span> {
+        <span class="ident">expr</span>: <span class="ident">Expression::Var</span>(<span class="ident">var</span>),
+        ..
+    }) <span class="op">=</span> <span class="ident">system_symbol</span>.<span class="ident">parameters</span>.<span class="ident">get</span>(<span class="number">0</span>)
+    {
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">value</span>) <span class="op">=</span> <span class="ident">source_state</span>.<span class="ident">get_variable_to_pointer_map</span>().<span class="ident">get</span>(<span class="ident">var</span>) {
+            <span class="kw">let</span> <span class="ident">contains_string_constant</span> <span class="op">=</span> <span class="ident">value</span>.<span class="ident">get_absolute_value</span>().<span class="ident">is_some</span>();
+            <span class="kw">let</span> <span class="ident">contains_relative_string_pointer</span> <span class="op">=</span> <span class="op">!</span><span class="ident">value</span>.<span class="ident">get_relative_values</span>().<span class="ident">is_empty</span>();
+            <span class="kw">if</span> <span class="ident">contains_relative_string_pointer</span> {
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">parameter_domain</span> <span class="op">=</span>
+                    <span class="ident">Context</span>::<span class="op">&lt;</span><span class="ident">BricksDomain</span><span class="op">&gt;</span><span class="ident">::merge_domains_from_multiple_pointer_targets</span>(
+                        <span class="ident">source_state</span>,
+                        <span class="ident">pi_state</span>,
+                        <span class="ident">value</span>.<span class="ident">get_relative_values</span>(),
+                    );
+                <span class="kw">if</span> <span class="ident">contains_string_constant</span> {
+                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">global_string</span>) <span class="op">=</span> <span class="ident">runtime_memory_image</span>
+                        .<span class="ident">read_string_until_null_terminator</span>(
+                            <span class="kw-2">&amp;</span><span class="ident">value</span>.<span class="ident">get_absolute_value</span>().<span class="ident">unwrap</span>().<span class="ident">try_to_bitvec</span>().<span class="ident">unwrap</span>(),
+                        )
+                    {
+                        <span class="ident">parameter_domain</span>.<span class="ident">widen</span>(<span class="kw-2">&amp;</span><span class="ident">BricksDomain::from</span>(<span class="ident">global_string</span>.<span class="ident">to_string</span>()));
+                    } <span class="kw">else</span> {
+                        <span class="ident">parameter_domain</span> <span class="op">=</span> <span class="ident">BricksDomain::Top</span>;
                     }
                 }
-                <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> (),
+                <span class="ident">check_if_string_domain_indicates_vulnerability</span>(
+                    <span class="ident">parameter_domain</span>,
+                    <span class="ident">jmp_tid</span>,
+                    <span class="ident">sub</span>,
+                    <span class="ident">system_symbol</span>,
+                    <span class="ident">cwe_collector</span>,
+                );
+            } <span class="kw">else</span> <span class="kw">if</span> <span class="op">!</span><span class="ident">contains_string_constant</span> <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">contains_relative_string_pointer</span> {
+                <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">cwe_collector</span>.<span class="ident">send</span>(<span class="ident">generate_cwe_warning</span>(
+                    <span class="kw-2">&amp;</span><span class="ident">sub</span>.<span class="ident">term</span>.<span class="ident">name</span>,
+                    <span class="ident">jmp_tid</span>,
+                    <span class="kw-2">&amp;</span><span class="ident">system_symbol</span>.<span class="ident">name</span>,
+                ));
             }
-        }
-
-        <span class="ident">BlockMaps</span> {
-            <span class="ident">block_first_def_set</span>,
-            <span class="ident">block_start_last_def_map</span>,
-            <span class="ident">jmp_to_blk_end_node_map</span>,
+        } <span class="kw">else</span> {
+            <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">log_collector</span>.<span class="ident">send</span>(<span class="ident">LogMessage::new_debug</span>(<span class="macro">format!</span>(
+                <span class="string">&quot;No Parameter tracked for system call at {}&quot;</span>,
+                <span class="ident">jmp_tid</span>.<span class="ident">address</span>
+            )));
         }
     }
 }
-</pre></div>
-</section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="cwe_checker_lib" data-search-index-js="../../../search-index.js" data-search-js="../../../search.js"></div>
-    <script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script></body></html>
+
+<span class="doccomment">/// Checks if the Bricks Domain indicates a vulnerability at the system call.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">check_if_string_domain_indicates_vulnerability</span>(
+    <span class="ident">input_domain</span>: <span class="ident">BricksDomain</span>,
+    <span class="ident">jmp_tid</span>: <span class="kw-2">&amp;</span><span class="ident">Tid</span>,
+    <span class="ident">sub</span>: <span class="kw-2">&amp;</span><span class="ident">Term</span><span class="op">&lt;</span><span class="ident">Sub</span><span class="op">&gt;</span>,
+    <span class="ident">system_symbol</span>: <span class="kw-2">&amp;</span><span class="ident">ExternSymbol</span>,
+    <span class="ident">cwe_collector</span>: <span class="kw-2">&amp;</span><span class="ident">crossbeam_channel::Sender</span><span class="op">&lt;</span><span class="ident">CweWarning</span><span class="op">&gt;</span>,
+) {
+    <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="ident">input_domain</span> {
+        <span class="ident">BricksDomain::Top</span> =&gt; {
+            <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">cwe_collector</span>.<span class="ident">send</span>(<span class="ident">generate_cwe_warning</span>(
+                <span class="kw-2">&amp;</span><span class="ident">sub</span>.<span class="ident">term</span>.<span class="ident">name</span>,
+                <span class="ident">jmp_tid</span>,
+                <span class="kw-2">&amp;</span><span class="ident">system_symbol</span>.<span class="ident">name</span>,
+            ));
+        }
+        <span class="ident">BricksDomain::Value</span>(<span class="ident">bricks</span>) =&gt; {
+            <span class="kw">let</span> <span class="ident">partially_known</span> <span class="op">=</span> <span class="ident">bricks</span>
+                .<span class="ident">iter</span>()
+                .<span class="ident">any</span>(<span class="op">|</span><span class="ident">brick</span><span class="op">|</span> <span class="macro">matches!</span>(<span class="ident">brick</span>, <span class="ident"><span class="kw">crate</span>::abstract_domain::BrickDomain::Top</span>));
+            <span class="kw">if</span> <span class="ident">partially_known</span> {
+                <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">cwe_collector</span>.<span class="ident">send</span>(<span class="ident">generate_cwe_warning</span>(
+                    <span class="kw-2">&amp;</span><span class="ident">sub</span>.<span class="ident">term</span>.<span class="ident">name</span>,
+                    <span class="ident">jmp_tid</span>,
+                    <span class="kw-2">&amp;</span><span class="ident">system_symbol</span>.<span class="ident">name</span>,
+                ));
+            }
+        }
+    }
+}
+
+<span class="doccomment">/// Generates the CWE Warning for the CWE 78 check</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">generate_cwe_warning</span>(<span class="ident">sub_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">jmp_tid</span>: <span class="kw-2">&amp;</span><span class="ident">Tid</span>, <span class="ident">symbol_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="ident">CweWarning</span> {
+    <span class="kw">let</span> <span class="ident">description</span>: <span class="ident">String</span> <span class="op">=</span> <span class="macro">format!</span>(
+        <span class="string">&quot;(OS Command Injection) Input for call to {} may not be properly sanitized in function {} ({})&quot;</span>,
+        <span class="ident">symbol_name</span>, <span class="ident">sub_name</span>, <span class="ident">jmp_tid</span>.<span class="ident">address</span>,
+    );
+    <span class="ident">CweWarning::new</span>(
+        <span class="ident">String::from</span>(<span class="ident">CWE_MODULE</span>.<span class="ident">name</span>),
+        <span class="ident">String::from</span>(<span class="ident">CWE_MODULE</span>.<span class="ident">version</span>),
+        <span class="ident">description</span>,
+    )
+    .<span class="ident">addresses</span>(<span class="macro">vec!</span>[<span class="ident">jmp_tid</span>.<span class="ident">address</span>.<span class="ident">clone</span>()])
+    .<span class="ident">tids</span>(<span class="macro">vec!</span>[<span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">jmp_tid</span>)])
+    .<span class="ident">symbols</span>(<span class="macro">vec!</span>[<span class="ident">String::from</span>(<span class="ident">sub_name</span>)])
+    .<span class="ident">other</span>(<span class="macro">vec!</span>[<span class="macro">vec!</span>[
+        <span class="ident">String::from</span>(<span class="string">&quot;OS Command Injection&quot;</span>),
+        <span class="ident">symbol_name</span>.<span class="ident">to_string</span>(),
+    ]])
+}
+</code></pre></div>
+</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="cwe_checker_lib" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.60.0 (7737e0b5c 2022-04-04)" ></div>
+</body></html>

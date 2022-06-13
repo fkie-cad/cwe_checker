@@ -1,7 +1,9 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/abstract_domain/data.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>data.rs - source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../favicon.svg">
-<link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../../cwe_checker_lib/index.html'><div class='logo-container rust-logo'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
-                <a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/abstract_domain/data.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>data.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><script defer src="../../../main.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script>
+    <noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../cwe_checker_lib/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../../cwe_checker_lib/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../cwe_checker_lib/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><div class="theme-picker hidden"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="22" height="22" alt="Pick another theme!" src="../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
 <span id="4">  4</span>
@@ -338,512 +340,317 @@
 <span id="335">335</span>
 <span id="336">336</span>
 <span id="337">337</span>
-<span id="338">338</span>
-<span id="339">339</span>
-<span id="340">340</span>
-<span id="341">341</span>
-<span id="342">342</span>
-<span id="343">343</span>
-<span id="344">344</span>
-<span id="345">345</span>
-<span id="346">346</span>
-<span id="347">347</span>
-<span id="348">348</span>
-<span id="349">349</span>
-<span id="350">350</span>
-<span id="351">351</span>
-<span id="352">352</span>
-<span id="353">353</span>
-<span id="354">354</span>
-<span id="355">355</span>
-<span id="356">356</span>
-<span id="357">357</span>
-<span id="358">358</span>
-<span id="359">359</span>
-<span id="360">360</span>
-<span id="361">361</span>
-<span id="362">362</span>
-<span id="363">363</span>
-<span id="364">364</span>
-<span id="365">365</span>
-<span id="366">366</span>
-<span id="367">367</span>
-<span id="368">368</span>
-<span id="369">369</span>
-<span id="370">370</span>
-<span id="371">371</span>
-<span id="372">372</span>
-<span id="373">373</span>
-<span id="374">374</span>
-<span id="375">375</span>
-<span id="376">376</span>
-<span id="377">377</span>
-<span id="378">378</span>
-<span id="379">379</span>
-<span id="380">380</span>
-<span id="381">381</span>
-<span id="382">382</span>
-<span id="383">383</span>
-<span id="384">384</span>
-<span id="385">385</span>
-<span id="386">386</span>
-<span id="387">387</span>
-<span id="388">388</span>
-<span id="389">389</span>
-<span id="390">390</span>
-<span id="391">391</span>
-<span id="392">392</span>
-<span id="393">393</span>
-<span id="394">394</span>
-<span id="395">395</span>
-<span id="396">396</span>
-<span id="397">397</span>
-<span id="398">398</span>
-<span id="399">399</span>
-<span id="400">400</span>
-<span id="401">401</span>
-<span id="402">402</span>
-<span id="403">403</span>
-<span id="404">404</span>
-<span id="405">405</span>
-<span id="406">406</span>
-<span id="407">407</span>
-<span id="408">408</span>
-<span id="409">409</span>
-<span id="410">410</span>
-<span id="411">411</span>
-<span id="412">412</span>
-<span id="413">413</span>
-<span id="414">414</span>
-<span id="415">415</span>
-<span id="416">416</span>
-<span id="417">417</span>
-<span id="418">418</span>
-<span id="419">419</span>
-<span id="420">420</span>
-<span id="421">421</span>
-<span id="422">422</span>
-<span id="423">423</span>
-<span id="424">424</span>
-<span id="425">425</span>
-<span id="426">426</span>
-<span id="427">427</span>
-<span id="428">428</span>
-<span id="429">429</span>
-<span id="430">430</span>
-<span id="431">431</span>
-<span id="432">432</span>
-<span id="433">433</span>
-<span id="434">434</span>
-<span id="435">435</span>
-<span id="436">436</span>
-<span id="437">437</span>
-</pre><div class="example-wrap"><pre class="rust ">
-<span class="kw">use</span> <span class="kw">super</span>::{
-    <span class="ident">AbstractDomain</span>, <span class="ident">AbstractIdentifier</span>, <span class="ident">HasTop</span>, <span class="ident">Interval</span>, <span class="ident">PointerDomain</span>, <span class="ident">RegisterDomain</span>,
-    <span class="ident">SizedDomain</span>, <span class="ident">SpecializeByConditional</span>, <span class="ident">TryToBitvec</span>, <span class="ident">TryToInterval</span>,
+</pre><pre class="rust"><code><span class="kw">use</span> <span class="kw">super</span>::{
+    <span class="ident">AbstractDomain</span>, <span class="ident">AbstractIdentifier</span>, <span class="ident">HasTop</span>, <span class="ident">Interval</span>, <span class="ident">RegisterDomain</span>, <span class="ident">SizedDomain</span>,
+    <span class="ident">SpecializeByConditional</span>, <span class="ident">TryToBitvec</span>, <span class="ident">TryToInterval</span>,
 };
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::intermediate_representation</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::prelude</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::intermediate_representation</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::prelude</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">std::collections</span>::{<span class="ident">BTreeMap</span>, <span class="ident">BTreeSet</span>};
 <span class="kw">use</span> <span class="ident">std::fmt::Display</span>;
+<span class="kw">use</span> <span class="ident">std::iter::FromIterator</span>;
 
-<span class="doccomment">/// An abstract domain representing either a pointer or a non-pointer value.</span>
-<span class="doccomment">/// Both non-pointer values and offsets of pointers are represented by the same abstract domain `T`.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">DataDomain</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">RegisterDomain</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// The `Top` element of the domain.</span>
-    <span class="doccomment">/// Describes a value for which nothing is known.</span>
-    <span class="ident">Top</span>(<span class="ident">ByteSize</span>),
-    <span class="doccomment">/// The value is a pointer to an abstract memory object.</span>
-    <span class="ident">Pointer</span>(<span class="ident">PointerDomain</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>),
-    <span class="doccomment">/// The value is a non-pointer value or a pointer to global memory.</span>
-    <span class="doccomment">/// The latter can happen if pointers to global memory are described by their absolute value.</span>
-    <span class="ident">Value</span>(<span class="ident">T</span>),
+<span class="kw">mod</span> <span class="ident">arithmetics</span>;
+<span class="kw">mod</span> <span class="ident">conditional_specialization</span>;
+<span class="kw">mod</span> <span class="ident">trait_impl</span>;
+
+<span class="doccomment">/// An abstract domain representing a set of base values plus offsets or an absolute value (or both).</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// The base values are represented as abstract IDs,</span>
+<span class="doccomment">/// i.e. they are treated as variables with unknown absolute value.</span>
+<span class="doccomment">/// For each base value the offset is given by an abstract domain `T`,</span>
+<span class="doccomment">/// which should specialize in representing absolute values (e.g. an interval domain).</span>
+<span class="doccomment">/// Note that the domain assumes pointer semantics for these values.</span>
+<span class="doccomment">/// That means if one applies operations to the domain that are not used in pointer arithmetics,</span>
+<span class="doccomment">/// the abstract ID of the base value might be removed from the domain.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// If the domain also represents absolute values,</span>
+<span class="doccomment">/// then the values are given by a single instance of the abstract domain `T`.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// The domain also contains a flag to indicate that it includes `Top` values,</span>
+<span class="doccomment">/// i.e. values of fully unknown origin and offset.</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Hash</span>, <span class="ident">Clone</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DataDomain</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">RegisterDomain</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// The byte size of the represented values.</span>
+    <span class="ident">size</span>: <span class="ident">ByteSize</span>,
+    <span class="doccomment">/// A map from base values to the corresponding offset.</span>
+    <span class="ident">relative_values</span>: <span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">AbstractIdentifier</span>, <span class="ident">T</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// An absolute value if the domain may represent an absolute value.</span>
+    <span class="ident">absolute_value</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// An indicator whether the domain also represents values for which both the base and the offset are unknown.</span>
+    <span class="ident">contains_top_values</span>: <span class="ident">bool</span>,
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">RegisterDomain</span><span class="op">&gt;</span> <span class="ident">DataDomain</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// Returns true if the domain does not represent any value.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// The meaning of an empty value depends on the usage of the domain.</span>
+    <span class="doccomment">/// E.g. it may indicate an impossible runtime state of a program in one analysis</span>
+    <span class="doccomment">/// or simply no value of interest in another analysis.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// An empty value represents the bottom value in the partial order of the domain.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_empty</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
+        <span class="self">self</span>.<span class="ident">relative_values</span>.<span class="ident">is_empty</span>()
+            <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">absolute_value</span>.<span class="ident">is_none</span>()
+            <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">contains_top_values</span>
+    }
+
+    <span class="doccomment">/// Return a new empty value with the given bytesize.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_empty</span>(<span class="ident">size</span>: <span class="ident">ByteSize</span>) -&gt; <span class="self">Self</span> {
+        <span class="ident">DataDomain</span> {
+            <span class="ident">size</span>,
+            <span class="ident">relative_values</span>: <span class="ident">BTreeMap::new</span>(),
+            <span class="ident">absolute_value</span>: <span class="prelude-val">None</span>,
+            <span class="ident">contains_top_values</span>: <span class="bool-val">false</span>,
+        }
+    }
+
     <span class="doccomment">/// For pointer values replace an abstract identifier with another one and add the offset_adjustment to the pointer offset.</span>
     <span class="doccomment">/// This is needed to adjust stack pointer on call and return instructions.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">replace_abstract_id</span>(
-        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
+        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
         <span class="ident">old_id</span>: <span class="kw-2">&amp;</span><span class="ident">AbstractIdentifier</span>,
         <span class="ident">new_id</span>: <span class="kw-2">&amp;</span><span class="ident">AbstractIdentifier</span>,
         <span class="ident">offset_adjustment</span>: <span class="kw-2">&amp;</span><span class="ident">T</span>,
     ) {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="self">Self</span><span class="ident">::Pointer</span>(<span class="ident">pointer</span>) <span class="op">=</span> <span class="self">self</span> {
-            <span class="ident">pointer</span>.<span class="ident">replace_abstract_id</span>(<span class="ident">old_id</span>, <span class="ident">new_id</span>, <span class="ident">offset_adjustment</span>);
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">old_offset</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">relative_values</span>.<span class="ident">get</span>(<span class="ident">old_id</span>) {
+            <span class="kw">let</span> <span class="ident">new_offset</span> <span class="op">=</span> <span class="ident">old_offset</span>.<span class="ident">bin_op</span>(<span class="ident">BinOpType::IntAdd</span>, <span class="ident">offset_adjustment</span>);
+            <span class="self">self</span>.<span class="ident">relative_values</span>.<span class="ident">remove</span>(<span class="ident">old_id</span>);
+            <span class="self">self</span>.<span class="ident">relative_values</span>.<span class="ident">insert</span>(<span class="ident">new_id</span>.<span class="ident">clone</span>(), <span class="ident">new_offset</span>);
         }
     }
 
-    <span class="doccomment">/// Return a set of all referenced abstract IDs. The set is empty if `self` is not a pointer.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">referenced_ids</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">BTreeSet</span><span class="op">&lt;</span><span class="ident">AbstractIdentifier</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="self">Self</span><span class="ident">::Pointer</span>(<span class="ident">pointer</span>) <span class="op">=</span> <span class="self">self</span> {
-            <span class="ident">pointer</span>.<span class="ident">ids</span>().<span class="ident">cloned</span>().<span class="ident">collect</span>()
-        } <span class="kw">else</span> {
-            <span class="ident">BTreeSet::new</span>()
-        }
-    }
-
-    <span class="doccomment">/// If *self* is a pointer, remove all provided IDs from the target list of it.</span>
-    <span class="doccomment">/// If this would leave the pointer without any targets, replace it with *Top*.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">remove_ids</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">ids_to_remove</span>: <span class="kw-2">&amp;</span><span class="ident">BTreeSet</span><span class="op">&lt;</span><span class="ident">AbstractIdentifier</span><span class="op">&gt;</span>) {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="self">Self</span><span class="ident">::Pointer</span>(<span class="ident">pointer</span>) <span class="op">=</span> <span class="self">self</span> {
-            <span class="kw">let</span> <span class="ident">remaining_targets</span>: <span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">AbstractIdentifier</span>, <span class="ident">T</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">pointer</span>
-                .<span class="ident">targets</span>()
-                .<span class="ident">iter</span>()
-                .<span class="ident">filter_map</span>(<span class="op">|</span>(<span class="ident">id</span>, <span class="ident">offset</span>)<span class="op">|</span> {
-                    <span class="kw">if</span> <span class="ident">ids_to_remove</span>.<span class="ident">get</span>(<span class="ident">id</span>).<span class="ident">is_none</span>() {
-                        <span class="prelude-val">Some</span>((<span class="ident">id</span>.<span class="ident">clone</span>(), <span class="ident">offset</span>.<span class="ident">clone</span>()))
-                    } <span class="kw">else</span> {
-                        <span class="prelude-val">None</span>
-                    }
-                })
-                .<span class="ident">collect</span>();
-            <span class="kw">if</span> <span class="ident">remaining_targets</span>.<span class="ident">is_empty</span>() {
-                <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="self">Self</span><span class="ident">::new_top</span>(<span class="self">self</span>.<span class="ident">bytesize</span>());
+    <span class="doccomment">/// Replace all abstract IDs in self with the corresponding values given by the `replacement_map`.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// For IDs without a replacement value the `contains_top_values` flag will be set.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">replace_all_ids</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">replacement_map</span>: <span class="kw-2">&amp;</span><span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">AbstractIdentifier</span>, <span class="self">Self</span><span class="op">&gt;</span>) {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_self</span> <span class="op">=</span> <span class="ident">DataDomain</span> {
+            <span class="ident">size</span>: <span class="self">self</span>.<span class="ident">size</span>,
+            <span class="ident">relative_values</span>: <span class="ident">BTreeMap::new</span>(),
+            <span class="ident">absolute_value</span>: <span class="self">self</span>.<span class="ident">absolute_value</span>.<span class="ident">clone</span>(),
+            <span class="ident">contains_top_values</span>: <span class="self">self</span>.<span class="ident">contains_top_values</span>,
+        };
+        <span class="kw">for</span> (<span class="ident">id</span>, <span class="ident">offset</span>) <span class="kw">in</span> <span class="self">self</span>.<span class="ident">relative_values</span>.<span class="ident">iter</span>() {
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">replacement_value</span>) <span class="op">=</span> <span class="ident">replacement_map</span>.<span class="ident">get</span>(<span class="ident">id</span>) {
+                <span class="ident">new_self</span> <span class="op">=</span> <span class="ident">new_self</span>.<span class="ident">merge</span>(<span class="kw-2">&amp;</span>(<span class="ident">replacement_value</span>.<span class="ident">clone</span>() <span class="op">+</span> <span class="ident">offset</span>.<span class="ident">clone</span>().<span class="ident">into</span>()));
             } <span class="kw">else</span> {
-                <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="self">Self</span><span class="ident">::Pointer</span>(<span class="ident">PointerDomain::with_targets</span>(<span class="ident">remaining_targets</span>));
+                <span class="ident">new_self</span>.<span class="ident">contains_top_values</span> <span class="op">=</span> <span class="bool-val">true</span>;
             }
         }
+        <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">new_self</span>;
     }
-}
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">SpecializeByConditional</span> <span class="op">+</span> <span class="ident">RegisterDomain</span><span class="op">&gt;</span> <span class="ident">SpecializeByConditional</span> <span class="kw">for</span> <span class="ident">DataDomain</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">add_signed_less_equal_bound</span>(<span class="self">self</span>, <span class="ident">bound</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="self">Self</span><span class="ident">::Value</span>(<span class="ident">value</span>) <span class="op">=</span> <span class="self">self</span> {
-            <span class="prelude-val">Ok</span>(<span class="self">Self</span><span class="ident">::Value</span>(<span class="ident">value</span>.<span class="ident">add_signed_less_equal_bound</span>(<span class="ident">bound</span>)<span class="question-mark">?</span>))
-        } <span class="kw">else</span> {
-            <span class="prelude-val">Ok</span>(<span class="self">self</span>)
+    <span class="doccomment">/// Return an iterator over all referenced abstract IDs.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">referenced_ids</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw">impl</span> <span class="ident">Iterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">AbstractIdentifier</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">relative_values</span>.<span class="ident">keys</span>()
+    }
+
+    <span class="doccomment">/// Return the relative values contained in the domain.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_relative_values</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">AbstractIdentifier</span>, <span class="ident">T</span><span class="op">&gt;</span> {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">relative_values</span>
+    }
+
+    <span class="doccomment">/// Replace the map of relative values with the given one.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_relative_values</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">relative_values</span>: <span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">AbstractIdentifier</span>, <span class="ident">T</span><span class="op">&gt;</span>) {
+        <span class="self">self</span>.<span class="ident">relative_values</span> <span class="op">=</span> <span class="ident">relative_values</span>;
+    }
+
+    <span class="doccomment">/// Return the absolute value contained in the domain if present</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_absolute_value</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">T</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">absolute_value</span>.<span class="ident">as_ref</span>()
+    }
+
+    <span class="doccomment">/// Replace the absolute value contained in the domain with the given one.</span>
+    <span class="doccomment">/// A value of `None` means that the domain does not contain an absolute value.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_absolute_value</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>) {
+        <span class="self">self</span>.<span class="ident">absolute_value</span> <span class="op">=</span> <span class="ident">value</span>
+    }
+
+    <span class="doccomment">/// Returns `true` if the domain contains `Top` values,</span>
+    <span class="doccomment">/// i.e. values for which neither a value nor an abstract identifier is known.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Note that the `DataDomain` itself has no maximal value,</span>
+    <span class="doccomment">/// i.e. this does not indicate a `Top` value of the abstract domain.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">contains_top</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
+        <span class="self">self</span>.<span class="ident">contains_top_values</span>
+    }
+
+    <span class="doccomment">/// Indicate that the domain may contain `Top` values</span>
+    <span class="doccomment">/// in addition to the contained absolute and relative values.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// This does not remove absolute or relative value information from the domain.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_contains_top_flag</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
+        <span class="self">self</span>.<span class="ident">contains_top_values</span> <span class="op">=</span> <span class="bool-val">true</span>;
+    }
+
+    <span class="doccomment">/// Indicate that the domain does not contain any `Top` values</span>
+    <span class="doccomment">/// in addition to the contained absolute and relative values.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">unset_contains_top_flag</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
+        <span class="self">self</span>.<span class="ident">contains_top_values</span> <span class="op">=</span> <span class="bool-val">false</span>;
+    }
+
+    <span class="doccomment">/// Return a new value representing a variable plus an offset,</span>
+    <span class="doccomment">/// where the variable is represented by the given abstract ID.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_target</span>(<span class="ident">id</span>: <span class="ident">AbstractIdentifier</span>, <span class="ident">offset</span>: <span class="ident">T</span>) -&gt; <span class="self">Self</span> {
+        <span class="ident">DataDomain</span> {
+            <span class="ident">size</span>: <span class="ident">offset</span>.<span class="ident">bytesize</span>(),
+            <span class="ident">relative_values</span>: <span class="ident">BTreeMap::from_iter</span>([(<span class="ident">id</span>, <span class="ident">offset</span>)]),
+            <span class="ident">absolute_value</span>: <span class="prelude-val">None</span>,
+            <span class="ident">contains_top_values</span>: <span class="bool-val">false</span>,
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">add_unsigned_less_equal_bound</span>(<span class="self">self</span>, <span class="ident">bound</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="self">Self</span><span class="ident">::Value</span>(<span class="ident">value</span>) <span class="op">=</span> <span class="self">self</span> {
-            <span class="prelude-val">Ok</span>(<span class="self">Self</span><span class="ident">::Value</span>(<span class="ident">value</span>.<span class="ident">add_unsigned_less_equal_bound</span>(<span class="ident">bound</span>)<span class="question-mark">?</span>))
-        } <span class="kw">else</span> {
-            <span class="prelude-val">Ok</span>(<span class="self">self</span>)
-        }
-    }
-
-    <span class="kw">fn</span> <span class="ident">add_signed_greater_equal_bound</span>(<span class="self">self</span>, <span class="ident">bound</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="self">Self</span><span class="ident">::Value</span>(<span class="ident">value</span>) <span class="op">=</span> <span class="self">self</span> {
-            <span class="prelude-val">Ok</span>(<span class="self">Self</span><span class="ident">::Value</span>(<span class="ident">value</span>.<span class="ident">add_signed_greater_equal_bound</span>(<span class="ident">bound</span>)<span class="question-mark">?</span>))
-        } <span class="kw">else</span> {
-            <span class="prelude-val">Ok</span>(<span class="self">self</span>)
-        }
-    }
-
-    <span class="kw">fn</span> <span class="ident">add_unsigned_greater_equal_bound</span>(<span class="self">self</span>, <span class="ident">bound</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="self">Self</span><span class="ident">::Value</span>(<span class="ident">value</span>) <span class="op">=</span> <span class="self">self</span> {
-            <span class="prelude-val">Ok</span>(<span class="self">Self</span><span class="ident">::Value</span>(<span class="ident">value</span>.<span class="ident">add_unsigned_greater_equal_bound</span>(<span class="ident">bound</span>)<span class="question-mark">?</span>))
-        } <span class="kw">else</span> {
-            <span class="prelude-val">Ok</span>(<span class="self">self</span>)
-        }
-    }
-
-    <span class="kw">fn</span> <span class="ident">add_not_equal_bound</span>(<span class="self">self</span>, <span class="ident">bound</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="self">Self</span><span class="ident">::Value</span>(<span class="ident">value</span>) <span class="op">=</span> <span class="self">self</span> {
-            <span class="prelude-val">Ok</span>(<span class="self">Self</span><span class="ident">::Value</span>(<span class="ident">value</span>.<span class="ident">add_not_equal_bound</span>(<span class="ident">bound</span>)<span class="question-mark">?</span>))
-        } <span class="kw">else</span> {
-            <span class="prelude-val">Ok</span>(<span class="self">self</span>)
-        }
-    }
-}
-
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">RegisterDomain</span><span class="op">&gt;</span> <span class="ident">SizedDomain</span> <span class="kw">for</span> <span class="ident">DataDomain</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="comment">// Return the bitsize of `self`.</span>
-    <span class="kw">fn</span> <span class="ident">bytesize</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ByteSize</span> {
-        <span class="kw">use</span> <span class="ident">DataDomain</span>::<span class="kw-2">*</span>;
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">Top</span>(<span class="ident">size</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw-2">*</span><span class="ident">size</span>,
-            <span class="ident">Pointer</span>(<span class="ident">pointer</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">pointer</span>.<span class="ident">bytesize</span>(),
-            <span class="ident">Value</span>(<span class="ident">bitvec</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">bitvec</span>.<span class="ident">bytesize</span>(),
-        }
-    }
-
-    <span class="comment">// Return a new *Top* element with the given bytesize</span>
-    <span class="kw">fn</span> <span class="ident">new_top</span>(<span class="ident">bytesize</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="self">Self</span><span class="ident">::Top</span>(<span class="ident">bytesize</span>)
-    }
-}
-
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">RegisterDomain</span><span class="op">&gt;</span> <span class="ident">HasTop</span> <span class="kw">for</span> <span class="ident">DataDomain</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="comment">// Generate a new *Top* element with the same bitsize as `self`.</span>
-    <span class="kw">fn</span> <span class="ident">top</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="ident">DataDomain::new_top</span>(<span class="self">self</span>.<span class="ident">bytesize</span>())
-    }
-}
-
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">RegisterDomain</span><span class="op">&gt;</span> <span class="ident">RegisterDomain</span> <span class="kw">for</span> <span class="ident">DataDomain</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Compute the (abstract) result of a binary operation</span>
-    <span class="kw">fn</span> <span class="ident">bin_op</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">op</span>: <span class="ident">BinOpType</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="kw">use</span> <span class="ident">BinOpType</span>::<span class="kw-2">*</span>;
-        <span class="kw">use</span> <span class="ident">DataDomain</span>::<span class="kw-2">*</span>;
-        <span class="kw">match</span> (<span class="self">self</span>, <span class="ident">op</span>, <span class="ident">rhs</span>) {
-            (<span class="ident">Value</span>(<span class="ident">left</span>), <span class="kw">_</span>, <span class="ident">Value</span>(<span class="ident">right</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Value</span>(<span class="ident">left</span>.<span class="ident">bin_op</span>(<span class="ident">op</span>, <span class="ident">right</span>)),
-            (<span class="ident">Pointer</span>(<span class="ident">pointer</span>), <span class="ident">IntAdd</span>, <span class="ident">Value</span>(<span class="ident">value</span>)) <span class="op">|</span> (<span class="ident">Value</span>(<span class="ident">value</span>), <span class="ident">IntAdd</span>, <span class="ident">Pointer</span>(<span class="ident">pointer</span>)) <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="ident">Pointer</span>(<span class="ident">pointer</span>.<span class="ident">add_to_offset</span>(<span class="ident">value</span>))
-            }
-            (<span class="ident">Pointer</span>(<span class="ident">pointer</span>), <span class="ident">IntSub</span>, <span class="ident">Value</span>(<span class="ident">value</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Pointer</span>(<span class="ident">pointer</span>.<span class="ident">sub_from_offset</span>(<span class="ident">value</span>)),
-            (<span class="ident">Pointer</span>(<span class="ident">pointer_lhs</span>), <span class="ident">IntSub</span>, <span class="ident">Pointer</span>(<span class="ident">pointer_rhs</span>)) <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">if</span> <span class="ident">pointer_lhs</span>.<span class="ident">ids</span>().<span class="ident">len</span>() <span class="op">=</span><span class="op">=</span> <span class="number">1</span> <span class="op">&amp;&amp;</span> <span class="ident">pointer_rhs</span>.<span class="ident">ids</span>().<span class="ident">len</span>() <span class="op">=</span><span class="op">=</span> <span class="number">1</span> {
-                    <span class="kw">let</span> (<span class="ident">id_lhs</span>, <span class="ident">offset_lhs</span>) <span class="op">=</span> <span class="ident">pointer_lhs</span>.<span class="ident">targets</span>().<span class="ident">iter</span>().<span class="ident">next</span>().<span class="ident">unwrap</span>();
-                    <span class="kw">let</span> (<span class="ident">id_rhs</span>, <span class="ident">offset_rhs</span>) <span class="op">=</span> <span class="ident">pointer_rhs</span>.<span class="ident">targets</span>().<span class="ident">iter</span>().<span class="ident">next</span>().<span class="ident">unwrap</span>();
-                    <span class="kw">if</span> <span class="ident">id_lhs</span> <span class="op">=</span><span class="op">=</span> <span class="ident">id_rhs</span> {
-                        <span class="self">Self</span><span class="ident">::Value</span>(<span class="ident">offset_lhs</span>.<span class="ident">bin_op</span>(<span class="ident">IntSub</span>, <span class="ident">offset_rhs</span>))
-                    } <span class="kw">else</span> {
-                        <span class="self">Self</span><span class="ident">::Top</span>(<span class="self">self</span>.<span class="ident">bytesize</span>())
-                    }
+    <span class="doccomment">/// Remove all provided IDs from the list of relative values.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">remove_ids</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">ids_to_remove</span>: <span class="kw-2">&amp;</span><span class="ident">BTreeSet</span><span class="op">&lt;</span><span class="ident">AbstractIdentifier</span><span class="op">&gt;</span>) {
+        <span class="self">self</span>.<span class="ident">relative_values</span> <span class="op">=</span> <span class="self">self</span>
+            .<span class="ident">relative_values</span>
+            .<span class="ident">iter</span>()
+            .<span class="ident">filter_map</span>(<span class="op">|</span>(<span class="ident">id</span>, <span class="ident">offset</span>)<span class="op">|</span> {
+                <span class="kw">if</span> <span class="ident">ids_to_remove</span>.<span class="ident">get</span>(<span class="ident">id</span>).<span class="ident">is_none</span>() {
+                    <span class="prelude-val">Some</span>((<span class="ident">id</span>.<span class="ident">clone</span>(), <span class="ident">offset</span>.<span class="ident">clone</span>()))
                 } <span class="kw">else</span> {
-                    <span class="comment">// We cannot be sure that both pointers point to the same target</span>
-                    <span class="self">Self</span><span class="ident">::Top</span>(<span class="self">self</span>.<span class="ident">bytesize</span>())
+                    <span class="prelude-val">None</span>
                 }
-            }
-            (<span class="kw">_</span>, <span class="ident">IntEqual</span>, <span class="kw">_</span>)
-            <span class="op">|</span> (<span class="kw">_</span>, <span class="ident">IntNotEqual</span>, <span class="kw">_</span>)
-            <span class="op">|</span> (<span class="kw">_</span>, <span class="ident">IntLess</span>, <span class="kw">_</span>)
-            <span class="op">|</span> (<span class="kw">_</span>, <span class="ident">IntLessEqual</span>, <span class="kw">_</span>)
-            <span class="op">|</span> (<span class="kw">_</span>, <span class="ident">IntSLess</span>, <span class="kw">_</span>)
-            <span class="op">|</span> (<span class="kw">_</span>, <span class="ident">IntSLessEqual</span>, <span class="kw">_</span>)
-            <span class="op">|</span> (<span class="kw">_</span>, <span class="ident">IntCarry</span>, <span class="kw">_</span>)
-            <span class="op">|</span> (<span class="kw">_</span>, <span class="ident">IntSCarry</span>, <span class="kw">_</span>)
-            <span class="op">|</span> (<span class="kw">_</span>, <span class="ident">IntSBorrow</span>, <span class="kw">_</span>)
-            <span class="op">|</span> (<span class="kw">_</span>, <span class="ident">BoolXOr</span>, <span class="kw">_</span>)
-            <span class="op">|</span> (<span class="kw">_</span>, <span class="ident">BoolOr</span>, <span class="kw">_</span>)
-            <span class="op">|</span> (<span class="kw">_</span>, <span class="ident">BoolAnd</span>, <span class="kw">_</span>)
-            <span class="op">|</span> (<span class="kw">_</span>, <span class="ident">FloatEqual</span>, <span class="kw">_</span>)
-            <span class="op">|</span> (<span class="kw">_</span>, <span class="ident">FloatNotEqual</span>, <span class="kw">_</span>)
-            <span class="op">|</span> (<span class="kw">_</span>, <span class="ident">FloatLess</span>, <span class="kw">_</span>)
-            <span class="op">|</span> (<span class="kw">_</span>, <span class="ident">FloatLessEqual</span>, <span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">T::new_top</span>(<span class="ident">ByteSize::new</span>(<span class="number">1</span>)).<span class="ident">into</span>(),
-            (<span class="kw">_</span>, <span class="ident">IntAdd</span>, <span class="kw">_</span>)
-            <span class="op">|</span> (<span class="kw">_</span>, <span class="ident">IntSub</span>, <span class="kw">_</span>)
-            <span class="op">|</span> (<span class="kw">_</span>, <span class="ident">IntMult</span>, <span class="kw">_</span>)
-            <span class="op">|</span> (<span class="kw">_</span>, <span class="ident">IntDiv</span>, <span class="kw">_</span>)
-            <span class="op">|</span> (<span class="kw">_</span>, <span class="ident">IntSDiv</span>, <span class="kw">_</span>)
-            <span class="op">|</span> (<span class="kw">_</span>, <span class="ident">IntRem</span>, <span class="kw">_</span>)
-            <span class="op">|</span> (<span class="kw">_</span>, <span class="ident">IntSRem</span>, <span class="kw">_</span>)
-            <span class="op">|</span> (<span class="kw">_</span>, <span class="ident">IntLeft</span>, <span class="kw">_</span>)
-            <span class="op">|</span> (<span class="kw">_</span>, <span class="ident">IntRight</span>, <span class="kw">_</span>)
-            <span class="op">|</span> (<span class="kw">_</span>, <span class="ident">IntSRight</span>, <span class="kw">_</span>)
-            <span class="op">|</span> (<span class="kw">_</span>, <span class="ident">IntAnd</span>, <span class="kw">_</span>)
-            <span class="op">|</span> (<span class="kw">_</span>, <span class="ident">IntOr</span>, <span class="kw">_</span>)
-            <span class="op">|</span> (<span class="kw">_</span>, <span class="ident">IntXOr</span>, <span class="kw">_</span>)
-            <span class="op">|</span> (<span class="kw">_</span>, <span class="ident">FloatAdd</span>, <span class="kw">_</span>)
-            <span class="op">|</span> (<span class="kw">_</span>, <span class="ident">FloatSub</span>, <span class="kw">_</span>)
-            <span class="op">|</span> (<span class="kw">_</span>, <span class="ident">FloatMult</span>, <span class="kw">_</span>)
-            <span class="op">|</span> (<span class="kw">_</span>, <span class="ident">FloatDiv</span>, <span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="self">Self</span><span class="ident">::new_top</span>(<span class="self">self</span>.<span class="ident">bytesize</span>()),
-            (<span class="kw">_</span>, <span class="ident">Piece</span>, <span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="self">Self</span><span class="ident">::new_top</span>(<span class="self">self</span>.<span class="ident">bytesize</span>() <span class="op">+</span> <span class="ident">rhs</span>.<span class="ident">bytesize</span>()),
-        }
+            })
+            .<span class="ident">collect</span>();
     }
 
-    <span class="doccomment">/// Compute the (abstract) result of a unary operation</span>
-    <span class="kw">fn</span> <span class="ident">un_op</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">op</span>: <span class="ident">UnOpType</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="self">Self</span><span class="ident">::Value</span>(<span class="ident">value</span>) <span class="op">=</span> <span class="self">self</span> {
-            <span class="self">Self</span><span class="ident">::Value</span>(<span class="ident">value</span>.<span class="ident">un_op</span>(<span class="ident">op</span>))
+    <span class="doccomment">/// Return the contained absolute value</span>
+    <span class="doccomment">/// only if `self` contains no other (relative or `Top`) values.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_if_absolute_value</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">T</span><span class="op">&gt;</span> {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">relative_values</span>.<span class="ident">is_empty</span>() <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">contains_top_values</span> {
+            <span class="self">self</span>.<span class="ident">absolute_value</span>.<span class="ident">as_ref</span>()
         } <span class="kw">else</span> {
-            <span class="kw">match</span> <span class="ident">op</span> {
-                <span class="ident">UnOpType::BoolNegate</span> <span class="op">|</span> <span class="ident">UnOpType::FloatNaN</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">Self</span><span class="ident">::new_top</span>(<span class="ident">ByteSize::new</span>(<span class="number">1</span>)),
-                <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">Self</span><span class="ident">::new_top</span>(<span class="self">self</span>.<span class="ident">bytesize</span>()),
-            }
+            <span class="prelude-val">None</span>
         }
     }
 
-    <span class="doccomment">/// extract a sub-bitvector</span>
-    <span class="kw">fn</span> <span class="ident">subpiece</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">low_byte</span>: <span class="ident">ByteSize</span>, <span class="ident">size</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="self">Self</span><span class="ident">::Value</span>(<span class="ident">value</span>) <span class="op">=</span> <span class="self">self</span> {
-            <span class="self">Self</span><span class="ident">::Value</span>(<span class="ident">value</span>.<span class="ident">subpiece</span>(<span class="ident">low_byte</span>, <span class="ident">size</span>))
-        } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">low_byte</span> <span class="op">=</span><span class="op">=</span> <span class="ident">ByteSize::new</span>(<span class="number">0</span>) <span class="op">&amp;&amp;</span> <span class="ident">size</span> <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">bytesize</span>() {
-            <span class="comment">// The operation is a no-op</span>
-            <span class="self">self</span>.<span class="ident">clone</span>()
+    <span class="doccomment">/// Return the contained absolute value</span>
+    <span class="doccomment">/// if `self` only contains absolute or `Top` values.</span>
+    <span class="kw">fn</span> <span class="ident">get_if_absolute_value_or_top</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">T</span><span class="op">&gt;</span> {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">relative_values</span>.<span class="ident">is_empty</span>() {
+            <span class="self">self</span>.<span class="ident">absolute_value</span>.<span class="ident">as_ref</span>()
         } <span class="kw">else</span> {
-            <span class="self">Self</span><span class="ident">::new_top</span>(<span class="ident">size</span>)
+            <span class="prelude-val">None</span>
         }
     }
 
-    <span class="doccomment">/// Cast a bitvector using the given cast type</span>
-    <span class="kw">fn</span> <span class="ident">cast</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">kind</span>: <span class="ident">CastOpType</span>, <span class="ident">width</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="self">Self</span><span class="ident">::Value</span>(<span class="ident">value</span>) <span class="op">=</span> <span class="self">self</span> {
-            <span class="self">Self</span><span class="ident">::Value</span>(<span class="ident">value</span>.<span class="ident">cast</span>(<span class="ident">kind</span>, <span class="ident">width</span>))
+    <span class="doccomment">/// Return the target ID and offset of the contained relative value</span>
+    <span class="doccomment">/// if `self` contains exactly one relative value and no absolute or `Top` values.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_if_unique_target</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="ident">AbstractIdentifier</span>, <span class="kw-2">&amp;</span><span class="ident">T</span>)<span class="op">&gt;</span> {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">relative_values</span>.<span class="ident">len</span>() <span class="op">==</span> <span class="number">1</span>
+            <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">absolute_value</span>.<span class="ident">is_none</span>()
+            <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">contains_top_values</span>
+        {
+            <span class="prelude-val">Some</span>(<span class="self">self</span>.<span class="ident">relative_values</span>.<span class="ident">iter</span>().<span class="ident">next</span>().<span class="ident">unwrap</span>())
         } <span class="kw">else</span> {
-            <span class="comment">// The result of casting pointers is undefined.</span>
-            <span class="self">Self</span><span class="ident">::new_top</span>(<span class="ident">width</span>)
+            <span class="prelude-val">None</span>
         }
-    }
-}
-
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">RegisterDomain</span><span class="op">&gt;</span> <span class="ident">AbstractDomain</span> <span class="kw">for</span> <span class="ident">DataDomain</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="comment">// Merge `self` with `other`.</span>
-    <span class="kw">fn</span> <span class="ident">merge</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="kw">use</span> <span class="ident">DataDomain</span>::<span class="kw-2">*</span>;
-        <span class="kw">match</span> (<span class="self">self</span>, <span class="ident">other</span>) {
-            (<span class="ident">Top</span>(<span class="ident">bytesize</span>), <span class="kw">_</span>) <span class="op">|</span> (<span class="kw">_</span>, <span class="ident">Top</span>(<span class="ident">bytesize</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Top</span>(<span class="kw-2">*</span><span class="ident">bytesize</span>),
-            (<span class="ident">Pointer</span>(<span class="ident">pointer1</span>), <span class="ident">Pointer</span>(<span class="ident">pointer2</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Pointer</span>(<span class="ident">pointer1</span>.<span class="ident">merge</span>(<span class="ident">pointer2</span>)),
-            (<span class="ident">Value</span>(<span class="ident">val1</span>), <span class="ident">Value</span>(<span class="ident">val2</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Value</span>(<span class="ident">val1</span>.<span class="ident">merge</span>(<span class="ident">val2</span>)),
-            (<span class="ident">Pointer</span>(<span class="kw">_</span>), <span class="ident">Value</span>(<span class="kw">_</span>)) <span class="op">|</span> (<span class="ident">Value</span>(<span class="kw">_</span>), <span class="ident">Pointer</span>(<span class="kw">_</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Top</span>(<span class="self">self</span>.<span class="ident">bytesize</span>()),
-        }
-    }
-
-    <span class="doccomment">/// Return whether the element represents a top element or not.</span>
-    <span class="kw">fn</span> <span class="ident">is_top</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="macro">matches!</span>(<span class="self">self</span>, <span class="self">Self</span><span class="ident">::Top</span>(<span class="kw">_</span>))
-    }
-}
-
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">RegisterDomain</span><span class="op">&gt;</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">PointerDomain</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">DataDomain</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">val</span>: <span class="ident">PointerDomain</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="self">Self</span><span class="ident">::Pointer</span>(<span class="ident">val</span>)
-    }
-}
-
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">RegisterDomain</span><span class="op">&gt;</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">DataDomain</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">value</span>: <span class="ident">T</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="self">Self</span><span class="ident">::Value</span>(<span class="ident">value</span>)
-    }
-}
-
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">RegisterDomain</span> <span class="op">+</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Bitvector</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Bitvector</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">DataDomain</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">bitvector</span>: <span class="ident">Bitvector</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="self">Self</span><span class="ident">::Value</span>(<span class="ident">bitvector</span>.<span class="ident">into</span>())
-    }
-}
-
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">RegisterDomain</span> <span class="op">+</span> <span class="ident">TryToBitvec</span><span class="op">&gt;</span> <span class="ident">TryToBitvec</span> <span class="kw">for</span> <span class="ident">DataDomain</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// If the domain represents a single, absolute value, return it.</span>
-    <span class="kw">fn</span> <span class="ident">try_to_bitvec</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Bitvector</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">DataDomain::Value</span>(<span class="ident">value</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">value</span>.<span class="ident">try_to_bitvec</span>(),
-            <span class="ident">DataDomain::Pointer</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="macro">anyhow!</span>(<span class="string">&quot;Value is a pointer.&quot;</span>)),
-            <span class="ident">DataDomain::Top</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="macro">anyhow!</span>(<span class="string">&quot;Value is Top&quot;</span>)),
-        }
-    }
-}
-
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">RegisterDomain</span> <span class="op">+</span> <span class="ident">TryToInterval</span><span class="op">&gt;</span> <span class="ident">TryToInterval</span> <span class="kw">for</span> <span class="ident">DataDomain</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// If the domain represents (or can be widened to) an interval of absolute values, return the interval.</span>
-    <span class="kw">fn</span> <span class="ident">try_to_interval</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Interval</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">DataDomain::Value</span>(<span class="ident">value</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">value</span>.<span class="ident">try_to_interval</span>(),
-            <span class="ident">DataDomain::Pointer</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="macro">anyhow!</span>(<span class="string">&quot;Value is a pointer.&quot;</span>)),
-            <span class="ident">DataDomain::Top</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="macro">anyhow!</span>(<span class="string">&quot;Value is Top&quot;</span>)),
-        }
-    }
-}
-
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">RegisterDomain</span><span class="op">&gt;</span> <span class="ident">std::ops::Add</span> <span class="kw">for</span> <span class="ident">DataDomain</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">DataDomain</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>;
-
-    <span class="kw">fn</span> <span class="ident">add</span>(<span class="self">self</span>, <span class="ident">rhs</span>: <span class="self">Self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="self">self</span>.<span class="ident">bin_op</span>(<span class="ident">BinOpType::IntAdd</span>, <span class="kw-2">&amp;</span><span class="ident">rhs</span>)
-    }
-}
-
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">RegisterDomain</span><span class="op">&gt;</span> <span class="ident">std::ops::Sub</span> <span class="kw">for</span> <span class="ident">DataDomain</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">DataDomain</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>;
-
-    <span class="kw">fn</span> <span class="ident">sub</span>(<span class="self">self</span>, <span class="ident">rhs</span>: <span class="self">Self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="self">self</span>.<span class="ident">bin_op</span>(<span class="ident">BinOpType::IntSub</span>, <span class="kw-2">&amp;</span><span class="ident">rhs</span>)
     }
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">RegisterDomain</span> <span class="op">+</span> <span class="ident">Display</span><span class="op">&gt;</span> <span class="ident">DataDomain</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
     <span class="doccomment">/// Get a more compact json-representation of the data domain.</span>
     <span class="doccomment">/// Intended for pretty printing, not useable for serialization/deserialization.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_json_compact</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">serde_json::Value</span> {
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="self">Self</span><span class="ident">::Top</span>(<span class="ident">bitsize</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">serde_json::Value::String</span>(<span class="macro">format!</span>(<span class="string">&quot;Top:{}&quot;</span>, <span class="ident">bitsize</span>)),
-            <span class="self">Self</span><span class="ident">::Pointer</span>(<span class="ident">pointer</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">let</span> <span class="ident">target_iter</span> <span class="op">=</span> <span class="ident">pointer</span>.<span class="ident">targets</span>().<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">id</span>, <span class="ident">offset</span>)<span class="op">|</span> {
-                    (
-                        <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">id</span>),
-                        <span class="ident">serde_json::Value::String</span>(<span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">offset</span>)),
-                    )
-                });
-                <span class="kw">let</span> <span class="ident">targets</span> <span class="op">=</span> <span class="ident">serde_json::Value::Object</span>(<span class="ident">target_iter</span>.<span class="ident">collect</span>());
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">obj_map</span> <span class="op">=</span> <span class="ident">serde_json::Map::new</span>();
-                <span class="ident">obj_map</span>.<span class="ident">insert</span>(<span class="string">&quot;Pointer&quot;</span>.<span class="ident">to_string</span>(), <span class="ident">targets</span>);
-                <span class="ident">serde_json::Value::Object</span>(<span class="ident">obj_map</span>)
-            }
-            <span class="self">Self</span><span class="ident">::Value</span>(<span class="ident">bitvector</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">serde_json::Value::String</span>(<span class="macro">format!</span>(<span class="string">&quot;Value: {}&quot;</span>, <span class="ident">bitvector</span>)),
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_json_compact</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">serde_json::Value</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">values</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
+        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">relative_values</span>.<span class="ident">is_empty</span>() {
+            <span class="kw">let</span> <span class="ident">target_iter</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">relative_values</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">id</span>, <span class="ident">offset</span>)<span class="op">|</span> {
+                (
+                    <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">id</span>),
+                    <span class="ident">serde_json::Value::String</span>(<span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">offset</span>)),
+                )
+            });
+            <span class="kw">let</span> <span class="ident">targets</span> <span class="op">=</span> <span class="ident">serde_json::Value::Object</span>(<span class="ident">target_iter</span>.<span class="ident">collect</span>());
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">obj_map</span> <span class="op">=</span> <span class="ident">serde_json::Map::new</span>();
+            <span class="ident">obj_map</span>.<span class="ident">insert</span>(<span class="string">&quot;Pointer&quot;</span>.<span class="ident">to_string</span>(), <span class="ident">targets</span>);
+            <span class="ident">values</span>.<span class="ident">push</span>(<span class="ident">serde_json::Value::Object</span>(<span class="ident">obj_map</span>));
+        }
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">absolute_value</span>) <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">absolute_value</span> {
+            <span class="ident">values</span>.<span class="ident">push</span>(<span class="ident">serde_json::Value::String</span>(<span class="macro">format!</span>(
+                <span class="string">&quot;Value: {}&quot;</span>,
+                <span class="ident">absolute_value</span>
+            )));
+        }
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">contains_top_values</span> {
+            <span class="ident">values</span>.<span class="ident">push</span>(<span class="ident">serde_json::Value::String</span>(<span class="macro">format!</span>(
+                <span class="string">&quot;Top:i{}&quot;</span>,
+                <span class="self">self</span>.<span class="ident">bytesize</span>().<span class="ident">as_bit_length</span>()
+            )));
+        }
+        <span class="kw">match</span> <span class="ident">values</span>.<span class="ident">len</span>() {
+            <span class="number">0</span> =&gt; <span class="ident">serde_json::Value::String</span>(<span class="macro">format!</span>(<span class="string">&quot;Empty:{}&quot;</span>, <span class="self">self</span>.<span class="ident">bytesize</span>())),
+            <span class="number">1</span> =&gt; <span class="ident">values</span>.<span class="ident">pop</span>().<span class="ident">unwrap</span>(),
+            <span class="kw">_</span> =&gt; <span class="ident">serde_json::Value::Array</span>(<span class="ident">values</span>),
         }
     }
 }
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
 <span class="kw">mod</span> <span class="ident">tests</span> {
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw">super</span>::<span class="kw-2">*</span>;
+    <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::<span class="kw">super</span></span>::<span class="kw-2">*</span>;
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 
-    <span class="kw">type</span> <span class="ident">Data</span> <span class="op">=</span> <span class="ident">DataDomain</span><span class="op">&lt;</span><span class="ident">BitvectorDomain</span><span class="op">&gt;</span>;
+    <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">RegisterDomain</span><span class="op">&gt;</span> <span class="ident">DataDomain</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+        <span class="doccomment">/// Return a new domain representing a set of relative values.</span>
+        <span class="doccomment">/// Note that this function will panic if given an empty set as input.</span>
+        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mock_from_target_map</span>(<span class="ident">targets</span>: <span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">AbstractIdentifier</span>, <span class="ident">T</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
+            <span class="ident">DataDomain</span> {
+                <span class="ident">size</span>: <span class="ident">targets</span>.<span class="ident">values</span>().<span class="ident">next</span>().<span class="ident">unwrap</span>().<span class="ident">bytesize</span>(),
+                <span class="ident">relative_values</span>: <span class="ident">targets</span>,
+                <span class="ident">absolute_value</span>: <span class="prelude-val">None</span>,
+                <span class="ident">contains_top_values</span>: <span class="bool-val">false</span>,
+            }
+        }
 
-    <span class="kw">fn</span> <span class="ident">bv</span>(<span class="ident">value</span>: <span class="ident">i64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">BitvectorDomain</span> {
-        <span class="ident">BitvectorDomain::Value</span>(<span class="ident">Bitvector::from_i64</span>(<span class="ident">value</span>))
-    }
-
-    <span class="kw">fn</span> <span class="ident">new_id</span>(<span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">AbstractIdentifier</span> {
-        <span class="ident">AbstractIdentifier::new</span>(
-            <span class="ident">Tid::new</span>(<span class="string">&quot;time0&quot;</span>),
-            <span class="ident">AbstractLocation::Register</span>(<span class="ident">name</span>.<span class="ident">into</span>(), <span class="ident">ByteSize::new</span>(<span class="number">8</span>)),
-        )
-    }
-
-    <span class="kw">fn</span> <span class="ident">new_pointer_domain</span>(<span class="ident">location</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">offset</span>: <span class="ident">i64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PointerDomain</span><span class="op">&lt;</span><span class="ident">BitvectorDomain</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">id</span> <span class="op">=</span> <span class="ident">new_id</span>(<span class="ident">location</span>);
-        <span class="ident">PointerDomain::new</span>(<span class="ident">id</span>, <span class="ident">bv</span>(<span class="ident">offset</span>))
-    }
-
-    <span class="kw">fn</span> <span class="ident">new_pointer</span>(<span class="ident">location</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">offset</span>: <span class="ident">i64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Data</span> {
-        <span class="ident">Data::Pointer</span>(<span class="ident">new_pointer_domain</span>(<span class="ident">location</span>, <span class="ident">offset</span>))
-    }
-
-    <span class="kw">fn</span> <span class="ident">new_value</span>(<span class="ident">value</span>: <span class="ident">i64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Data</span> {
-        <span class="ident">Data::Value</span>(<span class="ident">bv</span>(<span class="ident">value</span>))
-    }
-
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">data_abstract_domain</span>() {
-        <span class="kw">let</span> <span class="ident">pointer</span> <span class="op">=</span> <span class="ident">new_pointer</span>(<span class="string">&quot;Rax&quot;</span>.<span class="ident">into</span>(), <span class="number">0</span>);
-        <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="ident">new_value</span>(<span class="number">42</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">pointer</span>.<span class="ident">merge</span>(<span class="kw-2">&amp;</span><span class="ident">pointer</span>), <span class="ident">pointer</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">pointer</span>.<span class="ident">merge</span>(<span class="kw-2">&amp;</span><span class="ident">data</span>), <span class="ident">Data::new_top</span>(<span class="ident">ByteSize::new</span>(<span class="number">8</span>)));
-        <span class="macro">assert_eq!</span>(
-            <span class="ident">data</span>.<span class="ident">merge</span>(<span class="kw-2">&amp;</span><span class="ident">new_value</span>(<span class="number">41</span>)),
-            <span class="ident">Data::Value</span>(<span class="ident">BitvectorDomain::new_top</span>(<span class="ident">ByteSize::new</span>(<span class="number">8</span>)))
-        );
-
-        <span class="kw">let</span> <span class="ident">other_pointer</span> <span class="op">=</span> <span class="ident">new_pointer</span>(<span class="string">&quot;Rbx&quot;</span>.<span class="ident">into</span>(), <span class="number">0</span>);
-        <span class="kw">match</span> <span class="ident">pointer</span>.<span class="ident">merge</span>(<span class="kw-2">&amp;</span><span class="ident">other_pointer</span>) {
-            <span class="ident">Data::Pointer</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> (),
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic!</span>(),
+        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">insert_relative_value</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">id</span>: <span class="ident">AbstractIdentifier</span>, <span class="ident">offset</span>: <span class="ident">T</span>) {
+            <span class="self">self</span>.<span class="ident">relative_values</span>.<span class="ident">insert</span>(<span class="ident">id</span>, <span class="ident">offset</span>);
         }
     }
 
+    <span class="kw">fn</span> <span class="ident">bv</span>(<span class="ident">value</span>: <span class="ident">i64</span>) -&gt; <span class="ident">BitvectorDomain</span> {
+        <span class="ident">BitvectorDomain::Value</span>(<span class="ident">Bitvector::from_i64</span>(<span class="ident">value</span>))
+    }
+
+    <span class="kw">fn</span> <span class="ident">new_id</span>(<span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="ident">AbstractIdentifier</span> {
+        <span class="ident">AbstractIdentifier::new</span>(
+            <span class="ident">Tid::new</span>(<span class="string">&quot;time0&quot;</span>),
+            <span class="ident">AbstractLocation::Register</span>(<span class="ident">Variable::mock</span>(<span class="ident">name</span>, <span class="ident">ByteSize::new</span>(<span class="number">8</span>))),
+        )
+    }
+
     <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">data_register_domain</span>() {
-        <span class="kw">use</span> <span class="ident">BinOpType</span>::<span class="kw-2">*</span>;
-        <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="ident">new_value</span>(<span class="number">42</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">data</span>.<span class="ident">bytesize</span>(), <span class="ident">ByteSize::new</span>(<span class="number">8</span>));
-
-        <span class="kw">let</span> <span class="ident">three</span> <span class="op">=</span> <span class="ident">new_value</span>(<span class="number">3</span>);
-        <span class="kw">let</span> <span class="ident">pointer</span> <span class="op">=</span> <span class="ident">new_pointer</span>(<span class="string">&quot;Rax&quot;</span>.<span class="ident">into</span>(), <span class="number">0</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">data</span>.<span class="ident">bin_op</span>(<span class="ident">IntAdd</span>, <span class="kw-2">&amp;</span><span class="ident">three</span>), <span class="ident">new_value</span>(<span class="number">45</span>));
-        <span class="macro">assert_eq!</span>(<span class="ident">pointer</span>.<span class="ident">bin_op</span>(<span class="ident">IntAdd</span>, <span class="kw-2">&amp;</span><span class="ident">three</span>), <span class="ident">new_pointer</span>(<span class="string">&quot;Rax&quot;</span>.<span class="ident">into</span>(), <span class="number">3</span>));
-        <span class="macro">assert_eq!</span>(<span class="ident">three</span>.<span class="ident">un_op</span>(<span class="ident">UnOpType::Int2Comp</span>), <span class="ident">new_value</span>(<span class="op">-</span><span class="number">3</span>));
-
+    <span class="kw">fn</span> <span class="ident">replace_abstract_ids</span>() {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">targets</span> <span class="op">=</span> <span class="ident">BTreeMap::new</span>();
+        <span class="ident">targets</span>.<span class="ident">insert</span>(<span class="ident">new_id</span>(<span class="string">&quot;Rax&quot;</span>), <span class="ident">bv</span>(<span class="number">1</span>));
+        <span class="ident">targets</span>.<span class="ident">insert</span>(<span class="ident">new_id</span>(<span class="string">&quot;Rbx&quot;</span>), <span class="ident">bv</span>(<span class="number">2</span>));
+        <span class="ident">targets</span>.<span class="ident">insert</span>(<span class="ident">new_id</span>(<span class="string">&quot;Rcx&quot;</span>), <span class="ident">bv</span>(<span class="number">3</span>));
+        <span class="comment">// Test replacing exactly one ID.</span>
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data</span> <span class="op">=</span> <span class="ident">DataDomain::mock_from_target_map</span>(<span class="ident">targets</span>.<span class="ident">clone</span>());
+        <span class="ident">data</span>.<span class="ident">replace_abstract_id</span>(<span class="kw-2">&amp;</span><span class="ident">new_id</span>(<span class="string">&quot;Rbx&quot;</span>), <span class="kw-2">&amp;</span><span class="ident">new_id</span>(<span class="string">&quot;replaced_Rbx&quot;</span>), <span class="kw-2">&amp;</span><span class="ident">bv</span>(<span class="number">10</span>));
+        <span class="macro">assert_eq!</span>(<span class="ident">data</span>.<span class="ident">relative_values</span>.<span class="ident">len</span>(), <span class="number">3</span>);
+        <span class="macro">assert_eq!</span>(<span class="kw-2">*</span><span class="ident">data</span>.<span class="ident">relative_values</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">new_id</span>(<span class="string">&quot;Rax&quot;</span>)).<span class="ident">unwrap</span>(), <span class="ident">bv</span>(<span class="number">1</span>));
         <span class="macro">assert_eq!</span>(
-            <span class="ident">three</span>.<span class="ident">subpiece</span>(<span class="ident">ByteSize::new</span>(<span class="number">0</span>), <span class="ident">ByteSize::new</span>(<span class="number">4</span>)),
-            <span class="ident">Data::Value</span>(<span class="ident">BitvectorDomain::Value</span>(<span class="ident">Bitvector::from_i32</span>(<span class="number">3</span>)))
+            <span class="kw-2">*</span><span class="ident">data</span>.<span class="ident">relative_values</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">new_id</span>(<span class="string">&quot;replaced_Rbx&quot;</span>)).<span class="ident">unwrap</span>(),
+            <span class="ident">bv</span>(<span class="number">12</span>)
         );
-
+        <span class="comment">// Test replacing all IDs using a replacement map.</span>
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data</span> <span class="op">=</span> <span class="ident">DataDomain::mock_from_target_map</span>(<span class="ident">targets</span>);
+        <span class="kw">let</span> <span class="ident">replacement_map</span> <span class="op">=</span> <span class="ident">BTreeMap::from_iter</span>([
+            (
+                <span class="ident">new_id</span>(<span class="string">&quot;Rax&quot;</span>),
+                <span class="ident">DataDomain::from_target</span>(<span class="ident">new_id</span>(<span class="string">&quot;replaced_Rax&quot;</span>), <span class="ident">bv</span>(<span class="number">0</span>)),
+            ),
+            (<span class="ident">new_id</span>(<span class="string">&quot;Rbx&quot;</span>), <span class="ident">bv</span>(<span class="number">10</span>).<span class="ident">into</span>()),
+        ]);
+        <span class="ident">data</span>.<span class="ident">replace_all_ids</span>(<span class="kw-2">&amp;</span><span class="ident">replacement_map</span>);
+        <span class="macro">assert_eq!</span>(<span class="ident">data</span>.<span class="ident">relative_values</span>.<span class="ident">len</span>(), <span class="number">1</span>);
         <span class="macro">assert_eq!</span>(
-            <span class="ident">data</span>.<span class="ident">cast</span>(<span class="ident">CastOpType::IntSExt</span>, <span class="ident">ByteSize::new</span>(<span class="number">16</span>)).<span class="ident">bytesize</span>(),
-            <span class="ident">ByteSize::new</span>(<span class="number">16</span>)
+            <span class="kw-2">*</span><span class="ident">data</span>.<span class="ident">relative_values</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">new_id</span>(<span class="string">&quot;replaced_Rax&quot;</span>)).<span class="ident">unwrap</span>(),
+            <span class="ident">bv</span>(<span class="number">1</span>)
         );
-
-        <span class="kw">let</span> <span class="ident">one</span> <span class="op">=</span> <span class="ident">Data::Value</span>(<span class="ident">BitvectorDomain::Value</span>(<span class="ident">Bitvector::from_i32</span>(<span class="number">1</span>)));
-        <span class="kw">let</span> <span class="ident">two</span> <span class="op">=</span> <span class="ident">Data::Value</span>(<span class="ident">BitvectorDomain::Value</span>(<span class="ident">Bitvector::from_i32</span>(<span class="number">2</span>)));
-        <span class="kw">let</span> <span class="ident">concat</span> <span class="op">=</span> <span class="ident">new_value</span>((<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">32</span>) <span class="op">+</span> <span class="number">2</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">one</span>.<span class="ident">bin_op</span>(<span class="ident">Piece</span>, <span class="kw-2">&amp;</span><span class="ident">two</span>), <span class="ident">concat</span>);
+        <span class="macro">assert!</span>(<span class="ident">data</span>.<span class="ident">contains_top</span>());
+        <span class="macro">assert_eq!</span>(<span class="ident">data</span>.<span class="ident">absolute_value</span>.<span class="ident">unwrap</span>(), <span class="ident">bv</span>(<span class="number">12</span>));
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
@@ -851,7 +658,7 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">targets</span> <span class="op">=</span> <span class="ident">BTreeMap::new</span>();
         <span class="ident">targets</span>.<span class="ident">insert</span>(<span class="ident">new_id</span>(<span class="string">&quot;Rax&quot;</span>), <span class="ident">bv</span>(<span class="number">1</span>));
         <span class="ident">targets</span>.<span class="ident">insert</span>(<span class="ident">new_id</span>(<span class="string">&quot;Rbx&quot;</span>), <span class="ident">bv</span>(<span class="number">2</span>));
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data</span>: <span class="ident">Data</span> <span class="op">=</span> <span class="ident">PointerDomain::with_targets</span>(<span class="ident">targets</span>).<span class="ident">into</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data</span> <span class="op">=</span> <span class="ident">DataDomain::mock_from_target_map</span>(<span class="ident">targets</span>);
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ids_to_remove</span> <span class="op">=</span> <span class="ident">BTreeSet::new</span>();
         <span class="ident">ids_to_remove</span>.<span class="ident">insert</span>(<span class="ident">new_id</span>(<span class="string">&quot;Rbx&quot;</span>));
@@ -859,23 +666,17 @@
 
         <span class="ident">data</span>.<span class="ident">remove_ids</span>(<span class="kw-2">&amp;</span><span class="ident">ids_to_remove</span>);
         <span class="macro">assert_eq!</span>(
-            <span class="ident">data</span>.<span class="ident">referenced_ids</span>(),
-            <span class="macro">vec!</span>[<span class="ident">new_id</span>(<span class="string">&quot;Rax&quot;</span>)].<span class="ident">into_iter</span>().<span class="ident">collect</span>()
+            <span class="ident">data</span>.<span class="ident">referenced_ids</span>()
+                .<span class="ident">cloned</span>()
+                .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">AbstractIdentifier</span><span class="op">&gt;</span><span class="op">&gt;</span>(),
+            <span class="macro">vec!</span>[<span class="ident">new_id</span>(<span class="string">&quot;Rax&quot;</span>)]
         );
 
         <span class="ident">data</span> <span class="op">=</span> <span class="ident">bv</span>(<span class="number">42</span>).<span class="ident">into</span>();
         <span class="ident">data</span>.<span class="ident">remove_ids</span>(<span class="kw-2">&amp;</span><span class="ident">ids_to_remove</span>);
         <span class="macro">assert_eq!</span>(<span class="ident">data</span>, <span class="ident">bv</span>(<span class="number">42</span>).<span class="ident">into</span>());
     }
-
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">float_nan_bytesize</span>() {
-        <span class="kw">let</span> <span class="ident">top_value</span>: <span class="ident">DataDomain</span><span class="op">&lt;</span><span class="ident">BitvectorDomain</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">DataDomain::new_top</span>(<span class="ident">ByteSize::new</span>(<span class="number">8</span>));
-        <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">top_value</span>.<span class="ident">un_op</span>(<span class="ident">UnOpType::FloatNaN</span>);
-        <span class="macro">assert!</span>(<span class="ident">result</span>.<span class="ident">is_top</span>());
-        <span class="macro">assert_eq!</span>(<span class="ident">result</span>.<span class="ident">bytesize</span>(), <span class="ident">ByteSize::new</span>(<span class="number">1</span>));
-    }
 }
-</pre></div>
-</section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="cwe_checker_lib" data-search-index-js="../../../search-index.js" data-search-js="../../../search.js"></div>
-    <script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script></body></html>
+</code></pre></div>
+</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="cwe_checker_lib" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.60.0 (7737e0b5c 2022-04-04)" ></div>
+</body></html>

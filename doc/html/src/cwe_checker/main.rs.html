@@ -1,7 +1,9 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/caller/src/main.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>main.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><script src="../../crates.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
-<link rel="alternate icon" type="image/png" href="../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../cwe_checker/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
-                <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/caller/src/main.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>main.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script src="../../crates.js"></script><script defer src="../../main.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script>
+    <noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../cwe_checker/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../cwe_checker/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../cwe_checker/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><div class="theme-picker hidden"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="22" height="22" alt="Pick another theme!" src="../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
 <span id="4">  4</span>
@@ -338,20 +340,115 @@
 <span id="335">335</span>
 <span id="336">336</span>
 <span id="337">337</span>
-</pre><div class="example-wrap"><pre class="rust ">
-<span class="doccomment">//! This crate defines the command line interface for the cwe_checker.</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
+<span id="390">390</span>
+<span id="391">391</span>
+<span id="392">392</span>
+<span id="393">393</span>
+<span id="394">394</span>
+<span id="395">395</span>
+<span id="396">396</span>
+<span id="397">397</span>
+<span id="398">398</span>
+<span id="399">399</span>
+<span id="400">400</span>
+<span id="401">401</span>
+<span id="402">402</span>
+<span id="403">403</span>
+<span id="404">404</span>
+<span id="405">405</span>
+<span id="406">406</span>
+<span id="407">407</span>
+<span id="408">408</span>
+<span id="409">409</span>
+<span id="410">410</span>
+<span id="411">411</span>
+<span id="412">412</span>
+<span id="413">413</span>
+<span id="414">414</span>
+<span id="415">415</span>
+<span id="416">416</span>
+<span id="417">417</span>
+<span id="418">418</span>
+<span id="419">419</span>
+<span id="420">420</span>
+<span id="421">421</span>
+<span id="422">422</span>
+<span id="423">423</span>
+<span id="424">424</span>
+<span id="425">425</span>
+<span id="426">426</span>
+<span id="427">427</span>
+<span id="428">428</span>
+<span id="429">429</span>
+<span id="430">430</span>
+<span id="431">431</span>
+<span id="432">432</span>
+</pre><pre class="rust"><code><span class="doccomment">//! This crate defines the command line interface for the cwe_checker.</span>
 <span class="doccomment">//! General documentation about the cwe_checker is contained in the [`cwe_checker_lib`] crate.</span>
 
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">cwe_checker_lib</span>; <span class="comment">// Needed for the docstring-link to work</span>
 
 <span class="kw">use</span> <span class="ident">cwe_checker_lib::analysis::graph</span>;
-<span class="kw">use</span> <span class="ident">cwe_checker_lib::utils::binary::RuntimeMemoryImage</span>;
-<span class="kw">use</span> <span class="ident">cwe_checker_lib::utils::log::print_all_messages</span>;
+<span class="kw">use</span> <span class="ident">cwe_checker_lib::intermediate_representation::RuntimeMemoryImage</span>;
+<span class="kw">use</span> <span class="ident">cwe_checker_lib::utils::binary::BareMetalConfig</span>;
+<span class="kw">use</span> <span class="ident">cwe_checker_lib::utils::log</span>::{<span class="ident">print_all_messages</span>, <span class="ident">LogLevel</span>};
 <span class="kw">use</span> <span class="ident">cwe_checker_lib::utils</span>::{<span class="ident">get_ghidra_plugin_path</span>, <span class="ident">read_config_file</span>};
 <span class="kw">use</span> <span class="ident">cwe_checker_lib::AnalysisResults</span>;
 <span class="kw">use</span> <span class="ident">cwe_checker_lib</span>::{<span class="ident">intermediate_representation::Project</span>, <span class="ident">utils::log::LogMessage</span>};
 <span class="kw">use</span> <span class="ident">nix</span>::{<span class="ident">sys::stat</span>, <span class="ident">unistd</span>};
-<span class="kw">use</span> <span class="ident">std::collections::HashSet</span>;
+<span class="kw">use</span> <span class="ident">std::collections</span>::{<span class="ident">BTreeSet</span>, <span class="ident">HashSet</span>};
 <span class="kw">use</span> <span class="ident">std::path</span>::{<span class="ident">Path</span>, <span class="ident">PathBuf</span>};
 <span class="kw">use</span> <span class="ident">std::process::Command</span>;
 <span class="kw">use</span> <span class="ident">std::thread</span>;
@@ -387,6 +484,21 @@
     <span class="attribute">#[<span class="ident">structopt</span>(<span class="ident">long</span>, <span class="ident">short</span>)]</span>
     <span class="ident">quiet</span>: <span class="ident">bool</span>,
 
+    <span class="doccomment">/// Print additional debug log messages.</span>
+    <span class="attribute">#[<span class="ident">structopt</span>(<span class="ident">long</span>, <span class="ident">short</span>, <span class="ident">conflicts_with</span>(<span class="string">&quot;quiet&quot;</span>))]</span>
+    <span class="ident">verbose</span>: <span class="ident">bool</span>,
+
+    <span class="doccomment">/// Include various statistics in the log messages.</span>
+    <span class="doccomment">/// This can be helpful for assessing the analysis quality for the input binary.</span>
+    <span class="attribute">#[<span class="ident">structopt</span>(<span class="ident">long</span>, <span class="ident">conflicts_with</span>(<span class="string">&quot;quiet&quot;</span>))]</span>
+    <span class="ident">statistics</span>: <span class="ident">bool</span>,
+
+    <span class="doccomment">/// Path to a configuration file for analysis of bare metal binaries.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// If this option is set then the input binary is treated as a bare metal binary regardless of its format.</span>
+    <span class="attribute">#[<span class="ident">structopt</span>(<span class="ident">long</span>)]</span>
+    <span class="ident">bare_metal_config</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
+
     <span class="doccomment">/// Prints out the version numbers of all known modules.</span>
     <span class="attribute">#[<span class="ident">structopt</span>(<span class="ident">long</span>)]</span>
     <span class="ident">module_versions</span>: <span class="ident">bool</span>,
@@ -400,11 +512,11 @@
 <span class="kw">fn</span> <span class="ident">main</span>() {
     <span class="kw">let</span> <span class="ident">cmdline_args</span> <span class="op">=</span> <span class="ident">CmdlineArgs::from_args</span>();
 
-    <span class="ident">run_with_ghidra</span>(<span class="ident">cmdline_args</span>);
+    <span class="ident">run_with_ghidra</span>(<span class="kw-2">&amp;</span><span class="ident">cmdline_args</span>);
 }
 
 <span class="doccomment">/// Check the existence of a file</span>
-<span class="kw">fn</span> <span class="ident">check_file_existence</span>(<span class="ident">file_path</span>: <span class="ident">String</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">String</span><span class="op">&gt;</span> {
+<span class="kw">fn</span> <span class="ident">check_file_existence</span>(<span class="ident">file_path</span>: <span class="ident">String</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">String</span><span class="op">&gt;</span> {
     <span class="kw">if</span> <span class="ident">std::fs::metadata</span>(<span class="kw-2">&amp;</span><span class="ident">file_path</span>)
         .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">err</span><span class="op">|</span> <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">err</span>))<span class="question-mark">?</span>
         .<span class="ident">is_file</span>()
@@ -416,7 +528,7 @@
 }
 
 <span class="doccomment">/// Run the cwe_checker with Ghidra as its backend.</span>
-<span class="kw">fn</span> <span class="ident">run_with_ghidra</span>(<span class="ident">args</span>: <span class="ident">CmdlineArgs</span>) {
+<span class="kw">fn</span> <span class="ident">run_with_ghidra</span>(<span class="ident">args</span>: <span class="kw-2">&amp;</span><span class="ident">CmdlineArgs</span>) {
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">modules</span> <span class="op">=</span> <span class="ident">cwe_checker_lib::get_modules</span>();
     <span class="kw">if</span> <span class="ident">args</span>.<span class="ident">module_versions</span> {
         <span class="comment">// Only print the module versions and then quit.</span>
@@ -428,16 +540,24 @@
     }
 
     <span class="comment">// Get the configuration file</span>
-    <span class="kw">let</span> <span class="ident">config</span>: <span class="ident">serde_json::Value</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">config_path</span>) <span class="op">=</span> <span class="ident">args</span>.<span class="ident">config</span> {
+    <span class="kw">let</span> <span class="ident">config</span>: <span class="ident">serde_json::Value</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">config_path</span>) <span class="op">=</span> <span class="ident">args</span>.<span class="ident">config</span> {
         <span class="kw">let</span> <span class="ident">file</span> <span class="op">=</span> <span class="ident">std::io::BufReader::new</span>(<span class="ident">std::fs::File::open</span>(<span class="ident">config_path</span>).<span class="ident">unwrap</span>());
         <span class="ident">serde_json::from_reader</span>(<span class="ident">file</span>).<span class="ident">expect</span>(<span class="string">&quot;Parsing of the configuration file failed&quot;</span>)
     } <span class="kw">else</span> {
         <span class="ident">read_config_file</span>(<span class="string">&quot;config.json&quot;</span>)
     };
 
+    <span class="comment">// Get the bare metal configuration file if it is provided</span>
+    <span class="kw">let</span> <span class="ident">bare_metal_config_opt</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">BareMetalConfig</span><span class="op">&gt;</span> <span class="op">=</span>
+        <span class="ident">args</span>.<span class="ident">bare_metal_config</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">config_path</span><span class="op">|</span> {
+            <span class="kw">let</span> <span class="ident">file</span> <span class="op">=</span> <span class="ident">std::io::BufReader::new</span>(<span class="ident">std::fs::File::open</span>(<span class="ident">config_path</span>).<span class="ident">unwrap</span>());
+            <span class="ident">serde_json::from_reader</span>(<span class="ident">file</span>)
+                .<span class="ident">expect</span>(<span class="string">&quot;Parsing of the bare metal configuration file failed&quot;</span>)
+        });
+
     <span class="comment">// Filter the modules to be executed if the `--partial` parameter is set.</span>
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">partial_module_list</span>) <span class="op">=</span> <span class="ident">args</span>.<span class="ident">partial</span> {
-        <span class="ident">filter_modules_for_partial_run</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">modules</span>, <span class="ident">partial_module_list</span>);
+        <span class="ident">filter_modules_for_partial_run</span>(<span class="kw-2">&amp;mut</span> <span class="ident">modules</span>, <span class="ident">partial_module_list</span>);
     } <span class="kw">else</span> {
         <span class="comment">// TODO: CWE78 is disabled on a standard run for now,</span>
         <span class="comment">// because it uses up huge amounts of RAM and computation time on some binaries.</span>
@@ -447,65 +567,102 @@
             .<span class="ident">collect</span>();
     }
 
-    <span class="kw">let</span> <span class="ident">binary_file_path</span> <span class="op">=</span> <span class="ident">PathBuf::from</span>(<span class="ident">args</span>.<span class="ident">binary</span>.<span class="ident">unwrap</span>());
+    <span class="kw">let</span> <span class="ident">binary_file_path</span> <span class="op">=</span> <span class="ident">PathBuf::from</span>(<span class="ident">args</span>.<span class="ident">binary</span>.<span class="ident">clone</span>().<span class="ident">unwrap</span>());
     <span class="kw">let</span> <span class="ident">binary</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">std::fs::read</span>(<span class="kw-2">&amp;</span><span class="ident">binary_file_path</span>).<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> {
         <span class="macro">panic!</span>(
             <span class="string">&quot;Error: Could not read from file path {}&quot;</span>,
             <span class="ident">binary_file_path</span>.<span class="ident">display</span>()
         )
     });
-    <span class="kw">let</span> (<span class="kw-2">mut</span> <span class="ident">project</span>, <span class="kw-2">mut</span> <span class="ident">all_logs</span>) <span class="op">=</span> <span class="ident">get_project_from_ghidra</span>(<span class="kw-2">&amp;</span><span class="ident">binary_file_path</span>, <span class="kw-2">&amp;</span><span class="ident">binary</span>[..]);
+    <span class="kw">let</span> (<span class="kw-2">mut</span> <span class="ident">project</span>, <span class="kw-2">mut</span> <span class="ident">all_logs</span>) <span class="op">=</span> <span class="ident">get_project_from_ghidra</span>(
+        <span class="kw-2">&amp;</span><span class="ident">binary_file_path</span>,
+        <span class="kw-2">&amp;</span><span class="ident">binary</span>[..],
+        <span class="ident">bare_metal_config_opt</span>.<span class="ident">clone</span>(),
+    );
     <span class="comment">// Normalize the project and gather log messages generated from it.</span>
-    <span class="ident">all_logs</span>.<span class="ident">append</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">project</span>.<span class="ident">normalize</span>());
+    <span class="ident">all_logs</span>.<span class="ident">append</span>(<span class="kw-2">&amp;mut</span> <span class="ident">project</span>.<span class="ident">normalize</span>());
 
     <span class="comment">// Generate the representation of the runtime memory image of the binary</span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">runtime_memory_image</span> <span class="op">=</span> <span class="ident">RuntimeMemoryImage::new</span>(<span class="kw-2">&amp;</span><span class="ident">binary</span>).<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">err</span><span class="op">|</span> {
-        <span class="macro">panic!</span>(<span class="string">&quot;Error while generating runtime memory image: {}&quot;</span>, <span class="ident">err</span>);
-    });
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">runtime_memory_image</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">bare_metal_config</span>) <span class="op">=</span> <span class="ident">bare_metal_config_opt</span>.<span class="ident">as_ref</span>() {
+        <span class="ident">RuntimeMemoryImage::new_from_bare_metal</span>(<span class="kw-2">&amp;</span><span class="ident">binary</span>, <span class="ident">bare_metal_config</span>).<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">err</span><span class="op">|</span> {
+            <span class="macro">panic!</span>(<span class="string">&quot;Error while generating runtime memory image: {}&quot;</span>, <span class="ident">err</span>);
+        })
+    } <span class="kw">else</span> {
+        <span class="ident">RuntimeMemoryImage::new</span>(<span class="kw-2">&amp;</span><span class="ident">binary</span>).<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">err</span><span class="op">|</span> {
+            <span class="macro">panic!</span>(<span class="string">&quot;Error while generating runtime memory image: {}&quot;</span>, <span class="ident">err</span>);
+        })
+    };
     <span class="kw">if</span> <span class="ident">project</span>.<span class="ident">program</span>.<span class="ident">term</span>.<span class="ident">address_base_offset</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
         <span class="comment">// We adjust the memory addresses once globally</span>
         <span class="comment">// so that other analyses do not have to adjust their addresses.</span>
         <span class="ident">runtime_memory_image</span>.<span class="ident">add_global_memory_offset</span>(<span class="ident">project</span>.<span class="ident">program</span>.<span class="ident">term</span>.<span class="ident">address_base_offset</span>);
     }
+
+    <span class="ident">project</span>.<span class="ident">runtime_memory_image</span> <span class="op">=</span> <span class="ident">runtime_memory_image</span>;
+
     <span class="comment">// Generate the control flow graph of the program</span>
     <span class="kw">let</span> <span class="ident">extern_sub_tids</span> <span class="op">=</span> <span class="ident">project</span>
         .<span class="ident">program</span>
         .<span class="ident">term</span>
         .<span class="ident">extern_symbols</span>
-        .<span class="ident">iter</span>()
-        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">symbol</span><span class="op">|</span> <span class="ident">symbol</span>.<span class="ident">tid</span>.<span class="ident">clone</span>())
+        .<span class="ident">keys</span>()
+        .<span class="ident">cloned</span>()
         .<span class="ident">collect</span>();
     <span class="kw">let</span> <span class="ident">control_flow_graph</span> <span class="op">=</span> <span class="ident">graph::get_program_cfg</span>(<span class="kw-2">&amp;</span><span class="ident">project</span>.<span class="ident">program</span>, <span class="ident">extern_sub_tids</span>);
 
-    <span class="kw">let</span> <span class="ident">analysis_results</span> <span class="op">=</span> <span class="ident">AnalysisResults::new</span>(
-        <span class="kw-2">&amp;</span><span class="ident">binary</span>,
-        <span class="kw-2">&amp;</span><span class="ident">runtime_memory_image</span>,
-        <span class="kw-2">&amp;</span><span class="ident">control_flow_graph</span>,
-        <span class="kw-2">&amp;</span><span class="ident">project</span>,
-    );
+    <span class="kw">let</span> <span class="ident">analysis_results</span> <span class="op">=</span> <span class="ident">AnalysisResults::new</span>(<span class="kw-2">&amp;</span><span class="ident">binary</span>, <span class="kw-2">&amp;</span><span class="ident">control_flow_graph</span>, <span class="kw-2">&amp;</span><span class="ident">project</span>);
 
-    <span class="kw">let</span> <span class="ident">modules_depending_on_pointer_inference</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="string">&quot;CWE78&quot;</span>, <span class="string">&quot;CWE134&quot;</span>, <span class="string">&quot;CWE476&quot;</span>, <span class="string">&quot;Memory&quot;</span>];
-    <span class="kw">let</span> <span class="ident">pointer_inference_results</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">modules</span>
+    <span class="kw">let</span> <span class="ident">modules_depending_on_string_abstraction</span> <span class="op">=</span> <span class="ident">BTreeSet::from_iter</span>([<span class="string">&quot;CWE78&quot;</span>]);
+    <span class="kw">let</span> <span class="ident">modules_depending_on_pointer_inference</span> <span class="op">=</span>
+        <span class="ident">BTreeSet::from_iter</span>([<span class="string">&quot;CWE119&quot;</span>, <span class="string">&quot;CWE134&quot;</span>, <span class="string">&quot;CWE416&quot;</span>, <span class="string">&quot;CWE476&quot;</span>, <span class="string">&quot;Memory&quot;</span>]);
+
+    <span class="kw">let</span> <span class="ident">string_abstraction_needed</span> <span class="op">=</span> <span class="ident">modules</span>
         .<span class="ident">iter</span>()
-        .<span class="ident">any</span>(<span class="op">|</span><span class="ident">module</span><span class="op">|</span> <span class="ident">modules_depending_on_pointer_inference</span>.<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">module</span>.<span class="ident">name</span>))
-    {
-        <span class="prelude-val">Some</span>(<span class="ident">analysis_results</span>.<span class="ident">compute_pointer_inference</span>(<span class="kw-2">&amp;</span><span class="ident">config</span>[<span class="string">&quot;Memory&quot;</span>]))
+        .<span class="ident">any</span>(<span class="op">|</span><span class="ident">module</span><span class="op">|</span> <span class="ident">modules_depending_on_string_abstraction</span>.<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">module</span>.<span class="ident">name</span>));
+
+    <span class="kw">let</span> <span class="ident">pi_analysis_needed</span> <span class="op">=</span> <span class="ident">string_abstraction_needed</span>
+        <span class="op">|</span><span class="op">|</span> <span class="ident">modules</span>
+            .<span class="ident">iter</span>()
+            .<span class="ident">any</span>(<span class="op">|</span><span class="ident">module</span><span class="op">|</span> <span class="ident">modules_depending_on_pointer_inference</span>.<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">module</span>.<span class="ident">name</span>));
+
+    <span class="comment">// Compute function signatures if required</span>
+    <span class="kw">let</span> <span class="ident">function_signatures</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">pi_analysis_needed</span> {
+        <span class="kw">let</span> (<span class="ident">function_signatures</span>, <span class="kw-2">mut</span> <span class="ident">logs</span>) <span class="op">=</span> <span class="ident">analysis_results</span>.<span class="ident">compute_function_signatures</span>();
+        <span class="ident">all_logs</span>.<span class="ident">append</span>(<span class="kw-2">&amp;mut</span> <span class="ident">logs</span>);
+        <span class="prelude-val">Some</span>(<span class="ident">function_signatures</span>)
     } <span class="kw">else</span> {
         <span class="prelude-val">None</span>
     };
+    <span class="kw">let</span> <span class="ident">analysis_results</span> <span class="op">=</span> <span class="ident">analysis_results</span>.<span class="ident">with_function_signatures</span>(<span class="ident">function_signatures</span>.<span class="ident">as_ref</span>());
+    <span class="comment">// Compute pointer inference if required</span>
+    <span class="kw">let</span> <span class="ident">pi_analysis_results</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">pi_analysis_needed</span> {
+        <span class="prelude-val">Some</span>(<span class="ident">analysis_results</span>.<span class="ident">compute_pointer_inference</span>(<span class="kw-2">&amp;</span><span class="ident">config</span>[<span class="string">&quot;Memory&quot;</span>], <span class="ident">args</span>.<span class="ident">statistics</span>))
+    } <span class="kw">else</span> {
+        <span class="prelude-val">None</span>
+    };
+    <span class="kw">let</span> <span class="ident">analysis_results</span> <span class="op">=</span> <span class="ident">analysis_results</span>.<span class="ident">with_pointer_inference</span>(<span class="ident">pi_analysis_results</span>.<span class="ident">as_ref</span>());
+    <span class="comment">// Compute string abstraction analysis if required</span>
+    <span class="kw">let</span> <span class="ident">string_abstraction_results</span> <span class="op">=</span>
+        <span class="kw">if</span> <span class="ident">string_abstraction_needed</span> {
+            <span class="prelude-val">Some</span>(<span class="ident">analysis_results</span>.<span class="ident">compute_string_abstraction</span>(
+                <span class="kw-2">&amp;</span><span class="ident">config</span>[<span class="string">&quot;StringAbstraction&quot;</span>],
+                <span class="ident">pi_analysis_results</span>.<span class="ident">as_ref</span>(),
+            ))
+        } <span class="kw">else</span> {
+            <span class="prelude-val">None</span>
+        };
     <span class="kw">let</span> <span class="ident">analysis_results</span> <span class="op">=</span>
-        <span class="ident">analysis_results</span>.<span class="ident">set_pointer_inference</span>(<span class="ident">pointer_inference_results</span>.<span class="ident">as_ref</span>());
+        <span class="ident">analysis_results</span>.<span class="ident">with_string_abstraction</span>(<span class="ident">string_abstraction_results</span>.<span class="ident">as_ref</span>());
 
     <span class="comment">// Print debug and then return.</span>
     <span class="comment">// Right now there is only one debug printing function.</span>
     <span class="comment">// When more debug printing modes exist, this behaviour will change!</span>
     <span class="kw">if</span> <span class="ident">args</span>.<span class="ident">debug</span> {
         <span class="ident">cwe_checker_lib::analysis::pointer_inference::run</span>(
-            <span class="kw-2">&amp;</span><span class="ident">project</span>,
-            <span class="kw-2">&amp;</span><span class="ident">runtime_memory_image</span>,
-            <span class="kw-2">&amp;</span><span class="ident">control_flow_graph</span>,
+            <span class="kw-2">&amp;</span><span class="ident">analysis_results</span>,
             <span class="ident">serde_json::from_value</span>(<span class="ident">config</span>[<span class="string">&quot;Memory&quot;</span>].<span class="ident">clone</span>()).<span class="ident">unwrap</span>(),
             <span class="bool-val">true</span>,
+            <span class="bool-val">false</span>,
         );
         <span class="kw">return</span>;
     }
@@ -514,13 +671,20 @@
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">all_cwes</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
     <span class="kw">for</span> <span class="ident">module</span> <span class="kw">in</span> <span class="ident">modules</span> {
         <span class="kw">let</span> (<span class="kw-2">mut</span> <span class="ident">logs</span>, <span class="kw-2">mut</span> <span class="ident">cwes</span>) <span class="op">=</span> (<span class="ident">module</span>.<span class="ident">run</span>)(<span class="kw-2">&amp;</span><span class="ident">analysis_results</span>, <span class="kw-2">&amp;</span><span class="ident">config</span>[<span class="kw-2">&amp;</span><span class="ident">module</span>.<span class="ident">name</span>]);
-        <span class="ident">all_logs</span>.<span class="ident">append</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">logs</span>);
-        <span class="ident">all_cwes</span>.<span class="ident">append</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">cwes</span>);
+        <span class="ident">all_logs</span>.<span class="ident">append</span>(<span class="kw-2">&amp;mut</span> <span class="ident">logs</span>);
+        <span class="ident">all_cwes</span>.<span class="ident">append</span>(<span class="kw-2">&amp;mut</span> <span class="ident">cwes</span>);
     }
 
     <span class="comment">// Print the results of the modules.</span>
     <span class="kw">if</span> <span class="ident">args</span>.<span class="ident">quiet</span> {
         <span class="ident">all_logs</span> <span class="op">=</span> <span class="ident">Vec::new</span>(); <span class="comment">// Suppress all log messages since the `--quiet` flag is set.</span>
+    } <span class="kw">else</span> {
+        <span class="kw">if</span> <span class="ident">args</span>.<span class="ident">statistics</span> {
+            <span class="ident">cwe_checker_lib::utils::log::add_debug_log_statistics</span>(<span class="kw-2">&amp;mut</span> <span class="ident">all_logs</span>);
+        }
+        <span class="kw">if</span> <span class="op">!</span><span class="ident">args</span>.<span class="ident">verbose</span> {
+            <span class="ident">all_logs</span>.<span class="ident">retain</span>(<span class="op">|</span><span class="ident">log_msg</span><span class="op">|</span> <span class="ident">log_msg</span>.<span class="ident">level</span> <span class="op">!</span><span class="op">=</span> <span class="ident">LogLevel::Debug</span>);
+        }
     }
     <span class="ident">print_all_messages</span>(<span class="ident">all_logs</span>, <span class="ident">all_cwes</span>, <span class="ident">args</span>.<span class="ident">out</span>.<span class="ident">as_deref</span>(), <span class="ident">args</span>.<span class="ident">json</span>);
 }
@@ -528,14 +692,14 @@
 <span class="doccomment">/// Only keep the modules specified by the `--partial` parameter in the `modules` list.</span>
 <span class="doccomment">/// The parameter is a comma-separated list of module names, e.g. &#39;CWE332,CWE476,CWE782&#39;.</span>
 <span class="kw">fn</span> <span class="ident">filter_modules_for_partial_run</span>(
-    <span class="ident">modules</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">cwe_checker_lib::CweModule</span><span class="op">&gt;</span>,
+    <span class="ident">modules</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">cwe_checker_lib::CweModule</span><span class="op">&gt;</span>,
     <span class="ident">partial_param</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
 ) {
     <span class="kw">let</span> <span class="ident">module_names</span>: <span class="ident">HashSet</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">str</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">partial_param</span>.<span class="ident">split</span>(<span class="string">&#39;,&#39;</span>).<span class="ident">collect</span>();
     <span class="kw-2">*</span><span class="ident">modules</span> <span class="op">=</span> <span class="ident">module_names</span>
         .<span class="ident">into_iter</span>()
         .<span class="ident">filter_map</span>(<span class="op">|</span><span class="ident">module_name</span><span class="op">|</span> {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">module</span>) <span class="op">=</span> <span class="ident">modules</span>.<span class="ident">iter</span>().<span class="ident">find</span>(<span class="op">|</span><span class="ident">module</span><span class="op">|</span> <span class="ident">module</span>.<span class="ident">name</span> <span class="op">=</span><span class="op">=</span> <span class="ident">module_name</span>) {
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">module</span>) <span class="op">=</span> <span class="ident">modules</span>.<span class="ident">iter</span>().<span class="ident">find</span>(<span class="op">|</span><span class="ident">module</span><span class="op">|</span> <span class="ident">module</span>.<span class="ident">name</span> <span class="op">==</span> <span class="ident">module_name</span>) {
                 <span class="prelude-val">Some</span>(<span class="kw-2">*</span><span class="ident">module</span>)
             } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">module_name</span>.<span class="ident">is_empty</span>() {
                 <span class="prelude-val">None</span>
@@ -547,7 +711,14 @@
 }
 
 <span class="doccomment">/// Execute the `p_code_extractor` plugin in ghidra and parse its output into the `Project` data structure.</span>
-<span class="kw">fn</span> <span class="ident">get_project_from_ghidra</span>(<span class="ident">file_path</span>: <span class="kw-2">&amp;</span><span class="ident">Path</span>, <span class="ident">binary</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">Project</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">LogMessage</span><span class="op">&gt;</span>) {
+<span class="kw">fn</span> <span class="ident">get_project_from_ghidra</span>(
+    <span class="ident">file_path</span>: <span class="kw-2">&amp;</span><span class="ident">Path</span>,
+    <span class="ident">binary</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>],
+    <span class="ident">bare_metal_config_opt</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">BareMetalConfig</span><span class="op">&gt;</span>,
+) -&gt; (<span class="ident">Project</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">LogMessage</span><span class="op">&gt;</span>) {
+    <span class="kw">let</span> <span class="ident">bare_metal_base_address_opt</span> <span class="op">=</span> <span class="ident">bare_metal_config_opt</span>
+        .<span class="ident">as_ref</span>()
+        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">config</span><span class="op">|</span> <span class="ident">config</span>.<span class="ident">parse_binary_base_address</span>());
     <span class="kw">let</span> <span class="ident">ghidra_path</span>: <span class="ident">std::path::PathBuf</span> <span class="op">=</span>
         <span class="ident">serde_json::from_value</span>(<span class="ident">read_config_file</span>(<span class="string">&quot;ghidra.json&quot;</span>)[<span class="string">&quot;ghidra_path&quot;</span>].<span class="ident">clone</span>())
             .<span class="ident">expect</span>(<span class="string">&quot;Path to Ghidra not configured.&quot;</span>);
@@ -596,7 +767,8 @@
     <span class="comment">// Execute Ghidra in a new thread and return a Join Handle, so that the thread is only joined</span>
     <span class="comment">// after the output has been read into the cwe_checker</span>
     <span class="kw">let</span> <span class="ident">ghidra_subprocess</span> <span class="op">=</span> <span class="ident">thread::spawn</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
-        <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">Command::new</span>(<span class="kw-2">&amp;</span><span class="ident">headless_path</span>)
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ghidra_command</span> <span class="op">=</span> <span class="ident">Command::new</span>(<span class="kw-2">&amp;</span><span class="ident">headless_path</span>);
+        <span class="ident">ghidra_command</span>
             .<span class="ident">arg</span>(<span class="kw-2">&amp;</span><span class="ident">thread_tmp_folder</span>) <span class="comment">// The folder where temporary files should be stored</span>
             .<span class="ident">arg</span>(<span class="macro">format!</span>(<span class="string">&quot;PcodeExtractor_{}_{}&quot;</span>, <span class="ident">filename</span>, <span class="ident">timestamp_suffix</span>)) <span class="comment">// The name of the temporary Ghidra Project.</span>
             .<span class="ident">arg</span>(<span class="string">&quot;-import&quot;</span>) <span class="comment">// Import a file into the Ghidra project</span>
@@ -608,18 +780,31 @@
             .<span class="ident">arg</span>(<span class="ident">ghidra_plugin_path</span>) <span class="comment">// Path to the folder containing the PcodeExtractor.java (so that the other java files can be found.)</span>
             .<span class="ident">arg</span>(<span class="string">&quot;-deleteProject&quot;</span>) <span class="comment">// Delete the temporary project after the script finished</span>
             .<span class="ident">arg</span>(<span class="string">&quot;-analysisTimeoutPerFile&quot;</span>) <span class="comment">// Set a timeout for how long the standard analysis can run before getting aborted</span>
-            .<span class="ident">arg</span>(<span class="string">&quot;3600&quot;</span>) <span class="comment">// Timeout of one hour (=3600 seconds) // TODO: The post-script can detect that the timeout fired and react accordingly.</span>
-            .<span class="ident">output</span>() <span class="comment">// Execute the command and catch its output.</span>
+            .<span class="ident">arg</span>(<span class="string">&quot;3600&quot;</span>); <span class="comment">// Timeout of one hour (=3600 seconds) // TODO: The post-script can detect that the timeout fired and react accordingly.</span>
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">bare_metal_config</span>) <span class="op">=</span> <span class="ident">bare_metal_config_opt</span> {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">base_address</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">bare_metal_config</span>.<span class="ident">flash_base_address</span>;
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">stripped_address</span>) <span class="op">=</span> <span class="ident">base_address</span>.<span class="ident">strip_prefix</span>(<span class="string">&quot;0x&quot;</span>) {
+                <span class="ident">base_address</span> <span class="op">=</span> <span class="ident">stripped_address</span>;
+            }
+            <span class="ident">ghidra_command</span>
+                .<span class="ident">arg</span>(<span class="string">&quot;-loader&quot;</span>) <span class="comment">// Tell Ghidra to use a specific loader</span>
+                .<span class="ident">arg</span>(<span class="string">&quot;BinaryLoader&quot;</span>) <span class="comment">// Use the BinaryLoader for bare metal binaries</span>
+                .<span class="ident">arg</span>(<span class="string">&quot;-loader-baseAddr&quot;</span>) <span class="comment">// Provide the base address where the binary should be mapped in memory</span>
+                .<span class="ident">arg</span>(<span class="ident">base_address</span>)
+                .<span class="ident">arg</span>(<span class="string">&quot;-processor&quot;</span>) <span class="comment">// Provide the processor type ID, for which the binary was compiled.</span>
+                .<span class="ident">arg</span>(<span class="ident">bare_metal_config</span>.<span class="ident">processor_id</span>);
+        }
+        <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">ghidra_command</span>.<span class="ident">output</span>() <span class="comment">// Execute the command and catch its output.</span>
         {
-            <span class="prelude-val">Ok</span>(<span class="ident">output</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">output</span>,
-            <span class="prelude-val">Err</span>(<span class="ident">err</span>) <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="prelude-val">Ok</span>(<span class="ident">output</span>) =&gt; <span class="ident">output</span>,
+            <span class="prelude-val">Err</span>(<span class="ident">err</span>) =&gt; {
                 <span class="macro">eprintln!</span>(<span class="string">&quot;Error: Ghidra could not be executed:\n{}&quot;</span>, <span class="ident">err</span>);
                 <span class="ident">std::process::exit</span>(<span class="number">101</span>);
             }
         };
 
         <span class="kw">match</span> <span class="ident">String::from_utf8</span>(<span class="ident">output</span>.<span class="ident">stdout</span>.<span class="ident">clone</span>()) {
-            <span class="prelude-val">Ok</span>(<span class="ident">standard_out</span>) <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="prelude-val">Ok</span>(<span class="ident">standard_out</span>) =&gt; {
                 <span class="kw">if</span> <span class="op">!</span><span class="ident">standard_out</span>.<span class="ident">contains</span>(<span class="string">&quot;Pcode was successfully extracted!&quot;</span>) {
                     <span class="macro">eprintln!</span>(<span class="string">&quot;Execution of Ghidra plugin failed: Process was terminated.&quot;</span>);
                     <span class="kw">let</span> <span class="ident">error_message</span>: <span class="ident">String</span> <span class="op">=</span>
@@ -628,7 +813,7 @@
                     <span class="ident">std::process::exit</span>(<span class="number">101</span>);
                 }
             }
-            <span class="prelude-val">Err</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
                 <span class="macro">eprintln!</span>(<span class="string">&quot;Execution of Ghidra plugin failed: Process was terminated.&quot;</span>);
                 <span class="ident">std::process::exit</span>(<span class="number">101</span>);
             }
@@ -636,13 +821,13 @@
 
         <span class="kw">if</span> <span class="op">!</span><span class="ident">output</span>.<span class="ident">status</span>.<span class="ident">success</span>() {
             <span class="kw">match</span> <span class="ident">output</span>.<span class="ident">status</span>.<span class="ident">code</span>() {
-                <span class="prelude-val">Some</span>(<span class="ident">code</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="prelude-val">Some</span>(<span class="ident">code</span>) =&gt; {
                     <span class="macro">eprintln!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">String::from_utf8</span>(<span class="ident">output</span>.<span class="ident">stdout</span>).<span class="ident">unwrap</span>());
                     <span class="macro">eprintln!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">String::from_utf8</span>(<span class="ident">output</span>.<span class="ident">stderr</span>).<span class="ident">unwrap</span>());
                     <span class="macro">eprintln!</span>(<span class="string">&quot;Execution of Ghidra plugin failed with exit code {}&quot;</span>, <span class="ident">code</span>);
                     <span class="ident">std::process::exit</span>(<span class="number">101</span>);
                 }
-                <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="prelude-val">None</span> =&gt; {
                     <span class="macro">eprintln!</span>(<span class="string">&quot;Execution of Ghidra plugin failed: Process was terminated.&quot;</span>);
                     <span class="ident">std::process::exit</span>(<span class="number">101</span>);
                 }
@@ -657,14 +842,20 @@
         <span class="ident">serde_json::from_reader</span>(<span class="ident">std::io::BufReader::new</span>(<span class="ident">file</span>)).<span class="ident">unwrap</span>();
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">log_messages</span> <span class="op">=</span> <span class="ident">project_pcode</span>.<span class="ident">normalize</span>();
     <span class="kw">let</span> <span class="ident">project</span>: <span class="ident">Project</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">cwe_checker_lib::utils::get_binary_base_address</span>(<span class="ident">binary</span>) {
-        <span class="prelude-val">Ok</span>(<span class="ident">binary_base_address</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">project_pcode</span>.<span class="ident">into_ir_project</span>(<span class="ident">binary_base_address</span>),
-        <span class="prelude-val">Err</span>(<span class="ident">_err</span>) <span class="op">=</span><span class="op">&gt;</span> {
-            <span class="ident">log_messages</span>.<span class="ident">push</span>(<span class="ident">LogMessage::new_info</span>(<span class="string">&quot;Could not determine binary base address. Using base address of Ghidra output as fallback.&quot;</span>));
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">project</span> <span class="op">=</span> <span class="ident">project_pcode</span>.<span class="ident">into_ir_project</span>(<span class="number">0</span>);
-            <span class="comment">// Setting the address_base_offset to zero is a hack, which worked for the tested PE files.</span>
-            <span class="comment">// But this hack will probably not work in general!</span>
-            <span class="ident">project</span>.<span class="ident">program</span>.<span class="ident">term</span>.<span class="ident">address_base_offset</span> <span class="op">=</span> <span class="number">0</span>;
-            <span class="ident">project</span>
+        <span class="prelude-val">Ok</span>(<span class="ident">binary_base_address</span>) =&gt; <span class="ident">project_pcode</span>.<span class="ident">into_ir_project</span>(<span class="ident">binary_base_address</span>),
+        <span class="prelude-val">Err</span>(<span class="ident">_err</span>) =&gt; {
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">binary_base_address</span>) <span class="op">=</span> <span class="ident">bare_metal_base_address_opt</span> {
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">project</span> <span class="op">=</span> <span class="ident">project_pcode</span>.<span class="ident">into_ir_project</span>(<span class="ident">binary_base_address</span>);
+                <span class="ident">project</span>.<span class="ident">program</span>.<span class="ident">term</span>.<span class="ident">address_base_offset</span> <span class="op">=</span> <span class="number">0</span>;
+                <span class="ident">project</span>
+            } <span class="kw">else</span> {
+                <span class="ident">log_messages</span>.<span class="ident">push</span>(<span class="ident">LogMessage::new_info</span>(<span class="string">&quot;Could not determine binary base address. Using base address of Ghidra output as fallback.&quot;</span>));
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">project</span> <span class="op">=</span> <span class="ident">project_pcode</span>.<span class="ident">into_ir_project</span>(<span class="number">0</span>);
+                <span class="comment">// For PE files setting the address_base_offset to zero is a hack, which worked for the tested PE files.</span>
+                <span class="comment">// But this hack will probably not work in general!</span>
+                <span class="ident">project</span>.<span class="ident">program</span>.<span class="ident">term</span>.<span class="ident">address_base_offset</span> <span class="op">=</span> <span class="number">0</span>;
+                <span class="ident">project</span>
+            }
         }
     };
 
@@ -676,6 +867,6 @@
 
     (<span class="ident">project</span>, <span class="ident">log_messages</span>)
 }
-</pre></div>
-</section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="cwe_checker" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>
-    <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script></body></html>
+</code></pre></div>
+</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="cwe_checker" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.60.0 (7737e0b5c 2022-04-04)" ></div>
+</body></html>

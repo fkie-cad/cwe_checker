@@ -1,7 +1,9 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/analysis/pointer_inference/context/mod.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mod.rs - source</title><link rel="stylesheet" type="text/css" href="../../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../../../storage.js"></script><script src="../../../../../crates.js"></script><noscript><link rel="stylesheet" href="../../../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../../../favicon.svg">
-<link rel="alternate icon" type="image/png" href="../../../../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../../../../cwe_checker_lib/index.html'><div class='logo-container rust-logo'><img src='../../../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
-                <a id="settings-menu" href="../../../../../settings.html"><img src="../../../../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/analysis/pointer_inference/context/mod.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mod.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../../storage.js"></script><script src="../../../../../crates.js"></script><script defer src="../../../../../main.js"></script><script defer src="../../../../../source-script.js"></script><script defer src="../../../../../source-files.js"></script>
+    <noscript><link rel="stylesheet" href="../../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../../../cwe_checker_lib/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../../../../cwe_checker_lib/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../../../cwe_checker_lib/index.html"><img class="rust-logo" src="../../../../../rust-logo.svg" alt="logo"></a><nav class="sub"><div class="theme-picker hidden"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="22" height="22" alt="Pick another theme!" src="../../../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
 <span id="4">  4</span>
@@ -295,264 +297,35 @@
 <span id="292">292</span>
 <span id="293">293</span>
 <span id="294">294</span>
-<span id="295">295</span>
-<span id="296">296</span>
-<span id="297">297</span>
-<span id="298">298</span>
-<span id="299">299</span>
-<span id="300">300</span>
-<span id="301">301</span>
-<span id="302">302</span>
-<span id="303">303</span>
-<span id="304">304</span>
-<span id="305">305</span>
-<span id="306">306</span>
-<span id="307">307</span>
-<span id="308">308</span>
-<span id="309">309</span>
-<span id="310">310</span>
-<span id="311">311</span>
-<span id="312">312</span>
-<span id="313">313</span>
-<span id="314">314</span>
-<span id="315">315</span>
-<span id="316">316</span>
-<span id="317">317</span>
-<span id="318">318</span>
-<span id="319">319</span>
-<span id="320">320</span>
-<span id="321">321</span>
-<span id="322">322</span>
-<span id="323">323</span>
-<span id="324">324</span>
-<span id="325">325</span>
-<span id="326">326</span>
-<span id="327">327</span>
-<span id="328">328</span>
-<span id="329">329</span>
-<span id="330">330</span>
-<span id="331">331</span>
-<span id="332">332</span>
-<span id="333">333</span>
-<span id="334">334</span>
-<span id="335">335</span>
-<span id="336">336</span>
-<span id="337">337</span>
-<span id="338">338</span>
-<span id="339">339</span>
-<span id="340">340</span>
-<span id="341">341</span>
-<span id="342">342</span>
-<span id="343">343</span>
-<span id="344">344</span>
-<span id="345">345</span>
-<span id="346">346</span>
-<span id="347">347</span>
-<span id="348">348</span>
-<span id="349">349</span>
-<span id="350">350</span>
-<span id="351">351</span>
-<span id="352">352</span>
-<span id="353">353</span>
-<span id="354">354</span>
-<span id="355">355</span>
-<span id="356">356</span>
-<span id="357">357</span>
-<span id="358">358</span>
-<span id="359">359</span>
-<span id="360">360</span>
-<span id="361">361</span>
-<span id="362">362</span>
-<span id="363">363</span>
-<span id="364">364</span>
-<span id="365">365</span>
-<span id="366">366</span>
-<span id="367">367</span>
-<span id="368">368</span>
-<span id="369">369</span>
-<span id="370">370</span>
-<span id="371">371</span>
-<span id="372">372</span>
-<span id="373">373</span>
-<span id="374">374</span>
-<span id="375">375</span>
-<span id="376">376</span>
-<span id="377">377</span>
-<span id="378">378</span>
-<span id="379">379</span>
-<span id="380">380</span>
-<span id="381">381</span>
-<span id="382">382</span>
-<span id="383">383</span>
-<span id="384">384</span>
-<span id="385">385</span>
-<span id="386">386</span>
-<span id="387">387</span>
-<span id="388">388</span>
-<span id="389">389</span>
-<span id="390">390</span>
-<span id="391">391</span>
-<span id="392">392</span>
-<span id="393">393</span>
-<span id="394">394</span>
-<span id="395">395</span>
-<span id="396">396</span>
-<span id="397">397</span>
-<span id="398">398</span>
-<span id="399">399</span>
-<span id="400">400</span>
-<span id="401">401</span>
-<span id="402">402</span>
-<span id="403">403</span>
-<span id="404">404</span>
-<span id="405">405</span>
-<span id="406">406</span>
-<span id="407">407</span>
-<span id="408">408</span>
-<span id="409">409</span>
-<span id="410">410</span>
-<span id="411">411</span>
-<span id="412">412</span>
-<span id="413">413</span>
-<span id="414">414</span>
-<span id="415">415</span>
-<span id="416">416</span>
-<span id="417">417</span>
-<span id="418">418</span>
-<span id="419">419</span>
-<span id="420">420</span>
-<span id="421">421</span>
-<span id="422">422</span>
-<span id="423">423</span>
-<span id="424">424</span>
-<span id="425">425</span>
-<span id="426">426</span>
-<span id="427">427</span>
-<span id="428">428</span>
-<span id="429">429</span>
-<span id="430">430</span>
-<span id="431">431</span>
-<span id="432">432</span>
-<span id="433">433</span>
-<span id="434">434</span>
-<span id="435">435</span>
-<span id="436">436</span>
-<span id="437">437</span>
-<span id="438">438</span>
-<span id="439">439</span>
-<span id="440">440</span>
-<span id="441">441</span>
-<span id="442">442</span>
-<span id="443">443</span>
-<span id="444">444</span>
-<span id="445">445</span>
-<span id="446">446</span>
-<span id="447">447</span>
-<span id="448">448</span>
-<span id="449">449</span>
-<span id="450">450</span>
-<span id="451">451</span>
-<span id="452">452</span>
-<span id="453">453</span>
-<span id="454">454</span>
-<span id="455">455</span>
-<span id="456">456</span>
-<span id="457">457</span>
-<span id="458">458</span>
-<span id="459">459</span>
-<span id="460">460</span>
-<span id="461">461</span>
-<span id="462">462</span>
-<span id="463">463</span>
-<span id="464">464</span>
-<span id="465">465</span>
-<span id="466">466</span>
-<span id="467">467</span>
-<span id="468">468</span>
-<span id="469">469</span>
-<span id="470">470</span>
-<span id="471">471</span>
-<span id="472">472</span>
-<span id="473">473</span>
-<span id="474">474</span>
-<span id="475">475</span>
-<span id="476">476</span>
-<span id="477">477</span>
-<span id="478">478</span>
-<span id="479">479</span>
-<span id="480">480</span>
-<span id="481">481</span>
-<span id="482">482</span>
-<span id="483">483</span>
-<span id="484">484</span>
-<span id="485">485</span>
-<span id="486">486</span>
-<span id="487">487</span>
-<span id="488">488</span>
-<span id="489">489</span>
-<span id="490">490</span>
-<span id="491">491</span>
-<span id="492">492</span>
-<span id="493">493</span>
-<span id="494">494</span>
-<span id="495">495</span>
-<span id="496">496</span>
-<span id="497">497</span>
-<span id="498">498</span>
-<span id="499">499</span>
-<span id="500">500</span>
-<span id="501">501</span>
-<span id="502">502</span>
-<span id="503">503</span>
-<span id="504">504</span>
-<span id="505">505</span>
-<span id="506">506</span>
-<span id="507">507</span>
-<span id="508">508</span>
-<span id="509">509</span>
-<span id="510">510</span>
-<span id="511">511</span>
-<span id="512">512</span>
-<span id="513">513</span>
-<span id="514">514</span>
-<span id="515">515</span>
-<span id="516">516</span>
-<span id="517">517</span>
-<span id="518">518</span>
-<span id="519">519</span>
-<span id="520">520</span>
-<span id="521">521</span>
-<span id="522">522</span>
-</pre><div class="example-wrap"><pre class="rust ">
-<span class="kw">use</span> <span class="kw">super</span><span class="ident">::object::ObjectType</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::analysis::graph::Graph</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::intermediate_representation</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::prelude</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::utils::log</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">abstract_domain</span>::<span class="kw-2">*</span>, <span class="ident">utils::binary::RuntimeMemoryImage</span>};
+</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::abstract_domain</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::analysis::function_signature::FunctionSignature</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::analysis::graph::Graph</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::intermediate_representation</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::prelude</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::utils::log</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">std::collections</span>::{<span class="ident">BTreeMap</span>, <span class="ident">BTreeSet</span>};
 
-<span class="kw">use</span> <span class="kw">super</span><span class="ident">::state::State</span>;
-<span class="kw">use</span> <span class="kw">super</span><span class="ident">::ValueDomain</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::state::State</span>;
 <span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">Config</span>, <span class="ident">Data</span>, <span class="ident">VERSION</span>};
 
-<span class="comment">// contains trait implementations for the `Context` struct,</span>
-<span class="comment">// especially the implementation of the `interprocedural_fixpoint::Context` trait.</span>
+<span class="doccomment">/// Contains methods of the `Context` struct that deal with the manipulation of abstract IDs.</span>
+<span class="kw">mod</span> <span class="ident">id_manipulation</span>;
+<span class="doccomment">/// Contains trait implementations for the `Context` struct,</span>
+<span class="doccomment">/// especially the implementation of the [`forward_interprocedural_fixpoint::Context`](crate::analysis::forward_interprocedural_fixpoint::Context) trait.</span>
 <span class="kw">mod</span> <span class="ident">trait_impls</span>;
 
 <span class="doccomment">/// Contains all context information needed for the pointer inference fixpoint computation.</span>
 <span class="doccomment">///</span>
-<span class="doccomment">/// The struct also implements the `interprocedural_fixpoint::Context` trait to enable the fixpoint computation.</span>
+<span class="doccomment">/// The struct also implements the [`forward_interprocedural_fixpoint::Context`](crate::analysis::forward_interprocedural_fixpoint::Context) trait to enable the fixpoint computation.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Context</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
     <span class="doccomment">/// The program control flow graph on which the fixpoint will be computed</span>
     <span class="kw">pub</span> <span class="ident">graph</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Graph</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>,
     <span class="doccomment">/// A reference to the `Project` object representing the binary</span>
     <span class="kw">pub</span> <span class="ident">project</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Project</span>,
-    <span class="doccomment">/// The runtime memory image for reading global read-only variables.</span>
-    <span class="doccomment">/// Note that values of writeable global memory segments are not tracked.</span>
-    <span class="kw">pub</span> <span class="ident">runtime_memory_image</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">RuntimeMemoryImage</span>,
     <span class="doccomment">/// Maps the TIDs of functions that shall be treated as extern symbols to the `ExternSymbol` object representing it.</span>
-    <span class="kw">pub</span> <span class="ident">extern_symbol_map</span>: <span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">Tid</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">ExternSymbol</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">extern_symbol_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">Tid</span>, <span class="ident">ExternSymbol</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// Maps the TIDs of internal functions to the function signatures computed for it.</span>
+    <span class="kw">pub</span> <span class="ident">fn_signatures</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">Tid</span>, <span class="ident">FunctionSignature</span><span class="op">&gt;</span>,
     <span class="doccomment">/// A channel where found CWE warnings and log messages should be sent to.</span>
     <span class="doccomment">/// The receiver may filter or modify the warnings before presenting them to the user.</span>
     <span class="doccomment">/// For example, the same CWE warning will be found several times</span>
@@ -561,32 +334,45 @@
     <span class="kw">pub</span> <span class="ident">log_collector</span>: <span class="ident">crossbeam_channel::Sender</span><span class="op">&lt;</span><span class="ident">LogThreadMsg</span><span class="op">&gt;</span>,
     <span class="doccomment">/// Names of `malloc`-like extern functions.</span>
     <span class="kw">pub</span> <span class="ident">allocation_symbols</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Names of `free`-like extern functions.</span>
-    <span class="kw">pub</span> <span class="ident">deallocation_symbols</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">Context</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
     <span class="doccomment">/// Create a new context object for a given project.</span>
     <span class="doccomment">/// Also needs two channels as input to know where CWE warnings and log messages should be sent to.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-        <span class="ident">project</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Project</span>,
-        <span class="ident">runtime_memory_image</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">RuntimeMemoryImage</span>,
-        <span class="ident">control_flow_graph</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Graph</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>,
+        <span class="ident">analysis_results</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">AnalysisResults</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>,
         <span class="ident">config</span>: <span class="ident">Config</span>,
         <span class="ident">log_collector</span>: <span class="ident">crossbeam_channel::Sender</span><span class="op">&lt;</span><span class="ident">LogThreadMsg</span><span class="op">&gt;</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Context</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">extern_symbol_map</span> <span class="op">=</span> <span class="ident">BTreeMap::new</span>();
-        <span class="kw">for</span> <span class="ident">symbol</span> <span class="kw">in</span> <span class="ident">project</span>.<span class="ident">program</span>.<span class="ident">term</span>.<span class="ident">extern_symbols</span>.<span class="ident">iter</span>() {
-            <span class="ident">extern_symbol_map</span>.<span class="ident">insert</span>(<span class="ident">symbol</span>.<span class="ident">tid</span>.<span class="ident">clone</span>(), <span class="ident">symbol</span>);
-        }
+    ) -&gt; <span class="ident">Context</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
         <span class="ident">Context</span> {
-            <span class="ident">graph</span>: <span class="ident">control_flow_graph</span>,
-            <span class="ident">project</span>,
-            <span class="ident">runtime_memory_image</span>,
-            <span class="ident">extern_symbol_map</span>,
+            <span class="ident">graph</span>: <span class="ident">analysis_results</span>.<span class="ident">control_flow_graph</span>,
+            <span class="ident">project</span>: <span class="ident">analysis_results</span>.<span class="ident">project</span>,
+            <span class="ident">extern_symbol_map</span>: <span class="kw-2">&amp;</span><span class="ident">analysis_results</span>.<span class="ident">project</span>.<span class="ident">program</span>.<span class="ident">term</span>.<span class="ident">extern_symbols</span>,
+            <span class="ident">fn_signatures</span>: <span class="ident">analysis_results</span>.<span class="ident">function_signatures</span>.<span class="ident">unwrap</span>(),
             <span class="ident">log_collector</span>,
             <span class="ident">allocation_symbols</span>: <span class="ident">config</span>.<span class="ident">allocation_symbols</span>,
-            <span class="ident">deallocation_symbols</span>: <span class="ident">config</span>.<span class="ident">deallocation_symbols</span>,
+        }
+    }
+
+    <span class="doccomment">/// Return `true` if the all of the following properties hold:</span>
+    <span class="doccomment">/// * The CPU architecture is a MIPS variant and `var` is the MIPS global pointer register `gp`</span>
+    <span class="doccomment">/// * Loading the value at `address` into the register `var` would overwrite the value of `var` with a `Top` value.</span>
+    <span class="kw">fn</span> <span class="ident">is_mips_gp_load_to_top_value</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">state</span>: <span class="kw-2">&amp;</span><span class="ident">State</span>,
+        <span class="ident">var</span>: <span class="kw-2">&amp;</span><span class="ident">Variable</span>,
+        <span class="ident">address</span>: <span class="kw-2">&amp;</span><span class="ident">Expression</span>,
+    ) -&gt; <span class="ident">bool</span> {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">project</span>.<span class="ident">cpu_architecture</span>.<span class="ident">contains</span>(<span class="string">&quot;MIPS&quot;</span>) <span class="op">&amp;&amp;</span> <span class="ident">var</span>.<span class="ident">name</span> <span class="op">==</span> <span class="string">&quot;gp&quot;</span> {
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">gp_val</span>) <span class="op">=</span>
+                <span class="ident">state</span>.<span class="ident">load_value</span>(<span class="ident">address</span>, <span class="ident">var</span>.<span class="ident">size</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">project</span>.<span class="ident">runtime_memory_image</span>)
+            {
+                <span class="ident">gp_val</span>.<span class="ident">is_top</span>()
+            } <span class="kw">else</span> {
+                <span class="bool-val">true</span>
+            }
+        } <span class="kw">else</span> {
+            <span class="bool-val">false</span>
         }
     }
 
@@ -606,95 +392,26 @@
     <span class="kw">fn</span> <span class="ident">detect_stack_pointer_information_loss_on_return</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">state_before_return</span>: <span class="kw-2">&amp;</span><span class="ident">State</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Error</span><span class="op">&gt;</span> {
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Error</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">expected_stack_pointer_offset</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">project</span>.<span class="ident">cpu_architecture</span>.<span class="ident">as_str</span>() {
-            <span class="string">&quot;x86&quot;</span> <span class="op">|</span> <span class="string">&quot;x86_32&quot;</span> <span class="op">|</span> <span class="string">&quot;x86_64&quot;</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="string">&quot;x86&quot;</span> <span class="op">|</span> <span class="string">&quot;x86_32&quot;</span> <span class="op">|</span> <span class="string">&quot;x86_64&quot;</span> =&gt; {
                 <span class="ident">Bitvector::from_u64</span>(<span class="ident">u64::from</span>(<span class="self">self</span>.<span class="ident">project</span>.<span class="ident">get_pointer_bytesize</span>()))
                     .<span class="ident">into_truncate</span>(<span class="ident">apint::BitWidth::from</span>(<span class="self">self</span>.<span class="ident">project</span>.<span class="ident">get_pointer_bytesize</span>()))
                     .<span class="ident">unwrap</span>()
             }
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Bitvector::zero</span>(<span class="ident">apint::BitWidth::from</span>(<span class="self">self</span>.<span class="ident">project</span>.<span class="ident">get_pointer_bytesize</span>())),
+            <span class="kw">_</span> =&gt; <span class="ident">Bitvector::zero</span>(<span class="ident">apint::BitWidth::from</span>(<span class="self">self</span>.<span class="ident">project</span>.<span class="ident">get_pointer_bytesize</span>())),
         };
-        <span class="kw">match</span> <span class="ident">state_before_return</span>.<span class="ident">get_register</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">project</span>.<span class="ident">stack_pointer_register</span>) {
-            <span class="ident">Data::Pointer</span>(<span class="ident">pointer</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">if</span> <span class="ident">pointer</span>.<span class="ident">targets</span>().<span class="ident">len</span>() <span class="op">=</span><span class="op">=</span> <span class="number">1</span> {
-                    <span class="kw">let</span> (<span class="ident">id</span>, <span class="ident">offset</span>) <span class="op">=</span> <span class="ident">pointer</span>.<span class="ident">targets</span>().<span class="ident">iter</span>().<span class="ident">next</span>().<span class="ident">unwrap</span>();
-                    <span class="kw">if</span> <span class="kw-2">*</span><span class="ident">id</span> <span class="op">!</span><span class="op">=</span> <span class="ident">state_before_return</span>.<span class="ident">stack_id</span>
-                        <span class="op">|</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">offset</span> <span class="op">!</span><span class="op">=</span> <span class="ident">expected_stack_pointer_offset</span>.<span class="ident">into</span>()
-                    {
-                        <span class="prelude-val">Err</span>(<span class="macro">anyhow!</span>(<span class="string">&quot;Unexpected stack register value on return&quot;</span>))
-                    } <span class="kw">else</span> {
-                        <span class="prelude-val">Ok</span>(())
-                    }
-                } <span class="kw">else</span> {
-                    <span class="prelude-val">Err</span>(<span class="macro">anyhow!</span>(
-                        <span class="string">&quot;Unexpected number of stack register targets on return&quot;</span>
-                    ))
-                }
+        <span class="kw">match</span> <span class="ident">state_before_return</span>
+            .<span class="ident">get_register</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">project</span>.<span class="ident">stack_pointer_register</span>)
+            .<span class="ident">get_if_unique_target</span>()
+        {
+            <span class="prelude-val">Some</span>((<span class="ident">id</span>, <span class="ident">offset</span>))
+                <span class="kw">if</span> <span class="kw-2">*</span><span class="ident">id</span> <span class="op">==</span> <span class="ident">state_before_return</span>.<span class="ident">stack_id</span>
+                    <span class="op">&amp;&amp;</span> <span class="kw-2">*</span><span class="ident">offset</span> <span class="op">==</span> <span class="ident">expected_stack_pointer_offset</span>.<span class="ident">into</span>() =&gt;
+            {
+                <span class="prelude-val">Ok</span>(())
             }
-            <span class="ident">Data::Top</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="macro">anyhow!</span>(
-                <span class="string">&quot;Stack register value lost during function execution&quot;</span>
-            )),
-            <span class="ident">Data::Value</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="macro">anyhow!</span>(<span class="string">&quot;Unexpected stack register value on return&quot;</span>)),
-        }
-    }
-
-    <span class="doccomment">/// If the given `extern_symbol` is a call to a known allocation function</span>
-    <span class="doccomment">/// return the size of the memory object allocated by it.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// The function returns a `Top` element if the size could not be determined.</span>
-    <span class="doccomment">/// Known allocation functions: `malloc`, `realloc`, `calloc`.</span>
-    <span class="kw">fn</span> <span class="ident">get_allocation_size_of_alloc_call</span>(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">state</span>: <span class="kw-2">&amp;</span><span class="ident">State</span>,
-        <span class="ident">extern_symbol</span>: <span class="kw-2">&amp;</span><span class="ident">ExternSymbol</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ValueDomain</span> {
-        <span class="kw">let</span> <span class="ident">address_bytesize</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">project</span>.<span class="ident">get_pointer_bytesize</span>();
-        <span class="kw">let</span> <span class="ident">object_size</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">extern_symbol</span>.<span class="ident">name</span>.<span class="ident">as_str</span>() {
-            <span class="string">&quot;malloc&quot;</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">let</span> <span class="ident">size_parameter</span> <span class="op">=</span> <span class="ident">extern_symbol</span>.<span class="ident">parameters</span>.<span class="ident">get</span>(<span class="number">0</span>).<span class="ident">unwrap</span>();
-                <span class="ident">state</span>
-                    .<span class="ident">eval_parameter_arg</span>(
-                        <span class="ident">size_parameter</span>,
-                        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">project</span>.<span class="ident">stack_pointer_register</span>,
-                        <span class="self">self</span>.<span class="ident">runtime_memory_image</span>,
-                    )
-                    .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">Data::new_top</span>(<span class="ident">address_bytesize</span>))
-            }
-            <span class="string">&quot;realloc&quot;</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">let</span> <span class="ident">size_parameter</span> <span class="op">=</span> <span class="ident">extern_symbol</span>.<span class="ident">parameters</span>.<span class="ident">get</span>(<span class="number">1</span>).<span class="ident">unwrap</span>();
-                <span class="ident">state</span>
-                    .<span class="ident">eval_parameter_arg</span>(
-                        <span class="ident">size_parameter</span>,
-                        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">project</span>.<span class="ident">stack_pointer_register</span>,
-                        <span class="self">self</span>.<span class="ident">runtime_memory_image</span>,
-                    )
-                    .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">Data::new_top</span>(<span class="ident">address_bytesize</span>))
-            }
-            <span class="string">&quot;calloc&quot;</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">let</span> <span class="ident">size_param1</span> <span class="op">=</span> <span class="ident">extern_symbol</span>.<span class="ident">parameters</span>.<span class="ident">get</span>(<span class="number">0</span>).<span class="ident">unwrap</span>();
-                <span class="kw">let</span> <span class="ident">size_param2</span> <span class="op">=</span> <span class="ident">extern_symbol</span>.<span class="ident">parameters</span>.<span class="ident">get</span>(<span class="number">1</span>).<span class="ident">unwrap</span>();
-                <span class="kw">let</span> <span class="ident">param1_value</span> <span class="op">=</span> <span class="ident">state</span>
-                    .<span class="ident">eval_parameter_arg</span>(
-                        <span class="ident">size_param1</span>,
-                        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">project</span>.<span class="ident">stack_pointer_register</span>,
-                        <span class="self">self</span>.<span class="ident">runtime_memory_image</span>,
-                    )
-                    .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">Data::new_top</span>(<span class="ident">address_bytesize</span>));
-                <span class="kw">let</span> <span class="ident">param2_value</span> <span class="op">=</span> <span class="ident">state</span>
-                    .<span class="ident">eval_parameter_arg</span>(
-                        <span class="ident">size_param2</span>,
-                        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">project</span>.<span class="ident">stack_pointer_register</span>,
-                        <span class="self">self</span>.<span class="ident">runtime_memory_image</span>,
-                    )
-                    .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">Data::new_top</span>(<span class="ident">address_bytesize</span>));
-                <span class="ident">param1_value</span>.<span class="ident">bin_op</span>(<span class="ident">BinOpType::IntMult</span>, <span class="kw-2">&amp;</span><span class="ident">param2_value</span>)
-            }
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">DataDomain::new_top</span>(<span class="ident">address_bytesize</span>),
-        };
-        <span class="kw">match</span> <span class="ident">object_size</span> {
-            <span class="ident">Data::Value</span>(<span class="ident">val</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">val</span>,
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">ValueDomain::new_top</span>(<span class="ident">address_bytesize</span>),
+            <span class="kw">_</span> =&gt; <span class="prelude-val">Err</span>(<span class="macro">anyhow!</span>(<span class="string">&quot;Unexpected stack register value on return&quot;</span>)),
         }
     }
 
@@ -703,225 +420,62 @@
     <span class="doccomment">/// except that we cannot represent possible `NULL` pointers as return values yet.</span>
     <span class="kw">fn</span> <span class="ident">add_new_object_in_call_return_register</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">state</span>: <span class="kw-2">&amp;</span><span class="ident">State</span>,
-        <span class="kw-2">mut</span> <span class="ident">new_state</span>: <span class="ident">State</span>,
+        <span class="kw-2">mut</span> <span class="ident">state</span>: <span class="ident">State</span>,
         <span class="ident">call</span>: <span class="kw-2">&amp;</span><span class="ident">Term</span><span class="op">&lt;</span><span class="ident">Jmp</span><span class="op">&gt;</span>,
         <span class="ident">extern_symbol</span>: <span class="kw-2">&amp;</span><span class="ident">ExternSymbol</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">State</span> {
+    ) -&gt; <span class="ident">State</span> {
         <span class="kw">let</span> <span class="ident">address_bytesize</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">project</span>.<span class="ident">get_pointer_bytesize</span>();
-        <span class="kw">let</span> <span class="ident">object_size</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_allocation_size_of_alloc_call</span>(<span class="kw-2">&amp;</span><span class="ident">state</span>, <span class="ident">extern_symbol</span>);
 
         <span class="kw">match</span> <span class="ident">extern_symbol</span>.<span class="ident">get_unique_return_register</span>() {
-            <span class="prelude-val">Ok</span>(<span class="ident">return_register</span>) <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="prelude-val">Ok</span>(<span class="ident">return_register</span>) =&gt; {
                 <span class="kw">let</span> <span class="ident">object_id</span> <span class="op">=</span> <span class="ident">AbstractIdentifier::new</span>(
                     <span class="ident">call</span>.<span class="ident">tid</span>.<span class="ident">clone</span>(),
                     <span class="ident">AbstractLocation::from_var</span>(<span class="ident">return_register</span>).<span class="ident">unwrap</span>(),
                 );
-                <span class="ident">new_state</span>.<span class="ident">memory</span>.<span class="ident">add_abstract_object</span>(
+                <span class="ident">state</span>.<span class="ident">memory</span>.<span class="ident">add_abstract_object</span>(
                     <span class="ident">object_id</span>.<span class="ident">clone</span>(),
-                    <span class="ident">Bitvector::zero</span>(<span class="ident">apint::BitWidth::from</span>(<span class="ident">address_bytesize</span>)).<span class="ident">into</span>(),
-                    <span class="kw">super</span><span class="ident">::object::ObjectType::Heap</span>,
                     <span class="ident">address_bytesize</span>,
+                    <span class="prelude-val">Some</span>(<span class="ident"><span class="kw">super</span>::object::ObjectType::Heap</span>),
                 );
-                <span class="ident">new_state</span>.<span class="ident">memory</span>.<span class="ident">set_lower_index_bound</span>(
-                    <span class="kw-2">&amp;</span><span class="ident">object_id</span>,
-                    <span class="kw-2">&amp;</span><span class="ident">Bitvector::zero</span>(<span class="ident">address_bytesize</span>.<span class="ident">into</span>()).<span class="ident">into</span>(),
-                );
-                <span class="ident">new_state</span>.<span class="ident">memory</span>.<span class="ident">set_upper_index_bound</span>(
-                    <span class="kw-2">&amp;</span><span class="ident">object_id</span>,
-                    <span class="kw-2">&amp;</span>(<span class="ident">object_size</span> <span class="op">-</span> <span class="ident">Bitvector::one</span>(<span class="ident">address_bytesize</span>.<span class="ident">into</span>()).<span class="ident">into</span>()),
-                );
-                <span class="kw">let</span> <span class="ident">pointer</span> <span class="op">=</span> <span class="ident">PointerDomain::new</span>(
+                <span class="kw">let</span> <span class="ident">pointer</span> <span class="op">=</span> <span class="ident">Data::from_target</span>(
                     <span class="ident">object_id</span>,
                     <span class="ident">Bitvector::zero</span>(<span class="ident">apint::BitWidth::from</span>(<span class="ident">address_bytesize</span>)).<span class="ident">into</span>(),
                 );
-                <span class="ident">new_state</span>.<span class="ident">set_register</span>(<span class="ident">return_register</span>, <span class="ident">pointer</span>.<span class="ident">into</span>());
-                <span class="ident">new_state</span>
+                <span class="ident">state</span>.<span class="ident">set_register</span>(<span class="ident">return_register</span>, <span class="ident">pointer</span>);
+                <span class="ident">state</span>
             }
-            <span class="prelude-val">Err</span>(<span class="ident">err</span>) <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="prelude-val">Err</span>(<span class="ident">err</span>) =&gt; {
                 <span class="comment">// We cannot track the new object, since we do not know where to store the pointer to it.</span>
                 <span class="self">self</span>.<span class="ident">log_debug</span>(<span class="prelude-val">Err</span>(<span class="ident">err</span>), <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">call</span>.<span class="ident">tid</span>));
-                <span class="ident">new_state</span>
-            }
-        }
-    }
-
-    <span class="doccomment">/// Mark the object that the parameter of a call is pointing to as freed.</span>
-    <span class="doccomment">/// If the object may have been already freed, generate a CWE warning.</span>
-    <span class="doccomment">/// This models the behaviour of `free` and similar functions.</span>
-    <span class="kw">fn</span> <span class="ident">mark_parameter_object_as_freed</span>(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">state</span>: <span class="kw-2">&amp;</span><span class="ident">State</span>,
-        <span class="kw-2">mut</span> <span class="ident">new_state</span>: <span class="ident">State</span>,
-        <span class="ident">call</span>: <span class="kw-2">&amp;</span><span class="ident">Term</span><span class="op">&lt;</span><span class="ident">Jmp</span><span class="op">&gt;</span>,
-        <span class="ident">extern_symbol</span>: <span class="kw-2">&amp;</span><span class="ident">ExternSymbol</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">State</span> {
-        <span class="kw">match</span> <span class="ident">extern_symbol</span>.<span class="ident">get_unique_parameter</span>() {
-            <span class="prelude-val">Ok</span>(<span class="ident">parameter</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">let</span> <span class="ident">parameter_value</span> <span class="op">=</span> <span class="ident">state</span>.<span class="ident">eval_parameter_arg</span>(
-                    <span class="ident">parameter</span>,
-                    <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">project</span>.<span class="ident">stack_pointer_register</span>,
-                    <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">runtime_memory_image</span>,
-                );
-                <span class="kw">match</span> <span class="ident">parameter_value</span> {
-                    <span class="prelude-val">Ok</span>(<span class="ident">memory_object_pointer</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                        <span class="kw">if</span> <span class="kw">let</span> <span class="ident">Data::Pointer</span>(<span class="ident">pointer</span>) <span class="op">=</span> <span class="ident">memory_object_pointer</span> {
-                            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">possible_double_frees</span>) <span class="op">=</span>
-                                <span class="ident">new_state</span>.<span class="ident">mark_mem_object_as_freed</span>(<span class="kw-2">&amp;</span><span class="ident">pointer</span>)
-                            {
-                                <span class="kw">let</span> <span class="ident">warning</span> <span class="op">=</span> <span class="ident">CweWarning</span> {
-                                    <span class="ident">name</span>: <span class="string">&quot;CWE415&quot;</span>.<span class="ident">to_string</span>(),
-                                    <span class="ident">version</span>: <span class="ident">VERSION</span>.<span class="ident">to_string</span>(),
-                                    <span class="ident">addresses</span>: <span class="macro">vec!</span>[<span class="ident">call</span>.<span class="ident">tid</span>.<span class="ident">address</span>.<span class="ident">clone</span>()],
-                                    <span class="ident">tids</span>: <span class="macro">vec!</span>[<span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">call</span>.<span class="ident">tid</span>)],
-                                    <span class="ident">symbols</span>: <span class="ident">Vec::new</span>(),
-                                    <span class="ident">other</span>: <span class="macro">vec!</span>[<span class="ident">possible_double_frees</span>
-                                        .<span class="ident">into_iter</span>()
-                                        .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">id</span>, <span class="ident">err</span>)<span class="op">|</span> <span class="macro">format!</span>(<span class="string">&quot;{}: {}&quot;</span>, <span class="ident">id</span>, <span class="ident">err</span>))
-                                        .<span class="ident">collect</span>()],
-                                    <span class="ident">description</span>: <span class="macro">format!</span>(
-                                        <span class="string">&quot;(Double Free) Object may have been freed before at {}&quot;</span>,
-                                        <span class="ident">call</span>.<span class="ident">tid</span>.<span class="ident">address</span>
-                                    ),
-                                };
-                                <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">log_collector</span>.<span class="ident">send</span>(<span class="ident">LogThreadMsg::Cwe</span>(<span class="ident">warning</span>));
-                            }
-                        } <span class="kw">else</span> {
-                            <span class="self">self</span>.<span class="ident">log_debug</span>(
-                                <span class="prelude-val">Err</span>(<span class="macro">anyhow!</span>(<span class="string">&quot;Free on a non-pointer value called.&quot;</span>)),
-                                <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">call</span>.<span class="ident">tid</span>),
-                            );
-                        }
-                        <span class="ident">new_state</span>.<span class="ident">remove_unreferenced_objects</span>();
-                        <span class="ident">new_state</span>
-                    }
-                    <span class="prelude-val">Err</span>(<span class="ident">err</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                        <span class="self">self</span>.<span class="ident">log_debug</span>(<span class="prelude-val">Err</span>(<span class="ident">err</span>), <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">call</span>.<span class="ident">tid</span>));
-                        <span class="ident">new_state</span>
-                    }
-                }
-            }
-            <span class="prelude-val">Err</span>(<span class="ident">err</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="comment">// We do not know which memory object to free</span>
-                <span class="self">self</span>.<span class="ident">log_debug</span>(<span class="prelude-val">Err</span>(<span class="ident">err</span>), <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">call</span>.<span class="ident">tid</span>));
-                <span class="ident">new_state</span>
-            }
-        }
-    }
-
-    <span class="doccomment">/// Check all parameter registers of a call for dangling pointers and report possible use-after-frees.</span>
-    <span class="kw">fn</span> <span class="ident">check_parameter_register_for_dangling_pointer</span>(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">state</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">State</span>,
-        <span class="ident">call</span>: <span class="kw-2">&amp;</span><span class="ident">Term</span><span class="op">&lt;</span><span class="ident">Jmp</span><span class="op">&gt;</span>,
-        <span class="ident">extern_symbol</span>: <span class="kw-2">&amp;</span><span class="ident">ExternSymbol</span>,
-    ) {
-        <span class="kw">for</span> <span class="ident">parameter</span> <span class="kw">in</span> <span class="ident">extern_symbol</span>.<span class="ident">parameters</span>.<span class="ident">iter</span>() {
-            <span class="kw">match</span> <span class="ident">state</span>.<span class="ident">eval_parameter_arg</span>(
-                <span class="ident">parameter</span>,
-                <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">project</span>.<span class="ident">stack_pointer_register</span>,
-                <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">runtime_memory_image</span>,
-            ) {
-                <span class="prelude-val">Ok</span>(<span class="ident">value</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="kw">if</span> <span class="ident">state</span>.<span class="ident">memory</span>.<span class="ident">is_dangling_pointer</span>(<span class="kw-2">&amp;</span><span class="ident">value</span>, <span class="bool-val">true</span>) {
-                        <span class="ident">state</span>
-                            .<span class="ident">memory</span>
-                            .<span class="ident">mark_dangling_pointer_targets_as_flagged</span>(<span class="kw-2">&amp;</span><span class="ident">value</span>);
-                        <span class="kw">let</span> <span class="ident">warning</span> <span class="op">=</span> <span class="ident">CweWarning</span> {
-                            <span class="ident">name</span>: <span class="string">&quot;CWE416&quot;</span>.<span class="ident">to_string</span>(),
-                            <span class="ident">version</span>: <span class="ident">VERSION</span>.<span class="ident">to_string</span>(),
-                            <span class="ident">addresses</span>: <span class="macro">vec!</span>[<span class="ident">call</span>.<span class="ident">tid</span>.<span class="ident">address</span>.<span class="ident">clone</span>()],
-                            <span class="ident">tids</span>: <span class="macro">vec!</span>[<span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">call</span>.<span class="ident">tid</span>)],
-                            <span class="ident">symbols</span>: <span class="ident">Vec::new</span>(),
-                            <span class="ident">other</span>: <span class="ident">Vec::new</span>(),
-                            <span class="ident">description</span>: <span class="macro">format!</span>(
-                                <span class="string">&quot;(Use After Free) Call to {} may access freed memory at {}&quot;</span>,
-                                <span class="ident">extern_symbol</span>.<span class="ident">name</span>, <span class="ident">call</span>.<span class="ident">tid</span>.<span class="ident">address</span>
-                            ),
-                        };
-                        <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">log_collector</span>.<span class="ident">send</span>(<span class="ident">LogThreadMsg::Cwe</span>(<span class="ident">warning</span>));
-                    }
-                }
-                <span class="prelude-val">Err</span>(<span class="ident">err</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">log_debug</span>(
-                    <span class="prelude-val">Err</span>(<span class="ident">err</span>.<span class="ident">context</span>(<span class="macro">format!</span>(
-                        <span class="string">&quot;Function parameter {:?} could not be evaluated&quot;</span>,
-                        <span class="ident">parameter</span>
-                    ))),
-                    <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">call</span>.<span class="ident">tid</span>),
-                ),
-            }
-        }
-    }
-
-    <span class="doccomment">/// Check whether a parameter of a call to an extern symbol may point outside of the bounds of a memory object.</span>
-    <span class="doccomment">/// If yes, generate a CWE-warning,</span>
-    <span class="doccomment">/// since the pointer may be used for an out-of-bounds memory access by the function.</span>
-    <span class="kw">fn</span> <span class="ident">check_parameter_register_for_out_of_bounds_pointer</span>(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">state</span>: <span class="kw-2">&amp;</span><span class="ident">State</span>,
-        <span class="ident">call</span>: <span class="kw-2">&amp;</span><span class="ident">Term</span><span class="op">&lt;</span><span class="ident">Jmp</span><span class="op">&gt;</span>,
-        <span class="ident">extern_symbol</span>: <span class="kw-2">&amp;</span><span class="ident">ExternSymbol</span>,
-    ) {
-        <span class="kw">for</span> <span class="ident">parameter</span> <span class="kw">in</span> <span class="ident">extern_symbol</span>.<span class="ident">parameters</span>.<span class="ident">iter</span>() {
-            <span class="kw">match</span> <span class="ident">state</span>.<span class="ident">eval_parameter_arg</span>(
-                <span class="ident">parameter</span>,
-                <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">project</span>.<span class="ident">stack_pointer_register</span>,
-                <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">runtime_memory_image</span>,
-            ) {
-                <span class="prelude-val">Ok</span>(<span class="ident">data</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="kw">if</span> <span class="ident">state</span>.<span class="ident">pointer_contains_out_of_bounds_target</span>(<span class="kw-2">&amp;</span><span class="ident">data</span>, <span class="self">self</span>.<span class="ident">runtime_memory_image</span>)
-                    {
-                        <span class="kw">let</span> <span class="ident">warning</span> <span class="op">=</span> <span class="ident">CweWarning</span> {
-                            <span class="ident">name</span>: <span class="string">&quot;CWE119&quot;</span>.<span class="ident">to_string</span>(),
-                            <span class="ident">version</span>: <span class="ident">VERSION</span>.<span class="ident">to_string</span>(),
-                            <span class="ident">addresses</span>: <span class="macro">vec!</span>[<span class="ident">call</span>.<span class="ident">tid</span>.<span class="ident">address</span>.<span class="ident">clone</span>()],
-                            <span class="ident">tids</span>: <span class="macro">vec!</span>[<span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">call</span>.<span class="ident">tid</span>)],
-                            <span class="ident">symbols</span>: <span class="ident">Vec::new</span>(),
-                            <span class="ident">other</span>: <span class="ident">Vec::new</span>(),
-                            <span class="ident">description</span>: <span class="macro">format!</span>(
-                                <span class="string">&quot;(Buffer Overflow) Call to {} at {} may access out-of-bounds memory&quot;</span>,
-                                <span class="ident">extern_symbol</span>.<span class="ident">name</span>,
-                                <span class="ident">call</span>.<span class="ident">tid</span>.<span class="ident">address</span>
-                            ),
-                        };
-                        <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">log_collector</span>.<span class="ident">send</span>(<span class="ident">LogThreadMsg::Cwe</span>(<span class="ident">warning</span>));
-                    }
-                }
-                <span class="prelude-val">Err</span>(<span class="ident">err</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">log_debug</span>(
-                    <span class="prelude-val">Err</span>(<span class="ident">err</span>.<span class="ident">context</span>(<span class="macro">format!</span>(
-                        <span class="string">&quot;Function parameter {:?} could not be evaluated&quot;</span>,
-                        <span class="ident">parameter</span>
-                    ))),
-                    <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">call</span>.<span class="ident">tid</span>),
-                ),
+                <span class="ident">state</span>
             }
         }
     }
 
     <span class="doccomment">/// Check whether the jump is an indirect call whose target evaluates to a *Top* value in the given state.</span>
-    <span class="kw">fn</span> <span class="ident">is_indirect_call_with_top_target</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">state</span>: <span class="kw-2">&amp;</span><span class="ident">State</span>, <span class="ident">call</span>: <span class="kw-2">&amp;</span><span class="ident">Term</span><span class="op">&lt;</span><span class="ident">Jmp</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">fn</span> <span class="ident">is_indirect_call_with_top_target</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">state</span>: <span class="kw-2">&amp;</span><span class="ident">State</span>, <span class="ident">call</span>: <span class="kw-2">&amp;</span><span class="ident">Term</span><span class="op">&lt;</span><span class="ident">Jmp</span><span class="op">&gt;</span>) -&gt; <span class="ident">bool</span> {
         <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="ident">call</span>.<span class="ident">term</span> {
-            <span class="ident">Jmp::CallInd</span> { <span class="ident">target</span>, .. } <span class="op">=</span><span class="op">&gt;</span> <span class="ident">state</span>.<span class="ident">eval</span>(<span class="ident">target</span>).<span class="ident">is_top</span>(),
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="bool-val">false</span>,
+            <span class="ident">Jmp::CallInd</span> { <span class="ident">target</span>, .. } =&gt; <span class="ident">state</span>.<span class="ident">eval</span>(<span class="ident">target</span>).<span class="ident">is_top</span>(),
+            <span class="kw">_</span> =&gt; <span class="bool-val">false</span>,
         }
     }
 
-    <span class="doccomment">/// Adjust the stack register after a call to an extern function.</span>
+    <span class="doccomment">/// Adjust the stack register after a call to a function.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// On x86, this removes the return address from the stack</span>
     <span class="doccomment">/// (other architectures pass the return address in a register, not on the stack).</span>
     <span class="doccomment">/// On other architectures the stack register retains the value it had before the call.</span>
     <span class="doccomment">/// Note that in some calling conventions the callee also clears function parameters from the stack.</span>
     <span class="doccomment">/// We do not detect and handle these cases yet.</span>
-    <span class="kw">fn</span> <span class="ident">adjust_stack_register_on_extern_call</span>(
+    <span class="kw">fn</span> <span class="ident">adjust_stack_register_on_return_from_call</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">state_before_call</span>: <span class="kw-2">&amp;</span><span class="ident">State</span>,
-        <span class="ident">new_state</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">State</span>,
+        <span class="ident">new_state</span>: <span class="kw-2">&amp;mut</span> <span class="ident">State</span>,
     ) {
         <span class="kw">let</span> <span class="ident">stack_register</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">project</span>.<span class="ident">stack_pointer_register</span>;
         <span class="kw">let</span> <span class="ident">stack_pointer</span> <span class="op">=</span> <span class="ident">state_before_call</span>.<span class="ident">get_register</span>(<span class="ident">stack_register</span>);
         <span class="kw">match</span> <span class="self">self</span>.<span class="ident">project</span>.<span class="ident">cpu_architecture</span>.<span class="ident">as_str</span>() {
-            <span class="string">&quot;x86&quot;</span> <span class="op">|</span> <span class="string">&quot;x86_32&quot;</span> <span class="op">|</span> <span class="string">&quot;x86_64&quot;</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="string">&quot;x86&quot;</span> <span class="op">|</span> <span class="string">&quot;x86_32&quot;</span> <span class="op">|</span> <span class="string">&quot;x86_64&quot;</span> =&gt; {
                 <span class="kw">let</span> <span class="ident">offset</span> <span class="op">=</span> <span class="ident">Bitvector::from_u64</span>(<span class="ident">stack_register</span>.<span class="ident">size</span>.<span class="ident">into</span>())
                     .<span class="ident">into_truncate</span>(<span class="ident">apint::BitWidth::from</span>(<span class="ident">stack_register</span>.<span class="ident">size</span>))
                     .<span class="ident">unwrap</span>();
@@ -930,50 +484,43 @@
                     <span class="ident">stack_pointer</span>.<span class="ident">bin_op</span>(<span class="ident">BinOpType::IntAdd</span>, <span class="kw-2">&amp;</span><span class="ident">offset</span>.<span class="ident">into</span>()),
                 );
             }
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">new_state</span>.<span class="ident">set_register</span>(<span class="ident">stack_register</span>, <span class="ident">stack_pointer</span>),
+            <span class="kw">_</span> =&gt; <span class="ident">new_state</span>.<span class="ident">set_register</span>(<span class="ident">stack_register</span>, <span class="ident">stack_pointer</span>),
         }
     }
 
     <span class="doccomment">/// Handle an extern symbol call, whose concrete effect on the state is unknown.</span>
-    <span class="doccomment">/// Basically, we assume that the call may write to all memory objects and register that is has access to.</span>
+    <span class="doccomment">/// Basically, we assume that the call may write to all memory objects and registers that is has access to.</span>
     <span class="kw">fn</span> <span class="ident">handle_generic_extern_call</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">state</span>: <span class="kw-2">&amp;</span><span class="ident">State</span>,
         <span class="kw-2">mut</span> <span class="ident">new_state</span>: <span class="ident">State</span>,
         <span class="ident">call</span>: <span class="kw-2">&amp;</span><span class="ident">Term</span><span class="op">&lt;</span><span class="ident">Jmp</span><span class="op">&gt;</span>,
         <span class="ident">extern_symbol</span>: <span class="kw-2">&amp;</span><span class="ident">ExternSymbol</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">State</span> {
+    ) -&gt; <span class="ident">State</span> {
         <span class="self">self</span>.<span class="ident">log_debug</span>(
-            <span class="ident">new_state</span>.<span class="ident">clear_stack_parameter</span>(
-                <span class="ident">extern_symbol</span>,
-                <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">project</span>.<span class="ident">stack_pointer_register</span>,
-                <span class="self">self</span>.<span class="ident">runtime_memory_image</span>,
-            ),
+            <span class="ident">new_state</span>.<span class="ident">clear_stack_parameter</span>(<span class="ident">extern_symbol</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">project</span>.<span class="ident">runtime_memory_image</span>),
             <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">call</span>.<span class="ident">tid</span>),
         );
-        <span class="kw">let</span> <span class="ident">calling_conv</span> <span class="op">=</span> <span class="ident">extern_symbol</span>.<span class="ident">get_calling_convention</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">project</span>);
+        <span class="kw">let</span> <span class="ident">calling_conv</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">project</span>.<span class="ident">get_calling_convention</span>(<span class="ident">extern_symbol</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">possible_referenced_ids</span> <span class="op">=</span> <span class="ident">BTreeSet::new</span>();
         <span class="kw">if</span> <span class="ident">extern_symbol</span>.<span class="ident">parameters</span>.<span class="ident">is_empty</span>() <span class="op">&amp;&amp;</span> <span class="ident">extern_symbol</span>.<span class="ident">return_values</span>.<span class="ident">is_empty</span>() {
             <span class="comment">// We assume here that we do not know the parameters and approximate them by all possible parameter registers.</span>
             <span class="comment">// This approximation is wrong if the function is known but has neither parameters nor return values.</span>
             <span class="comment">// We cannot distinguish these two cases yet.</span>
-            <span class="kw">for</span> <span class="ident">parameter_register_name</span> <span class="kw">in</span> <span class="ident">calling_conv</span>
-                .<span class="ident">integer_parameter_register</span>
-                .<span class="ident">iter</span>()
-                .<span class="ident">chain</span>(<span class="ident">calling_conv</span>.<span class="ident">float_parameter_register</span>.<span class="ident">iter</span>())
-            {
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">register_value</span>) <span class="op">=</span> <span class="ident">state</span>.<span class="ident">get_register_by_name</span>(<span class="ident">parameter_register_name</span>) {
-                    <span class="ident">possible_referenced_ids</span>.<span class="ident">append</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">register_value</span>.<span class="ident">referenced_ids</span>());
-                }
+            <span class="kw">for</span> <span class="ident">parameter_register</span> <span class="kw">in</span> <span class="ident">calling_conv</span>.<span class="ident">integer_parameter_register</span>.<span class="ident">iter</span>() {
+                <span class="kw">let</span> <span class="ident">register_value</span> <span class="op">=</span> <span class="ident">state</span>.<span class="ident">get_register</span>(<span class="ident">parameter_register</span>);
+                <span class="ident">possible_referenced_ids</span>.<span class="ident">extend</span>(<span class="ident">register_value</span>.<span class="ident">referenced_ids</span>().<span class="ident">cloned</span>());
+            }
+            <span class="kw">for</span> <span class="ident">float_parameter_expression</span> <span class="kw">in</span> <span class="ident">calling_conv</span>.<span class="ident">float_parameter_register</span>.<span class="ident">iter</span>() {
+                <span class="kw">let</span> <span class="ident">register_value</span> <span class="op">=</span> <span class="ident">state</span>.<span class="ident">eval</span>(<span class="ident">float_parameter_expression</span>);
+                <span class="ident">possible_referenced_ids</span>.<span class="ident">extend</span>(<span class="ident">register_value</span>.<span class="ident">referenced_ids</span>().<span class="ident">cloned</span>());
             }
         } <span class="kw">else</span> {
             <span class="kw">for</span> <span class="ident">parameter</span> <span class="kw">in</span> <span class="ident">extern_symbol</span>.<span class="ident">parameters</span>.<span class="ident">iter</span>() {
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">data</span>) <span class="op">=</span> <span class="ident">state</span>.<span class="ident">eval_parameter_arg</span>(
-                    <span class="ident">parameter</span>,
-                    <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">project</span>.<span class="ident">stack_pointer_register</span>,
-                    <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">runtime_memory_image</span>,
-                ) {
-                    <span class="ident">possible_referenced_ids</span>.<span class="ident">append</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">data</span>.<span class="ident">referenced_ids</span>());
+                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">data</span>) <span class="op">=</span>
+                    <span class="ident">state</span>.<span class="ident">eval_parameter_arg</span>(<span class="ident">parameter</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">project</span>.<span class="ident">runtime_memory_image</span>)
+                {
+                    <span class="ident">possible_referenced_ids</span>.<span class="ident">extend</span>(<span class="ident">data</span>.<span class="ident">referenced_ids</span>().<span class="ident">cloned</span>());
                 }
             }
         }
@@ -994,24 +541,21 @@
     <span class="doccomment">/// and that it may access (and write to) all parameter registers of this calling convention.</span>
     <span class="doccomment">/// We also assume that the function does not use any parameters saved on the stack,</span>
     <span class="doccomment">/// which may greatly reduce correctness of the analysis for the x86_32 architecture.</span>
-    <span class="kw">fn</span> <span class="ident">handle_call_to_generic_unknown_function</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">state_before_call</span>: <span class="kw-2">&amp;</span><span class="ident">State</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">handle_call_to_generic_unknown_function</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">state_before_call</span>: <span class="kw-2">&amp;</span><span class="ident">State</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">calling_conv</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">project</span>.<span class="ident">get_standard_calling_convention</span>() {
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_state</span> <span class="op">=</span> <span class="ident">state_before_call</span>.<span class="ident">clone</span>();
             <span class="ident">new_state</span>.<span class="ident">clear_non_callee_saved_register</span>(<span class="kw-2">&amp;</span><span class="ident">calling_conv</span>.<span class="ident">callee_saved_register</span>[..]);
             <span class="comment">// Adjust stack register value (for x86 architecture).</span>
-            <span class="self">self</span>.<span class="ident">adjust_stack_register_on_extern_call</span>(<span class="ident">state_before_call</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">new_state</span>);
+            <span class="self">self</span>.<span class="ident">adjust_stack_register_on_return_from_call</span>(<span class="ident">state_before_call</span>, <span class="kw-2">&amp;mut</span> <span class="ident">new_state</span>);
 
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">possible_referenced_ids</span> <span class="op">=</span> <span class="ident">BTreeSet::new</span>();
-            <span class="kw">for</span> <span class="ident">parameter_register_name</span> <span class="kw">in</span> <span class="ident">calling_conv</span>
-                .<span class="ident">integer_parameter_register</span>
-                .<span class="ident">iter</span>()
-                .<span class="ident">chain</span>(<span class="ident">calling_conv</span>.<span class="ident">float_parameter_register</span>.<span class="ident">iter</span>())
-            {
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">register_value</span>) <span class="op">=</span>
-                    <span class="ident">state_before_call</span>.<span class="ident">get_register_by_name</span>(<span class="ident">parameter_register_name</span>)
-                {
-                    <span class="ident">possible_referenced_ids</span>.<span class="ident">append</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">register_value</span>.<span class="ident">referenced_ids</span>());
-                }
+            <span class="kw">for</span> <span class="ident">parameter_register</span> <span class="kw">in</span> <span class="ident">calling_conv</span>.<span class="ident">integer_parameter_register</span>.<span class="ident">iter</span>() {
+                <span class="kw">let</span> <span class="ident">register_value</span> <span class="op">=</span> <span class="ident">state_before_call</span>.<span class="ident">get_register</span>(<span class="ident">parameter_register</span>);
+                <span class="ident">possible_referenced_ids</span>.<span class="ident">extend</span>(<span class="ident">register_value</span>.<span class="ident">referenced_ids</span>().<span class="ident">cloned</span>());
+            }
+            <span class="kw">for</span> <span class="ident">float_parameter_expression</span> <span class="kw">in</span> <span class="ident">calling_conv</span>.<span class="ident">float_parameter_register</span>.<span class="ident">iter</span>() {
+                <span class="kw">let</span> <span class="ident">register_value</span> <span class="op">=</span> <span class="ident">state_before_call</span>.<span class="ident">eval</span>(<span class="ident">float_parameter_expression</span>);
+                <span class="ident">possible_referenced_ids</span>.<span class="ident">extend</span>(<span class="ident">register_value</span>.<span class="ident">referenced_ids</span>().<span class="ident">cloned</span>());
             }
             <span class="ident">possible_referenced_ids</span> <span class="op">=</span>
                 <span class="ident">state_before_call</span>.<span class="ident">add_recursively_referenced_ids_to_id_set</span>(<span class="ident">possible_referenced_ids</span>);
@@ -1027,25 +571,26 @@
         }
     }
 
-    <span class="doccomment">/// Get the offset of the current stack pointer to the base of the current stack frame.</span>
-    <span class="kw">fn</span> <span class="ident">get_current_stack_offset</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">state</span>: <span class="kw-2">&amp;</span><span class="ident">State</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ValueDomain</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="ident">Data::Pointer</span>(<span class="kw-2">ref</span> <span class="ident">stack_pointer</span>) <span class="op">=</span>
-            <span class="ident">state</span>.<span class="ident">get_register</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">project</span>.<span class="ident">stack_pointer_register</span>)
-        {
-            <span class="kw">if</span> <span class="ident">stack_pointer</span>.<span class="ident">targets</span>().<span class="ident">len</span>() <span class="op">=</span><span class="op">=</span> <span class="number">1</span> {
-                <span class="kw">let</span> (<span class="ident">stack_id</span>, <span class="ident">stack_offset_domain</span>) <span class="op">=</span>
-                    <span class="ident">stack_pointer</span>.<span class="ident">targets</span>().<span class="ident">iter</span>().<span class="ident">next</span>().<span class="ident">unwrap</span>();
-                <span class="kw">if</span> <span class="kw-2">*</span><span class="ident">stack_id</span> <span class="op">=</span><span class="op">=</span> <span class="ident">state</span>.<span class="ident">stack_id</span> {
-                    <span class="kw">return</span> <span class="ident">stack_offset_domain</span>.<span class="ident">clone</span>();
-                }
-            }
-        }
-        <span class="ident">ValueDomain::new_top</span>(<span class="self">self</span>.<span class="ident">project</span>.<span class="ident">stack_pointer_register</span>.<span class="ident">size</span>)
+    <span class="doccomment">/// Report a NULL dereference CWE at the address of the given TID.</span>
+    <span class="kw">fn</span> <span class="ident">report_null_deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">tid</span>: <span class="kw-2">&amp;</span><span class="ident">Tid</span>) {
+        <span class="kw">let</span> <span class="ident">warning</span> <span class="op">=</span> <span class="ident">CweWarning</span> {
+            <span class="ident">name</span>: <span class="string">&quot;CWE476&quot;</span>.<span class="ident">to_string</span>(),
+            <span class="ident">version</span>: <span class="ident">VERSION</span>.<span class="ident">to_string</span>(),
+            <span class="ident">addresses</span>: <span class="macro">vec!</span>[<span class="ident">tid</span>.<span class="ident">address</span>.<span class="ident">clone</span>()],
+            <span class="ident">tids</span>: <span class="macro">vec!</span>[<span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">tid</span>)],
+            <span class="ident">symbols</span>: <span class="ident">Vec::new</span>(),
+            <span class="ident">other</span>: <span class="ident">Vec::new</span>(),
+            <span class="ident">description</span>: <span class="macro">format!</span>(
+                <span class="string">&quot;(NULL Pointer Dereference) Memory access at {} may result in a NULL dereference&quot;</span>,
+                <span class="ident">tid</span>.<span class="ident">address</span>
+            ),
+        };
+        <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">log_collector</span>.<span class="ident">send</span>(<span class="ident">LogThreadMsg::Cwe</span>(<span class="ident">warning</span>));
     }
 }
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
 <span class="kw">mod</span> <span class="ident">tests</span>;
-</pre></div>
-</section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../../../../" data-current-crate="cwe_checker_lib" data-search-index-js="../../../../../search-index.js" data-search-js="../../../../../search.js"></div>
-    <script src="../../../../../main.js"></script><script src="../../../../../source-script.js"></script><script src="../../../../../source-files.js"></script></body></html>
+</code></pre></div>
+</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../../" data-current-crate="cwe_checker_lib" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.60.0 (7737e0b5c 2022-04-04)" ></div>
+</body></html>

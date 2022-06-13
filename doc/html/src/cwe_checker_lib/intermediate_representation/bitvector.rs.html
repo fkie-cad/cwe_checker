@@ -1,7 +1,9 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/intermediate_representation/bitvector.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>bitvector.rs - source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../favicon.svg">
-<link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../../cwe_checker_lib/index.html'><div class='logo-container rust-logo'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
-                <a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/intermediate_representation/bitvector.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>bitvector.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><script defer src="../../../main.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script>
+    <noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../cwe_checker_lib/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../../cwe_checker_lib/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../cwe_checker_lib/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><div class="theme-picker hidden"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="22" height="22" alt="Pick another theme!" src="../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
 <span id="4">  4</span>
@@ -330,8 +332,23 @@
 <span id="327">327</span>
 <span id="328">328</span>
 <span id="329">329</span>
-</pre><div class="example-wrap"><pre class="rust ">
-<span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+</pre><pre class="rust"><code><span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 
 <span class="doccomment">/// A bitvector is a fixed-length vector of bits</span>
 <span class="doccomment">/// with the semantics of a CPU register,</span>
@@ -344,61 +361,61 @@
 <span class="doccomment">/// that are not contained in the [`apint`] crate.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">BitvectorExtended</span>: <span class="ident">Sized</span> {
     <span class="doccomment">/// Resize `self` to the target byte size by either zero extending or truncating `self`.</span>
-    <span class="kw">fn</span> <span class="ident">into_resize_unsigned</span>(<span class="self">self</span>, <span class="ident">size</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span>;
+    <span class="kw">fn</span> <span class="ident">into_resize_unsigned</span>(<span class="self">self</span>, <span class="ident">size</span>: <span class="ident">ByteSize</span>) -&gt; <span class="self">Self</span>;
 
     <span class="doccomment">/// Resize `self` to the target byte size by either sign extending or truncating `self`.</span>
-    <span class="kw">fn</span> <span class="ident">into_resize_signed</span>(<span class="self">self</span>, <span class="ident">size</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span>;
+    <span class="kw">fn</span> <span class="ident">into_resize_signed</span>(<span class="self">self</span>, <span class="ident">size</span>: <span class="ident">ByteSize</span>) -&gt; <span class="self">Self</span>;
 
     <span class="doccomment">/// Perform a cast operation on the bitvector.</span>
     <span class="doccomment">/// Returns an error for non-implemented cast operations (currently all float-related casts).</span>
-    <span class="kw">fn</span> <span class="ident">cast</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">kind</span>: <span class="ident">CastOpType</span>, <span class="ident">width</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">cast</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">kind</span>: <span class="ident">CastOpType</span>, <span class="ident">width</span>: <span class="ident">ByteSize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
 
     <span class="doccomment">/// Extract a subpiece from the given bitvector.</span>
-    <span class="kw">fn</span> <span class="ident">subpiece</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">low_byte</span>: <span class="ident">ByteSize</span>, <span class="ident">size</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span>;
+    <span class="kw">fn</span> <span class="ident">subpiece</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">low_byte</span>: <span class="ident">ByteSize</span>, <span class="ident">size</span>: <span class="ident">ByteSize</span>) -&gt; <span class="self">Self</span>;
 
     <span class="doccomment">/// Perform a unary operation on the given bitvector.</span>
     <span class="doccomment">/// Returns an error for non-implemented operations (currently all float-related operations).</span>
-    <span class="kw">fn</span> <span class="ident">un_op</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">op</span>: <span class="ident">UnOpType</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">un_op</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">op</span>: <span class="ident">UnOpType</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
 
     <span class="doccomment">/// Perform a binary operation on the given bitvectors.</span>
     <span class="doccomment">/// Returns an error for non-implemented operations (currently all float-related operations).</span>
-    <span class="kw">fn</span> <span class="ident">bin_op</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">op</span>: <span class="ident">BinOpType</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">bin_op</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">op</span>: <span class="ident">BinOpType</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
 
     <span class="doccomment">/// Returns the result of `self + rhs` if the computation does not result in a signed integer overflow or underflow.</span>
-    <span class="kw">fn</span> <span class="ident">signed_add_overflow_checked</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">signed_add_overflow_checked</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>;
 
     <span class="doccomment">/// Returns the result of `self - rhs` if the computation does not result in a signed integer overflow or underflow.</span>
-    <span class="kw">fn</span> <span class="ident">signed_sub_overflow_checked</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">signed_sub_overflow_checked</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>;
 
     <span class="doccomment">/// Return the result of multiplying `self` with `rhs`</span>
     <span class="doccomment">/// and a flag that is set to `true` if the multiplication resulted in a signed integer overflow or underflow.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Returns an error for bitvectors larger than 8 bytes,</span>
     <span class="doccomment">/// since multiplication for them is not yet implemented in the [`apint`] crate.</span>
-    <span class="kw">fn</span> <span class="ident">signed_mult_with_overflow_flag</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="self">Self</span>, <span class="ident">bool</span>), <span class="ident">Error</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">signed_mult_with_overflow_flag</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="self">Self</span>, <span class="ident">bool</span>), <span class="ident">Error</span><span class="op">&gt;</span>;
 
     <span class="doccomment">/// Return the size in bytes of the bitvector.</span>
-    <span class="kw">fn</span> <span class="ident">bytesize</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ByteSize</span>;
+    <span class="kw">fn</span> <span class="ident">bytesize</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">ByteSize</span>;
 }
 
 <span class="kw">impl</span> <span class="ident">BitvectorExtended</span> <span class="kw">for</span> <span class="ident">Bitvector</span> {
     <span class="doccomment">/// Perform a cast operation on the bitvector.</span>
     <span class="doccomment">/// Returns an error for non-implemented cast operations (currently all float-related casts).</span>
-    <span class="kw">fn</span> <span class="ident">cast</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">kind</span>: <span class="ident">CastOpType</span>, <span class="ident">width</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">cast</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">kind</span>: <span class="ident">CastOpType</span>, <span class="ident">width</span>: <span class="ident">ByteSize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
         <span class="kw">match</span> <span class="ident">kind</span> {
-            <span class="ident">CastOpType::IntZExt</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="self">self</span>.<span class="ident">clone</span>().<span class="ident">into_zero_extend</span>(<span class="ident">width</span>).<span class="ident">unwrap</span>()),
-            <span class="ident">CastOpType::IntSExt</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="self">self</span>.<span class="ident">clone</span>().<span class="ident">into_sign_extend</span>(<span class="ident">width</span>).<span class="ident">unwrap</span>()),
-            <span class="ident">CastOpType::Int2Float</span> <span class="op">|</span> <span class="ident">CastOpType::Float2Float</span> <span class="op">|</span> <span class="ident">CastOpType::Trunc</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">CastOpType::IntZExt</span> =&gt; <span class="prelude-val">Ok</span>(<span class="self">self</span>.<span class="ident">clone</span>().<span class="ident">into_zero_extend</span>(<span class="ident">width</span>).<span class="ident">unwrap</span>()),
+            <span class="ident">CastOpType::IntSExt</span> =&gt; <span class="prelude-val">Ok</span>(<span class="self">self</span>.<span class="ident">clone</span>().<span class="ident">into_sign_extend</span>(<span class="ident">width</span>).<span class="ident">unwrap</span>()),
+            <span class="ident">CastOpType::Int2Float</span> <span class="op">|</span> <span class="ident">CastOpType::Float2Float</span> <span class="op">|</span> <span class="ident">CastOpType::Trunc</span> =&gt; {
                 <span class="prelude-val">Err</span>(<span class="macro">anyhow!</span>(<span class="string">&quot;Float operations not yet implemented&quot;</span>))
             }
-            <span class="ident">CastOpType::PopCount</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="ident">Bitvector::from_u64</span>(<span class="self">self</span>.<span class="ident">count_ones</span>() <span class="kw">as</span> <span class="ident">u64</span>)
+            <span class="ident">CastOpType::PopCount</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">Bitvector::from_u64</span>(<span class="self">self</span>.<span class="ident">count_ones</span>() <span class="kw">as</span> <span class="ident">u64</span>)
                 .<span class="ident">into_truncate</span>(<span class="ident">width</span>)
                 .<span class="ident">unwrap</span>()),
         }
     }
 
     <span class="doccomment">/// Extract a subpiece from the given bitvector.</span>
-    <span class="kw">fn</span> <span class="ident">subpiece</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">low_byte</span>: <span class="ident">ByteSize</span>, <span class="ident">size</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">subpiece</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">low_byte</span>: <span class="ident">ByteSize</span>, <span class="ident">size</span>: <span class="ident">ByteSize</span>) -&gt; <span class="self">Self</span> {
         <span class="self">self</span>.<span class="ident">clone</span>()
             .<span class="ident">into_checked_lshr</span>(<span class="ident">low_byte</span>.<span class="ident">as_bit_length</span>())
             .<span class="ident">unwrap</span>()
@@ -408,30 +425,32 @@
 
     <span class="doccomment">/// Perform a unary operation on the given bitvector.</span>
     <span class="doccomment">/// Returns an error for non-implemented operations (currently all float-related operations).</span>
-    <span class="kw">fn</span> <span class="ident">un_op</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">op</span>: <span class="ident">UnOpType</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">un_op</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">op</span>: <span class="ident">UnOpType</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
         <span class="kw">use</span> <span class="ident">UnOpType</span>::<span class="kw-2">*</span>;
         <span class="kw">match</span> <span class="ident">op</span> {
-            <span class="ident">Int2Comp</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="op">-</span><span class="self">self</span>.<span class="ident">clone</span>()),
-            <span class="ident">IntNegate</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="self">self</span>.<span class="ident">clone</span>().<span class="ident">into_bitnot</span>()),
-            <span class="ident">BoolNegate</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">Int2Comp</span> =&gt; <span class="prelude-val">Ok</span>(<span class="op">-</span><span class="self">self</span>.<span class="ident">clone</span>()),
+            <span class="ident">IntNegate</span> =&gt; <span class="prelude-val">Ok</span>(<span class="self">self</span>.<span class="ident">clone</span>().<span class="ident">into_bitnot</span>()),
+            <span class="ident">BoolNegate</span> =&gt; {
                 <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_zero</span>() {
                     <span class="prelude-val">Ok</span>(<span class="ident">Bitvector::from_u8</span>(<span class="number">1</span>))
                 } <span class="kw">else</span> {
+                    <span class="macro">assert_eq!</span>(<span class="self">self</span>, <span class="kw-2">&amp;</span><span class="ident">Bitvector::from_u8</span>(<span class="number">1</span>)); <span class="comment">// Any other value would indicate a bug.</span>
                     <span class="prelude-val">Ok</span>(<span class="ident">Bitvector::from_u8</span>(<span class="number">0</span>))
                 }
             }
-            <span class="ident">FloatNegate</span> <span class="op">|</span> <span class="ident">FloatAbs</span> <span class="op">|</span> <span class="ident">FloatSqrt</span> <span class="op">|</span> <span class="ident">FloatCeil</span> <span class="op">|</span> <span class="ident">FloatFloor</span> <span class="op">|</span> <span class="ident">FloatRound</span> <span class="op">|</span> <span class="ident">FloatNaN</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">FloatNegate</span> <span class="op">|</span> <span class="ident">FloatAbs</span> <span class="op">|</span> <span class="ident">FloatSqrt</span> <span class="op">|</span> <span class="ident">FloatCeil</span> <span class="op">|</span> <span class="ident">FloatFloor</span> <span class="op">|</span> <span class="ident">FloatRound</span> <span class="op">|</span> <span class="ident">FloatNaN</span> =&gt; {
                 <span class="prelude-val">Err</span>(<span class="macro">anyhow!</span>(<span class="string">&quot;Float operations not yet implemented&quot;</span>))
             }
         }
     }
 
     <span class="doccomment">/// Perform a binary operation on the given bitvectors.</span>
-    <span class="doccomment">/// Returns an error for non-implemented operations (currently all float-related operations).</span>
-    <span class="kw">fn</span> <span class="ident">bin_op</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">op</span>: <span class="ident">BinOpType</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// Returns an error for non-implemented operations (currently all float-related operations)</span>
+    <span class="doccomment">/// or for divisions-by-zero.</span>
+    <span class="kw">fn</span> <span class="ident">bin_op</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">op</span>: <span class="ident">BinOpType</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
         <span class="kw">use</span> <span class="ident">BinOpType</span>::<span class="kw-2">*</span>;
         <span class="kw">match</span> <span class="ident">op</span> {
-            <span class="ident">Piece</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">Piece</span> =&gt; {
                 <span class="kw">let</span> <span class="ident">new_bitwidth</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">width</span>().<span class="ident">to_usize</span>() <span class="op">+</span> <span class="ident">rhs</span>.<span class="ident">width</span>().<span class="ident">to_usize</span>();
                 <span class="kw">let</span> <span class="ident">upper_bits</span> <span class="op">=</span> <span class="self">self</span>
                     .<span class="ident">clone</span>()
@@ -442,9 +461,9 @@
                 <span class="kw">let</span> <span class="ident">lower_bits</span> <span class="op">=</span> <span class="ident">rhs</span>.<span class="ident">clone</span>().<span class="ident">into_zero_extend</span>(<span class="ident">new_bitwidth</span>).<span class="ident">unwrap</span>();
                 <span class="prelude-val">Ok</span>(<span class="ident">upper_bits</span> <span class="op">|</span> <span class="kw-2">&amp;</span><span class="ident">lower_bits</span>)
             }
-            <span class="ident">IntAdd</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="self">self</span> <span class="op">+</span> <span class="ident">rhs</span>),
-            <span class="ident">IntSub</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="self">self</span> <span class="op">-</span> <span class="ident">rhs</span>),
-            <span class="ident">IntCarry</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">IntAdd</span> =&gt; <span class="prelude-val">Ok</span>(<span class="self">self</span> <span class="op">+</span> <span class="ident">rhs</span>),
+            <span class="ident">IntSub</span> =&gt; <span class="prelude-val">Ok</span>(<span class="self">self</span> <span class="op">-</span> <span class="ident">rhs</span>),
+            <span class="ident">IntCarry</span> =&gt; {
                 <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="self">self</span> <span class="op">+</span> <span class="ident">rhs</span>;
                 <span class="kw">if</span> <span class="ident">result</span>.<span class="ident">checked_ult</span>(<span class="self">self</span>).<span class="ident">unwrap</span>() <span class="op">|</span><span class="op">|</span> <span class="ident">result</span>.<span class="ident">checked_ult</span>(<span class="ident">rhs</span>).<span class="ident">unwrap</span>() {
                     <span class="prelude-val">Ok</span>(<span class="ident">Bitvector::from_u8</span>(<span class="number">1</span>))
@@ -452,7 +471,7 @@
                     <span class="prelude-val">Ok</span>(<span class="ident">Bitvector::from_u8</span>(<span class="number">0</span>))
                 }
             }
-            <span class="ident">IntSCarry</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">IntSCarry</span> =&gt; {
                 <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">apint::Int::from</span>(<span class="self">self</span> <span class="op">+</span> <span class="ident">rhs</span>);
                 <span class="kw">let</span> <span class="ident">signed_self</span> <span class="op">=</span> <span class="ident">apint::Int::from</span>(<span class="self">self</span>.<span class="ident">clone</span>());
                 <span class="kw">let</span> <span class="ident">signed_rhs</span> <span class="op">=</span> <span class="ident">apint::Int::from</span>(<span class="ident">rhs</span>.<span class="ident">clone</span>());
@@ -466,7 +485,7 @@
                     <span class="prelude-val">Ok</span>(<span class="ident">Bitvector::from_u8</span>(<span class="number">0</span>))
                 }
             }
-            <span class="ident">IntSBorrow</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">IntSBorrow</span> =&gt; {
                 <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">apint::Int::from</span>(<span class="self">self</span> <span class="op">-</span> <span class="ident">rhs</span>);
                 <span class="kw">let</span> <span class="ident">signed_self</span> <span class="op">=</span> <span class="ident">apint::Int::from</span>(<span class="self">self</span>.<span class="ident">clone</span>());
                 <span class="kw">let</span> <span class="ident">signed_rhs</span> <span class="op">=</span> <span class="ident">apint::Int::from</span>(<span class="ident">rhs</span>.<span class="ident">clone</span>());
@@ -480,7 +499,7 @@
                     <span class="prelude-val">Ok</span>(<span class="ident">Bitvector::from_u8</span>(<span class="number">0</span>))
                 }
             }
-            <span class="ident">IntMult</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">IntMult</span> =&gt; {
                 <span class="comment">// FIXME: Multiplication for bitvectors larger than 8 bytes is not yet implemented in the `apint` crate (version 0.2).</span>
                 <span class="kw">if</span> <span class="self">self</span>.<span class="ident">width</span>().<span class="ident">to_usize</span>() <span class="op">&gt;</span> <span class="number">64</span> {
                     <span class="prelude-val">Err</span>(<span class="macro">anyhow!</span>(<span class="string">&quot;Multiplication and division of integers larger than 8 bytes not yet implemented.&quot;</span>))
@@ -488,25 +507,39 @@
                     <span class="prelude-val">Ok</span>(<span class="self">self</span> <span class="op">*</span> <span class="ident">rhs</span>)
                 }
             }
-            <span class="ident">IntDiv</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">IntDiv</span> =&gt; {
                 <span class="comment">// FIXME: Division for bitvectors larger than 8 bytes is not yet implemented in the `apint` crate (version 0.2).</span>
                 <span class="kw">if</span> <span class="self">self</span>.<span class="ident">width</span>().<span class="ident">to_usize</span>() <span class="op">&gt;</span> <span class="number">64</span> {
                     <span class="prelude-val">Err</span>(<span class="macro">anyhow!</span>(<span class="string">&quot;Multiplication and division of integers larger than 8 bytes not yet implemented.&quot;</span>))
                 } <span class="kw">else</span> {
-                    <span class="prelude-val">Ok</span>(<span class="self">self</span>.<span class="ident">clone</span>().<span class="ident">into_checked_udiv</span>(<span class="ident">rhs</span>).<span class="ident">unwrap</span>())
+                    <span class="prelude-val">Ok</span>(<span class="self">self</span>.<span class="ident">clone</span>().<span class="ident">into_checked_udiv</span>(<span class="ident">rhs</span>)<span class="question-mark">?</span>)
                 }
             }
-            <span class="ident">IntSDiv</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">IntSDiv</span> =&gt; {
                 <span class="comment">// FIXME: Division for bitvectors larger than 8 bytes is not yet implemented in the `apint` crate (version 0.2).</span>
                 <span class="kw">if</span> <span class="self">self</span>.<span class="ident">width</span>().<span class="ident">to_usize</span>() <span class="op">&gt;</span> <span class="number">64</span> {
                     <span class="prelude-val">Err</span>(<span class="macro">anyhow!</span>(<span class="string">&quot;Multiplication and division of integers larger than 8 bytes not yet implemented.&quot;</span>))
                 } <span class="kw">else</span> {
-                    <span class="prelude-val">Ok</span>(<span class="self">self</span>.<span class="ident">clone</span>().<span class="ident">into_checked_sdiv</span>(<span class="ident">rhs</span>).<span class="ident">unwrap</span>())
+                    <span class="prelude-val">Ok</span>(<span class="self">self</span>.<span class="ident">clone</span>().<span class="ident">into_checked_sdiv</span>(<span class="ident">rhs</span>)<span class="question-mark">?</span>)
                 }
             }
-            <span class="ident">IntRem</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="self">self</span>.<span class="ident">clone</span>().<span class="ident">into_checked_urem</span>(<span class="ident">rhs</span>).<span class="ident">unwrap</span>()),
-            <span class="ident">IntSRem</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="self">self</span>.<span class="ident">clone</span>().<span class="ident">into_checked_srem</span>(<span class="ident">rhs</span>).<span class="ident">unwrap</span>()),
-            <span class="ident">IntLeft</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">IntRem</span> =&gt; {
+                <span class="comment">// FIXME: Division for bitvectors larger than 8 bytes is not yet implemented in the `apint` crate (version 0.2).</span>
+                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">width</span>().<span class="ident">to_usize</span>() <span class="op">&gt;</span> <span class="number">64</span> {
+                    <span class="prelude-val">Err</span>(<span class="macro">anyhow!</span>(<span class="string">&quot;Multiplication and division of integers larger than 8 bytes not yet implemented.&quot;</span>))
+                } <span class="kw">else</span> {
+                    <span class="prelude-val">Ok</span>(<span class="self">self</span>.<span class="ident">clone</span>().<span class="ident">into_checked_urem</span>(<span class="ident">rhs</span>)<span class="question-mark">?</span>)
+                }
+            }
+            <span class="ident">IntSRem</span> =&gt; {
+                <span class="comment">// FIXME: Division for bitvectors larger than 8 bytes is not yet implemented in the `apint` crate (version 0.2).</span>
+                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">width</span>().<span class="ident">to_usize</span>() <span class="op">&gt;</span> <span class="number">64</span> {
+                    <span class="prelude-val">Err</span>(<span class="macro">anyhow!</span>(<span class="string">&quot;Multiplication and division of integers larger than 8 bytes not yet implemented.&quot;</span>))
+                } <span class="kw">else</span> {
+                    <span class="prelude-val">Ok</span>(<span class="self">self</span>.<span class="ident">clone</span>().<span class="ident">into_checked_srem</span>(<span class="ident">rhs</span>)<span class="question-mark">?</span>)
+                }
+            }
+            <span class="ident">IntLeft</span> =&gt; {
                 <span class="kw">let</span> <span class="ident">shift_amount</span> <span class="op">=</span> <span class="ident">rhs</span>.<span class="ident">try_to_u64</span>().<span class="ident">unwrap</span>() <span class="kw">as</span> <span class="ident">usize</span>;
                 <span class="kw">if</span> <span class="ident">shift_amount</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">width</span>().<span class="ident">to_usize</span>() {
                     <span class="prelude-val">Ok</span>(<span class="self">self</span>.<span class="ident">clone</span>().<span class="ident">into_checked_shl</span>(<span class="ident">shift_amount</span>).<span class="ident">unwrap</span>())
@@ -514,7 +547,7 @@
                     <span class="prelude-val">Ok</span>(<span class="ident">Bitvector::zero</span>(<span class="self">self</span>.<span class="ident">width</span>()))
                 }
             }
-            <span class="ident">IntRight</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">IntRight</span> =&gt; {
                 <span class="kw">let</span> <span class="ident">shift_amount</span> <span class="op">=</span> <span class="ident">rhs</span>.<span class="ident">try_to_u64</span>().<span class="ident">unwrap</span>() <span class="kw">as</span> <span class="ident">usize</span>;
                 <span class="kw">if</span> <span class="ident">shift_amount</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">width</span>().<span class="ident">to_usize</span>() {
                     <span class="prelude-val">Ok</span>(<span class="self">self</span>.<span class="ident">clone</span>().<span class="ident">into_checked_lshr</span>(<span class="ident">shift_amount</span>).<span class="ident">unwrap</span>())
@@ -522,7 +555,7 @@
                     <span class="prelude-val">Ok</span>(<span class="ident">Bitvector::zero</span>(<span class="self">self</span>.<span class="ident">width</span>()))
                 }
             }
-            <span class="ident">IntSRight</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">IntSRight</span> =&gt; {
                 <span class="kw">let</span> <span class="ident">shift_amount</span> <span class="op">=</span> <span class="ident">rhs</span>.<span class="ident">try_to_u64</span>().<span class="ident">unwrap</span>() <span class="kw">as</span> <span class="ident">usize</span>;
                 <span class="kw">if</span> <span class="ident">shift_amount</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">width</span>().<span class="ident">to_usize</span>() {
                     <span class="prelude-val">Ok</span>(<span class="self">self</span>.<span class="ident">clone</span>().<span class="ident">into_checked_ashr</span>(<span class="ident">shift_amount</span>).<span class="ident">unwrap</span>())
@@ -537,26 +570,26 @@
                     }
                 }
             }
-            <span class="ident">IntAnd</span> <span class="op">|</span> <span class="ident">BoolAnd</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="self">self</span> <span class="op">&amp;</span> <span class="ident">rhs</span>),
-            <span class="ident">IntOr</span> <span class="op">|</span> <span class="ident">BoolOr</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="self">self</span> <span class="op">|</span> <span class="ident">rhs</span>),
-            <span class="ident">IntXOr</span> <span class="op">|</span> <span class="ident">BoolXOr</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="self">self</span> <span class="op">^</span> <span class="ident">rhs</span>),
-            <span class="ident">IntEqual</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">IntAnd</span> <span class="op">|</span> <span class="ident">BoolAnd</span> =&gt; <span class="prelude-val">Ok</span>(<span class="self">self</span> <span class="op">&amp;</span> <span class="ident">rhs</span>),
+            <span class="ident">IntOr</span> <span class="op">|</span> <span class="ident">BoolOr</span> =&gt; <span class="prelude-val">Ok</span>(<span class="self">self</span> <span class="op">|</span> <span class="ident">rhs</span>),
+            <span class="ident">IntXOr</span> <span class="op">|</span> <span class="ident">BoolXOr</span> =&gt; <span class="prelude-val">Ok</span>(<span class="self">self</span> <span class="op">^</span> <span class="ident">rhs</span>),
+            <span class="ident">IntEqual</span> =&gt; {
                 <span class="macro">assert_eq!</span>(<span class="self">self</span>.<span class="ident">width</span>(), <span class="ident">rhs</span>.<span class="ident">width</span>());
-                <span class="prelude-val">Ok</span>(<span class="ident">Bitvector::from</span>((<span class="self">self</span> <span class="op">=</span><span class="op">=</span> <span class="ident">rhs</span>) <span class="kw">as</span> <span class="ident">u8</span>))
+                <span class="prelude-val">Ok</span>(<span class="ident">Bitvector::from</span>((<span class="self">self</span> <span class="op">==</span> <span class="ident">rhs</span>) <span class="kw">as</span> <span class="ident">u8</span>))
             }
-            <span class="ident">IntNotEqual</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">IntNotEqual</span> =&gt; {
                 <span class="macro">assert_eq!</span>(<span class="self">self</span>.<span class="ident">width</span>(), <span class="ident">rhs</span>.<span class="ident">width</span>());
                 <span class="prelude-val">Ok</span>(<span class="ident">Bitvector::from</span>((<span class="self">self</span> <span class="op">!</span><span class="op">=</span> <span class="ident">rhs</span>) <span class="kw">as</span> <span class="ident">u8</span>))
             }
-            <span class="ident">IntLess</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="ident">Bitvector::from</span>(<span class="self">self</span>.<span class="ident">checked_ult</span>(<span class="ident">rhs</span>).<span class="ident">unwrap</span>() <span class="kw">as</span> <span class="ident">u8</span>)),
-            <span class="ident">IntLessEqual</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="ident">Bitvector::from</span>(<span class="self">self</span>.<span class="ident">checked_ule</span>(<span class="ident">rhs</span>).<span class="ident">unwrap</span>() <span class="kw">as</span> <span class="ident">u8</span>)),
-            <span class="ident">IntSLess</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="ident">Bitvector::from</span>(<span class="self">self</span>.<span class="ident">checked_slt</span>(<span class="ident">rhs</span>).<span class="ident">unwrap</span>() <span class="kw">as</span> <span class="ident">u8</span>)),
-            <span class="ident">IntSLessEqual</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="ident">Bitvector::from</span>(<span class="self">self</span>.<span class="ident">checked_sle</span>(<span class="ident">rhs</span>).<span class="ident">unwrap</span>() <span class="kw">as</span> <span class="ident">u8</span>)),
-            <span class="ident">FloatEqual</span> <span class="op">|</span> <span class="ident">FloatNotEqual</span> <span class="op">|</span> <span class="ident">FloatLess</span> <span class="op">|</span> <span class="ident">FloatLessEqual</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">IntLess</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">Bitvector::from</span>(<span class="self">self</span>.<span class="ident">checked_ult</span>(<span class="ident">rhs</span>).<span class="ident">unwrap</span>() <span class="kw">as</span> <span class="ident">u8</span>)),
+            <span class="ident">IntLessEqual</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">Bitvector::from</span>(<span class="self">self</span>.<span class="ident">checked_ule</span>(<span class="ident">rhs</span>).<span class="ident">unwrap</span>() <span class="kw">as</span> <span class="ident">u8</span>)),
+            <span class="ident">IntSLess</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">Bitvector::from</span>(<span class="self">self</span>.<span class="ident">checked_slt</span>(<span class="ident">rhs</span>).<span class="ident">unwrap</span>() <span class="kw">as</span> <span class="ident">u8</span>)),
+            <span class="ident">IntSLessEqual</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">Bitvector::from</span>(<span class="self">self</span>.<span class="ident">checked_sle</span>(<span class="ident">rhs</span>).<span class="ident">unwrap</span>() <span class="kw">as</span> <span class="ident">u8</span>)),
+            <span class="ident">FloatEqual</span> <span class="op">|</span> <span class="ident">FloatNotEqual</span> <span class="op">|</span> <span class="ident">FloatLess</span> <span class="op">|</span> <span class="ident">FloatLessEqual</span> =&gt; {
                 <span class="comment">// TODO: Implement floating point comparison operators!</span>
                 <span class="prelude-val">Err</span>(<span class="macro">anyhow!</span>(<span class="string">&quot;Float operations not yet implemented&quot;</span>))
             }
-            <span class="ident">FloatAdd</span> <span class="op">|</span> <span class="ident">FloatSub</span> <span class="op">|</span> <span class="ident">FloatMult</span> <span class="op">|</span> <span class="ident">FloatDiv</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">FloatAdd</span> <span class="op">|</span> <span class="ident">FloatSub</span> <span class="op">|</span> <span class="ident">FloatMult</span> <span class="op">|</span> <span class="ident">FloatDiv</span> =&gt; {
                 <span class="comment">// TODO: Implement floating point arithmetic operators!</span>
                 <span class="prelude-val">Err</span>(<span class="macro">anyhow!</span>(<span class="string">&quot;Float operations not yet implemented&quot;</span>))
             }
@@ -564,20 +597,20 @@
     }
 
     <span class="doccomment">/// Returns the result of `self + rhs` if the computation does not result in a signed integer overflow or underflow.</span>
-    <span class="kw">fn</span> <span class="ident">signed_add_overflow_checked</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">signed_add_overflow_checked</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">clone</span>().<span class="ident">into_checked_add</span>(<span class="ident">rhs</span>).<span class="ident">unwrap</span>();
         <span class="kw">match</span> (<span class="ident">rhs</span>.<span class="ident">sign_bit</span>().<span class="ident">to_bool</span>(), <span class="self">self</span>.<span class="ident">checked_sle</span>(<span class="kw-2">&amp;</span><span class="ident">result</span>).<span class="ident">unwrap</span>()) {
-            (<span class="bool-val">true</span>, <span class="bool-val">true</span>) <span class="op">|</span> (<span class="bool-val">false</span>, <span class="bool-val">false</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">None</span>,
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Some</span>(<span class="ident">result</span>),
+            (<span class="bool-val">true</span>, <span class="bool-val">true</span>) <span class="op">|</span> (<span class="bool-val">false</span>, <span class="bool-val">false</span>) =&gt; <span class="prelude-val">None</span>,
+            <span class="kw">_</span> =&gt; <span class="prelude-val">Some</span>(<span class="ident">result</span>),
         }
     }
 
     <span class="doccomment">/// Returns the result of `self - rhs` if the computation does not result in a signed integer overflow or underflow.</span>
-    <span class="kw">fn</span> <span class="ident">signed_sub_overflow_checked</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">signed_sub_overflow_checked</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">clone</span>().<span class="ident">into_checked_sub</span>(<span class="ident">rhs</span>).<span class="ident">unwrap</span>();
         <span class="kw">match</span> (<span class="ident">rhs</span>.<span class="ident">sign_bit</span>().<span class="ident">to_bool</span>(), <span class="self">self</span>.<span class="ident">checked_sge</span>(<span class="kw-2">&amp;</span><span class="ident">result</span>).<span class="ident">unwrap</span>()) {
-            (<span class="bool-val">true</span>, <span class="bool-val">true</span>) <span class="op">|</span> (<span class="bool-val">false</span>, <span class="bool-val">false</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">None</span>,
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Some</span>(<span class="ident">result</span>),
+            (<span class="bool-val">true</span>, <span class="bool-val">true</span>) <span class="op">|</span> (<span class="bool-val">false</span>, <span class="bool-val">false</span>) =&gt; <span class="prelude-val">None</span>,
+            <span class="kw">_</span> =&gt; <span class="prelude-val">Some</span>(<span class="ident">result</span>),
         }
     }
 
@@ -586,7 +619,7 @@
     <span class="doccomment">///</span>
     <span class="doccomment">/// Returns an error for bitvectors larger than 8 bytes,</span>
     <span class="doccomment">/// since multiplication for them is not yet implemented in the [`apint`] crate.</span>
-    <span class="kw">fn</span> <span class="ident">signed_mult_with_overflow_flag</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="self">Self</span>, <span class="ident">bool</span>), <span class="ident">Error</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">signed_mult_with_overflow_flag</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="self">Self</span>, <span class="ident">bool</span>), <span class="ident">Error</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_zero</span>() {
             <span class="prelude-val">Ok</span>((<span class="ident">Bitvector::zero</span>(<span class="self">self</span>.<span class="ident">width</span>()), <span class="bool-val">false</span>))
         } <span class="kw">else</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">width</span>().<span class="ident">to_usize</span>() <span class="op">&gt;</span> <span class="number">64</span> {
@@ -605,12 +638,12 @@
     }
 
     <span class="doccomment">/// Return the size in bytes of the bitvector.</span>
-    <span class="kw">fn</span> <span class="ident">bytesize</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ByteSize</span> {
+    <span class="kw">fn</span> <span class="ident">bytesize</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">ByteSize</span> {
         <span class="self">self</span>.<span class="ident">width</span>().<span class="ident">into</span>()
     }
 
     <span class="doccomment">/// Resize `self` to the target byte size by either zero extending or truncating `self`.</span>
-    <span class="kw">fn</span> <span class="ident">into_resize_unsigned</span>(<span class="self">self</span>, <span class="ident">size</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">into_resize_unsigned</span>(<span class="self">self</span>, <span class="ident">size</span>: <span class="ident">ByteSize</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">width</span>() <span class="op">&lt;</span> <span class="ident">size</span>.<span class="ident">into</span>() {
             <span class="self">self</span>.<span class="ident">into_zero_extend</span>(<span class="ident">size</span>).<span class="ident">unwrap</span>()
         } <span class="kw">else</span> {
@@ -619,7 +652,7 @@
     }
 
     <span class="doccomment">/// Resize `self` to the target byte size by either sign extending or truncating `self`.</span>
-    <span class="kw">fn</span> <span class="ident">into_resize_signed</span>(<span class="self">self</span>, <span class="ident">size</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">into_resize_signed</span>(<span class="self">self</span>, <span class="ident">size</span>: <span class="ident">ByteSize</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">width</span>() <span class="op">&lt;</span> <span class="ident">size</span>.<span class="ident">into</span>() {
             <span class="self">self</span>.<span class="ident">into_sign_extend</span>(<span class="ident">size</span>).<span class="ident">unwrap</span>()
         } <span class="kw">else</span> {
@@ -660,6 +693,6 @@
         );
     }
 }
-</pre></div>
-</section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="cwe_checker_lib" data-search-index-js="../../../search-index.js" data-search-js="../../../search.js"></div>
-    <script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script></body></html>
+</code></pre></div>
+</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="cwe_checker_lib" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.60.0 (7737e0b5c 2022-04-04)" ></div>
+</body></html>

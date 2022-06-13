@@ -1,7 +1,9 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/abstract_domain/mem_region.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mem_region.rs - source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../favicon.svg">
-<link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../../cwe_checker_lib/index.html'><div class='logo-container rust-logo'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
-                <a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/abstract_domain/mem_region.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mem_region.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><script defer src="../../../main.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script>
+    <noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../cwe_checker_lib/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../../cwe_checker_lib/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../cwe_checker_lib/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><div class="theme-picker hidden"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="22" height="22" alt="Pick another theme!" src="../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
 <span id="4">  4</span>
@@ -391,27 +393,12 @@
 <span id="388">388</span>
 <span id="389">389</span>
 <span id="390">390</span>
-<span id="391">391</span>
-<span id="392">392</span>
-<span id="393">393</span>
-<span id="394">394</span>
-<span id="395">395</span>
-<span id="396">396</span>
-<span id="397">397</span>
-<span id="398">398</span>
-<span id="399">399</span>
-<span id="400">400</span>
-<span id="401">401</span>
-<span id="402">402</span>
-</pre><div class="example-wrap"><pre class="rust ">
-<span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">AbstractDomain</span>, <span class="ident">HasTop</span>, <span class="ident">SizedDomain</span>};
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::intermediate_representation::ByteSize</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::prelude</span>::<span class="kw-2">*</span>;
+</pre><pre class="rust"><code><span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">AbstractDomain</span>, <span class="ident">HasTop</span>, <span class="ident">SizedDomain</span>};
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::intermediate_representation::ByteSize</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::prelude</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">apint</span>::{<span class="ident">Int</span>, <span class="ident">Width</span>};
-<span class="kw">use</span> <span class="ident">derive_more::Deref</span>;
 <span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Serialize</span>};
 <span class="kw">use</span> <span class="ident">std::collections::BTreeMap</span>;
-<span class="kw">use</span> <span class="ident">std::ops::DerefMut</span>;
 <span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
 
 <span class="doccomment">/// A memory region is an abstract domain representing a continuous region of memory, e.g. the stack frame of a function.</span>
@@ -426,133 +413,131 @@
 <span class="doccomment">/// Thus an empty memory region actually represents the *Top* element of its abstract domain.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// To allow cheap cloning of a `MemRegion`, the actual data is wrapped inside an `Arc`.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">Hash</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Deref</span>)]</span>
-<span class="attribute">#[<span class="ident">deref</span>(<span class="ident">forward</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MemRegion</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">AbstractDomain</span> <span class="op">+</span> <span class="ident">SizedDomain</span> <span class="op">+</span> <span class="ident">HasTop</span> <span class="op">+</span> <span class="ident">std::fmt::Debug</span><span class="op">&gt;</span>(
-    <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">MemRegionData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-);
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">Hash</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MemRegion</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">AbstractDomain</span> <span class="op">+</span> <span class="ident">SizedDomain</span> <span class="op">+</span> <span class="ident">HasTop</span> <span class="op">+</span> <span class="ident">std::fmt::Debug</span><span class="op">&gt;</span> {
+    <span class="ident">inner</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Inner</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+}
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">AbstractDomain</span> <span class="op">+</span> <span class="ident">SizedDomain</span> <span class="op">+</span> <span class="ident">HasTop</span> <span class="op">+</span> <span class="ident">std::fmt::Debug</span><span class="op">&gt;</span> <span class="ident">DerefMut</span> <span class="kw">for</span> <span class="ident">MemRegion</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">deref_mut</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">MemRegionData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="ident">Arc::make_mut</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="number">0</span>)
+<span class="doccomment">/// The internal data of a memory region. See the description of `MemRegion` for more.</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Hash</span>, <span class="ident">Clone</span>)]</span>
+<span class="kw">struct</span> <span class="ident">Inner</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">AbstractDomain</span> <span class="op">+</span> <span class="ident">SizedDomain</span> <span class="op">+</span> <span class="ident">HasTop</span> <span class="op">+</span> <span class="ident">std::fmt::Debug</span><span class="op">&gt;</span> {
+    <span class="ident">address_bytesize</span>: <span class="ident">ByteSize</span>,
+    <span class="ident">values</span>: <span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">i64</span>, <span class="ident">T</span><span class="op">&gt;</span>,
+}
+
+<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::from_over_into</span>)]</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">AbstractDomain</span> <span class="op">+</span> <span class="ident">SizedDomain</span> <span class="op">+</span> <span class="ident">HasTop</span> <span class="op">+</span> <span class="ident">std::fmt::Debug</span><span class="op">&gt;</span> <span class="ident">std::convert::Into</span><span class="op">&lt;</span><span class="ident">MemRegion</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>
+    <span class="kw">for</span> <span class="ident">Inner</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>
+{
+    <span class="doccomment">/// Wrap the contents of a `MemRegion` into an `Arc&lt;..&gt;`.</span>
+    <span class="kw">fn</span> <span class="ident">into</span>(<span class="self">self</span>) -&gt; <span class="ident">MemRegion</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+        <span class="ident">MemRegion</span> {
+            <span class="ident">inner</span>: <span class="ident">Arc::new</span>(<span class="self">self</span>),
+        }
     }
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">AbstractDomain</span> <span class="op">+</span> <span class="ident">SizedDomain</span> <span class="op">+</span> <span class="ident">HasTop</span> <span class="op">+</span> <span class="ident">std::fmt::Debug</span><span class="op">&gt;</span> <span class="ident">AbstractDomain</span> <span class="kw">for</span> <span class="ident">MemRegion</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
     <span class="doccomment">/// Short-circuting the `MemRegionData::merge` function if `self==other`,</span>
     <span class="doccomment">/// to prevent unneccessary cloning.</span>
-    <span class="kw">fn</span> <span class="ident">merge</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="kw">if</span> <span class="self">self</span> <span class="op">=</span><span class="op">=</span> <span class="ident">other</span> {
+    <span class="kw">fn</span> <span class="ident">merge</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="self">Self</span> {
+        <span class="kw">if</span> <span class="self">self</span> <span class="op">==</span> <span class="ident">other</span> {
             <span class="self">self</span>.<span class="ident">clone</span>()
         } <span class="kw">else</span> {
-            <span class="ident">MemRegion</span>(<span class="ident">Arc::new</span>(<span class="self">self</span>.<span class="number">0</span>.<span class="ident">merge</span>(<span class="kw-2">&amp;</span><span class="ident">other</span>.<span class="number">0</span>)))
+            <span class="self">self</span>.<span class="ident">merge_inner</span>(<span class="ident">other</span>)
         }
     }
 
     <span class="doccomment">/// The *Top* element is represented by an empty memory region.</span>
-    <span class="kw">fn</span> <span class="ident">is_top</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">values</span>.<span class="ident">is_empty</span>()
+    <span class="kw">fn</span> <span class="ident">is_top</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
+        <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">values</span>.<span class="ident">is_empty</span>()
     }
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">AbstractDomain</span> <span class="op">+</span> <span class="ident">SizedDomain</span> <span class="op">+</span> <span class="ident">HasTop</span> <span class="op">+</span> <span class="ident">std::fmt::Debug</span><span class="op">&gt;</span> <span class="ident">HasTop</span> <span class="kw">for</span> <span class="ident">MemRegion</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
     <span class="doccomment">/// Return a new, empty memory region with the same address bytesize as `self`, representing the *Top* element of the abstract domain.</span>
-    <span class="kw">fn</span> <span class="ident">top</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="self">Self</span><span class="ident">::new</span>(<span class="self">self</span>.<span class="ident">get_address_bytesize</span>())
+    <span class="kw">fn</span> <span class="ident">top</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self</span> {
+        <span class="ident"><span class="self">Self</span>::new</span>(<span class="self">self</span>.<span class="ident">get_address_bytesize</span>())
     }
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">AbstractDomain</span> <span class="op">+</span> <span class="ident">SizedDomain</span> <span class="op">+</span> <span class="ident">HasTop</span> <span class="op">+</span> <span class="ident">std::fmt::Debug</span><span class="op">&gt;</span> <span class="ident">MemRegion</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
     <span class="doccomment">/// Create a new, empty memory region.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">address_bytesize</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="ident">MemRegion</span>(<span class="ident">Arc::new</span>(<span class="ident">MemRegionData::new</span>(<span class="ident">address_bytesize</span>)))
-    }
-}
-
-<span class="doccomment">/// The internal data of a memory region. See the description of `MemRegion` for more.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Hash</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MemRegionData</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">AbstractDomain</span> <span class="op">+</span> <span class="ident">SizedDomain</span> <span class="op">+</span> <span class="ident">HasTop</span> <span class="op">+</span> <span class="ident">std::fmt::Debug</span><span class="op">&gt;</span> {
-    <span class="ident">address_bytesize</span>: <span class="ident">ByteSize</span>,
-    <span class="ident">values</span>: <span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">i64</span>, <span class="ident">T</span><span class="op">&gt;</span>,
-}
-
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">AbstractDomain</span> <span class="op">+</span> <span class="ident">SizedDomain</span> <span class="op">+</span> <span class="ident">HasTop</span> <span class="op">+</span> <span class="ident">std::fmt::Debug</span><span class="op">&gt;</span> <span class="ident">MemRegionData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// create a new, empty MemRegion</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">address_bytesize</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">MemRegionData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="ident">MemRegionData</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">address_bytesize</span>: <span class="ident">ByteSize</span>) -&gt; <span class="ident">MemRegion</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+        <span class="ident">Inner</span> {
             <span class="ident">address_bytesize</span>,
             <span class="ident">values</span>: <span class="ident">BTreeMap::new</span>(),
         }
+        .<span class="ident">into</span>()
     }
 
-    <span class="doccomment">/// Get the bitsize of pointers for the address space that the memory region belongs to.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_address_bytesize</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ByteSize</span> {
-        <span class="self">self</span>.<span class="ident">address_bytesize</span>
+    <span class="doccomment">/// Get the bytesize of pointers for the address space that the memory region belongs to.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_address_bytesize</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">ByteSize</span> {
+        <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">address_bytesize</span>
     }
 
     <span class="doccomment">/// Remove all elements intersecting the provided interval.</span>
     <span class="doccomment">/// This function does not sanitize its inputs.</span>
-    <span class="kw">fn</span> <span class="ident">clear_interval</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">position</span>: <span class="ident">i64</span>, <span class="ident">size</span>: <span class="ident">i64</span>) {
+    <span class="kw">fn</span> <span class="ident">clear_interval</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">position</span>: <span class="ident">i64</span>, <span class="ident">size</span>: <span class="ident">i64</span>) {
+        <span class="kw">let</span> <span class="ident">inner</span> <span class="op">=</span> <span class="ident">Arc::make_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">inner</span>);
         <span class="comment">// If the previous element intersects the range, remove it</span>
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">prev_pos</span>, <span class="ident">prev_size</span>)) <span class="op">=</span> <span class="self">self</span>
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">prev_pos</span>, <span class="ident">prev_size</span>)) <span class="op">=</span> <span class="ident">inner</span>
             .<span class="ident">values</span>
             .<span class="ident">range</span>(..<span class="ident">position</span>)
             .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">pos</span>, <span class="ident">elem</span>)<span class="op">|</span> (<span class="kw-2">*</span><span class="ident">pos</span>, <span class="ident">u64::from</span>(<span class="ident">elem</span>.<span class="ident">bytesize</span>()) <span class="kw">as</span> <span class="ident">i64</span>))
             .<span class="ident">last</span>()
         {
             <span class="kw">if</span> <span class="ident">prev_pos</span> <span class="op">+</span> <span class="ident">prev_size</span> <span class="op">&gt;</span> <span class="ident">position</span> {
-                <span class="self">self</span>.<span class="ident">values</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">prev_pos</span>);
+                <span class="ident">inner</span>.<span class="ident">values</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">prev_pos</span>);
             }
         }
         <span class="comment">// remove all other intersecting elements</span>
-        <span class="kw">let</span> <span class="ident">intersecting_elements</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">i64</span><span class="op">&gt;</span> <span class="op">=</span> <span class="self">self</span>
+        <span class="kw">let</span> <span class="ident">intersecting_elements</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">i64</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">inner</span>
             .<span class="ident">values</span>
             .<span class="ident">range</span>(<span class="ident">position</span>..(<span class="ident">position</span> <span class="op">+</span> <span class="ident">size</span>))
             .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">pos</span>, <span class="ident">_elem</span>)<span class="op">|</span> <span class="kw-2">*</span><span class="ident">pos</span>)
             .<span class="ident">collect</span>();
         <span class="kw">for</span> <span class="ident">index</span> <span class="kw">in</span> <span class="ident">intersecting_elements</span> {
-            <span class="self">self</span>.<span class="ident">values</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">index</span>);
+            <span class="ident">inner</span>.<span class="ident">values</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">index</span>);
         }
     }
 
-    <span class="doccomment">/// Clear all values that might be overwritten if one writes a value with byte size `value_size`</span>
-    <span class="doccomment">/// to an offset contained in the interval from `start` to `end` (both bounds included in the interval).</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This represents the effect of writing an arbitrary value (with known byte size)</span>
-    <span class="doccomment">/// to an arbitrary offset contained in the interval.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">clear_offset_interval</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">start</span>: <span class="ident">i64</span>, <span class="ident">end</span>: <span class="ident">i64</span>, <span class="ident">value_size</span>: <span class="ident">ByteSize</span>) {
-        <span class="kw">let</span> <span class="ident">size</span> <span class="op">=</span> <span class="ident">end</span> <span class="op">-</span> <span class="ident">start</span> <span class="op">+</span> (<span class="ident">u64::from</span>(<span class="ident">value_size</span>) <span class="kw">as</span> <span class="ident">i64</span>);
-        <span class="self">self</span>.<span class="ident">clear_interval</span>(<span class="ident">start</span>, <span class="ident">size</span>);
-    }
-
     <span class="doccomment">/// Add a value to the memory region.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">T</span>, <span class="ident">position</span>: <span class="ident">Bitvector</span>) {
-        <span class="macro">assert_eq!</span>(<span class="ident">ByteSize::from</span>(<span class="ident">position</span>.<span class="ident">width</span>()), <span class="self">self</span>.<span class="ident">address_bytesize</span>);
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">T</span>, <span class="ident">position</span>: <span class="ident">Bitvector</span>) {
+        <span class="macro">assert_eq!</span>(
+            <span class="ident">ByteSize::from</span>(<span class="ident">position</span>.<span class="ident">width</span>()),
+            <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">address_bytesize</span>
+        );
         <span class="kw">let</span> <span class="ident">position</span> <span class="op">=</span> <span class="ident">Int::from</span>(<span class="ident">position</span>).<span class="ident">try_to_i64</span>().<span class="ident">unwrap</span>();
         <span class="self">self</span>.<span class="ident">insert_at_byte_index</span>(<span class="ident">value</span>, <span class="ident">position</span>);
     }
 
     <span class="doccomment">/// Insert a value into the memory region at the given position.</span>
     <span class="doccomment">/// The position is the index (in bytes) in the memory region.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">insert_at_byte_index</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">T</span>, <span class="ident">position</span>: <span class="ident">i64</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">insert_at_byte_index</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">T</span>, <span class="ident">position</span>: <span class="ident">i64</span>) {
         <span class="kw">let</span> <span class="ident">size_in_bytes</span> <span class="op">=</span> <span class="ident">u64::from</span>(<span class="ident">value</span>.<span class="ident">bytesize</span>()) <span class="kw">as</span> <span class="ident">i64</span>;
         <span class="macro">assert!</span>(<span class="ident">size_in_bytes</span> <span class="op">&gt;</span> <span class="number">0</span>);
 
         <span class="self">self</span>.<span class="ident">clear_interval</span>(<span class="ident">position</span>, <span class="ident">size_in_bytes</span>);
         <span class="kw">if</span> <span class="op">!</span><span class="ident">value</span>.<span class="ident">is_top</span>() {
             <span class="comment">// top()-values do not need to be explicitly saved, as they don&#39;t contain any information anyway.</span>
-            <span class="self">self</span>.<span class="ident">values</span>.<span class="ident">insert</span>(<span class="ident">position</span>, <span class="ident">value</span>);
+            <span class="ident">Arc::make_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">inner</span>)
+                .<span class="ident">values</span>
+                .<span class="ident">insert</span>(<span class="ident">position</span>, <span class="ident">value</span>);
         }
     }
 
     <span class="doccomment">/// Get the value at the given position.</span>
     <span class="doccomment">/// If there is no value at the position or the size of the element is not the same as the provided size, return `T::new_top()`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">position</span>: <span class="ident">Bitvector</span>, <span class="ident">size_in_bytes</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">T</span> {
-        <span class="macro">assert_eq!</span>(<span class="ident">ByteSize::from</span>(<span class="ident">position</span>.<span class="ident">width</span>()), <span class="self">self</span>.<span class="ident">address_bytesize</span>);
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">position</span>: <span class="ident">Bitvector</span>, <span class="ident">size_in_bytes</span>: <span class="ident">ByteSize</span>) -&gt; <span class="ident">T</span> {
+        <span class="macro">assert_eq!</span>(
+            <span class="ident">ByteSize::from</span>(<span class="ident">position</span>.<span class="ident">width</span>()),
+            <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">address_bytesize</span>
+        );
         <span class="kw">let</span> <span class="ident">position</span> <span class="op">=</span> <span class="ident">Int::from</span>(<span class="ident">position</span>).<span class="ident">try_to_i64</span>().<span class="ident">unwrap</span>();
 
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">elem</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">values</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">position</span>) {
-            <span class="kw">if</span> <span class="ident">elem</span>.<span class="ident">bytesize</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">size_in_bytes</span> {
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">elem</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">values</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">position</span>) {
+            <span class="kw">if</span> <span class="ident">elem</span>.<span class="ident">bytesize</span>() <span class="op">==</span> <span class="ident">size_in_bytes</span> {
                 <span class="kw">return</span> <span class="ident">elem</span>.<span class="ident">clone</span>();
             }
         }
@@ -561,16 +546,22 @@
 
     <span class="doccomment">/// Get the value at the given position regardless of the value size.</span>
     <span class="doccomment">/// Return `None` if there is no value at that position in the memory region.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_unsized</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">position</span>: <span class="ident">Bitvector</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="macro">assert_eq!</span>(<span class="ident">ByteSize::from</span>(<span class="ident">position</span>.<span class="ident">width</span>()), <span class="self">self</span>.<span class="ident">address_bytesize</span>);
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_unsized</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">position</span>: <span class="ident">Bitvector</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+        <span class="macro">assert_eq!</span>(
+            <span class="ident">ByteSize::from</span>(<span class="ident">position</span>.<span class="ident">width</span>()),
+            <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">address_bytesize</span>
+        );
         <span class="kw">let</span> <span class="ident">position</span> <span class="op">=</span> <span class="ident">Int::from</span>(<span class="ident">position</span>).<span class="ident">try_to_i64</span>().<span class="ident">unwrap</span>();
 
-        <span class="self">self</span>.<span class="ident">values</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">position</span>).<span class="ident">cloned</span>()
+        <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">values</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">position</span>).<span class="ident">cloned</span>()
     }
 
     <span class="doccomment">/// Remove all elements intersecting the provided interval.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">position</span>: <span class="ident">Bitvector</span>, <span class="ident">size_in_bytes</span>: <span class="ident">Bitvector</span>) {
-        <span class="macro">assert_eq!</span>(<span class="ident">ByteSize::from</span>(<span class="ident">position</span>.<span class="ident">width</span>()), <span class="self">self</span>.<span class="ident">address_bytesize</span>);
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">remove</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">position</span>: <span class="ident">Bitvector</span>, <span class="ident">size_in_bytes</span>: <span class="ident">Bitvector</span>) {
+        <span class="macro">assert_eq!</span>(
+            <span class="ident">ByteSize::from</span>(<span class="ident">position</span>.<span class="ident">width</span>()),
+            <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">address_bytesize</span>
+        );
         <span class="kw">let</span> <span class="ident">position</span> <span class="op">=</span> <span class="ident">Int::from</span>(<span class="ident">position</span>).<span class="ident">try_to_i64</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">size</span> <span class="op">=</span> <span class="ident">Int::from</span>(<span class="ident">size_in_bytes</span>).<span class="ident">try_to_i64</span>().<span class="ident">unwrap</span>();
         <span class="macro">assert!</span>(<span class="ident">size</span> <span class="op">&gt;</span> <span class="number">0</span>);
@@ -578,234 +569,220 @@
         <span class="self">self</span>.<span class="ident">clear_interval</span>(<span class="ident">position</span>, <span class="ident">size</span>);
     }
 
-    <span class="doccomment">/// Merge two memory regions.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Values at the same position and with the same size get merged via their merge function.</span>
-    <span class="doccomment">/// Other values are *not* added to the merged region, because they could be anything in at least one of the two regions.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">merge</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">MemRegionData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">MemRegionData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="macro">assert_eq!</span>(<span class="self">self</span>.<span class="ident">address_bytesize</span>, <span class="ident">other</span>.<span class="ident">address_bytesize</span>);
+    <span class="doccomment">/// If the `MemRegion` contains an element at the given position and with the given size</span>
+    <span class="doccomment">/// then merge it with a `Top` element.</span>
+    <span class="doccomment">/// Else clear all values intersecting the range from `position` to `position + size`.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">merge_write_top</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">position</span>: <span class="ident">Bitvector</span>, <span class="ident">size</span>: <span class="ident">ByteSize</span>) {
+        <span class="kw">let</span> <span class="ident">position</span> <span class="op">=</span> <span class="ident">Int::from</span>(<span class="ident">position</span>).<span class="ident">try_to_i64</span>().<span class="ident">unwrap</span>();
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">prev_value</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">values</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">position</span>) {
+            <span class="kw">if</span> <span class="ident">prev_value</span>.<span class="ident">bytesize</span>() <span class="op">==</span> <span class="ident">size</span> {
+                <span class="kw">let</span> <span class="ident">merged_value</span> <span class="op">=</span> <span class="ident">prev_value</span>.<span class="ident">merge</span>(<span class="kw-2">&amp;</span><span class="ident">prev_value</span>.<span class="ident">top</span>());
+                <span class="kw">let</span> <span class="ident">inner</span> <span class="op">=</span> <span class="ident">Arc::make_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">inner</span>);
+                <span class="kw">if</span> <span class="ident">merged_value</span>.<span class="ident">is_top</span>() {
+                    <span class="ident">inner</span>.<span class="ident">values</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">position</span>);
+                } <span class="kw">else</span> {
+                    <span class="ident">inner</span>.<span class="ident">values</span>.<span class="ident">insert</span>(<span class="ident">position</span>, <span class="ident">merged_value</span>);
+                }
+                <span class="kw">return</span>;
+            }
+        }
+        <span class="self">self</span>.<span class="ident">clear_interval</span>(<span class="ident">position</span>, <span class="ident">u64::from</span>(<span class="ident">size</span>) <span class="kw">as</span> <span class="ident">i64</span>)
+    }
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">merged_values</span>: <span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">i64</span>, <span class="ident">T</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">BTreeMap::new</span>();
+    <span class="doccomment">/// Emulate a write operation of a value to an unknown offset in the range between `start` and `end`</span>
+    <span class="doccomment">/// by merging all values in the range with `Top` (as we don&#39;t exactly know which values are overwritten).</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mark_interval_values_as_top</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">start</span>: <span class="ident">i64</span>, <span class="ident">end</span>: <span class="ident">i64</span>, <span class="ident">elem_size</span>: <span class="ident">ByteSize</span>) {
+        <span class="self">self</span>.<span class="ident">merge_values_intersecting_range_with_top</span>(<span class="ident">start</span>, <span class="ident">end</span> <span class="op">+</span> <span class="ident">u64::from</span>(<span class="ident">elem_size</span>) <span class="kw">as</span> <span class="ident">i64</span>)
+    }
 
-        <span class="comment">// add all elements contained in both memory regions</span>
-        <span class="kw">for</span> (<span class="ident">pos_left</span>, <span class="ident">elem_left</span>) <span class="kw">in</span> <span class="self">self</span>.<span class="ident">values</span>.<span class="ident">iter</span>() {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">_pos_right</span>, <span class="ident">elem_right</span>)) <span class="op">=</span> <span class="ident">other</span>.<span class="ident">values</span>.<span class="ident">get_key_value</span>(<span class="ident">pos_left</span>) {
-                <span class="kw">if</span> <span class="ident">elem_left</span>.<span class="ident">bytesize</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">elem_right</span>.<span class="ident">bytesize</span>() {
-                    <span class="kw">let</span> <span class="ident">merged_val</span> <span class="op">=</span> <span class="ident">elem_left</span>.<span class="ident">merge</span>(<span class="kw-2">&amp;</span><span class="ident">elem_right</span>);
-                    <span class="kw">if</span> <span class="op">!</span><span class="ident">merged_val</span>.<span class="ident">is_top</span>() {
-                        <span class="comment">// we discard top()-values, as they don&#39;t contain information</span>
-                        <span class="ident">merged_values</span>.<span class="ident">insert</span>(<span class="kw-2">*</span><span class="ident">pos_left</span>, <span class="ident">merged_val</span>);
-                    }
+    <span class="doccomment">/// Merge all values intersecting the given range with `Top`.</span>
+    <span class="doccomment">/// If `Top` is a maximal element of the value abstract domain,</span>
+    <span class="doccomment">/// this effectively removes all values intersecting the range.</span>
+    <span class="kw">fn</span> <span class="ident">merge_values_intersecting_range_with_top</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">start</span>: <span class="ident">i64</span>, <span class="ident">end</span>: <span class="ident">i64</span>) {
+        <span class="kw">let</span> <span class="ident">inner</span> <span class="op">=</span> <span class="ident">Arc::make_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">inner</span>);
+        <span class="comment">// If the previous element intersects the range, merge it with Top</span>
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">prev_pos</span>, <span class="ident">prev_size</span>)) <span class="op">=</span> <span class="ident">inner</span>
+            .<span class="ident">values</span>
+            .<span class="ident">range</span>(..<span class="ident">start</span>)
+            .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">pos</span>, <span class="ident">elem</span>)<span class="op">|</span> (<span class="kw-2">*</span><span class="ident">pos</span>, <span class="ident">u64::from</span>(<span class="ident">elem</span>.<span class="ident">bytesize</span>()) <span class="kw">as</span> <span class="ident">i64</span>))
+            .<span class="ident">last</span>()
+        {
+            <span class="kw">if</span> <span class="ident">prev_pos</span> <span class="op">+</span> <span class="ident">prev_size</span> <span class="op">&gt;</span> <span class="ident">start</span> {
+                <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">inner</span>.<span class="ident">values</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">prev_pos</span>).<span class="ident">unwrap</span>();
+                <span class="kw">let</span> <span class="ident">merged_value</span> <span class="op">=</span> <span class="ident">value</span>.<span class="ident">merge</span>(<span class="kw-2">&amp;</span><span class="ident">value</span>.<span class="ident">top</span>());
+                <span class="kw">if</span> <span class="ident">merged_value</span>.<span class="ident">is_top</span>() {
+                    <span class="ident">inner</span>.<span class="ident">values</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">prev_pos</span>);
+                } <span class="kw">else</span> {
+                    <span class="ident">inner</span>.<span class="ident">values</span>.<span class="ident">insert</span>(<span class="ident">prev_pos</span>, <span class="ident">merged_value</span>);
                 }
             }
         }
-
-        <span class="ident">MemRegionData</span> {
-            <span class="ident">address_bytesize</span>: <span class="self">self</span>.<span class="ident">address_bytesize</span>,
-            <span class="ident">values</span>: <span class="ident">merged_values</span>,
+        <span class="comment">// Merge all other intersecting elements with Top</span>
+        <span class="kw">let</span> <span class="ident">intersecting_elements</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">inner</span>
+            .<span class="ident">values</span>
+            .<span class="ident">range</span>(<span class="ident">start</span>..<span class="ident">end</span>)
+            .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">pos</span>, <span class="ident">elem</span>)<span class="op">|</span> (<span class="kw-2">*</span><span class="ident">pos</span>, <span class="ident">elem</span>.<span class="ident">merge</span>(<span class="kw-2">&amp;</span><span class="ident">elem</span>.<span class="ident">top</span>())))
+            .<span class="ident">collect</span>();
+        <span class="kw">for</span> (<span class="ident">index</span>, <span class="ident">merged_value</span>) <span class="kw">in</span> <span class="ident">intersecting_elements</span> {
+            <span class="kw">if</span> <span class="ident">merged_value</span>.<span class="ident">is_top</span>() {
+                <span class="ident">inner</span>.<span class="ident">values</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">index</span>);
+            } <span class="kw">else</span> {
+                <span class="ident">inner</span>.<span class="ident">values</span>.<span class="ident">insert</span>(<span class="ident">index</span>, <span class="ident">merged_value</span>);
+            }
         }
     }
 
+    <span class="doccomment">/// Emulate a write operation to an unknown offset by merging all values with `Top`</span>
+    <span class="doccomment">/// to indicate that they may have been overwritten</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mark_all_values_as_top</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
+        <span class="kw">let</span> <span class="ident">inner</span> <span class="op">=</span> <span class="ident">Arc::make_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">inner</span>);
+        <span class="kw">for</span> <span class="ident">value</span> <span class="kw">in</span> <span class="ident">inner</span>.<span class="ident">values</span>.<span class="ident">values_mut</span>() {
+            <span class="kw-2">*</span><span class="ident">value</span> <span class="op">=</span> <span class="ident">value</span>.<span class="ident">merge</span>(<span class="kw-2">&amp;</span><span class="ident">value</span>.<span class="ident">top</span>());
+        }
+        <span class="self">self</span>.<span class="ident">clear_top_values</span>();
+    }
+
+    <span class="doccomment">/// Add the given offset to the indices of all values contained in the memory region.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add_offset_to_all_indices</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">offset</span>: <span class="ident">i64</span>) {
+        <span class="kw">if</span> <span class="ident">offset</span> <span class="op">==</span> <span class="number">0</span> {
+            <span class="kw">return</span>;
+        }
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_values</span> <span class="op">=</span> <span class="ident">BTreeMap::new</span>();
+        <span class="kw">for</span> (<span class="ident">index</span>, <span class="ident">value</span>) <span class="kw">in</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">values</span>.<span class="ident">iter</span>() {
+            <span class="ident">new_values</span>.<span class="ident">insert</span>(<span class="kw-2">*</span><span class="ident">index</span> <span class="op">+</span> <span class="ident">offset</span>, <span class="ident">value</span>.<span class="ident">clone</span>());
+        }
+        <span class="kw">let</span> <span class="ident">inner</span> <span class="op">=</span> <span class="ident">Arc::make_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">inner</span>);
+        <span class="ident">inner</span>.<span class="ident">values</span> <span class="op">=</span> <span class="ident">new_values</span>;
+    }
+
+    <span class="doccomment">/// Merge two memory regions.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Values at the same position and with the same size get merged via their merge function.</span>
+    <span class="doccomment">/// Values intersecting other values but with not exactly matching position or size are not added to the merged region.</span>
+    <span class="doccomment">/// Values that do not intersect a value from the other `MemRegion`</span>
+    <span class="doccomment">/// are merged with `Top` before adding them.</span>
+    <span class="doccomment">/// This can only add elements to the merged domain if the `Top` value is not a maximal element of the abstract domain.</span>
+    <span class="kw">fn</span> <span class="ident">merge_inner</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">MemRegion</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>) -&gt; <span class="ident">MemRegion</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+        <span class="macro">assert_eq!</span>(<span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">address_bytesize</span>, <span class="ident">other</span>.<span class="ident">inner</span>.<span class="ident">address_bytesize</span>);
+
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">zipped</span>: <span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">i64</span>, (<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">T</span><span class="op">&gt;</span>, <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">T</span><span class="op">&gt;</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="ident">BTreeMap::new</span>();
+        <span class="kw">for</span> (<span class="ident">index</span>, <span class="ident">elem</span>) <span class="kw">in</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">values</span>.<span class="ident">iter</span>() {
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">other_elem</span>) <span class="op">=</span> <span class="ident">other</span>.<span class="ident">inner</span>.<span class="ident">values</span>.<span class="ident">get</span>(<span class="ident">index</span>) {
+                <span class="ident">zipped</span>.<span class="ident">insert</span>(<span class="kw-2">*</span><span class="ident">index</span>, (<span class="prelude-val">Some</span>(<span class="ident">elem</span>), <span class="prelude-val">Some</span>(<span class="ident">other_elem</span>)));
+            } <span class="kw">else</span> {
+                <span class="ident">zipped</span>.<span class="ident">insert</span>(<span class="kw-2">*</span><span class="ident">index</span>, (<span class="prelude-val">Some</span>(<span class="ident">elem</span>), <span class="prelude-val">None</span>));
+            }
+        }
+        <span class="kw">for</span> (<span class="ident">index</span>, <span class="ident">other_elem</span>) <span class="kw">in</span> <span class="ident">other</span>.<span class="ident">inner</span>.<span class="ident">values</span>.<span class="ident">iter</span>() {
+            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">values</span>.<span class="ident">get</span>(<span class="ident">index</span>).<span class="ident">is_none</span>() {
+                <span class="ident">zipped</span>.<span class="ident">insert</span>(<span class="kw-2">*</span><span class="ident">index</span>, (<span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="ident">other_elem</span>)));
+            }
+        }
+
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">merged_values</span>: <span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">i64</span>, <span class="ident">T</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">BTreeMap::new</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">merged_range_end</span> <span class="op">=</span> <span class="ident">i64::MIN</span>;
+        <span class="kw">for</span> (<span class="ident">index</span>, (<span class="ident">left</span>, <span class="ident">right</span>)) <span class="kw">in</span> <span class="ident">zipped</span>.<span class="ident">iter</span>() {
+            <span class="kw">let</span> <span class="ident">elem_range_end</span> <span class="op">=</span> <span class="ident">compute_range_end</span>(<span class="kw-2">*</span><span class="ident">index</span>, <span class="kw-2">*</span><span class="ident">left</span>, <span class="kw-2">*</span><span class="ident">right</span>);
+            <span class="kw">if</span> <span class="kw-2">*</span><span class="ident">index</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">merged_range_end</span> {
+                <span class="comment">// The element does not overlap a previous element</span>
+                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">next_index</span>, <span class="kw">_</span>)) <span class="op">=</span> <span class="ident">zipped</span>.<span class="ident">range</span>((<span class="ident">index</span> <span class="op">+</span> <span class="number">1</span>)..).<span class="ident">next</span>() {
+                    <span class="kw">if</span> <span class="kw-2">*</span><span class="ident">next_index</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">elem_range_end</span> {
+                        <span class="comment">// The element does not overlap a subsequent element</span>
+                        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">merged</span>) <span class="op">=</span> <span class="ident">merge_or_merge_with_top</span>(<span class="kw-2">*</span><span class="ident">left</span>, <span class="kw-2">*</span><span class="ident">right</span>) {
+                            <span class="ident">merged_values</span>.<span class="ident">insert</span>(<span class="kw-2">*</span><span class="ident">index</span>, <span class="ident">merged</span>);
+                        }
+                    }
+                } <span class="kw">else</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">merged</span>) <span class="op">=</span> <span class="ident">merge_or_merge_with_top</span>(<span class="kw-2">*</span><span class="ident">left</span>, <span class="kw-2">*</span><span class="ident">right</span>) {
+                    <span class="ident">merged_values</span>.<span class="ident">insert</span>(<span class="kw-2">*</span><span class="ident">index</span>, <span class="ident">merged</span>);
+                }
+            }
+            <span class="ident">merged_range_end</span> <span class="op">=</span> <span class="ident">std::cmp::max</span>(<span class="ident">merged_range_end</span>, <span class="ident">elem_range_end</span>);
+        }
+
+        <span class="ident">Inner</span> {
+            <span class="ident">address_bytesize</span>: <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">address_bytesize</span>,
+            <span class="ident">values</span>: <span class="ident">merged_values</span>,
+        }
+        .<span class="ident">into</span>()
+    }
+
     <span class="doccomment">/// Get an iterator over all elements together with their offset into the memory region.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">iter</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">std::collections::btree_map::Iter</span><span class="op">&lt;</span><span class="ident">i64</span>, <span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">values</span>.<span class="ident">iter</span>()
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">iter</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">std::collections::btree_map::Iter</span><span class="op">&lt;</span><span class="ident">i64</span>, <span class="ident">T</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">values</span>.<span class="ident">iter</span>()
     }
 
     <span class="doccomment">/// Get an iterator over all values in the memory region</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">values</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">std::collections::btree_map::Values</span><span class="op">&lt;</span><span class="ident">i64</span>, <span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">values</span>.<span class="ident">values</span>()
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">values</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">std::collections::btree_map::Values</span><span class="op">&lt;</span><span class="ident">i64</span>, <span class="ident">T</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">values</span>.<span class="ident">values</span>()
     }
 
     <span class="doccomment">/// Get the map of all elements including their offset into the memory region.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">entry_map</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">i64</span>, <span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">values</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">entry_map</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">i64</span>, <span class="ident">T</span><span class="op">&gt;</span> {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">values</span>
     }
 
     <span class="doccomment">/// Get an iterator over all values in the memory region for in-place manipulation.</span>
     <span class="doccomment">/// Note that one can changes values to *Top* using the iterator.</span>
     <span class="doccomment">/// These values should be removed from the memory region using `clear_top_values()`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">values_mut</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">std::collections::btree_map::ValuesMut</span><span class="op">&lt;</span><span class="ident">i64</span>, <span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">values</span>.<span class="ident">values_mut</span>()
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">values_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="ident">std::collections::btree_map::ValuesMut</span><span class="op">&lt;</span><span class="ident">i64</span>, <span class="ident">T</span><span class="op">&gt;</span> {
+        <span class="ident">Arc::make_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">inner</span>).<span class="ident">values</span>.<span class="ident">values_mut</span>()
     }
 
     <span class="doccomment">/// Remove all values representing the *Top* element from the internal value store,</span>
     <span class="doccomment">/// as these should not be saved in the internal representation.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">clear_top_values</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
-        <span class="kw">let</span> <span class="ident">indices_to_remove</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">i64</span><span class="op">&gt;</span> <span class="op">=</span> <span class="self">self</span>
-            .<span class="ident">values</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">filter_map</span>(
-                <span class="op">|</span>(<span class="ident">index</span>, <span class="ident">value</span>)<span class="op">|</span> {
-                    <span class="kw">if</span> <span class="ident">value</span>.<span class="ident">is_top</span>() {
-                        <span class="prelude-val">Some</span>(<span class="kw-2">*</span><span class="ident">index</span>)
-                    } <span class="kw">else</span> {
-                        <span class="prelude-val">None</span>
-                    }
-                },
-            )
-            .<span class="ident">collect</span>();
-        <span class="kw">for</span> <span class="ident">index</span> <span class="kw">in</span> <span class="ident">indices_to_remove</span> {
-            <span class="self">self</span>.<span class="ident">values</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">index</span>);
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">clear_top_values</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
+        <span class="kw">let</span> <span class="ident">inner</span> <span class="op">=</span> <span class="ident">Arc::make_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">inner</span>);
+        <span class="ident">inner</span>.<span class="ident">values</span>.<span class="ident">retain</span>(<span class="op">|</span><span class="ident">_key</span>, <span class="ident">value</span><span class="op">|</span> <span class="op">!</span><span class="ident">value</span>.<span class="ident">is_top</span>());
+    }
+}
+
+<span class="doccomment">/// Helper function that either merges `left` and `right`</span>
+<span class="doccomment">/// or, if one of them is `None`, merges the other with a `Top` value.</span>
+<span class="doccomment">/// Furthermore, if `left` and `right` have different byte sizes</span>
+<span class="doccomment">/// or the merge operation returns a `Top` value, then `None` is returned.</span>
+<span class="doccomment">/// Panics if both `left` and `right` are `None`.</span>
+<span class="kw">fn</span> <span class="ident">merge_or_merge_with_top</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">AbstractDomain</span> <span class="op">+</span> <span class="ident">SizedDomain</span><span class="op">&gt;</span>(
+    <span class="ident">left</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">T</span><span class="op">&gt;</span>,
+    <span class="ident">right</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">T</span><span class="op">&gt;</span>,
+) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">match</span> (<span class="ident">left</span>, <span class="ident">right</span>) {
+        (<span class="prelude-val">Some</span>(<span class="ident">elem_left</span>), <span class="prelude-val">Some</span>(<span class="ident">elem_right</span>)) =&gt; {
+            <span class="kw">if</span> <span class="ident">elem_left</span>.<span class="ident">bytesize</span>() <span class="op">==</span> <span class="ident">elem_right</span>.<span class="ident">bytesize</span>() {
+                <span class="kw">let</span> <span class="ident">merged</span> <span class="op">=</span> <span class="ident">elem_left</span>.<span class="ident">merge</span>(<span class="ident">elem_right</span>);
+                <span class="kw">if</span> <span class="op">!</span><span class="ident">merged</span>.<span class="ident">is_top</span>() {
+                    <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">merged</span>);
+                }
+            }
+            <span class="prelude-val">None</span>
         }
+        (<span class="prelude-val">Some</span>(<span class="ident">elem</span>), <span class="prelude-val">None</span>) <span class="op">|</span> (<span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="ident">elem</span>)) =&gt; {
+            <span class="kw">let</span> <span class="ident">merged</span> <span class="op">=</span> <span class="ident">elem</span>.<span class="ident">merge</span>(<span class="kw-2">&amp;</span><span class="ident">T::new_top</span>(<span class="ident">elem</span>.<span class="ident">bytesize</span>()));
+            <span class="kw">if</span> <span class="op">!</span><span class="ident">merged</span>.<span class="ident">is_top</span>() {
+                <span class="prelude-val">Some</span>(<span class="ident">merged</span>)
+            } <span class="kw">else</span> {
+                <span class="prelude-val">None</span>
+            }
+        }
+        (<span class="prelude-val">None</span>, <span class="prelude-val">None</span>) =&gt; <span class="macro">panic!</span>(),
+    }
+}
+
+<span class="doccomment">/// Helper function computing `index` plus the maximum of the bytesizes of `left` and `right`.</span>
+<span class="doccomment">/// Panics if both `left` and `right` are `None`.</span>
+<span class="kw">fn</span> <span class="ident">compute_range_end</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">SizedDomain</span><span class="op">&gt;</span>(<span class="ident">index</span>: <span class="ident">i64</span>, <span class="ident">left</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">right</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">T</span><span class="op">&gt;</span>) -&gt; <span class="ident">i64</span> {
+    <span class="kw">match</span> (<span class="ident">left</span>, <span class="ident">right</span>) {
+        (<span class="prelude-val">Some</span>(<span class="ident">left_elem</span>), <span class="prelude-val">Some</span>(<span class="ident">right_elem</span>)) =&gt; {
+            <span class="kw">let</span> <span class="ident">left_size</span> <span class="op">=</span> <span class="ident">u64::from</span>(<span class="ident">left_elem</span>.<span class="ident">bytesize</span>()) <span class="kw">as</span> <span class="ident">i64</span>;
+            <span class="kw">let</span> <span class="ident">right_size</span> <span class="op">=</span> <span class="ident">u64::from</span>(<span class="ident">right_elem</span>.<span class="ident">bytesize</span>()) <span class="kw">as</span> <span class="ident">i64</span>;
+            <span class="ident">index</span> <span class="op">+</span> <span class="ident">std::cmp::max</span>(<span class="ident">left_size</span>, <span class="ident">right_size</span>)
+        }
+        (<span class="prelude-val">Some</span>(<span class="ident">elem</span>), <span class="prelude-val">None</span>) <span class="op">|</span> (<span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="ident">elem</span>)) =&gt; <span class="ident">index</span> <span class="op">+</span> <span class="ident">u64::from</span>(<span class="ident">elem</span>.<span class="ident">bytesize</span>()) <span class="kw">as</span> <span class="ident">i64</span>,
+        (<span class="prelude-val">None</span>, <span class="prelude-val">None</span>) =&gt; <span class="macro">panic!</span>(),
     }
 }
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">tests</span> {
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
-    <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::abstract_domain::RegisterDomain</span>;
-    <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::intermediate_representation</span>::<span class="kw-2">*</span>;
-
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">Hash</span>, <span class="ident">PartialOrd</span>, <span class="ident">Ord</span>)]</span>
-    <span class="kw">struct</span> <span class="ident">MockDomain</span>(<span class="ident">i64</span>, <span class="ident">ByteSize</span>);
-
-    <span class="kw">impl</span> <span class="ident">AbstractDomain</span> <span class="kw">for</span> <span class="ident">MockDomain</span> {
-        <span class="kw">fn</span> <span class="ident">merge</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-            <span class="macro">assert_eq!</span>(<span class="self">self</span>.<span class="number">1</span>, <span class="ident">other</span>.<span class="number">1</span>);
-            <span class="kw">if</span> <span class="self">self</span> <span class="op">=</span><span class="op">=</span> <span class="ident">other</span> {
-                <span class="self">self</span>.<span class="ident">clone</span>()
-            } <span class="kw">else</span> {
-                <span class="self">self</span>.<span class="ident">top</span>()
-            }
-        }
-
-        <span class="kw">fn</span> <span class="ident">is_top</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-            <span class="self">self</span> <span class="op">=</span><span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">top</span>()
-        }
-    }
-
-    <span class="kw">impl</span> <span class="ident">SizedDomain</span> <span class="kw">for</span> <span class="ident">MockDomain</span> {
-        <span class="kw">fn</span> <span class="ident">bytesize</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ByteSize</span> {
-            <span class="self">self</span>.<span class="number">1</span>
-        }
-
-        <span class="kw">fn</span> <span class="ident">new_top</span>(<span class="ident">bytesize</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">MockDomain</span> {
-            <span class="ident">MockDomain</span>(<span class="number">0</span>, <span class="ident">bytesize</span>)
-        }
-    }
-
-    <span class="kw">impl</span> <span class="ident">HasTop</span> <span class="kw">for</span> <span class="ident">MockDomain</span> {
-        <span class="kw">fn</span> <span class="ident">top</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-            <span class="self">Self</span><span class="ident">::new_top</span>(<span class="self">self</span>.<span class="number">1</span>)
-        }
-    }
-
-    <span class="kw">impl</span> <span class="ident">RegisterDomain</span> <span class="kw">for</span> <span class="ident">MockDomain</span> {
-        <span class="kw">fn</span> <span class="ident">bin_op</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_op</span>: <span class="ident">BinOpType</span>, <span class="ident">_rhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-            <span class="self">Self</span><span class="ident">::new_top</span>(<span class="self">self</span>.<span class="number">1</span>)
-        }
-
-        <span class="kw">fn</span> <span class="ident">un_op</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_op</span>: <span class="ident">UnOpType</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-            <span class="self">Self</span><span class="ident">::new_top</span>(<span class="self">self</span>.<span class="number">1</span>)
-        }
-
-        <span class="kw">fn</span> <span class="ident">cast</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_kind</span>: <span class="ident">CastOpType</span>, <span class="ident">width</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-            <span class="self">Self</span><span class="ident">::new_top</span>(<span class="ident">width</span>)
-        }
-
-        <span class="kw">fn</span> <span class="ident">subpiece</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_low_byte</span>: <span class="ident">ByteSize</span>, <span class="ident">size</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-            <span class="self">Self</span><span class="ident">::new_top</span>(<span class="ident">size</span>)
-        }
-    }
-
-    <span class="kw">fn</span> <span class="ident">mock</span>(<span class="ident">val</span>: <span class="ident">i64</span>, <span class="ident">bytesize</span>: <span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">ByteSize</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">MockDomain</span> {
-        <span class="ident">MockDomain</span>(<span class="ident">val</span>, <span class="ident">bytesize</span>.<span class="ident">into</span>())
-    }
-
-    <span class="kw">fn</span> <span class="ident">bv</span>(<span class="ident">val</span>: <span class="ident">i64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Bitvector</span> {
-        <span class="ident">Bitvector::from_i64</span>(<span class="ident">val</span>)
-    }
-
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">mem_region</span>() {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">region</span>: <span class="ident">MemRegion</span><span class="op">&lt;</span><span class="ident">MockDomain</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">MemRegion::new</span>(<span class="ident">ByteSize::from</span>(<span class="number">8u64</span>));
-        <span class="ident">region</span>.<span class="ident">add</span>(<span class="ident">mock</span>(<span class="number">5</span>, <span class="number">3u64</span>), <span class="ident">bv</span>(<span class="number">5</span>));
-        <span class="macro">assert_eq!</span>(<span class="ident">region</span>.<span class="ident">get</span>(<span class="ident">bv</span>(<span class="number">5</span>), <span class="ident">ByteSize::from</span>(<span class="number">3u64</span>)), <span class="ident">mock</span>(<span class="number">5</span>, <span class="number">3u64</span>));
-        <span class="ident">region</span>.<span class="ident">add</span>(<span class="ident">mock</span>(<span class="number">7</span>, <span class="number">2u64</span>), <span class="ident">bv</span>(<span class="number">8</span>));
-        <span class="macro">assert_eq!</span>(<span class="ident">region</span>.<span class="ident">get</span>(<span class="ident">bv</span>(<span class="number">8</span>), <span class="ident">ByteSize::from</span>(<span class="number">2u64</span>)), <span class="ident">mock</span>(<span class="number">7</span>, <span class="number">2u64</span>));
-        <span class="macro">assert_eq!</span>(<span class="ident">region</span>.<span class="ident">get</span>(<span class="ident">bv</span>(<span class="number">5</span>), <span class="ident">ByteSize::from</span>(<span class="number">3u64</span>)), <span class="ident">mock</span>(<span class="number">5</span>, <span class="number">3u64</span>));
-        <span class="macro">assert_eq!</span>(
-            <span class="ident">region</span>.<span class="ident">get</span>(<span class="ident">bv</span>(<span class="number">5</span>), <span class="ident">ByteSize::from</span>(<span class="number">2u64</span>)),
-            <span class="ident">MockDomain::new_top</span>(<span class="ident">ByteSize::new</span>(<span class="number">2</span>))
-        );
-        <span class="ident">region</span>.<span class="ident">add</span>(<span class="ident">mock</span>(<span class="number">9</span>, <span class="number">2u64</span>), <span class="ident">bv</span>(<span class="number">6</span>));
-        <span class="macro">assert_eq!</span>(<span class="ident">region</span>.<span class="ident">get</span>(<span class="ident">bv</span>(<span class="number">6</span>), <span class="ident">ByteSize::from</span>(<span class="number">2u64</span>)), <span class="ident">mock</span>(<span class="number">9</span>, <span class="number">2u64</span>));
-        <span class="macro">assert_eq!</span>(
-            <span class="ident">region</span>.<span class="ident">get</span>(<span class="ident">bv</span>(<span class="number">5</span>), <span class="ident">ByteSize::from</span>(<span class="number">3u64</span>)),
-            <span class="ident">MockDomain::new_top</span>(<span class="ident">ByteSize::new</span>(<span class="number">3</span>))
-        );
-        <span class="macro">assert_eq!</span>(<span class="ident">region</span>.<span class="ident">get</span>(<span class="ident">bv</span>(<span class="number">8</span>), <span class="ident">ByteSize::from</span>(<span class="number">2u64</span>)), <span class="ident">mock</span>(<span class="number">7</span>, <span class="number">2u64</span>));
-        <span class="ident">region</span>.<span class="ident">add</span>(<span class="ident">mock</span>(<span class="number">9</span>, <span class="number">11u64</span>), <span class="ident">bv</span>(<span class="op">-</span><span class="number">3</span>));
-        <span class="macro">assert_eq!</span>(<span class="ident">region</span>.<span class="ident">get</span>(<span class="ident">bv</span>(<span class="op">-</span><span class="number">3</span>), <span class="ident">ByteSize::from</span>(<span class="number">11u64</span>)), <span class="ident">mock</span>(<span class="number">9</span>, <span class="number">11u64</span>));
-        <span class="macro">assert_eq!</span>(
-            <span class="ident">region</span>.<span class="ident">get</span>(<span class="ident">bv</span>(<span class="number">6</span>), <span class="ident">ByteSize::from</span>(<span class="number">2u64</span>)),
-            <span class="ident">MockDomain::new_top</span>(<span class="ident">ByteSize::new</span>(<span class="number">2</span>))
-        );
-        <span class="macro">assert_eq!</span>(<span class="ident">region</span>.<span class="ident">get</span>(<span class="ident">bv</span>(<span class="number">8</span>), <span class="ident">ByteSize::from</span>(<span class="number">2u64</span>)), <span class="ident">mock</span>(<span class="number">7</span>, <span class="number">2u64</span>));
-
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">other_region</span> <span class="op">=</span> <span class="ident">MemRegion::new</span>(<span class="ident">ByteSize::from</span>(<span class="number">8u64</span>));
-        <span class="ident">other_region</span>.<span class="ident">add</span>(<span class="ident">mock</span>(<span class="number">7</span>, <span class="number">2u64</span>), <span class="ident">bv</span>(<span class="number">8</span>));
-        <span class="macro">assert!</span>(<span class="ident">region</span> <span class="op">!</span><span class="op">=</span> <span class="ident">other_region</span>);
-        <span class="kw">let</span> <span class="ident">merged_region</span> <span class="op">=</span> <span class="ident">region</span>.<span class="ident">merge</span>(<span class="kw-2">&amp;</span><span class="ident">other_region</span>);
-        <span class="macro">assert_eq!</span>(
-            <span class="ident">merged_region</span>.<span class="ident">get</span>(<span class="ident">bv</span>(<span class="number">8</span>), <span class="ident">ByteSize::from</span>(<span class="number">2u64</span>)),
-            <span class="ident">mock</span>(<span class="number">7</span>, <span class="number">2u64</span>)
-        );
-        <span class="macro">assert_eq!</span>(
-            <span class="ident">merged_region</span>.<span class="ident">get</span>(<span class="ident">bv</span>(<span class="op">-</span><span class="number">3</span>), <span class="ident">ByteSize::from</span>(<span class="number">11u64</span>)),
-            <span class="ident">MockDomain::new_top</span>(<span class="ident">ByteSize::from</span>(<span class="number">11u64</span>))
-        );
-        <span class="ident">other_region</span>.<span class="ident">add</span>(<span class="ident">mock</span>(<span class="number">9</span>, <span class="number">11u64</span>), <span class="ident">bv</span>(<span class="op">-</span><span class="number">3</span>));
-        <span class="macro">assert_eq!</span>(<span class="ident">region</span>, <span class="ident">other_region</span>);
-    }
-
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">do_not_save_top_elements</span>() {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">region</span>: <span class="ident">MemRegionData</span><span class="op">&lt;</span><span class="ident">MockDomain</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">MemRegionData::new</span>(<span class="ident">ByteSize::from</span>(<span class="number">8u64</span>));
-        <span class="ident">region</span>.<span class="ident">add</span>(<span class="ident">MockDomain::new_top</span>(<span class="ident">ByteSize::from</span>(<span class="number">4u64</span>)), <span class="ident">bv</span>(<span class="number">5</span>));
-        <span class="macro">assert_eq!</span>(<span class="ident">region</span>.<span class="ident">values</span>.<span class="ident">len</span>(), <span class="number">0</span>);
-
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">other_region</span>: <span class="ident">MemRegionData</span><span class="op">&lt;</span><span class="ident">MockDomain</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">MemRegionData::new</span>(<span class="ident">ByteSize::from</span>(<span class="number">8u64</span>));
-        <span class="ident">region</span>.<span class="ident">add</span>(<span class="ident">mock</span>(<span class="number">5</span>, <span class="number">4u64</span>), <span class="ident">bv</span>(<span class="number">5</span>));
-        <span class="ident">other_region</span>.<span class="ident">add</span>(<span class="ident">mock</span>(<span class="number">7</span>, <span class="number">4u64</span>), <span class="ident">bv</span>(<span class="number">5</span>));
-        <span class="kw">let</span> <span class="ident">merged_region</span> <span class="op">=</span> <span class="ident">region</span>.<span class="ident">merge</span>(<span class="kw-2">&amp;</span><span class="ident">other_region</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">region</span>.<span class="ident">values</span>.<span class="ident">len</span>(), <span class="number">1</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">other_region</span>.<span class="ident">values</span>.<span class="ident">len</span>(), <span class="number">1</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">merged_region</span>.<span class="ident">values</span>.<span class="ident">len</span>(), <span class="number">0</span>);
-    }
-
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">value_removals</span>() {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">region</span>: <span class="ident">MemRegionData</span><span class="op">&lt;</span><span class="ident">MockDomain</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">MemRegionData::new</span>(<span class="ident">ByteSize::from</span>(<span class="number">8u64</span>));
-        <span class="ident">region</span>.<span class="ident">add</span>(<span class="ident">mock</span>(<span class="number">1</span>, <span class="number">8u64</span>), <span class="ident">bv</span>(<span class="number">0</span>));
-        <span class="ident">region</span>.<span class="ident">add</span>(<span class="ident">mock</span>(<span class="number">2</span>, <span class="number">8u64</span>), <span class="ident">bv</span>(<span class="number">8</span>));
-        <span class="ident">region</span>.<span class="ident">add</span>(<span class="ident">mock</span>(<span class="number">3</span>, <span class="number">8u64</span>), <span class="ident">bv</span>(<span class="number">16</span>));
-        <span class="ident">region</span>.<span class="ident">add</span>(<span class="ident">mock</span>(<span class="number">4</span>, <span class="number">8u64</span>), <span class="ident">bv</span>(<span class="number">24</span>));
-        <span class="ident">region</span>.<span class="ident">add</span>(<span class="ident">mock</span>(<span class="number">5</span>, <span class="number">8u64</span>), <span class="ident">bv</span>(<span class="number">32</span>));
-
-        <span class="macro">assert_eq!</span>(<span class="ident">region</span>.<span class="ident">values</span>.<span class="ident">len</span>(), <span class="number">5</span>);
-        <span class="ident">region</span>.<span class="ident">remove</span>(<span class="ident">bv</span>(<span class="number">2</span>), <span class="ident">bv</span>(<span class="number">3</span>));
-        <span class="macro">assert_eq!</span>(<span class="ident">region</span>.<span class="ident">values</span>.<span class="ident">len</span>(), <span class="number">4</span>);
-        <span class="ident">region</span>.<span class="ident">remove</span>(<span class="ident">bv</span>(<span class="number">7</span>), <span class="ident">bv</span>(<span class="number">1</span>));
-        <span class="macro">assert_eq!</span>(<span class="ident">region</span>.<span class="ident">values</span>.<span class="ident">len</span>(), <span class="number">4</span>);
-        <span class="ident">region</span>.<span class="ident">remove</span>(<span class="ident">bv</span>(<span class="number">7</span>), <span class="ident">bv</span>(<span class="number">2</span>));
-        <span class="macro">assert_eq!</span>(<span class="ident">region</span>.<span class="ident">values</span>.<span class="ident">len</span>(), <span class="number">3</span>);
-
-        <span class="ident">region</span>.<span class="ident">clear_interval</span>(<span class="number">15</span>, <span class="number">1</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">region</span>.<span class="ident">values</span>.<span class="ident">len</span>(), <span class="number">3</span>);
-        <span class="ident">region</span>.<span class="ident">clear_interval</span>(<span class="number">15</span>, <span class="number">3</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">region</span>.<span class="ident">values</span>.<span class="ident">len</span>(), <span class="number">2</span>);
-
-        <span class="kw">for</span> <span class="ident">val</span> <span class="kw">in</span> <span class="ident">region</span>.<span class="ident">values_mut</span>() {
-            <span class="kw">if</span> <span class="kw-2">*</span><span class="ident">val</span> <span class="op">=</span><span class="op">=</span> <span class="ident">mock</span>(<span class="number">5</span>, <span class="number">8u64</span>) {
-                <span class="kw-2">*</span><span class="ident">val</span> <span class="op">=</span> <span class="ident">mock</span>(<span class="number">0</span>, <span class="number">8u64</span>); <span class="comment">// This is a *Top* element</span>
-            }
-        }
-        <span class="ident">region</span>.<span class="ident">clear_top_values</span>();
-        <span class="macro">assert_eq!</span>(<span class="ident">region</span>.<span class="ident">values</span>.<span class="ident">len</span>(), <span class="number">1</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">region</span>.<span class="ident">get</span>(<span class="ident">bv</span>(<span class="number">24</span>), <span class="ident">ByteSize::from</span>(<span class="number">8u64</span>)), <span class="ident">mock</span>(<span class="number">4</span>, <span class="number">8u64</span>));
-    }
-}
-</pre></div>
-</section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="cwe_checker_lib" data-search-index-js="../../../search-index.js" data-search-js="../../../search.js"></div>
-    <script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script></body></html>
+<span class="kw">mod</span> <span class="ident">tests</span>;
+</code></pre></div>
+</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="cwe_checker_lib" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.60.0 (7737e0b5c 2022-04-04)" ></div>
+</body></html>

@@ -1,7 +1,9 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/abstract_domain/interval/simple_interval.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>simple_interval.rs - source</title><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../../storage.js"></script><script src="../../../../crates.js"></script><noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg">
-<link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../../../cwe_checker_lib/index.html'><div class='logo-container rust-logo'><img src='../../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
-                <a id="settings-menu" href="../../../../settings.html"><img src="../../../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/abstract_domain/interval/simple_interval.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>simple_interval.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script src="../../../../crates.js"></script><script defer src="../../../../main.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script>
+    <noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../../cwe_checker_lib/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../../../cwe_checker_lib/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../../cwe_checker_lib/index.html"><img class="rust-logo" src="../../../../rust-logo.svg" alt="logo"></a><nav class="sub"><div class="theme-picker hidden"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="22" height="22" alt="Pick another theme!" src="../../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
 <span id="4">  4</span>
@@ -577,9 +579,8 @@
 <span id="574">574</span>
 <span id="575">575</span>
 <span id="576">576</span>
-</pre><div class="example-wrap"><pre class="rust ">
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::intermediate_representation</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::prelude</span>::<span class="kw-2">*</span>;
+</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::intermediate_representation</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::prelude</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">gcd::Gcd</span>;
 
 <span class="doccomment">/// A strided interval of values with a fixed byte size.</span>
@@ -611,7 +612,7 @@
     <span class="doccomment">/// The function automatically rounds down `end` (if necessary)</span>
     <span class="doccomment">/// so that it is contained in the same residue class as the start value modulo the stride.</span>
     <span class="doccomment">/// If the stride is 0 then `end` will be set to `start`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">start</span>: <span class="ident">Bitvector</span>, <span class="ident">end</span>: <span class="ident">Bitvector</span>, <span class="ident">stride</span>: <span class="ident">u64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Interval</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">start</span>: <span class="ident">Bitvector</span>, <span class="ident">end</span>: <span class="ident">Bitvector</span>, <span class="ident">stride</span>: <span class="ident">u64</span>) -&gt; <span class="ident">Interval</span> {
         <span class="macro">assert_eq!</span>(<span class="ident">start</span>.<span class="ident">width</span>(), <span class="ident">end</span>.<span class="ident">width</span>());
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">interval</span> <span class="op">=</span> <span class="ident">Interval</span> { <span class="ident">start</span>, <span class="ident">end</span>, <span class="ident">stride</span> };
         <span class="ident">interval</span>.<span class="ident">adjust_end_to_value_in_stride</span>();
@@ -619,7 +620,7 @@
     }
 
     <span class="doccomment">/// Construct a new unconstrained interval.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_top</span>(<span class="ident">bytesize</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Interval</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_top</span>(<span class="ident">bytesize</span>: <span class="ident">ByteSize</span>) -&gt; <span class="ident">Interval</span> {
         <span class="ident">Interval</span> {
             <span class="ident">start</span>: <span class="ident">Bitvector::signed_min_value</span>(<span class="ident">bytesize</span>.<span class="ident">into</span>()),
             <span class="ident">end</span>: <span class="ident">Bitvector::signed_max_value</span>(<span class="ident">bytesize</span>.<span class="ident">into</span>()),
@@ -628,17 +629,17 @@
     }
 
     <span class="doccomment">/// Returns true if all values representable by bitvectors of the corresponding length are contained in the interval.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_top</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        (<span class="self">self</span>.<span class="ident">start</span>.<span class="ident">clone</span>() <span class="op">-</span> <span class="kw-2">&amp;</span><span class="ident">Bitvector::one</span>(<span class="self">self</span>.<span class="ident">start</span>.<span class="ident">width</span>())) <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">end</span> <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">stride</span> <span class="op">=</span><span class="op">=</span> <span class="number">1</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_top</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
+        (<span class="self">self</span>.<span class="ident">start</span>.<span class="ident">clone</span>() <span class="op">-</span> <span class="kw-2">&amp;</span><span class="ident">Bitvector::one</span>(<span class="self">self</span>.<span class="ident">start</span>.<span class="ident">width</span>())) <span class="op">==</span> <span class="self">self</span>.<span class="ident">end</span> <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">stride</span> <span class="op">==</span> <span class="number">1</span>
     }
 
     <span class="doccomment">/// Get the size in bytes of values contained in the interval.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">bytesize</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ByteSize</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">bytesize</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">ByteSize</span> {
         <span class="self">self</span>.<span class="ident">start</span>.<span class="ident">width</span>().<span class="ident">into</span>()
     }
 
     <span class="doccomment">/// Merge two intervals interpreting both as intervals of signed integers.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">signed_merge</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Interval</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Interval</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">signed_merge</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Interval</span>) -&gt; <span class="ident">Interval</span> {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">start</span>.<span class="ident">checked_sgt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">end</span>).<span class="ident">unwrap</span>()
             <span class="op">|</span><span class="op">|</span> <span class="ident">other</span>.<span class="ident">start</span>.<span class="ident">checked_sgt</span>(<span class="kw-2">&amp;</span><span class="ident">other</span>.<span class="ident">end</span>).<span class="ident">unwrap</span>()
         {
@@ -662,12 +663,12 @@
 
     <span class="doccomment">/// Compute the intersection of two intervals as intervals of signed integers.</span>
     <span class="doccomment">/// Return an error if the intersection is empty.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">signed_intersect</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Interval</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Interval</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">signed_intersect</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Interval</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Interval</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">signed_max</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">start</span>, <span class="kw-2">&amp;</span><span class="ident">other</span>.<span class="ident">start</span>);
         <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">signed_min</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">end</span>, <span class="kw-2">&amp;</span><span class="ident">other</span>.<span class="ident">end</span>);
 
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">stride</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> <span class="op">&amp;&amp;</span> <span class="ident">other</span>.<span class="ident">stride</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
-            <span class="kw">if</span> <span class="ident">start</span> <span class="op">=</span><span class="op">=</span> <span class="ident">end</span> {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">stride</span> <span class="op">==</span> <span class="number">0</span> <span class="op">&amp;&amp;</span> <span class="ident">other</span>.<span class="ident">stride</span> <span class="op">==</span> <span class="number">0</span> {
+            <span class="kw">if</span> <span class="ident">start</span> <span class="op">==</span> <span class="ident">end</span> {
                 <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">Interval</span> {
                     <span class="ident">start</span>,
                     <span class="ident">end</span>,
@@ -679,7 +680,7 @@
         }
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">start</span>.<span class="ident">bytesize</span>() <span class="op">&gt;</span> <span class="ident">ByteSize::new</span>(<span class="number">8</span>) {
             <span class="comment">// We ignore the stride for bytesizes larger than 8 bytes</span>
-            <span class="kw">let</span> <span class="ident">stride</span> <span class="op">=</span> <span class="op">!</span>(<span class="ident">start</span> <span class="op">=</span><span class="op">=</span> <span class="ident">end</span>) <span class="kw">as</span> <span class="ident">u64</span>; <span class="comment">// 0 if start == end, else 1</span>
+            <span class="kw">let</span> <span class="ident">stride</span> <span class="op">=</span> <span class="op">!</span>(<span class="ident">start</span> <span class="op">==</span> <span class="ident">end</span>) <span class="kw">as</span> <span class="ident">u64</span>; <span class="comment">// 0 if start == end, else 1</span>
             <span class="kw">if</span> <span class="ident">start</span>.<span class="ident">checked_sle</span>(<span class="kw-2">&amp;</span><span class="ident">end</span>).<span class="ident">unwrap</span>() {
                 <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">Interval</span> { <span class="ident">start</span>, <span class="ident">end</span>, <span class="ident">stride</span> });
             } <span class="kw">else</span> {
@@ -694,8 +695,8 @@
     }
 
     <span class="doccomment">/// If `self.start == self.end` set the stride to 0 and to 1 if `self.start &lt; self.end`.</span>
-    <span class="kw">fn</span> <span class="ident">set_stride_to_unknown</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">start</span> <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">end</span> {
+    <span class="kw">fn</span> <span class="ident">set_stride_to_unknown</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">start</span> <span class="op">==</span> <span class="self">self</span>.<span class="ident">end</span> {
             <span class="self">self</span>.<span class="ident">stride</span> <span class="op">=</span> <span class="number">0</span>;
         } <span class="kw">else</span> {
             <span class="self">self</span>.<span class="ident">stride</span> <span class="op">=</span> <span class="number">1</span>;
@@ -704,19 +705,19 @@
 
     <span class="doccomment">/// Round down `self.end` to the nearest value such that `self.end - self.start` is again divisible by the stride.</span>
     <span class="doccomment">/// If afterwards `self.start == self.end` holds then set the stride to 0.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">adjust_end_to_value_in_stride</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">stride</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">adjust_end_to_value_in_stride</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">stride</span> <span class="op">==</span> <span class="number">0</span> {
             <span class="self">self</span>.<span class="ident">end</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">start</span>.<span class="ident">clone</span>();
             <span class="kw">return</span>;
         }
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">stride</span> <span class="op">=</span><span class="op">=</span> <span class="number">1</span> <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">start</span> <span class="op">!</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">end</span> {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">stride</span> <span class="op">==</span> <span class="number">1</span> <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">start</span> <span class="op">!</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">end</span> {
             <span class="kw">return</span>;
         }
         <span class="kw">if</span> <span class="kw">let</span> (<span class="prelude-val">Ok</span>(<span class="ident">start</span>), <span class="prelude-val">Ok</span>(<span class="ident">end</span>)) <span class="op">=</span> (<span class="self">self</span>.<span class="ident">start</span>.<span class="ident">try_to_i64</span>(), <span class="self">self</span>.<span class="ident">end</span>.<span class="ident">try_to_i64</span>()) {
             <span class="kw">let</span> <span class="ident">diff</span> <span class="op">=</span> (<span class="ident">end</span> <span class="op">-</span> <span class="ident">start</span>) <span class="kw">as</span> <span class="ident">u64</span> <span class="op">%</span> <span class="self">self</span>.<span class="ident">stride</span>;
             <span class="kw">let</span> <span class="ident">diff</span> <span class="op">=</span> <span class="ident">Bitvector::from_u64</span>(<span class="ident">diff</span>).<span class="ident">into_resize_unsigned</span>(<span class="self">self</span>.<span class="ident">end</span>.<span class="ident">bytesize</span>());
             <span class="self">self</span>.<span class="ident">end</span>.<span class="ident">checked_sub_assign</span>(<span class="kw-2">&amp;</span><span class="ident">diff</span>).<span class="ident">unwrap</span>();
-            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">start</span> <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">end</span> {
+            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">start</span> <span class="op">==</span> <span class="self">self</span>.<span class="ident">end</span> {
                 <span class="self">self</span>.<span class="ident">stride</span> <span class="op">=</span> <span class="number">0</span>;
             }
         } <span class="kw">else</span> {
@@ -726,19 +727,19 @@
 
     <span class="doccomment">/// Round up `self.start` to the nearest value such that `self.end - self.start` is again divisible by the stride.</span>
     <span class="doccomment">/// If afterwards `self.start == self.end` holds then set the stride to 0.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">adjust_start_to_value_in_stride</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">stride</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">adjust_start_to_value_in_stride</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">stride</span> <span class="op">==</span> <span class="number">0</span> {
             <span class="self">self</span>.<span class="ident">start</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">end</span>.<span class="ident">clone</span>();
             <span class="kw">return</span>;
         }
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">stride</span> <span class="op">=</span><span class="op">=</span> <span class="number">1</span> <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">start</span> <span class="op">!</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">end</span> {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">stride</span> <span class="op">==</span> <span class="number">1</span> <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">start</span> <span class="op">!</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">end</span> {
             <span class="kw">return</span>;
         }
         <span class="kw">if</span> <span class="kw">let</span> (<span class="prelude-val">Ok</span>(<span class="ident">start</span>), <span class="prelude-val">Ok</span>(<span class="ident">end</span>)) <span class="op">=</span> (<span class="self">self</span>.<span class="ident">start</span>.<span class="ident">try_to_i64</span>(), <span class="self">self</span>.<span class="ident">end</span>.<span class="ident">try_to_i64</span>()) {
             <span class="kw">let</span> <span class="ident">diff</span> <span class="op">=</span> (<span class="ident">end</span> <span class="op">-</span> <span class="ident">start</span>) <span class="kw">as</span> <span class="ident">u64</span> <span class="op">%</span> <span class="self">self</span>.<span class="ident">stride</span>;
             <span class="kw">let</span> <span class="ident">diff</span> <span class="op">=</span> <span class="ident">Bitvector::from_u64</span>(<span class="ident">diff</span>).<span class="ident">into_resize_unsigned</span>(<span class="self">self</span>.<span class="ident">end</span>.<span class="ident">bytesize</span>());
             <span class="self">self</span>.<span class="ident">start</span>.<span class="ident">checked_add_assign</span>(<span class="kw-2">&amp;</span><span class="ident">diff</span>).<span class="ident">unwrap</span>();
-            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">start</span> <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">end</span> {
+            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">start</span> <span class="op">==</span> <span class="self">self</span>.<span class="ident">end</span> {
                 <span class="self">self</span>.<span class="ident">stride</span> <span class="op">=</span> <span class="number">0</span>;
             }
         } <span class="kw">else</span> {
@@ -756,7 +757,7 @@
         <span class="self">self</span>,
         <span class="ident">stride</span>: <span class="ident">u64</span>,
         <span class="ident">remainder</span>: <span class="ident">u64</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">bytesize</span>() <span class="op">&gt;</span> <span class="ident">ByteSize::new</span>(<span class="number">8</span>) {
             <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="self">self</span>);
         }
@@ -780,17 +781,17 @@
         <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">Bitvector::from_i64</span>(<span class="ident">end</span> <span class="kw">as</span> <span class="ident">i64</span>)
             .<span class="ident">into_truncate</span>(<span class="self">self</span>.<span class="ident">end</span>.<span class="ident">bytesize</span>())
             .<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">stride</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">start</span> <span class="op">=</span><span class="op">=</span> <span class="ident">end</span> { <span class="number">0</span> } <span class="kw">else</span> { <span class="ident">stride</span> };
+        <span class="kw">let</span> <span class="ident">stride</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">start</span> <span class="op">==</span> <span class="ident">end</span> { <span class="number">0</span> } <span class="kw">else</span> { <span class="ident">stride</span> };
         <span class="prelude-val">Ok</span>(<span class="ident">Interval</span> { <span class="ident">start</span>, <span class="ident">end</span>, <span class="ident">stride</span> })
     }
 
     <span class="doccomment">/// Compute the interval represented if the byte size of the value is zero-extended.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">zero_extend</span>(<span class="self">self</span>, <span class="ident">width</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Interval</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">zero_extend</span>(<span class="self">self</span>, <span class="ident">width</span>: <span class="ident">ByteSize</span>) -&gt; <span class="ident">Interval</span> {
         <span class="macro">assert!</span>(<span class="self">self</span>.<span class="ident">bytesize</span>() <span class="op">&lt;</span><span class="op">=</span> <span class="ident">width</span>);
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">bytesize</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">width</span> {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">bytesize</span>() <span class="op">==</span> <span class="ident">width</span> {
             <span class="kw">return</span> <span class="self">self</span>;
         }
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">start</span>.<span class="ident">sign_bit</span>().<span class="ident">to_bool</span>() <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">end</span>.<span class="ident">sign_bit</span>().<span class="ident">to_bool</span>() {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">start</span>.<span class="ident">sign_bit</span>().<span class="ident">to_bool</span>() <span class="op">==</span> <span class="self">self</span>.<span class="ident">end</span>.<span class="ident">sign_bit</span>().<span class="ident">to_bool</span>() {
             <span class="comment">// Both start and end have the same sign</span>
             <span class="ident">Interval</span> {
                 <span class="ident">start</span>: <span class="self">self</span>.<span class="ident">start</span>.<span class="ident">into_zero_extend</span>(<span class="ident">width</span>).<span class="ident">unwrap</span>(),
@@ -825,10 +826,10 @@
 
     <span class="doccomment">/// Truncate the bitvectors in the interval</span>
     <span class="doccomment">/// by removing the least significant bytes lower than the `low_byte` from them.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">subpiece_higher</span>(<span class="self">self</span>, <span class="ident">low_byte</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">subpiece_higher</span>(<span class="self">self</span>, <span class="ident">low_byte</span>: <span class="ident">ByteSize</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">start</span>.<span class="ident">subpiece</span>(<span class="ident">low_byte</span>, <span class="self">self</span>.<span class="ident">bytesize</span>() <span class="op">-</span> <span class="ident">low_byte</span>);
         <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">end</span>.<span class="ident">subpiece</span>(<span class="ident">low_byte</span>, <span class="self">self</span>.<span class="ident">bytesize</span>() <span class="op">-</span> <span class="ident">low_byte</span>);
-        <span class="kw">let</span> <span class="ident">stride</span> <span class="op">=</span> <span class="op">!</span>(<span class="ident">start</span> <span class="op">=</span><span class="op">=</span> <span class="ident">end</span>) <span class="kw">as</span> <span class="ident">u64</span>;
+        <span class="kw">let</span> <span class="ident">stride</span> <span class="op">=</span> <span class="op">!</span>(<span class="ident">start</span> <span class="op">==</span> <span class="ident">end</span>) <span class="kw">as</span> <span class="ident">u64</span>;
         <span class="ident">Interval</span> {
             <span class="ident">start</span>: <span class="self">self</span>.<span class="ident">start</span>.<span class="ident">subpiece</span>(<span class="ident">low_byte</span>, <span class="self">self</span>.<span class="ident">bytesize</span>() <span class="op">-</span> <span class="ident">low_byte</span>),
             <span class="ident">end</span>: <span class="self">self</span>.<span class="ident">end</span>.<span class="ident">subpiece</span>(<span class="ident">low_byte</span>, <span class="self">self</span>.<span class="ident">bytesize</span>() <span class="op">-</span> <span class="ident">low_byte</span>),
@@ -838,7 +839,7 @@
 
     <span class="doccomment">/// Truncate the bitvectors in the interval to `size`,</span>
     <span class="doccomment">/// i.e. the most significant bytes (higher than `size`) are removed from all values.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">subpiece_lower</span>(<span class="self">self</span>, <span class="ident">size</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">subpiece_lower</span>(<span class="self">self</span>, <span class="ident">size</span>: <span class="ident">ByteSize</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">let</span> <span class="ident">length</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">end</span>.<span class="ident">clone</span>() <span class="op">-</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">start</span>;
         <span class="kw">if</span> <span class="ident">length</span>
             .<span class="ident">checked_ule</span>(
@@ -858,11 +859,11 @@
                 };
             }
         }
-        <span class="self">Self</span><span class="ident">::new_top</span>(<span class="ident">size</span>)
+        <span class="ident"><span class="self">Self</span>::new_top</span>(<span class="ident">size</span>)
     }
 
     <span class="doccomment">/// Take a subpiece of the bitvectors.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">subpiece</span>(<span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">low_byte</span>: <span class="ident">ByteSize</span>, <span class="ident">size</span>: <span class="ident">ByteSize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">subpiece</span>(<span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">low_byte</span>: <span class="ident">ByteSize</span>, <span class="ident">size</span>: <span class="ident">ByteSize</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">if</span> <span class="ident">low_byte</span> <span class="op">!</span><span class="op">=</span> <span class="ident">ByteSize::new</span>(<span class="number">0</span>) {
             <span class="self">self</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">subpiece_higher</span>(<span class="ident">low_byte</span>);
         }
@@ -874,7 +875,7 @@
 
     <span class="doccomment">/// Piece two intervals together, where `self` contains the most signifcant bytes</span>
     <span class="doccomment">/// and `other` contains the least significant bytes of the resulting values.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">piece</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Interval</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">piece</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Interval</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">if</span> <span class="ident">other</span>.<span class="ident">start</span>.<span class="ident">sign_bit</span>().<span class="ident">to_bool</span>() <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">other</span>.<span class="ident">end</span>.<span class="ident">sign_bit</span>().<span class="ident">to_bool</span>() {
             <span class="comment">// The `other` interval contains both negative and positive values.</span>
             <span class="kw">let</span> <span class="ident">interval</span> <span class="op">=</span> <span class="ident">Interval</span> {
@@ -900,9 +901,9 @@
             }
         } <span class="kw">else</span> {
             <span class="kw">let</span> <span class="ident">stride</span> <span class="op">=</span> <span class="kw">match</span> (<span class="self">self</span>.<span class="ident">stride</span>, <span class="ident">other</span>.<span class="ident">stride</span>) {
-                (<span class="number">0</span>, <span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">other</span>.<span class="ident">stride</span>,
-                (<span class="kw">_</span>, <span class="number">0</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">stride</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">other</span>.<span class="ident">bytesize</span>().<span class="ident">as_bit_length</span>(),
-                <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">1u64</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">other</span>.<span class="ident">stride</span>.<span class="ident">trailing_zeros</span>(),
+                (<span class="number">0</span>, <span class="kw">_</span>) =&gt; <span class="ident">other</span>.<span class="ident">stride</span>,
+                (<span class="kw">_</span>, <span class="number">0</span>) =&gt; <span class="self">self</span>.<span class="ident">stride</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">other</span>.<span class="ident">bytesize</span>().<span class="ident">as_bit_length</span>(),
+                <span class="kw">_</span> =&gt; <span class="number">1u64</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">other</span>.<span class="ident">stride</span>.<span class="ident">trailing_zeros</span>(),
             };
             <span class="ident">Interval</span> {
                 <span class="ident">start</span>: <span class="self">self</span>.<span class="ident">start</span>.<span class="ident">bin_op</span>(<span class="ident">BinOpType::Piece</span>, <span class="kw-2">&amp;</span><span class="ident">other</span>.<span class="ident">start</span>).<span class="ident">unwrap</span>(),
@@ -913,7 +914,7 @@
     }
 
     <span class="doccomment">/// Take the 2&#39;s complement of values in the interval.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">int_2_comp</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">int_2_comp</span>(<span class="self">self</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">if</span> <span class="self">self</span>
             .<span class="ident">start</span>
             .<span class="ident">checked_sgt</span>(<span class="kw-2">&amp;</span><span class="ident">Bitvector::signed_min_value</span>(<span class="self">self</span>.<span class="ident">bytesize</span>().<span class="ident">into</span>()))
@@ -931,8 +932,8 @@
 
     <span class="doccomment">/// Compute the bitwise negation of values in the interval.</span>
     <span class="doccomment">/// Only exact if there is exactly one value in the interval.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">bitwise_not</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">start</span> <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">end</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">bitwise_not</span>(<span class="self">self</span>) -&gt; <span class="self">Self</span> {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">start</span> <span class="op">==</span> <span class="self">self</span>.<span class="ident">end</span> {
             <span class="self">self</span>.<span class="ident">start</span>.<span class="ident">into_bitnot</span>().<span class="ident">into</span>()
         } <span class="kw">else</span> {
             <span class="ident">Interval::new_top</span>(<span class="self">self</span>.<span class="ident">bytesize</span>())
@@ -941,7 +942,7 @@
 
     <span class="doccomment">/// Compute the interval of possible results</span>
     <span class="doccomment">/// if one adds a value from `self` to a value from `rhs`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="ident">Interval</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Interval</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="ident">Interval</span>) -&gt; <span class="ident">Interval</span> {
         <span class="kw">if</span> <span class="kw">let</span> (<span class="prelude-val">Some</span>(<span class="ident">start</span>), <span class="prelude-val">Some</span>(<span class="ident">end</span>)) <span class="op">=</span> (
             <span class="self">self</span>.<span class="ident">start</span>.<span class="ident">signed_add_overflow_checked</span>(<span class="kw-2">&amp;</span><span class="ident">rhs</span>.<span class="ident">start</span>),
             <span class="self">self</span>.<span class="ident">end</span>.<span class="ident">signed_add_overflow_checked</span>(<span class="kw-2">&amp;</span><span class="ident">rhs</span>.<span class="ident">end</span>),
@@ -958,7 +959,7 @@
 
     <span class="doccomment">/// Compute the interval of possible results</span>
     <span class="doccomment">/// if one subtracts a value in `rhs` from a value in `self`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">sub</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="ident">Interval</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Interval</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">sub</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="ident">Interval</span>) -&gt; <span class="ident">Interval</span> {
         <span class="kw">if</span> <span class="kw">let</span> (<span class="prelude-val">Some</span>(<span class="ident">start</span>), <span class="prelude-val">Some</span>(<span class="ident">end</span>)) <span class="op">=</span> (
             <span class="self">self</span>.<span class="ident">start</span>.<span class="ident">signed_sub_overflow_checked</span>(<span class="kw-2">&amp;</span><span class="ident">rhs</span>.<span class="ident">end</span>),
             <span class="self">self</span>.<span class="ident">end</span>.<span class="ident">signed_sub_overflow_checked</span>(<span class="kw-2">&amp;</span><span class="ident">rhs</span>.<span class="ident">start</span>),
@@ -975,7 +976,7 @@
 
     <span class="doccomment">/// Compute the interval of possible results</span>
     <span class="doccomment">/// if one multiplies a value in `self` with a value in `rhs`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">signed_mul</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="ident">Interval</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Interval</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">signed_mul</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="ident">Interval</span>) -&gt; <span class="ident">Interval</span> {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">bytesize</span>().<span class="ident">as_bit_length</span>() <span class="op">&gt;</span> <span class="number">64</span> {
             <span class="kw">return</span> <span class="ident">Interval::new_top</span>(<span class="self">self</span>.<span class="ident">bytesize</span>());
         }
@@ -1001,13 +1002,13 @@
 
     <span class="doccomment">/// Return `true` if `bitvec` is contained in the strided interval.</span>
     <span class="doccomment">/// Panics if the interval and `bitvec` have different bytesizes.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">bitvec</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">start</span> <span class="op">=</span><span class="op">=</span> <span class="kw-2">*</span><span class="ident">bitvec</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">bitvec</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>) -&gt; <span class="ident">bool</span> {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">start</span> <span class="op">==</span> <span class="kw-2">*</span><span class="ident">bitvec</span> {
             <span class="kw">return</span> <span class="bool-val">true</span>;
         }
         <span class="self">self</span>.<span class="ident">start</span>.<span class="ident">checked_sle</span>(<span class="ident">bitvec</span>).<span class="ident">unwrap</span>() <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">end</span>.<span class="ident">checked_sge</span>(<span class="ident">bitvec</span>).<span class="ident">unwrap</span>() <span class="op">&amp;&amp;</span> {
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">diff</span>) <span class="op">=</span> (<span class="ident">bitvec</span> <span class="op">-</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">start</span>).<span class="ident">try_to_u64</span>() {
-                <span class="self">self</span>.<span class="ident">stride</span> <span class="op">&gt;</span> <span class="number">0</span> <span class="op">&amp;&amp;</span> <span class="ident">diff</span> <span class="op">%</span> <span class="self">self</span>.<span class="ident">stride</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span>
+                <span class="self">self</span>.<span class="ident">stride</span> <span class="op">&gt;</span> <span class="number">0</span> <span class="op">&amp;&amp;</span> <span class="ident">diff</span> <span class="op">%</span> <span class="self">self</span>.<span class="ident">stride</span> <span class="op">==</span> <span class="number">0</span>
             } <span class="kw">else</span> {
                 <span class="bool-val">true</span>
             }
@@ -1017,7 +1018,7 @@
 
 <span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Bitvector</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Interval</span> {
     <span class="doccomment">/// Create an interval that only contains the given bitvector.</span>
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">bitvec</span>: <span class="ident">Bitvector</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">bitvec</span>: <span class="ident">Bitvector</span>) -&gt; <span class="self">Self</span> {
         <span class="ident">Interval</span> {
             <span class="ident">start</span>: <span class="ident">bitvec</span>.<span class="ident">clone</span>(),
             <span class="ident">end</span>: <span class="ident">bitvec</span>,
@@ -1027,7 +1028,7 @@
 }
 
 <span class="doccomment">/// Helper function returning the (signed) minimum of two bitvectors.</span>
-<span class="kw">fn</span> <span class="ident">signed_min</span>(<span class="ident">v1</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>, <span class="ident">v2</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Bitvector</span> {
+<span class="kw">fn</span> <span class="ident">signed_min</span>(<span class="ident">v1</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>, <span class="ident">v2</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>) -&gt; <span class="ident">Bitvector</span> {
     <span class="kw">if</span> <span class="ident">v1</span>.<span class="ident">checked_sle</span>(<span class="ident">v2</span>).<span class="ident">unwrap</span>() {
         <span class="ident">v1</span>.<span class="ident">clone</span>()
     } <span class="kw">else</span> {
@@ -1036,7 +1037,7 @@
 }
 
 <span class="doccomment">/// Helper function returning the (signed) maximum of two bitvectors.</span>
-<span class="kw">fn</span> <span class="ident">signed_max</span>(<span class="ident">v1</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>, <span class="ident">v2</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Bitvector</span> {
+<span class="kw">fn</span> <span class="ident">signed_max</span>(<span class="ident">v1</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>, <span class="ident">v2</span>: <span class="kw-2">&amp;</span><span class="ident">Bitvector</span>) -&gt; <span class="ident">Bitvector</span> {
     <span class="kw">if</span> <span class="ident">v1</span>.<span class="ident">checked_sge</span>(<span class="ident">v2</span>).<span class="ident">unwrap</span>() {
         <span class="ident">v1</span>.<span class="ident">clone</span>()
     } <span class="kw">else</span> {
@@ -1051,8 +1052,8 @@
 <span class="doccomment">/// ```txt</span>
 <span class="doccomment">/// gcd = x*a + y*b</span>
 <span class="doccomment">/// ```</span>
-<span class="kw">fn</span> <span class="ident">extended_gcd</span>(<span class="ident">a</span>: <span class="ident">i128</span>, <span class="ident">b</span>: <span class="ident">i128</span>) <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">i128</span>, <span class="ident">i128</span>, <span class="ident">i128</span>) {
-    <span class="kw">if</span> <span class="ident">a</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
+<span class="kw">fn</span> <span class="ident">extended_gcd</span>(<span class="ident">a</span>: <span class="ident">i128</span>, <span class="ident">b</span>: <span class="ident">i128</span>) -&gt; (<span class="ident">i128</span>, <span class="ident">i128</span>, <span class="ident">i128</span>) {
+    <span class="kw">if</span> <span class="ident">a</span> <span class="op">==</span> <span class="number">0</span> {
         (<span class="ident">b</span>, <span class="number">0</span>, <span class="number">1</span>)
     } <span class="kw">else</span> {
         <span class="kw">let</span> (<span class="ident">g</span>, <span class="ident">left_inverse</span>, <span class="ident">right_inverse</span>) <span class="op">=</span> <span class="ident">extended_gcd</span>(<span class="ident">b</span> <span class="op">%</span> <span class="ident">a</span>, <span class="ident">a</span>);
@@ -1069,17 +1070,17 @@
 <span class="kw">fn</span> <span class="ident">compute_intersection_residue_class</span>(
     <span class="ident">interval_left</span>: <span class="kw-2">&amp;</span><span class="ident">Interval</span>,
     <span class="ident">interval_right</span>: <span class="kw-2">&amp;</span><span class="ident">Interval</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">u64</span>, <span class="ident">u64</span>)<span class="op">&gt;</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
+) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">u64</span>, <span class="ident">u64</span>)<span class="op">&gt;</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
     <span class="kw">match</span> (<span class="ident">interval_left</span>.<span class="ident">stride</span>, <span class="ident">interval_right</span>.<span class="ident">stride</span>) {
-        (<span class="number">0</span>, <span class="number">0</span>) <span class="op">=</span><span class="op">&gt;</span> {
+        (<span class="number">0</span>, <span class="number">0</span>) =&gt; {
             <span class="comment">// both intervals contain exactly one value</span>
-            <span class="kw">if</span> <span class="ident">interval_left</span>.<span class="ident">start</span> <span class="op">=</span><span class="op">=</span> <span class="ident">interval_right</span>.<span class="ident">start</span> {
+            <span class="kw">if</span> <span class="ident">interval_left</span>.<span class="ident">start</span> <span class="op">==</span> <span class="ident">interval_right</span>.<span class="ident">start</span> {
                 <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>((<span class="number">0</span>, <span class="number">0</span>)));
             } <span class="kw">else</span> {
                 <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>);
             }
         }
-        (<span class="number">0</span>, <span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> {
+        (<span class="number">0</span>, <span class="kw">_</span>) =&gt; {
             <span class="kw">if</span> <span class="ident">interval_right</span>.<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">interval_left</span>.<span class="ident">start</span>) {
                 <span class="kw">let</span> <span class="ident">stride</span> <span class="op">=</span> <span class="ident">interval_right</span>.<span class="ident">stride</span> <span class="kw">as</span> <span class="ident">i128</span>;
                 <span class="kw">let</span> <span class="ident">remainder</span> <span class="op">=</span> <span class="ident">interval_right</span>.<span class="ident">start</span>.<span class="ident">try_to_i128</span>()<span class="question-mark">?</span> <span class="op">%</span> <span class="ident">stride</span>;
@@ -1089,7 +1090,7 @@
                 <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>);
             }
         }
-        (<span class="kw">_</span>, <span class="number">0</span>) <span class="op">=</span><span class="op">&gt;</span> {
+        (<span class="kw">_</span>, <span class="number">0</span>) =&gt; {
             <span class="kw">if</span> <span class="ident">interval_left</span>.<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">interval_right</span>.<span class="ident">start</span>) {
                 <span class="kw">let</span> <span class="ident">stride</span> <span class="op">=</span> <span class="ident">interval_left</span>.<span class="ident">stride</span> <span class="kw">as</span> <span class="ident">i128</span>;
                 <span class="kw">let</span> <span class="ident">remainder</span> <span class="op">=</span> <span class="ident">interval_left</span>.<span class="ident">start</span>.<span class="ident">try_to_i128</span>()<span class="question-mark">?</span> <span class="op">%</span> <span class="ident">stride</span>;
@@ -1099,7 +1100,7 @@
                 <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>);
             }
         }
-        <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> (),
+        <span class="kw">_</span> =&gt; (),
     }
     <span class="comment">// We compute everything in i128 to reduce the likelihood of integer overflows.</span>
     <span class="kw">let</span> (<span class="ident">stride_left</span>, <span class="ident">stride_right</span>) <span class="op">=</span> (<span class="ident">interval_left</span>.<span class="ident">stride</span> <span class="kw">as</span> <span class="ident">i128</span>, <span class="ident">interval_right</span>.<span class="ident">stride</span> <span class="kw">as</span> <span class="ident">i128</span>);
@@ -1138,10 +1139,10 @@
         <span class="comment">// Since we cannot rule out integer overflows for all possible inputs,</span>
         <span class="comment">// we need to check the correctness of the result.</span>
         <span class="kw">if</span> <span class="ident">lcm</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">u64::MAX</span> <span class="kw">as</span> <span class="ident">i128</span>
-            <span class="op">&amp;&amp;</span> <span class="ident">lcm</span> <span class="op">%</span> <span class="ident">stride_left</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span>
-            <span class="op">&amp;&amp;</span> <span class="ident">lcm</span> <span class="op">%</span> <span class="ident">stride_right</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span>
-            <span class="op">&amp;&amp;</span> (<span class="ident">base_left</span> <span class="op">-</span> <span class="ident">residue_class</span>) <span class="op">%</span> <span class="ident">stride_left</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span>
-            <span class="op">&amp;&amp;</span> (<span class="ident">base_right</span> <span class="op">-</span> <span class="ident">residue_class</span>) <span class="op">%</span> <span class="ident">stride_right</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span>
+            <span class="op">&amp;&amp;</span> <span class="ident">lcm</span> <span class="op">%</span> <span class="ident">stride_left</span> <span class="op">==</span> <span class="number">0</span>
+            <span class="op">&amp;&amp;</span> <span class="ident">lcm</span> <span class="op">%</span> <span class="ident">stride_right</span> <span class="op">==</span> <span class="number">0</span>
+            <span class="op">&amp;&amp;</span> (<span class="ident">base_left</span> <span class="op">-</span> <span class="ident">residue_class</span>) <span class="op">%</span> <span class="ident">stride_left</span> <span class="op">==</span> <span class="number">0</span>
+            <span class="op">&amp;&amp;</span> (<span class="ident">base_right</span> <span class="op">-</span> <span class="ident">residue_class</span>) <span class="op">%</span> <span class="ident">stride_right</span> <span class="op">==</span> <span class="number">0</span>
         {
             <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>((<span class="ident">lcm</span> <span class="kw">as</span> <span class="ident">u64</span>, <span class="ident">residue_class</span> <span class="kw">as</span> <span class="ident">u64</span>)))
         } <span class="kw">else</span> {
@@ -1154,6 +1155,6 @@
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
 <span class="kw">mod</span> <span class="ident">tests</span>;
-</pre></div>
-</section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="cwe_checker_lib" data-search-index-js="../../../../search-index.js" data-search-js="../../../../search.js"></div>
-    <script src="../../../../main.js"></script><script src="../../../../source-script.js"></script><script src="../../../../source-files.js"></script></body></html>
+</code></pre></div>
+</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="cwe_checker_lib" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.60.0 (7737e0b5c 2022-04-04)" ></div>
+</body></html>

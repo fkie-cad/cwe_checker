@@ -1,0 +1,46 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="This module implements a check for CWE-119: Buffer Overflow and its variants CWE-125: Out-of-bounds Read and CWE-787: Out-of-bounds Write."><meta name="keywords" content="rust, rustlang, rust-lang, cwe_119"><title>cwe_checker_lib::checkers::cwe_119 - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><script defer src="../../../main.js"></script>
+    <noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../cwe_checker_lib/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../../cwe_checker_lib/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"><a href="#">Module cwe_119</a></h2><div class="sidebar-elems"><section><div class="block"><ul><li><a href="#statics">Statics</a></li><li><a href="#functions">Functions</a></li></ul></div></section><div id="sidebar-vars" data-name="cwe_119" data-ty="mod" data-relpath="./"></div><script defer src="./sidebar-items.js"></script></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../cwe_checker_lib/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><div class="theme-picker hidden"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="22" height="22" alt="Pick another theme!" src="../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
+    <h1 class="fqn"><span class="in-band">Module <a href="../../index.html">cwe_checker_lib</a>::<wbr><a href="../index.html">checkers</a>::<wbr><a class="mod" href="#">cwe_119</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../../src/cwe_checker_lib/checkers/cwe_119/mod.rs.html#1-90">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>This module implements a check for CWE-119: Buffer Overflow
+and its variants CWE-125: Out-of-bounds Read and CWE-787: Out-of-bounds Write.</p>
+<p>Arrays or buffers of any kind are often accessed through indices.
+If the index of an access is outside of the bounds of the buffer this can lead to severe consequences.
+In the case of out-of-bounds read accesses this often leads to exposure of sensitive information to an attacker.
+Out-of-bounds write accesses can often be used to hijack the control flow of a program
+and thus may lead to arbitrary code execution.</p>
+<p>See <a href="https://cwe.mitre.org/data/definitions/119.html">https://cwe.mitre.org/data/definitions/119.html</a> for a detailed description.</p>
+<h3 id="how-the-check-works"><a href="#how-the-check-works">How the check works</a></h3>
+<p>The check uses the results of the <a href="../../analysis/pointer_inference/index.html">Pointer Inference analysis</a>
+to check whether any memory accesses may point outside of the bounds of the corresponding memory objects.
+For this the results of the Pointer Inference analysis are aggregated interprocedurally.
+Additionally, the check uses a lightweight intraprocedural dataflow fixpoint computation
+to ensure that for each memory object only the first access outside of its bounds is flagged as a CWE.</p>
+<h3 id="false-positives"><a href="#false-positives">False Positives</a></h3>
+<ul>
+<li>Any analysis imprecision of the Pointer Inference analysis may lead to false positive results in this check.</li>
+<li>If no exact bounds for a memory object could be inferred then the strictest bounds found are used,
+which can lead to false positive warnings.</li>
+</ul>
+<h3 id="false-negatives"><a href="#false-negatives">False Negatives</a></h3>
+<ul>
+<li>In cases where the Pointer Inference analysis could not infer any bounds at all for the memory object or the access index
+this check generally assumes analysis imprecision as the culprit and will not flag them as CWEs.
+This leads to false negatives, especially in cases where the bounds directly depend on user input.</li>
+<li>The Pointer Inference analysis cannot distinguish different objects located on the same stack frame.
+Thus buffer overflows on the stack can only be detected if they may reach outside of the whole stack frame.
+This leads to false negatives, especially for buffer overflows caused by off-by-one bugs.</li>
+<li>For parameters of extern function calls the check only checks whether the parameter itself may point outside of the boundaries of a memory object.
+But since we generally do not know what size the called function expects the pointed-to object to have
+this still may miss buffer overflows occuring in the called function.</li>
+<li>Right now the check only considers buffers on the stack or the heap, but not buffers in global memory.
+Thus corresponding overflows of buffers in global memory are not detected.</li>
+</ul>
+</div></details><h2 id="statics" class="small-section-header"><a href="#statics">Statics</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="static" href="static.CWE_MODULE.html" title="cwe_checker_lib::checkers::cwe_119::CWE_MODULE static">CWE_MODULE</a></div><div class="item-right docblock-short"><p>The module name and version</p>
+</div></div></div><h2 id="functions" class="small-section-header"><a href="#functions">Functions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.check_cwe.html" title="cwe_checker_lib::checkers::cwe_119::check_cwe fn">check_cwe</a></div><div class="item-right docblock-short"><p>Run the check for CWE-119: Buffer Overflows.</p>
+</div></div></div></section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="cwe_checker_lib" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.60.0 (7737e0b5c 2022-04-04)" ></div>
+</body></html>

@@ -1,7 +1,9 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/analysis/pointer_inference/mod.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mod.rs - source</title><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../../storage.js"></script><script src="../../../../crates.js"></script><noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg">
-<link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../../../cwe_checker_lib/index.html'><div class='logo-container rust-logo'><img src='../../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
-                <a id="settings-menu" href="../../../../settings.html"><img src="../../../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/analysis/pointer_inference/mod.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mod.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script src="../../../../crates.js"></script><script defer src="../../../../main.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script>
+    <noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../../cwe_checker_lib/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../../../cwe_checker_lib/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../../cwe_checker_lib/index.html"><img class="rust-logo" src="../../../../rust-logo.svg" alt="logo"></a><nav class="sub"><div class="theme-picker hidden"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="22" height="22" alt="Pick another theme!" src="../../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
 <span id="4">  4</span>
@@ -496,54 +498,23 @@
 <span id="493">493</span>
 <span id="494">494</span>
 <span id="495">495</span>
-<span id="496">496</span>
-<span id="497">497</span>
-<span id="498">498</span>
-<span id="499">499</span>
-<span id="500">500</span>
-<span id="501">501</span>
-<span id="502">502</span>
-<span id="503">503</span>
-<span id="504">504</span>
-<span id="505">505</span>
-<span id="506">506</span>
-<span id="507">507</span>
-<span id="508">508</span>
-<span id="509">509</span>
-<span id="510">510</span>
-<span id="511">511</span>
-<span id="512">512</span>
-<span id="513">513</span>
-<span id="514">514</span>
-<span id="515">515</span>
-<span id="516">516</span>
-<span id="517">517</span>
-<span id="518">518</span>
-<span id="519">519</span>
-<span id="520">520</span>
-<span id="521">521</span>
-<span id="522">522</span>
-<span id="523">523</span>
-<span id="524">524</span>
-</pre><div class="example-wrap"><pre class="rust ">
-<span class="doccomment">//! A fixpoint algorithm analyzing all memory accesses in a program.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! A fixpoint algorithm analyzing all memory accesses in a program.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! The goal of the pointer inference analysis is to keep track of all memory objects and pointers</span>
 <span class="doccomment">//! that the program knows about at specific program points during execution.</span>
+<span class="doccomment">//! It is a combination of a points-to-analysis and a value-set-analysis.</span>
+<span class="doccomment">//! The results of the pointer inference analysis are made available to other analyses,</span>
+<span class="doccomment">//! which can use them to look up points-to and value set information.</span>
+<span class="doccomment">//!</span>
 <span class="doccomment">//! If the **Memory** check is enabled,</span>
-<span class="doccomment">//! then the analysis also detects and reports possible memory management errors,</span>
-<span class="doccomment">//! like &quot;Use after free&quot;-errors, to the user.</span>
-<span class="doccomment">//! The result of the pointer inference analysis is also used as input for other analyses,</span>
-<span class="doccomment">//! which allows them to keep track of memory objects and pointers.</span>
+<span class="doccomment">//! then the analysis also reports some possible memory management errors,</span>
+<span class="doccomment">//! like Null pointer dereferences, to the user.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! ## The Memory Check</span>
 <span class="doccomment">//!</span>
-<span class="doccomment">//! If the **Memory** check is enabled, the pointer inference detects instances of the following CWEs:</span>
-<span class="doccomment">//! - [CWE-119](https://cwe.mitre.org/data/definitions/119.html) Buffer Overflow (generic case)</span>
-<span class="doccomment">//! - [CWE-125](https://cwe.mitre.org/data/definitions/125.html) Buffer Overflow: Out-of-bounds Read</span>
-<span class="doccomment">//! - [CWE-415](https://cwe.mitre.org/data/definitions/415.html): Double Free</span>
-<span class="doccomment">//! - [CWE-416](https://cwe.mitre.org/data/definitions/416.html): Use After Free</span>
-<span class="doccomment">//! - [CWE-787](https://cwe.mitre.org/data/definitions/787.html): Buffer Overflow: Out-of-bounds Write</span>
+<span class="doccomment">//! If the **Memory** check is enabled, the pointer inference reports instances</span>
+<span class="doccomment">//! of [CWE-476](https://cwe.mitre.org/data/definitions/476.html) (NULL Pointer Dereference)</span>
+<span class="doccomment">//! that were detected during the analysis.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! The analysis operates on a best-effort basis.</span>
 <span class="doccomment">//! In cases where we cannot know</span>
@@ -553,26 +524,25 @@
 <span class="doccomment">//!</span>
 <span class="doccomment">//! See the `Config` struct for configurable analysis parameters.</span>
 
-<span class="kw">use</span> <span class="kw">super</span><span class="ident">::fixpoint::Computation</span>;
-<span class="kw">use</span> <span class="kw">super</span><span class="ident">::forward_interprocedural_fixpoint::GeneralizedContext</span>;
-<span class="kw">use</span> <span class="kw">super</span><span class="ident">::interprocedural_fixpoint_generic::NodeValue</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::analysis::graph</span>::{<span class="ident">Graph</span>, <span class="ident">Node</span>};
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::intermediate_representation</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::prelude</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::utils::log</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::{
-    <span class="ident">abstract_domain</span>::{<span class="ident">DataDomain</span>, <span class="ident">IntervalDomain</span>},
-    <span class="ident">utils::binary::RuntimeMemoryImage</span>,
-};
+<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::fixpoint::Computation</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::forward_interprocedural_fixpoint::GeneralizedContext</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::interprocedural_fixpoint_generic::NodeValue</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::abstract_domain</span>::{<span class="ident">AbstractIdentifier</span>, <span class="ident">DataDomain</span>, <span class="ident">IntervalDomain</span>, <span class="ident">SizedDomain</span>};
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::analysis::forward_interprocedural_fixpoint::Context</span> <span class="kw">as</span> <span class="kw">_</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::analysis::graph</span>::{<span class="ident">Graph</span>, <span class="ident">Node</span>};
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::intermediate_representation</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::prelude</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::utils::log</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">petgraph::graph::NodeIndex</span>;
 <span class="kw">use</span> <span class="ident">petgraph::visit::IntoNodeReferences</span>;
-<span class="kw">use</span> <span class="ident">petgraph::Direction</span>;
-<span class="kw">use</span> <span class="ident">std::collections::HashMap</span>;
+<span class="kw">use</span> <span class="ident">std::collections</span>::{<span class="ident">BTreeMap</span>, <span class="ident">HashMap</span>};
 
 <span class="kw">mod</span> <span class="ident">context</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">object</span>;
 <span class="kw">mod</span> <span class="ident">object_list</span>;
 <span class="kw">mod</span> <span class="ident">state</span>;
+<span class="kw">mod</span> <span class="ident">statistics</span>;
+<span class="kw">mod</span> <span class="ident">vsa_result_impl</span>;
 
 <span class="kw">use</span> <span class="ident">context::Context</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">state::State</span>;
@@ -581,7 +551,7 @@
 <span class="kw">const</span> <span class="ident">VERSION</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;0.2&quot;</span>;
 
 <span class="doccomment">/// The name and version number of the &quot;Memory&quot; CWE check.</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">CWE_MODULE</span>: <span class="kw">crate</span><span class="ident">::CweModule</span> <span class="op">=</span> <span class="kw">crate</span><span class="ident">::CweModule</span> {
+<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">CWE_MODULE</span>: <span class="ident"><span class="kw">crate</span>::CweModule</span> <span class="op">=</span> <span class="ident"><span class="kw">crate</span>::CweModule</span> {
     <span class="ident">name</span>: <span class="string">&quot;Memory&quot;</span>,
     <span class="ident">version</span>: <span class="ident">VERSION</span>,
     <span class="ident">run</span>: <span class="ident">extract_pi_analysis_results</span>,
@@ -599,107 +569,101 @@
     <span class="doccomment">/// Names of extern functions that are `malloc`-like,</span>
     <span class="doccomment">/// i.e. the unique return value is a pointer to a newly allocated chunk of memory or a NULL pointer.</span>
     <span class="kw">pub</span> <span class="ident">allocation_symbols</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Names of extern functions that are `free`-like,</span>
-    <span class="doccomment">/// i.e. the memory chunk that the unique parameter of the function points to gets deallocated.</span>
-    <span class="doccomment">/// Note that the analysis currently does not detect mismatching allocation-deallocation pairs,</span>
-    <span class="doccomment">/// i.e. it cannot distinguish between memory allocated by `malloc` and memory allocated by `new`.</span>
-    <span class="kw">pub</span> <span class="ident">deallocation_symbols</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
 }
 
 <span class="doccomment">/// A wrapper struct for the pointer inference computation object.</span>
+<span class="doccomment">/// Also contains different analysis results computed through the fixpoint computation including generated log messages.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">PointerInference</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// The pointer inference fixpoint computation object.</span>
     <span class="ident">computation</span>: <span class="ident">Computation</span><span class="op">&lt;</span><span class="ident">GeneralizedContext</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">Context</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// A sender channel that can be used to collect logs in the corresponding log thread.</span>
     <span class="ident">log_collector</span>: <span class="ident">crossbeam_channel::Sender</span><span class="op">&lt;</span><span class="ident">LogThreadMsg</span><span class="op">&gt;</span>,
     <span class="doccomment">/// The log messages and CWE warnings that have been generated during the pointer inference analysis.</span>
     <span class="kw">pub</span> <span class="ident">collected_logs</span>: (<span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">LogMessage</span><span class="op">&gt;</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">CweWarning</span><span class="op">&gt;</span>),
+    <span class="doccomment">/// Maps the TIDs of assignment, load or store [`Def`] instructions to the computed value data.</span>
+    <span class="doccomment">/// The map will be filled after the fixpoint computation finished.</span>
+    <span class="ident">values_at_defs</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">Tid</span>, <span class="ident">Data</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// Maps the TIDs of load or store [`Def`] instructions to the computed address data.</span>
+    <span class="doccomment">/// The map will be filled after the fixpoint computation finished.</span>
+    <span class="ident">addresses_at_defs</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">Tid</span>, <span class="ident">Data</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// Maps certain TIDs like the TIDs of [`Jmp`] instructions to the pointer inference state at that TID.</span>
+    <span class="doccomment">/// The map will be filled after the fixpoint computation finished.</span>
+    <span class="ident">states_at_tids</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">Tid</span>, <span class="ident">State</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// Maps the TIDs of call instructions to a map mapping callee IDs to the corresponding value in the caller.</span>
+    <span class="doccomment">/// The map will be filled after the fixpoint computation finished.</span>
+    <span class="ident">id_renaming_maps_at_calls</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">Tid</span>, <span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">AbstractIdentifier</span>, <span class="ident">Data</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">PointerInference</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Generate a new pointer inference compuation for a project.</span>
+    <span class="doccomment">/// Generate a new pointer inference computation for a project.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-        <span class="ident">project</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Project</span>,
-        <span class="ident">runtime_memory_image</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">RuntimeMemoryImage</span>,
-        <span class="ident">control_flow_graph</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Graph</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>,
+        <span class="ident">analysis_results</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">AnalysisResults</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>,
         <span class="ident">config</span>: <span class="ident">Config</span>,
         <span class="ident">log_sender</span>: <span class="ident">crossbeam_channel::Sender</span><span class="op">&lt;</span><span class="ident">LogThreadMsg</span><span class="op">&gt;</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PointerInference</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">context</span> <span class="op">=</span> <span class="ident">Context::new</span>(
-            <span class="ident">project</span>,
-            <span class="ident">runtime_memory_image</span>,
-            <span class="ident">control_flow_graph</span>,
-            <span class="ident">config</span>,
-            <span class="ident">log_sender</span>.<span class="ident">clone</span>(),
-        );
+        <span class="ident">print_stats</span>: <span class="ident">bool</span>,
+    ) -&gt; <span class="ident">PointerInference</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">context</span> <span class="op">=</span> <span class="ident">Context::new</span>(<span class="ident">analysis_results</span>, <span class="ident">config</span>, <span class="ident">log_sender</span>.<span class="ident">clone</span>());
+        <span class="kw">let</span> <span class="ident">project</span> <span class="op">=</span> <span class="ident">analysis_results</span>.<span class="ident">project</span>;
+        <span class="kw">let</span> <span class="ident">function_signatures</span> <span class="op">=</span> <span class="ident">analysis_results</span>.<span class="ident">function_signatures</span>.<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">sub_to_entry_node_map</span> <span class="op">=</span> <span class="ident"><span class="kw">crate</span>::analysis::graph::get_entry_nodes_of_subs</span>(<span class="ident">context</span>.<span class="ident">graph</span>);
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">entry_sub_to_entry_blocks_map</span> <span class="op">=</span> <span class="ident">HashMap::new</span>();
-        <span class="kw">let</span> <span class="ident">subs</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">Tid</span>, <span class="kw-2">&amp;</span><span class="ident">Term</span><span class="op">&lt;</span><span class="ident">Sub</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">project</span>
-            .<span class="ident">program</span>
-            .<span class="ident">term</span>
-            .<span class="ident">subs</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">sub</span><span class="op">|</span> (<span class="ident">sub</span>.<span class="ident">tid</span>.<span class="ident">clone</span>(), <span class="ident">sub</span>))
-            .<span class="ident">collect</span>();
-        <span class="kw">for</span> <span class="ident">sub_tid</span> <span class="kw">in</span> <span class="ident">project</span>.<span class="ident">program</span>.<span class="ident">term</span>.<span class="ident">entry_points</span>.<span class="ident">iter</span>() {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">sub</span>) <span class="op">=</span> <span class="ident">subs</span>.<span class="ident">get</span>(<span class="ident">sub_tid</span>) {
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">entry_block</span>) <span class="op">=</span> <span class="ident">sub</span>.<span class="ident">term</span>.<span class="ident">blocks</span>.<span class="ident">get</span>(<span class="number">0</span>) {
-                    <span class="ident">entry_sub_to_entry_blocks_map</span>.<span class="ident">insert</span>(<span class="ident">sub_tid</span>, <span class="ident">entry_block</span>.<span class="ident">tid</span>.<span class="ident">clone</span>());
-                }
-            }
-        }
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tid_to_graph_indices_map</span> <span class="op">=</span> <span class="ident">HashMap::new</span>();
-        <span class="kw">for</span> <span class="ident">node</span> <span class="kw">in</span> <span class="ident">context</span>.<span class="ident">graph</span>.<span class="ident">node_indices</span>() {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="kw">super</span><span class="ident">::graph::Node::BlkStart</span>(<span class="ident">block</span>, <span class="ident">sub</span>) <span class="op">=</span> <span class="ident">context</span>.<span class="ident">graph</span>[<span class="ident">node</span>] {
-                <span class="ident">tid_to_graph_indices_map</span>.<span class="ident">insert</span>((<span class="ident">block</span>.<span class="ident">tid</span>.<span class="ident">clone</span>(), <span class="ident">sub</span>.<span class="ident">tid</span>.<span class="ident">clone</span>()), <span class="ident">node</span>);
-            }
-        }
-        <span class="kw">let</span> <span class="ident">entry_sub_to_entry_node_map</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">Tid</span>, <span class="ident">NodeIndex</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">entry_sub_to_entry_blocks_map</span>
-            .<span class="ident">into_iter</span>()
-            .<span class="ident">filter_map</span>(<span class="op">|</span>(<span class="ident">sub_tid</span>, <span class="ident">block_tid</span>)<span class="op">|</span> {
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">start_node_index</span>) <span class="op">=</span>
-                    <span class="ident">tid_to_graph_indices_map</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span>(<span class="ident">block_tid</span>, <span class="ident">sub_tid</span>.<span class="ident">clone</span>()))
-                {
-                    <span class="comment">// We only add entry points that are also control flow graph roots</span>
-                    <span class="kw">if</span> <span class="ident">context</span>
-                        .<span class="ident">graph</span>
-                        .<span class="ident">neighbors_directed</span>(<span class="kw-2">*</span><span class="ident">start_node_index</span>, <span class="ident">Direction::Incoming</span>)
-                        .<span class="ident">next</span>()
-                        .<span class="ident">is_none</span>()
-                    {
-                        <span class="prelude-val">Some</span>((<span class="ident">sub_tid</span>.<span class="ident">clone</span>(), <span class="kw-2">*</span><span class="ident">start_node_index</span>))
-                    } <span class="kw">else</span> {
-                        <span class="prelude-val">None</span>
-                    }
-                } <span class="kw">else</span> {
-                    <span class="prelude-val">None</span>
-                }
-            })
-            .<span class="ident">collect</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">fixpoint_computation</span> <span class="op">=</span>
-            <span class="kw">super</span><span class="ident">::forward_interprocedural_fixpoint::create_computation</span>(<span class="ident">context</span>, <span class="prelude-val">None</span>);
-        <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">log_sender</span>.<span class="ident">send</span>(<span class="ident">LogThreadMsg::Log</span>(<span class="ident">LogMessage::new_debug</span>(<span class="macro">format!</span>(
-            <span class="string">&quot;Pointer Inference: Adding {} entry points&quot;</span>,
-            <span class="ident">entry_sub_to_entry_node_map</span>.<span class="ident">len</span>()
-        ))));
-        <span class="kw">for</span> (<span class="ident">sub_tid</span>, <span class="ident">start_node_index</span>) <span class="kw">in</span> <span class="ident">entry_sub_to_entry_node_map</span>.<span class="ident">into_iter</span>() {
+            <span class="ident"><span class="kw">super</span>::forward_interprocedural_fixpoint::create_computation_with_alternate_worklist_order</span>(<span class="ident">context</span>, <span class="prelude-val">None</span>);
+        <span class="kw">if</span> <span class="ident">print_stats</span> {
+            <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">log_sender</span>.<span class="ident">send</span>(<span class="ident">LogThreadMsg::Log</span>(
+                <span class="ident">LogMessage::new_info</span>(<span class="macro">format!</span>(
+                    <span class="string">&quot;Adding {} entry points&quot;</span>,
+                    <span class="ident">sub_to_entry_node_map</span>.<span class="ident">len</span>()
+                ))
+                .<span class="ident">source</span>(<span class="string">&quot;Pointer Inference&quot;</span>),
+            ));
+        }
+        <span class="kw">for</span> (<span class="ident">sub_tid</span>, <span class="ident">start_node_index</span>) <span class="kw">in</span> <span class="ident">sub_to_entry_node_map</span>.<span class="ident">into_iter</span>() {
+            <span class="kw">let</span> <span class="ident">fn_signature</span> <span class="op">=</span> <span class="ident">function_signatures</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">sub_tid</span>).<span class="ident">unwrap</span>();
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">fn_entry_state</span> <span class="op">=</span> <span class="ident">State::from_fn_sig</span>(
+                <span class="ident">fn_signature</span>,
+                <span class="kw-2">&amp;</span><span class="ident">project</span>.<span class="ident">stack_pointer_register</span>,
+                <span class="ident">sub_tid</span>.<span class="ident">clone</span>(),
+            );
+            <span class="kw">if</span> <span class="ident">project</span>.<span class="ident">cpu_architecture</span>.<span class="ident">contains</span>(<span class="string">&quot;MIPS&quot;</span>) {
+                <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">fn_entry_state</span>
+                    .<span class="ident">set_mips_link_register</span>(<span class="kw-2">&amp;</span><span class="ident">sub_tid</span>, <span class="ident">project</span>.<span class="ident">stack_pointer_register</span>.<span class="ident">size</span>);
+            }
             <span class="ident">fixpoint_computation</span>.<span class="ident">set_node_value</span>(
                 <span class="ident">start_node_index</span>,
-                <span class="kw">super</span><span class="ident">::interprocedural_fixpoint_generic::NodeValue::Value</span>(<span class="ident">State::new</span>(
-                    <span class="kw-2">&amp;</span><span class="ident">project</span>.<span class="ident">stack_pointer_register</span>,
-                    <span class="ident">sub_tid</span>,
-                )),
+                <span class="ident"><span class="kw">super</span>::interprocedural_fixpoint_generic::NodeValue::Value</span>(<span class="ident">fn_entry_state</span>),
             );
         }
         <span class="ident">PointerInference</span> {
             <span class="ident">computation</span>: <span class="ident">fixpoint_computation</span>,
             <span class="ident">log_collector</span>: <span class="ident">log_sender</span>,
             <span class="ident">collected_logs</span>: (<span class="ident">Vec::new</span>(), <span class="ident">Vec::new</span>()),
+            <span class="ident">values_at_defs</span>: <span class="ident">HashMap::new</span>(),
+            <span class="ident">addresses_at_defs</span>: <span class="ident">HashMap::new</span>(),
+            <span class="ident">states_at_tids</span>: <span class="ident">HashMap::new</span>(),
+            <span class="ident">id_renaming_maps_at_calls</span>: <span class="ident">HashMap::new</span>(),
         }
     }
 
     <span class="doccomment">/// Compute the fixpoint of the pointer inference analysis.</span>
     <span class="doccomment">/// Has a `max_steps` bound for the fixpoint algorithm to prevent infinite loops.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">compute</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// If `print_stats` is `true` then some extra log messages with statistics about the computation are generated.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">compute</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">print_stats</span>: <span class="ident">bool</span>) {
         <span class="self">self</span>.<span class="ident">computation</span>.<span class="ident">compute_with_max_steps</span>(<span class="number">100</span>); <span class="comment">// TODO: make max_steps configurable!</span>
+        <span class="kw">if</span> <span class="ident">print_stats</span> {
+            <span class="self">self</span>.<span class="ident">count_blocks_with_state</span>();
+        }
+        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">computation</span>.<span class="ident">has_stabilized</span>() {
+            <span class="kw">let</span> <span class="ident">worklist_size</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">computation</span>.<span class="ident">get_worklist</span>().<span class="ident">len</span>();
+            <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">log_info</span>(<span class="macro">format!</span>(
+                <span class="string">&quot;Fixpoint did not stabilize. Remaining worklist size: {}&quot;</span>,
+                <span class="ident">worklist_size</span>,
+            ));
+        }
+        <span class="kw">if</span> <span class="ident">print_stats</span> {
+            <span class="ident">statistics::compute_and_log_mem_access_stats</span>(<span class="self">self</span>);
+        }
     }
 
     <span class="doccomment">/// Print results serialized as YAML to stdout</span>
@@ -722,7 +686,7 @@
     <span class="doccomment">/// Generate a compacted json representation of the results.</span>
     <span class="doccomment">/// Note that this output cannot be used for serialization/deserialization,</span>
     <span class="doccomment">/// but is only intended for user output and debugging.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">generate_compact_json</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">serde_json::Value</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">generate_compact_json</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">serde_json::Value</span> {
         <span class="kw">let</span> <span class="ident">graph</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">computation</span>.<span class="ident">get_graph</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">json_nodes</span> <span class="op">=</span> <span class="ident">serde_json::Map::new</span>();
         <span class="kw">for</span> (<span class="ident">node_index</span>, <span class="ident">node_value</span>) <span class="kw">in</span> <span class="self">self</span>.<span class="ident">computation</span>.<span class="ident">node_values</span>().<span class="ident">iter</span>() {
@@ -742,81 +706,20 @@
     }
 
     <span class="doccomment">/// Get the underlying graph of the computation.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_graph</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">Graph</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_graph</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">Graph</span> {
         <span class="self">self</span>.<span class="ident">computation</span>.<span class="ident">get_graph</span>()
     }
 
     <span class="doccomment">/// Get the context object of the computation.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_context</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">Context</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_context</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">Context</span> {
         <span class="self">self</span>.<span class="ident">computation</span>.<span class="ident">get_context</span>().<span class="ident">get_context</span>()
     }
 
     <span class="doccomment">/// Get the value associated to a node in the computed fixpoint</span>
     <span class="doccomment">/// (or intermediate state of the algorithm if the fixpoint has not been reached yet).</span>
     <span class="doccomment">/// Returns `None` if no value is associated to the Node.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_node_value</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">node_id</span>: <span class="ident">NodeIndex</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">NodeValue</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_node_value</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">node_id</span>: <span class="ident">NodeIndex</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">NodeValue</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">computation</span>.<span class="ident">get_node_value</span>(<span class="ident">node_id</span>)
-    }
-
-    <span class="doccomment">/// Add speculative entry points to the fixpoint algorithm state.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Since indirect jumps and calls are not handled yet (TODO: change that),</span>
-    <span class="doccomment">/// the analysis may miss a *lot* of code in some cases.</span>
-    <span class="doccomment">/// To remedy this somewhat,</span>
-    <span class="doccomment">/// we mark all function starts, that are also roots in the control flow graph</span>
-    <span class="doccomment">/// and do not have a state assigned to them yet, as additional entry points.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// If `only_cfg_roots` is set to `false`, then all function starts without a state are marked as roots.</span>
-    <span class="kw">fn</span> <span class="ident">add_speculative_entry_points</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">project</span>: <span class="kw-2">&amp;</span><span class="ident">Project</span>, <span class="ident">only_cfg_roots</span>: <span class="ident">bool</span>) {
-        <span class="comment">// TODO: Refactor the fixpoint computation structs, so that the project reference can be extracted from them.</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">start_block_to_sub_map</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">Tid</span>, <span class="kw-2">&amp;</span><span class="ident">Term</span><span class="op">&lt;</span><span class="ident">Sub</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">HashMap::new</span>();
-        <span class="kw">for</span> <span class="ident">sub</span> <span class="kw">in</span> <span class="ident">project</span>.<span class="ident">program</span>.<span class="ident">term</span>.<span class="ident">subs</span>.<span class="ident">iter</span>() {
-            <span class="kw">if</span> <span class="ident">project</span>
-                .<span class="ident">program</span>
-                .<span class="ident">term</span>
-                .<span class="ident">extern_symbols</span>
-                .<span class="ident">iter</span>()
-                .<span class="ident">any</span>(<span class="op">|</span><span class="ident">symbol</span><span class="op">|</span> <span class="ident">symbol</span>.<span class="ident">tid</span> <span class="op">=</span><span class="op">=</span> <span class="ident">sub</span>.<span class="ident">tid</span>)
-            {
-                <span class="kw">continue</span>; <span class="comment">// We ignore functions marked as extern symbols.</span>
-            }
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">start_block</span>) <span class="op">=</span> <span class="ident">sub</span>.<span class="ident">term</span>.<span class="ident">blocks</span>.<span class="ident">first</span>() {
-                <span class="ident">start_block_to_sub_map</span>.<span class="ident">insert</span>(<span class="kw-2">&amp;</span><span class="ident">start_block</span>.<span class="ident">tid</span>, <span class="ident">sub</span>);
-            }
-        }
-        <span class="kw">let</span> <span class="ident">graph</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">computation</span>.<span class="ident">get_graph</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_entry_points</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
-        <span class="kw">for</span> (<span class="ident">node_id</span>, <span class="ident">node</span>) <span class="kw">in</span> <span class="ident">graph</span>.<span class="ident">node_references</span>() {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="ident">Node::BlkStart</span>(<span class="ident">block</span>, <span class="ident">sub</span>) <span class="op">=</span> <span class="ident">node</span> {
-                <span class="kw">if</span> <span class="ident">start_block_to_sub_map</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">block</span>.<span class="ident">tid</span>) <span class="op">=</span><span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">sub</span>)
-                    <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">computation</span>.<span class="ident">get_node_value</span>(<span class="ident">node_id</span>).<span class="ident">is_none</span>()
-                    <span class="op">&amp;&amp;</span> (<span class="op">!</span><span class="ident">only_cfg_roots</span>
-                        <span class="op">|</span><span class="op">|</span> <span class="ident">graph</span>
-                            .<span class="ident">neighbors_directed</span>(<span class="ident">node_id</span>, <span class="ident">Direction::Incoming</span>)
-                            .<span class="ident">next</span>()
-                            .<span class="ident">is_none</span>())
-                {
-                    <span class="ident">new_entry_points</span>.<span class="ident">push</span>(<span class="ident">node_id</span>);
-                }
-            }
-        }
-        <span class="self">self</span>.<span class="ident">log_debug</span>(<span class="macro">format!</span>(
-            <span class="string">&quot;Pointer Inference: Adding {} speculative entry points&quot;</span>,
-            <span class="ident">new_entry_points</span>.<span class="ident">len</span>()
-        ));
-        <span class="kw">for</span> <span class="ident">entry</span> <span class="kw">in</span> <span class="ident">new_entry_points</span> {
-            <span class="kw">let</span> <span class="ident">sub_tid</span> <span class="op">=</span> <span class="ident">start_block_to_sub_map</span>
-                [<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">computation</span>.<span class="ident">get_graph</span>()[<span class="ident">entry</span>].<span class="ident">get_block</span>().<span class="ident">tid</span>]
-                .<span class="ident">tid</span>
-                .<span class="ident">clone</span>();
-            <span class="self">self</span>.<span class="ident">computation</span>.<span class="ident">set_node_value</span>(
-                <span class="ident">entry</span>,
-                <span class="kw">super</span><span class="ident">::interprocedural_fixpoint_generic::NodeValue::Value</span>(<span class="ident">State::new</span>(
-                    <span class="kw-2">&amp;</span><span class="ident">project</span>.<span class="ident">stack_pointer_register</span>,
-                    <span class="ident">sub_tid</span>,
-                )),
-            );
-        }
     }
 
     <span class="doccomment">/// Print the number of blocks that have a state associated to them.</span>
@@ -833,39 +736,116 @@
                 }
             }
         }
-        <span class="self">self</span>.<span class="ident">log_debug</span>(<span class="macro">format!</span>(
-            <span class="string">&quot;Pointer Inference: Blocks with state: {} / {}&quot;</span>,
+        <span class="self">self</span>.<span class="ident">log_info</span>(<span class="macro">format!</span>(
+            <span class="string">&quot;Blocks with state: {} / {}&quot;</span>,
             <span class="ident">stateful_blocks</span>, <span class="ident">all_blocks</span>
         ));
     }
 
-    <span class="kw">fn</span> <span class="ident">log_debug</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">msg</span>: <span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>) {
-        <span class="kw">let</span> <span class="ident">log_msg</span> <span class="op">=</span> <span class="ident">LogMessage::new_debug</span>(<span class="ident">msg</span>.<span class="ident">into</span>());
+    <span class="doccomment">/// Send an info log message to the log collector.</span>
+    <span class="kw">fn</span> <span class="ident">log_info</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">msg</span>: <span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>) {
+        <span class="kw">let</span> <span class="ident">log_msg</span> <span class="op">=</span> <span class="ident">LogMessage::new_info</span>(<span class="ident">msg</span>.<span class="ident">into</span>()).<span class="ident">source</span>(<span class="string">&quot;Pointer Inference&quot;</span>);
         <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">log_collector</span>.<span class="ident">send</span>(<span class="ident">LogThreadMsg::Log</span>(<span class="ident">log_msg</span>));
     }
 
-    <span class="doccomment">/// Compute the results of the pointer inference fixpoint algorithm.</span>
-    <span class="doccomment">/// Successively adds more functions as possible entry points</span>
-    <span class="doccomment">/// to increase code coverage.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">compute_with_speculative_entry_points</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">project</span>: <span class="kw-2">&amp;</span><span class="ident">Project</span>) {
-        <span class="self">self</span>.<span class="ident">compute</span>();
-        <span class="self">self</span>.<span class="ident">count_blocks_with_state</span>();
-        <span class="comment">// Now compute again with speculative entry points added</span>
-        <span class="self">self</span>.<span class="ident">add_speculative_entry_points</span>(<span class="ident">project</span>, <span class="bool-val">true</span>);
-        <span class="self">self</span>.<span class="ident">compute</span>();
-        <span class="self">self</span>.<span class="ident">count_blocks_with_state</span>();
-        <span class="comment">// Now compute again with all missed functions as additional entry points</span>
-        <span class="self">self</span>.<span class="ident">add_speculative_entry_points</span>(<span class="ident">project</span>, <span class="bool-val">false</span>);
-        <span class="self">self</span>.<span class="ident">compute</span>();
-        <span class="self">self</span>.<span class="ident">count_blocks_with_state</span>();
-
-        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">computation</span>.<span class="ident">has_stabilized</span>() {
-            <span class="kw">let</span> <span class="ident">worklist_size</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">computation</span>.<span class="ident">get_worklist</span>().<span class="ident">len</span>();
-            <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">log_debug</span>(<span class="macro">format!</span>(
-                <span class="string">&quot;Pointer Inference: Fixpoint did not stabilize. Remaining worklist size: {}&quot;</span>,
-                <span class="ident">worklist_size</span>
-            ));
+    <span class="doccomment">/// Fill the various result maps of `self` that are needed for the [`VsaResult`](crate::analysis::vsa_results::VsaResult) trait implementation.</span>
+    <span class="kw">fn</span> <span class="ident">fill_vsa_result_maps</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
+        <span class="kw">let</span> <span class="ident">context</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">computation</span>.<span class="ident">get_context</span>().<span class="ident">get_context</span>();
+        <span class="kw">let</span> <span class="ident">graph</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">computation</span>.<span class="ident">get_graph</span>();
+        <span class="kw">for</span> <span class="ident">node</span> <span class="kw">in</span> <span class="ident">graph</span>.<span class="ident">node_indices</span>() {
+            <span class="kw">match</span> <span class="ident">graph</span>[<span class="ident">node</span>] {
+                <span class="ident">Node::BlkStart</span>(<span class="ident">blk</span>, <span class="ident">_sub</span>) =&gt; {
+                    <span class="kw">let</span> <span class="ident">node_state</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">computation</span>.<span class="ident">get_node_value</span>(<span class="ident">node</span>) {
+                        <span class="prelude-val">Some</span>(<span class="ident">NodeValue::Value</span>(<span class="ident">value</span>)) =&gt; <span class="ident">value</span>,
+                        <span class="kw">_</span> =&gt; <span class="kw">continue</span>,
+                    };
+                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">state</span> <span class="op">=</span> <span class="ident">node_state</span>.<span class="ident">clone</span>();
+                    <span class="kw">for</span> <span class="ident">def</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">blk</span>.<span class="ident">term</span>.<span class="ident">defs</span> {
+                        <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="ident">def</span>.<span class="ident">term</span> {
+                            <span class="ident">Def::Assign</span> { <span class="ident">var</span>: <span class="kw">_</span>, <span class="ident">value</span> } =&gt; {
+                                <span class="self">self</span>.<span class="ident">values_at_defs</span>
+                                    .<span class="ident">insert</span>(<span class="ident">def</span>.<span class="ident">tid</span>.<span class="ident">clone</span>(), <span class="ident">state</span>.<span class="ident">eval</span>(<span class="ident">value</span>));
+                            }
+                            <span class="ident">Def::Load</span> { <span class="ident">var</span>, <span class="ident">address</span> } =&gt; {
+                                <span class="kw">let</span> <span class="ident">loaded_value</span> <span class="op">=</span> <span class="ident">state</span>
+                                    .<span class="ident">load_value</span>(
+                                        <span class="ident">address</span>,
+                                        <span class="ident">var</span>.<span class="ident">size</span>,
+                                        <span class="kw-2">&amp;</span><span class="ident">context</span>.<span class="ident">project</span>.<span class="ident">runtime_memory_image</span>,
+                                    )
+                                    .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">Data::new_top</span>(<span class="ident">var</span>.<span class="ident">size</span>));
+                                <span class="self">self</span>.<span class="ident">values_at_defs</span>.<span class="ident">insert</span>(<span class="ident">def</span>.<span class="ident">tid</span>.<span class="ident">clone</span>(), <span class="ident">loaded_value</span>);
+                                <span class="self">self</span>.<span class="ident">addresses_at_defs</span>
+                                    .<span class="ident">insert</span>(<span class="ident">def</span>.<span class="ident">tid</span>.<span class="ident">clone</span>(), <span class="ident">state</span>.<span class="ident">eval</span>(<span class="ident">address</span>));
+                            }
+                            <span class="ident">Def::Store</span> { <span class="ident">address</span>, <span class="ident">value</span> } =&gt; {
+                                <span class="self">self</span>.<span class="ident">values_at_defs</span>
+                                    .<span class="ident">insert</span>(<span class="ident">def</span>.<span class="ident">tid</span>.<span class="ident">clone</span>(), <span class="ident">state</span>.<span class="ident">eval</span>(<span class="ident">value</span>));
+                                <span class="self">self</span>.<span class="ident">addresses_at_defs</span>
+                                    .<span class="ident">insert</span>(<span class="ident">def</span>.<span class="ident">tid</span>.<span class="ident">clone</span>(), <span class="ident">state</span>.<span class="ident">eval</span>(<span class="ident">address</span>));
+                            }
+                        }
+                        <span class="ident">state</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">context</span>.<span class="ident">update_def</span>(<span class="kw-2">&amp;</span><span class="ident">state</span>, <span class="ident">def</span>) {
+                            <span class="prelude-val">Some</span>(<span class="ident">new_state</span>) =&gt; <span class="ident">new_state</span>,
+                            <span class="prelude-val">None</span> =&gt; <span class="kw">break</span>,
+                        }
+                    }
+                }
+                <span class="ident">Node::BlkEnd</span>(<span class="ident">blk</span>, <span class="ident">_sub</span>) =&gt; {
+                    <span class="kw">let</span> <span class="ident">node_state</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">computation</span>.<span class="ident">get_node_value</span>(<span class="ident">node</span>) {
+                        <span class="prelude-val">Some</span>(<span class="ident">NodeValue::Value</span>(<span class="ident">value</span>)) =&gt; <span class="ident">value</span>,
+                        <span class="kw">_</span> =&gt; <span class="kw">continue</span>,
+                    };
+                    <span class="kw">for</span> <span class="ident">jmp</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">blk</span>.<span class="ident">term</span>.<span class="ident">jmps</span> {
+                        <span class="self">self</span>.<span class="ident">states_at_tids</span>
+                            .<span class="ident">insert</span>(<span class="ident">jmp</span>.<span class="ident">tid</span>.<span class="ident">clone</span>(), <span class="ident">node_state</span>.<span class="ident">clone</span>());
+                    }
+                }
+                <span class="ident">Node::CallSource</span> { .. } =&gt; (),
+                <span class="ident">Node::CallReturn</span> {
+                    <span class="ident">call</span>: (<span class="ident">caller_blk</span>, <span class="ident">_caller_sub</span>),
+                    <span class="ident">return_</span>: <span class="kw">_</span>,
+                } =&gt; {
+                    <span class="kw">let</span> <span class="ident">call_tid</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">caller_blk</span>.<span class="ident">term</span>.<span class="ident">jmps</span>.<span class="ident">get</span>(<span class="number">0</span>) {
+                        <span class="prelude-val">Some</span>(<span class="ident">call</span>) =&gt; <span class="kw-2">&amp;</span><span class="ident">call</span>.<span class="ident">tid</span>,
+                        <span class="kw">_</span> =&gt; <span class="kw">continue</span>,
+                    };
+                    <span class="kw">let</span> (<span class="ident">state_before_call</span>, <span class="ident">state_before_return</span>) <span class="op">=</span>
+                        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">computation</span>.<span class="ident">get_node_value</span>(<span class="ident">node</span>) {
+                            <span class="prelude-val">Some</span>(<span class="ident">NodeValue::CallFlowCombinator</span> {
+                                <span class="ident">call_stub</span>: <span class="prelude-val">Some</span>(<span class="ident">state_before_call</span>),
+                                <span class="ident">interprocedural_flow</span>: <span class="prelude-val">Some</span>(<span class="ident">state_before_return</span>),
+                            }) =&gt; (<span class="ident">state_before_call</span>, <span class="ident">state_before_return</span>),
+                            <span class="kw">_</span> =&gt; <span class="kw">continue</span>,
+                        };
+                    <span class="kw">let</span> <span class="ident">id_to_data_map</span> <span class="op">=</span> <span class="ident">context</span>.<span class="ident">create_callee_id_to_caller_data_map</span>(
+                        <span class="ident">state_before_call</span>,
+                        <span class="ident">state_before_return</span>,
+                        <span class="ident">call_tid</span>,
+                    );
+                    <span class="self">self</span>.<span class="ident">id_renaming_maps_at_calls</span>
+                        .<span class="ident">insert</span>(<span class="ident">call_tid</span>.<span class="ident">clone</span>(), <span class="ident">id_to_data_map</span>);
+                }
+            }
         }
+    }
+
+    <span class="doccomment">/// Get the state of the fixpoint computation at the block end node before the given jump instruction.</span>
+    <span class="doccomment">/// This function only yields results after the fixpoint has been computed.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_state_at_jmp_tid</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">jmp_tid</span>: <span class="kw-2">&amp;</span><span class="ident">Tid</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">State</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">states_at_tids</span>.<span class="ident">get</span>(<span class="ident">jmp_tid</span>)
+    }
+
+    <span class="doccomment">/// Get the mapping from callee IDs to caller values for the given call.</span>
+    <span class="doccomment">/// This function only yields results after the fixpoint has been computed.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Note that the maps may contain mappings from callee IDs to temporary caller IDs that get instantly removed from the caller</span>
+    <span class="doccomment">/// since they are not referenced in any caller object.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_id_renaming_map_at_call_tid</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">call_tid</span>: <span class="kw-2">&amp;</span><span class="ident">Tid</span>,
+    ) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">AbstractIdentifier</span>, <span class="ident">Data</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">id_renaming_maps_at_calls</span>.<span class="ident">get</span>(<span class="ident">call_tid</span>)
     }
 
     <span class="doccomment">/// Print information on dead ends in the control flow graph for debugging purposes.</span>
@@ -880,23 +860,23 @@
                     .<span class="ident">any</span>(<span class="op">|</span><span class="ident">neighbor</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">computation</span>.<span class="ident">get_node_value</span>(<span class="ident">neighbor</span>).<span class="ident">is_some</span>())
                 {
                     <span class="kw">match</span> <span class="ident">node</span> {
-                        <span class="ident">Node::BlkEnd</span>(<span class="ident">block</span>, <span class="ident">_sub</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                        <span class="ident">Node::BlkEnd</span>(<span class="ident">block</span>, <span class="ident">_sub</span>) =&gt; {
                             <span class="kw">let</span> <span class="ident">state</span> <span class="op">=</span> <span class="ident">node_value</span>.<span class="ident">unwrap_value</span>();
                             <span class="kw">if</span> <span class="ident">block</span>.<span class="ident">term</span>.<span class="ident">jmps</span>.<span class="ident">is_empty</span>() {
                                 <span class="macro">println!</span>(<span class="string">&quot;Dead end without jumps after block {}&quot;</span>, <span class="ident">block</span>.<span class="ident">tid</span>);
                             }
                             <span class="kw">for</span> <span class="ident">jmp</span> <span class="kw">in</span> <span class="ident">block</span>.<span class="ident">term</span>.<span class="ident">jmps</span>.<span class="ident">iter</span>() {
                                 <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="ident">jmp</span>.<span class="ident">term</span> {
-                                    <span class="ident">Jmp::BranchInd</span>(<span class="ident">target_expr</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                                        <span class="kw">let</span> <span class="ident">address</span> <span class="op">=</span> <span class="ident">state</span>.<span class="ident">eval</span>(<span class="kw-2">&amp;</span><span class="ident">target_expr</span>);
+                                    <span class="ident">Jmp::BranchInd</span>(<span class="ident">target_expr</span>) =&gt; {
+                                        <span class="kw">let</span> <span class="ident">address</span> <span class="op">=</span> <span class="ident">state</span>.<span class="ident">eval</span>(<span class="ident">target_expr</span>);
                                         <span class="macro">println!</span>(
                                             <span class="string">&quot;{}: Indirect jump to {}&quot;</span>,
                                             <span class="ident">jmp</span>.<span class="ident">tid</span>,
                                             <span class="ident">address</span>.<span class="ident">to_json_compact</span>()
                                         );
                                     }
-                                    <span class="ident">Jmp::CallInd</span> { <span class="ident">target</span>, <span class="ident">return_</span> } <span class="op">=</span><span class="op">&gt;</span> {
-                                        <span class="kw">let</span> <span class="ident">address</span> <span class="op">=</span> <span class="ident">state</span>.<span class="ident">eval</span>(<span class="kw-2">&amp;</span><span class="ident">target</span>);
+                                    <span class="ident">Jmp::CallInd</span> { <span class="ident">target</span>, <span class="ident">return_</span> } =&gt; {
+                                        <span class="kw">let</span> <span class="ident">address</span> <span class="op">=</span> <span class="ident">state</span>.<span class="ident">eval</span>(<span class="ident">target</span>);
                                         <span class="macro">println!</span>(
                                             <span class="string">&quot;{}: Indirect call to {}. HasReturn: {}&quot;</span>,
                                             <span class="ident">jmp</span>.<span class="ident">tid</span>,
@@ -904,34 +884,27 @@
                                             <span class="ident">return_</span>.<span class="ident">is_some</span>()
                                         );
                                     }
-                                    <span class="ident">Jmp::Return</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                                        <span class="kw">if</span> <span class="op">!</span><span class="ident">state</span>.<span class="ident">caller_stack_ids</span>.<span class="ident">is_empty</span>() {
-                                            <span class="macro">println!</span>(
-                                                <span class="string">&quot;{}: Return dead end despite known caller ids&quot;</span>,
-                                                <span class="ident">jmp</span>.<span class="ident">tid</span>
-                                            )
-                                        }
-                                    }
-                                    <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">println!</span>(
+                                    <span class="ident">Jmp::Return</span>(<span class="kw">_</span>) =&gt; {}
+                                    <span class="kw">_</span> =&gt; <span class="macro">println!</span>(
                                         <span class="string">&quot;{}: Unexpected Jmp dead end: {:?}&quot;</span>,
                                         <span class="ident">jmp</span>.<span class="ident">tid</span>, <span class="ident">jmp</span>.<span class="ident">term</span>
                                     ),
                                 }
                             }
                         }
-                        <span class="ident">Node::BlkStart</span>(<span class="ident">block</span>, <span class="ident">_sub</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                        <span class="ident">Node::BlkStart</span>(<span class="ident">block</span>, <span class="ident">_sub</span>) =&gt; {
                             <span class="macro">println!</span>(<span class="string">&quot;{}: ERROR: Block start without successor state!&quot;</span>, <span class="ident">block</span>.<span class="ident">tid</span>)
                         }
-                        <span class="ident">Node::CallSource</span> { <span class="ident">source</span>, .. } <span class="op">=</span><span class="op">&gt;</span> {
+                        <span class="ident">Node::CallSource</span> { <span class="ident">source</span>, .. } =&gt; {
                             <span class="macro">println!</span>(<span class="string">&quot;{}: ERROR: Call source without target!&quot;</span>, <span class="ident">source</span>.<span class="number">0</span>.<span class="ident">tid</span>)
                         }
-                        <span class="ident">Node::CallReturn</span> { <span class="ident">call</span>, <span class="ident">return_</span> } <span class="op">=</span><span class="op">&gt;</span> {
+                        <span class="ident">Node::CallReturn</span> { <span class="ident">call</span>, <span class="ident">return_</span> } =&gt; {
                             <span class="kw">let</span> (<span class="ident">call_state</span>, <span class="ident">return_state</span>) <span class="op">=</span> <span class="kw">match</span> <span class="ident">node_value</span> {
                                 <span class="ident">NodeValue::CallFlowCombinator</span> {
                                     <span class="ident">call_stub</span>,
                                     <span class="ident">interprocedural_flow</span>,
-                                } <span class="op">=</span><span class="op">&gt;</span> (<span class="ident">call_stub</span>.<span class="ident">is_some</span>(), <span class="ident">interprocedural_flow</span>.<span class="ident">is_some</span>()),
-                                <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic!</span>(),
+                                } =&gt; (<span class="ident">call_stub</span>.<span class="ident">is_some</span>(), <span class="ident">interprocedural_flow</span>.<span class="ident">is_some</span>()),
+                                <span class="kw">_</span> =&gt; <span class="macro">panic!</span>(),
                             };
                             <span class="macro">println!</span>(
                                 <span class="string">&quot;CallReturn. Caller: ({}, {}), Return: ({}, {})&quot;</span>,
@@ -951,7 +924,7 @@
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">extract_pi_analysis_results</span>(
     <span class="ident">analysis_results</span>: <span class="kw-2">&amp;</span><span class="ident">AnalysisResults</span>,
     <span class="ident">_analysis_params</span>: <span class="kw-2">&amp;</span><span class="ident">serde_json::Value</span>,
-) <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">LogMessage</span><span class="op">&gt;</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">CweWarning</span><span class="op">&gt;</span>) {
+) -&gt; (<span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">LogMessage</span><span class="op">&gt;</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">CweWarning</span><span class="op">&gt;</span>) {
     <span class="kw">let</span> <span class="ident">pi_anaylsis</span> <span class="op">=</span> <span class="ident">analysis_results</span>.<span class="ident">pointer_inference</span>.<span class="ident">unwrap</span>();
     <span class="ident">pi_anaylsis</span>.<span class="ident">collected_logs</span>.<span class="ident">clone</span>()
 }
@@ -961,23 +934,22 @@
 <span class="doccomment">/// If `print_debug` is set to `true` print debug information to *stdout*.</span>
 <span class="doccomment">/// Note that the format of the debug information is currently unstable and subject to change.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">run</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>(
-    <span class="ident">project</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Project</span>,
-    <span class="ident">runtime_memory_image</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">RuntimeMemoryImage</span>,
-    <span class="ident">control_flow_graph</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Graph</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>,
+    <span class="ident">analysis_results</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">AnalysisResults</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>,
     <span class="ident">config</span>: <span class="ident">Config</span>,
     <span class="ident">print_debug</span>: <span class="ident">bool</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PointerInference</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">logging_thread</span> <span class="op">=</span> <span class="ident">LogThread::spawn</span>(<span class="ident">collect_all_logs</span>);
+    <span class="ident">print_stats</span>: <span class="ident">bool</span>,
+) -&gt; <span class="ident">PointerInference</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="ident">logging_thread</span> <span class="op">=</span> <span class="ident">LogThread::spawn</span>(<span class="ident">LogThread::collect_and_deduplicate</span>);
 
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">computation</span> <span class="op">=</span> <span class="ident">PointerInference::new</span>(
-        <span class="ident">project</span>,
-        <span class="ident">runtime_memory_image</span>,
-        <span class="ident">control_flow_graph</span>,
+        <span class="ident">analysis_results</span>,
         <span class="ident">config</span>,
         <span class="ident">logging_thread</span>.<span class="ident">get_msg_sender</span>(),
+        <span class="ident">print_stats</span>,
     );
 
-    <span class="ident">computation</span>.<span class="ident">compute_with_speculative_entry_points</span>(<span class="ident">project</span>);
+    <span class="ident">computation</span>.<span class="ident">compute</span>(<span class="ident">print_stats</span>);
+    <span class="ident">computation</span>.<span class="ident">fill_vsa_result_maps</span>();
 
     <span class="kw">if</span> <span class="ident">print_debug</span> {
         <span class="ident">computation</span>.<span class="ident">print_compact_json</span>();
@@ -988,68 +960,39 @@
     <span class="ident">computation</span>
 }
 
-<span class="doccomment">/// This function is responsible for collecting logs and CWE warnings.</span>
-<span class="doccomment">/// For warnings with the same origin address only the last one is kept.</span>
-<span class="doccomment">/// This prevents duplicates but may suppress some log messages</span>
-<span class="doccomment">/// in the rare case that several different log messages with the same origin address are generated.</span>
-<span class="kw">fn</span> <span class="ident">collect_all_logs</span>(
-    <span class="ident">receiver</span>: <span class="ident">crossbeam_channel::Receiver</span><span class="op">&lt;</span><span class="ident">LogThreadMsg</span><span class="op">&gt;</span>,
-) <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">LogMessage</span><span class="op">&gt;</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">CweWarning</span><span class="op">&gt;</span>) {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">logs_with_address</span> <span class="op">=</span> <span class="ident">HashMap::new</span>();
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">general_logs</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">collected_cwes</span> <span class="op">=</span> <span class="ident">HashMap::new</span>();
-
-    <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">log_thread_msg</span>) <span class="op">=</span> <span class="ident">receiver</span>.<span class="ident">recv</span>() {
-        <span class="kw">match</span> <span class="ident">log_thread_msg</span> {
-            <span class="ident">LogThreadMsg::Log</span>(<span class="ident">log_message</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">tid</span>) <span class="op">=</span> <span class="ident">log_message</span>.<span class="ident">location</span> {
-                    <span class="ident">logs_with_address</span>.<span class="ident">insert</span>(<span class="ident">tid</span>.<span class="ident">address</span>.<span class="ident">clone</span>(), <span class="ident">log_message</span>);
-                } <span class="kw">else</span> {
-                    <span class="ident">general_logs</span>.<span class="ident">push</span>(<span class="ident">log_message</span>);
-                }
-            }
-            <span class="ident">LogThreadMsg::Cwe</span>(<span class="ident">cwe_warning</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="ident">cwe_warning</span>.<span class="ident">addresses</span>[..] {
-                [] <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic!</span>(<span class="string">&quot;Unexpected CWE warning without origin address&quot;</span>),
-                [<span class="ident">address</span>, ..] <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="ident">collected_cwes</span>.<span class="ident">insert</span>(<span class="ident">address</span>.<span class="ident">clone</span>(), <span class="ident">cwe_warning</span>);
-                }
-            },
-            <span class="ident">LogThreadMsg::Terminate</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">break</span>,
-        }
-    }
-    <span class="kw">let</span> <span class="ident">logs</span> <span class="op">=</span> <span class="ident">logs_with_address</span>
-        .<span class="ident">values</span>()
-        .<span class="ident">cloned</span>()
-        .<span class="ident">chain</span>(<span class="ident">general_logs</span>.<span class="ident">into_iter</span>())
-        .<span class="ident">collect</span>();
-    <span class="kw">let</span> <span class="ident">cwes</span> <span class="op">=</span> <span class="ident">collected_cwes</span>.<span class="ident">drain</span>().<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">_key</span>, <span class="ident">value</span>)<span class="op">|</span> <span class="ident">value</span>).<span class="ident">collect</span>();
-    (<span class="ident">logs</span>, <span class="ident">cwes</span>)
-}
-
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
 <span class="kw">mod</span> <span class="ident">tests</span> {
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 
     <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">PointerInference</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mock</span>(
-            <span class="ident">project</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Project</span>,
-            <span class="ident">mem_image</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">RuntimeMemoryImage</span>,
-            <span class="ident">graph</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Graph</span>,
-        ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PointerInference</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
+        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mock</span>(<span class="ident">project</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Project</span>) -&gt; <span class="ident">PointerInference</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
+            <span class="kw">let</span> <span class="ident">analysis_results</span> <span class="op">=</span> <span class="ident">Box::new</span>(<span class="ident">AnalysisResults::mock_from_project</span>(<span class="ident">project</span>));
+            <span class="kw">let</span> <span class="ident">analysis_results</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">AnalysisResults</span> <span class="op">=</span> <span class="ident">Box::leak</span>(<span class="ident">analysis_results</span>);
             <span class="kw">let</span> <span class="ident">config</span> <span class="op">=</span> <span class="ident">Config</span> {
                 <span class="ident">allocation_symbols</span>: <span class="macro">vec!</span>[<span class="string">&quot;malloc&quot;</span>.<span class="ident">to_string</span>()],
-                <span class="ident">deallocation_symbols</span>: <span class="macro">vec!</span>[<span class="string">&quot;free&quot;</span>.<span class="ident">to_string</span>()],
             };
             <span class="kw">let</span> (<span class="ident">log_sender</span>, <span class="kw">_</span>) <span class="op">=</span> <span class="ident">crossbeam_channel::unbounded</span>();
-            <span class="ident">PointerInference::new</span>(<span class="ident">project</span>, <span class="ident">mem_image</span>, <span class="ident">graph</span>, <span class="ident">config</span>, <span class="ident">log_sender</span>)
+            <span class="ident">PointerInference::new</span>(<span class="ident">analysis_results</span>, <span class="ident">config</span>, <span class="ident">log_sender</span>, <span class="bool-val">false</span>)
         }
 
-        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_node_value</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">node_value</span>: <span class="ident">State</span>, <span class="ident">node_index</span>: <span class="ident">NodeIndex</span>) {
+        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_node_value</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">node_value</span>: <span class="ident">State</span>, <span class="ident">node_index</span>: <span class="ident">NodeIndex</span>) {
             <span class="self">self</span>.<span class="ident">computation</span>
                 .<span class="ident">set_node_value</span>(<span class="ident">node_index</span>, <span class="ident">NodeValue::Value</span>(<span class="ident">node_value</span>));
         }
+
+        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_mut_values_at_defs</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">Tid</span>, <span class="ident">Data</span><span class="op">&gt;</span> {
+            <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">values_at_defs</span>
+        }
+
+        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_mut_addresses_at_defs</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">Tid</span>, <span class="ident">Data</span><span class="op">&gt;</span> {
+            <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">addresses_at_defs</span>
+        }
+
+        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_mut_states_at_tids</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">Tid</span>, <span class="ident">State</span><span class="op">&gt;</span> {
+            <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">states_at_tids</span>
+        }
     }
 }
-</pre></div>
-</section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="cwe_checker_lib" data-search-index-js="../../../../search-index.js" data-search-js="../../../../search.js"></div>
-    <script src="../../../../main.js"></script><script src="../../../../source-script.js"></script><script src="../../../../source-files.js"></script></body></html>
+</code></pre></div>
+</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="cwe_checker_lib" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.60.0 (7737e0b5c 2022-04-04)" ></div>
+</body></html>
