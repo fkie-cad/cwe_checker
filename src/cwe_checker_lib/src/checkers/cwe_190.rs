@@ -10,7 +10,8 @@
 //! For each call to a function from the CWE190 symbol list we check whether the
 //! basic block directly before the call contains a multiplication instruction.
 //! If one is found, the call gets flagged as a CWE hit, as there is no overflow
-//! check corresponding to the multiplication before the call. The default CWE190
+//! check corresponding to the multiplication before the call and the Pointer Inference
+//! returns argument intervals containing top values. The default CWE190
 //! symbol list contains the memory allocation functions *malloc*, *xmalloc*,
 //! *calloc* and *realloc*. The list is configurable in config.json.
 //!
@@ -19,8 +20,7 @@
 //! - There is no check whether the result of the multiplication is actually used
 //!   as input to the function call. However, this does not seem to generate a lot
 //!   of false positives in practice.
-//! - There is no value set analysis in place to determine whether an overflow is
-//!   possible or not at the specific instruction.
+//! - Relative values are always generate a hit.
 //!
 //! ## False Negatives
 //!
@@ -28,6 +28,8 @@
 //! from the CWE190 symbol list.
 //! - All integer overflows caused by addition or subtraction.
 
+use crate::analysis::pointer_inference::*;
+use crate::analysis::vsa_results::*;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
 use crate::utils::log::{CweWarning, LogMessage};
@@ -97,6 +99,24 @@ fn generate_cwe_warning(callsite: &Tid, called_symbol: &ExternSymbol) -> CweWarn
         .symbols(vec![called_symbol.name.clone()])
 }
 
+/// Determines if the argument for the call contains relative intervals or top values for absolute intervals.
+fn contains_top_value(pir: &PointerInference, jmp_tid: &Tid, parms: Vec<&Arg>) -> bool {
+    for arg in parms {
+        let value = pir.eval_parameter_arg_at_call(jmp_tid, arg).unwrap();
+        dbg!(&value);
+        if let Some(inter_dom) = value.get_absolute_value() {
+            if inter_dom.get_interval().is_top() {
+                return true;
+            }
+        }
+        if !value.get_relative_values().is_empty() {
+            return true;
+        }
+    }
+
+    false
+}
+
 /// Run the CWE check.
 /// For each call to one of the symbols configured in config.json
 /// we check whether the block containing the call also contains a multiplication instruction.
@@ -105,13 +125,25 @@ pub fn check_cwe(
     cwe_params: &serde_json::Value,
 ) -> (Vec<LogMessage>, Vec<CweWarning>) {
     let project = analysis_results.project;
+    let pointer_inference_results = analysis_results.pointer_inference.unwrap();
+
     let config: Config = serde_json::from_value(cwe_params.clone()).unwrap();
     let mut cwe_warnings = Vec::new();
     let symbol_map = get_symbol_map(project, &config.symbols);
     for sub in project.program.term.subs.values() {
         for (block, jump, symbol) in get_callsites(sub, &symbol_map) {
             if block_contains_multiplication(block) {
-                cwe_warnings.push(generate_cwe_warning(&jump.tid, symbol));
+                let parms = match symbol.name.as_str() {
+                    "malloc" => vec![&symbol.parameters[0]],
+                    "xmalloc" => vec![&symbol.parameters[0]],
+                    "calloc" => vec![&symbol.parameters[0], &symbol.parameters[1]],
+                    "realloc" => vec![&symbol.parameters[1]],
+                    _ => vec![&symbol.parameters[0]],
+                };
+
+                if contains_top_value(pointer_inference_results, &jump.tid, parms) {
+                    cwe_warnings.push(generate_cwe_warning(&jump.tid, symbol));
+                }
             }
         }
     }
