@@ -373,11 +373,6 @@ impl IntervalDomain {
             widening_delay,
         }
     }
-
-    /// Returns the contained interval.
-    pub fn get_interval(&self) -> &Interval {
-        &self.interval
-    }
 }
 
 impl SpecializeByConditional for IntervalDomain {

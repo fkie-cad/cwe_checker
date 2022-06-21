@@ -10,8 +10,8 @@
 //! For each call to a function from the CWE190 symbol list we check whether the
 //! basic block directly before the call contains a multiplication instruction.
 //! If one is found, the call gets flagged as a CWE hit, as there is no overflow
-//! check corresponding to the multiplication before the call and the Pointer Inference
-//! returns argument intervals containing top values. The default CWE190
+//! check corresponding to the multiplication before the call as well as
+//! the Pointer Inference can not exclude an overflow. The default CWE190
 //! symbol list contains the memory allocation functions *malloc*, *xmalloc*,
 //! *calloc* and *realloc*. The list is configurable in config.json.
 //!
@@ -20,7 +20,7 @@
 //! - There is no check whether the result of the multiplication is actually used
 //!   as input to the function call. However, this does not seem to generate a lot
 //!   of false positives in practice.
-//! - Relative values are always generate a hit.
+//! - Values that are not absolute e.g. user controled or depend on other values.
 //!
 //! ## False Negatives
 //!
@@ -28,6 +28,7 @@
 //! from the CWE190 symbol list.
 //! - All integer overflows caused by addition or subtraction.
 
+use crate::abstract_domain::RegisterDomain;
 use crate::analysis::pointer_inference::*;
 use crate::analysis::vsa_results::*;
 use crate::intermediate_representation::*;
@@ -100,21 +101,32 @@ fn generate_cwe_warning(callsite: &Tid, called_symbol: &ExternSymbol) -> CweWarn
 }
 
 /// Determines if the argument for the call contains relative intervals or top values for absolute intervals.
+/// Returns false if parameters could not evaluated
 fn contains_top_value(pir: &PointerInference, jmp_tid: &Tid, parms: Vec<&Arg>) -> bool {
     for arg in parms {
-        let value = pir.eval_parameter_arg_at_call(jmp_tid, arg).unwrap();
-        dbg!(&value);
-        if let Some(inter_dom) = value.get_absolute_value() {
-            if inter_dom.get_interval().is_top() {
+        if let Some(value) = pir.eval_parameter_arg_at_call(jmp_tid, arg) {
+            // only absolute value without top value
+            if value.get_if_absolute_value().is_some() && value.get_relative_values().is_empty() {
+                return false;
+            }
+            if !value.is_empty() {
                 return true;
             }
         }
-        if !value.get_relative_values().is_empty() {
-            return true;
-        }
     }
-
     false
+}
+
+fn calloc_parm_mul_is_top(pir: &PointerInference, jmp_tid: &Tid, parms: Vec<&Arg>) -> bool {
+    if let (Some(nmeb), Some(size)) = (
+        pir.eval_parameter_arg_at_call(jmp_tid, parms[0]),
+        pir.eval_parameter_arg_at_call(jmp_tid, parms[1]),
+    ) {
+        nmeb.bin_op(BinOpType::IntMult, &size);
+        nmeb.contains_top()
+    } else {
+        false
+    }
 }
 
 /// Run the CWE check.
@@ -133,12 +145,29 @@ pub fn check_cwe(
     for sub in project.program.term.subs.values() {
         for (block, jump, symbol) in get_callsites(sub, &symbol_map) {
             if block_contains_multiplication(block) {
+                dbg!(&symbol);
                 let parms = match symbol.name.as_str() {
-                    "malloc" => vec![&symbol.parameters[0]],
-                    "xmalloc" => vec![&symbol.parameters[0]],
-                    "calloc" => vec![&symbol.parameters[0], &symbol.parameters[1]],
+                    "calloc" => {
+                        if calloc_parm_mul_is_top(
+                            pointer_inference_results,
+                            &jump.tid,
+                            vec![&symbol.parameters[0], &symbol.parameters[1]],
+                        ) {
+                            cwe_warnings.push(generate_cwe_warning(&jump.tid, symbol));
+                        };
+                        vec![&symbol.parameters[0], &symbol.parameters[1]]
+                    }
                     "realloc" => vec![&symbol.parameters[1]],
-                    _ => vec![&symbol.parameters[0]],
+                    sym_name => project
+                        .program
+                        .term
+                        .extern_symbols
+                        .values()
+                        .find(|x| x.name.eq(sym_name))
+                        .unwrap_or(symbol)
+                        .parameters
+                        .iter()
+                        .collect(),
                 };
 
                 if contains_top_value(pointer_inference_results, &jump.tid, parms) {
