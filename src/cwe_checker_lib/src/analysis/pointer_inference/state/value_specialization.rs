@@ -105,7 +105,7 @@ impl State {
                     self.eval(lhs).without_widening_hints() - result.clone();
                 self.specialize_by_expression_result(rhs, intermediate_result)?;
 
-                let intermediate_result = result.clone() + self.eval(rhs).without_widening_hints();
+                let intermediate_result = result + self.eval(rhs).without_widening_hints();
                 self.specialize_by_expression_result(lhs, intermediate_result)?;
 
                 return Ok(());
