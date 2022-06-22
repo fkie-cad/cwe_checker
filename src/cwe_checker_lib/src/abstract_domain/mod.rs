@@ -166,4 +166,9 @@ pub trait SpecializeByConditional: Sized {
 
     /// Return the intersection of two values or an error if the intersection is empty.
     fn intersect(self, other: &Self) -> Result<Self, Error>;
+
+    /// Remove all widening hints from `self`.
+    /// Necessary for cases where several sources have widening hints,
+    /// but only one source should contribute widening hints to the result.
+    fn without_widening_hints(self) -> Self;
 }
