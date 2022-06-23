@@ -864,6 +864,52 @@ fn specialize_pointer_comparison() {
     assert_eq!(state.get_register(&register("RAX")), specialized_pointer);
 }
 
+/// Test that value specialization does not introduce unintended widening hints.
+/// This is a regression test for cases where pointer comparisons introduced two-sided bounds
+/// (resulting in two-sided widenings) instead of one-sided bounds.
+#[test]
+fn test_widening_hints_after_pointer_specialization() {
+    let mut state = State::new(&register("RSP"), Tid::new("func_tid"));
+    state.set_register(
+        &register("RAX"),
+        Data::from_target(new_id("func_tid", "RSP"), Bitvector::from_i64(10).into()),
+    );
+    state.set_register(
+        &register("RBX"),
+        Data::from_target(new_id("func_tid", "RSP"), Bitvector::from_i64(10).into()),
+    );
+    let expression = Expression::BinOp {
+        op: BinOpType::IntSub,
+        lhs: Box::new(Expression::Var(Variable::mock("RAX", 8))),
+        rhs: Box::new(Expression::Var(Variable::mock("RBX", 8))),
+    };
+    let neq_expression = Expression::BinOp {
+        op: BinOpType::IntNotEqual,
+        lhs: Box::new(Expression::Const(Bitvector::from_i64(5))),
+        rhs: Box::new(expression),
+    };
+    state
+        .specialize_by_expression_result(&neq_expression, Bitvector::from_i8(1).into())
+        .unwrap();
+    state
+        .specialize_by_expression_result(&neq_expression, Bitvector::from_i8(1).into())
+        .unwrap();
+
+    let offset_with_upper_bound: IntervalDomain = Bitvector::from_i64(10).into();
+    let offset_with_upper_bound = offset_with_upper_bound
+        .add_signed_less_equal_bound(&Bitvector::from_i64(14))
+        .unwrap();
+    let expected_val = Data::from_target(new_id("func_tid", "RSP"), offset_with_upper_bound);
+    assert_eq!(state.get_register(&Variable::mock("RAX", 8)), expected_val);
+
+    let offset_with_lower_bound: IntervalDomain = Bitvector::from_i64(10).into();
+    let offset_with_lower_bound = offset_with_lower_bound
+        .add_signed_greater_equal_bound(&Bitvector::from_i64(6))
+        .unwrap();
+    let expected_val = Data::from_target(new_id("func_tid", "RSP"), offset_with_lower_bound);
+    assert_eq!(state.get_register(&Variable::mock("RBX", 8)), expected_val);
+}
+
 #[test]
 fn test_check_def_for_null_dereferences() {
     let mut state = State::new(&register("RSP"), Tid::new("func_tid"));

@@ -163,7 +163,7 @@ fn trivial_expression_substitution() {
             rhs: Box::new(setup.rcx_variable.clone()),
         }
     );
-
+    // Test `x < y || x == y` substitutes to `x <= y`
     let mut expr = Expression::BinOp {
         lhs: Box::new(Expression::BinOp {
             lhs: Box::new(setup.rax_variable.clone()),
@@ -183,6 +183,29 @@ fn trivial_expression_substitution() {
         Expression::BinOp {
             lhs: Box::new(setup.rax_variable.clone()),
             op: BinOpType::IntLessEqual,
+            rhs: Box::new(setup.rcx_variable.clone()),
+        }
+    );
+    // Test `x <= y && x != y` transforms to `x < y`
+    let mut expr = Expression::BinOp {
+        lhs: Box::new(Expression::BinOp {
+            lhs: Box::new(setup.rax_variable.clone()),
+            op: BinOpType::IntSLessEqual,
+            rhs: Box::new(setup.rcx_variable.clone()),
+        }),
+        op: BinOpType::BoolAnd,
+        rhs: Box::new(Expression::BinOp {
+            lhs: Box::new(setup.rcx_variable.clone()),
+            op: BinOpType::IntNotEqual,
+            rhs: Box::new(setup.rax_variable.clone()),
+        }),
+    };
+    expr.substitute_trivial_operations();
+    assert_eq!(
+        expr,
+        Expression::BinOp {
+            lhs: Box::new(setup.rax_variable.clone()),
+            op: BinOpType::IntSLess,
             rhs: Box::new(setup.rcx_variable.clone()),
         }
     );

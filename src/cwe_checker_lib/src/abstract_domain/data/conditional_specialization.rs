@@ -105,6 +105,14 @@ impl<T: SpecializeByConditional + RegisterDomain> SpecializeByConditional for Da
             Ok(result)
         }
     }
+
+    fn without_widening_hints(mut self) -> Self {
+        for offset in self.relative_values.values_mut() {
+            *offset = offset.clone().without_widening_hints();
+        }
+        self.absolute_value = self.absolute_value.map(|val| val.without_widening_hints());
+        self
+    }
 }
 
 #[cfg(test)]
