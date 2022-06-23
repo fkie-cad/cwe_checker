@@ -145,6 +145,76 @@ impl Expression {
                             rhs: less_right.clone(),
                         };
                     }
+                    (
+                        Expression::BinOp {
+                            lhs: lessequal_left,
+                            op: IntLessEqual,
+                            rhs: lessequal_right,
+                        },
+                        BoolAnd,
+                        Expression::BinOp {
+                            lhs: notequal_left,
+                            op: IntNotEqual,
+                            rhs: notequal_right,
+                        },
+                    )
+                    | (
+                        Expression::BinOp {
+                            lhs: notequal_left,
+                            op: IntNotEqual,
+                            rhs: notequal_right,
+                        },
+                        BoolAnd,
+                        Expression::BinOp {
+                            lhs: lessequal_left,
+                            op: IntLessEqual,
+                            rhs: lessequal_right,
+                        },
+                    ) if (lessequal_left == notequal_left && lessequal_right == notequal_right)
+                        || (lessequal_left == notequal_right && lessequal_right == notequal_left) =>
+                    {
+                        // `x <= y and x != y` is equivalent to `x < y `
+                        *self = Expression::BinOp {
+                            lhs: lessequal_left.clone(),
+                            op: IntLess,
+                            rhs: lessequal_right.clone(),
+                        };
+                    }
+                    (
+                        Expression::BinOp {
+                            lhs: lessequal_left,
+                            op: IntSLessEqual,
+                            rhs: lessequal_right,
+                        },
+                        BoolAnd,
+                        Expression::BinOp {
+                            lhs: notequal_left,
+                            op: IntNotEqual,
+                            rhs: notequal_right,
+                        },
+                    )
+                    | (
+                        Expression::BinOp {
+                            lhs: notequal_left,
+                            op: IntNotEqual,
+                            rhs: notequal_right,
+                        },
+                        BoolAnd,
+                        Expression::BinOp {
+                            lhs: lessequal_left,
+                            op: IntSLessEqual,
+                            rhs: lessequal_right,
+                        },
+                    ) if (lessequal_left == notequal_left && lessequal_right == notequal_right)
+                        || (lessequal_left == notequal_right && lessequal_right == notequal_left) =>
+                    {
+                        // `x <= y and x != y` is equivalent to `x < y `
+                        *self = Expression::BinOp {
+                            lhs: lessequal_left.clone(),
+                            op: IntSLess,
+                            rhs: lessequal_right.clone(),
+                        };
+                    }
                     _ => (),
                 }
             }
