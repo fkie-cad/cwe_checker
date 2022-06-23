@@ -171,7 +171,8 @@ impl Expression {
                             rhs: lessequal_right,
                         },
                     ) if (lessequal_left == notequal_left && lessequal_right == notequal_right)
-                        || (lessequal_left == notequal_right && lessequal_right == notequal_left) =>
+                        || (lessequal_left == notequal_right
+                            && lessequal_right == notequal_left) =>
                     {
                         // `x <= y and x != y` is equivalent to `x < y `
                         *self = Expression::BinOp {
@@ -206,7 +207,8 @@ impl Expression {
                             rhs: lessequal_right,
                         },
                     ) if (lessequal_left == notequal_left && lessequal_right == notequal_right)
-                        || (lessequal_left == notequal_right && lessequal_right == notequal_left) =>
+                        || (lessequal_left == notequal_right
+                            && lessequal_right == notequal_left) =>
                     {
                         // `x <= y and x != y` is equivalent to `x < y `
                         *self = Expression::BinOp {
