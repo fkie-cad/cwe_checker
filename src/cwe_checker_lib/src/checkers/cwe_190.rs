@@ -1,6 +1,6 @@
 //! This module implements a check for CWE-190: Integer overflow or wraparound.
 //!
-//! An integer overflow can lead to undefined behaviour and is especially dangerous
+//! An integer overflow can lead to undefined behavior and is especially dangerous
 //! in conjunction with memory management functions.
 //!
 //! See <https://cwe.mitre.org/data/definitions/190.html> for a detailed description.
@@ -20,7 +20,7 @@
 //! - There is no check whether the result of the multiplication is actually used
 //!   as input to the function call. However, this does not seem to generate a lot
 //!   of false positives in practice.
-//! - Values that are not absolute e.g. user controled or depend on other values.
+//! - Values that are not absolute e.g. user controlled or depend on other values.
 //!
 //! ## False Negatives
 //!
@@ -28,6 +28,7 @@
 //! from the CWE190 symbol list.
 //! - All integer overflows caused by addition or subtraction.
 
+use crate::abstract_domain::AbstractDomain;
 use crate::abstract_domain::RegisterDomain;
 use crate::analysis::pointer_inference::*;
 use crate::analysis::vsa_results::*;
@@ -100,16 +101,15 @@ fn generate_cwe_warning(callsite: &Tid, called_symbol: &ExternSymbol) -> CweWarn
         .symbols(vec![called_symbol.name.clone()])
 }
 
-/// Determines if the argument for the call contains relative intervals or top values for absolute intervals.
-/// Returns false if parameters could not evaluated
+/// Determines if all parameters are only absolute values and their included intervals are not top valued.
 fn contains_top_value(pir: &PointerInference, jmp_tid: &Tid, parms: Vec<&Arg>) -> bool {
     for arg in parms {
         if let Some(value) = pir.eval_parameter_arg_at_call(jmp_tid, arg) {
-            // only absolute value without top value
-            if value.get_if_absolute_value().is_some() && value.get_relative_values().is_empty() {
-                return false;
-            }
-            if !value.is_empty() {
+            if let Some(interval) = value.get_if_absolute_value() {
+                if interval.is_top() {
+                    return true;
+                }
+            } else {
                 return true;
             }
         }
@@ -117,6 +117,7 @@ fn contains_top_value(pir: &PointerInference, jmp_tid: &Tid, parms: Vec<&Arg>) -
     false
 }
 
+/// Checks if the multiplication of element count and size parameters result in an overflow.
 fn calloc_parm_mul_is_top(pir: &PointerInference, jmp_tid: &Tid, parms: Vec<&Arg>) -> bool {
     if let (Some(nmeb), Some(size)) = (
         pir.eval_parameter_arg_at_call(jmp_tid, parms[0]),
@@ -145,7 +146,6 @@ pub fn check_cwe(
     for sub in project.program.term.subs.values() {
         for (block, jump, symbol) in get_callsites(sub, &symbol_map) {
             if block_contains_multiplication(block) {
-                dbg!(&symbol);
                 let parms = match symbol.name.as_str() {
                     "calloc" => {
                         if calloc_parm_mul_is_top(
@@ -158,16 +158,7 @@ pub fn check_cwe(
                         vec![&symbol.parameters[0], &symbol.parameters[1]]
                     }
                     "realloc" => vec![&symbol.parameters[1]],
-                    sym_name => project
-                        .program
-                        .term
-                        .extern_symbols
-                        .values()
-                        .find(|x| x.name.eq(sym_name))
-                        .unwrap_or(symbol)
-                        .parameters
-                        .iter()
-                        .collect(),
+                    _ => symbol.parameters.iter().collect(),
                 };
 
                 if contains_top_value(pointer_inference_results, &jump.tid, parms) {

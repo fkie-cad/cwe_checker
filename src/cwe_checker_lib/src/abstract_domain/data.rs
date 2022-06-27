@@ -15,7 +15,7 @@ mod trait_impl;
 /// An abstract domain representing a set of base values plus offsets or an absolute value (or both).
 ///
 /// The base values are represented as abstract IDs,
-/// i.e. they are treated as variables with unknown absolute value.
+/// i.e. they are treated as variables with unknown absolute value, e.g. the returned pointer by malloc.
 /// For each base value the offset is given by an abstract domain `T`,
 /// which should specialize in representing absolute values (e.g. an interval domain).
 /// Note that the domain assumes pointer semantics for these values.
