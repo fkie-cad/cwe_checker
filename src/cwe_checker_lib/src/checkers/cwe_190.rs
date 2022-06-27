@@ -29,6 +29,8 @@
 //! - All integer overflows caused by addition or subtraction.
 
 use crate::abstract_domain::AbstractDomain;
+use crate::abstract_domain::DataDomain;
+use crate::abstract_domain::IntervalDomain;
 use crate::abstract_domain::RegisterDomain;
 use crate::analysis::pointer_inference::*;
 use crate::analysis::vsa_results::*;
@@ -105,11 +107,7 @@ fn generate_cwe_warning(callsite: &Tid, called_symbol: &ExternSymbol) -> CweWarn
 fn contains_top_value(pir: &PointerInference, jmp_tid: &Tid, parms: Vec<&Arg>) -> bool {
     for arg in parms {
         if let Some(value) = pir.eval_parameter_arg_at_call(jmp_tid, arg) {
-            if let Some(interval) = value.get_if_absolute_value() {
-                if interval.is_top() {
-                    return true;
-                }
-            } else {
+            if !contains_only_non_top_absolute_value(&value) {
                 return true;
             }
         }
@@ -124,10 +122,20 @@ fn calloc_parm_mul_is_top(pir: &PointerInference, jmp_tid: &Tid, parms: Vec<&Arg
         pir.eval_parameter_arg_at_call(jmp_tid, parms[1]),
     ) {
         nmeb.bin_op(BinOpType::IntMult, &size);
-        nmeb.contains_top()
-    } else {
-        false
+        return contains_only_non_top_absolute_value(&nmeb);
     }
+
+    false
+}
+
+/// Determines if the data domain only has absolute values and their included interval is not top valued.
+fn contains_only_non_top_absolute_value(data_domain: &DataDomain<IntervalDomain>) -> bool {
+    if let Some(interval) = data_domain.get_if_absolute_value() {
+        if !interval.is_top() {
+            return true;
+        }
+    }
+    false
 }
 
 /// Run the CWE check.
