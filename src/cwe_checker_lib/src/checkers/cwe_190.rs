@@ -122,7 +122,7 @@ fn calloc_parm_mul_is_top(pir: &PointerInference, jmp_tid: &Tid, parms: Vec<&Arg
         pir.eval_parameter_arg_at_call(jmp_tid, parms[1]),
     ) {
         nmeb.bin_op(BinOpType::IntMult, &size);
-        return contains_only_non_top_absolute_value(&nmeb);
+        return !contains_only_non_top_absolute_value(&nmeb);
     }
 
     false
