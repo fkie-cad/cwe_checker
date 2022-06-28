@@ -95,15 +95,22 @@ impl<'a> Context<'a> {
             let object_size = match object_size.get_absolute_value() {
                 Some(size) => {
                     if let Ok((lower_bound, upper_bound)) = size.try_to_offset_interval() {
-                        // If the lower bound is a reasonable value we approximate the object size by the lower bound instead of the upper bound.
-                        let bound = if lower_bound > 0 {
-                            lower_bound
+                        let (lower_bound, upper_bound) = (
+                            Bitvector::from_i64(lower_bound)
+                                .into_resize_signed(object_size.bytesize()),
+                            Bitvector::from_i64(upper_bound)
+                                .into_resize_signed(object_size.bytesize()),
+                        );
+                        if upper_bound.sign_bit().to_bool() {
+                            // Both bounds seem to be bogus values (because both are negative values).
+                            BitvectorDomain::new_top(object_size.bytesize())
+                        } else if lower_bound.sign_bit().to_bool() {
+                            // The lower bound is bogus, but we can approximate by the upper bound instead.
+                            upper_bound.into()
                         } else {
-                            upper_bound
-                        };
-                        Bitvector::from_i64(bound)
-                            .into_resize_signed(object_size.bytesize())
-                            .into()
+                            // We approximate the object size with the smallest possible value.
+                            lower_bound.into()
+                        }
                     } else {
                         BitvectorDomain::new_top(object_size.bytesize())
                     }
