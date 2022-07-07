@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::{self, Debug};
 
 use super::Variable;
 use super::{ByteSize, Def};
@@ -431,5 +432,94 @@ impl Expression {
     }
 }
 
+impl fmt::Display for Expression {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Expression::Var(var) => write!(f, "{}", var),
+            Expression::Const(c) => {
+                write!(
+                    f,
+                    "{}",
+                    match c.try_to_i128() {
+                        Ok(x) => x.to_string(),
+                        Err(_) => "?".to_string(),
+                    }
+                )
+            }
+            Expression::BinOp { op, lhs, rhs } => write!(f, "({lhs} {op} {rhs})"),
+            Expression::UnOp { op, arg } => write!(f, "({op}({arg}))"),
+            Expression::Cast { op, size: _, arg } => write!(f, "({}({}))", op, arg),
+            Expression::Unknown {
+                description,
+                size: _,
+            } => write!(f, "{}", description),
+            Expression::Subpiece {
+                low_byte,
+                size,
+                arg,
+            } => {
+                if let (Ok(mut start), Ok(mut end)) =
+                    (u32::try_from(low_byte.0), u32::try_from(size.0))
+                {
+                    if start > 9 {
+                        start = 13; // subscript '('
+                    }
+                    if end > 9 {
+                        end = 14; // subscript ')'
+                    }
+
+                    write!(
+                        f,
+                        "({}{}₋{}",
+                        arg,
+                        std::char::from_u32(0x2080 + start).unwrap_or_default(),
+                        std::char::from_u32(0x2080 + end).unwrap_or_default()
+                    )
+                } else {
+                    write!(f, "{}₍₋₎", arg)
+                }
+            }
+        }
+    }
+}
+
+impl fmt::Display for BinOpType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            BinOpType::IntEqual => write!(f, "=="),
+            BinOpType::IntNotEqual => write!(f, "!="),
+            BinOpType::IntLess => write!(f, "<"),
+            BinOpType::IntSLess => write!(f, "<"),
+            BinOpType::IntLessEqual => write!(f, "<="),
+            BinOpType::IntSLessEqual => write!(f, "<="),
+            BinOpType::IntAdd => write!(f, "+"),
+            BinOpType::IntSub => write!(f, "-"),
+            BinOpType::IntXOr => write!(f, "^"),
+            BinOpType::IntAnd => write!(f, "&"),
+            BinOpType::IntOr => write!(f, "|"),
+            BinOpType::IntLeft => write!(f, "<<"),
+            BinOpType::IntRight => write!(f, ">>"),
+            BinOpType::IntMult => write!(f, "*"),
+            BinOpType::IntDiv => write!(f, "/"),
+            BinOpType::IntRem => write!(f, "//"),
+            _ => write!(f, "{:?}", self),
+        }
+    }
+}
+
+impl fmt::Display for UnOpType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            UnOpType::IntNegate => write!(f, "¬"),
+            _ => write!(f, "{:?}", self),
+        }
+    }
+}
+
+impl fmt::Display for CastOpType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
 #[cfg(test)]
 mod tests;
