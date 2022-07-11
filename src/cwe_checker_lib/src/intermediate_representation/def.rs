@@ -1,3 +1,5 @@
+use std::fmt;
+
 use super::{CastOpType, Expression, Variable};
 use crate::prelude::*;
 
@@ -82,6 +84,16 @@ impl Term<Def> {
                 address.substitute_input_var(input_var, replace_with_expression);
                 value.substitute_input_var(input_var, replace_with_expression);
             }
+        }
+    }
+}
+
+impl fmt::Display for Def {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Def::Load { var, address } => write!(f, "{} = @{}", var, address),
+            Def::Store { address, value } => write!(f, "@{} = {}", address, value),
+            Def::Assign { var, value } => write!(f, "{} = {}", var, value),
         }
     }
 }

@@ -1,3 +1,5 @@
+use std::fmt;
+
 use super::Expression;
 use crate::prelude::*;
 
@@ -57,4 +59,36 @@ pub enum Jmp {
         /// where the disassembler assumes that execution will continue after handling of the side effect.
         return_: Option<Tid>,
     },
+}
+
+impl fmt::Display for Jmp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Jmp::Branch(tid) => write!(f, "-> {}", tid),
+            Jmp::BranchInd(expr) => write!(f, "-> {}", expr),
+            Jmp::CBranch { target, condition } => write!(f, "if {} -> {}", condition, target),
+            Jmp::Call { target, return_ } => write!(
+                f,
+                "call {} ret {}",
+                target,
+                return_.as_ref().unwrap_or(&Tid::new("?"))
+            ),
+            Jmp::CallInd { target, return_ } => write!(
+                f,
+                "call {} ret {}",
+                target,
+                return_.as_ref().unwrap_or(&Tid::new("?"))
+            ),
+            Jmp::Return(expr) => write!(f, "ret {}", expr),
+            Jmp::CallOther {
+                description,
+                return_,
+            } => write!(
+                f,
+                "call {} ret {}",
+                description,
+                return_.as_ref().unwrap_or(&Tid::new("?"))
+            ),
+        }
+    }
 }
