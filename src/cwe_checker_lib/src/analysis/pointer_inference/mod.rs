@@ -156,7 +156,7 @@ impl<'a> PointerInference<'a> {
         }
         if !self.computation.has_stabilized() {
             let worklist_size = self.computation.get_worklist().len();
-            let _ = self.log_info(format!(
+            self.log_info(format!(
                 "Fixpoint did not stabilize. Remaining worklist size: {}",
                 worklist_size,
             ));

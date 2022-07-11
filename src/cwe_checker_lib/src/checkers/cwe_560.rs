@@ -59,7 +59,7 @@ fn get_umask_permission_arg(
                 let _ = state.handle_store(address, value, &project.runtime_memory_image);
             }
             Def::Assign { var, value } => {
-                let _ = state.handle_register_assign(var, value);
+                state.handle_register_assign(var, value);
             }
             Def::Load { var, address } => {
                 let _ = state.handle_load(var, address, &project.runtime_memory_image);
