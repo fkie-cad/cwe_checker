@@ -554,7 +554,7 @@ fn display() {
         .subpiece(ByteSize(0), ByteSize(20));
 
     assert_eq!(
-        "((FloatCeil((IntSExt((¬((2 + (EAX:32 - ECX:32))))))))₀₋₎",
+        "((FloatCeil((IntSExt((¬((0x2:i32 + (EAX:32 - ECX:32))))))))[0₋20]",
         format!("{}", expr)
     );
 }
