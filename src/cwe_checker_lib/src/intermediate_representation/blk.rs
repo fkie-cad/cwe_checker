@@ -1,6 +1,6 @@
 use super::*;
 use crate::utils::log::LogMessage;
-use std::collections::HashSet;
+use std::{collections::HashSet, fmt};
 
 /// A basic block is a sequence of `Def` instructions followed by up to two `Jmp` instructions.
 ///
@@ -185,6 +185,21 @@ impl Term<Blk> {
             new_defs.push(last_def);
         }
         self.term.defs = new_defs;
+    }
+}
+
+impl fmt::Display for Blk {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for def in self.defs.iter() {
+            writeln!(f, "{}: {}", def.tid, def.term)?;
+        }
+        for jmp in self.jmps.iter() {
+            writeln!(f, "{}: {}", jmp.tid, jmp.term)?;
+        }
+        for indjmp in self.indirect_jmp_targets.iter() {
+            writeln!(f, "{}", indjmp)?;
+        }
+        Ok(())
     }
 }
 

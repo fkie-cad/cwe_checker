@@ -439,9 +439,16 @@ impl fmt::Display for Expression {
             Expression::Const(c) => {
                 write!(f, "0x{:016x}:i{}", c, c.bytesize().as_bit_length())
             }
-            Expression::BinOp { op, lhs, rhs } => write!(f, "({} {} {})", lhs, op, rhs),
-            Expression::UnOp { op, arg } => write!(f, "({}({}))", op, arg),
-            Expression::Cast { op, size: _, arg } => write!(f, "({}({}))", op, arg),
+            Expression::BinOp { op, lhs, rhs } => match op {
+                BinOpType::IntMult
+                | BinOpType::IntDiv
+                | BinOpType::IntRem
+                | BinOpType::FloatMult
+                | BinOpType::FloatDiv => write!(f, "{} {} {}", lhs, op, rhs),
+                _ => write!(f, "({} {} {})", lhs, op, rhs),
+            },
+            Expression::UnOp { op, arg } => write!(f, "{}({})", op, arg),
+            Expression::Cast { op, size: _, arg } => write!(f, "{}({})", op, arg),
             Expression::Unknown {
                 description,
                 size: _,
@@ -452,7 +459,7 @@ impl fmt::Display for Expression {
                 arg,
             } => {
                 if let (Ok(start), Ok(end)) = (u32::try_from(low_byte.0), u32::try_from(size.0)) {
-                    write!(f, "({}[{}₋{}]", arg, start, end)
+                    write!(f, "({})[{}₋{}]", arg, start, end)
                 } else {
                     write!(f, "{}[]", arg)
                 }

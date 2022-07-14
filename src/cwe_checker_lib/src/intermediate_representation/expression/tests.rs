@@ -543,7 +543,12 @@ fn processing_sub_registers() {
 #[test]
 fn display() {
     let expr = Expression::const_from_i32(2);
-    let expr = expr.plus(Setup::new().int_sub_expr);
+    let mul = Expression::BinOp {
+        op: BinOpType::IntMult,
+        lhs: Box::new(Expression::Var(Variable::mock("RAX", 8))),
+        rhs: Box::new(Expression::Var(Variable::mock("RBP", 8))),
+    };
+    let expr = expr.plus(mul);
     let expr = Expression::UnOp {
         op: UnOpType::IntNegate,
         arg: Box::new(expr),
@@ -554,7 +559,7 @@ fn display() {
         .subpiece(ByteSize(0), ByteSize(20));
 
     assert_eq!(
-        "((FloatCeil((IntSExt((¬((0x2:i32 + (EAX:32 - ECX:32))))))))[0₋20]",
+        "(FloatCeil(IntSExt(¬((0x2:i32 + RAX:64 * RBP:64)))))[0₋20]",
         format!("{}", expr)
     );
 }
