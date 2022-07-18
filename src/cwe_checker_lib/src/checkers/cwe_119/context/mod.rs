@@ -124,7 +124,7 @@ impl<'a> Context<'a> {
     }
 
     /// Log a debug log message in the log collector of `self`.
-    fn log_debug(&self, tid: &Tid, msg: impl ToString) {
+    pub fn log_debug(&self, tid: &Tid, msg: impl ToString) {
         let log_msg = LogMessage {
             text: msg.to_string(),
             level: crate::utils::log::LogLevel::Debug,
@@ -136,7 +136,7 @@ impl<'a> Context<'a> {
 
     /// Check whether the given parameter at the given callsite may point outside of its corresponding memory object.
     /// If yes, then generate a CWE warning.
-    fn check_param_at_call(
+    pub fn check_param_at_call(
         &self,
         state: &mut State,
         param: &Arg,
