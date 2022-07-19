@@ -211,7 +211,10 @@ public final class JumpProcessing {
     public static void addMissingJumpAfterInstructionSplit(Term<Blk> lastBlock) {
         lastBlock.getTerm().addMultipleDefs(PcodeBlockData.temporaryDefStorage);
         addBranchToCurrentBlock(lastBlock.getTerm(), PcodeBlockData.instruction.getAddress().toString(), PcodeBlockData.instruction.getFallThrough().toString());
-        PcodeBlockData.blocks.add(TermCreator.createBlkTerm(PcodeBlockData.instruction.getFallThrough().toString(), null));
+        // If and only if the jump target is still part of the same Ghidra block, we need to start a new block term for it.
+        if (PcodeBlockData.instructionIndex != PcodeBlockData.numberOfInstructionsInBlock - 1) {
+            PcodeBlockData.blocks.add(TermCreator.createBlkTerm(PcodeBlockData.instruction.getFallThrough().toString(), null));
+        } 
         PcodeBlockData.temporaryDefStorage.clear();
     }
 
