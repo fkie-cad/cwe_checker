@@ -539,3 +539,27 @@ fn processing_sub_registers() {
     expr.cast_sub_registers_to_base_register_subpieces(output, &register_map, peeked);
     assert_eq!(expr, setup.int_sub_subpiece_expr);
 }
+
+#[test]
+fn display() {
+    let expr = Expression::const_from_i32(2);
+    let mul = Expression::BinOp {
+        op: BinOpType::IntMult,
+        lhs: Box::new(Expression::Var(Variable::mock("RAX", 8))),
+        rhs: Box::new(Expression::Var(Variable::mock("RBP", 8))),
+    };
+    let expr = expr.plus(mul);
+    let expr = Expression::UnOp {
+        op: UnOpType::IntNegate,
+        arg: Box::new(expr),
+    };
+    let expr = expr
+        .cast(CastOpType::IntSExt)
+        .un_op(UnOpType::FloatCeil)
+        .subpiece(ByteSize(0), ByteSize(20));
+
+    assert_eq!(
+        "(FloatCeil(IntSExt(IntNegate((0x2:i32 + RAX:64 * RBP:64)))))[0-20]",
+        format!("{}", expr)
+    );
+}
