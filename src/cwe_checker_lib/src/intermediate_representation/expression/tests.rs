@@ -268,6 +268,25 @@ fn trivial_expression_substitution() {
             rhs: Box::new(setup.rax_variable.clone()),
         }
     );
+    // Test (x - const_1) - const_2 = x - (const_1 + const_2)
+    let mut expr = Expression::BinOp {
+        lhs: Box::new(Expression::BinOp {
+            lhs: Box::new(setup.rax_variable.clone()),
+            op: BinOpType::IntSub,
+            rhs: Box::new(Expression::Const(Bitvector::from_i64(3))),
+        }),
+        op: BinOpType::IntSub,
+        rhs: Box::new(Expression::Const(Bitvector::from_i64(4))),
+    };
+    expr.substitute_trivial_operations();
+    assert_eq!(
+        expr,
+        Expression::BinOp {
+            lhs: Box::new(setup.rax_variable.clone()),
+            op: BinOpType::IntSub,
+            rhs: Box::new(Expression::Const(Bitvector::from_i64(7)))
+        }
+    );
 }
 
 #[test]
