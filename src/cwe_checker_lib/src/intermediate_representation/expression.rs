@@ -459,7 +459,7 @@ impl fmt::Display for Expression {
                 arg,
             } => {
                 if let (Ok(start), Ok(end)) = (u32::try_from(low_byte.0), u32::try_from(size.0)) {
-                    write!(f, "({})[{}₋{}]", arg, start, end)
+                    write!(f, "({})[{}-{}]", arg, start, end)
                 } else {
                     write!(f, "{}[]", arg)
                 }
@@ -487,6 +487,8 @@ impl fmt::Display for BinOpType {
             BinOpType::IntMult => write!(f, "*"),
             BinOpType::IntDiv => write!(f, "/"),
             BinOpType::IntRem => write!(f, "%"),
+            BinOpType::BoolAnd => write!(f, "&&"),
+            BinOpType::BoolOr => write!(f, "||"),
             _ => write!(f, "{:?}", self),
         }
     }
@@ -495,7 +497,8 @@ impl fmt::Display for BinOpType {
 impl fmt::Display for UnOpType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            UnOpType::IntNegate => write!(f, "¬"),
+            UnOpType::IntNegate => write!(f, "~"),
+            UnOpType::BoolNegate => write!(f, "¬"),
             _ => write!(f, "{:?}", self),
         }
     }

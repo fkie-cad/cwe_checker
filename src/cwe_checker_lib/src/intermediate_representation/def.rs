@@ -91,8 +91,8 @@ impl Term<Def> {
 impl fmt::Display for Def {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Def::Load { var, address } => write!(f, "{} = @{}", var, address),
-            Def::Store { address, value } => write!(f, "@{} = {}", address, value),
+            Def::Load { var, address } => write!(f, "{} := Load from {}", var, address),
+            Def::Store { address, value } => write!(f, "Store at {} := {}", address, value),
             Def::Assign { var, value } => write!(f, "{} = {}", var, value),
         }
     }

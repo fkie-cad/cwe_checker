@@ -196,9 +196,6 @@ impl fmt::Display for Blk {
         for jmp in self.jmps.iter() {
             writeln!(f, "{}: {}", jmp.tid, jmp.term)?;
         }
-        for indjmp in self.indirect_jmp_targets.iter() {
-            writeln!(f, "{}", indjmp)?;
-        }
         Ok(())
     }
 }
