@@ -497,7 +497,6 @@ impl fmt::Display for BinOpType {
 impl fmt::Display for UnOpType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            UnOpType::IntNegate => write!(f, "~"),
             UnOpType::BoolNegate => write!(f, "¬"),
             _ => write!(f, "{:?}", self),
         }
