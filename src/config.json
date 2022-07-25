@@ -214,6 +214,9 @@
   "CWE782": {
     "symbols": []
   },
+  "CWE789": {
+    "threshold": 1000000
+  },
   "check_path": {
     "_comment": "functions that take direct user input",
     "symbols": [
