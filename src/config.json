@@ -215,7 +215,14 @@
     "symbols": []
   },
   "CWE789": {
-    "threshold": 1000000
+    "stack_threshold": 1000000,
+    "heap_threshold": 1000000,
+    "symbols": [
+      "xmalloc",
+      "malloc",
+      "realloc",
+      "calloc"
+    ]
   },
   "check_path": {
     "_comment": "functions that take direct user input",
