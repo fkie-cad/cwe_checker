@@ -11,7 +11,7 @@ use crate::{
 use std::collections::BTreeMap;
 
 /// Returns a map that maps the names of known extern functions to the access patterns for their parameters.
-/// 
+///
 /// The access patterns are ordered in the same order as the parameters
 /// (i.e. the first access pattern corresponds to the first parameter and so on).
 pub fn generate_param_access_stubs() -> BTreeMap<&'static str, Vec<AccessPattern>> {
@@ -117,10 +117,10 @@ pub fn generate_param_access_stubs() -> BTreeMap<&'static str, Vec<AccessPattern
 }
 
 /// Compute the return value of a call to a known extern symbol from the given state.
-/// 
+///
 /// Note that this function needs to be called before non-callee-saved registers are cleared from the state,
 /// since the return value is usually computed out of the parameter values.
-/// 
+///
 /// This function should only be called for symbols contained in the list returned by [generate_param_access_stubs],
 /// since it assumes untracked return values (e.g. integers or void) for all not explicitly handled symbols.
 pub fn compute_return_value_for_stubbed_function(
@@ -130,10 +130,14 @@ pub fn compute_return_value_for_stubbed_function(
 ) -> DataDomain<BitvectorDomain> {
     use return_value_stubs::*;
     match extern_symbol.name.as_str() {
-        "memcpy" | "memmove" | "memset" | "strcat" | "strcpy" | "strncat" | "strncpy" => copy_param(state, extern_symbol, 0),
+        "memcpy" | "memmove" | "memset" | "strcat" | "strcpy" | "strncat" | "strncpy" => {
+            copy_param(state, extern_symbol, 0)
+        }
         "fgets" => or_null(copy_param(state, extern_symbol, 0)),
         "realloc" => or_top(copy_param(state, extern_symbol, 0)),
-        "strchr" | "strrchr" | "strstr" => or_null(param_plus_unknown_offset(state, extern_symbol, 0)),
+        "strchr" | "strrchr" | "strstr" => {
+            or_null(param_plus_unknown_offset(state, extern_symbol, 0))
+        }
         _ => untracked(project.stack_pointer_register.size),
     }
 }

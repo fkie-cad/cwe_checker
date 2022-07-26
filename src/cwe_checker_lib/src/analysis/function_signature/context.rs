@@ -128,11 +128,15 @@ impl<'a> Context<'a> {
         if let Some(param_access_list) = self.param_access_stubs.get(extern_symbol.name.as_str()) {
             // Set access flags for parameter access
             for (param, access_pattern) in extern_symbol.parameters.iter().zip(param_access_list) {
-                for (id, _) in state.eval_parameter_arg(param).get_relative_values() {
+                for id in state.eval_parameter_arg(param).get_relative_values().keys() {
                     state.merge_access_pattern_of_id(id, access_pattern);
                 }
             }
-            let return_val = stubs::compute_return_value_for_stubbed_function(self.project, state, extern_symbol);
+            let return_val = stubs::compute_return_value_for_stubbed_function(
+                self.project,
+                state,
+                extern_symbol,
+            );
             state.clear_non_callee_saved_register(&cconv.callee_saved_register);
             state.set_register(&cconv.integer_parameter_register[0], return_val);
         } else {
