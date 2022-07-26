@@ -220,6 +220,15 @@ impl State {
         None
     }
 
+    /// Merges the access pattern of the given abstract identifer in `self` with the provided access pattern.
+    /// 
+    /// Does not add the identifier to the list of tracked identifiers if it is not already tracked in `self`.
+    pub fn merge_access_pattern_of_id(&mut self, id: &AbstractIdentifier, access_pattern: &AccessPattern) {
+        if let Some(object) = self.tracked_ids.get_mut(id) {
+            *object = object.merge(access_pattern);
+        }
+    }
+
     /// Evaluate the value of the given expression on the current state.
     pub fn eval(&self, expression: &Expression) -> DataDomain<BitvectorDomain> {
         match expression {

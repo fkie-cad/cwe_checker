@@ -23,6 +23,24 @@ impl AccessPattern {
         }
     }
 
+    /// Set the access flag for read access and return `self`.
+    pub fn with_read_flag(mut self) -> Self {
+        self.read = true;
+        self
+    }
+
+    /// Set the access flag for immutable pointer dereference and return `self`.
+    pub fn with_dereference_flag(mut self) -> Self {
+        self.dereferenced = true;
+        self
+    }
+
+    /// Set the access flag for pointer dereference with write access to the pointer target and return `self`.
+    pub fn with_mutably_dereferenced_flag(mut self) -> Self {
+        self.mutably_dereferenced = true;
+        self
+    }
+
     /// Set the access flag for immutable pointer dereference.
     pub fn set_dereference_flag(&mut self) {
         self.dereferenced = true;

@@ -5,7 +5,7 @@ impl State {
     ///
     /// Marks every possible input ID as accessed and writes to every return register a value
     /// that may point to any of the input IDs.
-    pub fn handle_extern_symbol(
+    pub fn handle_generic_extern_symbol(
         &mut self,
         call: &Term<Jmp>,
         extern_symbol: &ExternSymbol,

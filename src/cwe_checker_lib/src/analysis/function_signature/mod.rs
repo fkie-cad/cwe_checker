@@ -42,6 +42,7 @@ mod state;
 use state::State;
 mod access_pattern;
 pub use access_pattern::AccessPattern;
+mod stubs;
 
 /// Generate the computation object for the fixpoint computation
 /// and set the node values for all function entry nodes.

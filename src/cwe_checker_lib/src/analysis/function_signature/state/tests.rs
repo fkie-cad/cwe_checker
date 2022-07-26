@@ -156,7 +156,7 @@ fn test_extern_symbol_handling() {
     let return_val_id =
         AbstractIdentifier::from_var(Tid::new("call_tid"), &Variable::mock("r0", 4));
     // Test extern symbol handling.
-    state.handle_extern_symbol(&call, &extern_symbol, &cconv);
+    state.handle_generic_extern_symbol(&call, &extern_symbol, &cconv);
     assert_eq!(
         state
             .tracked_ids

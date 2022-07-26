@@ -10,12 +10,18 @@ use super::*;
 pub struct Context<'a> {
     graph: &'a Graph<'a>,
     project: &'a Project,
+    /// Parameter access patterns for stubbed extern symbols.
+    param_access_stubs: BTreeMap<&'static str, Vec<AccessPattern>>,
 }
 
 impl<'a> Context<'a> {
     /// Generate a new context object.
     pub fn new(project: &'a Project, graph: &'a Graph<'a>) -> Self {
-        Context { graph, project }
+        Context {
+            graph,
+            project,
+            param_access_stubs: stubs::generate_param_access_stubs(),
+        }
     }
 
     /// Compute the return values of a call and return them (without adding them to the caller state).
@@ -108,6 +114,31 @@ impl<'a> Context<'a> {
 
         return_value
     }
+
+    /// Handle a call to a specific extern symbol.
+    /// If function stubs exist for the symbol, then these are used to compute the effect of the call.
+    /// Else the [generic symbol handler](State::handle_generic_extern_symbol) is called.
+    fn handle_extern_symbol_call(
+        &self,
+        state: &mut State,
+        extern_symbol: &ExternSymbol,
+        call: &Term<Jmp>,
+    ) {
+        let cconv = self.project.get_calling_convention(extern_symbol);
+        if let Some(param_access_list) = self.param_access_stubs.get(extern_symbol.name.as_str()) {
+            // Set access flags for parameter access
+            for (param, access_pattern) in extern_symbol.parameters.iter().zip(param_access_list) {
+                for (id, _) in state.eval_parameter_arg(param).get_relative_values() {
+                    state.merge_access_pattern_of_id(id, access_pattern);
+                }
+            }
+            let return_val = stubs::compute_return_value_for_stubbed_function(self.project, state, extern_symbol);
+            state.clear_non_callee_saved_register(&cconv.callee_saved_register);
+            state.set_register(&cconv.integer_parameter_register[0], return_val);
+        } else {
+            state.handle_generic_extern_symbol(call, extern_symbol, cconv);
+        }
+    }
 }
 
 impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
@@ -194,8 +225,7 @@ impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
             }
             Jmp::Call { target, .. } => {
                 if let Some(extern_symbol) = self.project.program.term.extern_symbols.get(target) {
-                    let cconv = self.project.get_calling_convention(extern_symbol);
-                    new_state.handle_extern_symbol(call, extern_symbol, cconv);
+                    self.handle_extern_symbol_call(&mut new_state, extern_symbol, call);
                     if !extern_symbol.no_return {
                         return Some(new_state);
                     }
@@ -206,7 +236,7 @@ impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
             }
             _ => (),
         }
-        // The call could not be properly handled, so we treat it as a dead end in the control flow graph.
+        // The call could not be properly handled or is a non-returning function, so we treat it as a dead end in the control flow graph.
         None
     }
 
