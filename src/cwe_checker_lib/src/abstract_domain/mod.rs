@@ -76,15 +76,19 @@ pub trait HasTop {
 /// It has a *Top* element, which is only characterized by its bytesize.
 pub trait RegisterDomain: AbstractDomain + SizedDomain + HasTop {
     /// Compute the (abstract) result of a binary operation
+    #[must_use]
     fn bin_op(&self, op: BinOpType, rhs: &Self) -> Self;
 
     /// Compute the (abstract) result of a unary operation
+    #[must_use]
     fn un_op(&self, op: UnOpType) -> Self;
 
     /// Extract a sub-bitvector
+    #[must_use]
     fn subpiece(&self, low_byte: ByteSize, size: ByteSize) -> Self;
 
     /// Perform a typecast to extend a bitvector or to cast between integer and floating point types.
+    #[must_use]
     fn cast(&self, kind: CastOpType, width: ByteSize) -> Self;
 
     /// Return the bytesize of the result of the given binary operation.
