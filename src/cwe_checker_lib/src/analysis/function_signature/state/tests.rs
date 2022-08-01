@@ -78,7 +78,7 @@ fn test_store_and_load_from_stack() {
         state.stack.get(Bitvector::from_i32(-4), ByteSize::new(4)),
         value.clone()
     );
-    assert_eq!(state.load_value(address, ByteSize::new(4)), value);
+    assert_eq!(state.load_value(address, ByteSize::new(4), None), value);
     // Load a parameter register and check that the parameter gets generated
     let address = DataDomain::from_target(mock_stack_id(), Bitvector::from_i32(4).into());
     let stack_param_id = mock_stack_param_id(4, 4);
@@ -86,7 +86,7 @@ fn test_store_and_load_from_stack() {
         DataDomain::from_target(stack_param_id.clone(), Bitvector::from_i32(0).into());
     assert_eq!(state.tracked_ids.iter().len(), 6);
     assert_eq!(
-        state.load_value(address.clone(), ByteSize::new(4)),
+        state.load_value(address.clone(), ByteSize::new(4), None),
         stack_param
     );
     assert_eq!(state.tracked_ids.iter().len(), 7);
@@ -108,7 +108,7 @@ fn test_load_unsized_from_stack() {
     let stack_param_id = mock_stack_param_id(0, 4);
     let stack_param =
         DataDomain::from_target(stack_param_id.clone(), Bitvector::from_i32(0).into());
-    state.load_value(address, ByteSize::new(4));
+    state.load_value(address, ByteSize::new(4), None);
     let unsized_load = state.load_unsized_value_from_stack(Bitvector::from_i32(0));
     assert_eq!(unsized_load, stack_param);
     assert!(state.tracked_ids.get(&stack_param_id).is_some());

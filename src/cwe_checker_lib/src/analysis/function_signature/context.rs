@@ -1,4 +1,7 @@
-use crate::abstract_domain::{AbstractDomain, AbstractIdentifier, BitvectorDomain, DataDomain};
+use crate::abstract_domain::{
+    AbstractDomain, AbstractIdentifier, BitvectorDomain, DataDomain, TryToBitvec,
+};
+use crate::utils::arguments;
 use crate::{
     analysis::{forward_interprocedural_fixpoint, graph::Graph},
     intermediate_representation::Project,
@@ -12,6 +15,10 @@ pub struct Context<'a> {
     project: &'a Project,
     /// Parameter access patterns for stubbed extern symbols.
     param_access_stubs: BTreeMap<&'static str, Vec<AccessPattern>>,
+    /// Assigns to the name of a stubbed variadic symbol the index of its format string parameter,
+    /// the index of the first variadic parameter
+    /// and the access pattern for all variadic parameters
+    stubbed_variadic_symbols: BTreeMap<&'static str, (usize, usize, AccessPattern)>,
 }
 
 impl<'a> Context<'a> {
@@ -21,6 +28,7 @@ impl<'a> Context<'a> {
             graph,
             project,
             param_access_stubs: stubs::generate_param_access_stubs(),
+            stubbed_variadic_symbols: stubs::get_stubbed_variadic_symbols(),
         }
     }
 
@@ -132,6 +140,16 @@ impl<'a> Context<'a> {
                     state.merge_access_pattern_of_id(id, access_pattern);
                 }
             }
+            if self
+                .stubbed_variadic_symbols
+                .get(extern_symbol.name.as_str())
+                .is_some()
+                && self
+                    .set_access_flags_for_variadic_parameters(state, extern_symbol)
+                    .is_none()
+            {
+                self.set_access_flags_for_generic_variadic_parameters(state, extern_symbol);
+            }
             let return_val = stubs::compute_return_value_for_stubbed_function(
                 self.project,
                 state,
@@ -141,6 +159,95 @@ impl<'a> Context<'a> {
             state.set_register(&cconv.integer_parameter_register[0], return_val);
         } else {
             state.handle_generic_extern_symbol(call, extern_symbol, cconv);
+        }
+    }
+
+    /// Merges the access patterns for all variadic parameters of the given symbol.
+    ///
+    /// This function can only handle stubbed symbols where the number of variadic parameters can be parsed from a format string.
+    /// If the parsing of the variadic parameters failed for any reason
+    /// (e.g. because the format string could not be statically determined)
+    /// then this function does not modify any access patterns.
+    ///
+    /// If the variadic access pattern contains the mutable dereference flag
+    /// then all variadic parameters are assumed to be pointers.
+    fn set_access_flags_for_variadic_parameters(
+        &self,
+        state: &mut State,
+        extern_symbol: &ExternSymbol,
+    ) -> Option<()> {
+        let (format_string_index, variadic_params_index_start, variadic_access_pattern) = self
+            .stubbed_variadic_symbols
+            .get(extern_symbol.name.as_str())?;
+        let format_string_address = state
+            .eval_parameter_arg(&extern_symbol.parameters[*format_string_index])
+            .get_if_absolute_value()
+            .map(|value| value.try_to_bitvec().ok())??;
+        let format_string = arguments::parse_format_string_destination_and_return_content(
+            format_string_address,
+            &self.project.runtime_memory_image,
+        )
+        .ok()?;
+        let mut format_string_params = arguments::parse_format_string_parameters(
+            &format_string,
+            &self.project.datatype_properties,
+        )
+        .ok()?;
+        if variadic_access_pattern.is_mutably_dereferenced() {
+            // All parameters are pointers to where values shall be written.
+            format_string_params =
+                vec![
+                    (Datatype::Pointer, self.project.stack_pointer_register.size);
+                    format_string_params.len()
+                ];
+        }
+        let format_string_args = arguments::calculate_parameter_locations(
+            format_string_params,
+            self.project.get_calling_convention(extern_symbol),
+            *variadic_params_index_start,
+            &self.project.stack_pointer_register,
+            &self.project.cpu_architecture,
+        );
+        for param in format_string_args {
+            for id in state
+                .eval_parameter_arg(&param)
+                .get_relative_values()
+                .keys()
+            {
+                state.merge_access_pattern_of_id(id, variadic_access_pattern);
+            }
+        }
+        Some(())
+    }
+
+    /// Sets access patterns for variadic parameters
+    /// of a call to a variadic function with unknown number of variadic parameters.
+    /// This function assumes that all remaining integer parameter registers of the corresponding calling convention
+    /// are filled with variadic parameters,
+    /// but no variadic parameters are supplied as stack parameters.
+    fn set_access_flags_for_generic_variadic_parameters(
+        &self,
+        state: &mut State,
+        extern_symbol: &ExternSymbol,
+    ) {
+        let (_, variadic_params_index_start, variadic_access_pattern) = self
+            .stubbed_variadic_symbols
+            .get(extern_symbol.name.as_str())
+            .unwrap();
+        let cconv = self.project.get_calling_convention(extern_symbol);
+        if *variadic_params_index_start < cconv.integer_parameter_register.len() {
+            for index in [
+                *variadic_params_index_start,
+                cconv.integer_parameter_register.len() - 1,
+            ] {
+                for id in state
+                    .get_register(&cconv.integer_parameter_register[index])
+                    .get_relative_values()
+                    .keys()
+                {
+                    state.merge_access_pattern_of_id(id, variadic_access_pattern);
+                }
+            }
         }
     }
 }
@@ -165,7 +272,11 @@ impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
             }
             Def::Load { var, address } => {
                 new_state.set_deref_flag_for_input_ids_of_expression(address);
-                let value = new_state.load_value(new_state.eval(address), var.size);
+                let value = new_state.load_value(
+                    new_state.eval(address),
+                    var.size,
+                    Some(&self.project.runtime_memory_image),
+                );
                 new_state.set_register(var, value);
             }
             Def::Store { address, value } => {

@@ -99,10 +99,18 @@ impl State {
         &mut self,
         address: DataDomain<BitvectorDomain>,
         size: ByteSize,
+        global_memory: Option<&RuntimeMemoryImage>,
     ) -> DataDomain<BitvectorDomain> {
         if let Some(stack_offset) = self.get_offset_if_exact_stack_pointer(&address) {
             self.load_value_from_stack(stack_offset, size)
-        } else {
+        } else if let (Ok(global_address), Some(global_mem)) = (address.try_to_bitvec(), global_memory) {
+            if let Ok(Some(value)) = global_mem.read(&global_address, size) {
+                value.into()
+            } else {
+                DataDomain::new_top(size)
+            }
+        }
+        else {
             DataDomain::new_top(size)
         }
     }
@@ -268,7 +276,7 @@ impl State {
             } => {
                 self.set_deref_flag_for_input_ids_of_expression(address);
                 let address = self.eval(address);
-                self.load_value(address, *size)
+                self.load_value(address, *size, None)
             }
         }
     }

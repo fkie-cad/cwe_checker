@@ -1,4 +1,7 @@
-use crate::intermediate_representation::{Bitvector, Tid};
+use crate::{
+    abstract_domain::IntervalDomain,
+    intermediate_representation::{Bitvector, Tid},
+};
 
 use super::*;
 
@@ -85,8 +88,7 @@ fn test_get_input_format_string() {
 #[test]
 fn test_parse_format_string_destination_and_return_content() {
     let mem_image = RuntimeMemoryImage::mock();
-    let string_address_vector = Bitvector::from_str_radix(16, "3002").unwrap();
-    let string_address = IntervalDomain::new(string_address_vector.clone(), string_address_vector);
+    let string_address = Bitvector::from_str_radix(16, "3002").unwrap();
 
     assert_eq!(
         "Hello World",
@@ -186,7 +188,7 @@ fn test_calculate_parameter_locations() {
         calculate_parameter_locations(
             parameters.clone(),
             &cconv,
-            format_string_index,
+            format_string_index + 1,
             &Variable::mock("RSP", 8),
             "x86_64"
         )
@@ -216,7 +218,7 @@ fn test_calculate_parameter_locations() {
         calculate_parameter_locations(
             parameters,
             &cconv,
-            format_string_index,
+            format_string_index + 1,
             &Variable::mock("RSP", 8),
             "x86_64"
         )

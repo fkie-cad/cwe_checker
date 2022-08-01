@@ -41,6 +41,7 @@ pub fn generate_param_access_stubs() -> BTreeMap<&'static str, Vec<AccessPattern
         ("fgets", vec![deref_mut(), read(), deref_mut()]),
         ("fopen", vec![deref(), deref()]), // FIXME: Allocating function, whose return value should be a new abstract ID.
         ("fork", vec![]),
+        ("fprintf", vec![deref_mut(), deref()]),
         ("fputc", vec![read(), deref_mut()]),
         ("fputs", vec![deref(), deref_mut()]),
         ("fread", vec![deref_mut(), read(), read(), deref_mut()]),
@@ -60,6 +61,7 @@ pub fn generate_param_access_stubs() -> BTreeMap<&'static str, Vec<AccessPattern
         ("open", vec![deref(), read(), read()]),
         ("open64", vec![deref(), read(), read()]),
         ("perror", vec![deref()]),
+        ("printf", vec![deref()]),
         ("putchar", vec![read()]),
         ("puts", vec![deref()]),
         ("qsort", vec![deref_mut(), read(), read(), deref()]),
@@ -92,7 +94,10 @@ pub fn generate_param_access_stubs() -> BTreeMap<&'static str, Vec<AccessPattern
         ), // FIXME: The deref_mut parameter may only be deref?
         ("signal", vec![read(), read()]),
         ("sleep", vec![read()]),
+        ("snprintf", vec![deref_mut(), read(), deref()]),
         ("socket", vec![read(), read(), read()]),
+        ("sprintf", vec![deref_mut(), deref()]),
+        ("sscanf", vec![deref(), deref()]),
         ("strcasecmp", vec![deref(), deref()]),
         ("strcat", vec![deref_mut(), deref()]),
         ("strchr", vec![deref(), read()]),
@@ -112,7 +117,36 @@ pub fn generate_param_access_stubs() -> BTreeMap<&'static str, Vec<AccessPattern
         ("system", vec![deref()]),
         ("time", vec![deref_mut()]),
         ("unlink", vec![deref()]),
+        ("vfprintf", vec![deref_mut(), deref(), deref()]),
         ("write", vec![read(), deref(), read()]),
+    ])
+}
+
+/// Return a map that maps names of stubbed variadic symbols to a tuple consisting of:
+/// - the index of the format string parameter of the symbol
+/// - the index of the first variadic parameter (if at least one variadic parameter is used)
+/// - the access pattern that the called symbols uses to access its variadic parameters.
+/// Note that the access pattern may vary between variadic parameters,
+/// e.g. some parameters may only be read and not derefenced by a call to `printf`.
+/// But we still approximate all accesses by the the maximal possible access to these parameters.
+pub fn get_stubbed_variadic_symbols() -> BTreeMap<&'static str, (usize, usize, AccessPattern)> {
+    let deref = || {
+        AccessPattern::new()
+            .with_read_flag()
+            .with_dereference_flag()
+    };
+    let deref_mut = || {
+        AccessPattern::new()
+            .with_read_flag()
+            .with_dereference_flag()
+            .with_mutably_dereferenced_flag()
+    };
+    BTreeMap::from([
+        ("fprintf", (1, 2, deref())),
+        ("printf", (0, 1, deref())),
+        ("snprintf", (2, 3, deref())),
+        ("sprintf", (1, 2, deref())),
+        ("sscanf", (1, 2, deref_mut())),
     ])
 }
 
