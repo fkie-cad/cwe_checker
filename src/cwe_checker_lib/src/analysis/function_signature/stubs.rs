@@ -32,14 +32,14 @@ pub fn generate_param_access_stubs() -> BTreeMap<&'static str, Vec<AccessPattern
         ("abort", vec![]),
         ("atoi", vec![deref()]),
         ("bind", vec![read(), deref(), read()]),
-        ("calloc", vec![read(), read()]), // FIXME: Allocating function, whose return value should be a new abstract ID.
+        ("calloc", vec![read(), read()]),
         ("close", vec![read()]),
         ("connect", vec![read(), deref(), read()]),
         ("exit", vec![read()]),
         ("fclose", vec![deref_mut()]),
         ("fflush", vec![deref_mut()]),
         ("fgets", vec![deref_mut(), read(), deref_mut()]),
-        ("fopen", vec![deref(), deref()]), // FIXME: Allocating function, whose return value should be a new abstract ID.
+        ("fopen", vec![deref(), deref()]),
         ("fork", vec![]),
         ("fprintf", vec![deref_mut(), deref()]),
         ("fputc", vec![read(), deref_mut()]),
@@ -53,7 +53,7 @@ pub fn generate_param_access_stubs() -> BTreeMap<&'static str, Vec<AccessPattern
         ("gettimeofday", vec![deref_mut(), deref_mut()]),
         ("kill", vec![read(), read()]),
         ("localtime", vec![deref()]), // FIXME: The return value is a pointer to static storage.
-        ("malloc", vec![read()]), // FIXME: Allocating function, whose return value should be a new abstract ID.
+        ("malloc", vec![read()]),
         ("memcmp", vec![deref(), deref(), read()]),
         ("memcpy", vec![deref_mut(), deref(), read()]),
         ("memmove", vec![deref_mut(), deref(), read()]),
@@ -103,7 +103,7 @@ pub fn generate_param_access_stubs() -> BTreeMap<&'static str, Vec<AccessPattern
         ("strchr", vec![deref(), read()]),
         ("strcmp", vec![deref(), deref()]),
         ("strcpy", vec![deref_mut(), deref()]),
-        ("strdup", vec![deref()]), // FIXME: Allocating function, whose return value should be a new abstract ID.
+        ("strdup", vec![deref()]),
         ("strerror", vec![read()]),
         ("strlen", vec![deref()]),
         ("strncasecmp", vec![deref(), deref(), read()]),
@@ -161,6 +161,7 @@ pub fn compute_return_value_for_stubbed_function(
     project: &Project,
     state: &mut State,
     extern_symbol: &ExternSymbol,
+    call_tid: &Tid,
 ) -> DataDomain<BitvectorDomain> {
     use return_value_stubs::*;
     match extern_symbol.name.as_str() {
@@ -168,7 +169,15 @@ pub fn compute_return_value_for_stubbed_function(
             copy_param(state, extern_symbol, 0)
         }
         "fgets" => or_null(copy_param(state, extern_symbol, 0)),
-        "realloc" => or_top(copy_param(state, extern_symbol, 0)),
+        "calloc" | "fopen" | "malloc" | "strdup" => {
+            or_null(new_mem_object_id(call_tid, &extern_symbol.return_values[0]))
+        }
+        "realloc" => or_null(
+            copy_param(state, extern_symbol, 0).merge(&new_mem_object_id(
+                call_tid,
+                &extern_symbol.return_values[0],
+            )),
+        ),
         "strchr" | "strrchr" | "strstr" => {
             or_null(param_plus_unknown_offset(state, extern_symbol, 0))
         }
@@ -178,6 +187,8 @@ pub fn compute_return_value_for_stubbed_function(
 
 /// Helper functions for computing return values for extern symbol calls.
 pub mod return_value_stubs {
+    use crate::{abstract_domain::AbstractIdentifier, intermediate_representation::Arg};
+
     use super::*;
 
     /// An untracked value is just a `Top` value.
@@ -195,6 +206,15 @@ pub mod return_value_stubs {
         state.eval_parameter_arg(&extern_symbol.parameters[param_index])
     }
 
+    /// A return value that contains a pointer to the start of a new memory object.
+    /// The ID of the memory object is given by the return register and the TID of the call instruction.
+    pub fn new_mem_object_id(call_tid: &Tid, return_arg: &Arg) -> DataDomain<BitvectorDomain> {
+        DataDomain::from_target(
+            AbstractIdentifier::from_arg(call_tid, return_arg),
+            Bitvector::zero(return_arg.bytesize().into()).into(),
+        )
+    }
+
     /// A return value that adds an unknown offset to a given parameter.
     /// E.g. if the parameter is a pointer to a string,
     /// this return value would describe a pointer to an offset inside the string.
@@ -210,11 +230,5 @@ pub mod return_value_stubs {
     /// The return value may also be zero in addition to its other possible values.
     pub fn or_null(data: DataDomain<BitvectorDomain>) -> DataDomain<BitvectorDomain> {
         data.merge(&Bitvector::zero(data.bytesize().into()).into())
-    }
-
-    /// The return value might also be something completely untracked in addition to its other possible values.
-    pub fn or_top(mut data: DataDomain<BitvectorDomain>) -> DataDomain<BitvectorDomain> {
-        data.set_contains_top_flag();
-        data
     }
 }

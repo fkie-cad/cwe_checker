@@ -103,14 +103,15 @@ impl State {
     ) -> DataDomain<BitvectorDomain> {
         if let Some(stack_offset) = self.get_offset_if_exact_stack_pointer(&address) {
             self.load_value_from_stack(stack_offset, size)
-        } else if let (Ok(global_address), Some(global_mem)) = (address.try_to_bitvec(), global_memory) {
+        } else if let (Ok(global_address), Some(global_mem)) =
+            (address.try_to_bitvec(), global_memory)
+        {
             if let Ok(Some(value)) = global_mem.read(&global_address, size) {
                 value.into()
             } else {
                 DataDomain::new_top(size)
             }
-        }
-        else {
+        } else {
             DataDomain::new_top(size)
         }
     }

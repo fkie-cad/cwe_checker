@@ -154,6 +154,7 @@ impl<'a> Context<'a> {
                 self.project,
                 state,
                 extern_symbol,
+                &call.tid,
             );
             state.clear_non_callee_saved_register(&cconv.callee_saved_register);
             state.set_register(&cconv.integer_parameter_register[0], return_val);
