@@ -23,6 +23,15 @@ impl AccessPattern {
         }
     }
 
+    /// Generate a new `AccessPattern` object with all access flags set to true (to model unknown access).
+    pub fn new_unknown_access() -> Self {
+        Self {
+            dereferenced: true,
+            read: true,
+            mutably_dereferenced: true,
+        }
+    }
+
     /// Set the access flag for read access and return `self`.
     pub fn with_read_flag(mut self) -> Self {
         self.read = true;

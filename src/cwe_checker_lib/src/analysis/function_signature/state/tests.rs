@@ -145,18 +145,12 @@ fn test_extern_symbol_handling() {
     let mut state = State::mock_arm32();
     let extern_symbol = ExternSymbol::mock_arm32("mock_symbol");
     let cconv = CallingConvention::mock_arm32();
-    let call = Term {
-        tid: Tid::new("call_tid"),
-        term: Jmp::Call {
-            target: extern_symbol.tid.clone(),
-            return_: Some(Tid::new("return_tid")),
-        },
-    };
+    let call_tid = Tid::new("call_tid");
     let param_id = AbstractIdentifier::from_var(Tid::new("mock_fn"), &Variable::mock("r0", 4));
     let return_val_id =
         AbstractIdentifier::from_var(Tid::new("call_tid"), &Variable::mock("r0", 4));
     // Test extern symbol handling.
-    state.handle_generic_extern_symbol(&call, &extern_symbol, &cconv);
+    state.handle_generic_extern_symbol(&call_tid, &extern_symbol, &cconv);
     assert_eq!(
         state
             .tracked_ids

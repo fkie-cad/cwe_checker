@@ -130,7 +130,7 @@ impl<'a> Context<'a> {
         &self,
         state: &mut State,
         extern_symbol: &ExternSymbol,
-        call: &Term<Jmp>,
+        call_tid: &Tid,
     ) {
         let cconv = self.project.get_calling_convention(extern_symbol);
         if let Some(param_access_list) = self.param_access_stubs.get(extern_symbol.name.as_str()) {
@@ -154,12 +154,12 @@ impl<'a> Context<'a> {
                 self.project,
                 state,
                 extern_symbol,
-                &call.tid,
+                call_tid,
             );
             state.clear_non_callee_saved_register(&cconv.callee_saved_register);
             state.set_register(&cconv.integer_parameter_register[0], return_val);
         } else {
-            state.handle_generic_extern_symbol(call, extern_symbol, cconv);
+            state.handle_generic_extern_symbol(call_tid, extern_symbol, cconv);
         }
     }
 
@@ -341,7 +341,7 @@ impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
             }
             Jmp::Call { target, .. } => {
                 if let Some(extern_symbol) = self.project.program.term.extern_symbols.get(target) {
-                    self.handle_extern_symbol_call(&mut new_state, extern_symbol, call);
+                    self.handle_extern_symbol_call(&mut new_state, extern_symbol, &call.tid);
                     if !extern_symbol.no_return {
                         return Some(new_state);
                     }

@@ -7,13 +7,13 @@ impl State {
     /// that may point to any of the input IDs.
     pub fn handle_generic_extern_symbol(
         &mut self,
-        call: &Term<Jmp>,
+        call_tid: &Tid,
         extern_symbol: &ExternSymbol,
         calling_convention: &CallingConvention,
     ) {
         let input_ids = self.collect_input_ids_of_call(&extern_symbol.parameters);
         self.clear_non_callee_saved_register(&calling_convention.callee_saved_register);
-        self.generate_return_values_for_call(&input_ids, &extern_symbol.return_values, &call.tid);
+        self.generate_return_values_for_call(&input_ids, &extern_symbol.return_values, call_tid);
     }
 
     /// Handle a call to a completely unknown function
