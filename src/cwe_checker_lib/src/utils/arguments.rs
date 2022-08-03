@@ -118,10 +118,8 @@ pub fn get_variable_parameters(
             Ok(parameters) => {
                 return Ok(calculate_parameter_locations(
                     parameters,
-                    project.get_calling_convention(extern_symbol),
-                    format_string_index + 1,
-                    &project.stack_pointer_register,
-                    &project.cpu_architecture,
+                    extern_symbol,
+                    project,
                 ));
             }
             Err(e) => {
@@ -139,24 +137,31 @@ pub fn get_variable_parameters(
 /// Calculates the register and stack positions of format string parameters.
 /// The parameters are then returned as an argument vector for later tainting.
 pub fn calculate_parameter_locations(
-    parameters: Vec<(Datatype, ByteSize)>,
-    calling_convention: &CallingConvention,
-    variadic_params_index_start: usize,
-    stack_register: &Variable,
-    cpu_arch: &str,
+    variadic_parameters: Vec<(Datatype, ByteSize)>,
+    extern_symbol: &ExternSymbol,
+    project: &Project,
 ) -> Vec<Arg> {
+    let calling_convention = project.get_calling_convention(extern_symbol);
     let mut var_args: Vec<Arg> = Vec::new();
-    // The number of the remaining integer argument registers are calculated
-    // from the format string position since it is the last fixed argument.
-    let mut integer_arg_register_count =
-        calling_convention.integer_parameter_register.len() - variadic_params_index_start;
     let mut float_arg_register_count = calling_convention.float_parameter_register.len();
-    let mut stack_offset: i64 = match cpu_arch {
-        "x86" | "x86_32" | "x86_64" => u64::from(stack_register.size) as i64,
+    let mut stack_offset: i64 = match project.cpu_architecture.as_str() {
+        "x86" | "x86_32" | "x86_64" => u64::from(project.stack_pointer_register.size) as i64,
         _ => 0,
     };
+    let mut integer_arg_register_count =
+        if calling_convention.integer_parameter_register.len() >= extern_symbol.parameters.len() {
+            calling_convention.integer_parameter_register.len() - extern_symbol.parameters.len()
+        } else {
+            for param in extern_symbol.parameters.iter() {
+                if let Ok(offset) = param.eval_stack_offset() {
+                    let offset_after = offset.try_to_u64().unwrap() + u64::from(param.bytesize());
+                    stack_offset = std::cmp::max(stack_offset, offset_after as i64);
+                }
+            }
+            0
+        };
 
-    for (data_type, size) in parameters.iter() {
+    for (data_type, size) in variadic_parameters.iter() {
         match data_type {
             Datatype::Integer | Datatype::Pointer | Datatype::Char => {
                 if integer_arg_register_count > 0 {
@@ -177,7 +182,7 @@ pub fn calculate_parameter_locations(
                         *size,
                         stack_offset,
                         data_type.clone(),
-                        stack_register,
+                        &project.stack_pointer_register,
                     ));
                     stack_offset += u64::from(*size) as i64
                 }
@@ -198,7 +203,7 @@ pub fn calculate_parameter_locations(
                         *size,
                         stack_offset,
                         data_type.clone(),
-                        stack_register,
+                        &project.stack_pointer_register,
                     ));
                     stack_offset += u64::from(*size) as i64
                 }

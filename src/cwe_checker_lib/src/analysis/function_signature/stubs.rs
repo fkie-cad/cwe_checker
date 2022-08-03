@@ -124,12 +124,11 @@ pub fn generate_param_access_stubs() -> BTreeMap<&'static str, Vec<AccessPattern
 
 /// Return a map that maps names of stubbed variadic symbols to a tuple consisting of:
 /// - the index of the format string parameter of the symbol
-/// - the index of the first variadic parameter (if at least one variadic parameter is used)
 /// - the access pattern that the called symbols uses to access its variadic parameters.
 /// Note that the access pattern may vary between variadic parameters,
 /// e.g. some parameters may only be read and not derefenced by a call to `printf`.
 /// But we still approximate all accesses by the the maximal possible access to these parameters.
-pub fn get_stubbed_variadic_symbols() -> BTreeMap<&'static str, (usize, usize, AccessPattern)> {
+pub fn get_stubbed_variadic_symbols() -> BTreeMap<&'static str, (usize, AccessPattern)> {
     let deref = || {
         AccessPattern::new()
             .with_read_flag()
@@ -142,11 +141,11 @@ pub fn get_stubbed_variadic_symbols() -> BTreeMap<&'static str, (usize, usize, A
             .with_mutably_dereferenced_flag()
     };
     BTreeMap::from([
-        ("fprintf", (1, 2, deref())),
-        ("printf", (0, 1, deref())),
-        ("snprintf", (2, 3, deref())),
-        ("sprintf", (1, 2, deref())),
-        ("sscanf", (1, 2, deref_mut())),
+        ("fprintf", (1, deref())),
+        ("printf", (0, deref())),
+        ("snprintf", (2, deref())),
+        ("sprintf", (1, deref())),
+        ("sscanf", (1, deref_mut())),
     ])
 }
 

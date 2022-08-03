@@ -375,7 +375,7 @@ mod tests {
             }
         }
 
-        pub fn mock_string() -> Self {
+        pub fn mock_sprintf_x64() -> Self {
             ExternSymbol {
                 tid: Tid::new("sprintf"),
                 addresses: vec!["UNKNOWN".to_string()],

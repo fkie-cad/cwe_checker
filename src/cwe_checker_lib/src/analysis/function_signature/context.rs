@@ -15,10 +15,9 @@ pub struct Context<'a> {
     project: &'a Project,
     /// Parameter access patterns for stubbed extern symbols.
     param_access_stubs: BTreeMap<&'static str, Vec<AccessPattern>>,
-    /// Assigns to the name of a stubbed variadic symbol the index of its format string parameter,
-    /// the index of the first variadic parameter
-    /// and the access pattern for all variadic parameters
-    stubbed_variadic_symbols: BTreeMap<&'static str, (usize, usize, AccessPattern)>,
+    /// Assigns to the name of a stubbed variadic symbol the index of its format string parameter
+    /// and the access pattern for all variadic parameters.
+    stubbed_variadic_symbols: BTreeMap<&'static str, (usize, AccessPattern)>,
 }
 
 impl<'a> Context<'a> {
@@ -157,7 +156,7 @@ impl<'a> Context<'a> {
                 call_tid,
             );
             state.clear_non_callee_saved_register(&cconv.callee_saved_register);
-            state.set_register(&cconv.integer_parameter_register[0], return_val);
+            state.set_register(&cconv.integer_return_register[0], return_val);
         } else {
             state.handle_generic_extern_symbol(call_tid, extern_symbol, cconv);
         }
@@ -177,7 +176,7 @@ impl<'a> Context<'a> {
         state: &mut State,
         extern_symbol: &ExternSymbol,
     ) -> Option<()> {
-        let (format_string_index, variadic_params_index_start, variadic_access_pattern) = self
+        let (format_string_index, variadic_access_pattern) = self
             .stubbed_variadic_symbols
             .get(extern_symbol.name.as_str())?;
         let format_string_address = state
@@ -204,10 +203,8 @@ impl<'a> Context<'a> {
         }
         let format_string_args = arguments::calculate_parameter_locations(
             format_string_params,
-            self.project.get_calling_convention(extern_symbol),
-            *variadic_params_index_start,
-            &self.project.stack_pointer_register,
-            &self.project.cpu_architecture,
+            extern_symbol,
+            self.project,
         );
         for param in format_string_args {
             for id in state
@@ -231,14 +228,14 @@ impl<'a> Context<'a> {
         state: &mut State,
         extern_symbol: &ExternSymbol,
     ) {
-        let (_, variadic_params_index_start, variadic_access_pattern) = self
+        let (_, variadic_access_pattern) = self
             .stubbed_variadic_symbols
             .get(extern_symbol.name.as_str())
             .unwrap();
         let cconv = self.project.get_calling_convention(extern_symbol);
-        if *variadic_params_index_start < cconv.integer_parameter_register.len() {
+        if extern_symbol.parameters.len() < cconv.integer_parameter_register.len() {
             for index in [
-                *variadic_params_index_start,
+                extern_symbol.parameters.len(),
                 cconv.integer_parameter_register.len() - 1,
             ] {
                 for id in state
