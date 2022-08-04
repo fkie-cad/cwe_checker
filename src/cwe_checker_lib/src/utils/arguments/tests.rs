@@ -1,4 +1,7 @@
-use crate::intermediate_representation::{Bitvector, Tid};
+use crate::{
+    abstract_domain::IntervalDomain,
+    intermediate_representation::{Bitvector, Tid},
+};
 
 use super::*;
 
@@ -10,7 +13,7 @@ fn mock_pi_state() -> PointerInferenceState {
 /// Tests extraction of format string parameters '/dev/sd%c%d' and 'cat %s'.
 fn test_get_variable_parameters() {
     let mut pi_state = mock_pi_state();
-    let sprintf_symbol = ExternSymbol::mock_string();
+    let sprintf_symbol = ExternSymbol::mock_sprintf_x64();
     let mut format_string_index_map: HashMap<String, usize> = HashMap::new();
     format_string_index_map.insert("sprintf".to_string(), 1);
     let global_address = Bitvector::from_str_radix(16, "5000").unwrap();
@@ -68,7 +71,7 @@ fn test_get_variable_parameters() {
 fn test_get_input_format_string() {
     let mem_image = RuntimeMemoryImage::mock();
     let mut pi_state = mock_pi_state();
-    let sprintf_symbol = ExternSymbol::mock_string();
+    let sprintf_symbol = ExternSymbol::mock_sprintf_x64();
 
     let global_address = Bitvector::from_str_radix(16, "3002").unwrap();
     pi_state.set_register(
@@ -85,8 +88,7 @@ fn test_get_input_format_string() {
 #[test]
 fn test_parse_format_string_destination_and_return_content() {
     let mem_image = RuntimeMemoryImage::mock();
-    let string_address_vector = Bitvector::from_str_radix(16, "3002").unwrap();
-    let string_address = IntervalDomain::new(string_address_vector.clone(), string_address_vector);
+    let string_address = Bitvector::from_str_radix(16, "3002").unwrap();
 
     assert_eq!(
         "Hello World",
@@ -154,8 +156,8 @@ fn test_parse_format_string_parameters() {
 #[test]
 /// Tests tracking of parameters according to format string
 fn test_calculate_parameter_locations() {
-    let cconv = CallingConvention::mock_x64();
-    let format_string_index: usize = 1;
+    let project = Project::mock_x64();
+    let extern_symbol = ExternSymbol::mock_sprintf_x64();
     let mut parameters: Vec<(Datatype, ByteSize)> = Vec::new();
     parameters.push(("d".to_string().into(), ByteSize::new(8)));
     parameters.push(("f".to_string().into(), ByteSize::new(16)));
@@ -183,13 +185,7 @@ fn test_calculate_parameter_locations() {
     // Test Case 1: The string parameter is still written in the RCX register since 'f' is contained in the float register.
     assert_eq!(
         expected_args,
-        calculate_parameter_locations(
-            parameters.clone(),
-            &cconv,
-            format_string_index,
-            &Variable::mock("RSP", 8),
-            "x86_64"
-        )
+        calculate_parameter_locations(parameters.clone(), &extern_symbol, &project,)
     );
 
     parameters.push(("s".to_string().into(), ByteSize::new(8)));
@@ -213,13 +209,7 @@ fn test_calculate_parameter_locations() {
     // Test Case 2: Three further string parameter does not fit into the registers anymore and one is written into the stack.
     assert_eq!(
         expected_args,
-        calculate_parameter_locations(
-            parameters,
-            &cconv,
-            format_string_index,
-            &Variable::mock("RSP", 8),
-            "x86_64"
-        )
+        calculate_parameter_locations(parameters, &extern_symbol, &project)
     );
 }
 

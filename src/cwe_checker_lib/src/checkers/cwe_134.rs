@@ -218,7 +218,7 @@ pub mod tests {
 
     #[test]
     fn test_locate_format_string() {
-        let sprintf_symbol = ExternSymbol::mock_string();
+        let sprintf_symbol = ExternSymbol::mock_sprintf_x64();
         let project = mock_project();
         let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
         let mut pi_results = PointerInferenceComputation::mock(&project);

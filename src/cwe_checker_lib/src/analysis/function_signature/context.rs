@@ -1,4 +1,7 @@
-use crate::abstract_domain::{AbstractDomain, AbstractIdentifier, BitvectorDomain, DataDomain};
+use crate::abstract_domain::{
+    AbstractDomain, AbstractIdentifier, BitvectorDomain, DataDomain, TryToBitvec,
+};
+use crate::utils::arguments;
 use crate::{
     analysis::{forward_interprocedural_fixpoint, graph::Graph},
     intermediate_representation::Project,
@@ -10,12 +13,22 @@ use super::*;
 pub struct Context<'a> {
     graph: &'a Graph<'a>,
     project: &'a Project,
+    /// Parameter access patterns for stubbed extern symbols.
+    param_access_stubs: BTreeMap<&'static str, Vec<AccessPattern>>,
+    /// Assigns to the name of a stubbed variadic symbol the index of its format string parameter
+    /// and the access pattern for all variadic parameters.
+    stubbed_variadic_symbols: BTreeMap<&'static str, (usize, AccessPattern)>,
 }
 
 impl<'a> Context<'a> {
     /// Generate a new context object.
     pub fn new(project: &'a Project, graph: &'a Graph<'a>) -> Self {
-        Context { graph, project }
+        Context {
+            graph,
+            project,
+            param_access_stubs: stubs::generate_param_access_stubs(),
+            stubbed_variadic_symbols: stubs::get_stubbed_variadic_symbols(),
+        }
     }
 
     /// Compute the return values of a call and return them (without adding them to the caller state).
@@ -108,6 +121,133 @@ impl<'a> Context<'a> {
 
         return_value
     }
+
+    /// Handle a call to a specific extern symbol.
+    /// If function stubs exist for the symbol, then these are used to compute the effect of the call.
+    /// Else the [generic symbol handler](State::handle_generic_extern_symbol) is called.
+    fn handle_extern_symbol_call(
+        &self,
+        state: &mut State,
+        extern_symbol: &ExternSymbol,
+        call_tid: &Tid,
+    ) {
+        let cconv = self.project.get_calling_convention(extern_symbol);
+        if let Some(param_access_list) = self.param_access_stubs.get(extern_symbol.name.as_str()) {
+            // Set access flags for parameter access
+            for (param, access_pattern) in extern_symbol.parameters.iter().zip(param_access_list) {
+                for id in state.eval_parameter_arg(param).get_relative_values().keys() {
+                    state.merge_access_pattern_of_id(id, access_pattern);
+                }
+            }
+            if self
+                .stubbed_variadic_symbols
+                .get(extern_symbol.name.as_str())
+                .is_some()
+                && self
+                    .set_access_flags_for_variadic_parameters(state, extern_symbol)
+                    .is_none()
+            {
+                self.set_access_flags_for_generic_variadic_parameters(state, extern_symbol);
+            }
+            let return_val = stubs::compute_return_value_for_stubbed_function(
+                self.project,
+                state,
+                extern_symbol,
+                call_tid,
+            );
+            state.clear_non_callee_saved_register(&cconv.callee_saved_register);
+            state.set_register(&cconv.integer_return_register[0], return_val);
+        } else {
+            state.handle_generic_extern_symbol(call_tid, extern_symbol, cconv);
+        }
+    }
+
+    /// Merges the access patterns for all variadic parameters of the given symbol.
+    ///
+    /// This function can only handle stubbed symbols where the number of variadic parameters can be parsed from a format string.
+    /// If the parsing of the variadic parameters failed for any reason
+    /// (e.g. because the format string could not be statically determined)
+    /// then this function does not modify any access patterns.
+    ///
+    /// If the variadic access pattern contains the mutable dereference flag
+    /// then all variadic parameters are assumed to be pointers.
+    fn set_access_flags_for_variadic_parameters(
+        &self,
+        state: &mut State,
+        extern_symbol: &ExternSymbol,
+    ) -> Option<()> {
+        let (format_string_index, variadic_access_pattern) = self
+            .stubbed_variadic_symbols
+            .get(extern_symbol.name.as_str())?;
+        let format_string_address = state
+            .eval_parameter_arg(&extern_symbol.parameters[*format_string_index])
+            .get_if_absolute_value()
+            .map(|value| value.try_to_bitvec().ok())??;
+        let format_string = arguments::parse_format_string_destination_and_return_content(
+            format_string_address,
+            &self.project.runtime_memory_image,
+        )
+        .ok()?;
+        let mut format_string_params = arguments::parse_format_string_parameters(
+            &format_string,
+            &self.project.datatype_properties,
+        )
+        .ok()?;
+        if variadic_access_pattern.is_mutably_dereferenced() {
+            // All parameters are pointers to where values shall be written.
+            format_string_params =
+                vec![
+                    (Datatype::Pointer, self.project.stack_pointer_register.size);
+                    format_string_params.len()
+                ];
+        }
+        let format_string_args = arguments::calculate_parameter_locations(
+            format_string_params,
+            extern_symbol,
+            self.project,
+        );
+        for param in format_string_args {
+            for id in state
+                .eval_parameter_arg(&param)
+                .get_relative_values()
+                .keys()
+            {
+                state.merge_access_pattern_of_id(id, variadic_access_pattern);
+            }
+        }
+        Some(())
+    }
+
+    /// Sets access patterns for variadic parameters
+    /// of a call to a variadic function with unknown number of variadic parameters.
+    /// This function assumes that all remaining integer parameter registers of the corresponding calling convention
+    /// are filled with variadic parameters,
+    /// but no variadic parameters are supplied as stack parameters.
+    fn set_access_flags_for_generic_variadic_parameters(
+        &self,
+        state: &mut State,
+        extern_symbol: &ExternSymbol,
+    ) {
+        let (_, variadic_access_pattern) = self
+            .stubbed_variadic_symbols
+            .get(extern_symbol.name.as_str())
+            .unwrap();
+        let cconv = self.project.get_calling_convention(extern_symbol);
+        if extern_symbol.parameters.len() < cconv.integer_parameter_register.len() {
+            for index in [
+                extern_symbol.parameters.len(),
+                cconv.integer_parameter_register.len() - 1,
+            ] {
+                for id in state
+                    .get_register(&cconv.integer_parameter_register[index])
+                    .get_relative_values()
+                    .keys()
+                {
+                    state.merge_access_pattern_of_id(id, variadic_access_pattern);
+                }
+            }
+        }
+    }
 }
 
 impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
@@ -130,7 +270,11 @@ impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
             }
             Def::Load { var, address } => {
                 new_state.set_deref_flag_for_input_ids_of_expression(address);
-                let value = new_state.load_value(new_state.eval(address), var.size);
+                let value = new_state.load_value(
+                    new_state.eval(address),
+                    var.size,
+                    Some(&self.project.runtime_memory_image),
+                );
                 new_state.set_register(var, value);
             }
             Def::Store { address, value } => {
@@ -194,8 +338,7 @@ impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
             }
             Jmp::Call { target, .. } => {
                 if let Some(extern_symbol) = self.project.program.term.extern_symbols.get(target) {
-                    let cconv = self.project.get_calling_convention(extern_symbol);
-                    new_state.handle_extern_symbol(call, extern_symbol, cconv);
+                    self.handle_extern_symbol_call(&mut new_state, extern_symbol, &call.tid);
                     if !extern_symbol.no_return {
                         return Some(new_state);
                     }
@@ -206,7 +349,7 @@ impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
             }
             _ => (),
         }
-        // The call could not be properly handled, so we treat it as a dead end in the control flow graph.
+        // The call could not be properly handled or is a non-returning function, so we treat it as a dead end in the control flow graph.
         None
     }
 
