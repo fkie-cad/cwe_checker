@@ -81,7 +81,7 @@ fn exceeds_threshold_on_stack(interval: DataDomain<IntervalDomain>, threshold: u
 fn exceeds_threshold_on_call(interval: DataDomain<IntervalDomain>, threshold: u64) -> bool {
     if let Some(interval) = interval.get_absolute_value() {
         if let Ok(offset) = interval.try_to_interval() {
-            if let Ok(end) = dbg!(offset.end.try_to_u128()) {
+            if let Ok(end) = offset.end.try_to_u128() {
                 if end > u128::from(threshold) {
                     return true;
                 }

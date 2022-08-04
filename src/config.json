@@ -215,7 +215,7 @@
     "symbols": []
   },
   "CWE789": {
-    "stack_threshold": 1000000,
+    "stack_threshold": 7500,
     "heap_threshold": 1000000,
     "symbols": [
       "xmalloc",
