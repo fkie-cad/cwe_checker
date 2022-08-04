@@ -176,8 +176,9 @@ fn run_with_ghidra(args: &CmdlineArgs) {
     let analysis_results = AnalysisResults::new(&binary, &control_flow_graph, &project);
 
     let modules_depending_on_string_abstraction = BTreeSet::from_iter(["CWE78"]);
-    let modules_depending_on_pointer_inference =
-        BTreeSet::from_iter(["CWE119", "CWE134", "CWE416", "CWE476", "Memory", "CWE190"]);
+    let modules_depending_on_pointer_inference = BTreeSet::from_iter([
+        "CWE119", "CWE134", "CWE416", "CWE476", "Memory", "CWE190", "CWE789",
+    ]);
 
     let string_abstraction_needed = modules
         .iter()

@@ -20,3 +20,4 @@ pub mod cwe_560;
 pub mod cwe_676;
 pub mod cwe_78;
 pub mod cwe_782;
+pub mod cwe_789;

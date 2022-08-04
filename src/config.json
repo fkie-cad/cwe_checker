@@ -214,6 +214,16 @@
   "CWE782": {
     "symbols": []
   },
+  "CWE789": {
+    "stack_threshold": 7500,
+    "heap_threshold": 1000000,
+    "symbols": [
+      "xmalloc",
+      "malloc",
+      "realloc",
+      "calloc"
+    ]
+  },
   "check_path": {
     "_comment": "functions that take direct user input",
     "symbols": [
