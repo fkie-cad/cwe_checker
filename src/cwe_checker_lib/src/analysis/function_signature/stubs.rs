@@ -1,3 +1,6 @@
+//! This module contains stubs for frequently used LibC-symbols
+//! as well as helper functions for handling the effects of calls to these functions.
+
 use super::State;
 use crate::abstract_domain::AbstractDomain;
 use crate::abstract_domain::BitvectorDomain;

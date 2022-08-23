@@ -1,4 +1,5 @@
 use crate::abstract_domain::*;
+use crate::analysis::function_signature::AccessPattern;
 use crate::analysis::function_signature::FunctionSignature;
 use crate::analysis::graph::Graph;
 use crate::intermediate_representation::*;
@@ -11,6 +12,8 @@ use super::{Config, Data, VERSION};
 
 /// Contains methods of the `Context` struct that deal with the manipulation of abstract IDs.
 mod id_manipulation;
+/// Methods and functions for handling extern symbol stubs.
+mod stubs;
 /// Contains trait implementations for the `Context` struct,
 /// especially the implementation of the [`forward_interprocedural_fixpoint::Context`](crate::analysis::forward_interprocedural_fixpoint::Context) trait.
 mod trait_impls;
@@ -27,6 +30,8 @@ pub struct Context<'a> {
     pub extern_symbol_map: &'a BTreeMap<Tid, ExternSymbol>,
     /// Maps the TIDs of internal functions to the function signatures computed for it.
     pub fn_signatures: &'a BTreeMap<Tid, FunctionSignature>,
+    /// Maps the names of stubbed extern symbols to the corresponding function signatures.
+    pub extern_fn_param_access_patterns: BTreeMap<&'static str, Vec<AccessPattern>>,
     /// A channel where found CWE warnings and log messages should be sent to.
     /// The receiver may filter or modify the warnings before presenting them to the user.
     /// For example, the same CWE warning will be found several times
@@ -50,6 +55,8 @@ impl<'a> Context<'a> {
             project: analysis_results.project,
             extern_symbol_map: &analysis_results.project.program.term.extern_symbols,
             fn_signatures: analysis_results.function_signatures.unwrap(),
+            extern_fn_param_access_patterns:
+                crate::analysis::function_signature::stubs::generate_param_access_stubs(),
             log_collector,
             allocation_symbols: config.allocation_symbols,
         }
