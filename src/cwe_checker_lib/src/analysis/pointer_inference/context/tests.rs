@@ -336,3 +336,35 @@ fn get_unsound_caller_ids() {
     );
     assert_eq!(unsound_ids, BTreeSet::from_iter([new_id("caller", "RAX")]));
 }
+
+#[test]
+fn handle_extern_symbol_stubs() {
+    let context = mock_context();
+    let mut state = State::new(&context.project.stack_pointer_register, Tid::new("main"));
+    let mut extern_symbol = ExternSymbol::mock_x64("strchr");
+    extern_symbol.parameters = vec![Arg::mock_register("RDI", 8), Arg::mock_register("RSI", 8)];
+
+    state.set_register(
+        &Variable::mock("RDI", 8),
+        Data::from_target(
+            AbstractIdentifier::mock("param", "RBX", 8),
+            Bitvector::from_u64(0).into(),
+        ),
+    );
+    let mut new_state = state.clone();
+    let cconv = CallingConvention::mock_x64();
+    new_state.clear_non_callee_saved_register(&cconv.callee_saved_register[..]);
+
+    context.handle_parameter_access_for_stubbed_functions(&state, &mut new_state, &extern_symbol);
+    let return_value = context.compute_return_value_for_stubbed_function(&state, &extern_symbol);
+    new_state.set_register(&cconv.integer_return_register[0], return_value);
+
+    assert_eq!(
+        new_state.get_register(&Variable::mock("RAX", 8)),
+        Data::from_target(
+            AbstractIdentifier::mock("param", "RBX", 8),
+            IntervalDomain::new_top(ByteSize::new(8)),
+        )
+        .merge(&Bitvector::from_u64(0).into())
+    );
+}

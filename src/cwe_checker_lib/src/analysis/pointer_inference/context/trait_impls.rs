@@ -235,12 +235,41 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
             self.adjust_stack_register_on_return_from_call(state, &mut new_state);
 
             match extern_symbol.name.as_str() {
+                "sscanf" => {
+                    self.log_debug(
+                        self.handle_params_of_sscanf_call(
+                            state,
+                            &mut new_state,
+                            extern_symbol,
+                            &call.tid,
+                        ),
+                        Some(&call.tid),
+                    );
+                    Some(new_state)
+                }
                 malloc_like_fn if self.allocation_symbols.iter().any(|x| x == malloc_like_fn) => {
                     Some(self.add_new_object_in_call_return_register(
                         new_state,
                         call,
                         extern_symbol,
                     ))
+                }
+                stubbed_fn
+                    if self
+                        .extern_fn_param_access_patterns
+                        .contains_key(stubbed_fn) =>
+                {
+                    self.handle_parameter_access_for_stubbed_functions(
+                        state,
+                        &mut new_state,
+                        extern_symbol,
+                    );
+
+                    let return_value =
+                        self.compute_return_value_for_stubbed_function(state, extern_symbol);
+                    new_state.set_register(&cconv.integer_return_register[0], return_value);
+
+                    Some(new_state)
                 }
                 _ => Some(self.handle_generic_extern_call(state, new_state, call, extern_symbol)),
             }
