@@ -39,8 +39,15 @@ The following arguments should convince you to give *cwe_checker* a try:
 The simplest way is to pull the latest Docker image from [dockerhub](https://hub.docker.com/r/fkiecad/cwe_checker):
 -   `docker pull fkiecad/cwe_checker:latest` yields an image based on the current master branch.
 -   `docker pull fkiecad/cwe_checker:stable` yields an image based on the latest stable release version.
+-   `docker pull fkiecad/cwe_checker:v0.6` yields an image based on the v0.6 stable release version.
+However, it is recommended to switch to newer stable releases as soon as they get published, since improvements between stable versions can be quite significant.
 
-If you want to build the docker image yourself, just run `docker build -t cwe_checker .`
+If you want to build the docker image yourself, just run
+```
+docker build -t cwe_checker .
+```
+This way you can also build native Docker images for ARM-based PCs (e.g. newer Apple Macs).
+The prebuilt Docker images on dockerhub are currently only x86-based.
 
 ### Local installation ###
 
@@ -104,6 +111,7 @@ So far the following analyses are implemented:
 -   [CWE-560](https://cwe.mitre.org/data/definitions/560.html): Use of umask() with chmod-style Argument
 -   [CWE-676](https://cwe.mitre.org/data/definitions/676.html): Use of Potentially Dangerous Function
 -   [CWE-782](https://cwe.mitre.org/data/definitions/782.html): Exposed IOCTL with Insufficient Access Control
+-   [CWE-789](https://cwe.mitre.org/data/definitions/789.html): Memory Allocation with Excessive Size Value
 
 Please note that both false positives and false negatives are to be expected due to shortcuts and the nature of static analysis as well as over-approximation.
 You can find information on the inner workings of each check as well as known reasons for false positives and false negatives on the [check-specific documentation pages](https://fkie-cad.github.io/cwe_checker/doc/html/cwe_checker_lib/checkers/index.html).
@@ -118,9 +126,12 @@ The script is located at `ghidra_plugin/cwe_checker_ghidra_plugin.py`, usage ins
     <img src="doc/images/example_ghidra_integration.png" alt="Ghidra Integration" width="90%" height="90%"/>
 </p>
 
+The cwe_checker is also integrated as a plugin in [FACT](https://github.com/fkie-cad/FACT_core).
+If you want to integrate the cwe_checker into your own analysis toolchain, you can use the `--json` command line flag (in combination with either the `--quiet` or the `--out=...` command line options) to generate the CWE warnings in an easily parseable JSON output format.
+
 ## How does cwe_checker work internally? ##
 
-Building the documentation using `cargo doc --open --document-private-items` will give you more information about the internal structure of the cwe_checker.
+Building the documentation using `cargo doc --open --document-private-items --no-deps` will give you more information about the internal structure of the cwe_checker.
 However, the best documentation is still the source code itself.
 If you have questions, be sure to ask them on our [discussions page](https://github.com/fkie-cad/cwe_checker/discussions)!
 We are constantly striving to improve extensibility and documentation and your questions will help us to achieve that!
@@ -129,6 +140,7 @@ To get a quick/initial overview of its internals you can also look at the slides
 We presented cwe_checker at the following conferences so far:
 -   [Pass The SALT 2019](https://2019.pass-the-salt.org/talks/74.html) ([slides](doc/slides/cwe_checker_pts19.pdf))
 -   [Black Hat USA 2019](https://www.blackhat.com/us-19/arsenal/schedule/index.html#cwe_checker-hunting-binary-code-vulnerabilities-across-cpu-architectures-16782) ([slides](doc/slides/cwe_checker_BlackHatUSA2019.pdf))
+-   [Black Hat USA 2022](https://www.blackhat.com/us-22/arsenal/schedule/#cwe_checker-architecture-independent-binary-vulnerability-analysis-26960) ([slides](doc/slides/cwe_checker_BlackHatUSA2022.pdf))
 
 ## Contribute ##
 
