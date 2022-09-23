@@ -750,6 +750,9 @@ impl Project {
         // if so, they are swapped with subpieces of base registers
         for sub in program.term.subs.values_mut() {
             for blk in sub.term.blocks.iter_mut() {
+                super::subregister_substitution::replace_subregister_in_block(blk, &register_map);
+
+                /*
                 let mut def_iter = blk.term.defs.iter_mut().peekable();
                 while let Some(def) = def_iter.next() {
                     let peeked_def = def_iter.peek();
@@ -831,6 +834,7 @@ impl Project {
                     }
                     true
                 });
+                */
             }
         }
         // Iterate over symbol arguments and replace used sub-registers
