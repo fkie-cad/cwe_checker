@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap};
 use std::usize;
 
 use super::{Expression, ExpressionType, RegisterProperties, Variable};
@@ -18,6 +18,7 @@ use crate::intermediate_representation::Sub as IrSub;
 use crate::intermediate_representation::Variable as IrVariable;
 use crate::prelude::*;
 use crate::utils::log::LogMessage;
+use super::subregister_substitution::replace_input_subregister;
 
 // TODO: Handle the case where an indirect tail call is represented by CALLIND plus RETURN
 
@@ -678,7 +679,7 @@ impl CallingConvention {
                 .map(|register_name| {
                     let reg = register_map.get(&register_name).cloned().unwrap();
                     let mut expression = IrExpression::Var(reg.into());
-                    expression.replace_input_sub_register(register_map);
+                    expression = replace_input_subregister(expression, register_map);
                     expression
                 })
                 .collect()
@@ -745,111 +746,27 @@ impl Project {
                 &self.cpu_architecture,
             ),
         };
-        let mut zero_extend_tids: HashSet<Tid> = HashSet::new();
         // iterates over definitions and checks whether sub registers are used
         // if so, they are swapped with subpieces of base registers
         for sub in program.term.subs.values_mut() {
             for blk in sub.term.blocks.iter_mut() {
                 super::subregister_substitution::replace_subregister_in_block(blk, &register_map);
-
-                /*
-                let mut def_iter = blk.term.defs.iter_mut().peekable();
-                while let Some(def) = def_iter.next() {
-                    let peeked_def = def_iter.peek();
-                    match &mut def.term {
-                        IrDef::Assign { var, value } => {
-                            if let Some(zero_tid) = value
-                                .cast_sub_registers_to_base_register_subpieces(
-                                    Some(var),
-                                    &register_map,
-                                    peeked_def,
-                                )
-                            {
-                                zero_extend_tids.insert(zero_tid);
-                            }
-                        }
-                        IrDef::Load { var, address } => {
-                            if let Some(zero_tid) = address
-                                .cast_sub_registers_to_base_register_subpieces(
-                                    Some(var),
-                                    &register_map,
-                                    peeked_def,
-                                )
-                            {
-                                zero_extend_tids.insert(zero_tid);
-                            }
-                        }
-                        IrDef::Store { address, value } => {
-                            address.cast_sub_registers_to_base_register_subpieces(
-                                None,
-                                &register_map,
-                                peeked_def,
-                            );
-                            value.cast_sub_registers_to_base_register_subpieces(
-                                None,
-                                &register_map,
-                                peeked_def,
-                            );
-                        }
-                    }
-                }
-                for jmp in blk.term.jmps.iter_mut() {
-                    match &mut jmp.term {
-                        IrJmp::BranchInd(dest) => {
-                            dest.cast_sub_registers_to_base_register_subpieces(
-                                None,
-                                &register_map,
-                                None,
-                            );
-                        }
-                        IrJmp::CBranch { condition, .. } => {
-                            condition.cast_sub_registers_to_base_register_subpieces(
-                                None,
-                                &register_map,
-                                None,
-                            );
-                        }
-                        IrJmp::CallInd { target, .. } => {
-                            target.cast_sub_registers_to_base_register_subpieces(
-                                None,
-                                &register_map,
-                                None,
-                            );
-                        }
-                        IrJmp::Return(dest) => {
-                            dest.cast_sub_registers_to_base_register_subpieces(
-                                None,
-                                &register_map,
-                                None,
-                            );
-                        }
-                        _ => (),
-                    }
-                }
-                // Remove all tagged zero extension instruction that came after a sub register instruction
-                // since it has been wrapped around the former instruction.
-                blk.term.defs.retain(|def| {
-                    if zero_extend_tids.contains(&def.tid) {
-                        return false;
-                    }
-                    true
-                });
-                */
             }
         }
         // Iterate over symbol arguments and replace used sub-registers
         for symbol in program.term.extern_symbols.values_mut() {
             for arg in symbol.parameters.iter_mut() {
                 if let IrArg::Register { expr, .. } = arg {
-                    expr.replace_input_sub_register(&register_map);
+                    *expr = replace_input_subregister(expr.clone(), &register_map);
                 }
             }
             for arg in symbol.return_values.iter_mut() {
                 if let IrArg::Register { expr, .. } = arg {
-                    expr.replace_input_sub_register(&register_map);
+                    *expr = replace_input_subregister(expr.clone(), &register_map);
                 }
             }
         }
+        // TODO: Do I want to move this into the subregister substitution module?
 
         let register_set = self
             .register_properties

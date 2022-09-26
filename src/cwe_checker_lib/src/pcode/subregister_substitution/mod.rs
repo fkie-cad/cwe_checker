@@ -249,7 +249,7 @@ fn replace_subregister_in_jump(jump: &mut Term<Jmp>, register_map: &HashMap<&Str
 
 /// Replace input subregisters of the given expression by SUBPIECEs of the corresponding base register.
 /// Return the resulting expression.
-fn replace_input_subregister(
+pub fn replace_input_subregister(
     mut expression: Expression,
     register_map: &HashMap<&String, &RegisterProperties>,
 ) -> Expression {
@@ -357,3 +357,6 @@ fn piece_base_register_assignment_expression_together(
         };
     }
 }
+
+#[cfg(test)]
+mod tests;
