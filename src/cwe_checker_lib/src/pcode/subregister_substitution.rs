@@ -5,8 +5,14 @@ use std::collections::HashMap;
 use std::iter::Peekable;
 use std::ops::Deref;
 
-// TODO: Recognize the zero-extend-case in the next Def!
-
+/// In the given block replace all occurences of sub-registers by equivalent expressions of the corresponding base register.
+/// By getting rid of all mentions of sub-registers we get rid of all hidden dependencies between registers,
+/// which simplifies later analyses.
+/// 
+/// For example, this replaces mentions of the register EAX by a SUBPIECE expression of RAX for x86-64.
+/// 
+/// Note that Ghidra (and thus also the cwe_checker) handles flag registers as independent 1-bit registers
+/// instead of combining them to one register containing all flags.
 pub fn replace_subregister_in_block(block: & mut Term<Blk>,
 register_map: &HashMap<&String, &RegisterProperties>
 ) {
@@ -19,13 +25,22 @@ register_map: &HashMap<&String, &RegisterProperties>
     block.term.defs = new_defs;
 }
 
+/// A builder struct for substitution of subregisters in a basic block.
+/// 
+/// For the basic workflow of the subregister substitution process see the
+/// [compute_replacement_defs_for_block](SubregisterSubstitutionBuilder::compute_replacement_defs_for_block) method.
 struct SubregisterSubstitutionBuilder<'a> {
+    /// The register map containing the necessary information which registers are subregisters
+    /// and what their base registers are.
     register_map: &'a HashMap<&'a String, &'a RegisterProperties>,
+    /// The input iterator keeps track of which Def-terms are still to be substituted.
     input_iter: Peekable<std::slice::Iter<'a, Term<Def>>>,
+    /// The output vector contains the already substituted Def-terms (in the correct order).
     output_defs: Vec<Term<Def>>,
 }
 
 impl<'a> SubregisterSubstitutionBuilder<'a> {
+    /// Initialize a new substitution builder.
     fn new(
         block: &'a Term<Blk>,
         register_map: &'a HashMap<&'a String, &'a RegisterProperties>,
@@ -37,8 +52,20 @@ impl<'a> SubregisterSubstitutionBuilder<'a> {
         }
     }
 
+    /// Iterate through all Def-terms of the given block and replace any occurence of a subregister
+    /// by its base register (wrapped in SUBPIECE- or PIECE- instructions to not change program semantics).
+    /// 
+    /// The basic workflow of the subregister substitution process for each Def-term is as follows:
+    /// - First replace all occurences of subregisters as inputs into expressions of the Def-term
+    ///   by replacing them with the SUBPIECE-wrapped base register.
+    /// - Replace subregisters as outputs of the Def-term.
+    ///   If the Def-term is an assignment and the next Def-term is a cast to the base register (e.g. a zero-extension)
+    ///   then combine the two Def-terms to one.
+    ///   If the Def-term is a load instruction then replace the output with a temporary register
+    ///   and add a second Def-term that assigns the temporary register value to the corresponding bytes of the base register.
+    ///   In all other cases one can assign directly to the corresponding bytes of the base register.
     pub fn compute_replacement_defs_for_block(
-        block: &'a mut Term<Blk>,
+        block: &'a Term<Blk>,
         register_map: &'a HashMap<&'a String, &'a RegisterProperties>,
     ) -> Vec<Term<Def>> {
         let mut substitution_builder = Self::new(block, register_map);
@@ -48,6 +75,9 @@ impl<'a> SubregisterSubstitutionBuilder<'a> {
         substitution_builder.output_defs
     }
 
+    /// First replace subregisters as input into expressions of the given Def-term.
+    /// The replace subregisters as outputs of the Def-term.
+    /// The results get added to the `output_defs` array of `self`.
     fn replace_subregister(&mut self, def: &Term<Def>) {
         let mut def = def.clone();
         match &mut def.term {
@@ -69,6 +99,13 @@ impl<'a> SubregisterSubstitutionBuilder<'a> {
         self.replace_output_subregister(def);
     }
 
+    /// Replace subregisters as output variables of assign- or load-instructions.
+    /// 
+    /// If the next Def-term in the `input_iter` of `self` is a cast to the base register,
+    /// then it might get combined with the given Def-term to a single Def-term.
+    /// In this case the `input_iter` is advanced by one step.
+    /// 
+    /// For load instructions two Def-terms might get added to the `output_defs` array of `self`.
     fn replace_output_subregister(&mut self, def: Term<Def>) {
         match &def.term {
             Def::Assign { var, value } => {
@@ -155,12 +192,14 @@ impl<'a> SubregisterSubstitutionBuilder<'a> {
                     }
                 }
             }
-            Def::Store { address, value } => (),
+            Def::Store { .. } => (), // No output variable to replace.
         }
-        // We did not need to modify the Def
+        // If we reach this point we did not need to modify the Def
         self.output_defs.push(def);
     }
 
+    /// Return `true` if the next Def-term in the `input_iter` of `self` is a cast of the given variable
+    /// to its corresponding base register.
     fn is_next_def_cast_to_base_register(&mut self, input_var: &Variable) -> bool {
         if let Some(peeked_def) = self.input_iter.peek() {
             match &peeked_def.term {
@@ -192,6 +231,8 @@ impl<'a> SubregisterSubstitutionBuilder<'a> {
     }
 }
 
+/// Replace subregisters that are inputs into expressions used by the given jump term 
+/// by SUBPIECE expressions of the corresponding base register.
 fn replace_subregister_in_jump(jump: &mut Term<Jmp>, register_map: &HashMap<&String, &RegisterProperties>) {
     match &mut jump.term {
         Jmp::BranchInd(expr)
@@ -206,6 +247,8 @@ fn replace_subregister_in_jump(jump: &mut Term<Jmp>, register_map: &HashMap<&Str
     }
 }
 
+/// Replace input subregisters of the given expression by SUBPIECEs of the corresponding base register.
+/// Return the resulting expression.
 fn replace_input_subregister(
     mut expression: Expression,
     register_map: &HashMap<&String, &RegisterProperties>,
@@ -233,7 +276,7 @@ fn replace_input_subregister(
 }
 
 /// This function creates a SUBPIECE expression
-/// from a sub_register containing the corresponding base register.
+/// from a subregister containing the corresponding base register.
 fn create_subpiece_from_sub_register(
     base: String,
     size: ByteSize,
