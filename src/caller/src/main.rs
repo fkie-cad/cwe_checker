@@ -124,10 +124,7 @@ fn run_with_ghidra(args: &CmdlineArgs) {
     } else {
         // TODO: CWE78 is disabled on a standard run for now,
         // because it uses up huge amounts of RAM and computation time on some binaries.
-        modules = modules
-            .into_iter()
-            .filter(|module| module.name != "CWE78")
-            .collect();
+        modules.retain(|module| module.name != "CWE78");
     }
 
     let binary_file_path = PathBuf::from(args.binary.clone().unwrap());
