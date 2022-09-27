@@ -8,16 +8,16 @@ struct Setup<'a> {
     rax_name: String,
     ecx_name: String,
     rcx_name: String,
+    ah_name: String,
     eax_register: RegisterProperties,
     rax_register: RegisterProperties,
     ecx_register: RegisterProperties,
     rcx_register: RegisterProperties,
-    higher_byte_register: RegisterProperties,
+    ah_register: RegisterProperties,
     int_sub_expr: Expression,
     int_sub_subpiece_expr: Expression,
     eax_variable: Expression,
     rax_variable: Expression,
-    rcx_variable: Expression,
 }
 
 impl<'a> Setup<'a> {
@@ -28,6 +28,7 @@ impl<'a> Setup<'a> {
             rax_name: String::from("RAX"),
             ecx_name: String::from("ECX"),
             rcx_name: String::from("RCX"),
+            ah_name: String::from("AH"),
             eax_register: RegisterProperties {
                 register: String::from("EAX"),
                 base_register: String::from("RAX"),
@@ -52,7 +53,7 @@ impl<'a> Setup<'a> {
                 lsb: ByteSize::new(0),
                 size: ByteSize::new(8),
             },
-            higher_byte_register: RegisterProperties {
+            ah_register: RegisterProperties {
                 register: String::from("AH"),
                 base_register: String::from("RAX"),
                 lsb: ByteSize::new(1),
@@ -78,7 +79,6 @@ impl<'a> Setup<'a> {
             },
             eax_variable: Expression::Var(Variable::mock("EAX", 4)),
             rax_variable: Expression::Var(Variable::mock("RAX", 8)),
-            rcx_variable: Expression::Var(Variable::mock("RCX", 8)),
         }
     }
 }
@@ -92,15 +92,13 @@ fn subpiece_creation() {
     register_map.insert(&setup.eax_name, &setup.eax_register);
     register_map.insert(&setup.rax_name, &setup.rax_register);
 
-    let mut expr = setup.eax_variable.clone();
-
     let expected_expr = Expression::Subpiece {
         low_byte: ByteSize::new(0),
         size: ByteSize::new(4),
         arg: Box::new(setup.rax_variable.clone()),
     };
 
-    expr = create_subpiece_from_sub_register(setup.rax_name.clone(), size, lsb, &register_map);
+    let expr = create_subpiece_from_sub_register(setup.rax_name.clone(), size, lsb, &register_map);
     assert_eq!(expr, expected_expr);
 }
 
@@ -183,7 +181,7 @@ fn piecing_expressions_together() {
     higher_byte_exp = piece_base_register_assignment_expression_together(
         &higher_byte_exp,
         &setup.rax_register,
-        &setup.higher_byte_register,
+        &setup.ah_register,
     );
     assert_eq!(expr, expected_expr);
     assert_eq!(higher_byte_exp, expected_higher_byte_expr);
@@ -213,6 +211,29 @@ fn piecing_expressions_together() {
     assert_eq!(expression, expected_output);
 }
 
+/// Check whether the format strings when printing the defs of the given block are as expected.
+/// Return false if the number of elements does not match or at least one format string differs from the expected result.
+fn check_defs_of_block(block: &Term<Blk>, expected: Vec<&str>) -> bool {
+    if block.term.defs.len() != expected.len() {
+        println!(
+            "lengths do not match: {} != {}",
+            block.term.defs.len(),
+            expected.len()
+        );
+        return false;
+    }
+    for (def, expected_def) in block.term.defs.iter().zip(expected.iter()) {
+        let format_string = format!("{}: {}", def.tid, def.term);
+        if &format_string != expected_def {
+            println!("Def does not match:");
+            println!("   given: {}", format_string);
+            println!("expected: {}", expected_def);
+            return false;
+        }
+    }
+    true
+}
+
 #[test]
 fn piecing_or_zero_extending() {
     let setup = Setup::new();
@@ -221,155 +242,165 @@ fn piecing_or_zero_extending() {
     register_map.insert(&setup.rax_name, &setup.rax_register);
     register_map.insert(&setup.ecx_name, &setup.ecx_register);
     register_map.insert(&setup.rcx_name, &setup.rcx_register);
+    register_map.insert(&setup.ah_name, &setup.ah_register);
 
-
-    let eax_assign_def = Term {
+    let eax_assign = Term {
         tid: Tid::new("eax_assign"),
         term: Def::Assign {
             var: Variable::mock("EAX", 4),
-            value: Expression::Const(Bitvector::from_i32(0).into()),
+            value: Expression::const_from_i32(0),
         },
     };
-    let zero_extension_def = Term {
-        tid: Tid::new("zero_extension"),
+    let load_to_eax = Term {
+        tid: Tid::new("load_to_eax"),
+        term: Def::Load {
+            var: Variable::mock("EAX", 4),
+            address: Expression::const_from_i64(0),
+        },
+    };
+    let ah_assign = Term {
+        tid: Tid::new("ah_assign"),
+        term: Def::Assign {
+            var: Variable::mock("AH", 1),
+            value: Expression::Const(Bitvector::from_i8(0)),
+        },
+    };
+    let zext_eax_to_rax = Term {
+        tid: Tid::new("zext_eax_to_rax"),
         term: Def::Assign {
             var: Variable::mock("RAX", 8),
-            value: Expression::Cast {
-                op: CastOpType::IntZExt,
-                size: ByteSize::new(8),
-                arg: Box::new(setup.eax_variable.clone()),
-            },
+            value: Expression::cast(setup.eax_variable.clone(), CastOpType::IntZExt),
         },
     };
-    // Test when the next instruction is a zero extension.
+    let zext_ah_to_eax = Term {
+        tid: Tid::new("zext_ah_to_eax"),
+        term: Def::Assign {
+            var: Variable::mock("EAX", 4),
+            value: Expression::cast(
+                Expression::Var(Variable::mock("AH", 1)),
+                CastOpType::IntZExt,
+            ),
+        },
+    };
+    let zext_ah_to_rax = Term {
+        tid: Tid::new("zext_ah_to_rax"),
+        term: Def::Assign {
+            var: Variable::mock("RAX", 8),
+            value: Expression::cast(
+                Expression::Var(Variable::mock("AH", 1)),
+                CastOpType::IntZExt,
+            ),
+        },
+    };
+    let zext_eax_to_rcx = Term {
+        tid: Tid::new("zext_eax_to_rcx"),
+        term: Def::Assign {
+            var: Variable::mock("RCX", 8),
+            value: Expression::cast(setup.eax_variable.clone(), CastOpType::IntZExt),
+        },
+    };
+
+    // Test when the next instruction is a zero extension to the base register.
     let mut block = Term {
         tid: Tid::new("block"),
         term: Blk {
-            defs: vec![eax_assign_def, zero_extension_def],
+            defs: vec![eax_assign.clone(), zext_eax_to_rax.clone()],
             jmps: Vec::new(),
             indirect_jmp_targets: Vec::new(),
-        }
+        },
     };
-
     replace_subregister_in_block(&mut block, &register_map);
+    assert!(check_defs_of_block(
+        &block,
+        vec!["zext_eax_to_rax: RAX:64 = IntZExt(0x0:i32)"]
+    ));
 
-    for def in block.term.defs.iter() {
-        println!("{}: {}", def.tid, def.term);
-    }
-    todo!(); // Check correct output
-
-    todo!(); // Test case with wrong target register for the zero extension.
-
-    todo!(); // Test case with target register of zero extension also being a subregister.
-
-    todo!(); // Test case with a load instruction as first instruction.
-}
-
-
-/*
-#[test]
-fn processing_sub_registers() {
-    let setup = Setup::new();
-
-    let mut register_map = setup.register_map.clone();
-    register_map.insert(&setup.eax_name, &setup.eax_register);
-    register_map.insert(&setup.rax_name, &setup.rax_register);
-    register_map.insert(&setup.ecx_name, &setup.ecx_register);
-    register_map.insert(&setup.rcx_name, &setup.rcx_register);
-
-    // Test Case: Subregister output
-    let out_sub = Variable {
-        name: setup.eax_name.clone(),
-        size: ByteSize::new(4),
-        is_temp: false,
-    };
-    // Test Case: Baseregister output
-    let mut out_base = Variable {
-        name: setup.rax_name.clone(),
-        size: ByteSize::new(8),
-        is_temp: false,
-    };
-    // Test Case: Virtual register output
-    let mut out_virtual = Variable {
-        name: String::from("$u560"),
-        size: ByteSize::new(8),
-        is_temp: true,
-    };
-    // Test Case: Following instruction is a zero extend
-    let mut def_term_ext = Term {
-        tid: Tid::new("int_zext"),
-        term: Def::Assign {
-            var: out_base.clone(),
-            value: Expression::Cast {
-                op: CastOpType::IntZExt,
-                size: ByteSize::new(8),
-                arg: Box::new(setup.eax_variable.clone()),
-            },
+    // Test whether zero extension to base register is still recognized
+    // even if the sub-register starts not at byte zero of the base register.
+    let mut block = Term {
+        tid: Tid::new("block"),
+        term: Blk {
+            defs: vec![ah_assign.clone(), zext_ah_to_rax],
+            jmps: Vec::new(),
+            indirect_jmp_targets: Vec::new(),
         },
     };
-    // Test Case: Following instruction is not a zero extend
-    let mut def_term = Term {
-        tid: Tid::new("int_sext"),
-        term: Def::Assign {
-            var: out_base.clone(),
-            value: Expression::Cast {
-                op: CastOpType::IntSExt,
-                size: ByteSize::new(8),
-                arg: Box::new(setup.eax_variable.clone()),
-            },
+    replace_subregister_in_block(&mut block, &register_map);
+    assert!(check_defs_of_block(
+        &block,
+        vec!["zext_ah_to_rax: RAX:64 = IntZExt(0x0:i8)"]
+    ));
+
+    // Test when the next register is a zero extension to a different register.
+    let mut block = Term {
+        tid: Tid::new("block"),
+        term: Blk {
+            defs: vec![eax_assign, zext_eax_to_rcx.clone()],
+            jmps: Vec::new(),
+            indirect_jmp_targets: Vec::new(),
         },
     };
+    replace_subregister_in_block(&mut block, &register_map);
+    assert!(check_defs_of_block(
+        &block,
+        vec![
+            "eax_assign: RAX:64 = ((RAX:64)[4-7] Piece 0x0:i32)",
+            "zext_eax_to_rcx: RCX:64 = IntZExt((RAX:64)[0-3])"
+        ]
+    ));
 
-    // 1. Test: peeked is a zero extension and output is a sub register
-    // Expects: Sub register casted to base and zero extension detected
-    let def_term_ext_pointer = &mut def_term_ext;
-    let mut peeked = Some(&def_term_ext_pointer);
-    let mut sub_reg_output = out_sub.clone();
-    let mut output = Some(&mut sub_reg_output);
-    let mut expr = setup.int_sub_expr.clone();
-    let mut expected_expr = Expression::Cast {
-        op: CastOpType::IntZExt,
-        size: ByteSize::new(8),
-        arg: Box::new(setup.int_sub_subpiece_expr.clone()),
+    // Test when target of zero extension is also a sub-register
+    let mut block = Term {
+        tid: Tid::new("block"),
+        term: Blk {
+            defs: vec![ah_assign.clone(), zext_ah_to_eax],
+            jmps: Vec::new(),
+            indirect_jmp_targets: Vec::new(),
+        },
     };
+    replace_subregister_in_block(&mut block, &register_map);
+    assert!(check_defs_of_block(
+        &block,
+        vec![
+            "ah_assign: RAX:64 = (((RAX:64)[2-7] Piece 0x0:i8) Piece (RAX:64)[0-0])",
+            "zext_ah_to_eax: RAX:64 = ((RAX:64)[4-7] Piece IntZExt((RAX:64)[1-1]))",
+        ]
+    ));
 
-    expr.cast_sub_registers_to_base_register_subpieces(output, &register_map, peeked);
-    assert_eq!(expr, expected_expr);
-
-    // 2. Test: peeked is not a zero extend and output is a sub register
-    // Expects: Piece input together to get the base register size
-    let def_term_pointer = &mut def_term;
-    peeked = Some(&def_term_pointer);
-    expr = setup.int_sub_expr.clone();
-    expected_expr = Expression::BinOp {
-        op: BinOpType::Piece,
-        lhs: Box::new(Expression::Subpiece {
-            low_byte: ByteSize::new(4),
-            size: ByteSize::new(4),
-            arg: Box::new(setup.rax_variable.clone()),
-        }),
-        rhs: Box::new(setup.int_sub_subpiece_expr.clone()),
+    // Test when loading to a sub-register with a zero extension to the base register as next instruction
+    let mut block = Term {
+        tid: Tid::new("block"),
+        term: Blk {
+            defs: vec![load_to_eax.clone(), zext_eax_to_rax],
+            jmps: Vec::new(),
+            indirect_jmp_targets: Vec::new(),
+        },
     };
-    let mut sub_reg_output = out_sub.clone();
-    output = Some(&mut sub_reg_output);
-    expr.cast_sub_registers_to_base_register_subpieces(output, &register_map, peeked);
-    assert_eq!(expr, expected_expr);
+    replace_subregister_in_block(&mut block, &register_map);
+    assert!(check_defs_of_block(
+        &block,
+        vec![
+            "load_to_eax: loaded_value:32(temp) := Load from 0x0:i64",
+            "zext_eax_to_rax: RAX:64 = IntZExt(loaded_value:32(temp))",
+        ]
+    ));
 
-    // 3. Test: peek is neglectable and output is a base register
-    let def_term_pointer = &mut def_term;
-    peeked = Some(&def_term_pointer);
-    expr = setup.int_sub_expr.clone();
-    output = Some(&mut out_base);
-    expr.cast_sub_registers_to_base_register_subpieces(output, &register_map, peeked);
-    assert_eq!(expr, setup.int_sub_subpiece_expr);
-
-    // 4. Test: peek is neglectable and output is a virtual register
-    let def_term_pointer = &mut def_term;
-    peeked = Some(&def_term_pointer);
-    expr = setup.int_sub_expr.clone();
-    output = Some(&mut out_virtual);
-    expr.cast_sub_registers_to_base_register_subpieces(output, &register_map, peeked);
-    assert_eq!(expr, setup.int_sub_subpiece_expr);
+    // Test when loading to a sub-register without a zero extension to the base register as next instruction
+    let mut block = Term {
+        tid: Tid::new("block"),
+        term: Blk {
+            defs: vec![load_to_eax, zext_eax_to_rcx],
+            jmps: Vec::new(),
+            indirect_jmp_targets: Vec::new(),
+        },
+    };
+    replace_subregister_in_block(&mut block, &register_map);
+    assert!(check_defs_of_block(
+        &block,
+        vec![
+            "load_to_eax: loaded_value:32(temp) := Load from 0x0:i64",
+            "load_to_eax_cast_to_base: RAX:64 = ((RAX:64)[4-7] Piece loaded_value:32(temp))",
+            "zext_eax_to_rcx: RCX:64 = IntZExt((RAX:64)[0-3])"
+        ]
+    ));
 }
-
-*/

@@ -8,25 +8,27 @@ use std::ops::Deref;
 /// In the given block replace all occurences of sub-registers by equivalent expressions of the corresponding base register.
 /// By getting rid of all mentions of sub-registers we get rid of all hidden dependencies between registers,
 /// which simplifies later analyses.
-/// 
+///
 /// For example, this replaces mentions of the register EAX by a SUBPIECE expression of RAX for x86-64.
-/// 
+///
 /// Note that Ghidra (and thus also the cwe_checker) handles flag registers as independent 1-bit registers
 /// instead of combining them to one register containing all flags.
-pub fn replace_subregister_in_block(block: & mut Term<Blk>,
-register_map: &HashMap<&String, &RegisterProperties>
+pub fn replace_subregister_in_block(
+    block: &mut Term<Blk>,
+    register_map: &HashMap<&String, &RegisterProperties>,
 ) {
     // Substitute subregisters in expressions contained in jump instructions
     for jump in block.term.jmps.iter_mut() {
         replace_subregister_in_jump(jump, register_map);
-    };
+    }
     // Substitute subregisters in Def instructions
-    let new_defs = SubregisterSubstitutionBuilder::compute_replacement_defs_for_block(block, register_map);
+    let new_defs =
+        SubregisterSubstitutionBuilder::compute_replacement_defs_for_block(block, register_map);
     block.term.defs = new_defs;
 }
 
 /// A builder struct for substitution of subregisters in a basic block.
-/// 
+///
 /// For the basic workflow of the subregister substitution process see the
 /// [compute_replacement_defs_for_block](SubregisterSubstitutionBuilder::compute_replacement_defs_for_block) method.
 struct SubregisterSubstitutionBuilder<'a> {
@@ -54,7 +56,7 @@ impl<'a> SubregisterSubstitutionBuilder<'a> {
 
     /// Iterate through all Def-terms of the given block and replace any occurence of a subregister
     /// by its base register (wrapped in SUBPIECE- or PIECE- instructions to not change program semantics).
-    /// 
+    ///
     /// The basic workflow of the subregister substitution process for each Def-term is as follows:
     /// - First replace all occurences of subregisters as inputs into expressions of the Def-term
     ///   by replacing them with the SUBPIECE-wrapped base register.
@@ -100,11 +102,11 @@ impl<'a> SubregisterSubstitutionBuilder<'a> {
     }
 
     /// Replace subregisters as output variables of assign- or load-instructions.
-    /// 
+    ///
     /// If the next Def-term in the `input_iter` of `self` is a cast to the base register,
     /// then it might get combined with the given Def-term to a single Def-term.
     /// In this case the `input_iter` is advanced by one step.
-    /// 
+    ///
     /// For load instructions two Def-terms might get added to the `output_defs` array of `self`.
     fn replace_output_subregister(&mut self, def: Term<Def>) {
         match &def.term {
@@ -116,7 +118,7 @@ impl<'a> SubregisterSubstitutionBuilder<'a> {
                             let mut output = self.input_iter.next().unwrap().clone();
                             match &mut output.term {
                                 Def::Assign {
-                                    var,
+                                    var: _var_cast,
                                     value: output_expr,
                                 } => {
                                     output_expr.substitute_input_var(var, value);
@@ -231,9 +233,12 @@ impl<'a> SubregisterSubstitutionBuilder<'a> {
     }
 }
 
-/// Replace subregisters that are inputs into expressions used by the given jump term 
+/// Replace subregisters that are inputs into expressions used by the given jump term
 /// by SUBPIECE expressions of the corresponding base register.
-fn replace_subregister_in_jump(jump: &mut Term<Jmp>, register_map: &HashMap<&String, &RegisterProperties>) {
+fn replace_subregister_in_jump(
+    jump: &mut Term<Jmp>,
+    register_map: &HashMap<&String, &RegisterProperties>,
+) {
     match &mut jump.term {
         Jmp::BranchInd(expr)
         | Jmp::CBranch {

@@ -236,11 +236,7 @@ impl fmt::Display for Expression {
                 size,
                 arg,
             } => {
-                if let (Ok(start), Ok(end)) = (u32::try_from(low_byte.0), u32::try_from(size.0)) {
-                    write!(f, "({})[{}-{}]", arg, start, end)
-                } else {
-                    write!(f, "{}[]", arg)
-                }
+                write!(f, "({})[{}-{}]", arg, low_byte.0, low_byte.0 + size.0 - 1)
             }
         }
     }

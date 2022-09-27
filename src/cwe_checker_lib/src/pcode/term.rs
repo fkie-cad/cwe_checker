@@ -1,6 +1,7 @@
 use std::collections::{BTreeSet, HashMap};
 use std::usize;
 
+use super::subregister_substitution::replace_input_subregister;
 use super::{Expression, ExpressionType, RegisterProperties, Variable};
 use crate::intermediate_representation::Arg as IrArg;
 use crate::intermediate_representation::Blk as IrBlk;
@@ -18,7 +19,6 @@ use crate::intermediate_representation::Sub as IrSub;
 use crate::intermediate_representation::Variable as IrVariable;
 use crate::prelude::*;
 use crate::utils::log::LogMessage;
-use super::subregister_substitution::replace_input_subregister;
 
 // TODO: Handle the case where an indirect tail call is represented by CALLIND plus RETURN
 
