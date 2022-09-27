@@ -766,7 +766,6 @@ impl Project {
                 }
             }
         }
-        // TODO: Do I want to move this into the subregister substitution module?
 
         let register_set = self
             .register_properties
