@@ -204,28 +204,24 @@ impl<'a> SubregisterSubstitutionBuilder<'a> {
     /// to its corresponding base register.
     fn is_next_def_cast_to_base_register(&mut self, input_var: &Variable) -> bool {
         if let Some(peeked_def) = self.input_iter.peek() {
-            match &peeked_def.term {
-                Def::Assign { var, value } => {
-                    if let (Some(reg), Some(input_reg)) = (
-                        self.register_map.get(&var.name),
-                        self.register_map.get(&input_var.name),
-                    ) {
-                        match value {
-                            Expression::Cast { arg, .. } => match arg.deref() {
-                                Expression::Var(cast_var) if cast_var == input_var => {
-                                    if input_reg.register != input_reg.base_register
-                                        && input_reg.base_register == reg.register
-                                    {
-                                        return true;
-                                    }
+            if let Def::Assign { var, value } = &peeked_def.term {
+                if let (Some(reg), Some(input_reg)) = (
+                    self.register_map.get(&var.name),
+                    self.register_map.get(&input_var.name),
+                ) {
+                    if let Expression::Cast { arg, .. } = value {
+                        match arg.deref() {
+                            Expression::Var(cast_var) if cast_var == input_var => {
+                                if input_reg.register != input_reg.base_register
+                                    && input_reg.base_register == reg.register
+                                {
+                                    return true;
                                 }
-                                _ => (),
-                            },
+                            }
                             _ => (),
                         }
                     }
                 }
-                _ => (),
             }
         }
 
@@ -321,7 +317,7 @@ fn piece_base_register_assignment_expression_together(
 
     if sub_register.lsb > ByteSize::new(0) && sub_register.lsb + sub_register.size == base_size {
         // Build PIECE as PIECE(lhs: sub_register, rhs: low subpiece)
-        return Expression::BinOp {
+        Expression::BinOp {
             op: BinOpType::Piece,
             lhs: Box::new(input_expression.clone()),
             rhs: Box::new(Expression::Subpiece {
@@ -329,10 +325,10 @@ fn piece_base_register_assignment_expression_together(
                 size: sub_lsb,
                 arg: base_subpiece,
             }),
-        };
+        }
     } else if sub_register.lsb > ByteSize::new(0) {
         // Build PIECE as PIECE(lhs:PIECE(lhs:higher subpiece, rhs:sub register), rhs:lower subpiece)
-        return Expression::BinOp {
+        Expression::BinOp {
             op: BinOpType::Piece,
             lhs: Box::new(Expression::BinOp {
                 op: BinOpType::Piece,
@@ -348,10 +344,10 @@ fn piece_base_register_assignment_expression_together(
                 size: sub_lsb,
                 arg: base_subpiece,
             }),
-        };
+        }
     } else {
         // Build PIECE as PIECE(lhs: high subpiece, rhs: sub register)
-        return Expression::BinOp {
+        Expression::BinOp {
             op: BinOpType::Piece,
             lhs: Box::new(Expression::Subpiece {
                 low_byte: sub_size,
@@ -359,7 +355,7 @@ fn piece_base_register_assignment_expression_together(
                 arg: base_subpiece,
             }),
             rhs: Box::new(input_expression.clone()),
-        };
+        }
     }
 }
 
