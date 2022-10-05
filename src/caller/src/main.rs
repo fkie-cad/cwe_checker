@@ -3,6 +3,7 @@
 
 extern crate cwe_checker_lib; // Needed for the docstring-link to work
 
+use clap::Parser;
 use cwe_checker_lib::analysis::graph;
 use cwe_checker_lib::intermediate_representation::RuntimeMemoryImage;
 use cwe_checker_lib::utils::binary::BareMetalConfig;
@@ -15,7 +16,6 @@ use std::collections::{BTreeSet, HashSet};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::thread;
-use clap::Parser;
 
 #[derive(Debug, Parser)]
 #[command(version, about)]

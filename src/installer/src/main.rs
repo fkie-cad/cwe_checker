@@ -2,12 +2,12 @@
 //! It creates config files, copies the Ghida-Plugin and can search for a Ghidra installation at commonly used locations.
 
 use anyhow::{anyhow, Result};
+use clap::Parser;
 use directories::{BaseDirs, ProjectDirs, UserDirs};
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
-use clap::Parser;
 use walkdir::WalkDir;
 
 #[derive(Debug, Parser)]
