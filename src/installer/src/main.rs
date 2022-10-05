@@ -7,19 +7,18 @@ use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
-use structopt::StructOpt;
+use clap::Parser;
 use walkdir::WalkDir;
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
 /// Installs cwe_checker
 struct CmdlineArgs {
-    #[structopt()]
     /// Path to a ghidra installation.
     ///
     /// If this option is set then the installation will use ghidra at this location.
     ghidra_path: Option<String>,
 
-    #[structopt(long, short)]
+    #[arg(long, short)]
     /// If true, cwe_checker will be uninstalled.
     uninstall: bool,
 }
@@ -231,7 +230,7 @@ fn uninstall(conf_dir: &Path, data_dir: &Path) -> Result<()> {
 
 fn main() -> Result<()> {
     let cwe_checker_proj_dir = ProjectDirs::from("", "", "cwe_checker").unwrap();
-    let cmdline_args = CmdlineArgs::from_args();
+    let cmdline_args = CmdlineArgs::parse();
 
     match cmdline_args.uninstall {
         true => {

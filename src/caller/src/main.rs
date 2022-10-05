@@ -15,76 +15,77 @@ use std::collections::{BTreeSet, HashSet};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::thread;
-use structopt::StructOpt;
+use clap::Parser;
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
+#[command(version, about)]
 /// Find vulnerable patterns in binary executables
 struct CmdlineArgs {
     /// The path to the binary.
-    #[structopt(required_unless("module-versions"), validator(check_file_existence))]
+    #[arg(required_unless_present("module_versions"), value_parser = check_file_existence)]
     binary: Option<String>,
 
     /// Path to a custom configuration file to use instead of the standard one.
-    #[structopt(long, short, validator(check_file_existence))]
+    #[arg(long, short, value_parser = check_file_existence)]
     config: Option<String>,
 
     /// Write the results to a file instead of stdout.
     /// This only affects CWE warnings. Log messages are still printed to stdout.
-    #[structopt(long, short)]
+    #[arg(long, short)]
     out: Option<String>,
 
     /// Specify a specific set of checks to be run as a comma separated list, e.g. 'CWE332,CWE476,CWE782'.
     ///
     /// Use the "--module-versions" command line option to get a list of all valid check names.
-    #[structopt(long, short)]
+    #[arg(long, short)]
     partial: Option<String>,
 
     /// Generate JSON output.
-    #[structopt(long, short)]
+    #[arg(long, short)]
     json: bool,
 
     /// Do not print log messages. This prevents polluting stdout for json output.
-    #[structopt(long, short)]
+    #[arg(long, short)]
     quiet: bool,
 
     /// Print additional debug log messages.
-    #[structopt(long, short, conflicts_with("quiet"))]
+    #[arg(long, short, conflicts_with("quiet"))]
     verbose: bool,
 
     /// Include various statistics in the log messages.
     /// This can be helpful for assessing the analysis quality for the input binary.
-    #[structopt(long, conflicts_with("quiet"))]
+    #[arg(long, conflicts_with("quiet"))]
     statistics: bool,
 
     /// Path to a configuration file for analysis of bare metal binaries.
     ///
     /// If this option is set then the input binary is treated as a bare metal binary regardless of its format.
-    #[structopt(long)]
+    #[arg(long, value_parser = check_file_existence)]
     bare_metal_config: Option<String>,
 
     /// Prints out the version numbers of all known modules.
-    #[structopt(long)]
+    #[arg(long)]
     module_versions: bool,
 
     /// Output for debugging purposes.
     /// The current behavior of this flag is unstable and subject to change.
-    #[structopt(long, hidden = true)]
+    #[arg(long, hide(true))]
     debug: bool,
 }
 
 fn main() {
-    let cmdline_args = CmdlineArgs::from_args();
+    let cmdline_args = CmdlineArgs::parse();
 
     run_with_ghidra(&cmdline_args);
 }
 
-/// Check the existence of a file
-fn check_file_existence(file_path: String) -> Result<(), String> {
+/// Return `Ok(file_path)` only if `file_path` points to an existing file.
+fn check_file_existence(file_path: &str) -> Result<String, String> {
     if std::fs::metadata(&file_path)
         .map_err(|err| format!("{}", err))?
         .is_file()
     {
-        Ok(())
+        Ok(file_path.to_string())
     } else {
         Err(format!("{} is not a file.", file_path))
     }
