@@ -86,6 +86,18 @@ impl AbstractIdentifier {
         AbstractIdentifier::new(time.clone(), location)
     }
 
+    /// Create an abstract identifier from an address into global memory.
+    pub fn from_global_address(
+        time: &Tid,
+        address: &Bitvector,
+        size: ByteSize,
+    ) -> AbstractIdentifier {
+        AbstractIdentifier::new(
+            time.clone(),
+            AbstractLocation::from_global_address(address, size),
+        )
+    }
+
     /// Create a new abstract identifier
     /// by pushing the given path hint to the array of path hints of `self`.
     /// Returns an error if the path hint is already contained in the path hints of `self`.
@@ -106,11 +118,13 @@ impl AbstractIdentifier {
     }
 
     /// Get the register associated to the abstract location.
-    /// Panics if the abstract location is a memory location and not a register.
+    /// Panics if the abstract location is not a register but a memory location.
     pub fn unwrap_register(&self) -> &Variable {
         match &self.location {
             AbstractLocation::Register(var) => var,
-            AbstractLocation::Pointer(_, _) => panic!("Abstract location is not a register."),
+            AbstractLocation::GlobalValue { .. }
+            | AbstractLocation::GlobalPointer(_, _)
+            | AbstractLocation::Pointer(_, _) => panic!("Abstract location is not a register."),
         }
     }
 
@@ -153,18 +167,29 @@ impl std::fmt::Display for AbstractIdentifier {
 pub enum AbstractLocation {
     /// The location is given by a register.
     Register(Variable),
+    /// The location is given by a constant address in global memory.
+    GlobalValue { address: u64, size: ByteSize },
     /// The location is in memory.
     /// One needs to follow the pointer in the given register
     /// and then follow the abstract memory location inside the pointed to memory object
     /// to find the actual memory location.
     Pointer(Variable, AbstractMemoryLocation),
+    /// The location is in memory.
+    /// One needs to follow the pointer located at the given global address
+    /// and then follow the abstract memory location inside the pointed to memory object
+    /// to find the actual memory location.
+    GlobalPointer(u64, AbstractMemoryLocation),
 }
 
 impl std::fmt::Display for AbstractLocation {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Self::Register(var) => write!(formatter, "{}", var.name),
+            Self::GlobalValue { address, size: _ } => write!(formatter, "0x{:x}", address),
             Self::Pointer(var, location) => write!(formatter, "{}->{}", var.name, location),
+            Self::GlobalPointer(address, location) => {
+                write!(formatter, "0x{:x}->{}", address, location)
+            }
         }
     }
 }
@@ -193,11 +218,22 @@ impl AbstractLocation {
         AbstractLocation::Pointer(stack_register.clone(), stack_pos)
     }
 
+    /// Create an abstract location pointing to a value in global memory.
+    pub fn from_global_address(address: &Bitvector, size: ByteSize) -> AbstractLocation {
+        let address = address
+            .try_to_u64()
+            .expect("Global address larger than 64 bits encountered.");
+        AbstractLocation::GlobalValue { address, size }
+    }
+
     /// Get the bytesize of the value represented by the abstract location.
     pub fn bytesize(&self) -> ByteSize {
         match self {
             Self::Register(var) => var.size,
-            Self::Pointer(_pointer_var, mem_location) => mem_location.bytesize(),
+            Self::GlobalValue { size, .. } => *size,
+            Self::Pointer(_, mem_location) | Self::GlobalPointer(_, mem_location) => {
+                mem_location.bytesize()
+            }
         }
     }
 }
