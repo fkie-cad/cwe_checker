@@ -162,6 +162,9 @@ pub fn compute_function_signatures<'a>(
 pub struct FunctionSignature {
     /// The parameters of the function together with their access patterns.
     pub parameters: HashMap<Arg, AccessPattern>,
+    /// Values in writeable global memory accessed by the function.
+    /// Does not contain indirectly accessed values, e.g. values accessed by callees of this function.
+    pub global_parameters: HashMap<u64, AccessPattern>,
 }
 
 impl FunctionSignature {
@@ -169,6 +172,7 @@ impl FunctionSignature {
     pub fn new() -> Self {
         Self {
             parameters: HashMap::new(),
+            global_parameters: HashMap::new(),
         }
     }
 
@@ -186,8 +190,12 @@ impl FunctionSignature {
         stack_params_total_size
     }
 
-    /// Merge the parameter list of `self` with the given parameter list.
-    fn merge_parameter_list(&mut self, params: &[(Arg, AccessPattern)]) {
+    /// Merge the parameter list and the global parameter list of `self` with the given lists.
+    fn merge_parameter_lists(
+        &mut self,
+        params: &[(Arg, AccessPattern)],
+        global_params: &[(u64, AccessPattern)],
+    ) {
         for (arg, sig_new) in params {
             if let Some(sig_self) = self.parameters.get_mut(arg) {
                 *sig_self = sig_self.merge(sig_new);
@@ -195,12 +203,20 @@ impl FunctionSignature {
                 self.parameters.insert(arg.clone(), *sig_new);
             }
         }
+        for (address, sig_new) in global_params {
+            if let Some(sig_self) = self.global_parameters.get_mut(address) {
+                *sig_self = sig_self.merge(sig_new);
+            } else {
+                self.global_parameters.insert(*address, *sig_new);
+            }
+        }
     }
 
     /// Merge the function signature with the signature extracted from the given state.
     fn merge_with_fn_sig_of_state(&mut self, state: &State) {
         let params = state.get_params_of_current_function();
-        self.merge_parameter_list(&params);
+        let global_params = state.get_global_mem_params_of_current_function();
+        self.merge_parameter_lists(&params, &global_params);
     }
 
     /// Sanitize the function signature:
@@ -269,7 +285,10 @@ pub mod tests {
                     write_access_pattern,
                 ),
             ]);
-            FunctionSignature { parameters }
+            FunctionSignature {
+                parameters,
+                global_parameters: HashMap::new(),
+            }
         }
     }
 }

@@ -150,7 +150,12 @@ fn test_extern_symbol_handling() {
     let return_val_id =
         AbstractIdentifier::from_var(Tid::new("call_tid"), &Variable::mock("r0", 4));
     // Test extern symbol handling.
-    state.handle_generic_extern_symbol(&call_tid, &extern_symbol, &cconv);
+    state.handle_generic_extern_symbol(
+        &call_tid,
+        &extern_symbol,
+        &cconv,
+        &RuntimeMemoryImage::mock(),
+    );
     assert_eq!(
         state
             .tracked_ids
@@ -175,5 +180,32 @@ fn test_extern_symbol_handling() {
             .get(&return_val_id)
             .unwrap(),
         &Bitvector::from_i32(0).into()
+    );
+}
+
+#[test]
+fn test_substitute_global_mem_address() {
+    let mut state = State::mock_arm32();
+    let global_memory = RuntimeMemoryImage::mock();
+
+    // Test that addresses into non-writeable memory do not get substituted.
+    let global_address: DataDomain<BitvectorDomain> = Bitvector::from_i32(0x1000).into();
+    let substituted_address =
+        state.substitute_global_mem_address(global_address.clone(), &global_memory);
+    assert_eq!(global_address, substituted_address);
+    // Test substitution for addresses into writeable global memory.
+    let global_address: DataDomain<BitvectorDomain> = Bitvector::from_i32(0x2000).into();
+    let substituted_address = state.substitute_global_mem_address(global_address, &global_memory);
+    let expected_global_id = AbstractIdentifier::from_global_address(
+        state.get_current_function_tid(),
+        &Bitvector::from_i32(0x2000),
+    );
+    assert_eq!(
+        state.tracked_ids.get(&expected_global_id),
+        Some(&AccessPattern::new())
+    );
+    assert_eq!(
+        substituted_address,
+        DataDomain::from_target(expected_global_id, Bitvector::from_i32(0).into())
     );
 }
