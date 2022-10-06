@@ -163,7 +163,12 @@ pub enum AbstractLocation {
     /// The value itself is a constant address to global memory.
     /// Note that the `size` is the size of the pointer and not the size
     /// of the value residing at the specific address in global memory.
-    GlobalAddress { address: u64, size: ByteSize },
+    GlobalAddress {
+        /// The address in global memory.
+        address: u64,
+        /// The byte size of the address (not the pointed-to value!).
+        size: ByteSize,
+    },
     /// The location is in memory.
     /// One needs to follow the pointer in the given register
     /// and then follow the abstract memory location inside the pointed to memory object

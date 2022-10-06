@@ -152,7 +152,7 @@ impl State {
     }
 
     /// Return a list of all potential global memory addresses
-    /// for which any type of access has been tracked by the current state. 
+    /// for which any type of access has been tracked by the current state.
     pub fn get_global_mem_params_of_current_function(&self) -> Vec<(u64, AccessPattern)> {
         let mut global_params = Vec::new();
         for (id, access_pattern) in self.tracked_ids.iter() {
@@ -160,7 +160,7 @@ impl State {
                 match id.get_location() {
                     AbstractLocation::GlobalPointer(address, _)
                     | AbstractLocation::GlobalAddress { address, .. } => {
-                        global_params.push((*address, access_pattern.clone()));
+                        global_params.push((*address, *access_pattern));
                     }
                     AbstractLocation::Pointer(_, _) | AbstractLocation::Register(_) => (),
                 }
