@@ -189,7 +189,7 @@ impl Expression {
         }
     }
 
-    /// Substitute every occurence of `input_var` in `self` with the given `replace_with_expression`.
+    /// Substitute every occurrence of `input_var` in `self` with the given `replace_with_expression`.
     pub fn substitute_input_var(
         &mut self,
         input_var: &Variable,

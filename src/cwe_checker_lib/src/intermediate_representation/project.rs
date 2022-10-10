@@ -240,6 +240,7 @@ impl Project {
             self.remove_references_to_nonexisting_tids_and_retarget_non_returning_calls();
         make_block_to_sub_mapping_unique(self);
         self.propagate_input_expressions();
+        crate::analysis::expression_propagation::propagate_input_expression(self);
         self.substitute_trivial_expressions();
         crate::analysis::dead_variable_elimination::remove_dead_var_assignments(self);
         propagate_control_flow(self);
