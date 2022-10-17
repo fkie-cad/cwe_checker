@@ -92,27 +92,27 @@ fn get_mock_entry_block() -> Term<Blk> {
                     Expression::var("Z", 8).un_op(UnOpType::IntNegate),
                 ),
                 Def::assign(
-                    "tid_1",
+                    "tid_2",
                     Variable::mock("X", 8),
                     Expression::var("Y", 8).un_op(UnOpType::IntNegate),
                 ),
                 Def::assign(
-                    "tid_2",
+                    "tid_3",
                     Variable::mock("Y", 8),
                     Expression::var("X", 8).plus(Expression::var("Y", 8)),
                 ),
                 Def::assign(
-                    "tid_3",
+                    "tid_4",
                     Variable::mock("X", 8),
                     Expression::var("X", 8).un_op(UnOpType::IntNegate),
                 ),
                 Def::assign(
-                    "tid_4",
+                    "tid_5",
                     Variable::mock("Y", 8),
                     Expression::var("Y", 8).un_op(UnOpType::IntNegate),
                 ),
                 Def::assign(
-                    "tid_5",
+                    "tid_6",
                     Variable::mock("Y", 8),
                     Expression::var("X", 8).plus(Expression::var("Y", 8)),
                 ),
@@ -334,5 +334,85 @@ fn insertion_table_update() {
 #[test]
 /// Tests the correct insertion of propagational expressions.
 fn expressions_inserted() {
-    todo!()
+    let mut project = mock_project();
+    propagate_input_expression(&mut project);
+    let result_def_entry_block = vec![
+        Def::assign(
+            "tid_1",
+            Variable::mock("Z", 8),
+            Expression::var("Z", 8).un_op(UnOpType::IntNegate),
+        ),
+        Def::assign(
+            "tid_2",
+            Variable::mock("X", 8),
+            Expression::var("Y", 8).un_op(UnOpType::IntNegate),
+        ),
+        Def::assign(
+            "tid_3",
+            Variable::mock("Y", 8),
+            Expression::var("Y", 8)
+                .un_op(UnOpType::IntNegate)
+                .plus(Expression::var("Y", 8)),
+        ),
+        Def::assign(
+            "tid_4",
+            Variable::mock("X", 8),
+            Expression::var("X", 8).un_op(UnOpType::IntNegate),
+        ),
+        // tid_5 is removed by merge_def_assignments_to_same_var()
+        Def::assign(
+            "tid_6",
+            Variable::mock("Y", 8),
+            Expression::var("X", 8).plus(Expression::var("Y", 8).un_op(UnOpType::IntNegate)),
+        ),
+    ];
+    assert_eq!(
+        project
+            .program
+            .term
+            .subs
+            .get(&Tid::new("main"))
+            .unwrap()
+            .term
+            .blocks[0]
+            .term
+            .defs,
+        result_def_entry_block
+    );
+    assert_eq!(
+        project
+            .program
+            .term
+            .subs
+            .get(&Tid::new("main"))
+            .unwrap()
+            .term
+            .blocks[1]
+            .term
+            .defs,
+        vec![Def::assign(
+            "entry_jmp_def_1",
+            Variable::mock("X", 8),
+            Expression::var("Z", 8)
+                .un_op(UnOpType::IntNegate)
+                .un_op(UnOpType::BoolNegate),
+        )]
+    );
+    assert_eq!(
+        project
+            .program
+            .term
+            .subs
+            .get(&Tid::new("called_function"))
+            .unwrap()
+            .term
+            .blocks[0]
+            .term
+            .defs,
+        vec![Def::assign(
+            "callee_def_1",
+            Variable::mock("Y", 8),
+            Expression::var("Z", 8),
+        )]
+    );
 }

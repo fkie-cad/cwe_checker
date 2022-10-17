@@ -58,13 +58,13 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
                 value: expression,
             } => {
                 // Extend the considered expression with already known expressions.
-                let mut extendet_expression = expression.clone();
+                let mut extended_expression = expression.clone();
                 for input_var in expression.input_vars().into_iter() {
                     if let Some(expr) = insertable_expressions.get(input_var) {
-                        extendet_expression.substitute_input_var(input_var, expr)
+                        extended_expression.substitute_input_var(input_var, expr)
                     }
                 }
-                insertable_expressions.insert(var.clone(), extendet_expression.clone());
+                insertable_expressions.insert(var.clone(), extended_expression.clone());
 
                 // Expressions dependent on the assigned variable are no longer insertable.
                 // Except, if the assigned variable depends on itself.
@@ -187,19 +187,24 @@ fn extract_results<'a>(
     results
 }
 
-/// Replaces for every basic block all variables by the provided expressions.
+/// Replaces for every basic block all propagated expressions.
+///
+/// This uses the expression propagation of basic blocks, thus performs intra-basic-block insertion of expressions.
 fn insert_expressions(
     inseratables: HashMap<Tid, HashMap<Variable, Expression>>,
     program: &mut Program,
 ) {
     for sub in program.subs.values_mut() {
-        for block in sub.term.blocks.iter_mut() {
+        let mut blocks = sub.term.blocks.iter_mut();
+        // First blocks of functions should not insert any expressions, extracted by the fixpoint computation.
+        if let Some(first_block) = blocks.next() {
+            first_block.merge_def_assignments_to_same_var();
+            first_block.propagate_input_expressions(None);
+        }
+        for block in blocks {
+            block.merge_def_assignments_to_same_var();
             if let Some(insertable_for_block) = inseratables.get(&block.tid) {
-                for def in block.term.defs.iter_mut() {
-                    for (var, exp) in insertable_for_block {
-                        def.substitute_input_var(var, exp);
-                    }
-                }
+                block.propagate_input_expressions(Some(insertable_for_block.clone()));
             }
         }
     }
