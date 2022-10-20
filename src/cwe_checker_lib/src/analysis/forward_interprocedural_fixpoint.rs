@@ -14,6 +14,7 @@ use super::graph::*;
 use super::interprocedural_fixpoint_generic::*;
 use crate::intermediate_representation::*;
 use petgraph::graph::EdgeIndex;
+use petgraph::graph::NodeIndex;
 use std::marker::PhantomData;
 
 /// The context for an interprocedural fixpoint computation.
@@ -281,5 +282,74 @@ pub fn create_computation_with_alternate_worklist_order<'a, T: Context<'a>>(
     super::fixpoint::Computation::new_with_alternate_worklist_order(
         generalized_problem,
         default_value.map(NodeValue::Value),
+    )
+}
+
+/// Generate a new computation from the corresponding context and an optional default value for nodes.
+/// Uses the Callee before Caller worklist order when computing the fixpoint.
+pub fn create_computation_with_callee_before_caller_worklist_order<'a, T: Context<'a>>(
+    problem: T,
+    default_value: Option<T::Value>,
+) -> super::fixpoint::Computation<GeneralizedContext<'a, T>> {
+    let mut graph = problem.get_graph().clone();
+    for edge in graph.edge_indices() {
+        if let Edge::Call(call) | Edge::ExternCallStub(call) = graph[edge] {
+            if let Jmp::Call { .. } | Jmp::CallInd { .. } | Jmp::CallOther { .. } = call.term {
+                graph.remove_edge(edge).unwrap();
+            }
+        }
+    }
+    let priority_sorted_nodes: Vec<NodeIndex> = petgraph::algo::kosaraju_scc(&graph)
+        .into_iter()
+        .flatten()
+        .collect();
+    let generalized_problem = GeneralizedContext::new(problem);
+    super::fixpoint::Computation::from_node_priority_list(
+        generalized_problem,
+        default_value.map(NodeValue::Value),
+        priority_sorted_nodes,
+    )
+}
+
+/// Generate a new computation from the corresponding context and an optional default value for nodes.
+/// Uses the Caller before Callee worklist order when computing the fixpoint.
+pub fn create_computation_with_caller_before_callee_worklist_order<'a, T: Context<'a>>(
+    problem: T,
+    default_value: Option<T::Value>,
+) -> super::fixpoint::Computation<GeneralizedContext<'a, T>> {
+    let mut graph = problem.get_graph().clone();
+    for edge in graph.edge_indices() {
+        match graph[edge] {
+            Edge::Jump(jmp, untaken_jmp) => {
+                if let (
+                    Term {
+                        tid: _,
+                        term: Jmp::Return(..),
+                    },
+                    Some(Term {
+                        tid: _,
+                        term: Jmp::Return(..),
+                    }),
+                ) = (jmp, untaken_jmp)
+                {
+                    graph.remove_edge(edge).unwrap();
+                }
+            }
+            Edge::CrReturnStub => {
+                //Neccessary, since the construction around artificial nodes is never a SCC?
+                graph.remove_edge(edge).unwrap();
+            }
+            _ => (),
+        }
+    }
+    let priority_sorted_nodes: Vec<NodeIndex> = petgraph::algo::kosaraju_scc(&graph)
+        .into_iter()
+        .flatten()
+        .collect();
+    let generalized_problem = GeneralizedContext::new(problem);
+    super::fixpoint::Computation::from_node_priority_list(
+        generalized_problem,
+        default_value.map(NodeValue::Value),
+        priority_sorted_nodes,
     )
 }

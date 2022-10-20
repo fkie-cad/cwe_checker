@@ -113,7 +113,7 @@ impl<T: Context> Computation<T> {
     /// and the list of nodes of the graph ordered by the priority for the worklist algorithm.
     /// The worklist algorithm will try to stabilize the nodes with a higher index
     /// in the `priority_sorted_nodes` array before those with a lower index.
-    fn from_node_priority_list(
+    pub fn from_node_priority_list(
         fp_context: T,
         default_value: Option<T::NodeValue>,
         priority_sorted_nodes: Vec<NodeIndex>,
