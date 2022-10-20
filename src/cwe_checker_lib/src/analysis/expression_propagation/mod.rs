@@ -1,5 +1,5 @@
 //! This module contains a fixpoint computation for intra-functional expression propagation of variables
-//! and contains a functions for inserting such expressions.
+//! and contains a function for inserting such expressions.
 
 use super::fixpoint::Computation;
 use super::forward_interprocedural_fixpoint::GeneralizedContext;
@@ -14,12 +14,12 @@ use std::collections::HashMap;
 ///
 /// The computation is a intra procedural forward fixpoint calculation
 /// that stores at each node the set of registers with their propagated expressions.
-/// This expressions can be used for expression specification among basic blocks.
+/// This expressions can be used for expression propagation among basic blocks.
 pub struct Context<'a> {
     graph: &'a Graph<'a>,
 
     /// Variable-expression lookup table primitive.
-    pub insertable_expressions: HashMap<Variable, Expression>,
+    insertable_expressions: HashMap<Variable, Expression>,
 }
 
 impl<'a> Context<'a> {
@@ -41,7 +41,7 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
     fn merge(&self, value1: &Self::Value, value2: &Self::Value) -> Self::Value {
         value1
             .iter()
-            .filter(|x| value2.iter().any(|y| y == *x))
+            .filter(|(var, expr)| value2.get(var) == Some(expr))
             .map(|(var, expr)| (var.clone(), expr.clone()))
             .collect()
     }
@@ -90,10 +90,10 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
 
     fn update_call_stub(
         &self,
-        value_after_call: &Self::Value,
+        _value_before_call: &Self::Value,
         _call: &Term<Jmp>,
     ) -> Option<Self::Value> {
-        Some(value_after_call.clone())
+        Some(HashMap::new())
     }
 
     fn update_jump(
@@ -157,6 +157,9 @@ fn compute_expression_propagation<'a>(
                 .neighbors_directed(node, petgraph::Incoming)
                 .next()
                 .is_none()
+                || graph
+                    .edges(node)
+                    .any(|edge| matches!(edge.weight(), super::graph::Edge::Call(_)))
             {
                 computation.set_node_value(node, NodeValue::Value(HashMap::new()));
             }
@@ -198,14 +201,21 @@ fn insert_expressions(
         let mut blocks = sub.term.blocks.iter_mut();
         // First blocks of functions should not insert any expressions, extracted by the fixpoint computation.
         if let Some(first_block) = blocks.next() {
-            first_block.merge_def_assignments_to_same_var();
             first_block.propagate_input_expressions(None);
         }
         for block in blocks {
-            block.merge_def_assignments_to_same_var();
             if let Some(insertable_for_block) = inseratables.get(&block.tid) {
                 block.propagate_input_expressions(Some(insertable_for_block.clone()));
             }
+        }
+    }
+}
+
+/// Merges consecutive assignment expressions for the same variable.
+fn merge_same_var_assignments(project: &mut Project) {
+    for sub in project.program.term.subs.values_mut() {
+        for blk in sub.term.blocks.iter_mut() {
+            blk.merge_def_assignments_to_same_var();
         }
     }
 }
@@ -221,6 +231,7 @@ pub fn propagate_input_expression(project: &mut Project) {
         .keys()
         .cloned()
         .collect();
+    merge_same_var_assignments(project);
 
     let graph = crate::analysis::graph::get_program_cfg(&project.program, extern_subs);
     let computation = compute_expression_propagation(project, &graph);
