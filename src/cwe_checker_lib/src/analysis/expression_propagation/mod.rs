@@ -61,8 +61,8 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
                 insertable_expressions.insert(var.clone(), extended_expression.clone());
 
                 // Expressions dependent on the assigned variable are no longer insertable.
-                insertable_expressions.retain(|_input_var, input_expr| {
-                    input_expr.input_vars().into_iter().any(|x| x == var)
+                insertable_expressions.retain(|input_var, input_expr| {
+                    !(input_var != var && input_expr.input_vars().into_iter().any(|x| x == var))
                 });
 
                 Some(insertable_expressions)
@@ -167,13 +167,15 @@ fn compute_expression_propagation<'a>(
 }
 
 /// Returns the computed result for every basic block.
+///
+/// This returns the table of variable-expression pairs that hold at the beginning of the blocks.
 fn extract_results<'a>(
     graph: &Graph,
     computation: Computation<GeneralizedContext<'a, Context<'a>>>,
 ) -> HashMap<Tid, HashMap<Variable, Expression>> {
     let mut results = HashMap::new();
     for node in graph.node_indices() {
-        if let Node::BlkEnd(blk, _sub) = graph[node] {
+        if let Node::BlkStart(blk, _sub) = graph[node] {
             if let Some(NodeValue::Value(insertables)) = computation.get_node_value(node) {
                 results.insert(blk.tid.clone(), insertables.clone());
             }
@@ -190,15 +192,8 @@ fn insert_expressions(
     program: &mut Program,
 ) {
     for sub in program.subs.values_mut() {
-        let mut blocks = sub.term.blocks.iter_mut();
-        // First blocks of functions should not insert any expressions, extracted by the fixpoint computation.
-        if let Some(first_block) = blocks.next() {
-            first_block.propagate_input_expressions(None);
-        }
-        for block in blocks {
-            if let Some(insertable_for_block) = inseratables.get(&block.tid) {
-                block.propagate_input_expressions(Some(insertable_for_block.clone()));
-            }
+        for block in sub.term.blocks.iter_mut() {
+            block.propagate_input_expressions(inseratables.get(&block.tid).cloned());
         }
     }
 }

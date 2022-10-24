@@ -34,11 +34,18 @@ fn mock_project() -> Project {
     let entry_jmp_block = Term {
         tid: Tid::new("entry_jmp_block"),
         term: Blk {
-            defs: vec![Def::assign(
-                "entry_jmp_def_1",
-                Variable::mock("X", 8),
-                Expression::var("Z", 8).un_op(UnOpType::BoolNegate),
-            )],
+            defs: vec![
+                Def::assign(
+                    "entry_jmp_def_1",
+                    Variable::mock("X", 8),
+                    Expression::var("Z", 8).un_op(UnOpType::BoolNegate),
+                ),
+                Def::assign(
+                    "entry_jmp_def_2",
+                    Variable::mock("Z", 8),
+                    Expression::const_from_i32(42),
+                ),
+            ],
             jmps: vec![Term {
                 tid: Tid::new("call_to_called_function"),
                 term: Jmp::Call {
@@ -139,13 +146,20 @@ fn inter_block_propagation() {
             .blocks[1]
             .term
             .defs,
-        vec![Def::assign(
-            "entry_jmp_def_1",
-            Variable::mock("X", 8),
-            Expression::var("Z", 8)
-                .un_op(UnOpType::IntNegate)
-                .un_op(UnOpType::BoolNegate),
-        )]
+        vec![
+            Def::assign(
+                "entry_jmp_def_1",
+                Variable::mock("X", 8),
+                Expression::var("Z", 8)
+                    .un_op(UnOpType::IntNegate)
+                    .un_op(UnOpType::BoolNegate),
+            ),
+            Def::assign(
+                "entry_jmp_def_2",
+                Variable::mock("Z", 8),
+                Expression::const_from_i32(42),
+            )
+        ]
     )
 }
 #[test]
@@ -390,13 +404,20 @@ fn expressions_inserted() {
             .blocks[1]
             .term
             .defs,
-        vec![Def::assign(
-            "entry_jmp_def_1",
-            Variable::mock("X", 8),
-            Expression::var("Z", 8)
-                .un_op(UnOpType::IntNegate)
-                .un_op(UnOpType::BoolNegate),
-        )]
+        vec![
+            Def::assign(
+                "entry_jmp_def_1",
+                Variable::mock("X", 8),
+                Expression::var("Z", 8)
+                    .un_op(UnOpType::IntNegate)
+                    .un_op(UnOpType::BoolNegate),
+            ),
+            Def::assign(
+                "entry_jmp_def_2",
+                Variable::mock("Z", 8),
+                Expression::const_from_i32(42)
+            )
+        ]
     );
     assert_eq!(
         project
