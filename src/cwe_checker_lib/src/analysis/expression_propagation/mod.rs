@@ -61,8 +61,8 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
                 insertable_expressions.insert(var.clone(), extended_expression.clone());
 
                 // Expressions dependent on the assigned variable are no longer insertable.
-                insertable_expressions.retain(|input_var, input_expr| {
-                    !(input_var != var && input_expr.input_vars().into_iter().any(|x| x == var))
+                insertable_expressions.retain(|_input_var, input_expr| {
+                    !input_expr.input_vars().into_iter().any(|x| x == var)
                 });
 
                 Some(insertable_expressions)
@@ -72,8 +72,8 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
                 address: _expression,
             } => {
                 // Expressions dependent on the assigned variable are no longer insertable
-                insertable_expressions.retain(|input_var, input_expr| {
-                    input_var != var && !input_expr.input_vars().into_iter().any(|x| x == var)
+                insertable_expressions.retain(|_input_var, input_expr| {
+                    !input_expr.input_vars().into_iter().any(|x| x == var)
                 });
                 Some(insertable_expressions)
             }
