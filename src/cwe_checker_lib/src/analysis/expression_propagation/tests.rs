@@ -243,7 +243,7 @@ fn insertion_table_update() {
         &update.unwrap(),
         &blk.defs[2],
     );
-    // Assignment for Y is extended by the Expression for X and inserted. X is removed.
+    // Expression for X is removed and Assignment is inserted.
     assert_eq!(
         update.clone().unwrap(),
         HashMap::from([
@@ -253,9 +253,7 @@ fn insertion_table_update() {
             ),
             (
                 Variable::mock("Y", 8),
-                Expression::var("Y", 8)
-                    .un_op(UnOpType::IntNegate)
-                    .plus(Expression::var("Y", 8))
+                Expression::var("X", 8).plus(Expression::var("Y", 8))
             )
         ])
     );
@@ -264,19 +262,13 @@ fn insertion_table_update() {
         &update.unwrap(),
         &blk.defs[3],
     );
-    // Assignment for X is inserted into table, no other changes.
+    // Expression for Y is removed and assignment for X is inserted into table, no other changes.
     assert_eq!(
         update.clone().unwrap(),
         HashMap::from([
             (
                 Variable::mock("Z", 8),
                 Expression::var("Z", 8).un_op(UnOpType::IntNegate)
-            ),
-            (
-                Variable::mock("Y", 8),
-                Expression::var("Y", 8)
-                    .un_op(UnOpType::IntNegate)
-                    .plus(Expression::var("Y", 8))
             ),
             (
                 Variable::mock("X", 8),
@@ -290,7 +282,7 @@ fn insertion_table_update() {
         &update.unwrap(),
         &blk.defs[4],
     );
-    // Assignment for Y is extended by the Expression for Y and inserted. No other changes.
+    // Assignment for Y is inserted. No other changes.
     assert_eq!(
         update.clone().unwrap(),
         HashMap::from([
@@ -300,12 +292,7 @@ fn insertion_table_update() {
             ),
             (
                 Variable::mock("Y", 8),
-                Expression::un_op(
-                    Expression::var("Y", 8)
-                        .un_op(UnOpType::IntNegate)
-                        .plus(Expression::var("Y", 8)),
-                    UnOpType::IntNegate
-                )
+                Expression::var("Y", 8).un_op(UnOpType::IntNegate)
             ),
             (
                 Variable::mock("X", 8),
@@ -319,7 +306,7 @@ fn insertion_table_update() {
         &update.unwrap(),
         &blk.defs[5],
     );
-    // Assignment for Y is extended by the Expression for X and Y and inserted. No other changes.
+    // Expression for Y is removed and Assignment is inserted. No other changes.
     assert_eq!(
         update.clone().unwrap(),
         HashMap::from([
@@ -331,12 +318,7 @@ fn insertion_table_update() {
                 Variable::mock("Y", 8),
                 Expression::var("X", 8)
                     .un_op(UnOpType::IntNegate)
-                    .plus(Expression::un_op(
-                        Expression::var("Y", 8)
-                            .un_op(UnOpType::IntNegate)
-                            .plus(Expression::var("Y", 8)),
-                        UnOpType::IntNegate
-                    ))
+                    .plus(Expression::var("Y", 8))
             ),
             (
                 Variable::mock("X", 8),
