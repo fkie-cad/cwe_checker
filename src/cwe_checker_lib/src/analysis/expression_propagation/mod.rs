@@ -51,11 +51,6 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
                 var,
                 value: expression,
             } => {
-                // Expressions dependent on the assigned variable are no longer insertable.
-                insertable_expressions.retain(|_input_var, input_expr| {
-                    !input_expr.input_vars().into_iter().any(|x| x == var)
-                });
-
                 // Extend the considered expression with already known expressions.
                 let mut extended_expression = expression.clone();
                 for input_var in expression.input_vars().into_iter() {
@@ -64,6 +59,10 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
                     }
                 }
                 insertable_expressions.insert(var.clone(), extended_expression.clone());
+                // Expressions dependent on the assigned variable are no longer insertable.
+                insertable_expressions.retain(|_input_var, input_expr| {
+                    !input_expr.input_vars().into_iter().any(|x| x == var)
+                });
 
                 Some(insertable_expressions)
             }
