@@ -203,7 +203,7 @@ fn insertion_table_update() {
         .collect();
 
     let graph = crate::analysis::graph::get_program_cfg(&project.program, extern_subs);
-    let context = Context::new(project, &graph);
+    let context = Context::new(&graph);
 
     let blk = get_mock_entry_block().term;
     let update = crate::analysis::forward_interprocedural_fixpoint::Context::update_def(

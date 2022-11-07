@@ -1,4 +1,4 @@
-//! This module contains a fixpoint computation for intra-functional expression propagation of variables
+//! This module contains a fixpoint computation for intra-procedual expression propagation
 //! and contains a function for inserting such expressions.
 
 use super::fixpoint::Computation;
@@ -21,7 +21,7 @@ pub struct Context<'a> {
 
 impl<'a> Context<'a> {
     /// Create a new context object for the given project and control flow graph.
-    pub fn new(_project: &'a Project, graph: &'a Graph) -> Context<'a> {
+    pub fn new(graph: &'a Graph) -> Context<'a> {
         Context { graph }
     }
 }
@@ -105,7 +105,7 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
         _target: &Node,
         _calling_convention: &Option<String>,
     ) -> Option<Self::Value> {
-        None // This propagation is intra-functional
+        None // This propagation is intra-procedural
     }
 
     fn update_return(
@@ -134,10 +134,9 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
 ///
 /// Panics, if the computation does not stabilizes.
 fn compute_expression_propagation<'a>(
-    project: &'a Project,
     graph: &'a Graph,
 ) -> Computation<GeneralizedContext<'a, Context<'a>>> {
-    let context = Context::new(project, graph);
+    let context = Context::new(graph);
     let mut computation = create_computation(context, None);
 
     for node in graph.node_indices() {
@@ -220,7 +219,7 @@ pub fn propagate_input_expression(project: &mut Project) {
     merge_same_var_assignments(project);
 
     let graph = crate::analysis::graph::get_program_cfg(&project.program, extern_subs);
-    let computation = compute_expression_propagation(project, &graph);
+    let computation = compute_expression_propagation(&graph);
     let results = extract_results(&graph, computation);
     insert_expressions(results, &mut project.program.term);
 }
