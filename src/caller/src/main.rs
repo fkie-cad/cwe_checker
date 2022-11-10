@@ -81,7 +81,7 @@ fn main() {
 
 /// Return `Ok(file_path)` only if `file_path` points to an existing file.
 fn check_file_existence(file_path: &str) -> Result<String, String> {
-    if std::fs::metadata(&file_path)
+    if std::fs::metadata(file_path)
         .map_err(|err| format!("{}", err))?
         .is_file()
     {
