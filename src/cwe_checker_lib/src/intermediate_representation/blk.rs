@@ -1,6 +1,9 @@
 use super::*;
 use crate::utils::log::LogMessage;
-use std::{collections::HashSet, fmt};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt,
+};
 
 /// A basic block is a sequence of `Def` instructions followed by up to two `Jmp` instructions.
 ///
@@ -74,11 +77,17 @@ impl Term<Blk> {
     /// Note that substitution is only possible
     /// if the input variables of the input expression itself did not change since the definition of said variable.
     ///
-    /// The expression propagation allows the corresponding [`Project` normalization pass](Project::normalize)
-    /// to further simplify the generated expressions
+    /// The expression propagation is used in [`expression_propagation` normalization pass](crate::analysis::expression_propagation)
+    /// to further simplify the generated expressions using a fixpoint algorithm
     /// and allows more dead stores to be removed during [dead variable elimination](crate::analysis::dead_variable_elimination).
-    pub fn propagate_input_expressions(&mut self) {
-        let mut insertable_expressions = Vec::new();
+    pub fn propagate_input_expressions(
+        &mut self,
+        apriori_insertable_expressions: Option<HashMap<Variable, Expression>>,
+    ) {
+        let mut insertable_expressions = HashMap::new();
+        if let Some(insertables) = apriori_insertable_expressions {
+            insertable_expressions = insertables;
+        }
         for def in self.term.defs.iter_mut() {
             match &mut def.term {
                 Def::Assign {
@@ -90,13 +99,13 @@ impl Term<Blk> {
                         expression.substitute_input_var(input_var, input_expr);
                     }
                     // expressions dependent on the assigned variable are no longer insertable
-                    insertable_expressions.retain(|(input_var, input_expr)| {
+                    insertable_expressions.retain(|input_var, input_expr| {
                         input_var != var && !input_expr.input_vars().into_iter().any(|x| x == var)
                     });
                     // If the value of the assigned variable does not depend on the former value of the variable,
                     // then it is insertable for future expressions.
                     if !expression.input_vars().into_iter().any(|x| x == var) {
-                        insertable_expressions.push((var.clone(), expression.clone()));
+                        insertable_expressions.insert(var.clone(), expression.clone());
                     }
                 }
                 Def::Load {
@@ -108,7 +117,7 @@ impl Term<Blk> {
                         expression.substitute_input_var(input_var, input_expr);
                     }
                     // expressions dependent on the assigned variable are no longer insertable
-                    insertable_expressions.retain(|(input_var, input_expr)| {
+                    insertable_expressions.retain(|input_var, input_expr| {
                         input_var != var && !input_expr.input_vars().into_iter().any(|x| x == var)
                     });
                 }
@@ -269,7 +278,7 @@ mod tests {
             },
         };
         block.merge_def_assignments_to_same_var();
-        block.propagate_input_expressions();
+        block.propagate_input_expressions(None);
         let result_defs = vec![
             Def::assign(
                 "tid_1",

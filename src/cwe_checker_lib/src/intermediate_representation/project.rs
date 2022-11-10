@@ -209,19 +209,6 @@ impl Project {
         log_messages
     }
 
-    /// Propagate input expressions along variable assignments.
-    ///
-    /// The propagation only occurs inside basic blocks
-    /// but not across basic block boundaries.
-    fn propagate_input_expressions(&mut self) {
-        for sub in self.program.term.subs.values_mut() {
-            for block in sub.term.blocks.iter_mut() {
-                block.merge_def_assignments_to_same_var();
-                block.propagate_input_expressions();
-            }
-        }
-    }
-
     /// Run some normalization passes over the project.
     ///
     /// Passes:
@@ -239,7 +226,7 @@ impl Project {
         let mut logs =
             self.remove_references_to_nonexisting_tids_and_retarget_non_returning_calls();
         make_block_to_sub_mapping_unique(self);
-        self.propagate_input_expressions();
+        crate::analysis::expression_propagation::propagate_input_expression(self);
         self.substitute_trivial_expressions();
         crate::analysis::dead_variable_elimination::remove_dead_var_assignments(self);
         propagate_control_flow(self);
