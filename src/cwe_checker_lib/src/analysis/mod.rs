@@ -3,6 +3,7 @@
 
 pub mod backward_interprocedural_fixpoint;
 pub mod dead_variable_elimination;
+pub mod expression_propagation;
 pub mod fixpoint;
 pub mod forward_interprocedural_fixpoint;
 pub mod function_signature;

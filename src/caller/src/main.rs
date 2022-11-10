@@ -81,7 +81,7 @@ fn main() {
 
 /// Return `Ok(file_path)` only if `file_path` points to an existing file.
 fn check_file_existence(file_path: &str) -> Result<String, String> {
-    if std::fs::metadata(&file_path)
+    if std::fs::metadata(file_path)
         .map_err(|err| format!("{}", err))?
         .is_file()
     {
@@ -127,7 +127,6 @@ fn run_with_ghidra(args: &CmdlineArgs) {
         // because it uses up huge amounts of RAM and computation time on some binaries.
         modules.retain(|module| module.name != "CWE78");
     }
-
     let binary_file_path = PathBuf::from(args.binary.clone().unwrap());
     let binary: Vec<u8> = std::fs::read(&binary_file_path).unwrap_or_else(|_| {
         panic!(
