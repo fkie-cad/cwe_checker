@@ -4,6 +4,7 @@
 //! although only stack accesses with known, constant offset are processed.
 //! Accesses to potential function parameters are collected together with the type of the access
 //! (is the value read, dereferenced for read access or dereferenced for write access).
+//! Accesses to constant addresses that may correspond to global variables are also tracked.
 //!
 //! Known limitations of the analysis:
 //! * The analysis is an overapproximation in the sense that it may generate more input parameters
@@ -13,8 +14,9 @@
 //!   For functions that use other registers
 //!   than those in the standard calling convention for parameter passing
 //!   the results of this analysis will be wrong.
-//! * Parameters that are used as input values for variadic functions (e.g. sprintf) may be missed
-//!   since detection of variadic function parameters is not yet implemented for this analysis.
+//! * Parameters that are used as input values for variadic functions may be missed.
+//!   Some variadic functions are stubbed, i.e. parameter recognition should work for these.
+//!   But not all variadic functions are stubbed.
 //! * If only a part (e.g. a single byte) of a stack parameter is accessed instead of the whole parameter
 //!   then a duplicate stack parameter may be generated.
 //!   A proper sanitation for this case is not yet implemented,
@@ -42,6 +44,8 @@ mod state;
 use state::State;
 mod access_pattern;
 pub use access_pattern::AccessPattern;
+mod global_var_propagation;
+use global_var_propagation::propagate_globals;
 pub mod stubs;
 
 /// Generate the computation object for the fixpoint computation
@@ -152,6 +156,8 @@ pub fn compute_function_signatures<'a>(
             );
         }
     }
+    // Propagate globals in bottom-up direction in the call graph
+    propagate_globals(project, &mut fn_sig_map);
 
     (fn_sig_map, logs)
 }
