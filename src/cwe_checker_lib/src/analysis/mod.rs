@@ -2,6 +2,7 @@
 //! as well as analyses depending on these modules.
 
 pub mod backward_interprocedural_fixpoint;
+pub mod callgraph;
 pub mod dead_variable_elimination;
 pub mod expression_propagation;
 pub mod fixpoint;

@@ -4,6 +4,7 @@
 //! although only stack accesses with known, constant offset are processed.
 //! Accesses to potential function parameters are collected together with the type of the access
 //! (is the value read, dereferenced for read access or dereferenced for write access).
+//! Accesses to constant addresses that may correspond to global variables are also tracked.
 //!
 //! Known limitations of the analysis:
 //! * The analysis is an overapproximation in the sense that it may generate more input parameters
@@ -13,8 +14,9 @@
 //!   For functions that use other registers
 //!   than those in the standard calling convention for parameter passing
 //!   the results of this analysis will be wrong.
-//! * Parameters that are used as input values for variadic functions (e.g. sprintf) may be missed
-//!   since detection of variadic function parameters is not yet implemented for this analysis.
+//! * Parameters that are used as input values for variadic functions may be missed.
+//!   Some variadic functions are stubbed, i.e. parameter recognition should work for these.
+//!   But not all variadic functions are stubbed.
 //! * If only a part (e.g. a single byte) of a stack parameter is accessed instead of the whole parameter
 //!   then a duplicate stack parameter may be generated.
 //!   A proper sanitation for this case is not yet implemented,
@@ -42,6 +44,8 @@ mod state;
 use state::State;
 mod access_pattern;
 pub use access_pattern::AccessPattern;
+mod global_var_propagation;
+use global_var_propagation::propagate_globals;
 pub mod stubs;
 
 /// Generate the computation object for the fixpoint computation
@@ -152,6 +156,8 @@ pub fn compute_function_signatures<'a>(
             );
         }
     }
+    // Propagate globals in bottom-up direction in the call graph
+    propagate_globals(project, &mut fn_sig_map);
 
     (fn_sig_map, logs)
 }
@@ -162,6 +168,9 @@ pub fn compute_function_signatures<'a>(
 pub struct FunctionSignature {
     /// The parameters of the function together with their access patterns.
     pub parameters: HashMap<Arg, AccessPattern>,
+    /// Values in writeable global memory accessed by the function.
+    /// Does not contain indirectly accessed values, e.g. values accessed by callees of this function.
+    pub global_parameters: HashMap<u64, AccessPattern>,
 }
 
 impl FunctionSignature {
@@ -169,6 +178,7 @@ impl FunctionSignature {
     pub fn new() -> Self {
         Self {
             parameters: HashMap::new(),
+            global_parameters: HashMap::new(),
         }
     }
 
@@ -186,8 +196,12 @@ impl FunctionSignature {
         stack_params_total_size
     }
 
-    /// Merge the parameter list of `self` with the given parameter list.
-    fn merge_parameter_list(&mut self, params: &[(Arg, AccessPattern)]) {
+    /// Merge the parameter list and the global parameter list of `self` with the given lists.
+    fn merge_parameter_lists(
+        &mut self,
+        params: &[(Arg, AccessPattern)],
+        global_params: &[(u64, AccessPattern)],
+    ) {
         for (arg, sig_new) in params {
             if let Some(sig_self) = self.parameters.get_mut(arg) {
                 *sig_self = sig_self.merge(sig_new);
@@ -195,12 +209,20 @@ impl FunctionSignature {
                 self.parameters.insert(arg.clone(), *sig_new);
             }
         }
+        for (address, sig_new) in global_params {
+            if let Some(sig_self) = self.global_parameters.get_mut(address) {
+                *sig_self = sig_self.merge(sig_new);
+            } else {
+                self.global_parameters.insert(*address, *sig_new);
+            }
+        }
     }
 
     /// Merge the function signature with the signature extracted from the given state.
     fn merge_with_fn_sig_of_state(&mut self, state: &State) {
         let params = state.get_params_of_current_function();
-        self.merge_parameter_list(&params);
+        let global_params = state.get_global_mem_params_of_current_function();
+        self.merge_parameter_lists(&params, &global_params);
     }
 
     /// Sanitize the function signature:
@@ -269,7 +291,10 @@ pub mod tests {
                     write_access_pattern,
                 ),
             ]);
-            FunctionSignature { parameters }
+            FunctionSignature {
+                parameters,
+                global_parameters: HashMap::new(),
+            }
         }
     }
 }

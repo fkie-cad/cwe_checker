@@ -112,3 +112,26 @@ fn test_call_stub_handling() {
     );
     assert_eq!(params.len(), 5);
 }
+
+#[test]
+fn test_get_global_mem_address() {
+    let project = Project::mock_arm32();
+    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
+
+    let context = Context::new(&project, &graph);
+    // Check global address from abstract ID
+    let global_address_id: DataDomain<BitvectorDomain> = DataDomain::from_target(
+        AbstractIdentifier::from_global_address(&Tid::new("fn_tid"), &Bitvector::from_i32(0x2000)),
+        Bitvector::from_i32(0x2).into(),
+    );
+    let result = context.get_global_mem_address(&global_address_id);
+    assert_eq!(result, Some(Bitvector::from_i32(0x2002)));
+    // Check global address from absolute value
+    let global_address_const = Bitvector::from_i32(0x2003).into();
+    let result = context.get_global_mem_address(&global_address_const);
+    assert_eq!(result, Some(Bitvector::from_i32(0x2003)));
+    // Check global address not returned if it may not be unique
+    let value = global_address_id.merge(&global_address_const);
+    let result = context.get_global_mem_address(&value);
+    assert!(result.is_none());
+}

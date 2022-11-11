@@ -195,6 +195,14 @@ impl State {
         }
     }
 
+    /// Add an abstract ID to the set of tracked IDs if it is not already tracked.
+    /// No access flags are set if the ID was not already tracked.
+    pub fn add_id_to_tracked_ids(&mut self, id: &AbstractIdentifier) {
+        if self.tracked_ids.get(id).is_none() {
+            self.tracked_ids.insert(id.clone(), AccessPattern::new());
+        }
+    }
+
     /// Get the value located at a positive stack offset.
     ///
     /// If no corresponding stack parameter ID exists for the value,
@@ -308,30 +316,75 @@ impl State {
         }
     }
 
-    /// Set the read and dereferenced flag for every ID
+    /// Set the read and dereferenced flag for every tracked ID
     /// that may be referenced when computing the value of the expression.
     pub fn set_deref_flag_for_input_ids_of_expression(&mut self, expression: &Expression) {
         for register in expression.input_vars() {
-            for id in self.get_register(register).referenced_ids() {
-                if let Some(object) = self.tracked_ids.get_mut(id) {
-                    object.set_read_flag();
-                    object.set_dereference_flag();
-                }
+            self.set_deref_flag_for_contained_ids(&self.get_register(register));
+        }
+    }
+
+    /// Set the read and mutably dereferenced flag for every tracked ID
+    /// that may be referenced when computing the value of the expression.
+    pub fn set_mutable_deref_flag_for_input_ids_of_expression(&mut self, expression: &Expression) {
+        for register in expression.input_vars() {
+            self.set_deref_mut_flag_for_contained_ids(&self.get_register(register));
+        }
+    }
+
+    /// Set the read and dereferenced flag for every tracked ID contained in the given value.
+    pub fn set_deref_flag_for_contained_ids(&mut self, value: &DataDomain<BitvectorDomain>) {
+        for id in value.referenced_ids() {
+            if let Some(object) = self.tracked_ids.get_mut(id) {
+                object.set_read_flag();
+                object.set_dereference_flag();
             }
         }
     }
 
-    /// Set the read and mutably dereferenced flag for every ID
-    /// that may be referenced when computing the value of the expression.
-    pub fn set_mutable_deref_flag_for_input_ids_of_expression(&mut self, expression: &Expression) {
-        for register in expression.input_vars() {
-            for id in self.get_register(register).referenced_ids() {
-                if let Some(object) = self.tracked_ids.get_mut(id) {
-                    object.set_read_flag();
-                    object.set_mutably_dereferenced_flag();
+    /// Set the read and mutably dereferenced flag for every tracked ID contained in the given value.
+    pub fn set_deref_mut_flag_for_contained_ids(&mut self, value: &DataDomain<BitvectorDomain>) {
+        for id in value.referenced_ids() {
+            if let Some(object) = self.tracked_ids.get_mut(id) {
+                object.set_read_flag();
+                object.set_mutably_dereferenced_flag();
+            }
+        }
+    }
+
+    /// If the absolute value part of the given value might represent an address into writeable global memory
+    /// then substitute it by a relative value relative to a new global memory ID.
+    ///
+    /// The generated ID will be also added to the tracked IDs of `self`.
+    /// However, no access flags will be set for the newly generated ID.
+    pub fn substitute_global_mem_address(
+        &mut self,
+        mut value: DataDomain<BitvectorDomain>,
+        global_memory: &RuntimeMemoryImage,
+    ) -> DataDomain<BitvectorDomain> {
+        if value.bytesize() != self.stack_id.bytesize() {
+            // Only pointer-sized values can represent global addresses.
+            return value;
+        } else if let Some(absolute_value) = value.get_absolute_value() {
+            if let Ok(bitvec) = absolute_value.try_to_bitvec() {
+                if let Ok(true) = global_memory.is_address_writeable(&bitvec) {
+                    // The absolute value might be a pointer to global memory.
+                    let global_id = AbstractIdentifier::from_global_address(
+                        self.get_current_function_tid(),
+                        &bitvec,
+                    );
+                    // Add the ID to the set of tracked IDs for the state.
+                    self.add_id_to_tracked_ids(&global_id);
+                    // Convert the absolute value to a relative value (relative the new global ID).
+                    value = value.merge(&DataDomain::from_target(
+                        global_id,
+                        Bitvector::zero(value.bytesize().into()).into(),
+                    ));
+                    value.set_absolute_value(None);
                 }
             }
         }
+        value
     }
 }
 
