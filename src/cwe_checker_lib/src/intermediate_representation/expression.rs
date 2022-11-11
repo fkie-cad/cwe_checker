@@ -361,7 +361,7 @@ impl Expression {
             }
         } else if output_base_register.is_some() {
             self.piece_two_expressions_together(
-                *output_base_register.unwrap(),
+                output_base_register.unwrap(),
                 sub_register.unwrap(),
             );
         }
