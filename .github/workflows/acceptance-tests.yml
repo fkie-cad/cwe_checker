@@ -8,8 +8,8 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  GHIDRA_RELEASE_TAG: Ghidra_10.1_build
-  GHIDRA_VERSION: ghidra_10.1_PUBLIC_20211210
+  GHIDRA_RELEASE_TAG: Ghidra_10.1.5_build
+  GHIDRA_VERSION: ghidra_10.1.5_PUBLIC_20220726
 
 jobs: 
  

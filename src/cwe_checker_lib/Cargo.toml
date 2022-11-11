@@ -9,7 +9,7 @@ apint = "0.2"
 regex = "1.5.5"
 serde = {version = "1.0", features = ["derive", "rc"]}
 serde_json = "1.0"
-serde_yaml = "0.8"
+serde_yaml = "0.9"
 petgraph = { version = "0.6", features = ["default", "serde-1"] }
 fnv = "1.0" # a faster hash function for small keys like integers
 anyhow = "1.0" # for easy error types
