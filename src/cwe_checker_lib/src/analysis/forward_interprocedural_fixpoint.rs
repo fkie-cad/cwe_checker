@@ -292,15 +292,141 @@ pub fn create_computation_with_callee_before_caller_worklist_order<'a, T: Contex
     default_value: Option<T::Value>,
 ) -> super::fixpoint::Computation<GeneralizedContext<'a, T>> {
     let mut graph = problem.get_graph().clone();
-    graph.retain_edges(|frozen, edge| matches!(frozen[edge], Edge::Call(..)));
+    graph.retain_edges(|frozen, edge| !matches!(frozen[edge], Edge::Call(..)));
     let priority_sorted_nodes: Vec<NodeIndex> = petgraph::algo::kosaraju_scc(&graph)
         .into_iter()
+        .rev()
         .flatten()
         .collect();
+
     let generalized_problem = GeneralizedContext::new(problem);
     super::fixpoint::Computation::from_node_priority_list(
         generalized_problem,
         default_value.map(NodeValue::Value),
         priority_sorted_nodes,
     )
+}
+#[cfg(test)]
+mod tests {
+
+    use crate::{
+        analysis::{
+            expression_propagation::Context,
+            forward_interprocedural_fixpoint::create_computation_with_callee_before_caller_worklist_order,
+        },
+        intermediate_representation::*,
+    };
+    use std::collections::HashMap;
+
+    /// Creates a project with one caller function of two blocks and one callee function of one block.
+    fn mock_project() -> Project {
+        let callee_block = Term {
+            tid: Tid::new("callee_block"),
+            term: Blk {
+                defs: vec![],
+                jmps: vec![Term {
+                    tid: Tid::new("ret"),
+                    term: Jmp::Return(Expression::const_from_i32(42)),
+                }],
+                indirect_jmp_targets: Vec::new(),
+            },
+        };
+        let called_function = Term {
+            tid: Tid::new("called_function"),
+            term: Sub {
+                name: "called_function".to_string(),
+                blocks: vec![callee_block],
+                calling_convention: Some("_stdcall".to_string()),
+            },
+        };
+
+        let caller_block_2 = Term {
+            tid: Tid::new("caller_block_2"),
+            term: Blk {
+                defs: vec![],
+                jmps: vec![],
+                indirect_jmp_targets: Vec::new(),
+            },
+        };
+        let caller_block_1 = Term {
+            tid: Tid::new("caller_block_1"),
+            term: Blk {
+                defs: vec![],
+                jmps: vec![Term {
+                    tid: Tid::new("call"),
+                    term: Jmp::Call {
+                        target: called_function.tid.clone(),
+                        return_: Some(caller_block_2.tid.clone()),
+                    },
+                }],
+                indirect_jmp_targets: Vec::new(),
+            },
+        };
+        let caller_block_2 = Term {
+            tid: Tid::new("caller_block_2"),
+            term: Blk {
+                defs: vec![],
+                jmps: vec![Term {
+                    tid: Tid::new("jmp"),
+                    term: Jmp::Branch(caller_block_1.tid.clone()),
+                }],
+                indirect_jmp_targets: Vec::new(),
+            },
+        };
+        let caller_function = Term {
+            tid: Tid::new("caller_function"),
+            term: Sub {
+                name: "caller_function".to_string(),
+                blocks: vec![caller_block_1, caller_block_2],
+                calling_convention: Some("_stdcall".to_string()),
+            },
+        };
+        let mut project = Project::mock_x64();
+        project
+            .program
+            .term
+            .subs
+            .insert(caller_function.tid.clone(), caller_function.clone());
+
+        project
+            .program
+            .term
+            .subs
+            .insert(called_function.tid.clone(), called_function.clone());
+
+        project
+    }
+
+    #[test]
+    /// Checks if the nodes corresponding to the callee function are first in the worklist.
+    fn check_callee_first_worklist() {
+        let project = mock_project();
+        let extern_subs = project
+            .program
+            .term
+            .extern_symbols
+            .keys()
+            .cloned()
+            .collect();
+
+        let graph = crate::analysis::graph::get_program_cfg(&project.program, extern_subs);
+        let context = Context::new(&graph);
+        let comp = create_computation_with_callee_before_caller_worklist_order(
+            context,
+            Some(HashMap::new()),
+        );
+        // The first two nodes should belong to the callee
+        for node in comp.get_worklist()[0..1].iter() {
+            match graph[*node] {
+                crate::analysis::graph::Node::BlkStart(_, sub)
+                | crate::analysis::graph::Node::BlkEnd(_, sub) => {
+                    assert_eq!(
+                        sub.term,
+                        project.program.term.subs.get(&sub.tid).unwrap().term
+                    )
+                }
+                _ => panic!(),
+            }
+        }
+    }
 }
