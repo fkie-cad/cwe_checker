@@ -57,7 +57,14 @@ pub fn parse_format_string_parameters(
     format_string: &str,
     datatype_properties: &DatatypeProperties,
 ) -> Result<Vec<(Datatype, ByteSize)>, Error> {
-    let re = Regex::new(r#"%\d{0,2}(([c,C,d,i,o,u,x,X,e,E,f,F,g,G,a,A,n,p,s,S])|(hi|hd|hu|li|ld|lu|lli|lld|llu|lf|lg|le|la|lF|lG|lE|lA|Lf|Lg|Le|La|LF|LG|LE|LA))"#)
+    // Regex parts:
+    // - `%` starts a format string parameter
+    // - `[+\-#0]{0,1}` matches the flags `+`, `-`, `#`, `0` if present (for printf-like functions)
+    // - `\d*` matches the width parameter
+    // - `[\.]?\d*` matches the precision parameter (for printf-like functions)
+    // - `[cCdiouxXeEfFgGaAnpsS]` matches a format specifier without length parameter.
+    // - `hi|hd|hu|li|ld|lu|lli|lld|llu|lf|lg|le|la|lF|lG|lE|lA|Lf|Lg|Le|La|LF|LG|LE|LA` matches format specifiers with length parameter.
+    let re = Regex::new(r#"%[+\-#0]{0,1}\d*[\.]?\d*([cCdiouxXeEfFgGaAnpsS]|hi|hd|hu|li|ld|lu|lli|lld|llu|lf|lg|le|la|lF|lG|lE|lA|Lf|Lg|Le|La|LF|LG|LE|LA)"#)
         .expect("No valid regex!");
 
     let datatype_map: Vec<(Datatype, ByteSize)> = re

@@ -96,6 +96,34 @@ fn test_parse_format_string_destination_and_return_content() {
     );
 }
 
+/// Test the regular expression used for format string parameter parsing on specific cases.
+#[test]
+fn test_format_string_regex() {
+    let regex = Regex::new(r#"%[+\-#0]{0,1}\d*[\.]?\d*([cCdiouxXeEfFgGaAnpsS]|hi|hd|hu|li|ld|lu|lli|lld|llu|lf|lg|le|la|lF|lG|lE|lA|Lf|Lg|Le|La|LF|LG|LE|LA)"#)
+        .expect("No valid regex!");
+
+    let format_string = "one %s, two %.2lf%%, three %.2lf%%";
+    let results: Vec<_> = regex
+        .captures_iter(format_string)
+        .map(|cap| cap[1].to_string())
+        .collect();
+    assert_eq!(&results[..], vec!["s", "lf", "lf"]);
+
+    let format_string = "test %+2.300f,%-2.300f%#2.300f%02.300f";
+    let results: Vec<_> = regex
+        .captures_iter(format_string)
+        .map(|cap| cap[1].to_string())
+        .collect();
+    assert_eq!(&results[..], vec!["f", "f", "f", "f"]);
+
+    let format_string = r#"%cCd %ss %256s /dev/bus/usb/%03d/%s"#;
+    let results: Vec<_> = regex
+        .captures_iter(format_string)
+        .map(|cap| cap[1].to_string())
+        .collect();
+    assert_eq!(&results[..], vec!["c", "s", "s", "d", "s"]);
+}
+
 #[test]
 fn test_parse_format_string_parameters() {
     let test_cases: Vec<&str> = vec![
