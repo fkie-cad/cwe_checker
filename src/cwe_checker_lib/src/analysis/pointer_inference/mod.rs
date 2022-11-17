@@ -108,7 +108,7 @@ impl<'a> PointerInference<'a> {
         let sub_to_entry_node_map = crate::analysis::graph::get_entry_nodes_of_subs(context.graph);
 
         let mut fixpoint_computation =
-            super::forward_interprocedural_fixpoint::create_computation_with_alternate_worklist_order(context, None);
+            super::forward_interprocedural_fixpoint::create_computation_with_bottom_up_worklist_order(context, None);
         if print_stats {
             let _ = log_sender.send(LogThreadMsg::Log(
                 LogMessage::new_info(format!(
