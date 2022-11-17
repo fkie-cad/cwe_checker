@@ -257,6 +257,10 @@ pub fn create_computation<'a, T: Context<'a>>(
     super::fixpoint::Computation::new(generalized_problem, default_value.map(NodeValue::Value))
 }
 
+/// Generate a new computation from the corresponding context and an optional default value for nodes.
+/// Uses a bottom up worklist order when computing the fixpoint.
+///
+/// The worklist order prefers callee nodes before caller nodes.
 pub fn create_computation_with_bottom_up_worklist_order<'a, T: Context<'a>>(
     problem: T,
     default_value: Option<T::Value>,
@@ -270,6 +274,11 @@ pub fn create_computation_with_bottom_up_worklist_order<'a, T: Context<'a>>(
         priority_sorted_nodes,
     )
 }
+
+/// Generate a new computation from the corresponding context and an optional default value for nodes.
+/// Uses a top down worklist order when computing the fixpoint.
+///
+/// The worklist order prefers caller nodes before callee nodes.
 pub fn create_computation_with_top_down_worklist_order<'a, T: Context<'a>>(
     problem: T,
     default_value: Option<T::Value>,
