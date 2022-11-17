@@ -284,21 +284,35 @@ pub fn create_computation_with_alternate_worklist_order<'a, T: Context<'a>>(
         default_value.map(NodeValue::Value),
     )
 }
+/// Returns a node ordering with callee nodes behind caller nodes.
+pub fn create_bottom_up_worklist(graph: &Graph) -> Vec<NodeIndex> {
+    let mut graph = graph.clone();
+    graph.retain_edges(|frozen, edge| !matches!(frozen[edge], Edge::Call(..)));
+    petgraph::algo::kosaraju_scc(&graph)
+        .into_iter()
+        .flatten()
+        .collect()
+}
+
+/// Returns a node ordering with caller nodes behind callee nodes.
+pub fn create_top_down_worklist(graph: &Graph) -> Vec<NodeIndex> {
+    let mut graph = graph.clone();
+    graph.retain_edges(|frozen, edge| !matches!(frozen[edge], Edge::CrReturnStub));
+    petgraph::algo::kosaraju_scc(&graph)
+        .into_iter()
+        .flatten()
+        .collect()
+}
 
 /// Generate a new computation from the corresponding context and an optional default value for nodes.
-/// Uses the Callee before Caller worklist order when computing the fixpoint.
-pub fn create_computation_with_callee_before_caller_worklist_order<'a, T: Context<'a>>(
+/// Uses a bottom up worklist order when computing the fixpoint.
+///
+/// The worklist order prefers callee nodes before caller nodes.
+pub fn create_computation_with_bottom_up_worklist_order<'a, T: Context<'a>>(
     problem: T,
     default_value: Option<T::Value>,
 ) -> super::fixpoint::Computation<GeneralizedContext<'a, T>> {
-    let mut graph = problem.get_graph().clone();
-    graph.retain_edges(|frozen, edge| !matches!(frozen[edge], Edge::Call(..)));
-    let priority_sorted_nodes: Vec<NodeIndex> = petgraph::algo::kosaraju_scc(&graph)
-        .into_iter()
-        .rev()
-        .flatten()
-        .collect();
-
+    let priority_sorted_nodes: Vec<NodeIndex> = create_bottom_up_worklist(&problem.get_graph());
     let generalized_problem = GeneralizedContext::new(problem);
     super::fixpoint::Computation::from_node_priority_list(
         generalized_problem,
@@ -306,13 +320,31 @@ pub fn create_computation_with_callee_before_caller_worklist_order<'a, T: Contex
         priority_sorted_nodes,
     )
 }
+
+/// Generate a new computation from the corresponding context and an optional default value for nodes.
+/// Uses a top down worklist order when computing the fixpoint.
+///
+/// The worklist order prefers caller nodes before callee nodes.
+pub fn create_computation_with_top_down_worklist_order<'a, T: Context<'a>>(
+    problem: T,
+    default_value: Option<T::Value>,
+) -> super::fixpoint::Computation<GeneralizedContext<'a, T>> {
+    let priority_sorted_nodes: Vec<NodeIndex> = create_top_down_worklist(problem.get_graph());
+    let generalized_problem = GeneralizedContext::new(problem);
+    super::fixpoint::Computation::from_node_priority_list(
+        generalized_problem,
+        default_value.map(NodeValue::Value),
+        priority_sorted_nodes,
+    )
+}
+
 #[cfg(test)]
 mod tests {
 
     use crate::{
         analysis::{
             expression_propagation::Context,
-            forward_interprocedural_fixpoint::create_computation_with_callee_before_caller_worklist_order,
+            forward_interprocedural_fixpoint::create_computation_with_bottom_up_worklist_order,
         },
         intermediate_representation::*,
     };
@@ -399,7 +431,7 @@ mod tests {
 
     #[test]
     /// Checks if the nodes corresponding to the callee function are first in the worklist.
-    fn check_callee_first_worklist() {
+    fn check_bottom_up_worklist() {
         let project = mock_project();
         let extern_subs = project
             .program
@@ -411,18 +443,44 @@ mod tests {
 
         let graph = crate::analysis::graph::get_program_cfg(&project.program, extern_subs);
         let context = Context::new(&graph);
-        let comp = create_computation_with_callee_before_caller_worklist_order(
-            context,
-            Some(HashMap::new()),
-        );
-        // The first two nodes should belong to the callee
-        for node in comp.get_worklist()[0..1].iter() {
+        let comp = create_computation_with_bottom_up_worklist_order(context, Some(HashMap::new()));
+        // The last two nodes should belong to the callee
+        for node in comp.get_worklist()[6..].iter() {
             match graph[*node] {
                 crate::analysis::graph::Node::BlkStart(_, sub)
                 | crate::analysis::graph::Node::BlkEnd(_, sub) => {
                     assert_eq!(
-                        sub.term,
-                        project.program.term.subs.get(&sub.tid).unwrap().term
+                        sub.tid,
+                        project.program.term.subs.get(&sub.tid).unwrap().tid
+                    )
+                }
+                _ => panic!(),
+            }
+        }
+    }
+
+    #[test]
+    fn check_top_down_worklist() {
+        let project = mock_project();
+        let extern_subs = project
+            .program
+            .term
+            .extern_symbols
+            .keys()
+            .cloned()
+            .collect();
+
+        let graph = crate::analysis::graph::get_program_cfg(&project.program, extern_subs);
+        let context = Context::new(&graph);
+        let comp = create_computation_with_bottom_up_worklist_order(context, Some(HashMap::new()));
+        // The first two nodes should belong to the callee
+        for node in comp.get_worklist()[..2].iter() {
+            match graph[*node] {
+                crate::analysis::graph::Node::BlkStart(_, sub)
+                | crate::analysis::graph::Node::BlkEnd(_, sub) => {
+                    assert_eq!(
+                        sub.tid,
+                        project.program.term.subs.get(&sub.tid).unwrap().tid
                     )
                 }
                 _ => panic!(),
