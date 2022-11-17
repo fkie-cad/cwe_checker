@@ -262,7 +262,7 @@ pub fn create_computation_with_bottom_up_worklist_order<'a, T: Context<'a>>(
     default_value: Option<T::Value>,
 ) -> super::fixpoint::Computation<GeneralizedContext<'a, T>> {
     let priority_sorted_nodes =
-        forward_interprocedural_fixpoint::create_bottom_up_worklist(&problem.get_graph());
+        forward_interprocedural_fixpoint::create_bottom_up_worklist(problem.get_graph());
     let generalized_problem = GeneralizedContext::new(problem);
     super::fixpoint::Computation::from_node_priority_list(
         generalized_problem,
@@ -275,7 +275,7 @@ pub fn create_computation_with_top_down_worklist_order<'a, T: Context<'a>>(
     default_value: Option<T::Value>,
 ) -> super::fixpoint::Computation<GeneralizedContext<'a, T>> {
     let priority_sorted_nodes =
-        forward_interprocedural_fixpoint::create_top_down_worklist(&problem.get_graph());
+        forward_interprocedural_fixpoint::create_top_down_worklist(problem.get_graph());
     let generalized_problem = GeneralizedContext::new(problem);
     super::fixpoint::Computation::from_node_priority_list(
         generalized_problem,
