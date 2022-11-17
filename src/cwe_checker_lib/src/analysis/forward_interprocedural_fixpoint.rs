@@ -296,7 +296,7 @@ pub fn create_computation_with_bottom_up_worklist_order<'a, T: Context<'a>>(
     problem: T,
     default_value: Option<T::Value>,
 ) -> super::fixpoint::Computation<GeneralizedContext<'a, T>> {
-    let priority_sorted_nodes: Vec<NodeIndex> = create_bottom_up_worklist(&problem.get_graph());
+    let priority_sorted_nodes: Vec<NodeIndex> = create_bottom_up_worklist(problem.get_graph());
     let generalized_problem = GeneralizedContext::new(problem);
     super::fixpoint::Computation::from_node_priority_list(
         generalized_problem,
