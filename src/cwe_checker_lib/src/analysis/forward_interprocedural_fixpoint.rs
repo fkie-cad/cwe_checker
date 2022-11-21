@@ -328,25 +328,34 @@ mod tests {
     use crate::{
         analysis::{
             expression_propagation::Context,
-            forward_interprocedural_fixpoint::create_computation_with_bottom_up_worklist_order,
+            forward_interprocedural_fixpoint::{
+                create_computation_with_bottom_up_worklist_order,
+                create_computation_with_top_down_worklist_order,
+            },
         },
         intermediate_representation::*,
     };
-    use std::collections::HashMap;
+    use std::collections::{BTreeMap, HashMap, HashSet};
+
+    fn new_block(name: &str) -> Term<Blk> {
+        Term {
+            tid: Tid::new(name),
+            term: Blk {
+                defs: vec![],
+                jmps: vec![],
+                indirect_jmp_targets: Vec::new(),
+            },
+        }
+    }
 
     /// Creates a project with one caller function of two blocks and one callee function of one block.
     fn mock_project() -> Project {
-        let callee_block = Term {
-            tid: Tid::new("callee_block"),
-            term: Blk {
-                defs: vec![],
-                jmps: vec![Term {
-                    tid: Tid::new("ret"),
-                    term: Jmp::Return(Expression::const_from_i32(42)),
-                }],
-                indirect_jmp_targets: Vec::new(),
-            },
-        };
+        let mut callee_block = new_block("callee block");
+        callee_block.term.jmps.push(Term {
+            tid: Tid::new("ret"),
+            term: Jmp::Return(Expression::const_from_i32(42)),
+        });
+
         let called_function = Term {
             tid: Tid::new("called_function"),
             term: Sub {
@@ -356,39 +365,22 @@ mod tests {
             },
         };
 
-        let caller_block_2 = Term {
-            tid: Tid::new("caller_block_2"),
-            term: Blk {
-                defs: vec![],
-                jmps: vec![],
-                indirect_jmp_targets: Vec::new(),
+        let mut caller_block_2 = new_block("caller_block_2");
+
+        let mut caller_block_1 = new_block("caller_block_1");
+        caller_block_1.term.jmps.push(Term {
+            tid: Tid::new("call"),
+            term: Jmp::Call {
+                target: called_function.tid.clone(),
+                return_: Some(caller_block_2.tid.clone()),
             },
-        };
-        let caller_block_1 = Term {
-            tid: Tid::new("caller_block_1"),
-            term: Blk {
-                defs: vec![],
-                jmps: vec![Term {
-                    tid: Tid::new("call"),
-                    term: Jmp::Call {
-                        target: called_function.tid.clone(),
-                        return_: Some(caller_block_2.tid.clone()),
-                    },
-                }],
-                indirect_jmp_targets: Vec::new(),
-            },
-        };
-        let caller_block_2 = Term {
-            tid: Tid::new("caller_block_2"),
-            term: Blk {
-                defs: vec![],
-                jmps: vec![Term {
-                    tid: Tid::new("jmp"),
-                    term: Jmp::Branch(caller_block_1.tid.clone()),
-                }],
-                indirect_jmp_targets: Vec::new(),
-            },
-        };
+        });
+
+        caller_block_2.term.jmps.push(Term {
+            tid: Tid::new("jmp"),
+            term: Jmp::Branch(caller_block_1.tid.clone()),
+        });
+
         let caller_function = Term {
             tid: Tid::new("caller_function"),
             term: Sub {
@@ -398,17 +390,10 @@ mod tests {
             },
         };
         let mut project = Project::mock_x64();
-        project
-            .program
-            .term
-            .subs
-            .insert(caller_function.tid.clone(), caller_function.clone());
-
-        project
-            .program
-            .term
-            .subs
-            .insert(called_function.tid.clone(), called_function.clone());
+        project.program.term.subs = BTreeMap::from([
+            (caller_function.tid.clone(), caller_function.clone()),
+            (called_function.tid.clone(), called_function.clone()),
+        ]);
 
         project
     }
@@ -417,13 +402,7 @@ mod tests {
     /// Checks if the nodes corresponding to the callee function are first in the worklist.
     fn check_bottom_up_worklist() {
         let project = mock_project();
-        let extern_subs = project
-            .program
-            .term
-            .extern_symbols
-            .keys()
-            .cloned()
-            .collect();
+        let extern_subs = HashSet::new();
 
         let graph = crate::analysis::graph::get_program_cfg(&project.program, extern_subs);
         let context = Context::new(&graph);
@@ -433,10 +412,7 @@ mod tests {
             match graph[*node] {
                 crate::analysis::graph::Node::BlkStart(_, sub)
                 | crate::analysis::graph::Node::BlkEnd(_, sub) => {
-                    assert_eq!(
-                        sub.tid,
-                        project.program.term.subs.get(&sub.tid).unwrap().tid
-                    )
+                    assert_eq!(sub.tid, Tid::new("called_function"))
                 }
                 _ => panic!(),
             }
@@ -446,26 +422,17 @@ mod tests {
     #[test]
     fn check_top_down_worklist() {
         let project = mock_project();
-        let extern_subs = project
-            .program
-            .term
-            .extern_symbols
-            .keys()
-            .cloned()
-            .collect();
+        let extern_subs = HashSet::new();
 
         let graph = crate::analysis::graph::get_program_cfg(&project.program, extern_subs);
         let context = Context::new(&graph);
-        let comp = create_computation_with_bottom_up_worklist_order(context, Some(HashMap::new()));
+        let comp = create_computation_with_top_down_worklist_order(context, Some(HashMap::new()));
         // The first two nodes should belong to the callee
         for node in comp.get_worklist()[..2].iter() {
             match graph[*node] {
                 crate::analysis::graph::Node::BlkStart(_, sub)
                 | crate::analysis::graph::Node::BlkEnd(_, sub) => {
-                    assert_eq!(
-                        sub.tid,
-                        project.program.term.subs.get(&sub.tid).unwrap().tid
-                    )
+                    assert_eq!(sub.tid, Tid::new("called_function"))
                 }
                 _ => panic!(),
             }

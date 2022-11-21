@@ -141,32 +141,6 @@ impl<T: Context> Computation<T> {
         }
     }
 
-    /// Create a new fixpoint computation from a fixpoint problem and an optional default value for all nodes.
-    ///
-    /// Computations created by this function use an alternate priority order for the fixpoint stabilization algorithm:
-    /// Nodes with 10 or more incoming edges will be stabilized last by the algorithm.
-    pub fn new_with_alternate_worklist_order(
-        fp_context: T,
-        default_value: Option<T::NodeValue>,
-    ) -> Self {
-        let graph = fp_context.get_graph();
-        let mut high_priority_nodes = Vec::new();
-        let mut priority_sorted_nodes = Vec::new();
-        for node in petgraph::algo::kosaraju_scc(&graph).into_iter().flatten() {
-            if graph
-                .neighbors_directed(node, petgraph::EdgeDirection::Incoming)
-                .count()
-                >= 10
-            {
-                priority_sorted_nodes.push(node);
-            } else {
-                high_priority_nodes.push(node)
-            }
-        }
-        priority_sorted_nodes.append(&mut high_priority_nodes);
-        Self::from_node_priority_list(fp_context, default_value, priority_sorted_nodes)
-    }
-
     /// Get the value of a node.
     pub fn get_node_value(&self, node: NodeIndex) -> Option<&T::NodeValue> {
         self.node_values.get(&node)
@@ -390,28 +364,6 @@ mod tests {
         assert_eq!(
             computation.take_next_node_from_worklist(),
             Some(NodeIndex::new(20))
-        );
-
-        let mut computation =
-            Computation::new_with_alternate_worklist_order(FPContext { graph }, Some(1));
-        assert!(computation.node_priority_list[19] < computation.node_priority_list[0]);
-        assert!(computation.node_priority_list[1] > computation.node_priority_list[20]);
-        // assert that the nodes have the correct priority ordering
-        assert_eq!(
-            computation.take_next_node_from_worklist(),
-            Some(NodeIndex::new(0))
-        );
-        for _i in 1..19 {
-            assert!(computation.take_next_node_from_worklist().unwrap().index() < 19);
-        }
-        assert_eq!(
-            computation.take_next_node_from_worklist(),
-            Some(NodeIndex::new(20))
-        );
-        // nodes with a lot of incoming edges get stabilized last in the alternate worklist order
-        assert_eq!(
-            computation.take_next_node_from_worklist(),
-            Some(NodeIndex::new(19))
         );
     }
 }
