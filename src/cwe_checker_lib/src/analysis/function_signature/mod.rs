@@ -69,13 +69,17 @@ fn generate_fixpoint_computation<'a>(
                                 .get_standard_calling_convention()
                                 .expect("No standard calling convention found.")
                         });
+                    let mut fn_start_state = State::new(
+                        &sub.tid,
+                        &project.stack_pointer_register,
+                        calling_convention,
+                    );
+                    if project.cpu_architecture.contains("MIPS") {
+                        let _ = fn_start_state.set_mips_link_register(&sub.tid, project.stack_pointer_register.size);
+                    }
                     computation.set_node_value(
                         node,
-                        NodeValue::Value(State::new(
-                            &sub.tid,
-                            &project.stack_pointer_register,
-                            calling_convention,
-                        )),
+                        NodeValue::Value(fn_start_state),
                     )
                 }
             }
