@@ -6,11 +6,15 @@ use crate::{
         string_abstraction::tests::mock_project_with_intraprocedural_control_flow,
     },
 };
+use std::collections::BTreeSet;
 
 impl<T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> State<T> {
     pub fn mock_with_default_pi_state(current_sub: Term<Sub>) -> Self {
-        let pi_state =
-            PointerInferenceState::new(&Variable::mock("sp", 4 as u64), current_sub.tid.clone());
+        let pi_state = PointerInferenceState::new(
+            &Variable::mock("sp", 4 as u64),
+            current_sub.tid.clone(),
+            BTreeSet::new(),
+        );
         State {
             unassigned_return_pointer: HashSet::new(),
             variable_to_pointer_map: HashMap::new(),

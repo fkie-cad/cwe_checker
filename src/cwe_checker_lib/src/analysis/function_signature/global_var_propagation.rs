@@ -176,9 +176,7 @@ fn propagate_globals_bottom_up(
         let globals = fn_sig
             .global_parameters
             .iter()
-            .map(|(address, access_pattern)| {
-                (*address, *access_pattern)
-            })
+            .map(|(address, access_pattern)| (*address, *access_pattern))
             .collect();
         computation.set_node_value(node, globals);
     }

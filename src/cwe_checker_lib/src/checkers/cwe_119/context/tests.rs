@@ -1,4 +1,5 @@
 use super::*;
+use std::collections::BTreeSet;
 
 impl<'a> Context<'a> {
     /// Create a mock context.
@@ -27,7 +28,8 @@ fn test_compute_size_value_of_malloc_like_call() {
     use crate::analysis::pointer_inference::State as PiState;
     let project = Project::mock_x64();
     let mut pi_results = PointerInference::mock(&project);
-    let mut malloc_state = PiState::new(&Variable::mock("RSP", 8), Tid::new("func"));
+    let mut malloc_state =
+        PiState::new(&Variable::mock("RSP", 8), Tid::new("func"), BTreeSet::new());
     malloc_state.set_register(&Variable::mock("RDI", 8), Bitvector::from_i64(3).into());
     *pi_results.get_mut_states_at_tids() = HashMap::from([(Tid::new("malloc_call"), malloc_state)]);
     let malloc_symbol = ExternSymbol::mock_x64("malloc");

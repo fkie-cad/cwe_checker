@@ -37,7 +37,7 @@ fn reg_sub(name: &str, value: i64) -> Expression {
 #[test]
 fn state() {
     let global_memory = RuntimeMemoryImage::mock();
-    let mut state = State::new(&register("RSP"), Tid::new("time0"));
+    let mut state = State::new(&register("RSP"), Tid::new("time0"), BTreeSet::new());
     let stack_id = new_id("time0", "RSP");
     let stack_addr = Data::from_target(stack_id.clone(), bv(8));
     state
@@ -51,7 +51,7 @@ fn state() {
         bv(42).into()
     );
 
-    let mut other_state = State::new(&register("RSP"), Tid::new("time0"));
+    let mut other_state = State::new(&register("RSP"), Tid::new("time0"), BTreeSet::new());
     state.register.insert(register("RAX"), bv(42).into());
     other_state
         .register
@@ -78,15 +78,15 @@ fn state() {
         ByteSize::new(8),
         Some(ObjectType::Heap),
     );
-    assert_eq!(state.memory.get_num_objects(), 2);
+    assert_eq!(state.memory.get_num_objects(), 3);
     state.remove_unreferenced_objects();
-    assert_eq!(state.memory.get_num_objects(), 1);
+    assert_eq!(state.memory.get_num_objects(), 2);
 }
 
 #[test]
 fn handle_store() {
     let global_memory = RuntimeMemoryImage::mock();
-    let mut state = State::new(&register("RSP"), Tid::new("time0"));
+    let mut state = State::new(&register("RSP"), Tid::new("time0"), BTreeSet::new());
     let stack_id = new_id("time0", "RSP");
     assert_eq!(
         state.eval(&Var(register("RSP"))),
@@ -150,7 +150,7 @@ fn handle_store() {
 #[test]
 fn clear_parameters_on_the_stack_on_extern_calls() {
     let global_memory = RuntimeMemoryImage::mock();
-    let mut state = State::new(&register("RSP"), Tid::new("time0"));
+    let mut state = State::new(&register("RSP"), Tid::new("time0"), BTreeSet::new());
     state.register.insert(
         register("RSP"),
         Data::from_target(new_id("time0", "RSP"), bv(-20)),
@@ -199,7 +199,7 @@ fn clear_parameters_on_the_stack_on_extern_calls() {
 #[test]
 fn reachable_ids_under_and_overapproximation() {
     let global_memory = RuntimeMemoryImage::mock();
-    let mut state = State::new(&register("RSP"), Tid::new("func_tid"));
+    let mut state = State::new(&register("RSP"), Tid::new("func_tid"), BTreeSet::new());
     let stack_id = new_id("func_tid", "RSP");
     let heap_id = new_id("heap_obj", "RAX");
     let stack_address: Data = Data::from_target(stack_id.clone(), Bitvector::from_i64(-8).into());
@@ -248,8 +248,11 @@ fn reachable_ids_under_and_overapproximation() {
 #[test]
 fn global_mem_access() {
     let global_memory = RuntimeMemoryImage::mock();
-    let mut state = State::new(&register("RSP"), Tid::new("func_tid"));
-
+    let mut state = State::new(
+        &register("RSP"),
+        Tid::new("func_tid"),
+        BTreeSet::from([0x2000]),
+    );
     // global read-only address
     let address_expr = Expression::Const(Bitvector::from_u64(0x1000));
     assert_eq!(
@@ -265,7 +268,6 @@ fn global_mem_access() {
             &global_memory
         )
         .is_err());
-
     // global writeable address
     let address_expr = Expression::Const(Bitvector::from_u64(0x2000));
     assert_eq!(
@@ -277,10 +279,16 @@ fn global_mem_access() {
     assert!(state
         .write_to_address(
             &address_expr,
-            &DataDomain::new_top(ByteSize::new(4)),
+            &Bitvector::from_u32(21).into(),
             &global_memory
         )
         .is_ok());
+    assert_eq!(
+        state
+            .load_value(&address_expr, ByteSize::new(4), &global_memory)
+            .unwrap(),
+        Bitvector::from_u32(21).into()
+    );
 
     // invalid global address
     let address_expr = Expression::Const(Bitvector::from_u64(0x3456));
@@ -299,7 +307,7 @@ fn global_mem_access() {
 /// Test expression specialization except for binary operations.
 #[test]
 fn specialize_by_expression_results() {
-    let mut base_state = State::new(&register("RSP"), Tid::new("func_tid"));
+    let mut base_state = State::new(&register("RSP"), Tid::new("func_tid"), BTreeSet::new());
     base_state.set_register(
         &register("RAX"),
         IntervalDomain::new(Bitvector::from_i64(5), Bitvector::from_i64(10)).into(),
@@ -367,7 +375,7 @@ fn specialize_by_expression_results() {
     );
 
     // Expr = IntSExt(Var(EAX))
-    let mut state = State::new(&register("RSP"), Tid::new("func_tid"));
+    let mut state = State::new(&register("RSP"), Tid::new("func_tid"), BTreeSet::new());
     let eax_register = Variable {
         name: "EAX".to_string(),
         size: ByteSize::new(4),
@@ -388,7 +396,7 @@ fn specialize_by_expression_results() {
     );
 
     // Expr = Subpiece(Var(RAX))
-    let mut state = State::new(&register("RSP"), Tid::new("func_tid"));
+    let mut state = State::new(&register("RSP"), Tid::new("func_tid"), BTreeSet::new());
     let rax_register = Variable {
         name: "RAX".to_string(),
         size: ByteSize::new(8),
@@ -416,7 +424,7 @@ fn specialize_by_expression_results() {
 /// except equality and inequality operations
 #[test]
 fn specialize_by_binop() {
-    let base_state = State::new(&register("RSP"), Tid::new("func_tid"));
+    let base_state = State::new(&register("RSP"), Tid::new("func_tid"), BTreeSet::new());
 
     // Expr = RAX + Const
     let mut state = base_state.clone();
@@ -532,7 +540,7 @@ fn specialize_by_binop() {
 /// Test expression specialization for comparison operations `==` and `!=`.
 #[test]
 fn specialize_by_equality_comparison() {
-    let mut base_state = State::new(&register("RSP"), Tid::new("func_tid"));
+    let mut base_state = State::new(&register("RSP"), Tid::new("func_tid"), BTreeSet::new());
     base_state.set_register(&register("RAX"), IntervalDomain::mock(0, 50).into());
 
     // Expr = RAX == Const
@@ -596,7 +604,7 @@ fn specialize_by_equality_comparison() {
 /// Test expression specialization for signed comparison operations `<` and `<=`.
 #[test]
 fn specialize_by_signed_comparison_op() {
-    let mut base_state = State::new(&register("RSP"), Tid::new("func_tid"));
+    let mut base_state = State::new(&register("RSP"), Tid::new("func_tid"), BTreeSet::new());
     let interval = IntervalDomain::mock(5, 10);
     base_state.set_register(&register("RAX"), interval.into());
 
@@ -716,7 +724,7 @@ fn specialize_by_signed_comparison_op() {
 /// Test expression specialization for unsigned comparison operations `<` and `<=`.
 #[test]
 fn specialize_by_unsigned_comparison_op() {
-    let mut base_state = State::new(&register("RSP"), Tid::new("func_tid"));
+    let mut base_state = State::new(&register("RSP"), Tid::new("func_tid"), BTreeSet::new());
     let interval = IntervalDomain::mock(-5, 10);
     base_state.set_register(&register("RAX"), interval.into());
 
@@ -835,7 +843,7 @@ fn specialize_by_unsigned_comparison_op() {
 
 #[test]
 fn specialize_pointer_comparison() {
-    let mut state = State::new(&register("RSP"), Tid::new("func_tid"));
+    let mut state = State::new(&register("RSP"), Tid::new("func_tid"), BTreeSet::new());
     let interval = IntervalDomain::mock(-5, 10);
     state.set_register(
         &register("RAX"),
@@ -869,7 +877,7 @@ fn specialize_pointer_comparison() {
 /// (resulting in two-sided widenings) instead of one-sided bounds.
 #[test]
 fn test_widening_hints_after_pointer_specialization() {
-    let mut state = State::new(&register("RSP"), Tid::new("func_tid"));
+    let mut state = State::new(&register("RSP"), Tid::new("func_tid"), BTreeSet::new());
     state.set_register(
         &register("RAX"),
         Data::from_target(new_id("func_tid", "RSP"), Bitvector::from_i64(10).into()),
@@ -912,7 +920,7 @@ fn test_widening_hints_after_pointer_specialization() {
 
 #[test]
 fn test_check_def_for_null_dereferences() {
-    let mut state = State::new(&register("RSP"), Tid::new("func_tid"));
+    let mut state = State::new(&register("RSP"), Tid::new("func_tid"), BTreeSet::new());
     let var_rax = Variable::mock("RAX", 8);
     let def = Def::load(
         "load_def",
@@ -947,7 +955,7 @@ fn from_fn_sig() {
     let fn_sig = FunctionSignature::mock_x64();
     let state = State::from_fn_sig(&fn_sig, &Variable::mock("RSP", 8), Tid::new("func"));
 
-    assert_eq!(state.memory.get_num_objects(), 2);
+    assert_eq!(state.memory.get_num_objects(), 3);
     assert_eq!(
         *state.memory.get_object(&new_id("func", "RSI")).unwrap(),
         AbstractObject::new(None, ByteSize::new(8))
@@ -969,7 +977,8 @@ fn from_fn_sig() {
 #[test]
 fn add_param_object_from_callee() {
     let global_memory = RuntimeMemoryImage::empty(true);
-    let mut generic_state = State::new(&Variable::mock("RSP", 8), Tid::new("func"));
+    let mut generic_state =
+        State::new(&Variable::mock("RSP", 8), Tid::new("func"), BTreeSet::new());
     generic_state
         .write_to_address(
             &Expression::Var(Variable::mock("RSP", 8)).plus_const(-8),

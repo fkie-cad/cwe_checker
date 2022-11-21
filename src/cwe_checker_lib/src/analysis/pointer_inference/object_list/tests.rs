@@ -14,23 +14,45 @@ fn new_id(name: &str) -> AbstractIdentifier {
     )
 }
 
+fn new_global_id() -> AbstractIdentifier {
+    AbstractIdentifier::new(
+        Tid::new("time0"),
+        AbstractLocation::GlobalAddress {
+            address: 0,
+            size: ByteSize::new(8),
+        },
+    )
+}
+
 #[test]
 fn abstract_object_list() {
+    // A new object list has 2 memory objects.
     let mut obj_list = AbstractObjectList::from_stack_id(new_id("RSP".into()), ByteSize::new(8));
-    assert_eq!(obj_list.objects.len(), 1);
-
-    let pointer = DataDomain::from_target(new_id("RSP".into()), bv(8));
-    obj_list.set_value(pointer.clone(), bv(42).into()).unwrap();
+    assert_eq!(obj_list.objects.len(), 2);
+    // Test writing to and reading from the stack object
+    let stack_pointer = DataDomain::from_target(new_id("RSP".into()), bv(8));
+    obj_list
+        .set_value(stack_pointer.clone(), bv(42).into())
+        .unwrap();
     assert_eq!(
-        obj_list.get_value(&pointer, ByteSize::new(8)),
+        obj_list.get_value(&stack_pointer, ByteSize::new(8)),
         bv(42).into()
+    );
+    // Test writing to and reading from the global memory object
+    let global_pointer = DataDomain::from_target(new_global_id(), bv(1000));
+    obj_list
+        .set_value(global_pointer.clone(), bv(13).into())
+        .unwrap();
+    assert_eq!(
+        obj_list.get_value(&global_pointer, ByteSize::new(8)),
+        bv(13).into()
     );
 
     let mut other_obj_list =
         AbstractObjectList::from_stack_id(new_id("RSP".into()), ByteSize::new(8));
     let second_pointer = DataDomain::from_target(new_id("RSP".into()), bv(-8));
     other_obj_list
-        .set_value(pointer.clone(), bv(42).into())
+        .set_value(stack_pointer.clone(), bv(42).into())
         .unwrap();
     other_obj_list
         .set_value(second_pointer.clone(), bv(35).into())
@@ -51,7 +73,10 @@ fn abstract_object_list() {
         .unwrap();
 
     let mut merged = obj_list.merge(&other_obj_list);
-    assert_eq!(merged.get_value(&pointer, ByteSize::new(8)), bv(42).into());
+    assert_eq!(
+        merged.get_value(&stack_pointer, ByteSize::new(8)),
+        bv(42).into()
+    );
 
     assert!(merged
         .get_value(&second_pointer, ByteSize::new(8))
@@ -60,23 +85,23 @@ fn abstract_object_list() {
         merged.get_value(&heap_pointer, ByteSize::new(8)),
         bv(3).into()
     );
-    assert_eq!(merged.objects.len(), 2);
+    assert_eq!(merged.objects.len(), 3);
 
     merged
-        .set_value(pointer.merge(&heap_pointer), bv(3).into())
+        .set_value(stack_pointer.merge(&heap_pointer), bv(3).into())
         .unwrap();
     assert_eq!(
-        merged.get_value(&pointer, ByteSize::new(8)),
+        merged.get_value(&stack_pointer, ByteSize::new(8)),
         IntervalDomain::mock(3, 42).with_stride(39).into()
     );
     assert_eq!(
         merged.get_value(&heap_pointer, ByteSize::new(8)),
         bv(3).into()
     );
-    assert_eq!(merged.objects.len(), 2);
+    assert_eq!(merged.objects.len(), 3);
 
     other_obj_list
-        .set_value(pointer.clone(), heap_pointer.clone())
+        .set_value(stack_pointer.clone(), heap_pointer.clone())
         .unwrap();
     assert_eq!(
         other_obj_list

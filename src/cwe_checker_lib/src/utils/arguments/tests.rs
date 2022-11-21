@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use crate::{
     abstract_domain::IntervalDomain,
     intermediate_representation::{Bitvector, Tid},
@@ -6,7 +8,11 @@ use crate::{
 use super::*;
 
 fn mock_pi_state() -> PointerInferenceState {
-    PointerInferenceState::new(&Variable::mock("RSP", 8 as u64), Tid::new("func"))
+    PointerInferenceState::new(
+        &Variable::mock("RSP", 8 as u64),
+        Tid::new("func"),
+        BTreeSet::new(),
+    )
 }
 
 #[test]

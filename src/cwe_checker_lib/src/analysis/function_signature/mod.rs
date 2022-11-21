@@ -75,12 +75,10 @@ fn generate_fixpoint_computation<'a>(
                         calling_convention,
                     );
                     if project.cpu_architecture.contains("MIPS") {
-                        let _ = fn_start_state.set_mips_link_register(&sub.tid, project.stack_pointer_register.size);
+                        let _ = fn_start_state
+                            .set_mips_link_register(&sub.tid, project.stack_pointer_register.size);
                     }
-                    computation.set_node_value(
-                        node,
-                        NodeValue::Value(fn_start_state),
-                    )
+                    computation.set_node_value(node, NodeValue::Value(fn_start_state))
                 }
             }
         }
@@ -281,7 +279,9 @@ pub mod tests {
     use super::*;
 
     impl FunctionSignature {
-        /// Create a mock x64 function signature with 2 parameters, one of which is accessed mutably.
+        /// Create a mock x64 function signature with 2 parameters, one of which is accessed mutably,
+        /// one mutably accessed global variable at address 0x2000
+        /// and one immutably accessed global variable at address 0x3000.
         pub fn mock_x64() -> FunctionSignature {
             let mut write_access_pattern = AccessPattern::new();
             write_access_pattern.set_unknown_access_flags();
@@ -297,7 +297,10 @@ pub mod tests {
             ]);
             FunctionSignature {
                 parameters,
-                global_parameters: HashMap::new(),
+                global_parameters: HashMap::from([
+                    (0x2000, AccessPattern::new_unknown_access()),
+                    (0x3000, AccessPattern::new().with_dereference_flag()),
+                ]),
             }
         }
     }

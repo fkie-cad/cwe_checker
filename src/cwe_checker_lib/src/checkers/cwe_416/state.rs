@@ -168,9 +168,9 @@ impl AbstractDomain for State {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::intermediate_representation::Variable;
-
     use super::*;
+    use crate::intermediate_representation::Variable;
+    use std::collections::BTreeSet;
 
     #[test]
     fn test_check_address_for_use_after_free() {
@@ -225,7 +225,7 @@ pub mod tests {
             AbstractIdentifier::mock("obj_id", "RAX", 8),
             Bitvector::from_i64(0).into(),
         );
-        let pi_state = PiState::new(&Variable::mock("RSP", 8), Tid::new("call"));
+        let pi_state = PiState::new(&Variable::mock("RSP", 8), Tid::new("call"), BTreeSet::new());
         // Check that the parameter is correctly marked as freed in the state.
         assert!(state
             .handle_param_of_free_call(&Tid::new("free_call"), &param, &pi_state)
@@ -251,7 +251,7 @@ pub mod tests {
             AbstractIdentifier::mock("callee_obj_tid", "RAX", 8),
             ObjectState::Dangling(Tid::new("free_tid")),
         );
-        let pi_state = PiState::new(&Variable::mock("RSP", 8), Tid::new("call"));
+        let pi_state = PiState::new(&Variable::mock("RSP", 8), Tid::new("call"), BTreeSet::new());
         let id_replacement_map = BTreeMap::from([(
             AbstractIdentifier::mock("callee_obj_tid", "RAX", 8),
             Data::from_target(

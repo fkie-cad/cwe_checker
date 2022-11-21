@@ -376,6 +376,7 @@ mod tests {
     use super::*;
     use crate::abstract_domain::*;
     use crate::analysis::pointer_inference::ValueDomain;
+    use std::collections::BTreeSet;
 
     impl State {
         pub fn mock() -> State {
@@ -396,7 +397,8 @@ mod tests {
                 size: ByteSize::new(8),
                 data_type: None,
             };
-            let pi_state = PointerInferenceState::new(&register("RSP"), Tid::new("func"));
+            let pi_state =
+                PointerInferenceState::new(&register("RSP"), Tid::new("func"), BTreeSet::new());
             let symbol = ExternSymbol {
                 tid: Tid::new("extern_symbol".to_string()),
                 addresses: vec![],
