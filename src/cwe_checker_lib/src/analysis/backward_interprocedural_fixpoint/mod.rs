@@ -11,6 +11,7 @@
 //! The `Computation` object provides the necessary methods for the actual fixpoint computation.
 
 use super::fixpoint::Context as GeneralFPContext;
+use super::forward_interprocedural_fixpoint;
 use super::graph::*;
 use super::interprocedural_fixpoint_generic::*;
 use crate::intermediate_representation::*;
@@ -254,6 +255,42 @@ pub fn create_computation<'a, T: Context<'a>>(
 ) -> super::fixpoint::Computation<GeneralizedContext<'a, T>> {
     let generalized_problem = GeneralizedContext::new(problem);
     super::fixpoint::Computation::new(generalized_problem, default_value.map(NodeValue::Value))
+}
+
+/// Generate a new computation from the corresponding context and an optional default value for nodes.
+/// Uses a bottom up worklist order when computing the fixpoint.
+///
+/// The worklist order prefers callee nodes before caller nodes.
+pub fn create_computation_with_bottom_up_worklist_order<'a, T: Context<'a>>(
+    problem: T,
+    default_value: Option<T::Value>,
+) -> super::fixpoint::Computation<GeneralizedContext<'a, T>> {
+    let priority_sorted_nodes =
+        forward_interprocedural_fixpoint::create_bottom_up_worklist(problem.get_graph());
+    let generalized_problem = GeneralizedContext::new(problem);
+    super::fixpoint::Computation::from_node_priority_list(
+        generalized_problem,
+        default_value.map(NodeValue::Value),
+        priority_sorted_nodes,
+    )
+}
+
+/// Generate a new computation from the corresponding context and an optional default value for nodes.
+/// Uses a top down worklist order when computing the fixpoint.
+///
+/// The worklist order prefers caller nodes before callee nodes.
+pub fn create_computation_with_top_down_worklist_order<'a, T: Context<'a>>(
+    problem: T,
+    default_value: Option<T::Value>,
+) -> super::fixpoint::Computation<GeneralizedContext<'a, T>> {
+    let priority_sorted_nodes =
+        forward_interprocedural_fixpoint::create_top_down_worklist(problem.get_graph());
+    let generalized_problem = GeneralizedContext::new(problem);
+    super::fixpoint::Computation::from_node_priority_list(
+        generalized_problem,
+        default_value.map(NodeValue::Value),
+        priority_sorted_nodes,
+    )
 }
 
 #[cfg(test)]
