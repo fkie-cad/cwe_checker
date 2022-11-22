@@ -142,7 +142,7 @@ impl<'a> Context for GlobalsPropagationContext<'a> {
         let caller_globals: Self::NodeValue = callee_globals
             .iter()
             .filter_map(|(address, access_pattern)| {
-                if caller_known_globals.contains(address) && access_pattern.is_accessed() {
+                if caller_known_globals.contains(address) {
                     Some((*address, *access_pattern))
                 } else {
                     None
@@ -176,13 +176,7 @@ fn propagate_globals_bottom_up(
         let globals = fn_sig
             .global_parameters
             .iter()
-            .filter_map(|(address, access_pattern)| {
-                if access_pattern.is_accessed() {
-                    Some((*address, *access_pattern))
-                } else {
-                    None
-                }
-            })
+            .map(|(address, access_pattern)| (*address, *access_pattern))
             .collect();
         computation.set_node_value(node, globals);
     }

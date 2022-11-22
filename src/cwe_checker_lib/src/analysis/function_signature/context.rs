@@ -94,7 +94,22 @@ impl<'a> Context<'a> {
         // If yes, we can compute it relative to the value of the parameter at the callsite and add the result to the return value.
         // Else we just set the Top-flag of the return value to indicate some value originating in the callee.
         for (callee_id, callee_offset) in callee_value.get_relative_values() {
-            if let Some(param_arg) = callee_state.get_arg_corresponding_to_id(callee_id) {
+            if callee_id.get_tid() == callee_state.get_current_function_tid()
+                && matches!(
+                    callee_id.get_location(),
+                    AbstractLocation::GlobalAddress { .. }
+                )
+            {
+                // Globals get the same ID as if the global pointer originated in the caller.
+                let caller_global_id = AbstractIdentifier::new(
+                    caller_state.get_current_function_tid().clone(),
+                    callee_id.get_location().clone(),
+                );
+                caller_state.add_id_to_tracked_ids(&caller_global_id);
+                let caller_global =
+                    DataDomain::from_target(caller_global_id, callee_offset.clone());
+                return_value = return_value.merge(&caller_global);
+            } else if let Some(param_arg) = callee_state.get_arg_corresponding_to_id(callee_id) {
                 let param_value = caller_state.eval_parameter_arg(&param_arg);
                 let param_value = caller_state
                     .substitute_global_mem_address(param_value, &self.project.runtime_memory_image);
@@ -335,6 +350,8 @@ impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
                     var.size,
                     Some(&self.project.runtime_memory_image),
                 );
+                let value = new_state
+                    .substitute_global_mem_address(value, &self.project.runtime_memory_image);
                 new_state.set_register(var, value);
             }
             Def::Store { address, value } => {

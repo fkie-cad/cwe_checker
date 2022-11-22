@@ -27,6 +27,7 @@ use crate::prelude::*;
 use crate::utils::log::{CweWarning, LogMessage};
 use crate::utils::symbol_utils::{get_callsites, get_symbol_map};
 use crate::CweModule;
+use std::collections::BTreeSet;
 
 /// The module name and version
 pub static CWE_MODULE: CweModule = CweModule {
@@ -46,7 +47,7 @@ pub struct Config {
 /// assuming nothing is known about the state at the start of the block.
 fn compute_block_end_state(project: &Project, block: &Term<Blk>) -> State {
     let stack_register = &project.stack_pointer_register;
-    let mut state = State::new(stack_register, block.tid.clone());
+    let mut state = State::new(stack_register, block.tid.clone(), BTreeSet::new());
 
     for def in block.term.defs.iter() {
         match &def.term {

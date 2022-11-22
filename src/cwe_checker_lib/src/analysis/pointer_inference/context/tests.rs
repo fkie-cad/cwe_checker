@@ -72,7 +72,10 @@ fn mock_context() -> Context<'static> {
     let (log_sender, _log_receiver) = crossbeam_channel::unbounded();
     let mut mock_context = Context::new(analysis_results, config, log_sender);
     // Create mocked function signatures
-    let fn_sigs = BTreeMap::from_iter([(Tid::new("callee"), FunctionSignature::mock_x64())]);
+    let fn_sigs = BTreeMap::from_iter([
+        (Tid::new("caller"), FunctionSignature::mock_x64()),
+        (Tid::new("callee"), FunctionSignature::mock_x64()),
+    ]);
     let fn_sigs = Box::new(fn_sigs);
     let fn_sigs = Box::leak(fn_sigs);
     mock_context.fn_signatures = fn_sigs;
@@ -87,7 +90,7 @@ fn context_problem_implementation() {
     use Expression::*;
 
     let context = mock_context();
-    let mut state = State::new(&register("RSP"), Tid::new("main"));
+    let mut state = State::new(&register("RSP"), Tid::new("main"), BTreeSet::new());
 
     let def = Term {
         tid: Tid::new("def"),
@@ -120,7 +123,7 @@ fn context_problem_implementation() {
         state_after_malloc.get_register(&register("RAX")),
         Data::from_target(new_id("call_malloc", "RAX"), bv(0))
     );
-    assert_eq!(state_after_malloc.memory.get_num_objects(), 2);
+    assert_eq!(state_after_malloc.memory.get_num_objects(), 3);
     assert_eq!(
         state_after_malloc.get_register(&register("RSP")),
         state
@@ -142,7 +145,7 @@ fn context_problem_implementation() {
         .update_call_stub(&state_after_malloc, &free)
         .unwrap();
     assert!(state_after_free.get_register(&register("RDX")).is_top());
-    assert_eq!(state_after_free.memory.get_num_objects(), 2);
+    assert_eq!(state_after_free.memory.get_num_objects(), 3);
     assert_eq!(
         state_after_free.get_register(&register("RBP")),
         Data::from_target(new_id("call_malloc", "RAX"), bv(0))
@@ -198,7 +201,7 @@ fn update_return() {
         Data::from_target(new_id("callee", "RDI"), bv(0)),
     );
 
-    let state_before_call = State::new(&register("RSP"), Tid::new("caller"));
+    let state_before_call = State::new(&register("RSP"), Tid::new("caller"), BTreeSet::new());
     let mut state_before_call = context
         .update_def(
             &state_before_call,
@@ -252,7 +255,7 @@ fn update_return() {
         state.get_register(&register("RSP")),
         Data::from_target(new_id("caller", "RSP"), bv(-8).into())
     );
-    assert!(state.memory.get_all_object_ids().len() == 3);
+    assert_eq!(state.memory.get_all_object_ids().len(), 4);
     assert!(state
         .memory
         .get_all_object_ids()
@@ -277,7 +280,7 @@ fn specialize_conditional() {
     let analysis_results = AnalysisResults::mock_from_project(&project);
     let context = Context::new(&analysis_results, config, log_sender);
 
-    let mut state = State::new(&register("RSP"), Tid::new("func"));
+    let mut state = State::new(&register("RSP"), Tid::new("func"), BTreeSet::new());
     state.set_register(&register("RAX"), IntervalDomain::mock(-10, 20).into());
 
     let condition = Expression::BinOp {
@@ -340,7 +343,11 @@ fn get_unsound_caller_ids() {
 #[test]
 fn handle_extern_symbol_stubs() {
     let context = mock_context();
-    let mut state = State::new(&context.project.stack_pointer_register, Tid::new("main"));
+    let mut state = State::new(
+        &context.project.stack_pointer_register,
+        Tid::new("main"),
+        BTreeSet::new(),
+    );
     let mut extern_symbol = ExternSymbol::mock_x64("strchr");
     extern_symbol.parameters = vec![Arg::mock_register("RDI", 8), Arg::mock_register("RSI", 8)];
 
@@ -367,4 +374,68 @@ fn handle_extern_symbol_stubs() {
         )
         .merge(&Bitvector::from_u64(0).into())
     );
+}
+
+#[test]
+fn test_merge_global_mem_from_callee() {
+    let context = mock_context();
+    let mut caller_state = State::new(
+        &context.project.stack_pointer_register,
+        Tid::new("caller"),
+        BTreeSet::from([0x2000, 0x2002, 0x3000]),
+    );
+    let mut callee_state = State::new(
+        &context.project.stack_pointer_register,
+        Tid::new("callee"),
+        BTreeSet::from([0x2000, 0x2002]),
+    );
+    let write = |state: &mut State, address: u64, value: u16| {
+        state
+            .write_to_address(
+                &Expression::Const(Bitvector::from_u64(address)),
+                &Data::from(Bitvector::from_u16(value)),
+                &context.project.runtime_memory_image,
+            )
+            .unwrap();
+    };
+    let load = |state: &State, address: u64| -> Data {
+        state
+            .load_value(
+                &Expression::Const(Bitvector::from_u64(address)),
+                ByteSize::new(2),
+                &context.project.runtime_memory_image,
+            )
+            .unwrap()
+    };
+    write(&mut caller_state, 0x2000, 0);
+    write(&mut caller_state, 0x2002, 2);
+    write(&mut caller_state, 0x3000, 4);
+    write(&mut callee_state, 0x2000, 42);
+
+    let callee_global_mem = callee_state
+        .memory
+        .get_object(&callee_state.get_global_mem_id())
+        .unwrap();
+    let callee_fn_sig = FunctionSignature::mock_x64();
+    let replacement_map = BTreeMap::from([(
+        callee_state.get_global_mem_id(),
+        Data::from_target(
+            caller_state.get_global_mem_id(),
+            Bitvector::from_u64(0).into(),
+        ),
+    )]);
+
+    context.merge_global_mem_from_callee(
+        &mut caller_state,
+        callee_global_mem,
+        &replacement_map,
+        &callee_fn_sig,
+        &Tid::new("call"),
+    );
+
+    assert_eq!(load(&caller_state, 0x2000), Bitvector::from_u16(42).into());
+    let mut expected_result = Data::from(Bitvector::from_u16(2));
+    expected_result.set_contains_top_flag();
+    assert_eq!(load(&caller_state, 0x2002), expected_result);
+    assert_eq!(load(&caller_state, 0x3000), Bitvector::from_u16(4).into());
 }

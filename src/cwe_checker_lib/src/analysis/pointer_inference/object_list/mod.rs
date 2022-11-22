@@ -20,17 +20,26 @@ pub struct AbstractObjectList {
 }
 
 impl AbstractObjectList {
-    /// Create a new abstract object list with just one abstract object corresponding to the stack.
+    /// Create a new abstract object list with one abstract object corresponding to the stack
+    /// and one abstract object corresponding to global memory
     ///
-    /// The offset into the stack object and the `upper_index_bound` of the stack object will be both set to zero.
+    /// The offset into the stack object will be set to zero.
     /// This corresponds to the generic stack state at the start of a function.
     pub fn from_stack_id(
         stack_id: AbstractIdentifier,
         address_bytesize: ByteSize,
     ) -> AbstractObjectList {
-        let mut objects = BTreeMap::new();
         let stack_object = AbstractObject::new(Some(ObjectType::Stack), address_bytesize);
-        objects.insert(stack_id, stack_object);
+        let global_mem_id = AbstractIdentifier::new(
+            stack_id.get_tid().clone(),
+            AbstractLocation::GlobalAddress {
+                address: 0,
+                size: address_bytesize,
+            },
+        );
+        let global_mem_object = AbstractObject::new(Some(ObjectType::GlobalMem), address_bytesize);
+        let objects =
+            BTreeMap::from([(stack_id, stack_object), (global_mem_id, global_mem_object)]);
         AbstractObjectList { objects }
     }
 

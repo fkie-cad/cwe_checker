@@ -66,6 +66,31 @@ impl State {
         }
     }
 
+    /// Set the MIPS link register `t9` to the address of the function TID.
+    ///
+    /// According to the System V ABI for MIPS the caller has to save the callee address in register `t9`
+    /// on a function call to position-independent code.
+    /// This function manually sets `t9` to the correct value.
+    ///
+    /// Returns an error if the function address could not be parsed (e.g. for `UNKNOWN` addresses).
+    pub fn set_mips_link_register(
+        &mut self,
+        fn_tid: &Tid,
+        generic_pointer_size: ByteSize,
+    ) -> Result<(), Error> {
+        let link_register = Variable {
+            name: "t9".into(),
+            size: generic_pointer_size,
+            is_temp: false,
+        };
+        let address = Bitvector::from_u64(u64::from_str_radix(&fn_tid.address, 16)?)
+            .into_resize_unsigned(generic_pointer_size);
+        // Note that we do not replace the absolute value by a relative value representing a global memory pointer.
+        // Else we would risk every global variable to get assigned the same abstract ID.
+        self.set_register(&link_register, address.into());
+        Ok(())
+    }
+
     /// Get the value of the given register in the current state.
     pub fn get_register(&self, register: &Variable) -> DataDomain<BitvectorDomain> {
         self.register

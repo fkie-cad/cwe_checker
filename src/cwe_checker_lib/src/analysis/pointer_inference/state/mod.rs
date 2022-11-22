@@ -5,6 +5,7 @@ use crate::analysis::function_signature::FunctionSignature;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 mod access_handling;
 mod id_manipulation;
@@ -21,12 +22,21 @@ pub struct State {
     /// The abstract identifier of the current stack frame.
     /// It points to the base of the stack frame, i.e. only negative offsets point into the current stack frame.
     pub stack_id: AbstractIdentifier,
+    /// A list of constants that are assumed to be addresses of global variables accessed by this function.
+    /// Used to replace constants by relative values pointing to the global memory object.
+    known_global_addresses: Arc<BTreeSet<u64>>,
 }
 
 impl State {
-    /// Create a new state that contains only one memory object corresponding to the stack.
+    /// Create a new state that contains one memory object corresponding to the stack
+    /// and one memory object corresponding to global memory.
+    ///
     /// The stack offset will be set to zero.
-    pub fn new(stack_register: &Variable, function_tid: Tid) -> State {
+    pub fn new(
+        stack_register: &Variable,
+        function_tid: Tid,
+        global_addresses: BTreeSet<u64>,
+    ) -> State {
         let stack_id = AbstractIdentifier::new(
             function_tid,
             AbstractLocation::from_var(stack_register).unwrap(),
@@ -43,6 +53,7 @@ impl State {
             register,
             memory: AbstractObjectList::from_stack_id(stack_id.clone(), stack_register.size),
             stack_id,
+            known_global_addresses: Arc::new(global_addresses),
         }
     }
 
@@ -56,8 +67,9 @@ impl State {
         stack_register: &Variable,
         function_tid: Tid,
     ) -> State {
+        let global_addresses = fn_sig.global_parameters.keys().cloned().collect();
         let mock_global_memory = RuntimeMemoryImage::empty(true);
-        let mut state = State::new(stack_register, function_tid.clone());
+        let mut state = State::new(stack_register, function_tid.clone(), global_addresses);
         // Set parameter values and create parameter memory objects.
         for (arg, access_pattern) in &fn_sig.parameters {
             let param_id = AbstractIdentifier::from_arg(&function_tid, arg);
@@ -91,9 +103,10 @@ impl State {
     ///
     /// According to the System V ABI for MIPS the caller has to save the callee address in register `t9`
     /// on a function call to position-independent code.
-    /// This function manually sets `t9` to the correct value
-    /// to mitigate cases where `t9` could not be correctly computed due to previous analysis errors.
+    /// In MIPS this value is used to compute the addresses of some global variables,
+    /// since MIPS does not use program-counter-relative access instructions like other instruction set architectures do.
     ///
+    /// This function sets `t9` to the correct value.
     /// Returns an error if the callee address could not be parsed (e.g. for `UNKNOWN` addresses).
     pub fn set_mips_link_register(
         &mut self,
@@ -107,10 +120,6 @@ impl State {
         };
         let address = Bitvector::from_u64(u64::from_str_radix(&callee_tid.address, 16)?)
             .into_resize_unsigned(generic_pointer_size);
-        // FIXME: A better way would be to test whether the link register contains the correct value
-        // and only fix and log cases where it doesn't contain the correct value.
-        // Right now this is unfortunately the common case,
-        // so logging every case would generate too many log messages.
         self.set_register(&link_register, address.into());
         Ok(())
     }
@@ -173,6 +182,9 @@ impl State {
                 referenced_ids.insert(id);
             }
         }
+        // get the global memory ID, as it is always reachable
+        referenced_ids.insert(self.get_global_mem_id());
+        // Add IDs that are recursively reachable through the known IDs.
         referenced_ids = self.add_directly_reachable_ids_to_id_set(referenced_ids);
         // remove unreferenced objects
         self.memory.remove_unused_objects(&referenced_ids);
@@ -193,6 +205,17 @@ impl State {
     pub fn get_fn_tid(&self) -> &Tid {
         self.stack_id.get_tid()
     }
+
+    /// Get the abstract ID of the global memory object corresponding to this function.
+    pub fn get_global_mem_id(&self) -> AbstractIdentifier {
+        AbstractIdentifier::new(
+            self.stack_id.get_tid().clone(),
+            AbstractLocation::GlobalAddress {
+                address: 0,
+                size: self.stack_id.bytesize(),
+            },
+        )
+    }
 }
 
 impl AbstractDomain for State {
@@ -204,6 +227,7 @@ impl AbstractDomain for State {
             register: self.register.merge(&other.register),
             memory: merged_memory_objects,
             stack_id: self.stack_id.clone(),
+            known_global_addresses: self.known_global_addresses.clone(),
         }
     }
 

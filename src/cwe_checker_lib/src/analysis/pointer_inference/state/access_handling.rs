@@ -111,6 +111,19 @@ impl State {
         };
         result = result.merge(&self.memory.get_value(&address, size));
 
+        if let Ok(offset) = result.try_to_offset() {
+            if result.bytesize() == self.stack_id.bytesize()
+                && self.known_global_addresses.contains(&(offset as u64))
+            {
+                // The loaded value is most likely a pointer to a mutable global variable,
+                // so we replace it with a pointer to the global memory object
+                result = Data::from_target(
+                    self.get_global_mem_id(),
+                    result.try_to_bitvec().unwrap().into(),
+                );
+            }
+        }
+
         if address.contains_top() {
             result.set_contains_top_flag()
         }
@@ -130,6 +143,7 @@ impl State {
     ) -> Result<(), Error> {
         match self.load_value(address, var.size, global_memory) {
             Ok(data) => {
+                let data = self.replace_if_global_pointer(data);
                 self.set_register(var, data);
                 Ok(())
             }
@@ -140,8 +154,31 @@ impl State {
         }
     }
 
-    /// Evaluate the value of an expression in the current state
+    /// Evaluate the value of an expression in the current state.
     pub fn eval(&self, expression: &Expression) -> Data {
+        let result = self.eval_recursive(expression);
+        self.replace_if_global_pointer(result)
+    }
+
+    /// If the input value is a constant that is also the address of a global variable known to the function
+    /// then replace it with a value relative to the global memory ID of the state.
+    fn replace_if_global_pointer(&self, mut value: Data) -> Data {
+        if let Ok(constant) = value.try_to_offset() {
+            if self.known_global_addresses.contains(&(constant as u64)) {
+                // The result is a constant that denotes a pointer to global writeable memory.
+                // Thus we replace it with a value relative the global memory ID.
+                value = Data::from_target(
+                    self.get_global_mem_id(),
+                    value.try_to_interval().unwrap().into(),
+                );
+            }
+        }
+        value
+    }
+
+    /// Recursively evaluate the value of an expression in the current state.
+    /// Should only be called by [`State::eval`].
+    fn eval_recursive(&self, expression: &Expression) -> Data {
         use Expression::*;
         match expression {
             Var(variable) => self.get_register(variable),
@@ -151,11 +188,11 @@ impl State {
                     // the result of `x XOR x` is always zero.
                     return Bitvector::zero(apint::BitWidth::from(lhs.bytesize())).into();
                 }
-                let (left, right) = (self.eval(lhs), self.eval(rhs));
+                let (left, right) = (self.eval_recursive(lhs), self.eval_recursive(rhs));
                 left.bin_op(*op, &right)
             }
-            UnOp { op, arg } => self.eval(arg).un_op(*op),
-            Cast { op, size, arg } => self.eval(arg).cast(*op, *size),
+            UnOp { op, arg } => self.eval_recursive(arg).un_op(*op),
+            Cast { op, size, arg } => self.eval_recursive(arg).cast(*op, *size),
             Unknown {
                 description: _,
                 size,
@@ -164,7 +201,7 @@ impl State {
                 low_byte,
                 size,
                 arg,
-            } => self.eval(arg).subpiece(*low_byte, *size),
+            } => self.eval_recursive(arg).subpiece(*low_byte, *size),
         }
     }
 

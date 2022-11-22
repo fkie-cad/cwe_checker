@@ -29,6 +29,7 @@ use crate::prelude::*;
 use crate::utils::log::{CweWarning, LogMessage};
 use crate::utils::symbol_utils::{get_callsites, get_symbol_map};
 use crate::CweModule;
+use std::collections::BTreeSet;
 
 /// The module name and version
 pub static CWE_MODULE: CweModule = CweModule {
@@ -51,7 +52,7 @@ fn get_umask_permission_arg(
     project: &Project,
 ) -> Result<u64, Error> {
     let stack_register = &project.stack_pointer_register;
-    let mut state = State::new(stack_register, block.tid.clone());
+    let mut state = State::new(stack_register, block.tid.clone(), BTreeSet::new());
 
     for def in block.term.defs.iter() {
         match &def.term {

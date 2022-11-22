@@ -156,7 +156,7 @@ impl State {
     pub fn get_global_mem_params_of_current_function(&self) -> Vec<(u64, AccessPattern)> {
         let mut global_params = Vec::new();
         for (id, access_pattern) in self.tracked_ids.iter() {
-            if id.get_tid() == self.get_current_function_tid() && access_pattern.is_accessed() {
+            if id.get_tid() == self.get_current_function_tid() {
                 match id.get_location() {
                     AbstractLocation::GlobalPointer(address, _)
                     | AbstractLocation::GlobalAddress { address, .. } => {

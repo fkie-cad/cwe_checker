@@ -166,6 +166,20 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
                 // The callee stack frame does not exist anymore after return to the caller.
                 continue;
             }
+            if *callee_object_id == state_before_return.get_global_mem_id() {
+                let callee_fn_sig = self
+                    .fn_signatures
+                    .get(state_before_return.get_fn_tid())
+                    .unwrap();
+                self.merge_global_mem_from_callee(
+                    &mut state_after_return,
+                    callee_object,
+                    &id_map,
+                    callee_fn_sig,
+                    &call_term.tid,
+                );
+                continue;
+            }
             if Some(false)
                 == callee_id_to_access_pattern_map
                     .get(callee_object_id)

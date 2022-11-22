@@ -49,6 +49,14 @@ impl<'a> Context<'a> {
             state_before_return.stack_id.clone(),
             Data::new_top(stack_register.size),
         );
+        // Also insert the global memory IDs to the map.
+        id_map.insert(
+            state_before_return.get_global_mem_id(),
+            Data::from_target(
+                state_before_call.get_global_mem_id(),
+                Bitvector::zero(stack_register.size.into()).into(),
+            ),
+        );
 
         id_map
     }
