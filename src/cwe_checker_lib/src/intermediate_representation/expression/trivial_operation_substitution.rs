@@ -263,6 +263,59 @@ impl Expression {
         }
     }
 
+    /// Substitute the expression `(a - b < 0 ) != (a IntSBorrow b)` with the equivalent `a < b`
+    /// and the expression `(a - b < 0 ) == (a IntSBorrow b)` with the equivalent `b <= a`,
+    /// both for `a` and `b` signed integers.
+    fn substitute_complicated_a_less_than_b(&mut self) {
+        use BinOpType::*;
+        use Expression::*;
+        let mut expr_a = None;
+        let mut expr_b = None;
+        if let BinOp {
+            op: IntNotEqual | IntEqual,
+            lhs,
+            rhs,
+        } = self
+        {
+            if let Some((expr_a_left, expr_b_left)) = unpack_a_minus_b_less_than_zero(lhs) {
+                if let Some((expr_a_right, expr_b_right)) = unpack_a_intsborrow_b(rhs) {
+                    if expr_a_left == expr_a_right && expr_b_left == expr_b_right {
+                        expr_a = Some(expr_a_left.clone());
+                        expr_b = Some(expr_b_left.clone());
+                    }
+                }
+            } else if let Some((expr_a_left, expr_b_left)) = unpack_a_intsborrow_b(lhs) {
+                if let Some((expr_a_right, expr_b_right)) = unpack_a_minus_b_less_than_zero(rhs) {
+                    if expr_a_left == expr_a_right && expr_b_left == expr_b_right {
+                        expr_a = Some(expr_a_left.clone());
+                        expr_b = Some(expr_b_left.clone());
+                    }
+                }
+            }
+            if let (Some(a), Some(b)) = (expr_a, expr_b) {
+                if let BinOp { op, .. } = self {
+                    if *op == IntNotEqual {
+                        *self = Expression::BinOp {
+                            op: IntSLess,
+                            lhs: Box::new(a),
+                            rhs: Box::new(b),
+                        }
+                    } else if *op == IntEqual {
+                        *self = Expression::BinOp {
+                            op: IntSLessEqual,
+                            lhs: Box::new(b),
+                            rhs: Box::new(a),
+                        }
+                    } else {
+                        panic!()
+                    }
+                } else {
+                    panic!()
+                }
+            }
+        }
+    }
+
     /// Simplify arithmetic operations where intermediate results can be computed because some operands are constants.
     fn substitute_arithmetics_with_constants(&mut self) {
         use BinOpType::*;
@@ -333,6 +386,7 @@ impl Expression {
         self.substitute_binop_for_lhs_equal_rhs();
         self.substitute_and_xor_or_with_constant();
         self.substitute_equivalent_comparison_ops();
+        self.substitute_complicated_a_less_than_b();
         self.substitute_arithmetics_with_constants();
     }
 
@@ -473,5 +527,48 @@ impl Expression {
                 self.substitute_trivial_binops();
             }
         }
+    }
+}
+
+/// If the input expression is of the form `(a - b) < 0` then return `Some(a, b)`.
+/// Else return `None`.
+fn unpack_a_minus_b_less_than_zero(expr: &Expression) -> Option<(&Expression, &Expression)> {
+    use BinOpType::*;
+    if let Expression::BinOp {
+        op: IntSLess,
+        lhs: lhs_compare,
+        rhs: rhs_compare,
+    } = expr
+    {
+        if let Expression::Const(constant) = &**rhs_compare {
+            if !constant.is_zero() {
+                return None;
+            }
+            if let Expression::BinOp {
+                op: IntSub,
+                lhs,
+                rhs,
+            } = &**lhs_compare
+            {
+                return Some((&**lhs, &**rhs));
+            }
+        }
+    }
+    None
+}
+
+/// If the input expression is of the form `a IntSBorrow b` then return `Some(a, b)`.
+/// Else return `None`.
+fn unpack_a_intsborrow_b(expr: &Expression) -> Option<(&Expression, &Expression)> {
+    use BinOpType::*;
+    if let Expression::BinOp {
+        op: IntSBorrow,
+        lhs,
+        rhs,
+    } = expr
+    {
+        Some((&**lhs, &**rhs))
+    } else {
+        None
     }
 }

@@ -182,6 +182,38 @@ fn trivial_expression_substitution() {
 }
 
 #[test]
+fn test_complicated_a_less_than_b_substitution() {
+    use BinOpType::*;
+    use Expression::*;
+    let sborrow_expr = BinOp {
+        op: IntSBorrow,
+        lhs: Box::new(Var(Variable::mock("RAX", 8))),
+        rhs: Box::new(Var(Variable::mock("RBX", 8))),
+    };
+    let a_minus_b_less_zero_expr = BinOp {
+        op: IntSLess,
+        lhs: Box::new(BinOp {
+            op: IntSub,
+            lhs: Box::new(Var(Variable::mock("RAX", 8))),
+            rhs: Box::new(Var(Variable::mock("RBX", 8))),
+        }),
+        rhs: Box::new(Const(Bitvector::from_u64(0))),
+    };
+    let mut expr = BinOp {
+        op: IntNotEqual,
+        lhs: Box::new(sborrow_expr),
+        rhs: Box::new(a_minus_b_less_zero_expr),
+    };
+    expr.substitute_trivial_operations();
+    let expected_expr = BinOp {
+        op: IntSLess,
+        lhs: Box::new(Var(Variable::mock("RAX", 8))),
+        rhs: Box::new(Var(Variable::mock("RBX", 8))),
+    };
+    assert_eq!(expr, expected_expr);
+}
+
+#[test]
 fn display() {
     let expr = Expression::const_from_i32(2);
     let mul = Expression::BinOp {
