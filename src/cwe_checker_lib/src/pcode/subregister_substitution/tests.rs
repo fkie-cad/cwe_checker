@@ -312,7 +312,7 @@ fn piecing_or_zero_extending() {
     replace_subregister_in_block(&mut block, &register_map);
     assert!(check_defs_of_block(
         &block,
-        vec!["zext_eax_to_rax: RAX:64 = IntZExt(0x0:i32)"]
+        vec!["zext_eax_to_rax: RAX:64 = IntZExt(0x0:32)"]
     ));
 
     // Test whether zero extension to base register is still recognized
@@ -328,7 +328,7 @@ fn piecing_or_zero_extending() {
     replace_subregister_in_block(&mut block, &register_map);
     assert!(check_defs_of_block(
         &block,
-        vec!["zext_ah_to_rax: RAX:64 = IntZExt(0x0:i8)"]
+        vec!["zext_ah_to_rax: RAX:64 = IntZExt(0x0:8)"]
     ));
 
     // Test when the next register is a zero extension to a different register.
@@ -344,7 +344,7 @@ fn piecing_or_zero_extending() {
     assert!(check_defs_of_block(
         &block,
         vec![
-            "eax_assign: RAX:64 = ((RAX:64)[4-7] Piece 0x0:i32)",
+            "eax_assign: RAX:64 = ((RAX:64)[4-7] Piece 0x0:32)",
             "zext_eax_to_rcx: RCX:64 = IntZExt((RAX:64)[0-3])"
         ]
     ));
@@ -362,7 +362,7 @@ fn piecing_or_zero_extending() {
     assert!(check_defs_of_block(
         &block,
         vec![
-            "ah_assign: RAX:64 = (((RAX:64)[2-7] Piece 0x0:i8) Piece (RAX:64)[0-0])",
+            "ah_assign: RAX:64 = (((RAX:64)[2-7] Piece 0x0:8) Piece (RAX:64)[0-0])",
             "zext_ah_to_eax: RAX:64 = ((RAX:64)[4-7] Piece IntZExt((RAX:64)[1-1]))",
         ]
     ));
@@ -380,7 +380,7 @@ fn piecing_or_zero_extending() {
     assert!(check_defs_of_block(
         &block,
         vec![
-            "load_to_eax: loaded_value:32(temp) := Load from 0x0:i64",
+            "load_to_eax: loaded_value:32(temp) := Load from 0x0:64",
             "zext_eax_to_rax: RAX:64 = IntZExt(loaded_value:32(temp))",
         ]
     ));
@@ -398,7 +398,7 @@ fn piecing_or_zero_extending() {
     assert!(check_defs_of_block(
         &block,
         vec![
-            "load_to_eax: loaded_value:32(temp) := Load from 0x0:i64",
+            "load_to_eax: loaded_value:32(temp) := Load from 0x0:64",
             "load_to_eax_cast_to_base: RAX:64 = ((RAX:64)[4-7] Piece loaded_value:32(temp))",
             "zext_eax_to_rcx: RCX:64 = IntZExt((RAX:64)[0-3])"
         ]
