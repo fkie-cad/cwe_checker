@@ -12,18 +12,17 @@
 /// ```
 #[macro_export]
 macro_rules! variable {
-    (  $x:literal  ) => {{
+    (  $x:expr  ) => {{
         parsing::parse_variable($x)
     }};
 }
 
-/// Creates a `Bitvector` specified by the string slice of form `0xvalue:size`.
+/// Creates a `Bitvector` specified by the string slice of form `0xvalue:size` or value:size.
 ///
-/// `value` is in hexadecimal representation.
+/// `value` is either in hexadecimal representation with leading `0x` or in
+/// decimal representation. `size` in bits.
 /// If `value` does not fit in `size`, `value` is truncated.
-/// Signdness is not supported.
 /// ## Panics
-///- string must start with `0x`
 ///- string must contain `:`
 ///- `size` must be one of `8`, `16`, `32` or `64`
 ///
@@ -33,12 +32,12 @@ macro_rules! variable {
 ///     use cwe_checker_lib::bitvec;
 ///
 ///     assert_eq!(bitvec!("0xFF:32"), Bitvector::from_u32(0xFF));
-///     assert_eq!(bitvec!("0x0:64"), Bitvector::from_u64(0x0));
-///     assert_eq!(bitvec!("0xAAFF:8"), Bitvector::from_u8(0xFF));
+///     assert_eq!(bitvec!("0x-A:64"), Bitvector::from_i64(-10));
+///     assert_eq!(bitvec!("-5:8"), Bitvector::from_i8(-5));
 /// ```
 #[macro_export]
 macro_rules! bitvec {
-    (  $x:literal  ) => {{
+    (  $x:expr  ) => {{
         parsing::parse_bitvec($x)
     }};
 }
@@ -71,7 +70,7 @@ macro_rules! bitvec {
 /// ```
 #[macro_export]
 macro_rules! expr {
-    (  $x:literal  ) => {{
+    (  $x:expr  ) => {{
         parsing::parse_expr($x)
     }};
 }
@@ -97,7 +96,7 @@ macro_rules! expr {
 /// ```
 #[macro_export]
 macro_rules! def {
-    [$($x:literal),*] => {{
+    [$($x:expr),*] => {{
         let mut vec = vec![];
         let mut _tid_suffix = 0;
         $(
@@ -141,13 +140,17 @@ pub mod parsing {
     /// This is used for the `bitvec!` macro, consider the macro documentation for more details.
     pub fn parse_bitvec(str: &str) -> Bitvector {
         let args: Vec<&str> = str.split(&['x', ':'][..]).collect();
-        if args.len() != 3 {
+        let value: i64;
+        if args.len() == 3 {
+            // hex representation
+            value = i64::from_str_radix(args[1], 16).unwrap();
+        } else if args.len() == 2 {
+            // dec represenatation
+            value = args[0].parse().unwrap();
+        } else {
             panic!("Could not uniquely parse bitvector: {}", str)
         }
-
-        Bitvector::from_str_radix(16, args[1])
-            .unwrap()
-            .into_sign_resize(args[2].parse::<usize>().unwrap())
+        Bitvector::from_i64(value).into_sign_resize(args[args.len() - 1].parse::<usize>().unwrap())
     }
 
     #[allow(dead_code)]
@@ -156,10 +159,10 @@ pub mod parsing {
     /// This is used for the `expr!` macro, consider the macro documentation for more details.
     pub fn parse_expr(str: &str) -> Expression {
         let set = RegexSet::new([
-            r"^[[:alpha:]]+:[0-9]{1,2}$", // Variable
-            r"^0x[[:alnum:]]+:[0-9]+$",   // Constant
-            r"^[^\+]*\+{1}[^\+]*$",       // BinOp (IntAdd)
-            r"^[^\-]*\-{1}[^\-]*$",       // BinOp (IntSub)
+            r"^[[:alnum:]&&[^0]]{1}[[:alnum:]&&[^x]]?[[:alnum:]]*:[0-9]{1,2}$", // Variable
+            r"^^((0x[[:alnum:]]+)|^([0-9])+)+:[0-9]+$",                         // Constant
+            r"^[^\+]*\+{1}[^\+]*$",                                             // BinOp (IntAdd)
+            r"^[^\-]*\-{1}[^\-]*$",                                             // BinOp (IntSub)
         ])
         .unwrap();
         let result: Vec<usize> = set.matches(str).into_iter().collect();
@@ -282,6 +285,9 @@ mod tests {
         assert_eq!(bitvec!("0x42:8"), Bitvector::from_u8(0x42));
         assert_eq!(bitvec!("0xFF:16"), Bitvector::from_u16(0xFF));
         assert_eq!(bitvec!("0xAAFF:8"), Bitvector::from_u8(0xFF));
+        assert_eq!(bitvec!("0x-01:8"), Bitvector::from_i8(-1));
+        assert_eq!(bitvec!("123:32"), Bitvector::from_u32(123));
+        assert_eq!(bitvec!("-42:64"), Bitvector::from_i64(-42));
     }
 
     #[test]
@@ -424,7 +430,7 @@ mod tests {
     }
 
     #[test]
-    fn test_def_composion() {
+    fn test_def_composition() {
         assert_eq!(
             def![
                 "tid_a: Store at RSP:8 + 0x8:8 := RAX:8",
