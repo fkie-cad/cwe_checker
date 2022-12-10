@@ -127,11 +127,11 @@ pub fn remove_dead_var_assignments(project: &mut Project) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::def;
+    use crate::defs;
 
     #[test]
     fn dead_assignment_removal() {
-        let defs = def![
+        let defs = defs![
             "def_1: B:8 = A:8",
             "def_2: C:8 = B:8",
             "def_3: RAX:8 = C:8",
@@ -160,7 +160,7 @@ mod tests {
         project.program.term.subs.insert(sub.tid.clone(), sub);
         remove_dead_var_assignments(&mut project);
 
-        let cleaned_defs = def![
+        let cleaned_defs = defs![
             "def_1: B:8 = A:8",
             "def_2: C:8 = B:8",
             "def_4: RAX:8 = B:8",

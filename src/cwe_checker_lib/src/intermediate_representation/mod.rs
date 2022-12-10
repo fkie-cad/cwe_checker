@@ -32,8 +32,10 @@ mod project;
 pub use project::*;
 mod runtime_memory_image;
 pub use runtime_memory_image::*;
+#[cfg(test)]
 #[macro_use]
 mod macros;
+#[cfg(test)]
 pub use macros::*;
 
 /// An unsigned number of bytes.

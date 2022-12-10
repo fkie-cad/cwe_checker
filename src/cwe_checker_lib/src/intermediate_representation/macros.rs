@@ -1,3 +1,7 @@
+//! This module implements macros for an intuitive and condensed construction of intermediate representation elements.
+//! [variable!] creates a Variable, [bitvec!] creates a Bitvector, [expr!] creates an Expression, [def!] and [defs!]
+//! create `Term<Def>` and Vec<Term<Def>>.
+
 /// Creates a `Variable` specified by the string slice of form `name:size`.
 ///
 /// `size` determines the size in bytes. `is_temp` field is set to `false`.
@@ -12,34 +16,34 @@
 /// ```
 #[macro_export]
 macro_rules! variable {
-    (  $x:expr  ) => {{
+    (  $x:expr  ) => {
         parsing::parse_variable($x)
-    }};
+    };
 }
 
 /// Creates a `Bitvector` specified by the string slice of form `0xvalue:size` or value:size.
 ///
 /// `value` is either in hexadecimal representation with leading `0x` or in
-/// decimal representation. `size` in bits.
+/// decimal representation. `size` is in bytes.
 /// If `value` does not fit in `size`, `value` is truncated.
 /// ## Panics
 ///- string must contain `:`
-///- `size` must be one of `8`, `16`, `32` or `64`
+///- `size` must be one of `1`, `2`, `4` or `8`
 ///
 /// ## Example
 /// ```rust
 ///     use cwe_checker_lib::intermediate_representation::*;
 ///     use cwe_checker_lib::bitvec;
 ///
-///     assert_eq!(bitvec!("0xFF:32"), Bitvector::from_u32(0xFF));
-///     assert_eq!(bitvec!("0x-A:64"), Bitvector::from_i64(-10));
-///     assert_eq!(bitvec!("-5:8"), Bitvector::from_i8(-5));
+///     assert_eq!(bitvec!("0xFF:4"), Bitvector::from_u32(0xFF));
+///     assert_eq!(bitvec!("0x-A:8"), Bitvector::from_i64(-10));
+///     assert_eq!(bitvec!("-5:1"), Bitvector::from_i8(-5));
 /// ```
 #[macro_export]
 macro_rules! bitvec {
-    (  $x:expr  ) => {{
+    (  $x:expr  ) => {
         parsing::parse_bitvec($x)
-    }};
+    };
 }
 
 /// Creates an `Expression` specified by the string slice.
@@ -70,37 +74,34 @@ macro_rules! bitvec {
 /// ```
 #[macro_export]
 macro_rules! expr {
-    (  $x:expr  ) => {{
+    (  $x:expr  ) => {
         parsing::parse_expr($x)
-    }};
+    };
 }
 
 /// Creates a `Vec<Term<Def>>` specified by the string slices. Utilizes `variable!`, `bitvec!` and `expr!` macros and their constrains.
 ///
-/// Tid names start are prefixed by `tid_name: `.
+/// Tid IDs are optionally prefixed by `tid_name: `. If not, `tid_x` is set as Tid ID with incrementing `x` starting by `0`.
 /// ## Syntax
 /// Load: `var := Load from expr`, with a Variable `var` according to `variable!` macro and and expression `expr` according to `expr!` macro.
 ///
 /// Store: `Store at expr_a := expr_b` with Expressions `expr_a` and `expr_b` according to `expr!` macro.
 ///
 /// Assign: `var = expr` with a Variable `var` according to `var!` macro and an Expression `expr` according to `expr!` macro.
-///
-///
-///
 /// ## Example
 /// ```rust
 ///     use cwe_checker_lib::intermediate_representation::*;
 ///     use cwe_checker_lib::def;
 ///
-///     def!["tid_x: Store at RSP:8 + 0x8:8 := RAX:8", "tid_y: RSP:8 = RSP:8 + 0x8:8", "tid_z: RDI:8 := Load from RSP:8"];
+///     defs!["tid_x: Store at RSP:8 + 0x8:8 := RAX:8", "RSP:8 = RSP:8 + 0x8:8", "tid_z: RDI:8 := Load from RSP:8"];
 /// ```
 #[macro_export]
-macro_rules! def {
+macro_rules! defs {
     [$($x:expr),*] => {{
         let mut vec = vec![];
-        let mut _tid_suffix = 0;
+        let mut _tid_suffix: u8 = 0;
         $(
-            vec.push(parsing::parse_def($x));
+            vec.push(parsing::parse_def($x, _tid_suffix));
             _tid_suffix += 1;
         )*
         vec}
@@ -108,8 +109,32 @@ macro_rules! def {
     };
 }
 
+/// Creates a `Term<Def>` specified by the string slices. Utilizes `variable!`, `bitvec!` and `expr!` macros and their constrains.
+///
+/// Tid ID is optionally prefixed by `tid_name: `. If not, Tid ID `tid_0` is set.
+/// ## Syntax
+/// Load: `var := Load from expr`, with a Variable `var` according to `variable!` macro and and expression `expr` according to `expr!` macro.
+///
+/// Store: `Store at expr_a := expr_b` with Expressions `expr_a` and `expr_b` according to `expr!` macro.
+///
+/// Assign: `var = expr` with a Variable `var` according to `var!` macro and an Expression `expr` according to `expr!` macro.
+/// ## Example
+/// ```rust
+///     use cwe_checker_lib::intermediate_representation::*;
+///     use cwe_checker_lib::def;
+///
+///     def!["tid_x: Store at RSP:8 + 0x8:8 := RAX:8"];
+///     def!["RSP:8 = RSP:8 + 0x8:8"];
+/// ```
+#[macro_export]
+macro_rules! def {
+    ($x:expr) => {
+        parsing::parse_def($x, 0)
+    };
+}
+
 pub mod parsing {
-    //! Provides parsing functions for the macros defined in `macros.rs`
+    //! Provides parsing functions for the macros defined in `macros.rs`.
     //! This module hides the parsing functions and allows exposure of the macros only.
     use crate::intermediate_representation::{
         BinOpType, Bitvector, ByteSize, Def, Expression, Term, Tid, Variable,
@@ -134,10 +159,10 @@ pub mod parsing {
         }
     }
 
-    #[allow(dead_code)]
     /// Parses a Bitvector defining string slice and returns its corresponding Bitvector.
     ///
     /// This is used for the `bitvec!` macro, consider the macro documentation for more details.
+    #[allow(dead_code)]
     pub fn parse_bitvec(str: &str) -> Bitvector {
         let args: Vec<&str> = str.split(&['x', ':'][..]).collect();
         let value: i64;
@@ -145,18 +170,19 @@ pub mod parsing {
             // hex representation
             value = i64::from_str_radix(args[1], 16).unwrap();
         } else if args.len() == 2 {
-            // dec represenatation
+            // dec representation
             value = args[0].parse().unwrap();
         } else {
             panic!("Could not uniquely parse bitvector: {}", str)
         }
-        Bitvector::from_i64(value).into_sign_resize(args[args.len() - 1].parse::<usize>().unwrap())
+        Bitvector::from_i64(value)
+            .into_sign_resize(args[args.len() - 1].parse::<usize>().unwrap() * 8)
     }
 
-    #[allow(dead_code)]
     /// Parses a Expression defining string slice and returns its corresponding Expression.
     ///
     /// This is used for the `expr!` macro, consider the macro documentation for more details.
+    #[allow(dead_code)]
     pub fn parse_expr(str: &str) -> Expression {
         let set = RegexSet::new([
             r"^[[:alnum:]&&[^0]]{1}[[:alnum:]&&[^x]]?[[:alnum:]]*:[0-9]{1,2}$", // Variable
@@ -192,27 +218,37 @@ pub mod parsing {
             _ => panic!(),
         }
     }
+
     /// Parses a `Term<Def>` defining string slice and returns its corresponding `Term<Def>`.
     ///
-    /// This is used for the `def!` macro, consider the macro documentation for more details.
+    /// This is used for the `def!` and `defs!` macro, consider the macro documentation for more details.
     #[allow(dead_code)]
-    pub fn parse_def(str: &str) -> Term<Def> {
+    pub fn parse_def<S: AsRef<str>>(str: S, tid_suffix: u8) -> Term<Def> {
         let set = RegexSet::new([
-            r"^[[:ascii:]]+: [[:alnum:]:]* = ", // Assign
-            r"^[[:ascii:]]+: [[:alnum:]:]* := Load from [[:ascii:]:]*$", // Load
-            r"^[[:ascii:]]+: Store at [[:ascii:]:]* := ", // Store
+            r"^[[:ascii:]]+: [[:alnum:]:]* = ", // Assign with tid
+            r"^[[:alnum:]:]* = ",               // Assign without tid
+            r"^[[:ascii:]]+: [[:alnum:]:]* := Load from [[:ascii:]:]*$", // Load with tid
+            r"^[[:alnum:]:]* := Load from [[:ascii:]:]*$", // Load without tid
+            r"^[[:ascii:]]+: Store at [[:ascii:]:]* := ", // Store with tid
+            r"^Store at [[:ascii:]:]* := ",     // Store without tid
         ])
         .unwrap();
-        let result: Vec<usize> = set.matches(str).into_iter().collect();
+        let result: Vec<usize> = set.matches(str.as_ref()).into_iter().collect();
         if result.len() != 1 {
-            panic!("Def: {} matched Regex: {:#?}", str, result)
+            panic!("Def: {} matched Regex: {:#?}", str.as_ref(), result)
         }
-        let tid_def: Vec<&str> = str.split(": ").collect();
-        let tid = tid_def[0];
-        let def = tid_def[1];
+        let (tid, def): (String, &str) = match result[0] {
+            0 | 2 | 4 => {
+                // tid is specified
+                let (tid, def) = str.as_ref().split_once(": ").unwrap();
+                (tid.into(), def)
+            }
+            _ => (format!("tid_{}", tid_suffix), str.as_ref()), // unspecified tid
+        };
 
         match result[0] {
-            0 => {
+            0 | 1 => {
+                // Assign
                 let args: Vec<&str> = def.split('=').collect();
                 Term {
                     tid: Tid::new(tid),
@@ -222,7 +258,8 @@ pub mod parsing {
                     },
                 }
             }
-            1 => {
+            2 | 3 => {
+                // Load
                 let args: Vec<&str> = def.split(":= Load from").collect();
                 Term {
                     tid: Tid::new(tid),
@@ -232,7 +269,8 @@ pub mod parsing {
                     },
                 }
             }
-            2 => {
+            4 | 5 => {
+                // Store
                 let args: Vec<&str> = def.split(":=").collect();
                 Term {
                     tid: Tid::new(tid),
@@ -282,12 +320,12 @@ mod tests {
 
     #[test]
     fn test_bitvec() {
-        assert_eq!(bitvec!("0x42:8"), Bitvector::from_u8(0x42));
-        assert_eq!(bitvec!("0xFF:16"), Bitvector::from_u16(0xFF));
-        assert_eq!(bitvec!("0xAAFF:8"), Bitvector::from_u8(0xFF));
-        assert_eq!(bitvec!("0x-01:8"), Bitvector::from_i8(-1));
-        assert_eq!(bitvec!("123:32"), Bitvector::from_u32(123));
-        assert_eq!(bitvec!("-42:64"), Bitvector::from_i64(-42));
+        assert_eq!(bitvec!("0x42:1"), Bitvector::from_u8(0x42));
+        assert_eq!(bitvec!("0xFF:2"), Bitvector::from_u16(0xFF));
+        assert_eq!(bitvec!("0xAAFF:1"), Bitvector::from_u8(0xFF));
+        assert_eq!(bitvec!("0x-01:1"), Bitvector::from_i8(-1));
+        assert_eq!(bitvec!("123:4"), Bitvector::from_u32(123));
+        assert_eq!(bitvec!("-42:8"), Bitvector::from_i64(-42));
     }
 
     #[test]
@@ -304,18 +342,18 @@ mod tests {
     #[test]
     fn test_expr_const() {
         assert_eq!(
-            expr!("0x42:64"),
+            expr!("0x42:8"),
             Expression::Const(Bitvector::from_u64(0x42))
         );
         assert_eq!(
-            expr!("0xFFFF:8"),
+            expr!("0xFFFF:1"),
             Expression::Const(Bitvector::from_u8(255))
         );
     }
     #[test]
     fn test_expr_plus() {
         assert_eq!(
-            expr!("RAX:8 + 0x42:64"),
+            expr!("RAX:8 + 0x42:8"),
             Expression::BinOp {
                 op: BinOpType::IntAdd,
                 lhs: Box::new(Expression::Var(Variable {
@@ -330,7 +368,7 @@ mod tests {
     #[test]
     fn test_expr_minus() {
         assert_eq!(
-            expr!("RAX:8 - 0x42:64"),
+            expr!("RAX:8 - 0x42:8"),
             Expression::BinOp {
                 op: BinOpType::IntSub,
                 lhs: Box::new(Expression::Var(Variable {
@@ -343,9 +381,23 @@ mod tests {
         );
     }
     #[test]
-    fn test_def_assign() {
+    fn test_def_tid() {
+        let defs = defs![
+            "RDI:8 = RAX:8 + RBP:8",
+            "A: RAX:8 = 0x42:1",
+            "RDX:8 = RAX:8 + RBP:8"
+        ];
         assert_eq!(
-            def!["tid_0: RAX:8 = 0x42:8", "tid_1: RDI:8 = RAX:8 + RBP:8"],
+            defs.into_iter()
+                .map(|x| x.tid.to_string())
+                .collect::<Vec<String>>(),
+            ["tid_0", "A", "tid_2"]
+        )
+    }
+    #[test]
+    fn test_defs_assign() {
+        assert_eq!(
+            defs!["tid_0: RAX:8 = 0x42:1", "tid_1: RDI:8 = RAX:8 + RBP:8"],
             vec![
                 Term {
                     tid: Tid::new("tid_0"),
@@ -386,9 +438,9 @@ mod tests {
     }
 
     #[test]
-    fn test_def_store() {
+    fn test_defs_store() {
         assert_eq!(
-            def!["tid: Store at RSP:8 - 0x8:8 := 0x42:8"],
+            defs!["tid: Store at RSP:8 - 0x8:1 := 0x42:1"],
             vec![Term {
                 tid: Tid::new("tid"),
                 term: Def::Store {
@@ -408,9 +460,9 @@ mod tests {
     }
 
     #[test]
-    fn test_def_load() {
+    fn test_defs_load() {
         assert_eq!(
-            def!["tid_a: RAX:8 := Load from 0xFF00:32 + 0x08:32"],
+            defs!["tid_a: RAX:8 := Load from 0xFF00:4 + 0x08:4"],
             vec![Term {
                 tid: Tid::new("tid_a"),
                 term: Def::Load {
@@ -430,11 +482,11 @@ mod tests {
     }
 
     #[test]
-    fn test_def_composition() {
+    fn test_defs_composition() {
         assert_eq!(
-            def![
-                "tid_a: Store at RSP:8 + 0x8:8 := RAX:8",
-                "tid_b: RSP:8 = RSP:8 + 0x8:8",
+            defs![
+                "tid_a: Store at RSP:8 + 0x8:1 := RAX:8",
+                "tid_b: RSP:8 = RSP:8 + 0x8:1",
                 "tid_c: RDI:8 := Load from RSP:8"
             ],
             vec![

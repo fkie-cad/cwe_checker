@@ -27,19 +27,19 @@ fn test_compute_return_values_of_call() {
     );
     let expected_val = DataDomain::from_target(
         AbstractIdentifier::from_var(Tid::new("call_tid"), &variable!("RAX:8")),
-        bitvec!("0x0:64").into(),
+        bitvec!("0x0:8").into(),
     );
     assert_eq!(return_values.iter().len(), 3);
     assert_eq!(return_values[0], (&variable!("RAX:8"), expected_val));
     // Test returning a known value.
     let param_ref = DataDomain::from_target(
         AbstractIdentifier::from_var(Tid::new("callee"), &variable!("RDI:8")),
-        bitvec!("0x0:64").into(),
+        bitvec!("0x0:8").into(),
     );
     callee_state.set_register(&variable!("RAX:8"), param_ref);
     let expected_val = DataDomain::from_target(
         AbstractIdentifier::from_var(Tid::new("caller"), &variable!("RDI:8")),
-        bitvec!("0x0:64").into(),
+        bitvec!("0x0:8").into(),
     );
     let return_values = context.compute_return_values_of_call(
         &mut caller_state,
@@ -78,9 +78,9 @@ fn test_call_stub_handling() {
         state.get_register(&variable!("r0:4")),
         DataDomain::from_target(
             AbstractIdentifier::mock(call_tid, "r0", 4),
-            bitvec!("0x0:32").into()
+            bitvec!("0x0:4").into()
         )
-        .merge(&bitvec!("0x0:32").into())
+        .merge(&bitvec!("0x0:4").into())
     );
 
     // Test handling of sprintf call
@@ -90,7 +90,7 @@ fn test_call_stub_handling() {
         project.get_standard_calling_convention().unwrap(),
     );
     // Set the format string param register to a pointer to the string 'cat %s %s %s %s'.
-    state.set_register(&variable!("r1:4"), bitvec!("0x6000:32").into());
+    state.set_register(&variable!("r1:4"), bitvec!("0x6000:4").into());
     let extern_symbol = ExternSymbol::mock_sprintf_symbol_arm();
     let call_tid = Tid::new("call_sprintf");
     context.handle_extern_symbol_call(&mut state, &extern_symbol, &call_tid);
@@ -122,15 +122,15 @@ fn test_get_global_mem_address() {
     let context = Context::new(&project, &graph);
     // Check global address from abstract ID
     let global_address_id: DataDomain<BitvectorDomain> = DataDomain::from_target(
-        AbstractIdentifier::from_global_address(&Tid::new("fn_tid"), &bitvec!("0x2000:32")),
-        bitvec!("0x2:32").into(),
+        AbstractIdentifier::from_global_address(&Tid::new("fn_tid"), &bitvec!("0x2000:4")),
+        bitvec!("0x2:4").into(),
     );
     let result = context.get_global_mem_address(&global_address_id);
-    assert_eq!(result, Some(bitvec!("0x2002:32")));
+    assert_eq!(result, Some(bitvec!("0x2002:4")));
     // Check global address from absolute value
-    let global_address_const = bitvec!("0x2003:32").into();
+    let global_address_const = bitvec!("0x2003:4").into();
     let result = context.get_global_mem_address(&global_address_const);
-    assert_eq!(result, Some(bitvec!("0x2003:32")));
+    assert_eq!(result, Some(bitvec!("0x2003:4")));
     // Check global address not returned if it may not be unique
     let value = global_address_id.merge(&global_address_const);
     let result = context.get_global_mem_address(&value);
