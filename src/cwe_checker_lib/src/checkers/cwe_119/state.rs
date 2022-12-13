@@ -225,7 +225,7 @@ impl State {
 /// - All call TIDs that are relevant for reachting the site of the CWE warning.
 ///   This list is complete in the sense that all possible paths in the call graph from the root function to the CWE warning site
 ///   are covered by these calls.
-/// 
+///
 /// The resulting list is returned as a string,
 /// as it is currently only used for human-readable context information in the CWE warnings.
 fn collect_tids_for_cwe_warning(
