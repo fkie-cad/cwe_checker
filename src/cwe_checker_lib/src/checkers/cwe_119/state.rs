@@ -87,6 +87,18 @@ impl State {
                         ) = context.compute_bounds_of_id(id, &self.stack_id)
                         {
                             out_of_bounds_access_warnings.push(format!("The object bound is based on the possible source value {:#} for the object ID.", source.to_json_compact()));
+                            let call_sequence_tids = collect_tids_for_cwe_warning(
+                                source.get_if_unique_target().unwrap().0,
+                                self,
+                                context,
+                            );
+                            out_of_bounds_access_warnings
+                                .push(format!("Relevant callgraph TIDs: [{}]", call_sequence_tids));
+                        } else {
+                            out_of_bounds_access_warnings.push(format!(
+                                "Relevant callgraph TIDs: [{}]",
+                                self.stack_id.get_tid()
+                            ));
                         }
                         // Replace the bound with `Top` to prevent duplicate CWE warnings with the same root cause.
                         self.object_lower_bounds
@@ -110,6 +122,18 @@ impl State {
                         ) = context.compute_bounds_of_id(id, &self.stack_id)
                         {
                             out_of_bounds_access_warnings.push(format!("The object bound is based on the possible source value {:#} for the object ID.", source.to_json_compact()));
+                            let call_sequence_tids = collect_tids_for_cwe_warning(
+                                source.get_if_unique_target().unwrap().0,
+                                self,
+                                context,
+                            );
+                            out_of_bounds_access_warnings
+                                .push(format!("Relevant callgraph TIDs: [{}]", call_sequence_tids));
+                        } else {
+                            out_of_bounds_access_warnings.push(format!(
+                                "Relevant callgraph TIDs: [{}]",
+                                self.stack_id.get_tid()
+                            ));
                         }
                         // Replace the bound with `Top` to prevent duplicate CWE warnings with the same root cause.
                         self.object_upper_bounds
@@ -192,6 +216,58 @@ impl State {
 
         Value::Object(state_map)
     }
+}
+
+/// Collect all relevant call sequence TIDs corresponding to a CWE warning.
+/// This includes:
+/// - The TID of a root function from which both the allocation site and the site of the CWE warning can be reached
+/// - All call TID that are relevant for reaching the allocation site from the root function.
+/// - All call TIDs that are relevant for reachting the site of the CWE warning.
+///   This list is complete in the sense that all possible paths in the call graph from the root function to the CWE warning site
+///   are covered by these calls.
+/// 
+/// The resulting list is returned as a string,
+/// as it is currently only used for human-readable context information in the CWE warnings.
+fn collect_tids_for_cwe_warning(
+    id: &AbstractIdentifier,
+    state: &State,
+    context: &Context,
+) -> String {
+    use crate::analysis::callgraph::find_call_sequences_to_target;
+    let caller_tid = if context.project.program.term.subs.contains_key(id.get_tid()) {
+        // The ID is the stack ID of some function.
+        id.get_tid().clone()
+    } else {
+        // The ID corresponds to a malloc-like call
+        let root_call_tid = if let Some(root_call) = id.get_path_hints().last() {
+            root_call
+        } else {
+            id.get_tid()
+        };
+        context
+            .project
+            .program
+            .term
+            .find_sub_containing_jump(root_call_tid)
+            .expect("Caller corresponding to call does not exist.")
+    };
+    let mut tids = Vec::new();
+    tids.push(caller_tid.clone());
+    tids.extend(id.get_path_hints().iter().cloned());
+    if caller_tid != *state.stack_id.get_tid() {
+        // We also need the possible call sequences from the caller to the current function
+        let call_sequence_tids = find_call_sequences_to_target(
+            &context.callgraph,
+            &caller_tid,
+            state.stack_id.get_tid(),
+        );
+        tids.extend(call_sequence_tids.into_iter());
+    }
+    // Build a string out of the TID list
+    tids.iter()
+        .map(|tid| format!("{}", tid))
+        .reduce(|accum, elem| format!("{}, {}", accum, elem))
+        .unwrap()
 }
 
 #[cfg(test)]
