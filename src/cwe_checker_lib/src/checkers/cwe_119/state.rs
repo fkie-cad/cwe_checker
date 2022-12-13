@@ -318,7 +318,7 @@ pub mod tests {
             state
                 .check_address_access(&address, ByteSize::new(8), &context)
                 .len(),
-            1
+            2
         );
         // subsequent errors are suppressed
         let address = Data::from_target(stack_id, Bitvector::from_i64(8).into());
