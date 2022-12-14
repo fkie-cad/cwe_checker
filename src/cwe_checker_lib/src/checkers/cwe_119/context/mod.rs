@@ -1,4 +1,5 @@
 use crate::abstract_domain::*;
+use crate::analysis::callgraph::CallGraph;
 use crate::analysis::function_signature::FunctionSignature;
 use crate::analysis::graph::Graph;
 use crate::analysis::pointer_inference::{Data, PointerInference};
@@ -38,6 +39,8 @@ pub struct Context<'a> {
     pub malloc_tid_to_object_size_map: HashMap<Tid, Data>,
     /// A map that maps the TIDs of jump instructions to the function TID of the caller.
     pub call_to_caller_fn_map: HashMap<Tid, Tid>,
+    /// The callgraph corresponding to the project.
+    pub callgraph: CallGraph<'a>,
     /// A sender channel that can be used to collect logs in the corresponding logging thread.
     pub log_collector: crossbeam_channel::Sender<LogThreadMsg>,
 }
@@ -52,6 +55,7 @@ impl<'a> Context<'a> {
         'a: 'b,
     {
         let project = analysis_results.project;
+        let callgraph = crate::analysis::callgraph::get_program_callgraph(&project.program);
         Context {
             project,
             graph: analysis_results.control_flow_graph,
@@ -63,6 +67,7 @@ impl<'a> Context<'a> {
             ),
             malloc_tid_to_object_size_map: compute_size_values_of_malloc_calls(analysis_results),
             call_to_caller_fn_map: compute_call_to_caller_map(project),
+            callgraph,
             log_collector,
         }
     }
