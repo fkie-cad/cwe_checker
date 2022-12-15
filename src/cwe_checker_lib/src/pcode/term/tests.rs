@@ -809,7 +809,7 @@ fn from_project_to_ir_project() {
     );
     assert_eq!(
         format!("{}", ir_block.defs[4].term),
-        "RAX:64 = ((RAX:64)[4-7] Piece (0x0:i16 Piece (RAX:64)[0-1]))".to_string()
+        "RAX:64 = ((RAX:64)[4-7] Piece (0x0:16 Piece (RAX:64)[0-1]))".to_string()
     );
     assert_eq!(
         format!("{}", ir_block.defs[5].term),
