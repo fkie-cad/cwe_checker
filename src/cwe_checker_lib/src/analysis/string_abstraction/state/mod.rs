@@ -255,16 +255,9 @@ impl<T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> State<T> 
 
     /// Returns a vector of all currently tracked pointers.
     pub fn collect_all_tracked_pointers(&self) -> Vec<DataDomain<IntervalDomain>> {
-        let mut pointers: Vec<DataDomain<IntervalDomain>> = self
-            .stack_offset_to_pointer_map
-            .iter()
-            .map(|(_, pointer)| pointer.clone())
-            .collect();
-        let mut var_pointers = self
-            .variable_to_pointer_map
-            .iter()
-            .map(|(_, pointer)| pointer.clone())
-            .collect();
+        let mut pointers: Vec<DataDomain<IntervalDomain>> =
+            self.stack_offset_to_pointer_map.values().cloned().collect();
+        let mut var_pointers = self.variable_to_pointer_map.values().cloned().collect();
         let mut unassigned_pointers: Vec<DataDomain<IntervalDomain>> =
             self.unassigned_return_pointer.iter().cloned().collect_vec();
         pointers.append(&mut var_pointers);

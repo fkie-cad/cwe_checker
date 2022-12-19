@@ -34,7 +34,7 @@ struct GhidraConfig {
 fn copy_config_json(location: &Path) -> Result<()> {
     let repo_dir = env::current_dir().unwrap();
     std::fs::copy(
-        &repo_dir.join("src/config.json"),
+        repo_dir.join("src/config.json"),
         location.join("config.json"),
     )?;
     Ok(())

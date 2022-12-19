@@ -1,5 +1,7 @@
 use super::{create_computation, mock_context, NodeValue};
+use crate::bitvec;
 use crate::intermediate_representation::*;
+use crate::variable;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::iter::FromIterator;
@@ -8,11 +10,7 @@ use mock_context::Context;
 use mock_context::StartEnd;
 
 fn mock_program() -> Term<Program> {
-    let var = Variable {
-        name: String::from("RAX"),
-        size: ByteSize::new(8),
-        is_temp: false,
-    };
+    let var = variable!("RAX:8");
     let value = Expression::UnOp {
         op: UnOpType::IntNegate,
         arg: Box::new(Expression::Var(var.clone())),
@@ -61,7 +59,7 @@ fn mock_program() -> Term<Program> {
     };
     let return_term = Term {
         tid: Tid::new("return".to_string()),
-        term: Jmp::Return(Expression::Const(Bitvector::zero(64.into()))), // The return term does not matter
+        term: Jmp::Return(Expression::Const(bitvec!("0:8"))), // The return term does not matter
     };
     let jmp = Jmp::Branch(Tid::new("sub1_blk1"));
     let jmp_term = Term {
@@ -94,7 +92,7 @@ fn mock_program() -> Term<Program> {
     };
     let cond_jump = Jmp::CBranch {
         target: Tid::new("sub1_blk1"),
-        condition: Expression::Const(Bitvector::from_u8(0)),
+        condition: Expression::Const(bitvec!("0:1")),
     };
     let cond_jump_term = Term {
         tid: Tid::new("cond_jump"),

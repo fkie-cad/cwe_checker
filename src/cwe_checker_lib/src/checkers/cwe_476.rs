@@ -121,7 +121,7 @@ pub fn check_cwe(
             _ => panic!(),
         };
     }
-    let cwe_warnings = cwe_warnings.into_iter().map(|(_, cwe)| cwe).collect();
+    let cwe_warnings = cwe_warnings.into_values().collect();
 
     (Vec::new(), cwe_warnings)
 }

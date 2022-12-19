@@ -277,6 +277,7 @@ impl Default for FunctionSignature {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use crate::variable;
 
     impl FunctionSignature {
         /// Create a mock x64 function signature with 2 parameters, one of which is accessed mutably,
@@ -287,11 +288,11 @@ pub mod tests {
             write_access_pattern.set_unknown_access_flags();
             let parameters = HashMap::from_iter([
                 (
-                    Arg::from_var(Variable::mock("RDI", 8), None),
+                    Arg::from_var(variable!("RDI:8"), None),
                     AccessPattern::new(),
                 ),
                 (
-                    Arg::from_var(Variable::mock("RSI", 8), None),
+                    Arg::from_var(variable!("RSI:8"), None),
                     write_access_pattern,
                 ),
             ]);
