@@ -1,5 +1,5 @@
 use super::*;
-use crate::intermediate_representation::{Def, Expression, Variable};
+use crate::{defs, expr, intermediate_representation::Def, variable};
 
 /// Creates a specific project containing three blocks for expression propagation tests.
 ///
@@ -12,11 +12,7 @@ fn mock_project() -> Project {
     let callee_block = Term {
         tid: Tid::new("callee_block"),
         term: Blk {
-            defs: vec![Def::assign(
-                "callee_def_1",
-                Variable::mock("Y", 8),
-                Expression::var("Z", 8),
-            )],
+            defs: defs!["callee_def_1: Y:8 = Z:8"],
             jmps: Vec::new(),
             indirect_jmp_targets: Vec::new(),
         },
@@ -37,13 +33,13 @@ fn mock_project() -> Project {
             defs: vec![
                 Def::assign(
                     "entry_jmp_def_1",
-                    Variable::mock("X", 8),
-                    Expression::var("Z", 8).un_op(UnOpType::BoolNegate),
+                    variable!("X:8"),
+                    expr!("Z:8").un_op(UnOpType::BoolNegate),
                 ),
                 Def::assign(
                     "entry_jmp_def_2",
-                    Variable::mock("Z", 8),
-                    Expression::var("Z", 8).un_op(UnOpType::IntNegate),
+                    variable!("Z:8"),
+                    expr!("Z:8").un_op(UnOpType::IntNegate),
                 ),
             ],
             jmps: vec![Term {
@@ -95,34 +91,26 @@ fn get_mock_entry_block() -> Term<Blk> {
             defs: vec![
                 Def::assign(
                     "tid_1",
-                    Variable::mock("Z", 8),
-                    Expression::const_from_i32(42).un_op(UnOpType::IntNegate),
+                    variable!("Z:8"),
+                    expr!("42:4").un_op(UnOpType::IntNegate),
                 ),
                 Def::assign(
                     "tid_2",
-                    Variable::mock("X", 8),
-                    Expression::var("Y", 8).un_op(UnOpType::IntNegate),
+                    variable!("X:8"),
+                    expr!("Y:8").un_op(UnOpType::IntNegate),
                 ),
-                Def::assign(
-                    "tid_3",
-                    Variable::mock("Y", 8),
-                    Expression::var("X", 8).plus(Expression::var("Y", 8)),
-                ),
+                Def::assign("tid_3", variable!("Y:8"), expr!("X:8").plus(expr!("Y:8"))),
                 Def::assign(
                     "tid_4",
-                    Variable::mock("X", 8),
-                    Expression::var("X", 8).un_op(UnOpType::IntNegate),
+                    variable!("X:8"),
+                    expr!("X:8").un_op(UnOpType::IntNegate),
                 ),
                 Def::assign(
                     "tid_5",
-                    Variable::mock("Y", 8),
-                    Expression::var("Y", 8).un_op(UnOpType::IntNegate),
+                    variable!("Y:8"),
+                    expr!("Y:8").un_op(UnOpType::IntNegate),
                 ),
-                Def::assign(
-                    "tid_6",
-                    Variable::mock("Y", 8),
-                    Expression::var("X", 8).plus(Expression::var("Y", 8)),
-                ),
+                Def::assign("tid_6", variable!("Y:8"), expr!("X:8").plus(expr!("Y:8"))),
             ],
             jmps: Vec::new(),
             indirect_jmp_targets: Vec::new(),
@@ -149,15 +137,15 @@ fn inter_block_propagation() {
         vec![
             Def::assign(
                 "entry_jmp_def_1",
-                Variable::mock("X", 8),
-                Expression::const_from_i32(42)
+                variable!("X:8"),
+                expr!("42:4")
                     .un_op(UnOpType::IntNegate)
                     .un_op(UnOpType::BoolNegate),
             ),
             Def::assign(
                 "entry_jmp_def_2",
-                Variable::mock("Z", 8),
-                Expression::const_from_i32(42)
+                variable!("Z:8"),
+                expr!("42:4")
                     .un_op(UnOpType::IntNegate)
                     .un_op(UnOpType::IntNegate),
             )
@@ -181,11 +169,7 @@ fn no_propagation_on_calls() {
             .unwrap()
             .term
             .defs,
-        vec![Def::assign(
-            "callee_def_1",
-            Variable::mock("Y", 8),
-            Expression::var("Z", 8),
-        )]
+        defs!["callee_def_1: Y:8 = Z:8"]
     )
 }
 #[test]
@@ -214,10 +198,7 @@ fn insertion_table_update() {
     // Assignment is inserted into table, no other changes.
     assert_eq!(
         update.clone().unwrap(),
-        HashMap::from([(
-            Variable::mock("Z", 8),
-            Expression::const_from_i32(42).un_op(UnOpType::IntNegate)
-        )])
+        HashMap::from([(variable!("Z:8"), expr!("42:4").un_op(UnOpType::IntNegate))])
     );
 
     let update = crate::analysis::forward_interprocedural_fixpoint::Context::update_def(
@@ -229,14 +210,8 @@ fn insertion_table_update() {
     assert_eq!(
         update.clone().unwrap(),
         HashMap::from([
-            (
-                Variable::mock("Z", 8),
-                Expression::const_from_i32(42).un_op(UnOpType::IntNegate)
-            ),
-            (
-                Variable::mock("X", 8),
-                Expression::var("Y", 8).un_op(UnOpType::IntNegate)
-            )
+            (variable!("Z:8"), expr!("42:4").un_op(UnOpType::IntNegate)),
+            (variable!("X:8"), expr!("Y:8").un_op(UnOpType::IntNegate))
         ])
     );
 
@@ -248,10 +223,7 @@ fn insertion_table_update() {
     // Expression for X is removed and Assignment is not inserted.
     assert_eq!(
         update.clone().unwrap(),
-        HashMap::from([(
-            Variable::mock("Z", 8),
-            Expression::const_from_i32(42).un_op(UnOpType::IntNegate)
-        ),])
+        HashMap::from([(variable!("Z:8"), expr!("42:4").un_op(UnOpType::IntNegate)),])
     );
     let update = crate::analysis::forward_interprocedural_fixpoint::Context::update_def(
         &context,
@@ -261,10 +233,7 @@ fn insertion_table_update() {
     // Expression for Y is removed and Assignment is not inserted.
     assert_eq!(
         update.clone().unwrap(),
-        HashMap::from([(
-            Variable::mock("Z", 8),
-            Expression::const_from_i32(42).un_op(UnOpType::IntNegate)
-        ),])
+        HashMap::from([(variable!("Z:8"), expr!("42:4").un_op(UnOpType::IntNegate)),])
     );
 
     let update = crate::analysis::forward_interprocedural_fixpoint::Context::update_def(
@@ -275,10 +244,7 @@ fn insertion_table_update() {
     // Assignment not inserted.
     assert_eq!(
         update.clone().unwrap(),
-        HashMap::from([(
-            Variable::mock("Z", 8),
-            Expression::const_from_i32(42).un_op(UnOpType::IntNegate)
-        ),])
+        HashMap::from([(variable!("Z:8"), expr!("42:4").un_op(UnOpType::IntNegate)),])
     );
 
     let update = crate::analysis::forward_interprocedural_fixpoint::Context::update_def(
@@ -289,10 +255,7 @@ fn insertion_table_update() {
     // Assignment not inserted.
     assert_eq!(
         update.clone().unwrap(),
-        HashMap::from([(
-            Variable::mock("Z", 8),
-            Expression::const_from_i32(42).un_op(UnOpType::IntNegate)
-        ),])
+        HashMap::from([(variable!("Z:8"), expr!("42:4").un_op(UnOpType::IntNegate)),])
     );
 }
 #[test]
@@ -303,31 +266,29 @@ fn expressions_inserted() {
     let result_def_entry_block = vec![
         Def::assign(
             "tid_1",
-            Variable::mock("Z", 8),
-            Expression::const_from_i32(42).un_op(UnOpType::IntNegate),
+            variable!("Z:8"),
+            expr!("42:4").un_op(UnOpType::IntNegate),
         ),
         Def::assign(
             "tid_2",
-            Variable::mock("X", 8),
-            Expression::var("Y", 8).un_op(UnOpType::IntNegate),
+            variable!("X:8"),
+            expr!("Y:8").un_op(UnOpType::IntNegate),
         ),
         Def::assign(
             "tid_3",
-            Variable::mock("Y", 8),
-            Expression::var("Y", 8)
-                .un_op(UnOpType::IntNegate)
-                .plus(Expression::var("Y", 8)),
+            variable!("Y:8"),
+            expr!("Y:8").un_op(UnOpType::IntNegate).plus(expr!("Y:8")),
         ),
         Def::assign(
             "tid_4",
-            Variable::mock("X", 8),
-            Expression::var("X", 8).un_op(UnOpType::IntNegate),
+            variable!("X:8"),
+            expr!("X:8").un_op(UnOpType::IntNegate),
         ),
         // tid_5 is removed by merge_def_assignments_to_same_var()
         Def::assign(
             "tid_6",
-            Variable::mock("Y", 8),
-            Expression::var("X", 8).plus(Expression::var("Y", 8).un_op(UnOpType::IntNegate)),
+            variable!("Y:8"),
+            expr!("X:8").plus(expr!("Y:8").un_op(UnOpType::IntNegate)),
         ),
     ];
     assert_eq!(
@@ -357,15 +318,15 @@ fn expressions_inserted() {
         vec![
             Def::assign(
                 "entry_jmp_def_1",
-                Variable::mock("X", 8),
-                Expression::const_from_i32(42)
+                variable!("X:8"),
+                expr!("42:4")
                     .un_op(UnOpType::IntNegate)
                     .un_op(UnOpType::BoolNegate),
             ),
             Def::assign(
                 "entry_jmp_def_2",
-                Variable::mock("Z", 8),
-                Expression::const_from_i32(42)
+                variable!("Z:8"),
+                expr!("42:4")
                     .un_op(UnOpType::IntNegate)
                     .un_op(UnOpType::IntNegate)
             )
@@ -382,10 +343,6 @@ fn expressions_inserted() {
             .blocks[0]
             .term
             .defs,
-        vec![Def::assign(
-            "callee_def_1",
-            Variable::mock("Y", 8),
-            Expression::var("Z", 8),
-        )]
+        defs!["callee_def_1: Y:8 = Z:8"]
     );
 }

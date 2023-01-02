@@ -215,7 +215,7 @@ impl fmt::Display for Expression {
         match self {
             Expression::Var(var) => write!(f, "{}", var),
             Expression::Const(c) => {
-                write!(f, "0x{:016x}:{}", c, c.bytesize().as_bit_length())
+                write!(f, "0x{:016x}:{}", c, c.bytesize())
             }
             Expression::BinOp { op, lhs, rhs } => match op {
                 BinOpType::IntMult

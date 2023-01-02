@@ -538,7 +538,7 @@ fn compute_intersection_residue_class(
     // ```
     let (gcd, left_inverse, right_inverse) = extended_gcd(stride_left, stride_right);
 
-    if base_left as i128 % gcd != base_right as i128 % gcd {
+    if base_left % gcd != base_right % gcd {
         // The residue classes do not intersect, thus the intersection is empty.
         Ok(None)
     } else {

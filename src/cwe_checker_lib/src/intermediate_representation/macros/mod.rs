@@ -145,10 +145,10 @@ pub mod parsing {
     ///
     /// This is used for the `var!` macro, consider the macro documentation for more details.
     #[allow(dead_code)]
-    pub fn parse_variable(str: &str) -> Variable {
-        let args: Vec<&str> = str.split(':').collect();
+    pub fn parse_variable<S: AsRef<str>>(str: S) -> Variable {
+        let args: Vec<&str> = str.as_ref().split(':').collect();
         if args.len() != 2 {
-            panic!("Could not uniquely parse variable: {}", str)
+            panic!("Could not uniquely parse variable: {}", str.as_ref())
         }
 
         let (name, size) = (args[0], args[1]);
@@ -163,44 +163,45 @@ pub mod parsing {
     ///
     /// This is used for the `bitvec!` macro, consider the macro documentation for more details.
     #[allow(dead_code)]
-    pub fn parse_bitvec(str: &str) -> Bitvector {
-        let args: Vec<&str> = str.split(&['x', ':'][..]).collect();
-        let value: i64;
+    pub fn parse_bitvec<S: AsRef<str>>(str: S) -> Bitvector {
+        let args: Vec<&str> = str.as_ref().split(&['x', ':'][..]).collect();
+        let value: i128;
         if args.len() == 3 {
             // hex representation
-            value = i64::from_str_radix(args[1], 16).unwrap();
+            value = i128::from_str_radix(args[1], 16).unwrap();
         } else if args.len() == 2 {
             // dec representation
             value = args[0].parse().unwrap();
         } else {
-            panic!("Could not uniquely parse bitvector: {}", str)
+            panic!("Could not uniquely parse bitvector: {}", str.as_ref())
         }
-        Bitvector::from_i64(value)
+        Bitvector::from_i128(value)
             .into_sign_resize(args[args.len() - 1].parse::<usize>().unwrap() * 8)
     }
 
     /// Parses a Expression defining string slice and returns its corresponding Expression.
     ///
     /// This is used for the `expr!` macro, consider the macro documentation for more details.
+    /// Variable names must not start with a number.
     #[allow(dead_code)]
-    pub fn parse_expr(str: &str) -> Expression {
+    pub fn parse_expr<S: AsRef<str>>(str: S) -> Expression {
         let set = RegexSet::new([
-            r"^[[:alnum:]&&[^0]]{1}[[:alnum:]&&[^x]]?[[:alnum:]]*:[0-9]{1,2}$", // Variable
-            r"^^((0x[[:alnum:]]+)|^([0-9])+)+:[0-9]+$",                         // Constant
-            r"^[^\+]*\+{1}[^\+]*$",                                             // BinOp (IntAdd)
-            r"^[^\-]*\-{1}[^\-]*$",                                             // BinOp (IntSub)
+            r"^[[:alnum:]&&[^0-9]]{1}[[:alnum:]&&[^x]]?[[:alnum:]]*:[0-9]{1,2}$", // Variable
+            r"^((0x[[:alnum:]]+)|^([0-9])+)+:[0-9]+$",                            // Constant
+            r"^[^\+]*\+{1}[^\+]*$",                                               // BinOp (IntAdd)
+            r"^[^\-]*\-{1}[^\-]*$",                                               // BinOp (IntSub)
         ])
         .unwrap();
-        let result: Vec<usize> = set.matches(str).into_iter().collect();
+        let result: Vec<usize> = set.matches(str.as_ref()).into_iter().collect();
         if result.len() != 1 {
-            panic!("Expression: {} matched Regex: {:#?}", str, result)
+            panic!("Expression: {} matched Regex: {:#?}", str.as_ref(), result)
         }
 
         match result[0] {
             0 => Expression::Var(parse_variable(str)),
             1 => Expression::Const(parse_bitvec(str)),
             2 => {
-                let args: Vec<&str> = str.split('+').collect();
+                let args: Vec<&str> = str.as_ref().split('+').collect();
                 Expression::BinOp {
                     op: BinOpType::IntAdd,
                     lhs: Box::new(parse_expr(args[0].trim())),
@@ -208,7 +209,7 @@ pub mod parsing {
                 }
             }
             3 => {
-                let args: Vec<&str> = str.split('-').collect();
+                let args: Vec<&str> = str.as_ref().split('-').collect();
                 Expression::BinOp {
                     op: BinOpType::IntSub,
                     lhs: Box::new(parse_expr(args[0].trim())),
@@ -287,263 +288,4 @@ pub mod parsing {
 }
 
 #[cfg(test)]
-mod tests {
-    use crate::intermediate_representation::*;
-
-    #[test]
-    fn test_var() {
-        assert_eq!(
-            variable!("RAX:8"),
-            Variable {
-                name: "RAX".to_string(),
-                size: ByteSize(8),
-                is_temp: false
-            }
-        );
-    }
-    #[test]
-    #[should_panic]
-    fn var_empty_panics() {
-        variable!("");
-    }
-    #[test]
-    #[should_panic]
-    fn var_no_colon_panics() {
-        variable!("RAX8");
-    }
-
-    #[test]
-    #[should_panic]
-    fn var_no_size_panics() {
-        variable!("RAX:");
-    }
-
-    #[test]
-    fn test_bitvec() {
-        assert_eq!(bitvec!("0x42:1"), Bitvector::from_u8(0x42));
-        assert_eq!(bitvec!("0xFF:2"), Bitvector::from_u16(0xFF));
-        assert_eq!(bitvec!("0xAAFF:1"), Bitvector::from_u8(0xFF));
-        assert_eq!(bitvec!("0x-01:1"), Bitvector::from_i8(-1));
-        assert_eq!(bitvec!("123:4"), Bitvector::from_u32(123));
-        assert_eq!(bitvec!("-42:8"), Bitvector::from_i64(-42));
-    }
-
-    #[test]
-    fn test_expr_var() {
-        assert_eq!(
-            expr!("RAX:8"),
-            Expression::Var(Variable {
-                name: "RAX".into(),
-                size: ByteSize(8),
-                is_temp: false
-            })
-        );
-    }
-    #[test]
-    fn test_expr_const() {
-        assert_eq!(
-            expr!("0x42:8"),
-            Expression::Const(Bitvector::from_u64(0x42))
-        );
-        assert_eq!(
-            expr!("0xFFFF:1"),
-            Expression::Const(Bitvector::from_u8(255))
-        );
-    }
-    #[test]
-    fn test_expr_plus() {
-        assert_eq!(
-            expr!("RAX:8 + 0x42:8"),
-            Expression::BinOp {
-                op: BinOpType::IntAdd,
-                lhs: Box::new(Expression::Var(Variable {
-                    name: "RAX".into(),
-                    size: ByteSize(8),
-                    is_temp: false
-                })),
-                rhs: Box::new(Expression::Const(Bitvector::from_u64(0x42)))
-            }
-        );
-    }
-    #[test]
-    fn test_expr_minus() {
-        assert_eq!(
-            expr!("RAX:8 - 0x42:8"),
-            Expression::BinOp {
-                op: BinOpType::IntSub,
-                lhs: Box::new(Expression::Var(Variable {
-                    name: "RAX".into(),
-                    size: ByteSize(8),
-                    is_temp: false
-                })),
-                rhs: Box::new(Expression::Const(Bitvector::from_u64(0x42)))
-            }
-        );
-    }
-    #[test]
-    fn test_def_tid() {
-        let defs = defs![
-            "RDI:8 = RAX:8 + RBP:8",
-            "A: RAX:8 = 0x42:1",
-            "RDX:8 = RAX:8 + RBP:8"
-        ];
-        assert_eq!(
-            defs.into_iter()
-                .map(|x| x.tid.to_string())
-                .collect::<Vec<String>>(),
-            ["tid_0", "A", "tid_2"]
-        )
-    }
-    #[test]
-    fn test_defs_assign() {
-        assert_eq!(
-            defs!["tid_0: RAX:8 = 0x42:1", "tid_1: RDI:8 = RAX:8 + RBP:8"],
-            vec![
-                Term {
-                    tid: Tid::new("tid_0"),
-                    term: Def::Assign {
-                        var: Variable {
-                            name: "RAX".into(),
-                            size: ByteSize(8),
-                            is_temp: false
-                        },
-                        value: Expression::Const(Bitvector::from_i8(0x42))
-                    }
-                },
-                Term {
-                    tid: Tid::new("tid_1"),
-                    term: Def::Assign {
-                        var: Variable {
-                            name: "RDI".into(),
-                            size: ByteSize(8),
-                            is_temp: false
-                        },
-                        value: Expression::BinOp {
-                            op: BinOpType::IntAdd,
-                            lhs: Box::new(Expression::Var(Variable {
-                                name: "RAX".into(),
-                                size: ByteSize(8),
-                                is_temp: false
-                            })),
-                            rhs: Box::new(Expression::Var(Variable {
-                                name: "RBP".into(),
-                                size: ByteSize(8),
-                                is_temp: false
-                            }))
-                        }
-                    }
-                }
-            ]
-        );
-    }
-
-    #[test]
-    fn test_defs_store() {
-        assert_eq!(
-            defs!["tid: Store at RSP:8 - 0x8:1 := 0x42:1"],
-            vec![Term {
-                tid: Tid::new("tid"),
-                term: Def::Store {
-                    address: Expression::BinOp {
-                        op: BinOpType::IntSub,
-                        lhs: Box::new(Expression::Var(Variable {
-                            name: "RSP".into(),
-                            size: ByteSize(8),
-                            is_temp: false
-                        })),
-                        rhs: Box::new(Expression::Const(Bitvector::from_u8(0x8)))
-                    },
-                    value: Expression::Const(Bitvector::from_u8(0x42))
-                }
-            }]
-        )
-    }
-
-    #[test]
-    fn test_defs_load() {
-        assert_eq!(
-            defs!["tid_a: RAX:8 := Load from 0xFF00:4 + 0x08:4"],
-            vec![Term {
-                tid: Tid::new("tid_a"),
-                term: Def::Load {
-                    var: Variable {
-                        name: "RAX".into(),
-                        size: ByteSize(8),
-                        is_temp: false
-                    },
-                    address: Expression::BinOp {
-                        op: BinOpType::IntAdd,
-                        lhs: Box::new(Expression::Const(Bitvector::from_u32(0xFF00))),
-                        rhs: Box::new(Expression::Const(Bitvector::from_u32(0x08)))
-                    }
-                }
-            }]
-        )
-    }
-
-    #[test]
-    fn test_defs_composition() {
-        assert_eq!(
-            defs![
-                "tid_a: Store at RSP:8 + 0x8:1 := RAX:8",
-                "tid_b: RSP:8 = RSP:8 + 0x8:1",
-                "tid_c: RDI:8 := Load from RSP:8"
-            ],
-            vec![
-                Term {
-                    tid: Tid::new("tid_a"),
-                    term: Def::Store {
-                        address: Expression::BinOp {
-                            op: BinOpType::IntAdd,
-                            lhs: Box::new(Expression::Var(Variable {
-                                name: "RSP".into(),
-                                size: ByteSize(8),
-                                is_temp: false
-                            })),
-                            rhs: Box::new(Expression::Const(Bitvector::from_u8(0x08)))
-                        },
-                        value: Expression::Var(Variable {
-                            name: "RAX".into(),
-                            size: ByteSize(8),
-                            is_temp: false
-                        })
-                    }
-                },
-                Term {
-                    tid: Tid::new("tid_b"),
-                    term: Def::Assign {
-                        var: Variable {
-                            name: "RSP".into(),
-                            size: ByteSize(8),
-                            is_temp: false
-                        },
-                        value: Expression::BinOp {
-                            op: BinOpType::IntAdd,
-                            lhs: Box::new(Expression::Var(Variable {
-                                name: "RSP".into(),
-                                size: ByteSize(8),
-                                is_temp: false
-                            })),
-                            rhs: Box::new(Expression::Const(Bitvector::from_u8(0x08)))
-                        }
-                    }
-                },
-                Term {
-                    tid: Tid::new("tid_c"),
-                    term: Def::Load {
-                        var: Variable {
-                            name: "RDI".into(),
-                            size: ByteSize(8),
-                            is_temp: false
-                        },
-                        address: Expression::Var(Variable {
-                            name: "RSP".into(),
-                            size: ByteSize(8),
-                            is_temp: false
-                        })
-                    }
-                }
-            ]
-        )
-    }
-}
+mod tests;
