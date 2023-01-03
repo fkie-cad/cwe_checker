@@ -377,10 +377,7 @@ impl LogThread {
             .cloned()
             .chain(general_logs.into_iter())
             .collect();
-        let cwes = collected_cwes
-            .into_iter()
-            .map(|(_key, value)| value)
-            .collect();
+        let cwes = collected_cwes.into_values().collect();
         (logs, cwes)
     }
 }
