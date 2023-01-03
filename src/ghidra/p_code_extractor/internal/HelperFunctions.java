@@ -261,7 +261,7 @@ public final class HelperFunctions {
             regProps.add(
                 new RegisterProperties(reg.getName(), 
                                        reg.getBaseRegister().getName(), 
-                                       (int)(reg.getLeastSignificatBitInBaseRegister() / 8),
+                                       (int)(reg.getLeastSignificantBitInBaseRegister() / 8),
                                        context.getRegisterVarnode(reg).getSize())
             );
         }

@@ -82,7 +82,8 @@ fn get_search_locations() -> Vec<PathBuf> {
 fn find_ghidra() -> Result<PathBuf> {
     let mut ghidra_locations: Vec<PathBuf> = get_search_locations()
         .into_iter()
-        .filter_map(|x| search_for_ghidrarun(&x))
+        .map(|x| search_for_ghidrarun(&x))
+        .flatten()
         .collect();
 
     ghidra_locations.sort();
@@ -95,20 +96,28 @@ fn find_ghidra() -> Result<PathBuf> {
     }
 }
 
+/// check whether a path starts with ".", indicating a hidden file or folder on Linux.
+fn is_hidden(path: &walkdir::DirEntry) -> bool {
+    path.file_name().to_str().map(|s| s.starts_with(".")).unwrap_or(false)
+}
+
 /// Searches for a file containing "ghidraRun" at provided path recursively.
-fn search_for_ghidrarun(entry_path: &Path) -> Option<PathBuf> {
+fn search_for_ghidrarun(entry_path: &Path) -> Vec<PathBuf> {
+    let mut hits = Vec::new();
     for entry in WalkDir::new(entry_path)
+        .max_depth(8)
         .into_iter()
+        .filter_entry(|e| !is_hidden(e))
         .filter_map(|e| e.ok())
         .filter(|e| e.metadata().unwrap().is_file())
     {
         if entry.file_name().to_str().unwrap() == "ghidraRun" {
             let mut hit = entry.into_path();
             hit.pop();
-            return Some(hit);
+            hits.push(hit);
         }
     }
-    None
+    hits
 }
 
 /// Determines if a path is a ghidra installation
