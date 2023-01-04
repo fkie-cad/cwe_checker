@@ -138,7 +138,7 @@ pub fn check_cwe(
         };
     }
 
-    let cwe_warnings = cwe_warnings.into_iter().map(|(_, cwe)| cwe).collect();
+    let cwe_warnings = cwe_warnings.into_values().collect();
     let log_messages = log_receiver.try_iter().collect();
 
     (log_messages, cwe_warnings)

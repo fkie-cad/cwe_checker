@@ -294,7 +294,7 @@ impl Blk {
                     };
                     if input.address.is_some() {
                         let temp_register_name = format!("$load_temp{}", index);
-                        let load_def = input.to_load_def(&temp_register_name, generic_pointer_size);
+                        let load_def = input.to_load_def(temp_register_name, generic_pointer_size);
                         *input = load_def.lhs.clone().unwrap();
                         refactored_defs.push(Term {
                             tid: jmp.tid.clone().with_id_suffix("_load"),
