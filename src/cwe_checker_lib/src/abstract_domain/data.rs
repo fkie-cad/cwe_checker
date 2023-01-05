@@ -248,6 +248,7 @@ impl<T: RegisterDomain + Display> DataDomain<T> {
 mod tests {
     use super::super::*;
     use super::*;
+    use crate::{bitvec, variable};
 
     impl<T: RegisterDomain> DataDomain<T> {
         /// Return a new domain representing a set of relative values.
@@ -267,13 +268,13 @@ mod tests {
     }
 
     fn bv(value: i64) -> BitvectorDomain {
-        BitvectorDomain::Value(Bitvector::from_i64(value))
+        bitvec!(format!("{}:8", value)).into()
     }
 
     fn new_id(name: &str) -> AbstractIdentifier {
         AbstractIdentifier::new(
             Tid::new("time0"),
-            AbstractLocation::Register(Variable::mock(name, ByteSize::new(8))),
+            AbstractLocation::Register(variable!(format!("{}:8", name))),
         )
     }
 

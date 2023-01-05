@@ -244,18 +244,18 @@ impl<T: RegisterDomain> std::ops::Sub for DataDomain<T> {
 mod tests {
     use super::super::*;
     use super::*;
-    use crate::abstract_domain::*;
+    use crate::{abstract_domain::*, bitvec, variable};
 
     type Data = DataDomain<BitvectorDomain>;
 
     fn bv(value: i64) -> BitvectorDomain {
-        BitvectorDomain::Value(Bitvector::from_i64(value))
+        BitvectorDomain::Value(bitvec!(format!("{}:8", value)))
     }
 
     fn new_id(name: &str) -> AbstractIdentifier {
         AbstractIdentifier::new(
             Tid::new("time0"),
-            AbstractLocation::Register(Variable::mock(name, ByteSize::new(8))),
+            AbstractLocation::Register(variable!(format!("{}:8", name))),
         )
     }
 
@@ -313,7 +313,7 @@ mod tests {
 
         assert_eq!(
             three.subpiece(ByteSize::new(0), ByteSize::new(4)),
-            BitvectorDomain::Value(Bitvector::from_i32(3)).into()
+            BitvectorDomain::Value(bitvec!("3:4")).into()
         );
 
         assert_eq!(
@@ -321,8 +321,8 @@ mod tests {
             ByteSize::new(16)
         );
 
-        let one: Data = BitvectorDomain::Value(Bitvector::from_i32(1)).into();
-        let two: Data = BitvectorDomain::Value(Bitvector::from_i32(2)).into();
+        let one: Data = BitvectorDomain::Value(bitvec!("1:4")).into();
+        let two: Data = BitvectorDomain::Value(bitvec!("2:4")).into();
         let concat = new_value((1 << 32) + 2);
         assert_eq!(one.bin_op(Piece, &two), concat);
     }
