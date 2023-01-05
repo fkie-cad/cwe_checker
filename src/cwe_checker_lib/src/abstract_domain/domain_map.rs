@@ -217,7 +217,7 @@ impl<K: Ord + Clone, V: AbstractDomain + HasTop> MapMergeStrategy<K, V> for Merg
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{bitvec, intermediate_representation::Bitvector};
+    use crate::bitvec;
     use std::collections::BTreeMap;
 
     #[test]
