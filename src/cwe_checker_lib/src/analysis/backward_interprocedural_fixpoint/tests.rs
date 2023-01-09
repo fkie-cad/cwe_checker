@@ -2,12 +2,11 @@ use super::{create_computation, mock_context, NodeValue};
 use crate::def;
 use crate::expr;
 use crate::intermediate_representation::*;
-use crate::variable;
+use mock_context::Context;
+use mock_context::StartEnd;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::iter::FromIterator;
-use mock_context::Context;
-use mock_context::StartEnd;
 
 fn mock_program() -> Term<Program> {
     let def_term1 = def!["def1: RAX:8 = -(RAX:8)"];
@@ -59,7 +58,6 @@ fn mock_program() -> Term<Program> {
     let cond_jump = Jmp::CBranch {
         target: Tid::new("sub1_blk1"),
         condition: expr!("0:1"),
-
     };
     let cond_jump_term = Term {
         tid: Tid::new("cond_jump"),
