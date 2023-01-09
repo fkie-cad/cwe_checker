@@ -1,9 +1,7 @@
 use super::{create_computation, mock_context, NodeValue};
-use crate::bitvec;
 use crate::def;
 use crate::expr;
 use crate::intermediate_representation::*;
-use crate::variable;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::iter::FromIterator;
