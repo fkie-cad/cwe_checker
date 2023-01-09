@@ -5,7 +5,7 @@ WORKDIR /cwe_checker
 COPY . .
 RUN cargo build --release
 
-FROM fkiecad/ghidra_headless_base:10.1.2 as runtime
+FROM fkiecad/ghidra_headless_base:10.2.2 as runtime
 
 RUN apt-get -y update \
     && apt-get -y install sudo \
