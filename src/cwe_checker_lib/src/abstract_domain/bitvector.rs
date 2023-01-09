@@ -264,8 +264,8 @@ pub mod tests {
         use BinOpType::IntSRight;
         let positive_x = bv(31);
         let negative_x = bv(-31);
-        let shift_3 = bv(3);
-        let shift_70 = bv(70);
+        let shift_3 = BitvectorDomain::Value(bitvec!("3:1"));
+        let shift_70 = BitvectorDomain::Value(bitvec!("70:1"));
         assert_eq!(positive_x.bin_op(IntSRight, &shift_3), bv(3));
         assert_eq!(positive_x.bin_op(IntSRight, &shift_70), bv(0));
         assert_eq!(negative_x.bin_op(IntSRight, &shift_3), bv(-4));

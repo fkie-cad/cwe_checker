@@ -272,6 +272,7 @@ impl fmt::Display for UnOpType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             UnOpType::BoolNegate => write!(f, "¬"),
+            UnOpType::IntNegate => write!(f, "-"),
             _ => write!(f, "{:?}", self),
         }
     }

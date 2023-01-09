@@ -99,11 +99,12 @@ fn compute_correct_offset_x64() {
                             _ => 16 - (i % 16),
                         };
                         // translated alignment as substraction
-                        let expected_def = Def::Assign {
-                            var: proj.stack_pointer_register.clone(),
-                            value: expr!(format!("RSP:8 - {}:8", expected_offset)),
-                        };
-                        assert_eq!(expected_def, def.term);
+                        let expected_def = def![format!(
+                            "{} = RSP:8 - {}:8",
+                            proj.stack_pointer_register, expected_offset
+                        )];
+
+                        assert_eq!(expected_def.term, def.term);
                         assert!(log.is_none());
                     }
                 }

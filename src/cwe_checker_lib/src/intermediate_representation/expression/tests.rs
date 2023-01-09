@@ -232,7 +232,7 @@ fn display() {
         .subpiece(ByteSize(0), ByteSize(20));
 
     assert_eq!(
-        "(FloatCeil(IntSExt(IntNegate((0x2:4 + RAX:8 * RBP:8)))))[0-19]",
+        "(FloatCeil(IntSExt(-((0x2:4 + RAX:8 * RBP:8)))))[0-19]",
         format!("{}", expr)
     );
 }
