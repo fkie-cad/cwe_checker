@@ -92,6 +92,34 @@ fn test_expr_minus() {
     );
 }
 #[test]
+fn test_expr_int_negate() {
+    assert_eq!(
+        expr!("-(RAX:8)"),
+        Expression::UnOp {
+            op: UnOpType::IntNegate,
+            arg: Box::new(Expression::Var(Variable {
+                name: "RAX".into(),
+                size: ByteSize(8),
+                is_temp: false
+            }))
+        }
+    );
+}
+#[test]
+fn test_expr_bool_negate() {
+    assert_eq!(
+        expr!("¬(RAX:8)"),
+        Expression::UnOp {
+            op: UnOpType::BoolNegate,
+            arg: Box::new(Expression::Var(Variable {
+                name: "RAX".into(),
+                size: ByteSize(8),
+                is_temp: false
+            }))
+        }
+    );
+}
+#[test]
 fn test_def_tid() {
     let defs = defs![
         "RDI:8 = RAX:8 + RBP:8",
@@ -196,8 +224,8 @@ fn test_defs_load() {
 fn test_defs_composition() {
     assert_eq!(
         defs![
-            "tid_a: Store at RSP:8 + 0x8:1 := RAX:8",
-            "tid_b: RSP:8 = RSP:8 + 0x8:1",
+            "tid_a: Store at RSP:8 + -(0x8:1) := RAX:8",
+            "tid_b: RSP:8 = RSP:8 + ¬(0x8:1)",
             "tid_c: RDI:8 := Load from RSP:8"
         ],
         vec![
@@ -211,7 +239,10 @@ fn test_defs_composition() {
                             size: ByteSize(8),
                             is_temp: false
                         })),
-                        rhs: Box::new(Expression::Const(Bitvector::from_u8(0x08)))
+                        rhs: Box::new(Expression::UnOp {
+                            op: UnOpType::IntNegate,
+                            arg: Box::new(Expression::Const(Bitvector::from_u8(0x08)))
+                        })
                     },
                     value: Expression::Var(Variable {
                         name: "RAX".into(),
@@ -235,7 +266,10 @@ fn test_defs_composition() {
                             size: ByteSize(8),
                             is_temp: false
                         })),
-                        rhs: Box::new(Expression::Const(Bitvector::from_u8(0x08)))
+                        rhs: Box::new(Expression::UnOp {
+                            op: UnOpType::BoolNegate,
+                            arg: Box::new(Expression::Const(Bitvector::from_u8(0x08)))
+                        })
                     }
                 }
             },

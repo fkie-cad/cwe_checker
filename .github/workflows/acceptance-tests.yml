@@ -8,8 +8,8 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  GHIDRA_RELEASE_TAG: Ghidra_10.1.5_build
-  GHIDRA_VERSION: ghidra_10.1.5_PUBLIC_20220726
+  GHIDRA_RELEASE_TAG: Ghidra_10.2.2_build
+  GHIDRA_VERSION: ghidra_10.2.2_PUBLIC_20221115
 
 jobs: 
  
@@ -25,7 +25,7 @@ jobs:
           docker run --rm -v $(pwd)/build:/home/cwe/artificial_samples/build cross_compiling sudo python3 -m SCons
       - uses: actions/setup-java@v1
         with:
-          java-version: "11.0.x"
+          java-version: "17.0.x"
           java-package: jdk
           architecture: x64
       - name: Install Ghidra

@@ -118,12 +118,12 @@ impl<T: SpecializeByConditional + RegisterDomain> SpecializeByConditional for Da
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::abstract_domain::*;
+    use crate::{abstract_domain::*, variable};
 
     fn new_id(name: &str) -> AbstractIdentifier {
         AbstractIdentifier::new(
             Tid::new("time0"),
-            AbstractLocation::Register(Variable::mock(name, ByteSize::new(8))),
+            AbstractLocation::Register(variable!(format!("{}:8", name))),
         )
     }
 

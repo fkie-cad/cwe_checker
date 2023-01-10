@@ -217,23 +217,22 @@ impl<K: Ord + Clone, V: AbstractDomain + HasTop> MapMergeStrategy<K, V> for Merg
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::bitvec;
     use std::collections::BTreeMap;
-
-    use crate::intermediate_representation::Bitvector;
 
     #[test]
     fn test_merge_strategies() {
         let map_left: BTreeMap<u64, DataDomain<BitvectorDomain>> = [
-            (0u64, Bitvector::from_i64(0).into()),
-            (1u64, Bitvector::from_i64(0).into()),
+            (0u64, bitvec!("0:8").into()),
+            (1u64, bitvec!("0:8").into()),
             (5u64, DataDomain::new_top(ByteSize::new(8))),
         ]
         .iter()
         .cloned()
         .collect();
         let map_right: BTreeMap<u64, DataDomain<BitvectorDomain>> = [
-            (1u64, Bitvector::from_i64(1).into()),
-            (2u64, Bitvector::from_i64(1).into()),
+            (1u64, bitvec!("1:8").into()),
+            (2u64, bitvec!("1:8").into()),
             (5u64, DataDomain::new_top(ByteSize::new(8))),
         ]
         .iter()
@@ -244,12 +243,12 @@ mod tests {
         let domain_map_left: DomainMap<_, _, UnionMergeStrategy> = map_left.clone().into();
         let domain_map_right: DomainMap<_, _, UnionMergeStrategy> = map_right.clone().into();
         let merged_map = domain_map_left.merge(&domain_map_right);
-        assert_eq!(merged_map.get(&0), Some(&Bitvector::from_i64(0).into()));
+        assert_eq!(merged_map.get(&0), Some(&bitvec!("0:8").into()));
         assert_eq!(
             merged_map.get(&1),
             Some(&BitvectorDomain::new_top(ByteSize::new(8)).into())
         );
-        assert_eq!(merged_map.get(&2), Some(&Bitvector::from_i64(1).into()));
+        assert_eq!(merged_map.get(&2), Some(&bitvec!("1:8").into()));
         assert_eq!(
             merged_map.get(&5),
             Some(&DataDomain::new_top(ByteSize::new(8)).into())
@@ -273,7 +272,7 @@ mod tests {
         let merged_map = domain_map_left.merge(&domain_map_right);
         assert_eq!(
             merged_map.get(&0).unwrap().get_absolute_value(),
-            Some(&Bitvector::from_i64(0).into())
+            Some(&bitvec!("0:8").into())
         );
         assert!(merged_map.get(&0).unwrap().contains_top());
         assert_eq!(
@@ -282,7 +281,7 @@ mod tests {
         );
         assert_eq!(
             merged_map.get(&2).unwrap().get_absolute_value(),
-            Some(&Bitvector::from_i64(1).into())
+            Some(&bitvec!("1:8").into())
         );
         assert!(merged_map.get(&2).unwrap().contains_top());
         assert_eq!(merged_map.get(&5), None);

@@ -48,7 +48,8 @@ macro_rules! bitvec {
 
 /// Creates an `Expression` specified by the string slice.
 ///
-/// Currently supported are: `Var` and `Const` as well as `IntAdd` of `BinOp`.
+/// Currently supported are: `Var` and `Const` as well as `IntAdd` and `IntSub` of `BinOp`.
+/// Supported unary operations are `IntNegate` and `BoolNegate`.
 /// Does not support `(`, `)` nor chaining of `+`.
 /// ## Panics
 ///- utilizes `variable!` and `bitvec!` macros and their constrains.
@@ -64,6 +65,8 @@ macro_rules! bitvec {
 ///     expr!("RAX:8"),
 ///     Expression::Var(Variable {name: "RAX".into(), size: ByteSize::new(8),is_temp: false})
 ///     );
+///     assert_eq!(expr!("¬(0xFF)"), Expression::UnOp { op: UnOpType::BoolNegate, arg: Box::new(Expression::Const(Bitvector::from_u32(0xFF)))});
+///     assert_eq!(expr!("-(0xFF)"), Expression::UnOp { op: UnOpType::IntNegate, arg: Box::new(Expression::Const(Bitvector::from_u32(0xFF)))})
 ///
 ///     assert_eq!(
 ///     expr!("RAX:8 + 0x42:8"),
@@ -137,7 +140,7 @@ pub mod parsing {
     //! Provides parsing functions for the macros defined in `macros.rs`.
     //! This module hides the parsing functions and allows exposure of the macros only.
     use crate::intermediate_representation::{
-        BinOpType, Bitvector, ByteSize, Def, Expression, Term, Tid, Variable,
+        BinOpType, Bitvector, ByteSize, Def, Expression, Term, Tid, UnOpType, Variable,
     };
     use regex::RegexSet;
 
@@ -189,7 +192,9 @@ pub mod parsing {
             r"^[[:alnum:]&&[^0-9]]{1}[[:alnum:]&&[^x]]?[[:alnum:]]*:[0-9]{1,2}$", // Variable
             r"^((0x[[:alnum:]]+)|^([0-9])+)+:[0-9]+$",                            // Constant
             r"^[^\+]*\+{1}[^\+]*$",                                               // BinOp (IntAdd)
-            r"^[^\-]*\-{1}[^\-]*$",                                               // BinOp (IntSub)
+            r"^[[:ascii:]]+ \-{1} [[:ascii:]]+$",                                 // BinOp (IntSub)
+            r"^-\([[:ascii:]]*\)$",  // UnOp (IntNegate)
+            r"^¬\([[:ascii:]]*\)$", // UnOp (BoolNegate)
         ])
         .unwrap();
         let result: Vec<usize> = set.matches(str.as_ref()).into_iter().collect();
@@ -214,6 +219,20 @@ pub mod parsing {
                     op: BinOpType::IntSub,
                     lhs: Box::new(parse_expr(args[0].trim())),
                     rhs: Box::new(parse_expr(args[1].trim())),
+                }
+            }
+            4 => {
+                let arg: &str = str.as_ref().trim_matches(&['-', '(', ')'][..]);
+                Expression::UnOp {
+                    op: UnOpType::IntNegate,
+                    arg: Box::new(parse_expr(arg.trim())),
+                }
+            }
+            5 => {
+                let arg: &str = str.as_ref().trim_matches(&['¬', '(', ')'][..]);
+                Expression::UnOp {
+                    op: UnOpType::BoolNegate,
+                    arg: Box::new(parse_expr(arg.trim())),
                 }
             }
             _ => panic!(),

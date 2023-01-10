@@ -32,6 +32,22 @@ impl Program {
             .flat_map(|(_, sub)| sub.term.blocks.iter())
             .find(|block| block.tid == *tid)
     }
+
+    /// Find the sub containing a specific jump instruction (including call instructions).
+    /// WARNING: The function simply iterates though all blocks,
+    /// i.e. it is very inefficient for large projects!
+    pub fn find_sub_containing_jump(&self, jmp_tid: &Tid) -> Option<Tid> {
+        for sub in self.subs.values() {
+            for blk in &sub.term.blocks {
+                for jmp in &blk.term.jmps {
+                    if &jmp.tid == jmp_tid {
+                        return Some(sub.tid.clone());
+                    }
+                }
+            }
+        }
+        None
+    }
 }
 
 #[cfg(test)]
