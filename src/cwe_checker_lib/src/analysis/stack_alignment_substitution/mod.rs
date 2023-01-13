@@ -86,6 +86,49 @@ fn journal_sp_value(
     }
 }
 
+/// Returns the tid of the target of the first Jmp::Branch of the provided block.
+fn get_first_branch_tid(blk: &Term<Blk>) -> Option<&Tid> {
+    for jmp in &blk.term.jmps {
+        if let Jmp::Branch(jump_to_blk) = &jmp.term {
+            return Some(jump_to_blk);
+        }
+    }
+    None
+}
+
+/// Returns the index of the first block with non-empty defs.
+/// Blocks are iterated according by considering their first `Jmp::Branch`.
+#[allow(clippy::never_loop, unused_assignments)]
+fn get_first_blk_with_defs(sub: &Sub) -> Option<usize> {
+    let blocks = &sub.blocks;
+    if let Some(start_blk) = blocks.first() {
+        let mut blk = start_blk;
+        while blk.term.defs.is_empty() {
+            if let Some(target_tid) = get_first_branch_tid(blk) {
+                // try find this target
+                for (index, target_blk) in blocks.iter().enumerate() {
+                    if &target_blk.tid == target_tid {
+                        if !target_blk.term.defs.is_empty() {
+                            return Some(index);
+                        } else {
+                            // continue with new block
+                            blk = target_blk;
+                        }
+                    }
+                }
+                // did not find target
+                return None;
+            } else {
+                // did not find Branch in Block
+                return None;
+            }
+        }
+        // first block was not empty
+        return Some(0);
+    }
+    None
+}
+
 /// Substitutes logical AND on the stackpointer register by SUB.
 /// Expressions are changed to use constants w.r.t the provided bit mask.
 pub fn substitute_and_on_stackpointer(project: &mut Project) -> Option<Vec<LogMessage>> {
@@ -101,70 +144,67 @@ pub fn substitute_and_on_stackpointer(project: &mut Project) -> Option<Vec<LogMe
 
     'sub_loop: for sub in project.program.term.subs.values_mut() {
         let journaled_sp: &mut i64 = &mut 0;
-        for blk in sub.term.blocks.iter_mut() {
-            // only for the first, non-empty block the SP can be reasonable tracked
-            if !blk.term.defs.is_empty() {
-                for def in blk.term.defs.iter_mut() {
-                    if let Def::Assign { var, value } = &mut def.term {
-                        if *var == project.stack_pointer_register {
-                            if let Expression::BinOp { op, lhs, rhs } = value {
-                                match op {
-                                    BinOpType::IntAdd => {
-                                        if journal_sp_value(
-                                            journaled_sp,
-                                            true,
-                                            (lhs, rhs),
-                                            &project.stack_pointer_register,
-                                        )
-                                        .is_err()
-                                        {
-                                            continue 'sub_loop;
-                                        }
-                                    }
-                                    BinOpType::IntSub => {
-                                        if journal_sp_value(
-                                            journaled_sp,
-                                            false,
-                                            (lhs, rhs),
-                                            &project.stack_pointer_register,
-                                        )
-                                        .is_err()
-                                        {
-                                            continue 'sub_loop;
-                                        }
-                                    }
-                                    _ => {
-                                        let mut msg = substitute(
-                                            value,
-                                            sp_alignment,
-                                            journaled_sp,
-                                            def.tid.clone(),
-                                        );
-                                        log.append(&mut msg);
-                                        if !log
-                                            .iter()
-                                            .filter(|x| {
-                                                x.text.contains("Unsubstitutable Operation on SP")
-                                            })
-                                            .collect_vec()
-                                            .is_empty()
-                                        {
-                                            // Lost track of SP
-                                            continue 'sub_loop;
-                                        }
+        if let Some(index) = get_first_blk_with_defs(&sub.term) {
+            let blk = &mut sub.term.blocks[index];
+            for def in blk.term.defs.iter_mut() {
+                if let Def::Assign { var, value } = &mut def.term {
+                    if *var == project.stack_pointer_register {
+                        if let Expression::BinOp { op, lhs, rhs } = value {
+                            match op {
+                                BinOpType::IntAdd => {
+                                    if journal_sp_value(
+                                        journaled_sp,
+                                        true,
+                                        (lhs, rhs),
+                                        &project.stack_pointer_register,
+                                    )
+                                    .is_err()
+                                    {
+                                        continue 'sub_loop;
                                     }
                                 }
-                            } else {
-                                log.push(
-                                    LogMessage::new_info("Unexpected assignment on SP")
-                                        .location(def.tid.clone()),
-                                );
-                                continue 'sub_loop;
+                                BinOpType::IntSub => {
+                                    if journal_sp_value(
+                                        journaled_sp,
+                                        false,
+                                        (lhs, rhs),
+                                        &project.stack_pointer_register,
+                                    )
+                                    .is_err()
+                                    {
+                                        continue 'sub_loop;
+                                    }
+                                }
+                                _ => {
+                                    let mut msg = substitute(
+                                        value,
+                                        sp_alignment,
+                                        journaled_sp,
+                                        def.tid.clone(),
+                                    );
+                                    log.append(&mut msg);
+                                    if !log
+                                        .iter()
+                                        .filter(|x| {
+                                            x.text.contains("Unsubstitutable Operation on SP")
+                                        })
+                                        .collect_vec()
+                                        .is_empty()
+                                    {
+                                        // Lost track of SP
+                                        continue 'sub_loop;
+                                    }
+                                }
                             }
+                        } else {
+                            log.push(
+                                LogMessage::new_info("Unexpected assignment on SP")
+                                    .location(def.tid.clone()),
+                            );
+                            continue 'sub_loop;
                         }
                     }
                 }
-                continue 'sub_loop;
             }
         }
     }

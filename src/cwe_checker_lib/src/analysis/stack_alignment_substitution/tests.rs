@@ -410,18 +410,24 @@ fn skips_empty_blocks() {
     );
     // get project with empty block
     let mut proj = setup(vec![], true);
-    let blk = setup(
-        vec![sub_from_sp.clone(), byte_alignment_as_and.clone()],
-        true,
-    )
-    .program
-    .term
-    .subs
-    .get(&Tid::new("sub_tid"))
-    .unwrap()
-    .term
-    .blocks[0]
-        .clone();
+    // add jmp
+    proj.program
+        .term
+        .subs
+        .get_mut(&Tid::new("sub_tid"))
+        .unwrap()
+        .term
+        .blocks[0]
+        .term
+        .jmps
+        .push(Term {
+            tid: Tid::new("tid"),
+            term: Jmp::Branch(Tid::new("not_empty_blk")),
+        });
+
+    let mut blk = Blk::mock_with_tid("not_empty_blk");
+    blk.term.defs.push(sub_from_sp.clone());
+    blk.term.defs.push(byte_alignment_as_and.clone());
 
     // add block with substitutional def
     proj.program
