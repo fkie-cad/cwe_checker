@@ -3,15 +3,14 @@
 
 extern crate cwe_checker_lib; // Needed for the docstring-link to work
 
+use anyhow::Context;
 use anyhow::Error;
 use clap::Parser;
 use cwe_checker_lib::analysis::graph;
-use cwe_checker_lib::intermediate_representation::RuntimeMemoryImage;
+use cwe_checker_lib::pipeline::{disassemble_binary, AnalysisResults};
 use cwe_checker_lib::utils::binary::BareMetalConfig;
-use cwe_checker_lib::utils::ghidra::get_project_from_ghidra;
 use cwe_checker_lib::utils::log::{print_all_messages, LogLevel};
 use cwe_checker_lib::utils::read_config_file;
-use cwe_checker_lib::AnalysisResults;
 use std::collections::{BTreeSet, HashSet};
 use std::path::PathBuf;
 
@@ -104,9 +103,9 @@ fn run_with_ghidra(args: &CmdlineArgs) -> Result<(), Error> {
     // Get the configuration file
     let config: serde_json::Value = if let Some(ref config_path) = args.config {
         let file = std::io::BufReader::new(std::fs::File::open(config_path).unwrap());
-        serde_json::from_reader(file).expect("Parsing of the configuration file failed")
+        serde_json::from_reader(file).context("Parsing of the configuration file failed")?
     } else {
-        read_config_file("config.json")
+        read_config_file("config.json")?
     };
 
     // Get the bare metal configuration file if it is provided
@@ -126,38 +125,9 @@ fn run_with_ghidra(args: &CmdlineArgs) -> Result<(), Error> {
         modules.retain(|module| module.name != "CWE78");
     }
     let binary_file_path = PathBuf::from(args.binary.clone().unwrap());
-    let binary: Vec<u8> = std::fs::read(&binary_file_path).unwrap_or_else(|_| {
-        panic!(
-            "Error: Could not read from file path {}",
-            binary_file_path.display()
-        )
-    });
-    let (mut project, mut all_logs) = get_project_from_ghidra(
-        &binary_file_path,
-        &binary[..],
-        bare_metal_config_opt.clone(),
-        args.verbose,
-    )?;
-    // Normalize the project and gather log messages generated from it.
-    all_logs.append(&mut project.normalize());
 
-    // Generate the representation of the runtime memory image of the binary
-    let mut runtime_memory_image = if let Some(bare_metal_config) = bare_metal_config_opt.as_ref() {
-        RuntimeMemoryImage::new_from_bare_metal(&binary, bare_metal_config).unwrap_or_else(|err| {
-            panic!("Error while generating runtime memory image: {}", err);
-        })
-    } else {
-        RuntimeMemoryImage::new(&binary).unwrap_or_else(|err| {
-            panic!("Error while generating runtime memory image: {}", err);
-        })
-    };
-    if project.program.term.address_base_offset != 0 {
-        // We adjust the memory addresses once globally
-        // so that other analyses do not have to adjust their addresses.
-        runtime_memory_image.add_global_memory_offset(project.program.term.address_base_offset);
-    }
-
-    project.runtime_memory_image = runtime_memory_image;
+    let (binary, project, mut all_logs) =
+        disassemble_binary(&binary_file_path, bare_metal_config_opt, args.verbose)?;
 
     // Generate the control flow graph of the program
     let extern_sub_tids = project

@@ -136,7 +136,7 @@ fn generate_ghidra_call_command(
     bare_metal_config_opt: &Option<BareMetalConfig>,
 ) -> Result<Command, Error> {
     let ghidra_path: std::path::PathBuf =
-        serde_json::from_value(read_config_file("ghidra.json")["ghidra_path"].clone())
+        serde_json::from_value(read_config_file("ghidra.json")?["ghidra_path"].clone())
             .context("Path to Ghidra not configured.")?;
     let headless_path = ghidra_path.join("support/analyzeHeadless");
     let tmp_folder = get_tmp_folder()?;
