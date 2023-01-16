@@ -85,6 +85,7 @@ mod prelude {
     pub use crate::intermediate_representation::{Bitvector, BitvectorExtended, ByteSize};
     pub use crate::intermediate_representation::{Term, Tid};
     pub use crate::AnalysisResults;
+    pub use anyhow::Context as _;
     pub use anyhow::{anyhow, Error};
 }
 use prelude::*;

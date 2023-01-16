@@ -9,4 +9,4 @@ clap = { version = "4.0", features = ["derive"] }
 cwe_checker_lib = { path = "../cwe_checker_lib" }
 serde_json = "1.0"
 directories = "4.0.1"
-nix = "0.25.0"
+anyhow = "1.0"

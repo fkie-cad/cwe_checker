@@ -19,6 +19,7 @@ directories = "4.0.1"
 goblin = "0.5.1"
 itertools = "0.10.3"
 gcd = "2.1.0"
+nix = "0.26.1"
 
 [lib]
 name = "cwe_checker_lib"

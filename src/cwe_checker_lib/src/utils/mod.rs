@@ -2,6 +2,7 @@
 
 pub mod arguments;
 pub mod binary;
+pub mod ghidra;
 pub mod graph_utils;
 pub mod log;
 pub mod symbol_utils;
