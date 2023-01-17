@@ -3,19 +3,16 @@
 
 extern crate cwe_checker_lib; // Needed for the docstring-link to work
 
+use anyhow::Context;
+use anyhow::Error;
 use clap::Parser;
 use cwe_checker_lib::analysis::graph;
-use cwe_checker_lib::intermediate_representation::RuntimeMemoryImage;
+use cwe_checker_lib::pipeline::{disassemble_binary, AnalysisResults};
 use cwe_checker_lib::utils::binary::BareMetalConfig;
 use cwe_checker_lib::utils::log::{print_all_messages, LogLevel};
-use cwe_checker_lib::utils::{get_ghidra_plugin_path, read_config_file};
-use cwe_checker_lib::AnalysisResults;
-use cwe_checker_lib::{intermediate_representation::Project, utils::log::LogMessage};
-use nix::{sys::stat, unistd};
+use cwe_checker_lib::utils::read_config_file;
 use std::collections::{BTreeSet, HashSet};
-use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::thread;
+use std::path::PathBuf;
 
 #[derive(Debug, Parser)]
 #[command(version, about)]
@@ -73,10 +70,10 @@ struct CmdlineArgs {
     debug: bool,
 }
 
-fn main() {
+fn main() -> Result<(), Error> {
     let cmdline_args = CmdlineArgs::parse();
 
-    run_with_ghidra(&cmdline_args);
+    run_with_ghidra(&cmdline_args)
 }
 
 /// Return `Ok(file_path)` only if `file_path` points to an existing file.
@@ -92,7 +89,7 @@ fn check_file_existence(file_path: &str) -> Result<String, String> {
 }
 
 /// Run the cwe_checker with Ghidra as its backend.
-fn run_with_ghidra(args: &CmdlineArgs) {
+fn run_with_ghidra(args: &CmdlineArgs) -> Result<(), Error> {
     let mut modules = cwe_checker_lib::get_modules();
     if args.module_versions {
         // Only print the module versions and then quit.
@@ -100,15 +97,15 @@ fn run_with_ghidra(args: &CmdlineArgs) {
         for module in modules.iter() {
             println!("{}", module);
         }
-        return;
+        return Ok(());
     }
 
     // Get the configuration file
     let config: serde_json::Value = if let Some(ref config_path) = args.config {
         let file = std::io::BufReader::new(std::fs::File::open(config_path).unwrap());
-        serde_json::from_reader(file).expect("Parsing of the configuration file failed")
+        serde_json::from_reader(file).context("Parsing of the configuration file failed")?
     } else {
-        read_config_file("config.json")
+        read_config_file("config.json")?
     };
 
     // Get the bare metal configuration file if it is provided
@@ -128,37 +125,9 @@ fn run_with_ghidra(args: &CmdlineArgs) {
         modules.retain(|module| module.name != "CWE78");
     }
     let binary_file_path = PathBuf::from(args.binary.clone().unwrap());
-    let binary: Vec<u8> = std::fs::read(&binary_file_path).unwrap_or_else(|_| {
-        panic!(
-            "Error: Could not read from file path {}",
-            binary_file_path.display()
-        )
-    });
-    let (mut project, mut all_logs) = get_project_from_ghidra(
-        &binary_file_path,
-        &binary[..],
-        bare_metal_config_opt.clone(),
-    );
-    // Normalize the project and gather log messages generated from it.
-    all_logs.append(&mut project.normalize());
 
-    // Generate the representation of the runtime memory image of the binary
-    let mut runtime_memory_image = if let Some(bare_metal_config) = bare_metal_config_opt.as_ref() {
-        RuntimeMemoryImage::new_from_bare_metal(&binary, bare_metal_config).unwrap_or_else(|err| {
-            panic!("Error while generating runtime memory image: {}", err);
-        })
-    } else {
-        RuntimeMemoryImage::new(&binary).unwrap_or_else(|err| {
-            panic!("Error while generating runtime memory image: {}", err);
-        })
-    };
-    if project.program.term.address_base_offset != 0 {
-        // We adjust the memory addresses once globally
-        // so that other analyses do not have to adjust their addresses.
-        runtime_memory_image.add_global_memory_offset(project.program.term.address_base_offset);
-    }
-
-    project.runtime_memory_image = runtime_memory_image;
+    let (binary, project, mut all_logs) =
+        disassemble_binary(&binary_file_path, bare_metal_config_opt, args.verbose)?;
 
     // Generate the control flow graph of the program
     let extern_sub_tids = project
@@ -225,7 +194,7 @@ fn run_with_ghidra(args: &CmdlineArgs) {
             true,
             false,
         );
-        return;
+        return Ok(());
     }
 
     // Execute the modules and collect their logs and CWE-warnings.
@@ -248,6 +217,7 @@ fn run_with_ghidra(args: &CmdlineArgs) {
         }
     }
     print_all_messages(all_logs, all_cwes, args.out.as_deref(), args.json);
+    Ok(())
 }
 
 /// Only keep the modules specified by the `--partial` parameter in the `modules` list.
@@ -269,162 +239,4 @@ fn filter_modules_for_partial_run(
             }
         })
         .collect();
-}
-
-/// Execute the `p_code_extractor` plugin in ghidra and parse its output into the `Project` data structure.
-fn get_project_from_ghidra(
-    file_path: &Path,
-    binary: &[u8],
-    bare_metal_config_opt: Option<BareMetalConfig>,
-) -> (Project, Vec<LogMessage>) {
-    let bare_metal_base_address_opt = bare_metal_config_opt
-        .as_ref()
-        .map(|config| config.parse_binary_base_address());
-    let ghidra_path: std::path::PathBuf =
-        serde_json::from_value(read_config_file("ghidra.json")["ghidra_path"].clone())
-            .expect("Path to Ghidra not configured.");
-    let headless_path = ghidra_path.join("support/analyzeHeadless");
-
-    // Find the correct paths for temporary files.
-    let project_dirs = directories::ProjectDirs::from("", "", "cwe_checker")
-        .expect("Could not determine path for temporary files");
-    let tmp_folder = if let Some(folder) = project_dirs.runtime_dir() {
-        folder
-    } else {
-        Path::new("/tmp/cwe_checker")
-    };
-    if !tmp_folder.exists() {
-        std::fs::create_dir(tmp_folder).expect("Unable to create temporary folder");
-    }
-    // We add a timestamp suffix to file names
-    // so that if two instances of the cwe_checker are running in parallel on the same file
-    // they do not interfere with each other.
-    let timestamp_suffix = format!(
-        "{:?}",
-        std::time::SystemTime::now()
-            .duration_since(std::time::SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_millis()
-    );
-    let filename = file_path
-        .file_name()
-        .expect("Invalid file name")
-        .to_string_lossy()
-        .to_string();
-    let ghidra_plugin_path = get_ghidra_plugin_path("p_code_extractor");
-
-    // Create a unique name for the pipe
-    let fifo_path = tmp_folder.join(format!("pcode_{}.pipe", timestamp_suffix));
-
-    // Create a new fifo and give read and write rights to the owner
-    if let Err(err) = unistd::mkfifo(&fifo_path, stat::Mode::from_bits(0o600).unwrap()) {
-        eprintln!("Error creating FIFO pipe: {}", err);
-        std::process::exit(101);
-    }
-
-    let thread_fifo_path = fifo_path.clone();
-    let thread_file_path = file_path.to_path_buf();
-    let thread_tmp_folder = tmp_folder.to_path_buf();
-    // Execute Ghidra in a new thread and return a Join Handle, so that the thread is only joined
-    // after the output has been read into the cwe_checker
-    let ghidra_subprocess = thread::spawn(move || {
-        let mut ghidra_command = Command::new(&headless_path);
-        ghidra_command
-            .arg(&thread_tmp_folder) // The folder where temporary files should be stored
-            .arg(format!("PcodeExtractor_{}_{}", filename, timestamp_suffix)) // The name of the temporary Ghidra Project.
-            .arg("-import") // Import a file into the Ghidra project
-            .arg(thread_file_path) // File import path
-            .arg("-postScript") // Execute a script after standard analysis by Ghidra finished
-            .arg(ghidra_plugin_path.join("PcodeExtractor.java")) // Path to the PcodeExtractor.java
-            .arg(thread_fifo_path) // The path to the named pipe (fifo)
-            .arg("-scriptPath") // Add a folder containing additional script files to the Ghidra script file search paths
-            .arg(ghidra_plugin_path) // Path to the folder containing the PcodeExtractor.java (so that the other java files can be found.)
-            .arg("-deleteProject") // Delete the temporary project after the script finished
-            .arg("-analysisTimeoutPerFile") // Set a timeout for how long the standard analysis can run before getting aborted
-            .arg("3600"); // Timeout of one hour (=3600 seconds) // TODO: The post-script can detect that the timeout fired and react accordingly.
-        if let Some(bare_metal_config) = bare_metal_config_opt {
-            let mut base_address: &str = &bare_metal_config.flash_base_address;
-            if let Some(stripped_address) = base_address.strip_prefix("0x") {
-                base_address = stripped_address;
-            }
-            ghidra_command
-                .arg("-loader") // Tell Ghidra to use a specific loader
-                .arg("BinaryLoader") // Use the BinaryLoader for bare metal binaries
-                .arg("-loader-baseAddr") // Provide the base address where the binary should be mapped in memory
-                .arg(base_address)
-                .arg("-processor") // Provide the processor type ID, for which the binary was compiled.
-                .arg(bare_metal_config.processor_id);
-        }
-        let output = match ghidra_command.output() // Execute the command and catch its output.
-        {
-            Ok(output) => output,
-            Err(err) => {
-                eprintln!("Error: Ghidra could not be executed:\n{}", err);
-                std::process::exit(101);
-            }
-        };
-
-        match String::from_utf8(output.stdout.clone()) {
-            Ok(standard_out) => {
-                if !standard_out.contains("Pcode was successfully extracted!") {
-                    eprintln!("Execution of Ghidra plugin failed: Process was terminated.");
-                    let error_message: String =
-                        standard_out.lines().rev().collect::<Vec<&str>>()[..2].join("\n");
-                    eprintln!("{}", error_message);
-                    std::process::exit(101);
-                }
-            }
-            Err(_) => {
-                eprintln!("Execution of Ghidra plugin failed: Process was terminated.");
-                std::process::exit(101);
-            }
-        }
-
-        if !output.status.success() {
-            match output.status.code() {
-                Some(code) => {
-                    eprintln!("{}", String::from_utf8(output.stdout).unwrap());
-                    eprintln!("{}", String::from_utf8(output.stderr).unwrap());
-                    eprintln!("Execution of Ghidra plugin failed with exit code {}", code);
-                    std::process::exit(101);
-                }
-                None => {
-                    eprintln!("Execution of Ghidra plugin failed: Process was terminated.");
-                    std::process::exit(101);
-                }
-            }
-        }
-    });
-
-    // Open the FIFO
-    let file = std::fs::File::open(fifo_path.clone()).expect("Could not open FIFO.");
-
-    let mut project_pcode: cwe_checker_lib::pcode::Project =
-        serde_json::from_reader(std::io::BufReader::new(file)).unwrap();
-    let mut log_messages = project_pcode.normalize();
-    let project: Project = match cwe_checker_lib::utils::get_binary_base_address(binary) {
-        Ok(binary_base_address) => project_pcode.into_ir_project(binary_base_address),
-        Err(_err) => {
-            if let Some(binary_base_address) = bare_metal_base_address_opt {
-                let mut project = project_pcode.into_ir_project(binary_base_address);
-                project.program.term.address_base_offset = 0;
-                project
-            } else {
-                log_messages.push(LogMessage::new_info("Could not determine binary base address. Using base address of Ghidra output as fallback."));
-                let mut project = project_pcode.into_ir_project(0);
-                // For PE files setting the address_base_offset to zero is a hack, which worked for the tested PE files.
-                // But this hack will probably not work in general!
-                project.program.term.address_base_offset = 0;
-                project
-            }
-        }
-    };
-
-    ghidra_subprocess
-        .join()
-        .expect("The Ghidra thread to be joined has panicked!");
-
-    std::fs::remove_file(fifo_path).unwrap();
-
-    (project, log_messages)
 }

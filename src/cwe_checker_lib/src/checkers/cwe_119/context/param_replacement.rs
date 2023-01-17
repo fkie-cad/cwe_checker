@@ -1,8 +1,9 @@
 use super::Context;
+use crate::abstract_domain::*;
 use crate::analysis::pointer_inference::Data;
 use crate::analysis::vsa_results::VsaResult;
 use crate::intermediate_representation::*;
-use crate::{abstract_domain::*, AnalysisResults};
+use crate::pipeline::AnalysisResults;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 impl<'a> Context<'a> {
