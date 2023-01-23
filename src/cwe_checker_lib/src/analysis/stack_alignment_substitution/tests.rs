@@ -463,3 +463,31 @@ fn skips_empty_blocks() {
         vec![sub_from_sp.clone(), expected_def]
     );
 }
+
+#[test]
+fn skip_busy_loop() {
+    let mut proj = setup(vec![], true);
+    proj.program
+        .term
+        .subs
+        .get_mut(&Tid::new("sub_tid"))
+        .unwrap()
+        .term
+        .blocks[0]
+        .term
+        .jmps
+        .push(Jmp::branch("jmp_to_1st_blk", "block"));
+
+    assert_eq!(
+        get_first_blk_with_defs(
+            &proj
+                .program
+                .term
+                .subs
+                .get_mut(&Tid::new("sub_tid"))
+                .unwrap()
+                .term
+        ),
+        None
+    );
+}

@@ -10,6 +10,8 @@
 //! - the argument for the AND operation is not a constant
 //! - an operation alters the stack pointer, which can not be journaled.
 
+use std::collections::HashSet;
+
 use anyhow::{anyhow, Result};
 use apint::ApInt;
 use itertools::Itertools;
@@ -98,28 +100,38 @@ fn get_first_branch_tid(blk: &Term<Blk>) -> Option<&Tid> {
 
 /// Returns the index of the first block with non-empty defs.
 /// Blocks are iterated according by considering their first `Jmp::Branch`.
-#[allow(clippy::never_loop, unused_assignments)]
+/// If a block is revisited, `None` is returned.
 fn get_first_blk_with_defs(sub: &Sub) -> Option<usize> {
     let blocks = &sub.blocks;
     if let Some(start_blk) = blocks.first() {
+        let mut visited = HashSet::new();
         let mut blk = start_blk;
-        while blk.term.defs.is_empty() {
+
+        'search_loop: while blk.term.defs.is_empty() {
             if let Some(target_tid) = get_first_branch_tid(blk) {
-                // try find this target
-                for (index, target_blk) in blocks.iter().enumerate() {
-                    if &target_blk.tid == target_tid {
-                        if !target_blk.term.defs.is_empty() {
-                            return Some(index);
-                        } else {
-                            // continue with new block
-                            blk = target_blk;
+                if !visited.contains(&blk.tid) {
+                    visited.insert(&blk.tid);
+
+                    // try find this target
+                    for (index, target_blk) in blocks.iter().enumerate() {
+                        if &target_blk.tid == target_tid {
+                            if !target_blk.term.defs.is_empty() {
+                                return Some(index);
+                            } else {
+                                // continue with new block
+                                blk = target_blk;
+                                continue 'search_loop;
+                            }
                         }
                     }
+                    // did not find target
+                    return None;
+                } else {
+                    // busy loop
+                    return None;
                 }
-                // did not find target
-                return None;
             } else {
-                // did not find Branch in Block
+                // did not find branch in block
                 return None;
             }
         }
