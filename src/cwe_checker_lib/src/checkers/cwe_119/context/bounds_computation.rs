@@ -171,6 +171,7 @@ impl<'a> Context<'a> {
 pub mod tests {
     use super::*;
     use crate::analysis::pointer_inference::Data;
+    use crate::{bitvec, intermediate_representation::parsing};
     use std::collections::{HashMap, HashSet};
 
     #[test]
@@ -183,9 +184,8 @@ pub mod tests {
         let malloc_call_id = AbstractIdentifier::mock("malloc_call", "RAX", 8);
         let main_stack_id = AbstractIdentifier::mock("main", "RSP", 8);
 
-        let param_value = Data::from_target(malloc_call_id.clone(), Bitvector::from_i64(2).into());
-        let param_value_2 =
-            Data::from_target(main_stack_id.clone(), Bitvector::from_i64(-10).into());
+        let param_value = Data::from_target(malloc_call_id.clone(), bitvec!("2:8").into());
+        let param_value_2 = Data::from_target(main_stack_id.clone(), bitvec!("-10:8").into());
         let param_replacement_map = HashMap::from([
             (callsite_id, param_value.clone()),
             (callsite_id_2, param_value_2.clone()),
@@ -196,7 +196,7 @@ pub mod tests {
         context.callee_to_callsites_map = callee_to_callsites_map;
         context
             .malloc_tid_to_object_size_map
-            .insert(Tid::new("malloc_call"), Data::from(Bitvector::from_i64(42)));
+            .insert(Tid::new("malloc_call"), Data::from(bitvec!("42:8")));
         context.call_to_caller_fn_map = HashMap::from([
             (Tid::new("malloc_call"), Tid::new("main")),
             (Tid::new("callsite_id"), Tid::new("main")),
