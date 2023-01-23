@@ -382,3 +382,112 @@ fn supports_commutative_and() {
         }
     }
 }
+#[test]
+/// Some functions have leading blocks without any defs. This might be due to `endbr`-like instructions.
+/// We skip those empty blocks and start substituting for rhe first non-empty block.
+fn skips_empty_blocks() {
+    let sub_from_sp = Def::assign(
+        "tid_alter_sp",
+        Project::mock_x64().stack_pointer_register.clone(),
+        Expression::minus(
+            Expression::Var(Project::mock_x64().stack_pointer_register.clone()),
+            Expression::const_from_apint(ApInt::from_u64(1)),
+        ),
+    );
+
+    let byte_alignment_as_and = Def::assign(
+        "tid_to_be_substituted",
+        Project::mock_x64().stack_pointer_register.clone(),
+        Expression::BinOp {
+            op: BinOpType::IntAnd,
+            lhs: Box::new(Expression::Var(
+                Project::mock_x64().stack_pointer_register.clone(),
+            )),
+            rhs: Box::new(Expression::const_from_apint(ApInt::from_u64(
+                0xFFFFFFFF_FFFFFFFF << 4, // 16 Byte alignment
+            ))),
+        },
+    );
+    // get project with empty block
+    let mut proj = setup(vec![], true);
+    // add jmp
+    proj.program
+        .term
+        .subs
+        .get_mut(&Tid::new("sub_tid"))
+        .unwrap()
+        .term
+        .blocks[0]
+        .term
+        .jmps
+        .push(Term {
+            tid: Tid::new("tid"),
+            term: Jmp::Branch(Tid::new("not_empty_blk")),
+        });
+
+    let mut blk = Blk::mock_with_tid("not_empty_blk");
+    blk.term.defs.push(sub_from_sp.clone());
+    blk.term.defs.push(byte_alignment_as_and.clone());
+
+    // add block with substitutional def
+    proj.program
+        .term
+        .subs
+        .get_mut(&Tid::new("sub_tid"))
+        .unwrap()
+        .term
+        .blocks
+        .push(blk);
+
+    let expected_def = Def::assign(
+        "tid_to_be_substituted",
+        Project::mock_x64().stack_pointer_register.clone(),
+        Expression::minus(
+            Expression::Var(Project::mock_x64().stack_pointer_register.clone()),
+            Expression::const_from_apint(ApInt::from_u64(15)),
+        ),
+    );
+
+    substitute_and_on_stackpointer(&mut proj);
+
+    assert_eq!(
+        proj.program
+            .term
+            .subs
+            .get(&Tid::new("sub_tid"))
+            .unwrap()
+            .term
+            .blocks[1]
+            .term
+            .defs,
+        vec![sub_from_sp.clone(), expected_def]
+    );
+}
+
+#[test]
+fn skip_busy_loop() {
+    let mut proj = setup(vec![], true);
+    proj.program
+        .term
+        .subs
+        .get_mut(&Tid::new("sub_tid"))
+        .unwrap()
+        .term
+        .blocks[0]
+        .term
+        .jmps
+        .push(Jmp::branch("jmp_to_1st_blk", "block"));
+
+    assert_eq!(
+        get_first_blk_with_defs(
+            &proj
+                .program
+                .term
+                .subs
+                .get_mut(&Tid::new("sub_tid"))
+                .unwrap()
+                .term
+        ),
+        None
+    );
+}
