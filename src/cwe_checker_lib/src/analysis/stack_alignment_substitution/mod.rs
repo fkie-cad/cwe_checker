@@ -90,7 +90,7 @@ fn journal_sp_value(
 
 /// Returns the tid of the target of the first Jmp::Branch of the provided block.
 fn get_first_branch_tid(blk: &Term<Blk>) -> Option<&Tid> {
-    for jmp in &blk.term.jmps {
+    if let Some(jmp) = blk.term.jmps.get(0) {
         if let Jmp::Branch(jump_to_blk) = &jmp.term {
             return Some(jump_to_blk);
         }
