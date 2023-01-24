@@ -169,7 +169,7 @@ impl AbstractDomain for State {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::intermediate_representation::Variable;
+    use crate::{bitvec, intermediate_representation::parsing, variable};
     use std::collections::BTreeSet;
 
     #[test]
@@ -223,9 +223,9 @@ pub mod tests {
         let mut state = State::new(Tid::new("current_fn"));
         let param = Data::from_target(
             AbstractIdentifier::mock("obj_id", "RAX", 8),
-            Bitvector::from_i64(0).into(),
+            bitvec!("0:8").into(),
         );
-        let pi_state = PiState::new(&Variable::mock("RSP", 8), Tid::new("call"), BTreeSet::new());
+        let pi_state = PiState::new(&variable!("RSP:8"), Tid::new("call"), BTreeSet::new());
         // Check that the parameter is correctly marked as freed in the state.
         assert!(state
             .handle_param_of_free_call(&Tid::new("free_call"), &param, &pi_state)
@@ -251,12 +251,12 @@ pub mod tests {
             AbstractIdentifier::mock("callee_obj_tid", "RAX", 8),
             ObjectState::Dangling(Tid::new("free_tid")),
         );
-        let pi_state = PiState::new(&Variable::mock("RSP", 8), Tid::new("call"), BTreeSet::new());
+        let pi_state = PiState::new(&variable!("RSP:8"), Tid::new("call"), BTreeSet::new());
         let id_replacement_map = BTreeMap::from([(
             AbstractIdentifier::mock("callee_obj_tid", "RAX", 8),
             Data::from_target(
                 AbstractIdentifier::mock("caller_tid", "RBX", 8),
-                Bitvector::from_i64(42).into(),
+                bitvec!("42:8").into(),
             ),
         )]);
         // Check that the callee object ID is correctly translated to a caller object ID

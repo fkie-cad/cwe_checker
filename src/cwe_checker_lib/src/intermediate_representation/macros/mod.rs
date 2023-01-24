@@ -295,7 +295,7 @@ pub mod parsing {
                 Term {
                     tid: Tid::new(tid),
                     term: Def::Store {
-                        address: parse_expr(args[0].trim_start_matches("Store at ")),
+                        address: parse_expr(args[0].trim_start_matches("Store at ").trim()),
                         value: parse_expr(args[1].trim()),
                     },
                 }
