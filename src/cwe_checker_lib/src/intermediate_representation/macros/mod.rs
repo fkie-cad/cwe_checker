@@ -190,7 +190,7 @@ pub mod parsing {
     pub fn parse_expr<S: AsRef<str>>(str: S) -> Expression {
         let set = RegexSet::new([
             r"^[[:alnum:]&&[^0-9]]{1}[[:alnum:]&&[^x]]?[[:alnum:]]*:[0-9]{1,2}$", // Variable
-            r"^((0x[[:alnum:]]+)|^([0-9])+)+:[0-9]+$",                            // Constant
+            r"^((0x(-)?[[:alnum:]]+)|^(-)?([0-9])+)+:[0-9]+$",                    // Constant
             r"^[^\+]*\+{1}[^\+]*$",                                               // BinOp (IntAdd)
             r"^[[:ascii:]]+ \-{1} [[:ascii:]]+$",                                 // BinOp (IntSub)
             r"^-\([[:ascii:]]*\)$",  // UnOp (IntNegate)
