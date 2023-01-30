@@ -1,4 +1,5 @@
 use super::*;
+use crate::{expr, intermediate_representation::*};
 
 #[test]
 fn trivial_expression_substitution() {
@@ -215,7 +216,7 @@ fn test_complicated_a_less_than_b_substitution() {
 
 #[test]
 fn display() {
-    let expr = Expression::const_from_i32(2);
+    let expr = expr!("2:4");
     let mul = Expression::BinOp {
         op: BinOpType::IntMult,
         lhs: Box::new(Expression::Var(Variable::mock("RAX", 8))),
