@@ -157,8 +157,7 @@ impl<'a> PointerInference<'a> {
         if !self.computation.has_stabilized() {
             let worklist_size = self.computation.get_worklist().len();
             self.log_info(format!(
-                "Fixpoint did not stabilize. Remaining worklist size: {}",
-                worklist_size,
+                "Fixpoint did not stabilize. Remaining worklist size: {worklist_size}"
             ));
         }
         if print_stats {
@@ -172,11 +171,10 @@ impl<'a> PointerInference<'a> {
         for (node_index, value) in self.computation.node_values().iter() {
             let node = graph.node_weight(*node_index).unwrap();
             if let Ok(string) = serde_yaml::to_string(&(node, value)) {
-                println!("{}", string);
+                println!("{string}");
             } else {
                 println!(
-                    "Serializing failed at {:?} with {:?}",
-                    node_index,
+                    "Serializing failed at {node_index:?} with {:?}",
                     serde_yaml::to_string(value)
                 );
             }
@@ -192,7 +190,7 @@ impl<'a> PointerInference<'a> {
         for (node_index, node_value) in self.computation.node_values().iter() {
             let node = graph.node_weight(*node_index).unwrap();
             if let NodeValue::Value(value) = node_value {
-                json_nodes.insert(format!("{}", node), value.to_json_compact());
+                json_nodes.insert(format!("{node}"), value.to_json_compact());
             }
         }
         serde_json::Value::Object(json_nodes)
@@ -237,8 +235,7 @@ impl<'a> PointerInference<'a> {
             }
         }
         self.log_info(format!(
-            "Blocks with state: {} / {}",
-            stateful_blocks, all_blocks
+            "Blocks with state: {stateful_blocks} / {all_blocks}"
         ));
     }
 

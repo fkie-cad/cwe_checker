@@ -89,7 +89,7 @@ impl<'a> Context<'a> {
     pub fn log_debug(&self, result: Result<(), Error>, location: Option<&Tid>) {
         if let Err(err) = result {
             let mut log_message =
-                LogMessage::new_debug(format!("{}", err)).source("Pointer Inference");
+                LogMessage::new_debug(format!("{err}")).source("Pointer Inference");
             if let Some(loc) = location {
                 log_message = log_message.location(loc.clone());
             };
@@ -286,7 +286,7 @@ impl<'a> Context<'a> {
             name: "CWE476".to_string(),
             version: VERSION.to_string(),
             addresses: vec![tid.address.clone()],
-            tids: vec![format!("{}", tid)],
+            tids: vec![format!("{tid}")],
             symbols: Vec::new(),
             other: Vec::new(),
             description: format!(

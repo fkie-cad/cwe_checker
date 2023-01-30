@@ -349,7 +349,7 @@ impl State {
         let register: Vec<(String, Value)> = self
             .register_taint
             .iter()
-            .map(|(var, data)| (var.name.clone(), json!(format!("{}", data))))
+            .map(|(var, data)| (var.name.clone(), json!(format!("{data}"))))
             .collect();
         let mut memory = Vec::new();
         for (tid, mem_region) in self.memory_taint.iter() {
@@ -357,7 +357,7 @@ impl State {
             for (offset, elem) in mem_region.iter() {
                 elements.push((offset.to_string(), json!(elem.to_string())));
             }
-            memory.push((format!("{}", tid), Value::Object(Map::from_iter(elements))));
+            memory.push((format!("{tid}"), Value::Object(Map::from_iter(elements))));
         }
         let state_map = vec![
             (

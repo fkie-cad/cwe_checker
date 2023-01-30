@@ -216,7 +216,7 @@ impl AbstractObject {
             .inner
             .memory
             .iter()
-            .map(|(index, value)| (format!("{}", index), value.to_json_compact()));
+            .map(|(index, value)| (format!("{index}"), value.to_json_compact()));
         elements.push((
             "memory".to_string(),
             serde_json::Value::Object(memory.collect()),

@@ -144,7 +144,7 @@ impl std::fmt::Display for AbstractIdentifier {
         } else {
             write!(formatter, "{}(", self.0.time)?;
             for hint in &self.0.path_hints {
-                write!(formatter, "->{}", hint)?;
+                write!(formatter, "->{hint}",)?;
             }
             write!(formatter, ") @ {}", self.0.location)
         }
@@ -185,10 +185,10 @@ impl std::fmt::Display for AbstractLocation {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Self::Register(var) => write!(formatter, "{}", var.name),
-            Self::GlobalAddress { address, size: _ } => write!(formatter, "0x{:x}", address),
+            Self::GlobalAddress { address, size: _ } => write!(formatter, "0x{address:x}"),
             Self::Pointer(var, location) => write!(formatter, "{}->{}", var.name, location),
             Self::GlobalPointer(address, location) => {
-                write!(formatter, "0x{:x}->{}", address, location)
+                write!(formatter, "0x{address:x}->{location}")
             }
         }
     }
@@ -275,8 +275,8 @@ impl AbstractMemoryLocation {
 impl std::fmt::Display for AbstractMemoryLocation {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Self::Location { offset, .. } => write!(formatter, "({})", offset),
-            Self::Pointer { offset, target } => write!(formatter, "({})->{}", offset, target),
+            Self::Location { offset, .. } => write!(formatter, "({offset})"),
+            Self::Pointer { offset, target } => write!(formatter, "({offset})->{target}"),
         }
     }
 }

@@ -63,8 +63,7 @@ impl State {
         for id in address.get_relative_values().keys() {
             if let Some(ObjectState::Dangling(free_id)) = self.dangling_objects.get(id) {
                 free_ids_of_dangling_pointers.push(format!(
-                    "Accessed ID {} may have been already freed at {}",
-                    id, free_id
+                    "Accessed ID {id} may have been already freed at {free_id}"
                 ));
 
                 self.dangling_objects
@@ -101,8 +100,7 @@ impl State {
                 .insert(id.clone(), ObjectState::Dangling(call_tid.clone()))
             {
                 warnings.push(format!(
-                    "Object {} may have been freed before at {}.",
-                    id, old_free_id
+                    "Object {id} may have been freed before at {old_free_id}."
                 ));
             }
         }

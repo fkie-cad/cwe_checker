@@ -79,12 +79,12 @@ fn main() -> Result<(), Error> {
 /// Return `Ok(file_path)` only if `file_path` points to an existing file.
 fn check_file_existence(file_path: &str) -> Result<String, String> {
     if std::fs::metadata(file_path)
-        .map_err(|err| format!("{}", err))?
+        .map_err(|err| format!("{err}"))?
         .is_file()
     {
         Ok(file_path.to_string())
     } else {
-        Err(format!("{} is not a file.", file_path))
+        Err(format!("{file_path} is not a file."))
     }
 }
 
@@ -95,7 +95,7 @@ fn run_with_ghidra(args: &CmdlineArgs) -> Result<(), Error> {
         // Only print the module versions and then quit.
         println!("[cwe_checker] module_versions:");
         for module in modules.iter() {
-            println!("{}", module);
+            println!("{module}");
         }
         return Ok(());
     }
@@ -235,7 +235,7 @@ fn filter_modules_for_partial_run(
             } else if module_name.is_empty() {
                 None
             } else {
-                panic!("Error: {} is not a valid module name.", module_name)
+                panic!("Error: {module_name} is not a valid module name.")
             }
         })
         .collect();

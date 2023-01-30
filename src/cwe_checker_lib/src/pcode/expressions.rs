@@ -42,7 +42,7 @@ impl From<Variable> for IrExpression {
         match (&pcode_var.name, &pcode_var.value) {
             (Some(_name), None) => IrExpression::Var(pcode_var.into()),
             (None, Some(_hex_value)) => IrExpression::Const(pcode_var.parse_const_to_bitvector()),
-            _ => panic!("Conversion failed:\n{:?}", pcode_var),
+            _ => panic!("Conversion failed:\n{pcode_var:?}"),
         }
     }
 }

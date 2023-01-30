@@ -73,11 +73,7 @@ impl State {
             if let Ok((lower_offset, upper_offset)) = offset.try_to_offset_interval() {
                 if let Ok(lower_bound) = self.object_lower_bounds.get(id).unwrap().try_to_offset() {
                     if lower_bound > lower_offset {
-                        out_of_bounds_access_warnings.push(format!("For the object ID {} access to the offset {} may be smaller than the lower object bound of {}.",
-                            id,
-                            lower_offset,
-                            lower_bound,
-                        ));
+                        out_of_bounds_access_warnings.push(format!("For the object ID {id} access to the offset {lower_offset} may be smaller than the lower object bound of {lower_bound}."));
                         if let (
                             Some(BoundsMetadata {
                                 source: Some(source),
@@ -93,7 +89,7 @@ impl State {
                                 context,
                             );
                             out_of_bounds_access_warnings
-                                .push(format!("Relevant callgraph TIDs: [{}]", call_sequence_tids));
+                                .push(format!("Relevant callgraph TIDs: [{call_sequence_tids}]"));
                         } else {
                             out_of_bounds_access_warnings.push(format!(
                                 "Relevant callgraph TIDs: [{}]",
@@ -128,7 +124,7 @@ impl State {
                                 context,
                             );
                             out_of_bounds_access_warnings
-                                .push(format!("Relevant callgraph TIDs: [{}]", call_sequence_tids));
+                                .push(format!("Relevant callgraph TIDs: [{call_sequence_tids}]"));
                         } else {
                             out_of_bounds_access_warnings.push(format!(
                                 "Relevant callgraph TIDs: [{}]",
@@ -204,13 +200,13 @@ impl State {
         let lower_bounds: Vec<_> = self
             .object_lower_bounds
             .iter()
-            .map(|(id, bound)| Value::String(format!("{}: {}", id, bound)))
+            .map(|(id, bound)| Value::String(format!("{id}: {bound}")))
             .collect();
         state_map.insert("lower_bounds".to_string(), Value::Array(lower_bounds));
         let upper_bounds: Vec<_> = self
             .object_upper_bounds
             .iter()
-            .map(|(id, bound)| Value::String(format!("{}: {}", id, bound)))
+            .map(|(id, bound)| Value::String(format!("{id}: {bound}")))
             .collect();
         state_map.insert("upper_bounds".to_string(), Value::Array(upper_bounds));
 
@@ -265,8 +261,8 @@ fn collect_tids_for_cwe_warning(
     }
     // Build a string out of the TID list
     tids.iter()
-        .map(|tid| format!("{}", tid))
-        .reduce(|accum, elem| format!("{}, {}", accum, elem))
+        .map(|tid| format!("{tid}"))
+        .reduce(|accum, elem| format!("{accum}, {elem}"))
         .unwrap()
 }
 
