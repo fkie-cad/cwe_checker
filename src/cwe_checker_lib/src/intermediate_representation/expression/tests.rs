@@ -3,34 +3,27 @@ use crate::{expr, intermediate_representation::*};
 
 #[test]
 fn trivial_expression_substitution() {
-    let rax_variable = Expression::Var(Variable::mock("RAX", 8));
-    let rcx_variable = Expression::Var(Variable::mock("RCX", 8));
+    let rax_variable = expr!("RAX:8");
+    let rcx_variable = expr!("RCX:8");
     let mut expr = Expression::BinOp {
         op: BinOpType::IntXOr,
         lhs: Box::new(rax_variable.clone()),
         rhs: Box::new(rax_variable.clone()),
     };
     expr.substitute_trivial_operations();
-    assert_eq!(
-        expr,
-        Expression::Const(Bitvector::zero(ByteSize::new(8).into()))
-    );
+    assert_eq!(expr, expr!("0:8"));
     let mut expr = Expression::BinOp {
         op: BinOpType::IntOr,
         lhs: Box::new(rax_variable.clone()),
-        rhs: Box::new(Expression::Const(Bitvector::zero(ByteSize::new(8).into()))),
+        rhs: Box::new(expr!("0:8")),
     };
     expr.substitute_trivial_operations();
     assert_eq!(expr, rax_variable);
 
-    let sub_expr = Expression::BinOp {
-        lhs: Box::new(rax_variable.clone()),
-        op: BinOpType::IntSub,
-        rhs: Box::new(rcx_variable.clone()),
-    };
+    let sub_expr = expr!("RAX:8 - RCX:8");
     let mut expr = Expression::BinOp {
         op: BinOpType::IntEqual,
-        lhs: Box::new(Expression::Const(Bitvector::zero(ByteSize::new(1).into()))),
+        lhs: Box::new(expr!("0:8")),
         rhs: Box::new(sub_expr.clone()),
     };
     expr.substitute_trivial_operations();
@@ -45,7 +38,7 @@ fn trivial_expression_substitution() {
     let mut expr = Expression::BinOp {
         op: BinOpType::IntNotEqual,
         lhs: Box::new(sub_expr.clone()),
-        rhs: Box::new(Expression::Const(Bitvector::zero(ByteSize::new(1).into()))),
+        rhs: Box::new(expr!("0:8")),
     };
     expr.substitute_trivial_operations();
     assert_eq!(
@@ -109,29 +102,29 @@ fn trivial_expression_substitution() {
         arg: Box::new(Expression::Cast {
             op: CastOpType::IntSExt,
             size: ByteSize::new(8),
-            arg: Box::new(Expression::Var(Variable::mock("EAX", 4))),
+            arg: Box::new(expr!("EAX:4")),
         }),
     };
     expr.substitute_trivial_operations();
-    assert_eq!(expr, Expression::Var(Variable::mock("EAX", 4)));
+    assert_eq!(expr, expr!("EAX:4"));
     let mut expr = Expression::Subpiece {
         low_byte: ByteSize::new(4),
         size: ByteSize::new(4),
         arg: Box::new(Expression::BinOp {
             op: BinOpType::Piece,
-            lhs: Box::new(Expression::Var(Variable::mock("EAX", 4))),
-            rhs: Box::new(Expression::Var(Variable::mock("EBX", 4))),
+            lhs: Box::new(expr!("EAX:4")),
+            rhs: Box::new(expr!("EBX:4")),
         }),
     };
     expr.substitute_trivial_operations();
-    assert_eq!(expr, Expression::Var(Variable::mock("EAX", 4)));
+    assert_eq!(expr, expr!("EAX:4"));
     let mut expr = Expression::Subpiece {
         low_byte: ByteSize::new(0),
         size: ByteSize::new(4),
         arg: Box::new(Expression::Subpiece {
             low_byte: ByteSize::new(2),
             size: ByteSize::new(6),
-            arg: Box::new(Expression::Var(Variable::mock("RAX", 8))),
+            arg: Box::new(expr!("RAX:8")),
         }),
     };
     expr.substitute_trivial_operations();
@@ -140,7 +133,7 @@ fn trivial_expression_substitution() {
         Expression::Subpiece {
             low_byte: ByteSize::new(2),
             size: ByteSize::new(4),
-            arg: Box::new(Expression::Var(Variable::mock("RAX", 8))),
+            arg: Box::new(expr!("RAX:8")),
         }
     );
 
@@ -166,10 +159,10 @@ fn trivial_expression_substitution() {
         lhs: Box::new(Expression::BinOp {
             lhs: Box::new(rax_variable.clone()),
             op: BinOpType::IntSub,
-            rhs: Box::new(Expression::Const(Bitvector::from_i64(3))),
+            rhs: Box::new(expr!("3:8")),
         }),
         op: BinOpType::IntSub,
-        rhs: Box::new(Expression::Const(Bitvector::from_i64(4))),
+        rhs: Box::new(expr!("4:8")),
     };
     expr.substitute_trivial_operations();
     assert_eq!(
@@ -177,7 +170,7 @@ fn trivial_expression_substitution() {
         Expression::BinOp {
             lhs: Box::new(rax_variable.clone()),
             op: BinOpType::IntSub,
-            rhs: Box::new(Expression::Const(Bitvector::from_i64(7)))
+            rhs: Box::new(expr!("7:8"))
         }
     );
 }
@@ -188,17 +181,13 @@ fn test_complicated_a_less_than_b_substitution() {
     use Expression::*;
     let sborrow_expr = BinOp {
         op: IntSBorrow,
-        lhs: Box::new(Var(Variable::mock("RAX", 8))),
-        rhs: Box::new(Var(Variable::mock("RBX", 8))),
+        lhs: Box::new(expr!("RAX:8")),
+        rhs: Box::new(expr!("RBX:8")),
     };
     let a_minus_b_less_zero_expr = BinOp {
         op: IntSLess,
-        lhs: Box::new(BinOp {
-            op: IntSub,
-            lhs: Box::new(Var(Variable::mock("RAX", 8))),
-            rhs: Box::new(Var(Variable::mock("RBX", 8))),
-        }),
-        rhs: Box::new(Const(Bitvector::from_u64(0))),
+        lhs: Box::new(expr!("RAX:8 - RBX:8")),
+        rhs: Box::new(expr!("0:8")),
     };
     let mut expr = BinOp {
         op: IntNotEqual,
@@ -208,8 +197,8 @@ fn test_complicated_a_less_than_b_substitution() {
     expr.substitute_trivial_operations();
     let expected_expr = BinOp {
         op: IntSLess,
-        lhs: Box::new(Var(Variable::mock("RAX", 8))),
-        rhs: Box::new(Var(Variable::mock("RBX", 8))),
+        lhs: Box::new(expr!("RAX:8")),
+        rhs: Box::new(expr!("RBX:8")),
     };
     assert_eq!(expr, expected_expr);
 }
@@ -219,8 +208,8 @@ fn display() {
     let expr = expr!("2:4");
     let mul = Expression::BinOp {
         op: BinOpType::IntMult,
-        lhs: Box::new(Expression::Var(Variable::mock("RAX", 8))),
-        rhs: Box::new(Expression::Var(Variable::mock("RBP", 8))),
+        lhs: Box::new(expr!("RAX:8")),
+        rhs: Box::new(expr!("RBP:8")),
     };
     let expr = expr.plus(mul);
     let expr = Expression::UnOp {

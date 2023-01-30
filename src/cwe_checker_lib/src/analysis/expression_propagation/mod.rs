@@ -211,7 +211,7 @@ fn merge_same_var_assignments(project: &mut Project) {
 /// Note that substitution is only possible
 /// if the input variables of the input expression itself did not change since the definition of said variable.
 ///
-/// The expression propagation allows more dead stores to be removed during 
+/// The expression propagation allows more dead stores to be removed during
 /// [dead variable elimination](crate::analysis::dead_variable_elimination).
 pub fn propagate_input_expressions(
     blk: &mut Term<Blk>,
