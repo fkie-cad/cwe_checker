@@ -169,7 +169,7 @@ fn generate_cwe_warning(
         _ => panic!("Invalid String Location."),
     };
     CweWarning::new(CWE_MODULE.name, CWE_MODULE.version, description)
-        .tids(vec![format!("{}", callsite)])
+        .tids(vec![format!("{callsite}")])
         .addresses(vec![callsite.address.clone()])
         .symbols(vec![called_symbol.name.clone()])
 }

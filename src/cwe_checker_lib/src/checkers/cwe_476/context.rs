@@ -156,7 +156,7 @@ impl<'a> Context<'a> {
             format!("(NULL Pointer Dereference) There is no check if the return value is NULL at {} ({}).",
             taint_source.tid.address, taint_source_name))
             .addresses(vec![taint_source.tid.address.clone(), taint_access_location.address.clone()])
-            .tids(vec![format!("{}", taint_source.tid), format!("{}", taint_access_location)])
+            .tids(vec![format!("{}", taint_source.tid), format!("{taint_access_location}")])
             .symbols(vec![taint_source_name]);
         let _ = self.cwe_collector.send(cwe_warning);
     }

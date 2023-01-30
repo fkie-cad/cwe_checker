@@ -215,8 +215,8 @@ impl<T: RegisterDomain + Display> DataDomain<T> {
         if !self.relative_values.is_empty() {
             let target_iter = self.relative_values.iter().map(|(id, offset)| {
                 (
-                    format!("{}", id),
-                    serde_json::Value::String(format!("{}", offset)),
+                    format!("{id}"),
+                    serde_json::Value::String(format!("{offset}")),
                 )
             });
             let targets = serde_json::Value::Object(target_iter.collect());
@@ -226,8 +226,7 @@ impl<T: RegisterDomain + Display> DataDomain<T> {
         }
         if let Some(absolute_value) = &self.absolute_value {
             values.push(serde_json::Value::String(format!(
-                "Value: {}",
-                absolute_value
+                "Value: {absolute_value}"
             )));
         }
         if self.contains_top_values {

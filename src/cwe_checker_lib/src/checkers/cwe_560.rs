@@ -92,7 +92,7 @@ fn generate_cwe_warning(sub: &Term<Sub>, jmp: &Term<Jmp>, permission_const: u64)
         .addresses(vec![jmp.tid.address.clone()])
         .other(vec![vec![
             "umask_arg".to_string(),
-            format!("{:#o}", permission_const),
+            format!("{permission_const:#o}"),
         ]])
 }
 
@@ -122,8 +122,7 @@ pub fn check_cwe(
                     }
                     Err(err) => {
                         let log = LogMessage::new_info(format!(
-                            "Could not determine umask argument: {}",
-                            err
+                            "Could not determine umask argument: {err}"
                         ))
                         .location(jmp.tid.clone())
                         .source(CWE_MODULE.name);

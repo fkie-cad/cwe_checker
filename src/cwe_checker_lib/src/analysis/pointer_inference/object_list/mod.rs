@@ -174,7 +174,7 @@ impl AbstractObjectList {
         use serde_json::*;
         let mut object_map = Map::new();
         for (id, object) in self.objects.iter() {
-            object_map.insert(format!("{}", id), object.to_json_compact());
+            object_map.insert(format!("{id}"), object.to_json_compact());
         }
         Value::Object(object_map)
     }

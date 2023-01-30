@@ -70,8 +70,7 @@ impl CweTestCase {
             } else {
                 println!("{} \t {}", filepath, "[FAILED]".red());
                 Err(format!(
-                    "Expected occurrences: {}. Found: {}",
-                    num_expected_occurences, num_cwes
+                    "Expected occurrences: {num_expected_occurences}. Found: {num_cwes}"
                 ))
             }
         } else {
@@ -79,7 +78,7 @@ impl CweTestCase {
             match output.status.code() {
                 Some(_code) => Err(String::from_utf8(output.stdout).unwrap()
                     + &String::from_utf8(output.stderr).unwrap()),
-                None => Err(format!("Execution failed for file {}", filepath)),
+                None => Err(format!("Execution failed for file {filepath}")),
             }
         }
     }
@@ -160,8 +159,8 @@ pub fn all_test_cases(cwe: &'static str, check_name: &'static str) -> Vec<CweTes
 /// The `error_log` tuples are of the form `(check_filename, error_message)`.
 pub fn print_errors(error_log: Vec<(String, String)>) {
     for (filepath, error) in error_log {
-        println!("{}", format!("+++ Error for {} +++", filepath).red());
-        println!("{}", error);
+        println!("{}", format!("+++ Error for {filepath} +++").red());
+        println!("{error}");
     }
 }
 

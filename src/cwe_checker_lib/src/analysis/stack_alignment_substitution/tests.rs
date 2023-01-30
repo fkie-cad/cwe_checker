@@ -320,18 +320,11 @@ fn supports_commutative_and() {
 /// Some functions have leading blocks without any defs. This might be due to `endbr`-like instructions.
 /// We skip those empty blocks and start substituting for rhe first non-empty block.
 fn skips_empty_blocks() {
-    let sub_from_sp = Def::assign(
-        "tid_alter_sp",
-        Project::mock_x64().stack_pointer_register.clone(),
-        Expression::minus(
-            Expression::Var(Project::mock_x64().stack_pointer_register.clone()),
-            Expression::const_from_apint(ApInt::from_u64(1)),
-        ),
-    );
+    let sub_from_sp = def!["tid_alter_sp: RSP:8 = RSP:8 - 1:8"];
 
     let byte_alignment_as_and = Def::assign(
         "tid_to_be_substituted",
-        Project::mock_x64().stack_pointer_register.clone(),
+        variable!("RSP:8"),
         Expression::BinOp {
             op: BinOpType::IntAnd,
             lhs: Box::new(Expression::Var(
@@ -373,14 +366,7 @@ fn skips_empty_blocks() {
         .blocks
         .push(blk);
 
-    let expected_def = Def::assign(
-        "tid_to_be_substituted",
-        Project::mock_x64().stack_pointer_register.clone(),
-        Expression::minus(
-            Expression::Var(Project::mock_x64().stack_pointer_register.clone()),
-            Expression::const_from_apint(ApInt::from_u64(15)),
-        ),
-    );
+    let expected_def = def!["tid_to_be_substituted: RSP:8 = RSP:8 - 15:8"];
 
     substitute_and_on_stackpointer(&mut proj);
 
