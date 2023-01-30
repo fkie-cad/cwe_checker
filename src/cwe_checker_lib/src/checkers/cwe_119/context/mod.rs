@@ -166,7 +166,7 @@ impl<'a> Context<'a> {
                 };
                 let mut cwe_warning =
                     CweWarning::new("CWE119", super::CWE_MODULE.version, description);
-                cwe_warning.tids = vec![format!("{}", call_tid)];
+                cwe_warning.tids = vec![format!("{call_tid}")];
                 cwe_warning.addresses = vec![call_tid.address.to_string()];
                 cwe_warning.other = vec![warnings];
                 self.log_collector.send(cwe_warning.into()).unwrap();

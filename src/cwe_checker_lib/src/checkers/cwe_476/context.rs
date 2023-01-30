@@ -156,7 +156,7 @@ impl<'a> Context<'a> {
             format!("(NULL Pointer Dereference) There is no check if the return value is NULL at {} ({}).",
             taint_source.tid.address, taint_source_name))
             .addresses(vec![taint_source.tid.address.clone(), taint_access_location.address.clone()])
-            .tids(vec![format!("{}", taint_source.tid), format!("{}", taint_access_location)])
+            .tids(vec![format!("{}", taint_source.tid), format!("{taint_access_location}")])
             .symbols(vec![taint_source_name]);
         let _ = self.cwe_collector.send(cwe_warning);
     }
@@ -412,6 +412,7 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{def, expr, variable};
 
     impl<'a> Context<'a> {
         pub fn mock(
@@ -451,10 +452,7 @@ mod tests {
             false
         );
 
-        state.set_register_taint(
-            &Variable::mock("RDI", ByteSize::new(8)),
-            Taint::Tainted(ByteSize::new(8)),
-        );
+        state.set_register_taint(&variable!("RDI:8"), Taint::Tainted(ByteSize::new(8)));
         assert_eq!(
             context.check_parameters_for_taint(
                 &state,
@@ -476,10 +474,7 @@ mod tests {
             .handle_generic_call(&state, &Tid::new("call_tid"))
             .is_some());
 
-        state.set_register_taint(
-            &Variable::mock("RDX", 8u64),
-            Taint::Tainted(ByteSize::new(8)),
-        );
+        state.set_register_taint(&variable!("RDX:8"), Taint::Tainted(ByteSize::new(8)));
         assert!(context
             .handle_generic_call(&state, &Tid::new("call_tid"))
             .is_none());
@@ -493,48 +488,21 @@ mod tests {
         let (mut state, pi_state) = State::mock_with_pi_state();
         state.set_pointer_inference_state(Some(pi_state));
 
-        let assign_def = Term {
-            tid: Tid::new("def"),
-            term: Def::Assign {
-                var: Variable::mock("RCX", 8u64),
-                value: Expression::Var(Variable::mock("RAX", 8u64)),
-            },
-        };
+        let assign_def = def!["def: RCX:8 = RAX:8"];
         let result = context.update_def(&state, &assign_def).unwrap();
-        assert!(result
-            .eval(&Expression::Var(Variable::mock("RCX", 8u64)))
-            .is_tainted());
-        assert!(result
-            .eval(&Expression::Var(Variable::mock("RSP", 8u64)))
-            .is_top());
+        assert!(result.eval(&expr!("RCX:8")).is_tainted());
+        assert!(result.eval(&expr!("RSP:8")).is_top());
 
-        let load_def = Term {
-            tid: Tid::new("def"),
-            term: Def::Load {
-                var: Variable::mock("RCX", 8u64),
-                address: Expression::Var(Variable::mock("RSP", 8u64)),
-            },
-        };
+        let load_def = def!["def: RCX:8 := Load from RSP:8"];
+
         let result = context.update_def(&state, &load_def).unwrap();
-        assert!(result
-            .eval(&Expression::Var(Variable::mock("RCX", 8u64)))
-            .is_tainted());
-        assert!(result
-            .eval(&Expression::Var(Variable::mock("RSP", 8u64)))
-            .is_top());
+        assert!(result.eval(&expr!("RCX:8")).is_tainted());
+        assert!(result.eval(&expr!("RSP:8")).is_top());
 
-        let store_def = Term {
-            tid: Tid::new("def"),
-            term: Def::Store {
-                value: Expression::Var(Variable::mock("RCX", 8u64)),
-                address: Expression::Var(Variable::mock("RSP", 8u64)),
-            },
-        };
+        let store_def = def!["def: Store at RSP:8 := RCX:8"];
         let result = context.update_def(&state, &store_def).unwrap();
         let result = context.update_def(&result, &load_def).unwrap();
-        assert!(result
-            .eval(&Expression::Var(Variable::mock("RCX", 8u64)))
-            .is_top());
+        assert!(result.eval(&expr!("RCX:8")).is_top());
     }
 
     #[test]
@@ -548,7 +516,7 @@ mod tests {
             tid: Tid::new("jmp"),
             term: Jmp::CBranch {
                 target: Tid::new("target"),
-                condition: Expression::Var(Variable::mock("RAX", 8u64)),
+                condition: expr!("RAX:8"),
             },
         };
         assert!(context
@@ -558,7 +526,7 @@ mod tests {
             tid: Tid::new("jmp"),
             term: Jmp::CBranch {
                 target: Tid::new("target"),
-                condition: Expression::Var(Variable::mock("RBX", 8u64)),
+                condition: expr!("RBX:8"),
             },
         };
         assert!(context

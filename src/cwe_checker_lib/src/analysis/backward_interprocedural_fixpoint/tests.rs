@@ -1,57 +1,20 @@
 use super::{create_computation, mock_context, NodeValue};
+use crate::def;
+use crate::expr;
 use crate::intermediate_representation::*;
+use mock_context::Context;
+use mock_context::StartEnd;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::iter::FromIterator;
 
-use mock_context::Context;
-use mock_context::StartEnd;
-
 fn mock_program() -> Term<Program> {
-    let var = Variable {
-        name: String::from("RAX"),
-        size: ByteSize::new(8),
-        is_temp: false,
-    };
-    let value = Expression::UnOp {
-        op: UnOpType::IntNegate,
-        arg: Box::new(Expression::Var(var.clone())),
-    };
-    let def_term1 = Term {
-        tid: Tid::new("def1".to_string()),
-        term: Def::Assign {
-            var: var.clone(),
-            value: value.clone(),
-        },
-    };
-    let def_term2 = Term {
-        tid: Tid::new("def2".to_string()),
-        term: Def::Assign {
-            var: var.clone(),
-            value: value.clone(),
-        },
-    };
-    let def_term3 = Term {
-        tid: Tid::new("def3".to_string()),
-        term: Def::Assign {
-            var: var.clone(),
-            value: value.clone(),
-        },
-    };
-    let def_term4 = Term {
-        tid: Tid::new("def4".to_string()),
-        term: Def::Assign {
-            var: var.clone(),
-            value: value.clone(),
-        },
-    };
-    let def_term5 = Term {
-        tid: Tid::new("def5".to_string()),
-        term: Def::Assign {
-            var: var.clone(),
-            value: value.clone(),
-        },
-    };
+    let def_term1 = def!["def1: RAX:8 = -(RAX:8)"];
+    let def_term2 = def!["def2: RAX:8 = -(RAX:8)"];
+    let def_term3 = def!["def3: RAX:8 = -(RAX:8)"];
+    let def_term4 = def!["def4: RAX:8 = -(RAX:8)"];
+    let def_term5 = def!["def5: RAX:8 = -(RAX:8)"];
+
     let call_term = Term {
         tid: Tid::new("call".to_string()),
         term: Jmp::Call {
@@ -61,7 +24,7 @@ fn mock_program() -> Term<Program> {
     };
     let return_term = Term {
         tid: Tid::new("return".to_string()),
-        term: Jmp::Return(Expression::Const(Bitvector::zero(64.into()))), // The return term does not matter
+        term: Jmp::Return(expr!("0:8")), // The return term does not matter
     };
     let jmp = Jmp::Branch(Tid::new("sub1_blk1"));
     let jmp_term = Term {
@@ -94,7 +57,7 @@ fn mock_program() -> Term<Program> {
     };
     let cond_jump = Jmp::CBranch {
         target: Tid::new("sub1_blk1"),
-        condition: Expression::Const(Bitvector::from_u8(0)),
+        condition: expr!("0:1"),
     };
     let cond_jump_term = Term {
         tid: Tid::new("cond_jump"),

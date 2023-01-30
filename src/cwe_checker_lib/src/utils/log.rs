@@ -155,9 +155,9 @@ impl std::fmt::Display for LogMessage {
             LogLevel::Info => write!(formatter, "INFO: ")?,
         };
         match (&self.source, &self.location) {
-            (Some(source), Some(location)) => write!(formatter, "{} @ {}: ", source, location)?,
-            (Some(source), None) => write!(formatter, "{}: ", source)?,
-            (None, Some(location)) => write!(formatter, "{}: ", location)?,
+            (Some(source), Some(location)) => write!(formatter, "{source} @ {location}: ")?,
+            (Some(source), None) => write!(formatter, "{source}: ")?,
+            (None, Some(location)) => write!(formatter, "{location}: ")?,
             (None, None) => (),
         };
         write!(formatter, "{}", self.text)
@@ -177,23 +177,22 @@ pub fn print_all_messages(
     emit_json: bool,
 ) {
     for log in logs {
-        println!("{}", log);
+        println!("{log}");
     }
     let output: String = if emit_json {
         serde_json::to_string_pretty(&cwes).unwrap()
     } else {
         cwes.iter()
-            .map(|cwe| format!("{}", cwe))
+            .map(|cwe| format!("{cwe}"))
             .collect::<Vec<String>>()
             .join("\n")
             + "\n"
     };
     if let Some(file_path) = out_path {
-        std::fs::write(file_path, output).unwrap_or_else(|error| {
-            panic!("Writing to output path {} failed: {}", file_path, error)
-        });
+        std::fs::write(file_path, output)
+            .unwrap_or_else(|error| panic!("Writing to output path {file_path} failed: {error}"));
     } else {
-        print!("{}", output);
+        print!("{output}",);
     }
 }
 
@@ -215,7 +214,7 @@ pub fn add_debug_log_statistics(all_logs: &mut Vec<LogMessage>) {
     }
     for (analysis, count) in analysis_debug_log_count {
         all_logs.push(LogMessage {
-            text: format!("Logged {} debug log messages.", count),
+            text: format!("Logged {count} debug log messages."),
             level: LogLevel::Info,
             location: None,
             source: Some(analysis),
@@ -223,10 +222,7 @@ pub fn add_debug_log_statistics(all_logs: &mut Vec<LogMessage>) {
     }
     if general_debug_log_count > 0 {
         all_logs.push(LogMessage {
-            text: format!(
-                "Logged {} general debug log messages.",
-                general_debug_log_count
-            ),
+            text: format!("Logged {general_debug_log_count} general debug log messages."),
             level: LogLevel::Info,
             location: None,
             source: None,

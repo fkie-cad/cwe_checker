@@ -197,7 +197,7 @@ impl fmt::Display for BricksDomain {
             BricksDomain::Value(brick_domains) => {
                 write!(f, "Bricks: ")?;
                 for brick_domain in brick_domains.iter() {
-                    write!(f, "{} ", brick_domain)?;
+                    write!(f, "{brick_domain} ")?;
                 }
 
                 Ok(())

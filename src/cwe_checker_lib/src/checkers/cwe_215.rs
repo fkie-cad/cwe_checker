@@ -63,7 +63,7 @@ pub fn check_cwe(
             (vec![info_log], Vec::new())
         }
         Err(err) => {
-            let err_log = LogMessage::new_error(format!("Error while parsing binary: {}", err))
+            let err_log = LogMessage::new_error(format!("Error while parsing binary: {err}"))
                 .source(CWE_MODULE.name);
             (vec![err_log], Vec::new())
         }

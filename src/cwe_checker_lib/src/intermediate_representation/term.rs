@@ -37,7 +37,7 @@ impl Tid {
     /// the returned block ID is the one that would be executed first if a jump to the given address happened.
     pub fn blk_id_at_address(address: &str) -> Tid {
         Tid {
-            id: format!("blk_{}", address),
+            id: format!("blk_{address}"),
             address: address.to_string(),
         }
     }

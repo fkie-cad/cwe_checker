@@ -1,12 +1,22 @@
+use crate::bitvec;
+
 use super::*;
 
 impl Interval {
     pub fn mock(start: i64, end: i64) -> Interval {
-        Interval::new(Bitvector::from_i64(start), Bitvector::from_i64(end), 1)
+        Interval::new(
+            bitvec!(format!("{}:8", start)),
+            bitvec!(format!("{}:8", end)),
+            1,
+        )
     }
 
     pub fn mock_i8(start: i8, end: i8) -> Interval {
-        Interval::new(Bitvector::from_i8(start), Bitvector::from_i8(end), 1)
+        Interval::new(
+            bitvec!(format!("{}:1", start)),
+            bitvec!(format!("{}:1", end)),
+            1,
+        )
     }
 
     pub fn with_stride(mut self, stride: u64) -> Interval {
@@ -92,7 +102,7 @@ fn subpiece_higher() {
     let val = Interval::mock(3, 21).with_stride(6);
     assert_eq!(
         val.subpiece_higher(ByteSize::new(7)),
-        Interval::from(Bitvector::from_i8(0))
+        Interval::from(bitvec!("0:1"))
     )
 }
 
@@ -117,8 +127,8 @@ fn piece() {
     assert_eq!(
         left.piece(&right),
         Interval {
-            start: Bitvector::from_i16(256),
-            end: Bitvector::from_i16(1278),
+            start: bitvec!("256:2"),
+            end: bitvec!("1278:2"),
             stride: 2,
         }
     );
@@ -127,8 +137,8 @@ fn piece() {
     assert_eq!(
         left.piece(&right),
         Interval {
-            start: Bitvector::from_i16(259),
-            end: Bitvector::from_i16(1039),
+            start: bitvec!("259:2"),
+            end: bitvec!("1039:2"),
             stride: 2,
         }
     );
@@ -145,11 +155,11 @@ fn add_and_sub() {
 #[test]
 fn contains() {
     let interval = Interval::mock(2, 10).with_stride(4);
-    let elem = Bitvector::from_i64(4);
+    let elem = bitvec!("4:8");
     assert!(!interval.contains(&elem));
-    let elem = Bitvector::from_i64(6);
+    let elem = bitvec!("6:8");
     assert!(interval.contains(&elem));
-    let elem = Bitvector::from_i64(14);
+    let elem = bitvec!("14:8");
     assert!(!interval.contains(&elem));
 }
 

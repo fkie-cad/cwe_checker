@@ -144,7 +144,7 @@ impl std::fmt::Display for AbstractIdentifier {
         } else {
             write!(formatter, "{}(", self.0.time)?;
             for hint in &self.0.path_hints {
-                write!(formatter, "->{}", hint)?;
+                write!(formatter, "->{hint}",)?;
             }
             write!(formatter, ") @ {}", self.0.location)
         }
@@ -185,10 +185,10 @@ impl std::fmt::Display for AbstractLocation {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Self::Register(var) => write!(formatter, "{}", var.name),
-            Self::GlobalAddress { address, size: _ } => write!(formatter, "0x{:x}", address),
+            Self::GlobalAddress { address, size: _ } => write!(formatter, "0x{address:x}"),
             Self::Pointer(var, location) => write!(formatter, "{}->{}", var.name, location),
             Self::GlobalPointer(address, location) => {
-                write!(formatter, "0x{:x}->{}", address, location)
+                write!(formatter, "0x{address:x}->{location}")
             }
         }
     }
@@ -275,8 +275,8 @@ impl AbstractMemoryLocation {
 impl std::fmt::Display for AbstractMemoryLocation {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Self::Location { offset, .. } => write!(formatter, "({})", offset),
-            Self::Pointer { offset, target } => write!(formatter, "({})->{}", offset, target),
+            Self::Location { offset, .. } => write!(formatter, "({offset})"),
+            Self::Pointer { offset, target } => write!(formatter, "({offset})->{target}"),
         }
     }
 }
@@ -284,6 +284,7 @@ impl std::fmt::Display for AbstractMemoryLocation {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use crate::variable;
 
     impl AbstractIdentifier {
         /// Mock an abstract identifier with the given TID name and pointing to the value in the given register name.
@@ -294,7 +295,12 @@ pub mod tests {
         ) -> AbstractIdentifier {
             AbstractIdentifier::new(
                 Tid::new(tid.to_string()),
-                AbstractLocation::from_var(&Variable::mock(register, size_in_bytes)).unwrap(),
+                AbstractLocation::from_var(&variable!(format!(
+                    "{}:{}",
+                    register.to_string(),
+                    size_in_bytes
+                )))
+                .unwrap(),
             )
         }
     }
@@ -311,7 +317,7 @@ pub mod tests {
         // Test uniqueness of TIDs in path hint array.
         let id = AbstractIdentifier::new(
             Tid::new("time_id"),
-            AbstractLocation::from_var(&Variable::mock("var", 8)).unwrap(),
+            AbstractLocation::from_var(&variable!("var:8")).unwrap(),
         );
         let id = id.with_path_hint(Tid::new("first_hint")).unwrap();
         let id = id.with_path_hint(Tid::new("second_hint")).unwrap();
@@ -321,7 +327,7 @@ pub mod tests {
     #[test]
     fn test_bytesize() {
         let location =
-            AbstractLocation::from_stack_position(&Variable::mock("RSP", 8), 10, ByteSize::new(4));
+            AbstractLocation::from_stack_position(&variable!("RSP:8"), 10, ByteSize::new(4));
         let id = AbstractIdentifier::new(Tid::new("id"), location);
         assert_eq!(id.bytesize(), ByteSize::new(4));
     }

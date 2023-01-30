@@ -169,7 +169,7 @@ fn generate_cwe_warning(
         _ => panic!("Invalid String Location."),
     };
     CweWarning::new(CWE_MODULE.name, CWE_MODULE.version, description)
-        .tids(vec![format!("{}", callsite)])
+        .tids(vec![format!("{callsite}")])
         .addresses(vec![callsite.address.clone()])
         .symbols(vec![called_symbol.name.clone()])
 }
@@ -179,7 +179,7 @@ pub mod tests {
     use std::collections::HashSet;
 
     use crate::analysis::pointer_inference::PointerInference as PointerInferenceComputation;
-    use crate::intermediate_representation::*;
+    use crate::{defs, intermediate_representation::*};
 
     use super::*;
 
@@ -189,21 +189,10 @@ pub mod tests {
         let mut block1 = Blk::mock_with_tid("block1");
         let block2 = Blk::mock_with_tid("block2");
 
-        let def1 = Def::assign(
-            "def2",
-            Variable::mock("RDI", 8 as u64),
-            Expression::var("RBP", 8).plus_const(8),
-        );
-        let def2 = Def::assign(
-            "def3",
-            Variable::mock("RSI", 8 as u64),
-            Expression::Const(Bitvector::from_str_radix(16, "3002").unwrap()),
-        );
-
+        let mut defs = defs!["def2: RDI:8 = RBP:8 + 8:8", "def3: RSI:8 = 0x3002:8"];
         let jump = Jmp::call("call_string", "sprintf", Some("block2"));
 
-        block1.term.defs.push(def1);
-        block1.term.defs.push(def2);
+        block1.term.defs.append(&mut defs);
         block1.term.jmps.push(jump);
         sub.term.blocks.push(block1);
         sub.term.blocks.push(block2);

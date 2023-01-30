@@ -31,7 +31,7 @@ pub fn get_project_from_ghidra(
             .as_millis()
     );
     // Create a unique name for the pipe
-    let fifo_path = tmp_folder.join(format!("pcode_{}.pipe", timestamp_suffix));
+    let fifo_path = tmp_folder.join(format!("pcode_{timestamp_suffix}.pipe"));
     let ghidra_command = generate_ghidra_call_command(
         file_path,
         &fifo_path,
@@ -93,7 +93,7 @@ fn execute_ghidra(
         let output = match ghidra_command.output() {
             Ok(output) => output,
             Err(err) => {
-                eprintln!("Ghidra could not be executed: {}", err);
+                eprintln!("Ghidra could not be executed: {err}");
                 std::process::exit(101);
             }
         };
@@ -107,7 +107,7 @@ fn execute_ghidra(
             eprintln!("{}", String::from_utf8(output.stdout).unwrap());
             eprintln!("{}", String::from_utf8(output.stderr).unwrap());
             if let Some(code) = output.status.code() {
-                eprintln!("Ghidra plugin failed with exit code {}", code);
+                eprintln!("Ghidra plugin failed with exit code {code}");
             }
             eprintln!("Execution of Ghidra plugin failed.");
         } else {
@@ -150,7 +150,7 @@ fn generate_ghidra_call_command(
     let mut ghidra_command = Command::new(headless_path);
     ghidra_command
         .arg(&tmp_folder) // The folder where temporary files should be stored
-        .arg(format!("PcodeExtractor_{}_{}", filename, timestamp_suffix)) // The name of the temporary Ghidra Project.
+        .arg(format!("PcodeExtractor_{filename}_{timestamp_suffix}")) // The name of the temporary Ghidra Project.
         .arg("-import") // Import a file into the Ghidra project
         .arg(file_path) // File import path
         .arg("-postScript") // Execute a script after standard analysis by Ghidra finished

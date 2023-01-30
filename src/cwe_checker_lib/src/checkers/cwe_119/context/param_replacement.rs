@@ -218,6 +218,7 @@ fn add_param_replacements_for_call(
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use crate::bitvec;
 
     #[test]
     fn test_substitute_param_values_context_sensitive() {
@@ -228,9 +229,8 @@ pub mod tests {
         let recursive_param_id = AbstractIdentifier::mock("main", "RSI", 8);
         let recursive_callsite_id = AbstractIdentifier::mock("recursive_callsite_id", "RSI", 8);
 
-        let param_value =
-            Data::from_target(recursive_param_id.clone(), Bitvector::from_i64(1).into());
-        let recursive_param_value = Data::from(Bitvector::from_i64(41));
+        let param_value = Data::from_target(recursive_param_id.clone(), bitvec!("1:8").into());
+        let recursive_param_value = Data::from(bitvec!("41:8"));
         let param_replacement_map = HashMap::from([
             (callsite_id, param_value.clone()),
             (recursive_callsite_id.clone(), recursive_param_value),
@@ -254,7 +254,7 @@ pub mod tests {
         context.call_to_caller_fn_map = call_to_caller_map;
         // non-recursive substitution
         let result = context.substitute_param_values_context_sensitive(
-            &Data::from_target(param_id.clone(), Bitvector::from_i64(5).into()),
+            &Data::from_target(param_id.clone(), bitvec!("5:8").into()),
             &Tid::new("callsite_id"),
             &Tid::new("func"),
         );
@@ -264,12 +264,12 @@ pub mod tests {
         );
         // recursive substitution
         let result = context.recursively_substitute_param_values_context_sensitive(
-            &Data::from_target(param_id, Bitvector::from_i64(5).into()),
+            &Data::from_target(param_id, bitvec!("5:8").into()),
             &Tid::new("func"),
             &[Tid::new("callsite_id"), Tid::new("recursive_callsite_id")],
         );
         println!("{:#}", result.to_json_compact());
-        assert_eq!(result, Bitvector::from_i64(47).into());
+        assert_eq!(result, bitvec!("47:8").into());
     }
 
     #[test]
@@ -281,9 +281,8 @@ pub mod tests {
         let recursive_param_id = AbstractIdentifier::mock("main", "RSI", 8);
         let recursive_callsite_id = AbstractIdentifier::mock("recursive_callsite_id", "RSI", 8);
 
-        let param_value =
-            Data::from_target(recursive_param_id.clone(), Bitvector::from_i64(1).into());
-        let recursive_param_value = Data::from(Bitvector::from_i64(39));
+        let param_value = Data::from_target(recursive_param_id.clone(), bitvec!("1:8").into());
+        let recursive_param_value = Data::from(bitvec!("39:8"));
         let param_replacement_map = HashMap::from([
             (callsite_id, param_value.clone()),
             (recursive_callsite_id.clone(), recursive_param_value),
@@ -304,8 +303,8 @@ pub mod tests {
         // recursive substitution
         let result = context.recursively_substitute_param_values(&Data::from_target(
             param_id,
-            Bitvector::from_i64(5).into(),
+            bitvec!("5:8").into(),
         ));
-        assert_eq!(result, Bitvector::from_i64(45).into());
+        assert_eq!(result, bitvec!("45:8").into());
     }
 }

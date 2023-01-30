@@ -792,28 +792,28 @@ fn from_project_to_ir_project() {
     // Checks if the other definitions and the jump were correctly casted.
     assert_eq!(
         format!("{}", ir_block.defs[0].term),
-        "loaded_value:32(temp) := Load from (RDI:64)[0-3]".to_string()
+        "loaded_value:4(temp) := Load from (RDI:8)[0-3]".to_string()
     );
     assert_eq!(
         format!("{}", ir_block.defs[1].term),
-        "RDI:64 = ((RDI:64)[4-7] Piece loaded_value:32(temp))".to_string()
+        "RDI:8 = ((RDI:8)[4-7] Piece loaded_value:4(temp))".to_string()
     );
     assert_eq!(
         format!("{}", ir_block.defs[2].term),
-        "RAX:64 = (((RAX:64)[2-7] Piece ((RAX:64)[1-1] ^ (RAX:64)[1-1])) Piece (RAX:64)[0-0])"
+        "RAX:8 = (((RAX:8)[2-7] Piece ((RAX:8)[1-1] ^ (RAX:8)[1-1])) Piece (RAX:8)[0-0])"
             .to_string()
     );
     assert_eq!(
         format!("{}", ir_block.defs[3].term),
-        "RAX:64 = IntZExt((RDI:64)[0-3])".to_string()
+        "RAX:8 = IntZExt((RDI:8)[0-3])".to_string()
     );
     assert_eq!(
         format!("{}", ir_block.defs[4].term),
-        "RAX:64 = ((RAX:64)[4-7] Piece (0x0:i16 Piece (RAX:64)[0-1]))".to_string()
+        "RAX:8 = ((RAX:8)[4-7] Piece (0x0:2 Piece (RAX:8)[0-1]))".to_string()
     );
     assert_eq!(
         format!("{}", ir_block.defs[5].term),
-        "RAX:64 = ((RAX:64)[2-7] Piece ((RDI:64)[0-3])[1-2])".to_string()
+        "RAX:8 = ((RAX:8)[2-7] Piece ((RDI:8)[0-3])[1-2])".to_string()
     );
     assert_eq!(ir_block.jmps[0].term, expected_jmp);
 }

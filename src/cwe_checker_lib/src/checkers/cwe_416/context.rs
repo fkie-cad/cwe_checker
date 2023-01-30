@@ -117,7 +117,7 @@ impl<'a> Context<'a> {
                 name: "CWE416".to_string(),
                 version: CWE_MODULE.version.to_string(),
                 addresses: vec![call_tid.address.clone()],
-                tids: vec![format!("{}", call_tid)],
+                tids: vec![format!("{call_tid}")],
                 symbols: Vec::new(),
                 other: vec![warnings],
                 description: format!(
@@ -151,7 +151,7 @@ impl<'a> Context<'a> {
                         name: "CWE415".to_string(),
                         version: CWE_MODULE.version.to_string(),
                         addresses: vec![call_tid.address.clone()],
-                        tids: vec![format!("{}", call_tid)],
+                        tids: vec![format!("{call_tid}")],
                         symbols: Vec::new(),
                         other: vec![warning_causes],
                         description: format!(

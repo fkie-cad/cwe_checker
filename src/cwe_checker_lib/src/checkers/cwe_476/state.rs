@@ -349,7 +349,7 @@ impl State {
         let register: Vec<(String, Value)> = self
             .register_taint
             .iter()
-            .map(|(var, data)| (var.name.clone(), json!(format!("{}", data))))
+            .map(|(var, data)| (var.name.clone(), json!(format!("{data}"))))
             .collect();
         let mut memory = Vec::new();
         for (tid, mem_region) in self.memory_taint.iter() {
@@ -357,7 +357,7 @@ impl State {
             for (offset, elem) in mem_region.iter() {
                 elements.push((offset.to_string(), json!(elem.to_string())));
             }
-            memory.push((format!("{}", tid), Value::Object(Map::from_iter(elements))));
+            memory.push((format!("{tid}"), Value::Object(Map::from_iter(elements))));
         }
         let state_map = vec![
             (
@@ -374,8 +374,8 @@ impl State {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::abstract_domain::*;
     use crate::analysis::pointer_inference::ValueDomain;
+    use crate::{abstract_domain::*, expr, variable};
     use std::collections::BTreeSet;
 
     impl State {
@@ -389,16 +389,16 @@ mod tests {
 
         pub fn mock_with_pi_state() -> (State, PointerInferenceState) {
             let arg1 = Arg::Register {
-                expr: Expression::Var(register("RAX")),
+                expr: expr!("RAX:8"),
                 data_type: None,
             };
             let arg2 = Arg::Stack {
-                address: Expression::Var(register("RSP")),
+                address: expr!("RSP:8"),
                 size: ByteSize::new(8),
                 data_type: None,
             };
             let pi_state =
-                PointerInferenceState::new(&register("RSP"), Tid::new("func"), BTreeSet::new());
+                PointerInferenceState::new(&variable!("RSP:8"), Tid::new("func"), BTreeSet::new());
             let symbol = ExternSymbol {
                 tid: Tid::new("extern_symbol".to_string()),
                 addresses: vec![],
@@ -414,14 +414,6 @@ mod tests {
         }
     }
 
-    fn register(name: &str) -> Variable {
-        Variable {
-            name: name.into(),
-            size: ByteSize::new(8),
-            is_temp: false,
-        }
-    }
-
     fn bv(value: i64) -> ValueDomain {
         ValueDomain::from(Bitvector::from_i64(value))
     }
@@ -429,7 +421,7 @@ mod tests {
     fn new_id(name: &str) -> AbstractIdentifier {
         AbstractIdentifier::new(
             Tid::new("time0"),
-            AbstractLocation::Register(Variable::mock(name, ByteSize::new(8))),
+            AbstractLocation::Register(variable!(format!("{}:8", name))),
         )
     }
 
@@ -444,7 +436,7 @@ mod tests {
         let top = Taint::Top(ByteSize::new(8));
 
         let mut state = State::mock();
-        state.set_register_taint(&register("RAX"), taint.clone());
+        state.set_register_taint(&variable!("RAX:8"), taint.clone());
 
         let mut other_state = State::mock();
         let address = new_pointer("mem", 10);
@@ -452,10 +444,10 @@ mod tests {
 
         let merged_state = state.merge(&other_state);
         assert_eq!(
-            merged_state.register_taint.get(&register("RAX")),
+            merged_state.register_taint.get(&variable!("RAX:8")),
             Some(&taint)
         );
-        assert_eq!(merged_state.register_taint.get(&register("RBX")), None);
+        assert_eq!(merged_state.register_taint.get(&variable!("RBX:8")), None);
         assert_eq!(
             merged_state.load_taint_from_memory(&address, ByteSize::new(8)),
             taint.clone()
@@ -471,9 +463,9 @@ mod tests {
     fn new_state() {
         let (state, pi_state) = State::mock_with_pi_state();
         let taint = Taint::Tainted(ByteSize::new(8));
-        assert_eq!(state.register_taint.get(&register("RAX")), Some(&taint));
-        assert_eq!(state.register_taint.get(&register("RSP")), None);
-        let address = Expression::Var(register("RSP"));
+        assert_eq!(state.register_taint.get(&variable!("RAX:8")), Some(&taint));
+        assert_eq!(state.register_taint.get(&variable!("RSP:8")), None);
+        let address = Expression::Var(variable!("RSP:8"));
         assert_eq!(
             state.load_taint_from_memory(&pi_state.eval(&address), ByteSize::new(8)),
             taint
@@ -484,12 +476,12 @@ mod tests {
     fn eval_expression() {
         let (state, _pi_state) = State::mock_with_pi_state();
 
-        let expr = Expression::Var(register("RAX")).plus(Expression::Var(register("RBX")));
+        let expr = expr!("RAX:8 + RBX:8");
         assert!(state.eval(&expr).is_tainted());
 
         let expr = Expression::UnOp {
             op: UnOpType::Int2Comp,
-            arg: Box::new(Expression::Var(register("RSP"))),
+            arg: Box::new(Expression::Var(variable!("RSP:8"))),
         };
         assert!(state.eval(&expr).is_top());
     }

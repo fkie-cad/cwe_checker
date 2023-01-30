@@ -22,7 +22,7 @@ pub struct Variable {
 
 impl Display for Variable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}:{}", self.name, self.size.as_bit_length())?;
+        write!(f, "{}:{}", self.name, self.size)?;
         if self.is_temp {
             write!(f, "(temp)")?;
         }

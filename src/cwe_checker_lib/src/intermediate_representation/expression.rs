@@ -213,24 +213,24 @@ impl Expression {
 impl fmt::Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Expression::Var(var) => write!(f, "{}", var),
+            Expression::Var(var) => write!(f, "{var}"),
             Expression::Const(c) => {
-                write!(f, "0x{:016x}:i{}", c, c.bytesize().as_bit_length())
+                write!(f, "0x{:016x}:{}", c, c.bytesize())
             }
             Expression::BinOp { op, lhs, rhs } => match op {
                 BinOpType::IntMult
                 | BinOpType::IntDiv
                 | BinOpType::IntRem
                 | BinOpType::FloatMult
-                | BinOpType::FloatDiv => write!(f, "{} {} {}", lhs, op, rhs),
-                _ => write!(f, "({} {} {})", lhs, op, rhs),
+                | BinOpType::FloatDiv => write!(f, "{lhs} {op} {rhs}"),
+                _ => write!(f, "({lhs} {op} {rhs})"),
             },
-            Expression::UnOp { op, arg } => write!(f, "{}({})", op, arg),
-            Expression::Cast { op, size: _, arg } => write!(f, "{}({})", op, arg),
+            Expression::UnOp { op, arg } => write!(f, "{op}({arg})"),
+            Expression::Cast { op, size: _, arg } => write!(f, "{op}({arg})"),
             Expression::Unknown {
                 description,
                 size: _,
-            } => write!(f, "{}", description),
+            } => write!(f, "{description}"),
             Expression::Subpiece {
                 low_byte,
                 size,
@@ -263,7 +263,7 @@ impl fmt::Display for BinOpType {
             BinOpType::IntRem => write!(f, "%"),
             BinOpType::BoolAnd => write!(f, "&&"),
             BinOpType::BoolOr => write!(f, "||"),
-            _ => write!(f, "{:?}", self),
+            _ => write!(f, "{self:?}"),
         }
     }
 }
@@ -272,14 +272,15 @@ impl fmt::Display for UnOpType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             UnOpType::BoolNegate => write!(f, "¬"),
-            _ => write!(f, "{:?}", self),
+            UnOpType::IntNegate => write!(f, "-"),
+            _ => write!(f, "{self:?}"),
         }
     }
 }
 
 impl fmt::Display for CastOpType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 #[cfg(test)]

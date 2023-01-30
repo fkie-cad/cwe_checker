@@ -444,7 +444,7 @@ impl State {
         let regs = self
             .register
             .iter()
-            .map(|(var, value)| (format!("{}", var), value.to_json_compact()))
+            .map(|(var, value)| (format!("{var}"), value.to_json_compact()))
             .collect();
         json_map.insert("Register".to_string(), serde_json::Value::Object(regs));
         let access_patterns = self
@@ -452,8 +452,8 @@ impl State {
             .iter()
             .map(|(id, pattern)| {
                 (
-                    format!("{}", id),
-                    serde_json::Value::String(format!("{}", pattern)),
+                    format!("{id}"),
+                    serde_json::Value::String(format!("{pattern}")),
                 )
             })
             .collect();

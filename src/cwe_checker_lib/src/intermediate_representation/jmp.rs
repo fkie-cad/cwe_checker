@@ -64,9 +64,9 @@ pub enum Jmp {
 impl fmt::Display for Jmp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Jmp::Branch(tid) => write!(f, "Jump to {}", tid),
-            Jmp::BranchInd(expr) => write!(f, "Jump to {}", expr),
-            Jmp::CBranch { target, condition } => write!(f, "If {} jump to {}", condition, target),
+            Jmp::Branch(tid) => write!(f, "Jump to {tid}"),
+            Jmp::BranchInd(expr) => write!(f, "Jump to {expr}"),
+            Jmp::CBranch { target, condition } => write!(f, "If {condition} jump to {target}"),
             Jmp::Call { target, return_ } => write!(
                 f,
                 "call {} ret {}",
@@ -79,7 +79,7 @@ impl fmt::Display for Jmp {
                 target,
                 return_.as_ref().unwrap_or(&Tid::new("?"))
             ),
-            Jmp::Return(expr) => write!(f, "ret {}", expr),
+            Jmp::Return(expr) => write!(f, "ret {expr}"),
             Jmp::CallOther {
                 description,
                 return_,
