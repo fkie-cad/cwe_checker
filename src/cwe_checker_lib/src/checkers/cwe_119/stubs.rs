@@ -50,7 +50,7 @@ impl<'a, 'b> ExternCallHandler<'a, 'b> {
                 warnings.append(&mut self.check_buffer_size(1, 2));
             }
             "fread" | "fwrite" => warnings.append(&mut self.check_buffer_size_and_count(0, 1, 2)),
-            "qsort" | "qsort_r" => warnings.append(&mut self.check_buffer_size_and_count(0, 2, 1)),
+            "qsort" | "qsort_s" => warnings.append(&mut self.check_buffer_size_and_count(0, 2, 1)),
             _ => self.handle_generic_call(),
         }
 
