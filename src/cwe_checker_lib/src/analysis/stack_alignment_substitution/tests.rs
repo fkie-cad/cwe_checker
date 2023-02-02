@@ -285,9 +285,7 @@ fn supports_commutative_and() {
         Expression::BinOp {
             op: BinOpType::IntAnd,
             lhs: Box::new(expr!("RSP:8")),
-            rhs: Box::new(Expression::const_from_apint(ApInt::from_u64(
-                0xFFFFFFFF_FFFFFFFF << 4, // 16 Byte alignment
-            ))),
+            rhs: Box::new(expr!(format!("{}:8", 0xFFFFFFFF_FFFFFFFF_u64 << 4))),
         },
     );
     let bitmask_and_var = Def::assign(
@@ -330,9 +328,7 @@ fn skips_empty_blocks() {
             lhs: Box::new(Expression::Var(
                 Project::mock_x64().stack_pointer_register.clone(),
             )),
-            rhs: Box::new(Expression::const_from_apint(ApInt::from_u64(
-                0xFFFFFFFF_FFFFFFFF << 4, // 16 Byte alignment
-            ))),
+            rhs: Box::new(expr!(format!("{}:8", 0xFFFFFFFF_FFFFFFFF_u64 << 4))),
         },
     );
     // get project with empty block

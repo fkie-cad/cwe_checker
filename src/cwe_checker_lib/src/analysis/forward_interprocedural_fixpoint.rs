@@ -333,6 +333,7 @@ mod tests {
                 create_computation_with_top_down_worklist_order,
             },
         },
+        expr,
         intermediate_representation::*,
     };
     use std::collections::{BTreeMap, HashMap, HashSet};
@@ -353,7 +354,7 @@ mod tests {
         let mut callee_block = new_block("callee block");
         callee_block.term.jmps.push(Term {
             tid: Tid::new("ret"),
-            term: Jmp::Return(Expression::const_from_i32(42)),
+            term: Jmp::Return(expr!("42:4")),
         });
 
         let called_function = Term {

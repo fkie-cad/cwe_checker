@@ -95,6 +95,32 @@ fn get_mock_entry_block() -> Term<Blk> {
 }
 
 #[test]
+fn expression_propagation() {
+    use super::*;
+
+    let defs = defs![
+        "tid_1: X:8 = -(Y:8)",
+        "tid_2: Y:8 = X:8 + Y:8",
+        "tid_3: X:8 = -(X:8)",
+        "tid_4: Y:8 = -(Y:8)",
+        "tid_5: Y:8 = X:8 + Y:8"
+    ];
+
+    let block = &mut Blk::mock();
+    block.term.defs = defs;
+
+    merge_def_assignments_to_same_var(block);
+    propagate_input_expressions(block, None);
+    let result_defs = defs![
+        "tid_1: X:8 = -(Y:8)",
+        "tid_2: Y:8 = -(Y:8) + Y:8",
+        "tid_3: X:8 = -(X:8)",
+        "tid_5: Y:8 = X:8 + -(Y:8)"
+    ];
+    assert_eq!(block.term.defs, result_defs);
+}
+
+#[test]
 /// Tests the propagation of insertable expressions among basic blocks.
 fn inter_block_propagation() {
     let mut project = mock_project();

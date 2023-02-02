@@ -5,6 +5,8 @@ use crate::{
         pointer_inference::State as PiState,
         string_abstraction::tests::mock_project_with_intraprocedural_control_flow,
     },
+    expr,
+    intermediate_representation::*,
 };
 use std::collections::BTreeSet;
 
@@ -156,7 +158,7 @@ fn test_handle_assign_and_load() {
     let output = Variable::mock("r1", 4);
     let constant_input = Expression::Const(Bitvector::from_str_radix(16, "7000").unwrap());
     let return_address_input = Expression::Const(Bitvector::from_str_radix(16, "14718").unwrap());
-    let other_input = Expression::var("r6", 4);
+    let other_input = expr!("r6:4");
 
     let mut block_first_def_set: HashSet<(Tid, Tid)> = HashSet::new();
     let mut return_tid = Tid::new("14718");

@@ -186,12 +186,12 @@ fn extract_results<'a>(
 ///
 /// This uses the expression propagation of basic blocks, thus performs intra-basic-block insertion of expressions.
 fn insert_expressions(
-    inseratables: HashMap<Tid, HashMap<Variable, Expression>>,
+    insertables: HashMap<Tid, HashMap<Variable, Expression>>,
     program: &mut Program,
 ) {
     for sub in program.subs.values_mut() {
         for block in sub.term.blocks.iter_mut() {
-            block.propagate_input_expressions(inseratables.get(&block.tid).cloned());
+            propagate_input_expressions(block, insertables.get(&block.tid).cloned());
         }
     }
 }
@@ -200,9 +200,130 @@ fn insert_expressions(
 fn merge_same_var_assignments(project: &mut Project) {
     for sub in project.program.term.subs.values_mut() {
         for blk in sub.term.blocks.iter_mut() {
-            blk.merge_def_assignments_to_same_var();
+            merge_def_assignments_to_same_var(blk);
         }
     }
+}
+
+/// Wherever possible, substitute input variables of expressions
+/// with the input expression that defines the input variable.
+///
+/// Note that substitution is only possible
+/// if the input variables of the input expression itself did not change since the definition of said variable.
+///
+/// The expression propagation allows more dead stores to be removed during
+/// [dead variable elimination](crate::analysis::dead_variable_elimination).
+pub fn propagate_input_expressions(
+    blk: &mut Term<Blk>,
+    apriori_insertable_expressions: Option<HashMap<Variable, Expression>>,
+) {
+    let mut insertable_expressions = HashMap::new();
+    if let Some(insertables) = apriori_insertable_expressions {
+        insertable_expressions = insertables;
+    }
+    for def in blk.term.defs.iter_mut() {
+        match &mut def.term {
+            Def::Assign {
+                var,
+                value: expression,
+            } => {
+                // insert known input expressions
+                for (input_var, input_expr) in insertable_expressions.iter() {
+                    expression.substitute_input_var(input_var, input_expr);
+                }
+                // expressions dependent on the assigned variable are no longer insertable
+                insertable_expressions.retain(|input_var, input_expr| {
+                    input_var != var && !input_expr.input_vars().into_iter().any(|x| x == var)
+                });
+                // If the value of the assigned variable does not depend on the former value of the variable,
+                // then it is insertable for future expressions.
+                if !expression.input_vars().into_iter().any(|x| x == var) {
+                    insertable_expressions.insert(var.clone(), expression.clone());
+                }
+            }
+            Def::Load {
+                var,
+                address: expression,
+            } => {
+                // insert known input expressions
+                for (input_var, input_expr) in insertable_expressions.iter() {
+                    expression.substitute_input_var(input_var, input_expr);
+                }
+                // expressions dependent on the assigned variable are no longer insertable
+                insertable_expressions.retain(|input_var, input_expr| {
+                    input_var != var && !input_expr.input_vars().into_iter().any(|x| x == var)
+                });
+            }
+            Def::Store { address, value } => {
+                // insert known input expressions
+                for (input_var, input_expr) in insertable_expressions.iter() {
+                    address.substitute_input_var(input_var, input_expr);
+                    value.substitute_input_var(input_var, input_expr);
+                }
+            }
+        }
+    }
+    for jump in blk.term.jmps.iter_mut() {
+        match &mut jump.term {
+            Jmp::Branch(_) | Jmp::Call { .. } | Jmp::CallOther { .. } => (),
+            Jmp::BranchInd(expr)
+            | Jmp::CBranch {
+                condition: expr, ..
+            }
+            | Jmp::CallInd { target: expr, .. }
+            | Jmp::Return(expr) => {
+                // insert known input expressions
+                for (input_var, input_expr) in insertable_expressions.iter() {
+                    expr.substitute_input_var(input_var, input_expr);
+                }
+            }
+        }
+    }
+}
+
+/// Merge subsequent assignments to the same variable to a single assignment to that variable.
+pub fn merge_def_assignments_to_same_var(blk: &mut Term<Blk>) {
+    let mut new_defs = Vec::new();
+    let mut last_def_opt = None;
+    for def in blk.term.defs.iter() {
+        if let Def::Assign {
+            var: current_var, ..
+        } = &def.term
+        {
+            if let Some(Term {
+                term:
+                    Def::Assign {
+                        var: last_var,
+                        value: last_value,
+                    },
+                ..
+            }) = &last_def_opt
+            {
+                if current_var == last_var {
+                    let mut substituted_def = def.clone();
+                    substituted_def.substitute_input_var(last_var, last_value);
+                    last_def_opt = Some(substituted_def);
+                } else {
+                    new_defs.push(last_def_opt.unwrap());
+                    last_def_opt = Some(def.clone());
+                }
+            } else if last_def_opt.is_some() {
+                panic!(); // Only assign-defs should be saved in last_def.
+            } else {
+                last_def_opt = Some(def.clone());
+            }
+        } else {
+            if let Some(last_def) = last_def_opt {
+                new_defs.push(last_def);
+            }
+            new_defs.push(def.clone());
+            last_def_opt = None;
+        }
+    }
+    if let Some(last_def) = last_def_opt {
+        new_defs.push(last_def);
+    }
+    blk.term.defs = new_defs;
 }
 
 /// Replaces variables by expressions that can be propagated within functions.

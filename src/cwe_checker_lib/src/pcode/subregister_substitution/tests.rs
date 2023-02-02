@@ -1,4 +1,4 @@
-use crate::intermediate_representation::CastOpType;
+use crate::{def, intermediate_representation::*};
 
 use super::*;
 
@@ -244,20 +244,8 @@ fn piecing_or_zero_extending() {
     register_map.insert(&setup.rcx_name, &setup.rcx_register);
     register_map.insert(&setup.ah_name, &setup.ah_register);
 
-    let eax_assign = Term {
-        tid: Tid::new("eax_assign"),
-        term: Def::Assign {
-            var: Variable::mock("EAX", 4),
-            value: Expression::const_from_i32(0),
-        },
-    };
-    let load_to_eax = Term {
-        tid: Tid::new("load_to_eax"),
-        term: Def::Load {
-            var: Variable::mock("EAX", 4),
-            address: Expression::const_from_i64(0),
-        },
-    };
+    let eax_assign = def!["eax_assign: EAX:4 = 0:4"];
+    let load_to_eax = def!["load_to_eax: EAX:4 := Load from 0:8"];
     let ah_assign = Term {
         tid: Tid::new("ah_assign"),
         term: Def::Assign {
