@@ -1,5 +1,4 @@
 use crate::{def, expr, intermediate_representation::*, variable};
-
 use super::*;
 
 struct Setup<'a> {

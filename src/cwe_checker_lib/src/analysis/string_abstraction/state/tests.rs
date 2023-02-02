@@ -6,8 +6,8 @@ use crate::{
         string_abstraction::tests::mock_project_with_intraprocedural_control_flow,
     },
     expr,
-    intermediate_representation::*,
-    variable,
+    intermediate_representation::*, variable,
+
 };
 use std::collections::BTreeSet;
 
