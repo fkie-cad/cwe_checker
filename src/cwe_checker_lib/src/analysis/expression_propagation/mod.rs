@@ -186,12 +186,12 @@ fn extract_results<'a>(
 ///
 /// This uses the expression propagation of basic blocks, thus performs intra-basic-block insertion of expressions.
 fn insert_expressions(
-    inseratables: HashMap<Tid, HashMap<Variable, Expression>>,
+    insertatables: HashMap<Tid, HashMap<Variable, Expression>>,
     program: &mut Program,
 ) {
     for sub in program.subs.values_mut() {
         for block in sub.term.blocks.iter_mut() {
-            propagate_input_expressions(block, inseratables.get(&block.tid).cloned());
+            propagate_input_expressions(block, insertatables.get(&block.tid).cloned());
         }
     }
 }
