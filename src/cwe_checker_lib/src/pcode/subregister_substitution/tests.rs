@@ -1,5 +1,5 @@
-use crate::{def, expr, intermediate_representation::*, variable};
 use super::*;
+use crate::{def, expr, intermediate_representation::*, variable};
 
 struct Setup<'a> {
     register_map: HashMap<&'a String, &'a RegisterProperties>,
