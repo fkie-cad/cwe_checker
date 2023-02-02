@@ -80,33 +80,3 @@ impl fmt::Display for Blk {
         Ok(())
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    impl Blk {
-        /// Creates empty block with tid "block".
-        pub fn mock() -> Term<Blk> {
-            Term {
-                tid: Tid::new("block"),
-                term: Blk {
-                    defs: Vec::new(),
-                    jmps: Vec::new(),
-                    indirect_jmp_targets: Vec::new(),
-                },
-            }
-        }
-
-        pub fn mock_with_tid(tid: &str) -> Term<Blk> {
-            Term {
-                tid: Tid::new(tid),
-                term: Blk {
-                    defs: Vec::new(),
-                    jmps: Vec::new(),
-                    indirect_jmp_targets: Vec::new(),
-                },
-            }
-        }
-    }
-}

@@ -245,12 +245,13 @@ fn negate_condition(expr: Expression) -> Expression {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use crate::{def, expr};
     use std::collections::BTreeMap;
 
     fn mock_condition_block(name: &str, if_target: &str, else_target: &str) -> Term<Blk> {
         let if_jmp = Jmp::CBranch {
             target: Tid::new(if_target),
-            condition: Expression::Var(Variable::mock("zero_flag", ByteSize::new(1))),
+            condition: expr!("zero_flag:1"),
         };
         let if_jmp = Term {
             tid: Tid::new(name.to_string() + "_jmp_if"),
@@ -273,14 +274,8 @@ pub mod tests {
     }
 
     fn mock_block_with_defs(name: &str, return_target: &str) -> Term<Blk> {
-        let def = Def::Assign {
-            var: Variable::mock("r0", ByteSize::new(4)),
-            value: Expression::Var(Variable::mock("r1", ByteSize::new(4))),
-        };
-        let def = Term {
-            tid: Tid::new(name.to_string() + "_def"),
-            term: def,
-        };
+        let def = def![format!("{name}_def: r0:4 = r1:4")];
+
         let jmp = Jmp::Branch(Tid::new(return_target));
         let jmp = Term {
             tid: Tid::new(name.to_string() + "_jmp"),

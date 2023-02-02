@@ -13,10 +13,10 @@ use crate::analysis::pointer_inference::PointerInference as PointerInferenceComp
 use crate::analysis::pointer_inference::State as PiState;
 use crate::analysis::string_abstraction::state::State;
 use crate::analysis::string_abstraction::tests::*;
-use crate::intermediate_representation::{Bitvector, ExternSymbol, Project, Sub};
+use crate::intermediate_representation::*;
+use crate::variable;
 use crate::{
     abstract_domain::{AbstractIdentifier, AbstractLocation},
-    intermediate_representation::{Tid, Variable},
     utils::symbol_utils::get_symbol_map,
 };
 
@@ -119,7 +119,7 @@ fn test_handle_generic_symbol_calls() {
     let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
     setup.state_before_call.add_new_variable_to_pointer_entry(
-        Variable::mock("r1", 4),
+        variable!("r1:4"),
         DataDomain::from(IntervalDomain::from(Bitvector::from_i32(32))),
     );
 
@@ -143,7 +143,7 @@ fn test_handle_unknown_symbol_calls() {
     let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
     setup.state_before_call.add_new_variable_to_pointer_entry(
-        Variable::mock("r1", 4),
+        variable!("r1:4"),
         DataDomain::from(IntervalDomain::from(Bitvector::from_i32(32))),
     );
 
@@ -174,7 +174,7 @@ fn test_add_new_string_abstract_domain() {
 
     let stack_id = AbstractIdentifier::new(
         Tid::new("func"),
-        AbstractLocation::from_var(&Variable::mock("sp", 4)).unwrap(),
+        AbstractLocation::from_var(&variable!("sp:4")).unwrap(),
     );
     let stack_pointer = DataDomain::from_target(
         stack_id.clone(),
@@ -194,7 +194,7 @@ fn test_add_new_string_abstract_domain() {
 
     let heap_id = AbstractIdentifier::new(
         Tid::new("func"),
-        AbstractLocation::from_var(&Variable::mock("r5", 4)).unwrap(),
+        AbstractLocation::from_var(&variable!("r5:4")).unwrap(),
     );
 
     let heap_pointer = DataDomain::from_target(
@@ -227,12 +227,12 @@ fn test_merge_domains_from_multiple_pointer_targets() {
 
     let stack_id = AbstractIdentifier::new(
         Tid::new("func"),
-        AbstractLocation::from_var(&Variable::mock("sp", 4)).unwrap(),
+        AbstractLocation::from_var(&variable!("sp:4")).unwrap(),
     );
 
     let heap_id = AbstractIdentifier::new(
         Tid::new("func"),
-        AbstractLocation::from_var(&Variable::mock("r5", 4)).unwrap(),
+        AbstractLocation::from_var(&variable!("r5:4")).unwrap(),
     );
 
     let mut domain_pointer: DataDomain<IntervalDomain> =
@@ -424,7 +424,7 @@ fn test_insert_constant_string_into_format_string() {
 fn test_handle_free() {
     let free_symbol = ExternSymbol::mock_free_symbol_arm();
     let malloc_symbol = ExternSymbol::mock_malloc_symbol_arm();
-    let r0_reg = Variable::mock("r0", 4);
+    let r0_reg = variable!("r0:4");
     let project = mock_project_with_intraprocedural_control_flow(
         vec![
             (malloc_symbol.clone(), vec![]),

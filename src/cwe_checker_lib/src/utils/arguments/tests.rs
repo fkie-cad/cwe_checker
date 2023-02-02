@@ -1,18 +1,11 @@
 use std::collections::BTreeSet;
 
-use crate::{
-    abstract_domain::IntervalDomain,
-    intermediate_representation::{Bitvector, Tid},
-};
+use crate::{abstract_domain::IntervalDomain, expr, intermediate_representation::*, variable};
 
 use super::*;
 
 fn mock_pi_state() -> PointerInferenceState {
-    PointerInferenceState::new(
-        &Variable::mock("RSP", 8 as u64),
-        Tid::new("func"),
-        BTreeSet::new(),
-    )
+    PointerInferenceState::new(&variable!("RSP:8"), Tid::new("func"), BTreeSet::new())
 }
 
 #[test]
@@ -24,20 +17,14 @@ fn test_get_variable_parameters() {
     format_string_index_map.insert("sprintf".to_string(), 1);
     let global_address = Bitvector::from_str_radix(16, "5000").unwrap();
     pi_state.set_register(
-        &Variable::mock("RSI", 8 as u64),
+        &variable!("RSI:8"),
         IntervalDomain::new(global_address.clone(), global_address).into(),
     );
     let project = Project::mock_x64();
 
     let mut output: Vec<Arg> = Vec::new();
-    output.push(Arg::from_var(
-        Variable::mock("RDX", 8),
-        Some(Datatype::Char),
-    ));
-    output.push(Arg::from_var(
-        Variable::mock("RCX", 8),
-        Some(Datatype::Integer),
-    ));
+    output.push(Arg::from_var(variable!("RDX:8"), Some(Datatype::Char)));
+    output.push(Arg::from_var(variable!("RCX:8"), Some(Datatype::Integer)));
 
     assert_eq!(
         output,
@@ -50,14 +37,11 @@ fn test_get_variable_parameters() {
         .unwrap()
     );
 
-    output = vec![Arg::from_var(
-        Variable::mock("RDX", 8),
-        Some(Datatype::Pointer),
-    )];
+    output = vec![Arg::from_var(variable!("RDX:8"), Some(Datatype::Pointer))];
 
     let global_address = Bitvector::from_str_radix(16, "500c").unwrap();
     pi_state.set_register(
-        &Variable::mock("RSI", 8 as u64),
+        &variable!("RSI:8"),
         IntervalDomain::new(global_address.clone(), global_address).into(),
     );
 
@@ -81,7 +65,7 @@ fn test_get_input_format_string() {
 
     let global_address = Bitvector::from_str_radix(16, "3002").unwrap();
     pi_state.set_register(
-        &Variable::mock("RSI", 8 as u64),
+        &variable!("RSI:8"),
         IntervalDomain::new(global_address.clone(), global_address).into(),
     );
 
@@ -199,19 +183,15 @@ fn test_calculate_parameter_locations() {
 
     let mut expected_args = vec![
         Arg::Register {
-            expr: Expression::Var(Variable::mock("RDX", ByteSize::new(8))),
+            expr: expr!("RDX:8"),
             data_type: Some(Datatype::Integer),
         },
         Arg::Register {
-            expr: Expression::subpiece(
-                Expression::Var(Variable::mock("ZMM0", 64)),
-                ByteSize::new(0),
-                ByteSize::new(8),
-            ),
+            expr: Expression::subpiece(expr!("ZMM0:64"), ByteSize::new(0), ByteSize::new(8)),
             data_type: Some(Datatype::Double),
         },
         Arg::Register {
-            expr: Expression::Var(Variable::mock("RCX", ByteSize::new(8))),
+            expr: expr!("RCX:8"),
             data_type: Some(Datatype::Pointer),
         },
     ];
@@ -227,15 +207,15 @@ fn test_calculate_parameter_locations() {
     parameters.push(("s".to_string().into(), ByteSize::new(8)));
 
     expected_args.push(Arg::Register {
-        expr: Expression::Var(Variable::mock("R8", ByteSize::new(8))),
+        expr: expr!("R8:8"),
         data_type: Some(Datatype::Pointer),
     });
     expected_args.push(Arg::Register {
-        expr: Expression::Var(Variable::mock("R9", ByteSize::new(8))),
+        expr: expr!("R9:8"),
         data_type: Some(Datatype::Pointer),
     });
     expected_args.push(Arg::Stack {
-        address: Expression::Var(Variable::mock("RSP", 8)).plus_const(8),
+        address: expr!("RSP:8 + 8:8"),
         size: ByteSize::new(8),
         data_type: Some(Datatype::Pointer),
     });
@@ -251,15 +231,10 @@ fn test_calculate_parameter_locations() {
 fn test_create_stack_arg() {
     assert_eq!(
         Arg::Stack {
-            address: Expression::Var(Variable::mock("RSP", 8)).plus_const(8),
+            address: expr!("RSP:8 + 8:8"),
             size: ByteSize::new(8),
             data_type: Some(Datatype::Pointer),
         },
-        create_stack_arg(
-            ByteSize::new(8),
-            8,
-            Datatype::Pointer,
-            &Variable::mock("RSP", 8)
-        ),
+        create_stack_arg(ByteSize::new(8), 8, Datatype::Pointer, &variable!("RSP:8")),
     )
 }

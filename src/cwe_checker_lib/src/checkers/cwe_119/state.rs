@@ -269,7 +269,7 @@ fn collect_tids_for_cwe_warning(
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::intermediate_representation::Variable;
+    use crate::{intermediate_representation::*, variable};
 
     #[test]
     fn test_new() {
@@ -279,7 +279,7 @@ pub mod tests {
             &FunctionSignature::mock_x64(),
             context.project,
         );
-        let stack_id = AbstractIdentifier::from_var(Tid::new("func"), &Variable::mock("RSP", 8));
+        let stack_id = AbstractIdentifier::from_var(Tid::new("func"), &variable!("RSP:8"));
 
         assert_eq!(state.stack_id, stack_id);
         assert_eq!(state.object_lower_bounds.len(), 1);
@@ -302,7 +302,7 @@ pub mod tests {
             &FunctionSignature::mock_x64(),
             context.project,
         );
-        let stack_id = AbstractIdentifier::from_var(Tid::new("func"), &Variable::mock("RSP", 8));
+        let stack_id = AbstractIdentifier::from_var(Tid::new("func"), &variable!("RSP:8"));
         // access in bounds
         let address = Data::from_target(stack_id.clone(), Bitvector::from_i64(-12).into());
         assert!(state
