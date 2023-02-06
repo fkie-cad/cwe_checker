@@ -1,5 +1,7 @@
 //! This module contains the implementations of various builder functions for
-//! the higher intermediate representation [Project], [Program] and [RuntimeMemoryImage].
+//! the higher intermediate representation [Project](crate::intermediate_representation::Expression),
+//! [Program](crate::intermediate_representation::Expression)
+//! and [RuntimeMemoryImage](crate::intermediate_representation::Expression).
 
 #[cfg(test)]
 use crate::utils::binary::MemorySegment;

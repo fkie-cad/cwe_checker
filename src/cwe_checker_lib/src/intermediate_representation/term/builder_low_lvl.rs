@@ -1,6 +1,12 @@
 //! This module contains the implementations of various builder functions
-//! for lower intermediate representation terms [Expression], [Jmp], [Def],
-//! [DatatypeProperties], [Blk], [Sub], [CallingConvention], [Arg] and [ExternSymbol]
+//! for lower intermediate representation terms [Expression](crate::intermediate_representation::Expression),
+//! [Jmp](crate::intermediate_representation::Expression), [Def](crate::intermediate_representation::Expression),
+//! [DatatypeProperties](crate::intermediate_representation::Expression),
+//! [Blk](crate::intermediate_representation::Expression),
+//! [Sub](crate::intermediate_representation::Expression),
+//! [CallingConvention](crate::intermediate_representation::Expression),
+//! [Arg](crate::intermediate_representation::Expression) and
+//! [ExternSymbol](crate::intermediate_representation::Expression)
 //!
 #[cfg(test)]
 use crate::{expr, intermediate_representation::*, variable};
