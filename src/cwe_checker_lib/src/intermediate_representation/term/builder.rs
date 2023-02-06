@@ -139,6 +139,7 @@ impl DatatypeProperties {
             short_size: ByteSize::new(2),
         }
     }
+
     /// Datatype sizes according to System V ABI
     pub fn mock_x64() -> DatatypeProperties {
         DatatypeProperties {
@@ -182,6 +183,7 @@ impl Blk {
             },
         }
     }
+
     /// Creates empty block with tid "block".
     pub fn mock() -> Term<Blk> {
         Self::mock_with_tid("block")
@@ -200,6 +202,7 @@ impl Sub {
         }
     }
 }
+
 /// Wrapper for subpiece to model float register for argument passing
 #[cfg(test)]
 fn create_float_register_subpiece(
@@ -214,6 +217,7 @@ fn create_float_register_subpiece(
         ByteSize::new(size),
     )
 }
+
 #[cfg(test)]
 impl CallingConvention {
     /// Creates System V Calling Convention with Advanced Vector Extensions 512
@@ -255,6 +259,7 @@ impl CallingConvention {
             ],
         }
     }
+
     /// Following ARM32 ABI with MVE Extention
     pub fn mock_arm32() -> CallingConvention {
         CallingConvention {
@@ -306,6 +311,7 @@ impl CallingConvention {
         }
     }
 }
+
 #[cfg(test)]
 impl Arg {
     pub fn mock_register(name: impl ToString, size_in_bytes: impl Into<ByteSize>) -> Arg {
@@ -333,6 +339,7 @@ impl Arg {
         }
     }
 }
+
 #[cfg(test)]
 impl ExternSymbol {
     pub fn mock_x64(name: impl ToString) -> ExternSymbol {
@@ -501,6 +508,7 @@ impl Program {
             address_base_offset: 0x1000u64,
         }
     }
+
     /// Returns Program with malloc, free and other_function
     pub fn mock_x64() -> Program {
         let malloc = ExternSymbol::create_extern_symbol(
@@ -528,6 +536,7 @@ impl Program {
             (other_function.tid.clone(), other_function),
         ])
     }
+
     /// Returns Program with malloc, free and other_function
     pub fn mock_arm32() -> Program {
         let malloc = ExternSymbol::create_extern_symbol(
