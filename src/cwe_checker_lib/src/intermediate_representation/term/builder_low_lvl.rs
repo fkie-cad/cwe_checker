@@ -1,6 +1,7 @@
 //! This module contains the implementations of various builder functions
 //! for lower intermediate representation terms [Expression], [Jmp], [Def],
 //! [DatatypeProperties], [Blk], [Sub], [CallingConvention], [Arg] and [ExternSymbol]
+//!
 #[cfg(test)]
 use crate::{expr, intermediate_representation::*, variable};
 
@@ -186,6 +187,7 @@ impl Blk {
         Self::mock_with_tid("block")
     }
 }
+
 #[cfg(test)]
 impl Sub {
     pub fn mock(name: impl ToString) -> Term<Sub> {
