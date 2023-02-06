@@ -1,7 +1,9 @@
 use crate::analysis::graph::{Edge, Graph, Node};
 use crate::intermediate_representation::*;
+use itertools::Itertools;
 use petgraph::graph::NodeIndex;
-use std::collections::{BTreeSet, HashMap};
+use petgraph::Direction::Incoming;
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 /// The `propagate_control_flow` normalization pass tries to simplify the representation of
 /// sequences of if-else blocks that all have the same condition
@@ -13,15 +15,17 @@ use std::collections::{BTreeSet, HashMap};
 /// we look for sequences of (conditional) jumps where the final jump target is determined by the source of the first jump
 /// (because we know that the conditionals for all jumps evaluate to the same value along the sequence).
 /// For such a sequence we then retarget the destination of the first jump to the final jump destination of the sequence.
+/// Lastly, the newly bypassed blocks are considered dead code and are removed.
 pub fn propagate_control_flow(project: &mut Project) {
-    let extern_subs = project
+    let extern_subs: HashSet<Tid> = project
         .program
         .term
         .extern_symbols
         .keys()
         .cloned()
         .collect();
-    let cfg = crate::analysis::graph::get_program_cfg(&project.program, extern_subs);
+    let cfg = crate::analysis::graph::get_program_cfg(&project.program, extern_subs.clone());
+    let nodes_without_incomming_edges_at_beginning = get_nodes_without_incomming_edge(&cfg);
 
     let mut jmps_to_retarget = HashMap::new();
     for node in cfg.node_indices() {
@@ -71,6 +75,15 @@ pub fn propagate_control_flow(project: &mut Project) {
         }
     }
     retarget_jumps(project, jmps_to_retarget);
+
+    let cfg = crate::analysis::graph::get_program_cfg(&project.program, extern_subs);
+    let nodes_without_incomming_edges_at_end = get_nodes_without_incomming_edge(&cfg);
+
+    remove_new_orphaned_blocks(
+        project,
+        nodes_without_incomming_edges_at_beginning,
+        nodes_without_incomming_edges_at_end,
+    );
 }
 
 /// Insert the new target TIDs into jump instructions for which a new target was computed.
@@ -79,6 +92,7 @@ fn retarget_jumps(project: &mut Project, mut jmps_to_retarget: HashMap<Tid, Tid>
         for blk in sub.term.blocks.iter_mut() {
             for jmp in blk.term.jmps.iter_mut() {
                 if let Some(new_target) = jmps_to_retarget.remove(&jmp.tid) {
+                    println!("block: {}: {} ---> {}", blk.tid, jmp.term, new_target);
                     match &mut jmp.term {
                         Jmp::Branch(target) | Jmp::CBranch { target, .. } => *target = new_target,
                         _ => panic!("Unexpected type of jump encountered."),
@@ -242,15 +256,44 @@ fn negate_condition(expr: Expression) -> Expression {
     }
 }
 
+/// Iterates the CFG and returns all node's blocks, that do not have an incoming edge.
+fn get_nodes_without_incomming_edge(cfg: &Graph) -> HashSet<Tid> {
+    let mut nodes_without_incomming_edges = HashSet::new();
+    for node in cfg.node_indices() {
+        if cfg.neighbors_directed(node, Incoming).next().is_none() {
+            println!("{}", cfg[node].get_block().tid.clone());
+            nodes_without_incomming_edges.insert(cfg[node].get_block().tid.clone());
+        }
+    }
+    nodes_without_incomming_edges
+}
+
+/// Calculates the difference of the orphaned blocks and removes them from the project.
+fn remove_new_orphaned_blocks(
+    project: &mut Project,
+    orphaned_blocks_before: HashSet<Tid>,
+    orphaned_blocks_after: HashSet<Tid>,
+) {
+    let new_orphan_blocks = orphaned_blocks_after
+        .difference(&orphaned_blocks_before)
+        .collect_vec();
+    for sub in project.program.term.subs.values_mut() {
+        sub.term
+            .blocks
+            .retain(|blk| !new_orphan_blocks.contains(&&blk.tid));
+    }
+}
+
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use crate::{def, expr};
     use std::collections::BTreeMap;
 
     fn mock_condition_block(name: &str, if_target: &str, else_target: &str) -> Term<Blk> {
         let if_jmp = Jmp::CBranch {
             target: Tid::new(if_target),
-            condition: Expression::Var(Variable::mock("zero_flag", ByteSize::new(1))),
+            condition: expr!("ZF:1"),
         };
         let if_jmp = Term {
             tid: Tid::new(name.to_string() + "_jmp_if"),
@@ -273,14 +316,7 @@ pub mod tests {
     }
 
     fn mock_block_with_defs(name: &str, return_target: &str) -> Term<Blk> {
-        let def = Def::Assign {
-            var: Variable::mock("r0", ByteSize::new(4)),
-            value: Expression::Var(Variable::mock("r1", ByteSize::new(4))),
-        };
-        let def = Term {
-            tid: Tid::new(name.to_string() + "_def"),
-            term: def,
-        };
+        let def = def![format!("{name}_def: r0:4 = r1:4")];
         let jmp = Jmp::Branch(Tid::new(return_target));
         let jmp = Term {
             tid: Tid::new(name.to_string() + "_jmp"),
@@ -323,9 +359,9 @@ pub mod tests {
         let expected_blocks = vec![
             mock_condition_block("cond_blk_1", "def_blk_1", "end_blk"),
             mock_block_with_defs("def_blk_1", "def_blk_2"),
-            mock_condition_block("cond_blk_2", "def_blk_2", "end_blk"),
+            // cond_blk_2 removed, since no incomming edge anymore
             mock_block_with_defs("def_blk_2", "def_blk_3"),
-            mock_condition_block("cond_blk_3", "def_blk_3", "end_blk"),
+            // cond_blk_3 removed, since no incomming edge anymore
             mock_block_with_defs("def_blk_3", "end_blk"),
             mock_block_with_defs("end_blk", "end_blk"),
         ];
