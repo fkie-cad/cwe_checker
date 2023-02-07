@@ -1,5 +1,3 @@
-use crate::variable;
-
 use super::super::ValueDomain;
 use super::*;
 use crate::{bitvec, def, expr, variable};
