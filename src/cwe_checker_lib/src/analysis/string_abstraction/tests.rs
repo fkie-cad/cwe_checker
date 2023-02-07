@@ -1,48 +1,4 @@
-use crate::{def, defs, expr, intermediate_representation::*, variable};
-
-// FIXME: Move this function to the intermediate_representation module
-pub fn pointer_plus_offset_to_temp_var(
-    tid: &str,
-    tmp_name: &str,
-    pointer: &str,
-    offset: i64,
-) -> Term<Def> {
-    Def::assign(
-        tid,
-        Variable {
-            name: String::from(tmp_name),
-            size: ByteSize::new(4),
-            is_temp: true,
-        },
-        expr!(format!("{}:4 + {}:4", pointer, offset)),
-    )
-}
-
-// FIXME: Move this function to the intermediate_representation module
-pub fn store_var_content_at_temp_var(tid: &str, tmp_name: &str, var: &str) -> Term<Def> {
-    Def::store(
-        tid,
-        Expression::Var(Variable {
-            name: String::from(tmp_name),
-            size: ByteSize::new(4),
-            is_temp: true,
-        }),
-        expr!(format!("{}:4", var)),
-    )
-}
-
-// FIXME: Move this function to the intermediate_representation module
-pub fn load_var_content_from_temp_var(tid: &str, var: &str, tmp_name: &str) -> Term<Def> {
-    Def::load(
-        tid,
-        variable!(format!("{}:4", var)),
-        Expression::Var(Variable {
-            name: String::from(tmp_name),
-            size: ByteSize::new(4),
-            is_temp: true,
-        }),
-    )
-}
+use crate::{def, defs, intermediate_representation::*};
 
 fn mock_defs_for_sprintf(format_known: bool, blk_num: usize) -> Vec<Term<Def>> {
     /*
@@ -81,13 +37,13 @@ fn mock_defs_for_sprintf(format_known: bool, blk_num: usize) -> Vec<Term<Def>> {
         .as_mut(),
     );
 
-    defs.push(pointer_plus_offset_to_temp_var(
+    defs.push(Def::pointer_plus_offset_to_temp_var(
         &format!("def_6_blk_{}", blk_num),
         "$U1050",
         "sp",
         0,
     ));
-    defs.push(store_var_content_at_temp_var(
+    defs.push(Def::store_var_content_at_temp_var(
         &format!("def_7_blk_{}", blk_num),
         "$U1050",
         "r12",
@@ -98,13 +54,13 @@ fn mock_defs_for_sprintf(format_known: bool, blk_num: usize) -> Vec<Term<Def>> {
         blk_num
     )]);
 
-    defs.push(pointer_plus_offset_to_temp_var(
+    defs.push(Def::pointer_plus_offset_to_temp_var(
         &format!("def_9_blk_{}", blk_num),
         "$U1050",
         "sp",
         4,
     ));
-    defs.push(store_var_content_at_temp_var(
+    defs.push(Def::store_var_content_at_temp_var(
         &format!("def_10_blk_{}", blk_num),
         "$U1050",
         "r12",
@@ -132,14 +88,14 @@ fn mock_defs_for_scanf(format_known: bool, blk_num: usize) -> Vec<Term<Def>> {
         format!("def_1_blk_{}: r0:4 = r11:4 - 0x3c:4", blk_num)
     ];
 
-    defs.push(pointer_plus_offset_to_temp_var(
+    defs.push(Def::pointer_plus_offset_to_temp_var(
         &format!("def_2_blk_{}", blk_num),
         "$U1050",
         "sp",
         0,
     ));
 
-    defs.push(store_var_content_at_temp_var(
+    defs.push(Def::store_var_content_at_temp_var(
         &format!("def_3_blk_{}", blk_num),
         "$U1050",
         "r0",
@@ -196,14 +152,14 @@ fn mock_defs_for_sscanf(source_known: bool, format_known: bool, blk_num: usize) 
         format!("def_1_blk_{}: r3:4 = r11:4 - 0x96:4", blk_num)
     ];
 
-    defs.push(pointer_plus_offset_to_temp_var(
+    defs.push(Def::pointer_plus_offset_to_temp_var(
         &format!("def_2_blk_{}", blk_num),
         "$U1050",
         "sp",
         0,
     ));
 
-    defs.push(store_var_content_at_temp_var(
+    defs.push(Def::store_var_content_at_temp_var(
         &format!("def_3_blk_{}", blk_num),
         "$U1050",
         "r3",
@@ -214,13 +170,13 @@ fn mock_defs_for_sscanf(source_known: bool, format_known: bool, blk_num: usize) 
         blk_num
     )]);
 
-    defs.push(pointer_plus_offset_to_temp_var(
+    defs.push(Def::pointer_plus_offset_to_temp_var(
         &format!("def_5_blk_{}", blk_num),
         "$U1050",
         "sp",
         4,
     ));
-    defs.push(store_var_content_at_temp_var(
+    defs.push(Def::store_var_content_at_temp_var(
         &format!("def_6_blk_{}", blk_num),
         "$U1050",
         "r3",

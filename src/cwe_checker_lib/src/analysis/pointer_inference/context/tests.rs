@@ -1,3 +1,5 @@
+use crate::variable;
+
 use super::super::ValueDomain;
 use super::*;
 
@@ -8,7 +10,7 @@ fn bv(value: i64) -> ValueDomain {
 fn new_id(time: &str, reg_name: &str) -> AbstractIdentifier {
     AbstractIdentifier::new(
         Tid::new(time),
-        AbstractLocation::Register(Variable::mock(reg_name, ByteSize::new(8))),
+        AbstractLocation::Register(variable!(format!("{reg_name}:8"))),
     )
 }
 
@@ -352,7 +354,7 @@ fn handle_extern_symbol_stubs() {
     extern_symbol.parameters = vec![Arg::mock_register("RDI", 8), Arg::mock_register("RSI", 8)];
 
     state.set_register(
-        &Variable::mock("RDI", 8),
+        &variable!("RDI:8"),
         Data::from_target(
             AbstractIdentifier::mock("param", "RBX", 8),
             Bitvector::from_u64(0).into(),
@@ -367,7 +369,7 @@ fn handle_extern_symbol_stubs() {
     new_state.set_register(&cconv.integer_return_register[0], return_value);
 
     assert_eq!(
-        new_state.get_register(&Variable::mock("RAX", 8)),
+        new_state.get_register(&variable!("RAX:8")),
         Data::from_target(
             AbstractIdentifier::mock("param", "RBX", 8),
             IntervalDomain::new_top(ByteSize::new(8)),

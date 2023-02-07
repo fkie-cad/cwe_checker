@@ -1,6 +1,7 @@
 use crate::prelude::*;
 
-mod builder;
+mod builder_high_lvl;
+mod builder_low_lvl;
 
 /// A term identifier consisting of an ID string (which is required to be unique)
 /// and an address to indicate where the term is located.

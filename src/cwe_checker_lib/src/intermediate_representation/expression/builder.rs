@@ -1,38 +1,7 @@
-#[cfg(test)]
-use super::CastOpType;
 use super::*;
 
 /// ## Helper functions for building expressions
 impl Expression {
-    /// Shortcut for creating a cast expression
-    #[cfg(test)]
-    pub fn cast(self, op: CastOpType) -> Expression {
-        Expression::Cast {
-            op,
-            size: ByteSize::new(8),
-            arg: Box::new(self),
-        }
-    }
-
-    /// Shortcut for creating a subpiece expression
-    #[cfg(test)]
-    pub fn subpiece(self, low_byte: ByteSize, size: ByteSize) -> Expression {
-        Expression::Subpiece {
-            low_byte,
-            size,
-            arg: Box::new(self),
-        }
-    }
-
-    /// Shortcut for creating unary operation expressions.
-    #[cfg(test)]
-    pub fn un_op(self, op: UnOpType) -> Expression {
-        Expression::UnOp {
-            op,
-            arg: Box::new(self),
-        }
-    }
-
     /// Shortcut for creating an `IntAdd`-expression
     pub fn plus(self, rhs: Expression) -> Expression {
         Expression::BinOp {

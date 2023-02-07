@@ -107,10 +107,9 @@ mod tests {
             context::symbol_calls::tests::Setup,
             tests::mock_project_with_intraprocedural_control_flow,
         },
-        intermediate_representation::{ByteSize, Variable},
+        intermediate_representation::*,
+        variable,
     };
-
-    use super::*;
 
     #[test]
     fn test_handle_strcat_and_strncat_calls_with_known_second_input() {
@@ -247,7 +246,7 @@ mod tests {
 
     #[test]
     fn test_process_second_input_domain_local_and_global() {
-        let r1_reg = Variable::mock("r1", ByteSize::new(4));
+        let r1_reg = variable!("r1:4");
         let strcat_symbol = ExternSymbol::mock_strcat_symbol_arm();
         let project = mock_project_with_intraprocedural_control_flow(
             vec![(strcat_symbol.clone(), vec![false])],

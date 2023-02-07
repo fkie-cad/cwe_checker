@@ -7,7 +7,7 @@ use crate::{
         AbstractDomain, DataDomain, DomainInsertion, HasTop, IntervalDomain, TryToBitvec,
     },
     analysis::string_abstraction::{context::Context, state::State},
-    intermediate_representation::ExternSymbol,
+    intermediate_representation::*,
 };
 use std::collections::BTreeMap;
 
@@ -206,7 +206,8 @@ mod tests {
             context::symbol_calls::tests::Setup,
             tests::mock_project_with_intraprocedural_control_flow,
         },
-        intermediate_representation::{Bitvector, Tid, Variable},
+        intermediate_representation::{Bitvector, Tid},
+        variable,
     };
     use std::collections::{BTreeMap, BTreeSet};
 
@@ -226,12 +227,12 @@ mod tests {
 
         let stack_id = AbstractIdentifier::new(
             Tid::new("func"),
-            AbstractLocation::from_var(&Variable::mock("sp", 4)).unwrap(),
+            AbstractLocation::from_var(&variable!("sp:4")).unwrap(),
         );
 
         let heap_id = AbstractIdentifier::new(
             Tid::new("func"),
-            AbstractLocation::from_var(&Variable::mock("r5", 4)).unwrap(),
+            AbstractLocation::from_var(&variable!("r5:4")).unwrap(),
         );
 
         let mut parameter_pointer: DataDomain<IntervalDomain> =
@@ -250,7 +251,7 @@ mod tests {
 
         setup
             .pi_state_before_symbol_call
-            .set_register(&Variable::mock("r1", 4), parameter_pointer);
+            .set_register(&variable!("r1:4"), parameter_pointer);
 
         setup
             .state_before_call
@@ -314,7 +315,7 @@ mod tests {
 
         let stack_id = AbstractIdentifier::new(
             Tid::new("func"),
-            AbstractLocation::from_var(&Variable::mock("sp", 4)).unwrap(),
+            AbstractLocation::from_var(&variable!("sp:4")).unwrap(),
         );
 
         let expected_data: DataDomain<IntervalDomain> =
@@ -365,12 +366,12 @@ mod tests {
 
         let return_targets = setup
             .pi_state_before_symbol_call
-            .get_register(&Variable::mock("r0", 4));
+            .get_register(&variable!("r0:4"));
 
         let input_target: DataDomain<IntervalDomain> = DataDomain::from(
             setup
                 .pi_state_before_symbol_call
-                .get_register(&Variable::mock("r1", 4))
+                .get_register(&variable!("r1:4"))
                 .get_absolute_value()
                 .unwrap()
                 .clone(),
@@ -407,14 +408,14 @@ mod tests {
 
         let return_targets = setup
             .pi_state_before_symbol_call
-            .get_register(&Variable::mock("r0", 4))
+            .get_register(&variable!("r0:4"))
             .get_relative_values()
             .clone();
 
         let input_target: DataDomain<IntervalDomain> = DataDomain::from(
             setup
                 .pi_state_before_symbol_call
-                .get_register(&Variable::mock("r1", 4))
+                .get_register(&variable!("r1:4"))
                 .get_absolute_value()
                 .unwrap()
                 .clone(),
@@ -462,11 +463,11 @@ mod tests {
     fn test_has_multiple_targets() {
         let stack_id = AbstractIdentifier::new(
             Tid::new("func"),
-            AbstractLocation::from_var(&Variable::mock("sp", 4)).unwrap(),
+            AbstractLocation::from_var(&variable!("sp:4")).unwrap(),
         );
         let heap_id = AbstractIdentifier::new(
             Tid::new("func"),
-            AbstractLocation::from_var(&Variable::mock("r5", 4)).unwrap(),
+            AbstractLocation::from_var(&variable!("r5:4")).unwrap(),
         );
         // Test Case 1: Only one relative target.
         let mut data: DataDomain<IntervalDomain> = DataDomain::mock_from_target_map(
