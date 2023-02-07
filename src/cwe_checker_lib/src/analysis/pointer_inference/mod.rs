@@ -20,7 +20,7 @@
 //! In cases where we cannot know
 //! whether an error is due to an error in the memory management of the program under analysis
 //! or due to inexactness of the pointer inference analysis itself,
-//! we try to treat is as the more likely (but not necessarily true) case of the two.
+//! we try to treat it as the more likely (but not necessarily true) case of the two.
 //!
 //! See the `Config` struct for configurable analysis parameters.
 
