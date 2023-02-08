@@ -91,9 +91,12 @@ impl State {
                             out_of_bounds_access_warnings
                                 .push(format!("Relevant callgraph TIDs: [{call_sequence_tids}]"));
                         } else {
+                            let mut callgraph_tids = format!("{}", self.stack_id.get_tid());
+                            for call_tid in id.get_path_hints() {
+                                callgraph_tids += &format!(", {call_tid}");
+                            }
                             out_of_bounds_access_warnings.push(format!(
-                                "Relevant callgraph TIDs: [{}]",
-                                self.stack_id.get_tid()
+                                "Relevant callgraph TIDs: [{callgraph_tids}]",
                             ));
                         }
                         // Replace the bound with `Top` to prevent duplicate CWE warnings with the same root cause.
@@ -126,9 +129,12 @@ impl State {
                             out_of_bounds_access_warnings
                                 .push(format!("Relevant callgraph TIDs: [{call_sequence_tids}]"));
                         } else {
+                            let mut callgraph_tids = format!("{}", self.stack_id.get_tid());
+                            for call_tid in id.get_path_hints() {
+                                callgraph_tids += &format!(", {call_tid}");
+                            }
                             out_of_bounds_access_warnings.push(format!(
-                                "Relevant callgraph TIDs: [{}]",
-                                self.stack_id.get_tid()
+                                "Relevant callgraph TIDs: [{callgraph_tids}]",
                             ));
                         }
                         // Replace the bound with `Top` to prevent duplicate CWE warnings with the same root cause.
