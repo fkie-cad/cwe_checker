@@ -1,6 +1,5 @@
-use crate::intermediate_representation::CastOpType;
-
 use super::*;
+use crate::{def, expr, intermediate_representation::*, variable};
 
 struct Setup<'a> {
     register_map: HashMap<&'a String, &'a RegisterProperties>,
@@ -61,24 +60,24 @@ impl<'a> Setup<'a> {
             },
             int_sub_expr: Expression::BinOp {
                 op: BinOpType::IntSub,
-                lhs: Box::new(Expression::Var(Variable::mock("EAX", 4))),
-                rhs: Box::new(Expression::Var(Variable::mock("ECX", 4))),
+                lhs: Box::new(expr!("EAX:4")),
+                rhs: Box::new(expr!("ECX:4")),
             },
             int_sub_subpiece_expr: Expression::BinOp {
                 op: BinOpType::IntSub,
                 lhs: Box::new(Expression::Subpiece {
                     low_byte: ByteSize::new(0),
                     size: ByteSize::new(4),
-                    arg: Box::new(Expression::Var(Variable::mock("RAX", 8))),
+                    arg: Box::new(expr!("RAX:8")),
                 }),
                 rhs: Box::new(Expression::Subpiece {
                     low_byte: ByteSize::new(0),
                     size: ByteSize::new(4),
-                    arg: Box::new(Expression::Var(Variable::mock("RCX", 8))),
+                    arg: Box::new(expr!("RCX:8")),
                 }),
             },
-            eax_variable: Expression::Var(Variable::mock("EAX", 4)),
-            rax_variable: Expression::Var(Variable::mock("RAX", 8)),
+            eax_variable: expr!("EAX:4"),
+            rax_variable: expr!("RAX:8"),
         }
     }
 }
@@ -244,58 +243,34 @@ fn piecing_or_zero_extending() {
     register_map.insert(&setup.rcx_name, &setup.rcx_register);
     register_map.insert(&setup.ah_name, &setup.ah_register);
 
-    let eax_assign = Term {
-        tid: Tid::new("eax_assign"),
-        term: Def::Assign {
-            var: Variable::mock("EAX", 4),
-            value: Expression::const_from_i32(0),
-        },
-    };
-    let load_to_eax = Term {
-        tid: Tid::new("load_to_eax"),
-        term: Def::Load {
-            var: Variable::mock("EAX", 4),
-            address: Expression::const_from_i64(0),
-        },
-    };
-    let ah_assign = Term {
-        tid: Tid::new("ah_assign"),
-        term: Def::Assign {
-            var: Variable::mock("AH", 1),
-            value: Expression::Const(Bitvector::from_i8(0)),
-        },
-    };
+    let eax_assign = def!["eax_assign: EAX:4 = 0:4"];
+    let load_to_eax = def!["load_to_eax: EAX:4 := Load from 0:8"];
+    let ah_assign = def!["ah_assign: AH:1 = 0:1"];
     let zext_eax_to_rax = Term {
         tid: Tid::new("zext_eax_to_rax"),
         term: Def::Assign {
-            var: Variable::mock("RAX", 8),
+            var: variable!("RAX:8"),
             value: Expression::cast(setup.eax_variable.clone(), CastOpType::IntZExt),
         },
     };
     let zext_ah_to_eax = Term {
         tid: Tid::new("zext_ah_to_eax"),
         term: Def::Assign {
-            var: Variable::mock("EAX", 4),
-            value: Expression::cast(
-                Expression::Var(Variable::mock("AH", 1)),
-                CastOpType::IntZExt,
-            ),
+            var: variable!("EAX:4"),
+            value: Expression::cast(expr!("AH:1"), CastOpType::IntZExt),
         },
     };
     let zext_ah_to_rax = Term {
         tid: Tid::new("zext_ah_to_rax"),
         term: Def::Assign {
-            var: Variable::mock("RAX", 8),
-            value: Expression::cast(
-                Expression::Var(Variable::mock("AH", 1)),
-                CastOpType::IntZExt,
-            ),
+            var: variable!("RAX:8"),
+            value: Expression::cast(expr!("AH:1"), CastOpType::IntZExt),
         },
     };
     let zext_eax_to_rcx = Term {
         tid: Tid::new("zext_eax_to_rcx"),
         term: Def::Assign {
-            var: Variable::mock("RCX", 8),
+            var: variable!("RCX:8"),
             value: Expression::cast(setup.eax_variable.clone(), CastOpType::IntZExt),
         },
     };
