@@ -95,9 +95,8 @@ impl State {
                             for call_tid in id.get_path_hints() {
                                 callgraph_tids += &format!(", {call_tid}");
                             }
-                            out_of_bounds_access_warnings.push(format!(
-                                "Relevant callgraph TIDs: [{callgraph_tids}]",
-                            ));
+                            out_of_bounds_access_warnings
+                                .push(format!("Relevant callgraph TIDs: [{callgraph_tids}]",));
                         }
                         // Replace the bound with `Top` to prevent duplicate CWE warnings with the same root cause.
                         self.object_lower_bounds
@@ -133,9 +132,8 @@ impl State {
                             for call_tid in id.get_path_hints() {
                                 callgraph_tids += &format!(", {call_tid}");
                             }
-                            out_of_bounds_access_warnings.push(format!(
-                                "Relevant callgraph TIDs: [{callgraph_tids}]",
-                            ));
+                            out_of_bounds_access_warnings
+                                .push(format!("Relevant callgraph TIDs: [{callgraph_tids}]",));
                         }
                         // Replace the bound with `Top` to prevent duplicate CWE warnings with the same root cause.
                         self.object_upper_bounds
