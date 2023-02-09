@@ -167,11 +167,11 @@ fn specialize_by_binop() {
     );
     assert!(x.is_ok());
     assert_eq!(
-        state.get_register(&Variable::mock("FLAG1", 1u64)),
+        state.get_register(&variable!("FLAG1:1")),
         bitvec!("1:1").into()
     );
     assert_eq!(
-        state.get_register(&Variable::mock("FLAG2", 1u64)),
+        state.get_register(&variable!("FLAG2:1")),
         bitvec!("1:1").into()
     );
     // Expr = (FLAG bool_and 1 = Const)

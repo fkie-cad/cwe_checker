@@ -28,8 +28,8 @@ fn test_update_def() {
     setup.context.block_first_def_set = HashSet::new();
 
     let assign_def = def!["assign_def: r1:4 = 0x7000:4"];
-    let load_def = load_var_content_from_temp_var("load_def", "r5", "r2");
-    let store_def = store_var_content_at_temp_var("store_def", "r0", "r5");
+    let load_def = Def::load_var_content_from_temp_var("load_def", "r5", "r2");
+    let store_def = Def::store_var_content_at_temp_var("store_def", "r0", "r5");
 
     let new_state = setup
         .context

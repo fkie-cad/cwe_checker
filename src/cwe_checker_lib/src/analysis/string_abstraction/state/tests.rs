@@ -5,13 +5,16 @@ use crate::{
         pointer_inference::State as PiState,
         string_abstraction::tests::mock_project_with_intraprocedural_control_flow,
     },
+    expr,
+    intermediate_representation::*,
+    variable,
 };
 use std::collections::BTreeSet;
 
 impl<T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>> State<T> {
     pub fn mock_with_default_pi_state(current_sub: Term<Sub>) -> Self {
         let pi_state = PointerInferenceState::new(
-            &Variable::mock("sp", 4 as u64),
+            &variable!("sp:4"),
             current_sub.tid.clone(),
             BTreeSet::new(),
         );
@@ -50,7 +53,7 @@ fn test_delete_string_map_entries_if_no_pointer_targets_are_tracked() {
 
     let stack_id = AbstractIdentifier::new(
         Tid::new("func"),
-        AbstractLocation::from_var(&Variable::mock("sp", 4)).unwrap(),
+        AbstractLocation::from_var(&variable!("sp:4")).unwrap(),
     );
     let stack_pointer: DataDomain<IntervalDomain> = DataDomain::from_target(
         stack_id.clone(),
@@ -59,7 +62,7 @@ fn test_delete_string_map_entries_if_no_pointer_targets_are_tracked() {
 
     let heap_id_1 = AbstractIdentifier::new(
         Tid::new("func"),
-        AbstractLocation::from_var(&Variable::mock("r5", 4)).unwrap(),
+        AbstractLocation::from_var(&variable!("r5:4")).unwrap(),
     );
 
     let heap_pointer_1: DataDomain<IntervalDomain> = DataDomain::from_target(
@@ -69,7 +72,7 @@ fn test_delete_string_map_entries_if_no_pointer_targets_are_tracked() {
 
     let heap_id_2 = AbstractIdentifier::new(
         Tid::new("func"),
-        AbstractLocation::from_var(&Variable::mock("r6", 4)).unwrap(),
+        AbstractLocation::from_var(&variable!("r6:4")).unwrap(),
     );
 
     let heap_pointer_2: DataDomain<IntervalDomain> = DataDomain::from_target(
@@ -79,12 +82,12 @@ fn test_delete_string_map_entries_if_no_pointer_targets_are_tracked() {
 
     let heap_id_3 = AbstractIdentifier::new(
         Tid::new("func"),
-        AbstractLocation::from_var(&Variable::mock("r7", 4)).unwrap(),
+        AbstractLocation::from_var(&variable!("r7:4")).unwrap(),
     );
 
     state
         .variable_to_pointer_map
-        .insert(Variable::mock("r0", 4), stack_pointer);
+        .insert(variable!("r0:4"), stack_pointer);
     state.stack_offset_to_pointer_map.insert(-8, heap_pointer_1);
     state.unassigned_return_pointer.insert(heap_pointer_2);
 
@@ -153,10 +156,10 @@ fn test_handle_assign_and_load() {
     let sub = Sub::mock("func");
     let mut state: State<CharacterInclusionDomain> = State::mock_with_default_pi_state(sub.clone());
     let runtime_memory_image = RuntimeMemoryImage::mock();
-    let output = Variable::mock("r1", 4);
+    let output = variable!("r1:4");
     let constant_input = Expression::Const(Bitvector::from_str_radix(16, "7000").unwrap());
     let return_address_input = Expression::Const(Bitvector::from_str_radix(16, "14718").unwrap());
-    let other_input = Expression::var("r6", 4);
+    let other_input = expr!("r6:4");
 
     let mut block_first_def_set: HashSet<(Tid, Tid)> = HashSet::new();
     let mut return_tid = Tid::new("14718");
@@ -211,7 +214,7 @@ fn test_handle_assign_and_load() {
     // Test Case 2: Assign Def with other input
     let heap_id = AbstractIdentifier::new(
         Tid::new("func"),
-        AbstractLocation::from_var(&Variable::mock("r5", 4)).unwrap(),
+        AbstractLocation::from_var(&variable!("r5:4")).unwrap(),
     );
 
     let heap_pointer: DataDomain<IntervalDomain> = DataDomain::from_target(
@@ -263,19 +266,19 @@ fn test_handle_assign_and_load() {
 
 #[test]
 fn test_add_pointer_to_variable_maps_if_tracked() {
-    let output_var = Variable::mock("r2", 4);
-    let origin_var = Variable::mock("r5", 4);
+    let output_var = variable!("r2:4");
+    let origin_var = variable!("r5:4");
     let mut mock_state =
         State::<CharacterInclusionDomain>::mock_with_default_pi_state(Sub::mock("func"));
     let pi_state = mock_state.get_pointer_inference_state().unwrap().clone();
 
     let heap_id = AbstractIdentifier::new(
         Tid::new("func"),
-        AbstractLocation::from_var(&Variable::mock("r5", 4)).unwrap(),
+        AbstractLocation::from_var(&variable!("r5:4")).unwrap(),
     );
     let stack_id = AbstractIdentifier::new(
         Tid::new("func"),
-        AbstractLocation::from_var(&Variable::mock("sp", 4)).unwrap(),
+        AbstractLocation::from_var(&variable!("sp:4")).unwrap(),
     );
 
     let mut source_pointer: DataDomain<IntervalDomain> =
@@ -339,7 +342,7 @@ fn test_pointer_targets_partially_tracked() {
 
     let heap_id = AbstractIdentifier::new(
         Tid::new("heap"),
-        AbstractLocation::from_var(&Variable::mock("r0", 4)).unwrap(),
+        AbstractLocation::from_var(&variable!("r0:4")).unwrap(),
     );
     let stack_id = pi_state.stack_id.clone();
 
@@ -367,8 +370,8 @@ fn test_pointer_targets_partially_tracked() {
 
 #[test]
 fn test_pointer_is_in_pointer_maps() {
-    let r2_reg = Variable::mock("r2", 4);
-    let sp_reg = Variable::mock("sp", 4);
+    let r2_reg = variable!("r2:4");
+    let sp_reg = variable!("sp:4");
     let mut mock_state =
         State::<CharacterInclusionDomain>::mock_with_default_pi_state(Sub::mock("func"));
 
@@ -401,10 +404,10 @@ fn test_pointer_is_in_pointer_maps() {
 #[test]
 fn test_handle_store() {
     let block_first_def_set: HashSet<(Tid, Tid)> = HashSet::new();
-    let target_var = Variable::mock("r2", 4);
-    let value_var = Variable::mock("r3", 4);
+    let target_var = variable!("r2:4");
+    let value_var = variable!("r3:4");
     let value_location = Expression::Var(value_var.clone());
-    let sp_reg = Variable::mock("sp", 4);
+    let sp_reg = variable!("sp:4");
     let target_location = Expression::Var(target_var.clone());
     let runtime_memory_image = RuntimeMemoryImage::mock();
     let mut mock_state =
@@ -465,7 +468,7 @@ fn test_handle_store() {
     mock_state.set_all_maps_empty();
     mock_state
         .variable_to_pointer_map
-        .insert(Variable::mock("r0", 4), string_pointer.clone());
+        .insert(variable!("r0:4"), string_pointer.clone());
 
     mock_state.handle_store(
         &target_location,
@@ -483,15 +486,15 @@ fn test_handle_store() {
     mock_state.set_all_maps_empty();
     mock_state
         .variable_to_pointer_map
-        .insert(Variable::mock("r0", 4), string_pointer.clone());
+        .insert(variable!("r0:4"), string_pointer.clone());
     // Test Case 5: Global address pointer as constant.
     // Test Case 6: Global address pointer in variable.
 }
 
 #[test]
 fn test_add_pointer_to_stack_map() {
-    let r2_reg = Variable::mock("r2", 4);
-    let sp_reg = Variable::mock("sp", 4);
+    let r2_reg = variable!("r2:4");
+    let sp_reg = variable!("sp:4");
     let target = Expression::Var(r2_reg.clone());
     let mut mock_state =
         State::<CharacterInclusionDomain>::mock_with_default_pi_state(Sub::mock("func"));
@@ -532,18 +535,18 @@ fn test_remove_non_callee_saved_pointer_entries_for_external_symbol() {
 
     mock_state
         .variable_to_pointer_map
-        .insert(Variable::mock("r0", 4), top_domain.clone());
+        .insert(variable!("r0:4"), top_domain.clone());
     mock_state
         .variable_to_pointer_map
-        .insert(Variable::mock("r11", 4), top_domain);
+        .insert(variable!("r11:4"), top_domain);
 
     mock_state
         .remove_non_callee_saved_pointer_entries_for_external_symbol(&project, &sprintf_symbol);
 
     assert!(!mock_state
         .variable_to_pointer_map
-        .contains_key(&Variable::mock("r0", 4)));
+        .contains_key(&variable!("r0:4")));
     assert!(mock_state
         .variable_to_pointer_map
-        .contains_key(&Variable::mock("r11", 4)));
+        .contains_key(&variable!("r11:4")));
 }

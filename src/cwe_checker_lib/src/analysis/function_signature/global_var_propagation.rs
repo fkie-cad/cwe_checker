@@ -235,14 +235,14 @@ pub mod tests {
         // main -> callee1 -> callee2
         let mut func = Sub::mock("main");
         let mut call_blk = Blk::mock_with_tid("main_blk");
-        let call = Jmp::mock_call("callee1", None);
+        let call = Jmp::call("call_callee1", "callee1", None);
         call_blk.term.jmps.push(call);
         func.term.blocks.push(call_blk);
         project.program.term.subs.insert(Tid::new("main"), func);
 
         let mut func = Sub::mock("callee1");
         let mut call_blk = Blk::mock_with_tid("callee1_blk");
-        let call = Jmp::mock_call("callee2", None);
+        let call = Jmp::call("call_callee2", "callee2", None);
         call_blk.term.jmps.push(call);
         func.term.blocks.push(call_blk);
         project.program.term.subs.insert(Tid::new("callee1"), func);

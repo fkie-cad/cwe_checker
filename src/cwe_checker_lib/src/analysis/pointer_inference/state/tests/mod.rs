@@ -316,7 +316,7 @@ fn test_widening_hints_after_pointer_specialization() {
         .add_signed_greater_equal_bound(&Bitvector::from_i64(6))
         .unwrap();
     let expected_val = Data::from_target(new_id("func_tid", "RSP"), offset_with_lower_bound);
-    assert_eq!(state.get_register(&Variable::mock("RBX", 8)), expected_val);
+    assert_eq!(state.get_register(&variable!("RBX:8")), expected_val);
 }
 
 #[test]
@@ -363,11 +363,11 @@ fn from_fn_sig() {
         Data::from_target(new_id("func", "RSP"), bv(0).into())
     );
     assert_eq!(
-        state.get_register(&Variable::mock("RDI", 8)),
+        state.get_register(&variable!("RDI:8")),
         Data::from_target(new_id("func", "RDI"), bv(0).into())
     );
     assert_eq!(
-        state.get_register(&Variable::mock("RSI", 8)),
+        state.get_register(&variable!("RSI:8")),
         Data::from_target(new_id("func", "RSI"), bv(0).into())
     );
 }

@@ -92,23 +92,3 @@ impl fmt::Display for Jmp {
         }
     }
 }
-
-#[cfg(test)]
-pub mod tests {
-    use super::*;
-
-    impl Jmp {
-        /// Create a mock call to a TID with the given `target` and `return_`
-        /// as the names of the target and return TIDs.
-        pub fn mock_call(target: &str, return_: Option<&str>) -> Term<Jmp> {
-            let call = Jmp::Call {
-                target: Tid::new(target.to_string()),
-                return_: return_.map(|tid_name| Tid::new(tid_name)),
-            };
-            Term {
-                tid: Tid::new(format!("call_{}", target.to_string())),
-                term: call,
-            }
-        }
-    }
-}

@@ -512,6 +512,8 @@ pub fn get_entry_nodes_of_subs(graph: &Graph) -> HashMap<Tid, NodeIndex> {
 
 #[cfg(test)]
 mod tests {
+    use crate::expr;
+
     use super::*;
     use std::collections::{BTreeMap, BTreeSet};
     use std::iter::FromIterator;
@@ -526,7 +528,7 @@ mod tests {
         };
         let return_term = Term {
             tid: Tid::new("return".to_string()),
-            term: Jmp::Return(Expression::Const(Bitvector::zero(64.into()))), // The return term does not matter
+            term: Jmp::Return(expr!("0:8")), // The return term does not matter
         };
         let jmp = Jmp::Branch(Tid::new("sub1_blk1"));
         let jmp_term = Term {
@@ -559,7 +561,7 @@ mod tests {
         };
         let cond_jump = Jmp::CBranch {
             target: Tid::new("sub1_blk1"),
-            condition: Expression::Const(Bitvector::from_u8(0)),
+            condition: expr!("0:1"),
         };
         let cond_jump_term = Term {
             tid: Tid::new("cond_jump"),
@@ -618,7 +620,7 @@ mod tests {
     fn add_indirect_jumps() {
         let indirect_jmp_term = Term {
             tid: Tid::new("indrect_jmp".to_string()),
-            term: Jmp::BranchInd(Expression::Const(Bitvector::from_u32(0x1000))), // At the moment the expression does not matter
+            term: Jmp::BranchInd(expr!("0x1000:4")), // At the moment the expression does not matter
         };
         let mut blk_tid = Tid::new("blk_00001000");
         blk_tid.address = "00001000".to_string();

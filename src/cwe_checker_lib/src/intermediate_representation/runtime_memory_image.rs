@@ -5,8 +5,10 @@ use goblin::{elf, Object};
 /// A representation of the runtime image of a binary after being loaded into memory by the loader.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct RuntimeMemoryImage {
-    memory_segments: Vec<MemorySegment>,
-    is_little_endian: bool,
+    /// Sequence of memory segments.
+    pub memory_segments: Vec<MemorySegment>,
+    /// Endianness
+    pub is_little_endian: bool,
 }
 
 impl RuntimeMemoryImage {
@@ -276,108 +278,29 @@ impl RuntimeMemoryImage {
     }
 }
 
-impl RuntimeMemoryImage {
-    /// Creates a mock runtime memory image with: byte series, strings and format strings.
-    pub fn mock() -> RuntimeMemoryImage {
-        RuntimeMemoryImage {
-            memory_segments: vec![
-                MemorySegment {
-                    bytes: [0xb0u8, 0xb1, 0xb2, 0xb3, 0xb4].to_vec(),
-                    base_address: 0x1000,
-                    read_flag: true,
-                    write_flag: false,
-                    execute_flag: false,
-                },
-                MemorySegment {
-                    bytes: [0u8; 8].to_vec(),
-                    base_address: 0x2000,
-                    read_flag: true,
-                    write_flag: true,
-                    execute_flag: false,
-                },
-                // Contains the Hello World string at byte 3002.
-                MemorySegment {
-                    bytes: [
-                        0x01, 0x02, 0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x57, 0x6f, 0x72, 0x6c,
-                        0x64, 0x00,
-                    ]
-                    .to_vec(),
-                    base_address: 0x3000,
-                    read_flag: true,
-                    write_flag: false,
-                    execute_flag: false,
-                },
-                MemorySegment {
-                    bytes: [0x02, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00].to_vec(),
-                    base_address: 0x4000,
-                    read_flag: true,
-                    write_flag: false,
-                    execute_flag: false,
-                },
-                // Contains strings: '/dev/sd%c%d' and 'cat %s'
-                MemorySegment {
-                    bytes: [
-                        0x2f, 0x64, 0x65, 0x76, 0x2f, 0x73, 0x64, 0x25, 0x63, 0x25, 0x64, 0x00,
-                        0x63, 0x61, 0x74, 0x20, 0x25, 0x73, 0x00,
-                    ]
-                    .to_vec(),
-                    base_address: 0x5000,
-                    read_flag: true,
-                    write_flag: false,
-                    execute_flag: false,
-                },
-                // Contains string: 'cat %s %s %s %s' starting at the first byte.
-                MemorySegment {
-                    bytes: [
-                        0x63, 0x61, 0x74, 0x20, 0x25, 0x73, 0x20, 0x25, 0x73, 0x20, 0x25, 0x73,
-                        0x20, 0x25, 0x73, 0x00,
-                    ]
-                    .to_vec(),
-                    base_address: 0x6000,
-                    read_flag: true,
-                    write_flag: false,
-                    execute_flag: false,
-                },
-                // Contains string: 'str1 str2 str3 str4'
-                MemorySegment {
-                    bytes: [
-                        0x73, 0x74, 0x72, 0x31, 0x20, 0x73, 0x74, 0x72, 0x32, 0x20, 0x73, 0x74,
-                        0x72, 0x33, 0x20, 0x73, 0x74, 0x72, 0x34, 0x00,
-                    ]
-                    .to_vec(),
-                    base_address: 0x7000,
-                    read_flag: true,
-                    write_flag: false,
-                    execute_flag: false,
-                },
-            ],
-            is_little_endian: true,
-        }
-    }
-}
 #[cfg(test)]
 mod tests {
-    use crate::intermediate_representation::{Bitvector, ByteSize, RuntimeMemoryImage};
+    use crate::{bitvec, intermediate_representation::*};
 
     #[test]
     fn read_endianness() {
         let mut mem_image = RuntimeMemoryImage::mock();
-        let address = Bitvector::from_u32(0x1001);
+        let address = bitvec!("0x1001:4");
         assert_eq!(
             mem_image.read(&address, ByteSize::new(4)).unwrap(),
-            Bitvector::from_u32(0xb4b3b2b1).into()
+            bitvec!("0xb4b3b2b1:4").into()
         );
         mem_image.is_little_endian = false;
         assert_eq!(
             mem_image.read(&address, ByteSize::new(4)).unwrap(),
-            Bitvector::from_u32(0xb1b2b3b4).into()
+            bitvec!("0xb1b2b3b4:4").into()
         );
     }
 
     #[test]
     fn ro_data_pointer() {
         let mem_image = RuntimeMemoryImage::mock();
-        let address = Bitvector::from_u32(0x1002);
+        let address = bitvec!("0x1002:4");
         let (slice, index) = mem_image.get_ro_data_pointer_at_address(&address).unwrap();
         assert_eq!(index, 2);
         assert_eq!(&slice[index..], &[0xb2u8, 0xb3, 0xb4]);
@@ -389,7 +312,7 @@ mod tests {
         // the byte array contains "Hello World".
         let expected_string: &str =
             std::str::from_utf8(b"\x48\x65\x6c\x6c\x6f\x20\x57\x6f\x72\x6c\x64").unwrap();
-        let address = Bitvector::from_u32(0x3002);
+        let address = bitvec!("0x3002:4");
         assert_eq!(
             expected_string,
             mem_image
