@@ -1,6 +1,5 @@
 use crate::analysis::graph::{Edge, Graph, Node};
 use crate::intermediate_representation::*;
-use itertools::Itertools;
 use petgraph::graph::NodeIndex;
 use petgraph::Direction::Incoming;
 use std::collections::{BTreeSet, HashMap, HashSet};
@@ -25,7 +24,7 @@ pub fn propagate_control_flow(project: &mut Project) {
         .cloned()
         .collect();
     let cfg = crate::analysis::graph::get_program_cfg(&project.program, extern_subs.clone());
-    let nodes_without_incomming_edges_at_beginning = get_nodes_without_incomming_edge(&cfg);
+    let nodes_without_incoming_edges_at_beginning = get_nodes_without_incoming_edge(&cfg);
 
     let mut jmps_to_retarget = HashMap::new();
     for node in cfg.node_indices() {
@@ -77,12 +76,12 @@ pub fn propagate_control_flow(project: &mut Project) {
     retarget_jumps(project, jmps_to_retarget);
 
     let cfg = crate::analysis::graph::get_program_cfg(&project.program, extern_subs);
-    let nodes_without_incomming_edges_at_end = get_nodes_without_incomming_edge(&cfg);
+    let nodes_without_incoming_edges_at_end = get_nodes_without_incoming_edge(&cfg);
 
     remove_new_orphaned_blocks(
         project,
-        nodes_without_incomming_edges_at_beginning,
-        nodes_without_incomming_edges_at_end,
+        nodes_without_incoming_edges_at_beginning,
+        nodes_without_incoming_edges_at_end,
     );
 }
 
@@ -92,7 +91,6 @@ fn retarget_jumps(project: &mut Project, mut jmps_to_retarget: HashMap<Tid, Tid>
         for blk in sub.term.blocks.iter_mut() {
             for jmp in blk.term.jmps.iter_mut() {
                 if let Some(new_target) = jmps_to_retarget.remove(&jmp.tid) {
-                    println!("block: {}: {} ---> {}", blk.tid, jmp.term, new_target);
                     match &mut jmp.term {
                         Jmp::Branch(target) | Jmp::CBranch { target, .. } => *target = new_target,
                         _ => panic!("Unexpected type of jump encountered."),
@@ -257,15 +255,14 @@ fn negate_condition(expr: Expression) -> Expression {
 }
 
 /// Iterates the CFG and returns all node's blocks, that do not have an incoming edge.
-fn get_nodes_without_incomming_edge(cfg: &Graph) -> HashSet<Tid> {
-    let mut nodes_without_incomming_edges = HashSet::new();
+fn get_nodes_without_incoming_edge(cfg: &Graph) -> HashSet<Tid> {
+    let mut nodes_without_incoming_edges = HashSet::new();
     for node in cfg.node_indices() {
         if cfg.neighbors_directed(node, Incoming).next().is_none() {
-            println!("{}", cfg[node].get_block().tid.clone());
-            nodes_without_incomming_edges.insert(cfg[node].get_block().tid.clone());
+            nodes_without_incoming_edges.insert(cfg[node].get_block().tid.clone());
         }
     }
-    nodes_without_incomming_edges
+    nodes_without_incoming_edges
 }
 
 /// Calculates the difference of the orphaned blocks and removes them from the project.
@@ -274,9 +271,9 @@ fn remove_new_orphaned_blocks(
     orphaned_blocks_before: HashSet<Tid>,
     orphaned_blocks_after: HashSet<Tid>,
 ) {
-    let new_orphan_blocks = orphaned_blocks_after
+    let new_orphan_blocks: HashSet<&Tid> = orphaned_blocks_after
         .difference(&orphaned_blocks_before)
-        .collect_vec();
+        .collect();
     for sub in project.program.term.subs.values_mut() {
         sub.term
             .blocks
@@ -359,9 +356,9 @@ pub mod tests {
         let expected_blocks = vec![
             mock_condition_block("cond_blk_1", "def_blk_1", "end_blk"),
             mock_block_with_defs("def_blk_1", "def_blk_2"),
-            // cond_blk_2 removed, since no incomming edge anymore
+            // cond_blk_2 removed, since no incoming edge anymore
             mock_block_with_defs("def_blk_2", "def_blk_3"),
-            // cond_blk_3 removed, since no incomming edge anymore
+            // cond_blk_3 removed, since no incoming edge anymore
             mock_block_with_defs("def_blk_3", "end_blk"),
             mock_block_with_defs("end_blk", "end_blk"),
         ];
