@@ -27,6 +27,7 @@
 //!   the registers may be incorrectly flagged as input parameters.
 
 use crate::abstract_domain::AbstractDomain;
+use crate::abstract_domain::Interval;
 use crate::analysis::fixpoint::Computation;
 use crate::analysis::forward_interprocedural_fixpoint::create_computation;
 use crate::analysis::forward_interprocedural_fixpoint::GeneralizedContext;
@@ -37,10 +38,12 @@ use crate::prelude::*;
 use crate::utils::log::LogMessage;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 mod context;
 use context::*;
 mod state;
+use itertools::Itertools;
 use state::State;
 mod access_pattern;
 pub use access_pattern::AccessPattern;
@@ -150,12 +153,21 @@ pub fn compute_function_signatures<'a>(
     // Sanitize the parameters
     let mut logs = Vec::new();
     for (fn_tid, fn_sig) in fn_sig_map.iter_mut() {
-        if fn_sig.sanitize(project).is_err() {
-            logs.push(
+        match fn_sig.sanitize(project) {
+            Ok(merge_logs) => {
+                for log in merge_logs {
+                    logs.push(
+                        LogMessage::new_info(log)
+                            .location(fn_tid.clone())
+                            .source("Function Signature Analysis"),
+                    )
+                }
+            }
+            Err(_) => logs.push(
                 LogMessage::new_error("Function parameters are not properly sanitized")
                     .location(fn_tid.clone())
                     .source("Function Signature Analysis"),
-            );
+            ),
         }
     }
     // Propagate globals in bottom-up direction in the call graph
@@ -233,7 +245,7 @@ impl FunctionSignature {
     ///   and return an error message if one is found.
     ///   This may indicate an error in the analysis
     ///   as no proper sanitation pass is implemented for such cases yet.
-    fn sanitize(&mut self, project: &Project) -> Result<(), Error> {
+    fn sanitize(&mut self, project: &Project) -> Result<Vec<String>, Error> {
         match project.cpu_architecture.as_str() {
             "x86" | "x86_32" | "x86_64" => {
                 let return_addr_expr = Expression::Var(project.stack_pointer_register.clone());
@@ -246,7 +258,8 @@ impl FunctionSignature {
             }
             _ => (),
         }
-        self.check_for_unaligned_stack_params(&project.stack_pointer_register)
+        self.check_for_unaligned_stack_params(&project.stack_pointer_register)?;
+        self.merge_overlapping_stack_parameters()
     }
 
     /// Return an error if an unaligned stack parameter
@@ -266,6 +279,100 @@ impl FunctionSignature {
         }
         Ok(())
     }
+
+    fn merge_overlapping_stack_parameters(&mut self) -> Result<Vec<String>, Error> {
+        let mut merged_args = HashMap::new();
+        let mut removed_args = HashSet::new();
+        let mut logs = vec![];
+        for ((arg, pattern), (other_arg, other_pattern)) in
+            self.parameters.iter().combinations(2).map(|v| (v[0], v[1]))
+        {
+            if let Ok((merged_interval, log)) = arg.merge_overlapping_stack_arg(other_arg) {
+                let merged_arg = Arg::Stack {
+                    address: Expression::Const(merged_interval.start.clone()),
+                    size: ByteSize::from(
+                        merged_interval
+                            .end
+                            .bin_op(BinOpType::IntSub, &merged_interval.start)?
+                            .try_to_u64()?,
+                    ),
+                    data_type: arg.get_data_type(),
+                };
+                merged_args.insert(merged_arg, pattern.merge(other_pattern));
+                removed_args.insert(arg.clone());
+                removed_args.insert(other_arg.clone());
+                logs.extend(log.clone());
+            }
+        }
+        for arg in removed_args {
+            self.parameters.remove(&arg);
+        }
+        self.parameters.extend(merged_args);
+        Ok(logs)
+    }
+}
+
+impl Arg {
+    /// Returns the merged offset interval of two stack arguments
+    ///
+    /// Returns `Err` if `self` or `stack_arg`:
+    /// * are not `Arg::Stack`
+    /// * do not have the same `Datatype`
+    /// * return `Err` on `Arg::eval_stack_offset()`
+    /// * do not intersect
+    pub fn merge_overlapping_stack_arg(
+        &self,
+        stack_arg: &Arg,
+    ) -> Result<(Interval, Vec<String>), Error> {
+        if let (
+            Arg::Stack {
+                data_type: self_datatype,
+                size: self_size,
+                ..
+            },
+            Arg::Stack {
+                data_type: other_datatype,
+                size: other_size,
+                ..
+            },
+        ) = (self, stack_arg)
+        {
+            if self_datatype == other_datatype {
+                let self_chunk = Interval::new(
+                    self.eval_stack_offset()?,
+                    self.eval_stack_offset()?
+                        .bin_op(BinOpType::IntAdd, &Bitvector::from(u64::from(*self_size)))?,
+                    1,
+                );
+                let other_chunk = Interval::new(
+                    stack_arg.eval_stack_offset()?,
+                    stack_arg
+                        .eval_stack_offset()?
+                        .bin_op(BinOpType::IntAdd, &Bitvector::from(u64::from(*other_size)))?,
+                    1,
+                );
+                let mut logs = vec![];
+
+                dbg!(&self_chunk, &other_chunk);
+                // Check if the intervals intersect
+                if self_chunk.signed_intersect(&other_chunk).is_ok() {
+                    // Check if they are not subsets
+                    if !((self_chunk.contains(&other_chunk.start)
+                        && self_chunk.contains(&other_chunk.end))
+                        || (other_chunk.contains(&self_chunk.start)
+                            && other_chunk.contains(&self_chunk.end)))
+                    {
+                        logs.push(format!("Merged stack parameters '{:?}' and '{:?}' intersected, but has not been a subset", self.eval_stack_offset(), stack_arg.eval_stack_offset()))
+                    }
+
+                    return Ok((self_chunk.signed_merge(&other_chunk), logs));
+                }
+            } else {
+                return Err(anyhow!("Args do not share same datatype"));
+            }
+        }
+        Err(anyhow!("Args do not overlap"))
+    }
 }
 
 impl Default for FunctionSignature {
@@ -277,7 +384,7 @@ impl Default for FunctionSignature {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::variable;
+    use crate::{expr, variable};
 
     impl FunctionSignature {
         /// Create a mock x64 function signature with 2 parameters, one of which is accessed mutably,
@@ -304,5 +411,29 @@ pub mod tests {
                 ]),
             }
         }
+    }
+
+    #[test]
+    fn test_parameter_merging() {
+        let mut func_sig = FunctionSignature::mock_x64();
+        let stack_parm_1 = Arg::Stack {
+            address: expr!("0x1000:8"),
+            size: 8.into(),
+            data_type: Some(Datatype::Integer),
+        };
+        let stack_parm_2 = Arg::Stack {
+            address: expr!("0x1004:8"),
+            size: 8.into(),
+            data_type: Some(Datatype::Integer),
+        };
+        func_sig
+            .parameters
+            .insert(stack_parm_1, AccessPattern::new());
+        func_sig
+            .parameters
+            .insert(stack_parm_2, AccessPattern::new());
+
+        assert_eq!(func_sig.merge_overlapping_stack_parameters().unwrap(),
+        vec!["Merged stack parameters 'Ok(ApInt { len: BitWidth(64), digits: [Digit(4100)] })' and 'Ok(ApInt { len: BitWidth(64), digits: [Digit(4096)] })' intersected, but has not been a subset"]);
     }
 }
