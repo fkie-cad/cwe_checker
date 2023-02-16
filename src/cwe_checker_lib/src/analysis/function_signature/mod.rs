@@ -280,7 +280,7 @@ impl FunctionSignature {
     }
     /// Merges two intersecting stack parameters by joining them one stack parameter.
     ///
-    /// Two [Arg](intermediate_representation::Arg) are merged if *all* of the following applies:
+    /// Two [Arg](crate::intermediate_representation::Arg) are merged if *all* of the following applies:
     /// * parameters have the same `Datatype`
     /// * parameters return `Ok` on `Arg::eval_stack_offset()`
     /// * parameters intersect
