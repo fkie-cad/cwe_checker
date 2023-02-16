@@ -287,7 +287,7 @@ impl FunctionSignature {
         for ((arg, pattern), (other_arg, other_pattern)) in
             self.parameters.iter().combinations(2).map(|v| (v[0], v[1]))
         {
-            if let Ok((merged_interval, log)) = arg.merge_overlapping_stack_arg(other_arg) {
+            if let Ok((merged_interval, log)) = merge_overlapping_stack_arg(arg, other_arg) {
                 let merged_arg = Arg::Stack {
                     address: Expression::Const(merged_interval.start.clone()),
                     size: ByteSize::from(
@@ -312,67 +312,65 @@ impl FunctionSignature {
     }
 }
 
-impl Arg {
-    /// Returns the merged offset interval of two stack arguments
-    ///
-    /// Returns `Err` if `self` or `stack_arg`:
-    /// * are not `Arg::Stack`
-    /// * do not have the same `Datatype`
-    /// * return `Err` on `Arg::eval_stack_offset()`
-    /// * do not intersect
-    pub fn merge_overlapping_stack_arg(
-        &self,
-        stack_arg: &Arg,
-    ) -> Result<(Interval, Vec<String>), Error> {
-        if let (
-            Arg::Stack {
-                data_type: self_datatype,
-                size: self_size,
-                ..
-            },
-            Arg::Stack {
-                data_type: other_datatype,
-                size: other_size,
-                ..
-            },
-        ) = (self, stack_arg)
-        {
-            if self_datatype == other_datatype {
-                let self_chunk = Interval::new(
-                    self.eval_stack_offset()?,
-                    self.eval_stack_offset()?
-                        .bin_op(BinOpType::IntAdd, &Bitvector::from(u64::from(*self_size)))?,
-                    1,
-                );
-                let other_chunk = Interval::new(
-                    stack_arg.eval_stack_offset()?,
-                    stack_arg
-                        .eval_stack_offset()?
-                        .bin_op(BinOpType::IntAdd, &Bitvector::from(u64::from(*other_size)))?,
-                    1,
-                );
-                let mut logs = vec![];
+/// Returns the merged offset interval of two stack arguments
+///
+/// Returns `Err` if `self` or `stack_arg`:
+/// * are not `Arg::Stack`
+/// * do not have the same `Datatype`
+/// * return `Err` on `Arg::eval_stack_offset()`
+/// * do not intersect
+pub fn merge_overlapping_stack_arg(
+    arg: &Arg,
+    stack_arg: &Arg,
+) -> Result<(Interval, Vec<String>), Error> {
+    if let (
+        Arg::Stack {
+            data_type: self_datatype,
+            size: self_size,
+            ..
+        },
+        Arg::Stack {
+            data_type: other_datatype,
+            size: other_size,
+            ..
+        },
+    ) = (arg, stack_arg)
+    {
+        if self_datatype == other_datatype {
+            let self_chunk = Interval::new(
+                arg.eval_stack_offset()?,
+                arg.eval_stack_offset()?
+                    .bin_op(BinOpType::IntAdd, &Bitvector::from(u64::from(*self_size)))?,
+                1,
+            );
+            let other_chunk = Interval::new(
+                stack_arg.eval_stack_offset()?,
+                stack_arg
+                    .eval_stack_offset()?
+                    .bin_op(BinOpType::IntAdd, &Bitvector::from(u64::from(*other_size)))?,
+                1,
+            );
+            let mut logs = vec![];
 
-                dbg!(&self_chunk, &other_chunk);
-                // Check if the intervals intersect
-                if self_chunk.signed_intersect(&other_chunk).is_ok() {
-                    // Check if they are not subsets
-                    if !((self_chunk.contains(&other_chunk.start)
-                        && self_chunk.contains(&other_chunk.end))
-                        || (other_chunk.contains(&self_chunk.start)
-                            && other_chunk.contains(&self_chunk.end)))
-                    {
-                        logs.push(format!("Merged stack parameters '{:?}' and '{:?}' intersected, but has not been a subset", self.eval_stack_offset(), stack_arg.eval_stack_offset()))
-                    }
-
-                    return Ok((self_chunk.signed_merge(&other_chunk), logs));
+            dbg!(&self_chunk, &other_chunk);
+            // Check if the intervals intersect
+            if self_chunk.signed_intersect(&other_chunk).is_ok() {
+                // Check if they are not subsets
+                if !((self_chunk.contains(&other_chunk.start)
+                    && self_chunk.contains(&other_chunk.end))
+                    || (other_chunk.contains(&self_chunk.start)
+                        && other_chunk.contains(&self_chunk.end)))
+                {
+                    logs.push(format!("Merged stack parameters '{:?}' and '{:?}' intersected, but has not been a subset", arg.eval_stack_offset(), stack_arg.eval_stack_offset()))
                 }
-            } else {
-                return Err(anyhow!("Args do not share same datatype"));
+
+                return Ok((self_chunk.signed_merge(&other_chunk), logs));
             }
+        } else {
+            return Err(anyhow!("Args do not share same datatype"));
         }
-        Err(anyhow!("Args do not overlap"))
     }
+    Err(anyhow!("Args do not overlap"))
 }
 
 impl Default for FunctionSignature {
