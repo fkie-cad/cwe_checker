@@ -189,8 +189,14 @@ public class TermCreator {
     public static Variable createVariable(Varnode node) {
         Variable var = new Variable();
         if (node.isRegister()) {
-            var.setName(HelperFunctions.context.getRegister(node).getName());
-            var.setIsVirtual(false);
+            if (HelperFunctions.context.getRegister(node) == null) {
+                // This is a workaround for nameless registers encountered in some Aarch64 binaries.
+                var.setName(String.format("$U{}_unnamed", node.getAddress().toString()));
+                var.setIsVirtual(true);
+            } else {
+                var.setName(HelperFunctions.context.getRegister(node).getName());
+                var.setIsVirtual(false);
+            }
         } else if (node.isUnique()) {
             var.setName(HelperFunctions.renameVirtualRegister(node.getAddress().toString()));
             var.setIsVirtual(true);
