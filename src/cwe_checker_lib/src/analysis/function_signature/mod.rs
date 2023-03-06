@@ -37,7 +37,6 @@ use crate::prelude::*;
 use crate::utils::log::LogMessage;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
-use std::collections::HashSet;
 
 mod context;
 use context::*;
@@ -139,7 +138,7 @@ fn extract_fn_signatures_from_fixpoint<'a>(
 /// Compute the function signatures for all functions in the project.
 ///
 /// Returns a map from the function TIDs to their signatures,
-/// and a list of log messages recorded during the computation of the signatures.
+/// and a list of log and debug messages recorded during the computation of the signatures.
 ///
 /// For more information on the used algorithm see the module-level documentation.
 pub fn compute_function_signatures<'a>(
@@ -152,21 +151,20 @@ pub fn compute_function_signatures<'a>(
     // Sanitize the parameters
     let mut logs = Vec::new();
     for (fn_tid, fn_sig) in fn_sig_map.iter_mut() {
-        match fn_sig.sanitize(project) {
-            Ok(merge_logs) => {
-                for log in merge_logs {
-                    logs.push(
-                        LogMessage::new_info(log)
-                            .location(fn_tid.clone())
-                            .source("Function Signature Analysis"),
-                    )
-                }
-            }
-            Err(_) => logs.push(
-                LogMessage::new_error("Function parameters are not properly sanitized")
+        let (info_log, debug_log) = fn_sig.sanitize(project);
+        for log in info_log {
+            logs.push(
+                LogMessage::new_info(log)
                     .location(fn_tid.clone())
                     .source("Function Signature Analysis"),
-            ),
+            )
+        }
+        for log in debug_log {
+            logs.push(
+                LogMessage::new_debug(log)
+                    .location(fn_tid.clone())
+                    .source("Function Signature Analysis"),
+            )
         }
     }
     // Propagate globals in bottom-up direction in the call graph
@@ -241,10 +239,11 @@ impl FunctionSignature {
     /// Sanitize the function signature:
     /// * Remove the return address from the list of stack parameters for x86-based architectures.
     /// * Check for unaligned stack parameters or stack parameters that are not pointer-sized
-    ///   and return an error message if one is found.
+    ///   and return an info message if one is found.
     ///   This may indicate an error in the analysis
     ///   as no proper sanitation pass is implemented for such cases yet.
-    fn sanitize(&mut self, project: &Project) -> Result<Vec<String>, Error> {
+    /// * Merge intersecting stack parameters
+    fn sanitize(&mut self, project: &Project) -> (Vec<String>, Vec<String>) {
         match project.cpu_architecture.as_str() {
             "x86" | "x86_32" | "x86_64" => {
                 let return_addr_expr = Expression::Var(project.stack_pointer_register.clone());
@@ -257,97 +256,109 @@ impl FunctionSignature {
             }
             _ => (),
         }
-        self.check_for_unaligned_stack_params(&project.stack_pointer_register)?;
-        self.merge_intersecting_stack_parameters()
+        let debug_messages = self.merge_intersecting_stack_parameters();
+        let info_messages = self.check_for_unaligned_stack_params(&project.stack_pointer_register);
+
+        (info_messages, debug_messages)
     }
 
-    /// Return an error if an unaligned stack parameter
+    /// Return a log message for every unaligned stack parameter
     /// or a stack parameter of different size than the generic pointer size is found.
-    fn check_for_unaligned_stack_params(&self, stack_register: &Variable) -> Result<(), Error> {
+    fn check_for_unaligned_stack_params(&self, stack_register: &Variable) -> Vec<String> {
+        let mut log_messages: Vec<String> = vec![];
         for arg in self.parameters.keys() {
             if let Arg::Stack { size, .. } = arg {
                 if *size != stack_register.size {
-                    return Err(anyhow!("Unexpected stack parameter size"));
+                    log_messages.push("Unexpected stack parameter size".into());
                 }
                 if let Ok(offset) = arg.eval_stack_offset() {
-                    if offset.try_to_u64()? % u64::from(stack_register.size) != 0 {
-                        return Err(anyhow!("Unexpected stack parameter alignment"));
+                    if offset.try_to_u64().unwrap_or(0) % u64::from(stack_register.size) != 0 {
+                        log_messages.push("Unexpected stack parameter alignment".into());
                     }
                 }
             }
         }
-        Ok(())
+        log_messages
     }
-    /// Merges two intersecting stack parameters by joining them one stack parameter.
+    /// Merges two intersecting stack parameters by joining them into one stack parameter.
     ///
     /// Two [Arg](crate::intermediate_representation::Arg) are merged if *all* of the following applies:
-    /// * parameters have the same `Datatype`
     /// * parameters return `Ok` on `Arg::eval_stack_offset()`
     /// * parameters intersect
-    fn merge_intersecting_stack_parameters(&mut self) -> Result<Vec<String>, Error> {
-        let mut merged_args = HashMap::new();
-        let mut removed_args = HashSet::new();
-        let mut logs = vec![];
-        for ((first_arg, first_pattern), (second_arg, second_pattern)) in self
+    fn merge_intersecting_stack_parameters(&mut self) -> Vec<String> {
+        let mut stack_parms = self
             .parameters
-            .iter()
+            .clone()
+            .into_iter()
             .filter(|x| x.0.eval_stack_offset().is_ok())
             .sorted_by(|a, b| {
                 match a
                     .0
                     .eval_stack_offset()
                     .unwrap()
-                    .checked_sge(&b.0.eval_stack_offset().unwrap())
+                    .checked_sgt(&b.0.eval_stack_offset().unwrap())
                     .unwrap()
                 {
                     true => std::cmp::Ordering::Greater,
                     false => std::cmp::Ordering::Less,
                 }
             })
-            .tuple_windows()
-        {
-            if let Ok(((address, size), log)) =
-                get_bounds_intersecting_stack_arg(first_arg, second_arg)
-            {
-                let merged_arg = Arg::Stack {
-                    address,
-                    size: ByteSize::from(size),
-                    data_type: first_arg.get_data_type(),
-                };
-                merged_args.insert(merged_arg, first_pattern.merge(second_pattern));
-                removed_args.insert(first_arg.clone());
-                removed_args.insert(second_arg.clone());
-                logs.extend(log.clone());
+            .collect_vec();
+        let mut logs = vec![];
+
+        if !stack_parms.is_empty() {
+            let mut i = 0;
+            while i < stack_parms.len() - 1 {
+                if let Ok((merged_arg, log)) =
+                    get_bounds_intersecting_stack_arg(&stack_parms[i].0, &stack_parms[i + 1].0)
+                {
+                    self.parameters.remove(&stack_parms[i].0);
+                    self.parameters.remove(&stack_parms[i + 1].0);
+                    self.parameters.insert(
+                        merged_arg.clone(),
+                        stack_parms[i].1.merge(&stack_parms[i + 1].1),
+                    );
+
+                    stack_parms.insert(
+                        i,
+                        (merged_arg, stack_parms[i].1.merge(&stack_parms[i + 1].1)),
+                    );
+                    stack_parms.remove(i + 1);
+                    stack_parms.remove(i + 1);
+
+                    logs.extend(log);
+                } else {
+                    i += 1;
+                }
             }
         }
-        for arg in removed_args {
-            self.parameters.remove(&arg);
-        }
-        self.parameters.extend(merged_args);
-        Ok(logs)
+
+        //self.parameters = stack_parms.into_iter().collect();
+        logs
     }
 }
 
-/// Merges two stack parameters and returns address and size.
+/// Merges two stack parameters and returns the merged [Arg](crate::intermediate_representation::Arg).
 /// Also returns a message, if one argument is not a subset of the other one.
+///
+/// Assumes the provided `Arg` are ordered by equal or increasing stack offset.
 ///
 /// Returns `Err` if `first_arg` or `second_arg`:
 /// * are not `Arg::Stack` types
-/// * do not have the same `Datatype`
 /// * return `Err` on `Arg::eval_stack_offset()`
 /// * do not intersect
 fn get_bounds_intersecting_stack_arg(
     first_arg: &Arg,
     second_arg: &Arg,
-) -> Result<((Expression, u64), Vec<String>), Error> {
+) -> Result<(Arg, Vec<String>), Error> {
     if let (
         Arg::Stack {
-            data_type: first_datatype,
+            data_type: _,
             size: first_size,
             address: first_address,
         },
         Arg::Stack {
-            data_type: second_datatype,
+            data_type: _,
             size: second_size,
             ..
         },
@@ -358,28 +369,38 @@ fn get_bounds_intersecting_stack_arg(
         let second_arg_offset = second_arg.eval_stack_offset()?.try_to_u64()?;
         let second_arg_size = u64::from(*second_size);
 
-        if first_datatype == second_datatype {
-            let mut logs = vec![];
-            let first_arg_upper_bound = first_arg_offset + first_arg_size;
-            // Check if they intersect
-            if first_arg_upper_bound >= second_arg_offset {
-                let second_arg_upper_bound = second_arg_offset + second_arg_size;
-                // Check if subset
-                if second_arg_upper_bound <= first_arg_upper_bound {
-                } else {
-                    // second arg is not a subset, but intersects
-                    logs.push(
-                        "Merged a stack parameter, that intersect another but is no subset"
-                            .to_string(),
-                    );
-                }
-                let merged_size = second_arg_upper_bound - first_arg_offset;
-                return Ok(((first_address.clone(), merged_size), logs));
-            } else {
-                return Err(anyhow!("Args do not intersect"));
+        let mut logs = vec![];
+        let first_arg_upper_bound = first_arg_offset + first_arg_size;
+
+        // Check if they intersect
+        if first_arg_upper_bound > second_arg_offset {
+            let second_arg_upper_bound = second_arg_offset + second_arg_size;
+
+            // Check if subset
+            if second_arg_upper_bound <= first_arg_upper_bound
+                && second_arg_offset >= first_arg_offset
+            {
+                // second arg is a subset, we just keep first_arg
+                return Ok((first_arg.clone(), logs));
             }
+            if first_arg_upper_bound <= second_arg_upper_bound
+                && first_arg_offset >= second_arg_offset
+            {
+                // first arg is a subset, we just keep second_arg
+                return Ok((second_arg.clone(), logs));
+            }
+            logs.push(
+                "Merged a stack parameter, that intersect another but is no subset".to_string(),
+            );
+
+            let merged_arg = Arg::Stack {
+                address: first_address.clone(),
+                size: (second_arg_upper_bound - first_arg_offset).into(),
+                data_type: None,
+            };
+            return Ok((merged_arg, logs));
         } else {
-            return Err(anyhow!("Args do not share same datatype"));
+            return Err(anyhow!("Args do not intersect"));
         }
     }
     Err(anyhow!("Args are no stack arguments"))
@@ -423,19 +444,21 @@ pub mod tests {
         }
     }
 
+    fn mock_stack_arg(address: Expression, size: u64) -> Arg {
+        Arg::Stack {
+            address,
+            size: size.into(),
+            data_type: None,
+        }
+    }
+
     #[test]
-    fn test_parameter_merging() {
+    fn test_two_parameter_overlapping_merging() {
+        let proj = Project::mock_x64();
         let mut func_sig = FunctionSignature::mock_x64();
-        let stack_parm_1 = Arg::Stack {
-            address: expr!("RSP:8 + 0x1000:8"),
-            size: 8.into(),
-            data_type: Some(Datatype::Integer),
-        };
-        let stack_parm_2 = Arg::Stack {
-            address: expr!("RSP:8 + 0x1004:8"),
-            size: 8.into(),
-            data_type: Some(Datatype::Integer),
-        };
+        let stack_parm_1 = mock_stack_arg(expr!("RSP:8 + 0x1000:8"), 8);
+        let stack_parm_2 = mock_stack_arg(expr!("RSP:8 + 0x1004:8"), 8);
+
         func_sig
             .parameters
             .insert(stack_parm_1, AccessPattern::new());
@@ -444,18 +467,71 @@ pub mod tests {
             .insert(stack_parm_2, AccessPattern::new());
 
         assert_eq!(
-            func_sig.merge_intersecting_stack_parameters().unwrap(),
-            vec!["Merged a stack parameter, that intersect another but is no subset"]
+            func_sig.sanitize(&proj),
+            (
+                vec!["Unexpected stack parameter size".to_string()],
+                vec![
+                    "Merged a stack parameter, that intersect another but is no subset".to_string()
+                ]
+            )
         );
         let mut expected_function_sig = FunctionSignature::mock_x64();
-        let expected_stack_arg = Arg::Stack {
-            address: expr!("RSP:8 + 0x1000:8"),
-            size: 12.into(),
-            data_type: Some(Datatype::Integer),
-        };
+        let expected_stack_arg = mock_stack_arg(expr!("RSP:8 + 0x1000:8"), 12);
+
         expected_function_sig
             .parameters
             .insert(expected_stack_arg, AccessPattern::new());
         assert_eq!(func_sig, expected_function_sig);
+    }
+
+    #[test]
+    fn test_merging_multiple_parameters() {
+        let proj = Project::mock_x64();
+        let mut func_sig = FunctionSignature::mock_x64();
+        let stack_parm_1 = mock_stack_arg(expr!("RSP:8 + 0x1000:8"), 8);
+        let stack_parm_2 = mock_stack_arg(expr!("RSP:8 + 0x1000:8"), 1);
+        let stack_parm_3 = mock_stack_arg(expr!("RSP:8 + 0x1007:8"), 1);
+        let stack_parm_4 = mock_stack_arg(expr!("RSP:8 + 0x1008:8"), 8);
+
+        func_sig.parameters.extend([
+            (stack_parm_1.clone(), AccessPattern::new()),
+            (stack_parm_2, AccessPattern::new()),
+            (stack_parm_3, AccessPattern::new()),
+            (stack_parm_4.clone(), AccessPattern::new()),
+        ]);
+        assert_eq!((vec![], vec![]), func_sig.sanitize(&proj));
+
+        let mut expected_function_sig = FunctionSignature::mock_x64();
+        expected_function_sig.parameters.extend([
+            (stack_parm_1, AccessPattern::new()),
+            (stack_parm_4, AccessPattern::new()),
+        ]);
+        assert_eq!(func_sig, expected_function_sig);
+    }
+    #[test]
+    fn test_log_messages() {
+        let proj = Project::mock_x64();
+        let mut func_sig = FunctionSignature::mock_x64();
+        let stack_parm_1 = mock_stack_arg(expr!("RSP:8 + 0x1001:8"), 8);
+        let stack_parm_2 = mock_stack_arg(expr!("RSP:8 + 0x1007:8"), 4);
+
+        func_sig.parameters.extend([
+            (stack_parm_1.clone(), AccessPattern::new()),
+            (stack_parm_2, AccessPattern::new()),
+        ]);
+
+        let logs = func_sig.sanitize(&proj);
+        assert_eq!(
+            (
+                vec![
+                    "Unexpected stack parameter size".to_string(),
+                    "Unexpected stack parameter alignment".to_string()
+                ],
+                vec![
+                    "Merged a stack parameter, that intersect another but is no subset".to_string()
+                ]
+            ),
+            logs
+        );
     }
 }
