@@ -333,7 +333,6 @@ impl FunctionSignature {
             }
         }
 
-        //self.parameters = stack_parms.into_iter().collect();
         logs
     }
 }
