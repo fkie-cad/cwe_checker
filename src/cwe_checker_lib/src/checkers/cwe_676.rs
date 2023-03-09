@@ -84,7 +84,6 @@ pub fn generate_cwe_warnings<'a>(
         cwe_warnings.push(cwe_warning);
     }
 
-    cwe_warnings.sort();
     cwe_warnings
 }
 

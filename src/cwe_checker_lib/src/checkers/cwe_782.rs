@@ -80,6 +80,6 @@ pub fn check_cwe(
             .values()
             .for_each(|sub| warnings.append(&mut handle_sub(sub, symbol)));
     }
-    warnings.sort();
+
     (vec![], warnings)
 }

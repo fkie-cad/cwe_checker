@@ -68,6 +68,5 @@ pub fn check_cwe(
             cwe_warnings.push(generate_cwe_warning(secure_initializer_func, rand_func));
         }
     }
-    cwe_warnings.sort();
     (Vec::new(), cwe_warnings)
 }

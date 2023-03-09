@@ -89,7 +89,6 @@ pub fn check_cwe(
 
     fixpoint_computation.compute_with_max_steps(100);
 
-    let (logs, mut cwe_warnings) = log_thread.collect();
-    cwe_warnings.sort();
+    let (logs, cwe_warnings) = log_thread.collect();
     (logs, cwe_warnings)
 }

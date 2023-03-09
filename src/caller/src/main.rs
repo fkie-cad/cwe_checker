@@ -197,6 +197,7 @@ fn run_with_ghidra(args: &CmdlineArgs) -> Result<(), Error> {
         all_logs.append(&mut logs);
         all_cwes.append(&mut cwes);
     }
+    all_cwes.sort();
 
     // Print the results of the modules.
     if args.quiet {
