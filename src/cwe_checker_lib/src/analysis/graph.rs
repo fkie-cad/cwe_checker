@@ -487,27 +487,25 @@ impl<'a> GraphBuilder<'a> {
     }
 
     /// Build the interprocedural control flow graph.
-    pub fn build(mut self) -> Graph<'a> {
+    pub fn build(&mut self) -> Graph<'a> {
         self.add_program_blocks();
         self.add_subs_to_call_targets();
         self.add_jump_and_call_edges();
         self.add_return_edges();
-        self.graph
+        self.graph.clone()
     }
 }
 
 /// Build the interprocedural control flow graph for a program term.
 pub fn get_program_cfg(program: &Term<Program>) -> Graph {
-    let extern_subs = program.term.extern_symbols.keys().cloned().collect();
-    let builder = GraphBuilder::new(program, extern_subs);
-    builder.build()
+    get_program_cfg_with_logs(program).0
 }
 
 /// Build the interprocedural control flow graph for a program term with log messages created by building.
-pub fn get_program_cfg_with_logs(program: &Term<Program>) -> (Vec<LogMessage>, Graph) {
+pub fn get_program_cfg_with_logs(program: &Term<Program>) -> (Graph, Vec<LogMessage>) {
     let extern_subs = program.term.extern_symbols.keys().cloned().collect();
-    let builder = GraphBuilder::new(program, extern_subs);
-    (builder.log_messages.clone(), builder.build())
+    let mut builder = GraphBuilder::new(program, extern_subs);
+    (builder.build(), builder.log_messages)
 }
 
 /// Returns a map from function TIDs to the node index of the `BlkStart` node of the first block in the function.
