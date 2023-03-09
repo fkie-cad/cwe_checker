@@ -489,7 +489,8 @@ impl<'a> GraphBuilder<'a> {
 }
 
 /// Build the interprocedural control flow graph for a program term.
-pub fn get_program_cfg(program: &Term<Program>, extern_subs: HashSet<Tid>) -> Graph {
+pub fn get_program_cfg(program: &Term<Program>) -> Graph {
+    let extern_subs = program.term.extern_symbols.keys().cloned().collect();
     let builder = GraphBuilder::new(program, extern_subs);
     builder.build()
 }
@@ -610,7 +611,7 @@ mod tests {
     #[test]
     fn create_program_cfg() {
         let program = mock_program();
-        let graph = get_program_cfg(&program, HashSet::new());
+        let graph = get_program_cfg(&program);
         println!("{}", serde_json::to_string_pretty(&graph).unwrap());
         assert_eq!(graph.node_count(), 16);
         assert_eq!(graph.edge_count(), 20);
@@ -646,7 +647,7 @@ mod tests {
             tid: Tid::new("program".to_string()),
             term: program,
         };
-        let graph = get_program_cfg(&program_term, HashSet::new());
+        let graph = get_program_cfg(&program_term);
         assert_eq!(graph.node_count(), 2);
         assert_eq!(graph.edge_count(), 2);
     }

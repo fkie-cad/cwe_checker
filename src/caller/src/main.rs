@@ -130,14 +130,7 @@ fn run_with_ghidra(args: &CmdlineArgs) -> Result<(), Error> {
         disassemble_binary(&binary_file_path, bare_metal_config_opt, args.verbose)?;
 
     // Generate the control flow graph of the program
-    let extern_sub_tids = project
-        .program
-        .term
-        .extern_symbols
-        .keys()
-        .cloned()
-        .collect();
-    let control_flow_graph = graph::get_program_cfg(&project.program, extern_sub_tids);
+    let control_flow_graph = graph::get_program_cfg(&project.program);
 
     let analysis_results = AnalysisResults::new(&binary, &control_flow_graph, &project);
 

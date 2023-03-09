@@ -1,11 +1,10 @@
 use super::*;
 use crate::{bitvec, variable};
-use std::collections::HashSet;
 
 #[test]
 fn test_compute_return_values_of_call() {
     let project = Project::mock_x64();
-    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
+    let graph = crate::analysis::graph::get_program_cfg(&project.program);
 
     let context = Context::new(&project, &graph);
 
@@ -54,7 +53,7 @@ fn test_compute_return_values_of_call() {
 #[test]
 fn test_call_stub_handling() {
     let project = Project::mock_arm32();
-    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
+    let graph = crate::analysis::graph::get_program_cfg(&project.program);
 
     let context = Context::new(&project, &graph);
 
@@ -117,7 +116,7 @@ fn test_call_stub_handling() {
 #[test]
 fn test_get_global_mem_address() {
     let project = Project::mock_arm32();
-    let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
+    let graph = crate::analysis::graph::get_program_cfg(&project.program);
 
     let context = Context::new(&project, &graph);
     // Check global address from abstract ID

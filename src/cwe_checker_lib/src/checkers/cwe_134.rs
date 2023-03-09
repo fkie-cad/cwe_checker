@@ -176,8 +176,6 @@ fn generate_cwe_warning(
 
 #[cfg(test)]
 pub mod tests {
-    use std::collections::HashSet;
-
     use crate::analysis::pointer_inference::PointerInference as PointerInferenceComputation;
     use crate::{defs, intermediate_representation::*};
 
@@ -209,7 +207,7 @@ pub mod tests {
     fn test_locate_format_string() {
         let sprintf_symbol = ExternSymbol::mock_sprintf_x64();
         let project = mock_project();
-        let graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
+        let graph = crate::analysis::graph::get_program_cfg(&project.program);
         let mut pi_results = PointerInferenceComputation::mock(&project);
         pi_results.compute(false);
         let mut format_string_index: HashMap<String, usize> = HashMap::new();

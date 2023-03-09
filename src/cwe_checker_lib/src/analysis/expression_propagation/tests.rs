@@ -176,15 +176,7 @@ fn no_propagation_on_calls() {
 /// variable-expressions pairs.
 fn insertion_table_update() {
     let project = &mock_project();
-    let extern_subs = project
-        .program
-        .term
-        .extern_symbols
-        .keys()
-        .cloned()
-        .collect();
-
-    let graph = crate::analysis::graph::get_program_cfg(&project.program, extern_subs);
+    let graph = crate::analysis::graph::get_program_cfg(&project.program);
     let context = Context::new(&graph);
 
     let blk = get_mock_entry_block().term;
