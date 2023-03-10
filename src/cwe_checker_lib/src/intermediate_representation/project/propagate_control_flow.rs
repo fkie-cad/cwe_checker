@@ -16,14 +16,7 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 /// For such a sequence we then retarget the destination of the first jump to the final jump destination of the sequence.
 /// Lastly, the newly bypassed blocks are considered dead code and are removed.
 pub fn propagate_control_flow(project: &mut Project) {
-    let extern_subs: HashSet<Tid> = project
-        .program
-        .term
-        .extern_symbols
-        .keys()
-        .cloned()
-        .collect();
-    let cfg = crate::analysis::graph::get_program_cfg(&project.program, extern_subs.clone());
+    let cfg = crate::analysis::graph::get_program_cfg(&project.program);
     let nodes_without_incoming_edges_at_beginning = get_nodes_without_incoming_edge(&cfg);
 
     let mut jmps_to_retarget = HashMap::new();
@@ -75,7 +68,7 @@ pub fn propagate_control_flow(project: &mut Project) {
     }
     retarget_jumps(project, jmps_to_retarget);
 
-    let cfg = crate::analysis::graph::get_program_cfg(&project.program, extern_subs);
+    let cfg = crate::analysis::graph::get_program_cfg(&project.program);
     let nodes_without_incoming_edges_at_end = get_nodes_without_incoming_edge(&cfg);
 
     remove_new_orphaned_blocks(

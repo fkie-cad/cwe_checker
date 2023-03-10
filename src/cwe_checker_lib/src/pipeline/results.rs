@@ -123,15 +123,12 @@ impl<'a> AnalysisResults<'a> {
 mod tests {
     use super::*;
     use crate::analysis::graph::get_program_cfg;
-    use std::collections::HashSet;
 
     impl<'a> AnalysisResults<'a> {
         /// Mocks the `AnalysisResults` struct with a given project.
         /// Note that the function leaks memory!
         pub fn mock_from_project(project: &'a Project) -> AnalysisResults<'a> {
-            let extern_subs =
-                HashSet::from_iter(project.program.term.extern_symbols.keys().cloned());
-            let graph = Box::new(get_program_cfg(&project.program, extern_subs));
+            let graph = Box::new(get_program_cfg(&project.program));
             let graph: &'a Graph = Box::leak(graph);
             let binary: &'a Vec<u8> = Box::leak(Box::new(Vec::new()));
             let analysis_results = AnalysisResults::new(binary, graph, project);

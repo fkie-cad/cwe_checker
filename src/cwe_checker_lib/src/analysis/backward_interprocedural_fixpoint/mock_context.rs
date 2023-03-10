@@ -1,7 +1,7 @@
 use super::*;
 use crate::analysis::graph::Graph;
 use petgraph::graph::NodeIndex;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 /// Identifier for BlkStart and BlkEnd nodes
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -19,7 +19,7 @@ pub struct Context<'a> {
 
 impl<'a> Context<'a> {
     pub fn new(project: &'a Project) -> Self {
-        let mut graph = crate::analysis::graph::get_program_cfg(&project.program, HashSet::new());
+        let mut graph = crate::analysis::graph::get_program_cfg(&project.program);
         graph.reverse();
         let mut tid_to_node_index: HashMap<(Tid, Tid, StartEnd), NodeIndex> = HashMap::new();
         for node in graph.node_indices() {

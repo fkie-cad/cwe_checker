@@ -330,16 +330,9 @@ pub fn merge_def_assignments_to_same_var(blk: &mut Term<Blk>) {
 ///
 /// This is performed by a fixpoint computation and might panic, if it does not stabilize.
 pub fn propagate_input_expression(project: &mut Project) {
-    let extern_subs = project
-        .program
-        .term
-        .extern_symbols
-        .keys()
-        .cloned()
-        .collect();
     merge_same_var_assignments(project);
 
-    let graph = crate::analysis::graph::get_program_cfg(&project.program, extern_subs);
+    let graph = crate::analysis::graph::get_program_cfg(&project.program);
     let computation = compute_expression_propagation(&graph);
     let results = extract_results(&graph, computation);
     insert_expressions(results, &mut project.program.term);

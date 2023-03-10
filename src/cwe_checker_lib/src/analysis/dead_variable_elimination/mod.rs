@@ -14,14 +14,7 @@ use alive_vars_computation::*;
 /// Returns a map that assigns to each basic block `Tid` the set of all variables
 /// that are alive at the end of the basic block.
 pub fn compute_alive_vars(project: &Project) -> HashMap<Tid, BTreeSet<Variable>> {
-    let extern_subs = project
-        .program
-        .term
-        .extern_symbols
-        .keys()
-        .cloned()
-        .collect();
-    let mut graph = crate::analysis::graph::get_program_cfg(&project.program, extern_subs);
+    let mut graph = crate::analysis::graph::get_program_cfg(&project.program);
     graph.reverse();
     let context = Context::new(project, &graph);
     let all_physical_registers = context.all_physical_registers.clone();

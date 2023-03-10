@@ -175,6 +175,5 @@ pub fn check_cwe(
         }
     }
 
-    cwe_warnings.sort();
     (Vec::new(), cwe_warnings)
 }
