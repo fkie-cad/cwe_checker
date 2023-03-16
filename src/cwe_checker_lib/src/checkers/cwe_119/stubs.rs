@@ -155,7 +155,7 @@ impl<'a, 'b> ExternCallHandler<'a, 'b> {
     /// Compute the size of a buffer from a corresponding size value.
     /// Returns `None` if no absolute size value could be determined for any reason.
     ///
-    /// If a range of posible sizes is detected, use the smallest possible size,
+    /// If a range of possible sizes is detected, use the smallest possible size,
     /// as using larger sizes would lead to too many false positive CWE warnings.
     fn compute_buffer_size_from_data_domain(&self, size: Data) -> Option<ByteSize> {
         let size = self.context.recursively_substitute_param_values(&size);
