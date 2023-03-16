@@ -106,10 +106,13 @@ impl<'a> Context<'a> {
                             Bitvector::from_i64(upper_bound)
                                 .into_resize_signed(object_size.bytesize()),
                         );
-                        if upper_bound.sign_bit().to_bool() {
-                            // Both bounds seem to be bogus values (because both are negative values).
+                        if lower_bound.is_zero() || upper_bound.is_zero() {
+                            self.log_info(object_id.get_tid(), "Heap object may have size zero. This may indicate an instance of CWE-687.");
+                        }
+                        if upper_bound.sign_bit().to_bool() || upper_bound.is_zero() {
+                            // Both bounds seem to be bogus values (because both are non-positive values).
                             BitvectorDomain::new_top(object_size.bytesize())
-                        } else if lower_bound.sign_bit().to_bool() {
+                        } else if lower_bound.sign_bit().to_bool() || lower_bound.is_zero() {
                             // The lower bound is bogus, but we can approximate by the upper bound instead.
                             upper_bound.into()
                         } else {
@@ -133,6 +136,17 @@ impl<'a> Context<'a> {
         let log_msg = LogMessage {
             text: msg.to_string(),
             level: crate::utils::log::LogLevel::Debug,
+            location: Some(tid.clone()),
+            source: Some(super::CWE_MODULE.name.to_string()),
+        };
+        self.log_collector.send(log_msg.into()).unwrap();
+    }
+
+    /// Log an info log message in the log collector of `self`.
+    pub fn log_info(&self, tid: &Tid, msg: impl ToString) {
+        let log_msg = LogMessage {
+            text: msg.to_string(),
+            level: crate::utils::log::LogLevel::Info,
             location: Some(tid.clone()),
             source: Some(super::CWE_MODULE.name.to_string()),
         };

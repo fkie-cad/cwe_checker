@@ -50,3 +50,25 @@ fn test_compute_size_value_of_malloc_like_call() {
     )
     .is_none());
 }
+
+#[test]
+fn test_malloc_zero_case() {
+    let mut context = Context::mock_x64();
+    let (sender, _receiver) = crossbeam_channel::unbounded();
+    context.log_collector = sender; // So that log messages can be sent and received.
+
+    let object_size = IntervalDomain::mock(0, 32);
+    let object_size = DataDomain::from(object_size);
+    let object_id = AbstractIdentifier::mock("object_tid", "RAX", 8);
+
+    context
+        .call_to_caller_fn_map
+        .insert(object_id.get_tid().clone(), Tid::new("func_tid"));
+    context
+        .malloc_tid_to_object_size_map
+        .insert(object_id.get_tid().clone(), object_size);
+    // Since zero sizes usually result in implementation-specific behavior for allocators,
+    // the fallback of taking the maximum object size in `context.compute_size_of_heap_object()` should trigger.
+    let size_domain = context.compute_size_of_heap_object(&object_id);
+    assert_eq!(size_domain.try_to_offset().unwrap(), 32);
+}
