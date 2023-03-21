@@ -1,3 +1,6 @@
+***Important note:*** We recently decided to migrate from Dockerhub to the Github container registry.
+If you are using our prebuilt Docker images, please remember to change the cwe_checker-image names from `fkiecad/cwe_checker` to `ghcr.io/fkie-cad/cwe_checker` in your scripts!
+
 <p align="center">
     <img src="doc/images/cwe_checker_logo.png" alt="cwe_checker logo" width="50%" height="50%"/>
 </p>
@@ -36,10 +39,10 @@ The following arguments should convince you to give *cwe_checker* a try:
 
 ### Using the docker image ###
 
-The simplest way is to pull the latest Docker image from [dockerhub](https://hub.docker.com/r/fkiecad/cwe_checker):
--   `docker pull fkiecad/cwe_checker:latest` yields an image based on the current master branch.
--   `docker pull fkiecad/cwe_checker:stable` yields an image based on the latest stable release version.
--   `docker pull fkiecad/cwe_checker:v0.6` yields an image based on the v0.6 stable release version.
+The simplest way is to pull the latest Docker image from the [Github container registry](https://github.com/fkie-cad/cwe_checker/pkgs/container/cwe_checker):
+-   `docker pull ghcr.io/fkie-cad/cwe_checker:latest` yields an image based on the current master branch.
+-   `docker pull ghcr.io/fkie-cad/cwe_checker:stable` yields an image based on the latest stable release version.
+-   `docker pull ghcr.io/fkie-cad/cwe_checker:v0.6` yields an image based on the v0.6 stable release version.
 However, it is recommended to switch to newer stable releases as soon as they get published, since improvements between stable versions can be quite significant.
 
 If you want to build the docker image yourself, just run
@@ -47,7 +50,7 @@ If you want to build the docker image yourself, just run
 docker build -t cwe_checker .
 ```
 This way you can also build native Docker images for ARM-based PCs (e.g. newer Apple Macs).
-The prebuilt Docker images on dockerhub are currently only x86-based.
+The prebuilt Docker images are currently only x86-based.
 
 ### Local installation ###
 
@@ -66,7 +69,7 @@ and then outputs a list of CWE warnings that have been found during the analysis
 
 If you use the official docker image, just run
 ```bash
-docker run --rm -v /PATH/TO/BINARY:/input fkiecad/cwe_checker /input
+docker run --rm -v /PATH/TO/BINARY:/input ghcr.io/fkie-cad/cwe_checker /input
 ```
 If you installed the *cwe_checker* locally, run
 ```bash
@@ -154,7 +157,7 @@ A special thanks goes out to the BAP community (especially the official gitter) 
 
 ## License ##
 ```
-    Copyright (C) 2018 -       Fraunhofer FKIE  (firmware-security@fkie.fraunhofer.de)
+    Copyright (C) 2018 - 2023  Fraunhofer FKIE  (firmware-security@fkie.fraunhofer.de)
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Library General Public
