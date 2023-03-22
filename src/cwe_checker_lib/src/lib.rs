@@ -21,7 +21,7 @@ cwe_checker BINARY
 ```
 If you want to use the official docker image, you have to mount the input binary into the docker container, e.g.
 ```sh
-docker run --rm -v $(pwd)/BINARY:/input fkiecad/cwe_checker /input
+docker run --rm -v $(pwd)/BINARY:/input ghcr.io/fkie-cad/cwe_checker /input
 ```
 One can modify the behaviour of the cwe_checker through the command line.
 Use the `--help` command line option for more information.
@@ -33,7 +33,7 @@ and read the [check-specific documentation](crate::checkers) for more details ab
 ## For bare-metal binaries
 
 The cwe_checker offers experimental support for analyzing bare-metal binaries.
-For that one needs to provide a bare metal configuration file via the `--bare-metal-config` command line option.
+For that, one needs to provide a bare metal configuration file via the `--bare-metal-config` command line option.
 An example for such a configuration file can be found at `bare_metal/stm32f407vg.json`
 (which was created and tested for an STM32F407VG MCU).
 
