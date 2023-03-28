@@ -8,16 +8,16 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  GHIDRA_RELEASE_TAG: Ghidra_10.2.2_build
-  GHIDRA_VERSION: ghidra_10.2.2_PUBLIC_20221115
+  GHIDRA_RELEASE_TAG: Ghidra_10.2.3_build
+  GHIDRA_VERSION: ghidra_10.2.3_PUBLIC_20230208
 
 jobs: 
  
   acceptance-tests:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Build and run docker image for cross compiling
         run: |
           cd test/artificial_samples
@@ -50,7 +50,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Build the docker image
         run: docker build -t cwe_checker .
       - name: Check functionality of the image
