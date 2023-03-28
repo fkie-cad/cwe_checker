@@ -50,38 +50,59 @@ pub fn find_call_sequences_to_target(
         .node_indices()
         .find(|node| callgraph[*node] == *source_sub_tid)
         .unwrap_or_else(|| panic!("Function TID not found in call graph."));
-    find_call_sequences_from_node_to_target(callgraph, source_node, target_sub_tid, BTreeSet::new())
+    let target_node = callgraph
+        .node_indices()
+        .find(|node| callgraph[*node] == *target_sub_tid)
+        .unwrap_or_else(|| panic!("Function TID not found in call graph."));
+    find_call_sequences_from_node_to_target(callgraph, source_node, target_node)
 }
 
-/// Recursively collects all call TIDs of call sequences that start in the function given by the `source_node` in the call graph
-/// and end in the function given by the `target_sub_tid`.
+/// Collect all call TIDs of calls contained in path in the call graph starting at the source node and ending at the target node.
 fn find_call_sequences_from_node_to_target(
     callgraph: &CallGraph,
     source_node: NodeIndex,
-    target_sub_tid: &Tid,
-    visited_nodes: BTreeSet<NodeIndex>,
+    target_node: NodeIndex,
 ) -> BTreeSet<Tid> {
-    let mut call_tids = BTreeSet::new();
-    for edge in callgraph.edges_directed(source_node, petgraph::Direction::Outgoing) {
-        let (_, target_node) = callgraph.edge_endpoints(edge.id()).unwrap();
-        if callgraph[target_node] == *target_sub_tid {
-            call_tids.insert(edge.weight().tid.clone());
-        } else if !visited_nodes.contains(&target_node) {
-            let mut recursive_visited = visited_nodes.clone();
-            recursive_visited.insert(target_node);
-            let recursive_tids = find_call_sequences_from_node_to_target(
-                callgraph,
-                target_node,
-                target_sub_tid,
-                recursive_visited,
-            );
-            if !recursive_tids.is_empty() {
-                call_tids.extend(recursive_tids.into_iter());
-                call_tids.insert(edge.weight().tid.clone());
+    use petgraph::Direction;
+    // Find all edges on paths starting at source_node using depth-first-search
+    let mut nodes_reachable_from_source = BTreeSet::new();
+    let mut edges_reachable_from_source = BTreeSet::new();
+    let mut stack = vec![source_node];
+    while let Some(node) = stack.pop() {
+        if nodes_reachable_from_source.insert(node) {
+            for neighbor in callgraph.neighbors_directed(node, Direction::Outgoing) {
+                stack.push(neighbor);
+            }
+            for edge in callgraph.edges_directed(node, Direction::Outgoing) {
+                edges_reachable_from_source.insert(edge.id());
             }
         }
     }
-    call_tids
+    // Find all edges on paths leading to target_node using depth-first-search
+    let mut nodes_on_paths_to_target = BTreeSet::new();
+    let mut edges_on_paths_to_target = BTreeSet::new();
+    let mut stack = vec![target_node];
+    while let Some(node) = stack.pop() {
+        if nodes_on_paths_to_target.insert(node) {
+            for neighbor in callgraph.neighbors_directed(node, petgraph::Direction::Incoming) {
+                stack.push(neighbor);
+            }
+            for edge in callgraph.edges_directed(node, Direction::Incoming) {
+                edges_on_paths_to_target.insert(edge.id());
+            }
+        }
+    }
+    // Compute the intersection of both edge sets and return the corresponding call TIDs
+    edges_reachable_from_source
+        .iter()
+        .filter_map(|edge| {
+            if edges_on_paths_to_target.contains(edge) {
+                Some(callgraph[*edge].tid.clone())
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 #[cfg(test)]
