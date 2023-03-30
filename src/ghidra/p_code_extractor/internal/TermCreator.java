@@ -265,7 +265,18 @@ public class TermCreator {
                 case PcodeOp.UNIMPLEMENTED:
                     jumpLabel = null;
                     break;
+                case PcodeOp.CBRANCH:
+                    // If the target a constant, an intra Pcode jump is performed.
+                    if (PcodeBlockData.pcodeOp.getInput(0).isConstant()) {                       
+                        int offset = (int) PcodeBlockData.pcodeOp.getInput(0).getAddress().getOffset();
+                        // if the target pcodeOp is not contained within the current instruction, go to next
+                        if (PcodeBlockData.pcodeIndex + offset >= PcodeBlockData.ops.length){
+                            jumpLabel = new Label((Tid) new Tid(String.format("blk_%s", PcodeBlockData.instruction.getNext().getAddress().toString()), PcodeBlockData.instruction.getNext().getAddress().toString()));
+                            break;
+                        }                        
+                    }
                 default:
+                    // Note: If getInput() returns a constant, the resulting Tid is invalid
                     jumpLabel = new Label((Tid) new Tid(String.format("blk_%s", PcodeBlockData.pcodeOp.getInput(0).getAddress().toString()), PcodeBlockData.pcodeOp.getInput(0).getAddress().toString()));
                     break;
             }
