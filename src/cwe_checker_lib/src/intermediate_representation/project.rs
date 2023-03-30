@@ -209,22 +209,85 @@ impl Project {
         log_messages
     }
 
+    /// Remove blocks, defs and jumps with duplicate TIDs and return log messages on such cases.
+    /// Since such cases break the fundamental invariant that each TID is unique,
+    /// they result in errors if not removed.
+    ///
+    /// Note that each case has a bug as a root cause.
+    /// This code is only a workaround so that before the corresponding bug is fixed
+    /// the rest of the binary can still be analyzed.
+    #[must_use]
+    fn remove_duplicate_tids(&mut self) -> Vec<LogMessage> {
+        let mut known_tids = HashSet::new();
+        let mut errors = Vec::new();
+        known_tids.insert(self.program.tid.clone());
+        for sub in self.program.term.subs.values_mut() {
+            if !known_tids.insert(sub.tid.clone()) {
+                panic!("Duplicate of TID {} encountered.", sub.tid);
+            }
+            let mut filtered_blocks = Vec::new();
+            for block in &sub.term.blocks {
+                if known_tids.insert(block.tid.clone()) {
+                    filtered_blocks.push(block.clone());
+                } else {
+                    errors.push(LogMessage::new_error(&format!(
+                        "Removed duplicate of TID {}. This is a bug in the cwe_checker!",
+                        block.tid
+                    )));
+                }
+            }
+            sub.term.blocks = filtered_blocks;
+            for block in sub.term.blocks.iter_mut() {
+                let mut filtered_defs = Vec::new();
+                let mut filtered_jmps = Vec::new();
+                for def in &block.term.defs {
+                    if known_tids.insert(def.tid.clone()) {
+                        filtered_defs.push(def.clone());
+                    } else {
+                        errors.push(LogMessage::new_error(&format!(
+                            "Removed duplicate of TID {}. This is a Bug in the cwe_checker!",
+                            def.tid
+                        )));
+                    }
+                }
+                for jmp in &block.term.jmps {
+                    if known_tids.insert(jmp.tid.clone()) {
+                        filtered_jmps.push(jmp.clone());
+                    } else {
+                        errors.push(LogMessage::new_error(&format!(
+                            "Removed duplicate of TID {}. This is a Bug in the cwe_checker!",
+                            jmp.tid
+                        )));
+                    }
+                }
+                block.term.defs = filtered_defs;
+                block.term.jmps = filtered_jmps;
+            }
+        }
+
+        errors
+    }
+
     /// Run some normalization passes over the project.
     ///
     /// Passes:
+    /// - Remove duplicate TIDs.
+    ///   This is a workaround for a bug in the P-Code-Extractor and should be removed once the bug is fixed.
     /// - Replace jumps to nonexisting TIDs with jumps to artificial sink targets in the CFG.
-    /// Also replace return addresses of non-returning external symbols with artificial sink targets.
+    ///   Also replace return addresses of non-returning external symbols with artificial sink targets.
     /// - Duplicate blocks so that if a block is contained in several functions, each function gets its own unique copy.
     /// - Propagate input expressions along variable assignments.
     /// - Replace trivial expressions like `a XOR a` with their result.
     /// - Remove dead register assignments.
     /// - Propagate the control flow along chains of conditionals with the same condition.
     /// - Substitute bitwise `AND` and `OR` operations with the stack pointer
-    /// in cases where the result is known due to known stack pointer alignment.
+    ///   in cases where the result is known due to known stack pointer alignment.
     #[must_use]
     pub fn normalize(&mut self) -> Vec<LogMessage> {
-        let mut logs =
-            self.remove_references_to_nonexisting_tids_and_retarget_non_returning_calls();
+        let mut logs = self.remove_duplicate_tids();
+        logs.append(
+            &mut self.remove_references_to_nonexisting_tids_and_retarget_non_returning_calls(),
+        );
         make_block_to_sub_mapping_unique(self);
         crate::analysis::expression_propagation::propagate_input_expression(self);
         self.substitute_trivial_expressions();
