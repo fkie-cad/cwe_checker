@@ -25,8 +25,8 @@ impl AbstractDomain for ObjectState {
             (ObjectState::AlreadyFlagged, _) | (_, ObjectState::AlreadyFlagged) => {
                 ObjectState::AlreadyFlagged
             }
-            (ObjectState::Dangling(tid), ObjectState::Dangling(_)) => {
-                ObjectState::Dangling(tid.clone())
+            (ObjectState::Dangling(tid), ObjectState::Dangling(other_tid)) => {
+                ObjectState::Dangling(std::cmp::min(tid, other_tid).clone())
             }
         }
     }
