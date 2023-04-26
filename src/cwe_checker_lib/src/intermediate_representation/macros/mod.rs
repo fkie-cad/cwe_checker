@@ -193,7 +193,7 @@ pub mod parsing {
             r"^((0x(-)?[[:alnum:]]+)|^(-)?([0-9])+)+:[0-9]+$",                     // Constant
             r"^[^\+]*\+{1}[^\+]*$",                                                // BinOp (IntAdd)
             r"^[[:ascii:]]+ \-{1} [[:ascii:]]+$",                                  // BinOp (IntSub)
-            r"^-\([[:ascii:]]*\)$",  // UnOp (IntNegate)
+            r"^-\([[:ascii:]]*\)$", // UnOp (IntNegate)
             r"^¬\([[:ascii:]]*\)$", // UnOp (BoolNegate)
         ])
         .unwrap();
