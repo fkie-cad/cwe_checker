@@ -54,17 +54,28 @@ impl State {
         }
     }
 
+    /// If the given `object_id` represents a dangling object, return the TID of the site where it was freed.
+    pub fn get_free_tid_if_dangling(&self, object_id: &AbstractIdentifier) -> Option<&Tid> {
+        if let Some(ObjectState::Dangling(free_tid)) = self.dangling_objects.get(object_id) {
+            Some(free_tid)
+        } else {
+            None
+        }
+    }
+
     /// Check the given address on whether it may point to already freed memory.
-    /// For each possible dangling pointer target a string describing the root cause is returnen.
+    /// For each possible dangling pointer target the abstract ID of the object
+    /// and the TID of the corresponding site where the object was freed is returned.
     /// The object states of corresponding memory objects are set to [`ObjectState::AlreadyFlagged`]
     /// to prevent reporting duplicate CWE messages with the same root cause.
-    pub fn check_address_for_use_after_free(&mut self, address: &Data) -> Option<Vec<String>> {
+    pub fn check_address_for_use_after_free(
+        &mut self,
+        address: &Data,
+    ) -> Option<Vec<(AbstractIdentifier, Tid)>> {
         let mut free_ids_of_dangling_pointers = Vec::new();
         for id in address.get_relative_values().keys() {
             if let Some(ObjectState::Dangling(free_id)) = self.dangling_objects.get(id) {
-                free_ids_of_dangling_pointers.push(format!(
-                    "Accessed ID {id} may have been already freed at {free_id}"
-                ));
+                free_ids_of_dangling_pointers.push((id.clone(), free_id.clone()));
 
                 self.dangling_objects
                     .insert(id.clone(), ObjectState::AlreadyFlagged);
@@ -84,7 +95,7 @@ impl State {
         call_tid: &Tid,
         param: &Data,
         pi_state: &PiState,
-    ) -> Option<Vec<String>> {
+    ) -> Option<Vec<(AbstractIdentifier, Tid)>> {
         // FIXME: This function could also generate debug log messages whenever nonsensical information is detected.
         // E.g. stack frame IDs or non-zero ID offsets can be indicators of other bugs.
         let mut warnings = Vec::new();
@@ -99,9 +110,7 @@ impl State {
                 .dangling_objects
                 .insert(id.clone(), ObjectState::Dangling(call_tid.clone()))
             {
-                warnings.push(format!(
-                    "Object {id} may have been freed before at {old_free_id}."
-                ));
+                warnings.push((id.clone(), old_free_id.clone()));
             }
         }
         if !warnings.is_empty() {
@@ -161,6 +170,31 @@ impl AbstractDomain for State {
     /// Always returns false. The state has no logical `Top` element.
     fn is_top(&self) -> bool {
         false
+    }
+}
+
+impl State {
+    /// Get a more compact json-representation of the state.
+    /// Intended for pretty printing, not useable for serialization/deserialization.
+    #[allow(dead_code)]
+    pub fn to_json_compact(&self) -> serde_json::Value {
+        use serde_json::*;
+        let mut state_map = Map::new();
+        state_map.insert(
+            "current_function".to_string(),
+            Value::String(format!("{}", self.current_fn_tid)),
+        );
+        for (id, object_state) in self.dangling_objects.iter() {
+            if let ObjectState::Dangling(free_tid) = object_state {
+                state_map.insert(
+                    format!("{id}"),
+                    Value::String(format!("Dangling({free_tid})")),
+                );
+            } else {
+                state_map.insert(format!("{id}"), Value::String("Already freed".to_string()));
+            }
+        }
+        Value::Object(state_map)
     }
 }
 
