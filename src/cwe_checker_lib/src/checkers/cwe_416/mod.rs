@@ -93,7 +93,8 @@ pub fn check_cwe(
     while let Ok(warning) = cwe_warning_receiver.try_recv() {
         warnings.insert(warning);
     }
-    let cwes = generate_context_information_for_warnings(&fixpoint_computation, warnings);
+    let return_site_states = collect_return_site_states(&fixpoint_computation);
+    let cwes = generate_context_information_for_warnings(return_site_states, warnings);
 
     let mut logs = BTreeSet::new();
     while let Ok(log_msg) = log_receiver.try_recv() {
@@ -105,7 +106,7 @@ pub fn check_cwe(
 
 /// A struct for collecting CWE warnings together with context information
 /// that can be used to post-process the warning after the fixpoint has been computed.
-#[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct WarningContext {
     /// The CWE warning.
     cwe: CweWarning,
@@ -206,11 +207,10 @@ fn get_source_of_free(
 
 /// Generate context information for CWE warnings.
 /// E.g. relevant callgraph addresses are added to each CWE here.
-fn generate_context_information_for_warnings<'a>(
-    fixpoint: &Computation<GeneralizedContext<'a, Context<'a>>>,
+fn generate_context_information_for_warnings(
+    return_site_states: HashMap<Tid, State>,
     warnings: HashSet<WarningContext>,
 ) -> BTreeSet<CweWarning> {
-    let return_site_states = collect_return_site_states(fixpoint);
     let mut processed_warnings = BTreeSet::new();
     for mut warning in warnings {
         let mut context_infos = Vec::new();
@@ -242,4 +242,54 @@ fn generate_context_information_for_warnings<'a>(
     }
 
     processed_warnings
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use crate::{
+        abstract_domain::{AbstractIdentifier, AbstractLocation},
+        checkers::cwe_416::WarningContext,
+        intermediate_representation::*,
+        utils::log::CweWarning,
+        variable,
+    };
+
+    #[test]
+    fn test_warning_context_generation() {
+        let id = AbstractIdentifier::new(
+            Tid::new("object_origin_tid"),
+            AbstractLocation::Register(variable!("RAX:8")),
+        );
+        let path_id = id.with_path_hint(Tid::new("call_tid")).unwrap();
+        let object_and_free_ids = vec![(path_id, Tid::new("call_tid"))];
+
+        let cwe = CweWarning::new("CWE416", "test", "mock_cwe");
+        let warning_context =
+            WarningContext::new(cwe, object_and_free_ids, Tid::new("root_func_tid"));
+        let warnings = HashSet::from([warning_context]);
+
+        // Test warning context generation
+        let return_state = State::mock(
+            Tid::new("callee_tid"),
+            &[(id.clone(), Tid::new("free_tid"))],
+            &[],
+        );
+        let return_site_states = HashMap::from([(Tid::new("call_tid"), return_state)]);
+        let processed_warnings =
+            generate_context_information_for_warnings(return_site_states, warnings.clone());
+        assert_eq!(processed_warnings.len(), 1);
+        let processed_cwe = processed_warnings.iter().next().unwrap();
+        assert_eq!(&processed_cwe.other[0], &[
+            "Accessed ID object_origin_tid(->call_tid) @ RAX may have been freed before at free_tid.".to_string(),
+            "Relevant callgraph TIDs: [root_func_tid, call_tid]".to_string(),
+        ]);
+
+        // Test warning filtering
+        let return_state = State::mock(Tid::new("callee_tid"), &[], &[id.clone()]);
+        let return_site_states = HashMap::from([(Tid::new("call_tid"), return_state)]);
+        let processed_warnings =
+            generate_context_information_for_warnings(return_site_states, warnings);
+        assert_eq!(processed_warnings.len(), 0)
+    }
 }

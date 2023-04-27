@@ -213,6 +213,27 @@ pub mod tests {
     use crate::{bitvec, intermediate_representation::parsing, variable};
     use std::collections::BTreeSet;
 
+    impl State {
+        pub fn mock(
+            current_fn_tid: Tid,
+            dangling_ids: &[(AbstractIdentifier, Tid)],
+            already_flagged_ids: &[AbstractIdentifier],
+        ) -> Self {
+            let mut state = State::new(current_fn_tid);
+            for (id, free_id) in dangling_ids.iter() {
+                state
+                    .dangling_objects
+                    .insert(id.clone(), ObjectState::Dangling(free_id.clone()));
+            }
+            for id in already_flagged_ids.iter() {
+                state
+                    .dangling_objects
+                    .insert(id.clone(), ObjectState::AlreadyFlagged);
+            }
+            state
+        }
+    }
+
     #[test]
     fn test_check_address_for_use_after_free() {
         let mut state = State::new(Tid::new("current_fn"));
