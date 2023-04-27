@@ -176,25 +176,32 @@ fn collect_return_site_states<'a>(
 /// If the ID of the "free"-site is the same call from which the object ID originates from
 /// then (recursively) identify the real "free"-site inside the call.
 /// Also return a list of call TIDs that lead to the real "free"-site.
+///
+/// The function returns an error if the source object was already flagged in some of the callees.
+/// In such a case the corresponding CWE warning should be removed,
+/// since there already exists another CWE warning with the same root cause.
 fn get_source_of_free(
     object_id: &AbstractIdentifier,
     free_id: &Tid,
     return_site_states: &HashMap<Tid, State>,
-) -> (Tid, Vec<Tid>) {
+) -> Result<(Tid, Vec<Tid>), ()> {
     if let (inner_object, Some(path_hint_id)) = object_id.without_last_path_hint() {
         if path_hint_id == *free_id {
             if let Some(return_state) = return_site_states.get(free_id) {
+                if return_state.is_id_already_flagged(&inner_object) {
+                    return Err(());
+                }
                 if let Some(inner_free) = return_state.get_free_tid_if_dangling(&inner_object) {
                     let (root_free, mut callgraph_ids) =
-                        get_source_of_free(&inner_object, inner_free, return_site_states);
+                        get_source_of_free(&inner_object, inner_free, return_site_states)?;
                     callgraph_ids.push(path_hint_id);
-                    return (root_free, callgraph_ids);
+                    return Ok((root_free, callgraph_ids));
                 }
             }
         }
     }
     // No inner source apart from the given free_id could be identified
-    (free_id.clone(), Vec::new())
+    Ok((free_id.clone(), Vec::new()))
 }
 
 /// Generate context information for CWE warnings.
@@ -209,12 +216,19 @@ fn generate_context_information_for_warnings<'a>(
         let mut context_infos = Vec::new();
         let mut relevant_callgraph_tids = Vec::new();
         for (object_id, free_id) in warning.object_and_free_ids.iter() {
-            let (root_free_id, mut callgraph_ids_to_free) =
-                get_source_of_free(object_id, free_id, &return_site_states);
-            relevant_callgraph_tids.append(&mut callgraph_ids_to_free);
-            context_infos.push(format!(
-                "Accessed ID {object_id} may have been freed before at {root_free_id}."
-            ))
+            if let Ok((root_free_id, mut callgraph_ids_to_free)) =
+                get_source_of_free(object_id, free_id, &return_site_states)
+            {
+                relevant_callgraph_tids.append(&mut callgraph_ids_to_free);
+                context_infos.push(format!(
+                    "Accessed ID {object_id} may have been freed before at {root_free_id}."
+                ));
+            }
+        }
+        if context_infos.is_empty() {
+            // Skip (delete) this CWE warning,
+            // since another warning with the same root cause was already generated in some callee.
+            continue;
         }
         let mut callgraph_tids_as_string = format!("{}", warning.root_function);
         for id in relevant_callgraph_tids {

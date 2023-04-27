@@ -54,6 +54,12 @@ impl State {
         }
     }
 
+    /// Return whether the given object ID is already flagged in this state,
+    /// i.e. whether a CWE warning was already generated for this object.
+    pub fn is_id_already_flagged(&self, object_id: &AbstractIdentifier) -> bool {
+        self.dangling_objects.get(object_id) == Some(&ObjectState::AlreadyFlagged)
+    }
+
     /// If the given `object_id` represents a dangling object, return the TID of the site where it was freed.
     pub fn get_free_tid_if_dangling(&self, object_id: &AbstractIdentifier) -> Option<&Tid> {
         if let Some(ObjectState::Dangling(free_tid)) = self.dangling_objects.get(object_id) {
@@ -191,7 +197,10 @@ impl State {
                     Value::String(format!("Dangling({free_tid})")),
                 );
             } else {
-                state_map.insert(format!("{id}"), Value::String("Already freed".to_string()));
+                state_map.insert(
+                    format!("{id}"),
+                    Value::String("Already flagged".to_string()),
+                );
             }
         }
         Value::Object(state_map)
