@@ -37,6 +37,7 @@ use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
+use crate::abstract_domain::AbstractDomain;
 use crate::abstract_domain::AbstractIdentifier;
 use crate::analysis::fixpoint::Computation;
 use crate::analysis::forward_interprocedural_fixpoint::GeneralizedContext;
@@ -136,7 +137,7 @@ impl WarningContext {
 fn collect_return_site_states<'a>(
     fixpoint: &Computation<GeneralizedContext<'a, Context<'a>>>,
 ) -> HashMap<Tid, State> {
-    let mut call_tid_to_return_state_map = HashMap::new();
+    let mut call_tid_to_return_state_map: HashMap<Tid, State> = HashMap::new();
     let graph = fixpoint.get_graph();
     for node in graph.node_indices() {
         let call_tid = match graph[node] {
@@ -160,7 +161,14 @@ fn collect_return_site_states<'a>(
             }
             _ => panic!("Unexpexted NodeValue type encountered."),
         };
-        call_tid_to_return_state_map.insert(call_tid, return_state);
+        // There exists one CallReturn node for each return instruction in the callee,
+        // so we have to merge the corresponding states here.
+        call_tid_to_return_state_map
+            .entry(call_tid)
+            .and_modify(|saved_return_state| {
+                *saved_return_state = saved_return_state.merge(&return_state)
+            })
+            .or_insert(return_state);
     }
     call_tid_to_return_state_map
 }
