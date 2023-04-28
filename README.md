@@ -55,7 +55,7 @@ The prebuilt Docker images are currently only x86-based.
 ### Local installation ###
 
 The following dependencies must be installed in order to build and install the *cwe_checker* locally:
--   [Rust](https://www.rust-lang.org) >= 1.63
+-   [Rust](https://www.rust-lang.org) >= 1.69
 -   [Ghidra](https://ghidra-sre.org/) >= 10.2 (**Warning:** This applies to the master branch, the v0.6 stable release needs Ghidra 10.1.5)
 
 Run `make all GHIDRA_PATH=/path/to/ghidra_folder` (with the correct path to the local Ghidra installation inserted) to compile and install the cwe_checker.
