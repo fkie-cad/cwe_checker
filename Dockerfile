@@ -1,4 +1,4 @@
-FROM rust:1.63 AS builder
+FROM rust:1.69 AS builder
 
 WORKDIR /cwe_checker
 

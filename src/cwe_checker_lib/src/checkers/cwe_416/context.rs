@@ -1,6 +1,8 @@
 use super::State;
+use super::WarningContext;
 use super::CWE_MODULE;
 use crate::abstract_domain::AbstractDomain;
+use crate::abstract_domain::AbstractIdentifier;
 use crate::analysis::function_signature::FunctionSignature;
 use crate::analysis::graph::Graph;
 use crate::analysis::pointer_inference::PointerInference;
@@ -9,7 +11,6 @@ use crate::intermediate_representation::*;
 use crate::prelude::*;
 use crate::utils::log::CweWarning;
 use crate::utils::log::LogMessage;
-use crate::utils::log::LogThreadMsg;
 use std::collections::BTreeMap;
 
 /// The context struct for the fixpoint algorithm that contains references to the analysis results
@@ -23,8 +24,10 @@ pub struct Context<'a> {
     pub pointer_inference: &'a PointerInference<'a>,
     /// A pointer to the computed function signatures for all internal functions.
     pub function_signatures: &'a BTreeMap<Tid, FunctionSignature>,
-    /// A sender channel that can be used to collect logs in the corresponding logging thread.
-    pub log_collector: crossbeam_channel::Sender<LogThreadMsg>,
+    /// A sender channel that can be used to collect context objects for CWEwarnings.
+    pub cwe_warning_collector: crossbeam_channel::Sender<WarningContext>,
+    /// A sender channel that can be used to collect log messages.
+    pub log_collector: crossbeam_channel::Sender<LogMessage>,
     /// Generic function arguments assumed for calls to functions where the real number of parameters are unknown.
     generic_function_parameter: Vec<Arg>,
 }
@@ -33,7 +36,8 @@ impl<'a> Context<'a> {
     /// Generate a new context struct from the given analysis results and a channel for gathering log messages and CWE warnings.
     pub fn new<'b>(
         analysis_results: &'b AnalysisResults<'a>,
-        log_collector: crossbeam_channel::Sender<LogThreadMsg>,
+        cwe_warning_collector: crossbeam_channel::Sender<WarningContext>,
+        log_collector: crossbeam_channel::Sender<LogMessage>,
     ) -> Context<'a>
     where
         'a: 'b,
@@ -53,6 +57,7 @@ impl<'a> Context<'a> {
             graph: analysis_results.control_flow_graph,
             pointer_inference: analysis_results.pointer_inference.unwrap(),
             function_signatures: analysis_results.function_signatures.unwrap(),
+            cwe_warning_collector,
             log_collector,
             generic_function_parameter,
         }
@@ -65,7 +70,7 @@ impl<'a> Context<'a> {
         state: &mut State,
         call_tid: &Tid,
         call_params: impl IntoIterator<Item = &'b Arg>,
-    ) -> Option<Vec<String>> {
+    ) -> Option<Vec<(AbstractIdentifier, Tid)>> {
         let mut warnings = Vec::new();
         for arg in call_params {
             if let Some(arg_value) = self
@@ -96,37 +101,32 @@ impl<'a> Context<'a> {
             Some(fn_sig) => fn_sig,
             None => return,
         };
-        let mut warnings = Vec::new();
+        let mut warning_causes = Vec::new();
         for (arg, access_pattern) in &function_signature.parameters {
             if access_pattern.is_dereferenced() {
                 if let Some(arg_value) = self
                     .pointer_inference
                     .eval_parameter_arg_at_call(call_tid, arg)
                 {
-                    if let Some(mut warning_causes) =
-                        state.check_address_for_use_after_free(&arg_value)
-                    {
-                        warnings.append(&mut warning_causes);
+                    if let Some(mut warnings) = state.check_address_for_use_after_free(&arg_value) {
+                        warning_causes.append(&mut warnings);
                     }
                 }
             }
         }
         let callee_sub_name = &self.project.program.term.subs[callee_sub_tid].term.name;
-        if !warnings.is_empty() {
-            let cwe_warning = CweWarning {
-                name: "CWE416".to_string(),
-                version: CWE_MODULE.version.to_string(),
-                addresses: vec![call_tid.address.clone()],
-                tids: vec![format!("{call_tid}")],
-                symbols: Vec::new(),
-                other: vec![warnings],
-                description: format!(
+        if !warning_causes.is_empty() {
+            self.generate_cwe_warning(
+                "CWE416",
+                format!(
                     "(Use After Free) Call to {} at {} may access dangling pointers through its parameters",
                     callee_sub_name,
                     call_tid.address
-                    ),
-            };
-            self.log_collector.send(cwe_warning.into()).unwrap();
+                ),
+                call_tid,
+                warning_causes,
+                &state.current_fn_tid
+            );
         }
     }
 
@@ -136,7 +136,7 @@ impl<'a> Context<'a> {
             let error_msg = LogMessage::new_error("free symbol without parameter encountered.")
                 .location(call_tid.clone())
                 .source(CWE_MODULE.name);
-            self.log_collector.send(error_msg.into()).unwrap();
+            self.log_collector.send(error_msg).unwrap();
             return;
         }
         if let Some(param) = self
@@ -147,22 +147,46 @@ impl<'a> Context<'a> {
                 if let Some(warning_causes) =
                     state.handle_param_of_free_call(call_tid, &param, pi_state)
                 {
-                    let cwe_warning = CweWarning {
-                        name: "CWE415".to_string(),
-                        version: CWE_MODULE.version.to_string(),
-                        addresses: vec![call_tid.address.clone()],
-                        tids: vec![format!("{call_tid}")],
-                        symbols: Vec::new(),
-                        other: vec![warning_causes],
-                        description: format!(
+                    self.generate_cwe_warning(
+                        "CWE415",
+                        format!(
                             "(Double Free) Object may have been freed before at {}",
                             call_tid.address
                         ),
-                    };
-                    self.log_collector.send(cwe_warning.into()).unwrap();
+                        call_tid,
+                        warning_causes,
+                        &state.current_fn_tid,
+                    );
                 }
             }
         }
+    }
+
+    /// Generate a CWE warning and send it to the warning collector channel.
+    fn generate_cwe_warning(
+        &self,
+        name: &str,
+        description: String,
+        location: &Tid,
+        warning_causes: Vec<(AbstractIdentifier, Tid)>,
+        root_function: &Tid,
+    ) {
+        let cwe_warning = CweWarning {
+            name: name.to_string(),
+            version: CWE_MODULE.version.to_string(),
+            addresses: vec![location.address.clone()],
+            tids: vec![format!("{location}")],
+            symbols: Vec::new(),
+            other: Vec::new(),
+            description,
+        };
+        self.cwe_warning_collector
+            .send(WarningContext::new(
+                cwe_warning,
+                warning_causes,
+                root_function.clone(),
+            ))
+            .unwrap();
     }
 }
 
@@ -185,19 +209,16 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
         let mut state = state.clone();
         if let Some(address) = self.pointer_inference.eval_address_at_def(&def.tid) {
             if let Some(warning_causes) = state.check_address_for_use_after_free(&address) {
-                let cwe_warning = CweWarning {
-                    name: "CWE416".to_string(),
-                    version: CWE_MODULE.version.to_string(),
-                    addresses: vec![def.tid.address.clone()],
-                    tids: vec![format!("{}", def.tid)],
-                    symbols: Vec::new(),
-                    other: vec![warning_causes],
-                    description: format!(
+                self.generate_cwe_warning(
+                    "CWE416",
+                    format!(
                         "(Use After Free) Access through a dangling pointer at {}",
                         def.tid.address
                     ),
-                };
-                self.log_collector.send(cwe_warning.into()).unwrap();
+                    &def.tid,
+                    warning_causes,
+                    &state.current_fn_tid,
+                );
             }
         }
         Some(state)
@@ -293,46 +314,40 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
             match extern_symbol.name.as_str() {
                 "free" => self.handle_call_to_free(&mut state, &call.tid, extern_symbol),
                 extern_symbol_name => {
-                    if let Some(warnings) = self.collect_cwe_warnings_of_call_params(
+                    if let Some(warning_causes) = self.collect_cwe_warnings_of_call_params(
                         &mut state,
                         &call.tid,
                         &extern_symbol.parameters,
                     ) {
-                        let cwe_warning = CweWarning {
-                            name: "CWE416".to_string(),
-                            version: CWE_MODULE.version.to_string(),
-                            addresses: vec![call.tid.address.clone()],
-                            tids: vec![format!("{}", call.tid)],
-                            symbols: Vec::new(),
-                            other: vec![warnings],
-                            description: format!(
+                        self.generate_cwe_warning(
+                            "CWE416",
+                            format!(
                                 "(Use After Free) Call to {} at {} may access dangling pointers through its parameters",
                                 extern_symbol_name,
                                 call.tid.address
                                 ),
-                        };
-                        self.log_collector.send(cwe_warning.into()).unwrap();
+                            &call.tid,
+                            warning_causes,
+                            &state.current_fn_tid,
+                        );
                     }
                 }
             }
-        } else if let Some(warnings) = self.collect_cwe_warnings_of_call_params(
+        } else if let Some(warning_causes) = self.collect_cwe_warnings_of_call_params(
             &mut state,
             &call.tid,
             &self.generic_function_parameter,
         ) {
-            let cwe_warning = CweWarning {
-                name: "CWE416".to_string(),
-                version: CWE_MODULE.version.to_string(),
-                addresses: vec![call.tid.address.clone()],
-                tids: vec![format!("{}", call.tid)],
-                symbols: Vec::new(),
-                other: vec![warnings],
-                description: format!(
+            self.generate_cwe_warning(
+                "CWE416",
+                format!(
                     "(Use After Free) Call at {} may access dangling pointers through its parameters",
                     call.tid.address
                     ),
-                };
-            self.log_collector.send(cwe_warning.into()).unwrap();
+                &call.tid,
+                warning_causes,
+                &state.current_fn_tid,
+            );
         }
         Some(state)
     }
