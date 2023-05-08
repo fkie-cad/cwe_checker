@@ -28,7 +28,9 @@ public class FunctionSimple {
                 blocks.add(new BlockSimple(block, context, listing));
             }
         } catch (CancelledException e) {
-            System.out.println(e);
+            System.out.printf("Construction of FunctionSimple object failed");
+            e.printStackTrace();
+            System.exit(1);
         }
     }
 }

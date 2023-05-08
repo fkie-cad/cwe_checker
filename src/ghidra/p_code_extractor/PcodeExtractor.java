@@ -6,6 +6,7 @@ import java.util.LinkedList;
 import java.io.FileWriter;
 import java.io.IOException;
 import ghidra.app.script.GhidraScript;
+import ghidra.program.model.address.Address;
 import ghidra.program.model.block.SimpleBlockModel;
 import ghidra.program.model.lang.CompilerSpec;
 import ghidra.program.model.lang.PrototypeModel;
@@ -15,6 +16,7 @@ import ghidra.program.model.listing.Listing;
 import ghidra.program.model.listing.VariableStorage;
 import ghidra.program.util.VarnodeContext;
 import ghidra.program.model.pcode.Varnode;
+import ghidra.program.model.listing.Parameter;
 import ghidra.program.model.lang.Language;
 import ghidra.program.model.lang.Register;
 import ghidra.program.model.listing.Program;
@@ -28,6 +30,8 @@ import ghidra.program.model.data.PointerDataType;
 import ghidra.program.model.data.DataType;
 import ghidra.program.model.listing.Variable;
 import ghidra.program.model.data.DataTypeManager;
+import ghidra.program.model.symbol.SymbolTable;
+import ghidra.program.model.symbol.Symbol;
 import ghidra.util.task.TaskMonitor;
 import ghidra.util.exception.InvalidInputException;
 import com.google.gson.*;
@@ -54,33 +58,65 @@ public class PcodeExtractor extends GhidraScript {
         Listing listing = ghidraProgram.getListing();
         Language language = ghidraProgram.getLanguage();
 
-        // collecting function's pcode
+        // collect external functions
+        HashMap<String, ExternFunctionSimple> externalFunctions = new HashMap<String, ExternFunctionSimple>();
+        for (Function ext_func : funcMan.getExternalFunctions()) {
+
+            ArrayList<VarnodeSimple> parameters = new ArrayList<VarnodeSimple>();
+            for (Parameter parameter : ext_func.getParameters()) {
+                parameters.add(new VarnodeSimple(parameter.getFirstStorageVarnode(), context));
+
+            }
+            VarnodeSimple return_location = null;
+            if (ext_func.getReturn().getFirstStorageVarnode() != null) {
+                return_location = new VarnodeSimple(ext_func.getReturn().getFirstStorageVarnode(), context);
+            }
+
+            externalFunctions.put(ext_func.getName(),
+                    (new ExternFunctionSimple(ext_func.getName(), funcMan.getDefaultCallingConvention().toString(),
+                            parameters, return_location, ext_func.hasNoReturn(), ext_func.hasVarArgs())));
+        }
+
+        // collect function's pcode
         ArrayList<FunctionSimple> functions = new ArrayList<FunctionSimple>();
         for (Function func : funcMan.getFunctions(true)) {
+            // if the function shares the same name with an external function, it is most
+            // likely a thunk function,
+            // Note: We add the thunk function to the internal functions anyways.
+            if (externalFunctions.containsKey(func.getName())) {
+                externalFunctions.get(func.getName()).add_thunk_function_address(func.getEntryPoint());
+            }
+
             FunctionSimple function = new FunctionSimple(func, context, simpleBM, monitor, listing);
             functions.add(function);
         }
 
-        // collecting register properties
+        // collect entry points to the binary
+        ArrayList<String> entry_points = new ArrayList<String>();
+        for (Address address : (currentProgram.getSymbolTable().getExternalEntryPointIterator())) {
+            entry_points.add(address.toString(false, true));
+        }
+
+        // collect register properties
         ArrayList<RegisterProperties> registerProperties = new ArrayList<RegisterProperties>();
         for (Register reg : language.getRegisters()) {
             registerProperties.add(new RegisterProperties(reg, context));
         }
 
-        // collecting architecture details, e.g. "x86:LE:64:default"
+        // collect architecture details, e.g. "x86:LE:64:default"
         String cpuArch = language.getLanguageID().getIdAsString();
 
-        // collecting stack pointer
+        // collect stack pointer
         CompilerSpec comSpec = ghidraProgram.getCompilerSpec();
         VarnodeSimple stackPointerRegister = new VarnodeSimple(comSpec.getStackPointer());
 
-        // collecting datatype properties
+        // collect datatype properties
         DatatypeProperties dataTypeProperties = new DatatypeProperties(ghidraProgram);
 
-        // collecting image base offset
+        // collect image base offset
         String imageBase = "0x" + ghidraProgram.getImageBase().toString(false, true);
 
-        // collecting calling conventions
+        // collect calling conventions
         HashMap<String, CallingConventionSimple> callingConventions = new HashMap<String, CallingConventionSimple>();
         for (PrototypeModel prototypeModel : comSpec.getCallingConventions()) {
             CallingConventionSimple cconv = new CallingConventionSimple(prototypeModel.getName(),
@@ -106,23 +142,33 @@ public class PcodeExtractor extends GhidraScript {
         }
 
         // assembling everything together
-        ProjectSimple project = new ProjectSimple(functions, registerProperties, cpuArch, stackPointerRegister,
-                callingConventions, dataTypeProperties, imageBase);
+        ProjectSimple project = new ProjectSimple(functions, registerProperties, cpuArch, externalFunctions,
+                entry_points, stackPointerRegister, callingConventions, dataTypeProperties, imageBase);
 
         // serialization
-
         Gson gson = new GsonBuilder().setPrettyPrinting().serializeNulls().create();
+        FileWriter writer = null;
+        String jsonPath = getScriptArgs()[0];
+
         try {
-            FileWriter writer = new FileWriter(getScriptArgs()[0]);
-            gson.toJson(project, writer);
-            writer.close();
-        } catch (JsonIOException e) {
-            e.printStackTrace();
+            writer = new FileWriter(jsonPath);
         } catch (IOException e) {
+            System.out.printf("%s is a directory, could not be created or can not be opened", getScriptArgs()[0]);
             e.printStackTrace();
+            System.exit(1);
+        }
+        try {
+            gson.toJson(project, writer);
+            writer.flush();
+            writer.close();
+        } catch (Exception e) {
+            System.out.printf("Could not write to %s", getScriptArgs()[0]);
+            e.printStackTrace();
+            System.exit(1);
         }
 
         println("Pcode was successfully extracted!");
+
     }
 
     /**
