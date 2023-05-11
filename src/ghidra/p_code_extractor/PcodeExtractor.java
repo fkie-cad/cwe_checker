@@ -1,288 +1,299 @@
-import java.io.FileNotFoundException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.HashMap;
-import java.util.stream.StreamSupport;
-
-import bil.*;
-import term.*;
-import internal.*;
-import internal.PcodeBlockData;
-import internal.JumpProcessing;
-import internal.TermCreator;
-import internal.HelperFunctions;
-import symbol.ExternSymbol;
-import symbol.ExternSymbolCreator;
-import serializer.Serializer;
+import java.util.LinkedList;
+import java.io.FileWriter;
+import java.io.IOException;
 import ghidra.app.script.GhidraScript;
-import ghidra.program.model.block.CodeBlock;
-import ghidra.program.model.block.CodeBlockIterator;
-import ghidra.program.model.block.CodeBlockReferenceIterator;
+import ghidra.program.model.address.Address;
 import ghidra.program.model.block.SimpleBlockModel;
 import ghidra.program.model.lang.CompilerSpec;
 import ghidra.program.model.lang.PrototypeModel;
 import ghidra.program.model.lang.Register;
 import ghidra.program.model.listing.Function;
-import ghidra.program.model.listing.FunctionIterator;
-import ghidra.program.model.listing.Instruction;
-import ghidra.program.model.listing.InstructionIterator;
 import ghidra.program.model.listing.Listing;
 import ghidra.program.model.listing.VariableStorage;
-import ghidra.program.model.pcode.PcodeOp;
 import ghidra.program.util.VarnodeContext;
-import ghidra.util.exception.CancelledException;
+import ghidra.program.model.pcode.Varnode;
+import ghidra.program.model.listing.Parameter;
+import ghidra.program.model.lang.Language;
+import ghidra.program.model.lang.Register;
+import ghidra.program.model.listing.Program;
+import ghidra.program.model.listing.FunctionManager;
+import ghidra.program.util.VarnodeContext;
+import ghidra.program.model.lang.PrototypeModel;
+import ghidra.program.model.data.FloatDataType;
+import ghidra.program.model.data.IntegerDataType;
+import ghidra.program.model.data.DoubleDataType;
+import ghidra.program.model.data.PointerDataType;
+import ghidra.program.model.data.DataType;
+import ghidra.program.model.listing.Variable;
+import ghidra.program.model.data.DataTypeManager;
+import ghidra.program.model.symbol.SymbolTable;
+import ghidra.program.model.symbol.Symbol;
+import ghidra.util.task.TaskMonitor;
+import ghidra.util.exception.InvalidInputException;
+import com.google.gson.*;
 
 public class PcodeExtractor extends GhidraScript {
 
     /**
-     * 
-     * Entry point to Ghidra Script. Calls serializer after processing of Terms.
+     * Main routine for extracting pcode, register properties, CPU architecture
+     * details, stack pointer, datatype properties,
+     * image base and calling conventions.
+     * All of the above are put together via a PcodeProject object and this is JSON
+     * serialized afterwards.
+     * Most of the components are represented as "Simple" classes and only contain
+     * the desired information.
      */
     @Override
-    protected void run() throws Exception { 
-        HelperFunctions.monitor = getMonitor();
-        HelperFunctions.ghidraProgram = currentProgram;
-        HelperFunctions.funcMan = currentProgram.getFunctionManager();
-        HelperFunctions.context = new VarnodeContext(currentProgram, currentProgram.getProgramContext(), currentProgram.getProgramContext());
-        SimpleBlockModel simpleBM = new SimpleBlockModel(currentProgram);
-        Listing listing = currentProgram.getListing();
+    protected void run() throws Exception {
+        TaskMonitor monitor = getMonitor();
+        Program ghidraProgram = currentProgram;
+        FunctionManager funcMan = ghidraProgram.getFunctionManager();
+        VarnodeContext context = new VarnodeContext(ghidraProgram, ghidraProgram.getProgramContext(),
+                ghidraProgram.getProgramContext());
+        SimpleBlockModel simpleBM = new SimpleBlockModel(ghidraProgram);
+        Listing listing = ghidraProgram.getListing();
+        Language language = ghidraProgram.getLanguage();
 
-        setFunctionEntryPoints();
-        TermCreator.symTab = currentProgram.getSymbolTable();
-        Term<Program> program = TermCreator.createProgramTerm();
-        Project project = createProject(program);
-        ExternSymbolCreator.createExternalSymbolMap(TermCreator.symTab);
-        program = iterateFunctions(simpleBM, listing, program);
-        program.getTerm().setExternSymbols(new ArrayList<ExternSymbol>(ExternSymbolCreator.externalSymbolMap.values()));
+        // collect external functions
+        HashMap<String, ExternFunction> externalFunctions = new HashMap<String, ExternFunction>();
+        for (Function ext_func : funcMan.getExternalFunctions()) {
 
+            ArrayList<Varnode> parameters = new ArrayList<Varnode>();
+            for (Parameter parameter : ext_func.getParameters()) {
+                parameters.add(new Varnode(parameter.getFirstStorageVarnode(), context));
+
+            }
+            Varnode return_location = null;
+            if (ext_func.getReturn().getFirstStorageVarnode() != null) {
+                return_location = new Varnode(ext_func.getReturn().getFirstStorageVarnode(), context);
+            }
+
+            externalFunctions.put(ext_func.getName(),
+                    (new ExternFunction(ext_func.getName(), funcMan.getDefaultCallingConvention().toString(),
+                            parameters, return_location, ext_func.hasNoReturn(), ext_func.hasVarArgs())));
+        }
+
+        // collect function's pcode
+        ArrayList<Function> functions = new ArrayList<Function>();
+        for (Function func : funcMan.getFunctions(true)) {
+            // If a function is thunk for an external function, add the address to the external function
+            // Note: We add the thunk function to the internal functions anyways.
+            if (func.isThunk()){
+                Function thunked_func = func.getThunkedFunction(true);
+                if (thunked_func.isExternal()){
+                    if (externalFunctions.containsKey(thunked_func.getName())) {
+                        externalFunctions.get(thunked_func.getName()).add_thunk_function_address(func.getEntryPoint());
+                    }
+                } 
+            }
+            
+            Function function = new Function(func, context, simpleBM, monitor, listing);
+            functions.add(function);
+        }
+
+        // collect entry points to the binary
+        ArrayList<String> entry_points = new ArrayList<String>();
+        for (Address address : (currentProgram.getSymbolTable().getExternalEntryPointIterator())) {
+            entry_points.add(address.toString(false, false));
+        }
+
+        // collect register properties
+        ArrayList<RegisterProperties> registerProperties = new ArrayList<RegisterProperties>();
+        for (Register reg : language.getRegisters()) {
+            registerProperties.add(new RegisterProperties(reg, context));
+        }
+
+        // collect architecture details, e.g. "x86:LE:64:default"
+        String cpuArch = language.getLanguageID().getIdAsString();
+
+        // collect stack pointer
+        CompilerSpec comSpec = ghidraProgram.getCompilerSpec();
+        Varnode stackPointerRegister = new Varnode(comSpec.getStackPointer());
+
+        // collect datatype properties
+        DatatypeProperties dataTypeProperties = new DatatypeProperties(ghidraProgram);
+
+        // collect image base offset
+        String imageBase = "0x" + ghidraProgram.getImageBase().toString(false, false);
+
+        // collect calling conventions
+        HashMap<String, CallingConvention> callingConventions = new HashMap<String, CallingConvention>();
+        for (PrototypeModel prototypeModel : comSpec.getCallingConventions()) {
+            CallingConvention cconv = new CallingConvention(prototypeModel.getName(),
+                    prototypeModel.getUnaffectedList(),
+                    prototypeModel.getKilledByCallList(),
+                    context);
+            ArrayList<Varnode> integer_register = get_integer_parameter_register(prototypeModel, ghidraProgram,
+                    context);
+            cconv.setIntegerParameterRegister(integer_register);
+
+            ArrayList<Varnode> float_register = get_float_parameter_register(prototypeModel, ghidraProgram,
+                    context);
+            cconv.setFloatParameterRegister(float_register);
+
+            Varnode integer_return_register = get_integer_return_register(prototypeModel, ghidraProgram,
+                    context);
+            cconv.setIntegerReturnRegister(integer_return_register);
+
+            Varnode float_return_register = get_float_return_register(prototypeModel, ghidraProgram, context);
+            cconv.setFloatReturnRegister(float_return_register);
+
+            callingConventions.put(prototypeModel.getName(), cconv);
+        }
+
+        // assembling everything together
+        PcodeProject project = new PcodeProject(functions, registerProperties, cpuArch, externalFunctions,
+                entry_points, stackPointerRegister, callingConventions, dataTypeProperties, imageBase);
+
+        // serialization
+        Gson gson = new GsonBuilder().setPrettyPrinting().serializeNulls().create();
+        FileWriter writer = null;
         String jsonPath = getScriptArgs()[0];
-        Serializer ser = new Serializer(project, jsonPath);
-        ser.serializeProject();
+
+        try {
+            writer = new FileWriter(jsonPath);
+        } catch (IOException e) {
+            System.out.printf("%s is a directory, could not be created or can not be opened", getScriptArgs()[0]);
+            e.printStackTrace();
+            System.exit(1);
+        }
+        try {
+            gson.toJson(project, writer);
+            writer.flush();
+            writer.close();
+        } catch (Exception e) {
+            System.out.printf("Could not write to %s", getScriptArgs()[0]);
+            e.printStackTrace();
+            System.exit(1);
+        }
 
         println("Pcode was successfully extracted!");
+
     }
 
-
     /**
+     * Returns list of Varnode of integer parameter in order defined by the
+     * calling convention.
      * 
-     * @param simpleBM: Simple Block Model to iterate over blocks
-     * @param listing:  Listing to get assembly instructions
-     * @param program: program term
-     * @return: Processed Program Term
-     * 
-     * Iterates over functions to create sub terms and calls the block iterator to add all block terms to each subroutine.
+     * This functions returns the base register, e.g. RDI is returned and not EDI.
+     * *Approximation*: This function returns the first 10 or less integer registers
+     * This is due to the only way of extracting the integer parameter register
+     * available
+     * (https://ghidra.re/ghidra_docs/api/ghidra/program/model/lang/PrototypeModel.html)
      */
-    protected Term<Program> iterateFunctions(SimpleBlockModel simpleBM, Listing listing, Term<Program> program) {
-        FunctionIterator functions = HelperFunctions.funcMan.getFunctions(true);
-        for (Function func : functions) {
-            if(ExternSymbolCreator.externalSymbolMap.containsKey(func.getName())) {
-                ArrayList<String> addresses = ExternSymbolCreator.externalSymbolMap.get(func.getName()).getAddresses();
-                if(!addresses.stream().anyMatch(addr -> addr.equals(func.getEntryPoint().toString()))) {
-                    Term<Sub> currentSub = TermCreator.createSubTerm(func);
-                    currentSub.getTerm().setBlocks(iterateBlocks(currentSub, simpleBM, listing));
-                    program.getTerm().addSub(currentSub);
+    private ArrayList<Varnode> get_integer_parameter_register(PrototypeModel prototypeModel,
+            Program ghidraProgram, VarnodeContext context) {
+        ArrayList<Varnode> integer_parameter_register = new ArrayList<Varnode>();
+
+        // prepare a parameter list of integers only
+        DataTypeManager dataTypeManager = ghidraProgram.getDataTypeManager();
+        IntegerDataType[] integer_parameter_list = new IntegerDataType[10];
+        for (int i = 0; i < integer_parameter_list.length; i++) {
+            integer_parameter_list[i] = new IntegerDataType(dataTypeManager);
+        }
+        // get all possible parameter passing registers, including floating point
+        // registers
+        for (VariableStorage potential_register : prototypeModel.getPotentialInputRegisterStorage​​(ghidraProgram)) {
+            // get all used registers by the prepared integer parameter list
+            for (VariableStorage integer_register : prototypeModel.getStorageLocations​(ghidraProgram,
+                    integer_parameter_list, false)) {
+                // take only registers that are in common
+                if (integer_register.isRegisterStorage()
+                        && integer_register.getRegister().getParentRegister() == potential_register.getRegister()) {
+                    integer_parameter_register.add(new Varnode(potential_register.getFirstVarnode(), context));
                 }
-            } else {
-                Term<Sub> currentSub = TermCreator.createSubTerm(func);
-                currentSub.getTerm().setBlocks(iterateBlocks(currentSub, simpleBM, listing));
-                program.getTerm().addSub(currentSub);
             }
         }
-
-        return program;
+        return integer_parameter_register;
     }
 
-
     /**
+     * Returns list of Varnode of float parameter in order defined by the
+     * calling convention.
      * 
-     * @param currentSub: Current Sub Term to processed
-     * @param simpleBM:   Simple Block Model to iterate over blocks
-     * @param listing:    Listing to get assembly instructions
-     * @return: new ArrayList of Blk Terms
-     * 
-     * Iterates over all blocks and calls the instruction iterator to add def and jmp terms to each block.
+     * This functions returns the *not* register, e.g. XMM0_Qa is *not* changed to
+     * YMM0.
+     * *Approximation*: This function returns the first 10 or less float registers
+     * This is due to the only way of extracting the float parameter register
+     * available
+     * (https://ghidra.re/ghidra_docs/api/ghidra/program/model/lang/PrototypeModel.html)
      */
-    protected ArrayList<Term<Blk>> iterateBlocks(Term<Sub> currentSub, SimpleBlockModel simpleBM, Listing listing) {
-        ArrayList<Term<Blk>> blockTerms = new ArrayList<Term<Blk>>();
-        try {
-            CodeBlockIterator blockIter = simpleBM.getCodeBlocksContaining(currentSub.getTerm().getAddresses(), getMonitor());
-            while(blockIter.hasNext()) {
-                CodeBlock currentBlock = blockIter.next();
-                ArrayList<Term<Blk>> newBlockTerms = iterateInstructions(TermCreator.createBlkTerm(currentBlock.getFirstStartAddress().toString(), null), listing, currentBlock);
-                Term<Blk> lastBlockTerm = newBlockTerms.get(newBlockTerms.size() - 1);
-                JumpProcessing.handlePossibleDefinitionAtEndOfBlock(lastBlockTerm, currentBlock);
-                blockTerms.addAll(newBlockTerms);
-            }
-        } catch (CancelledException e) {
-            System.out.printf("Could not retrieve all basic blocks comprised by function: %s\n", currentSub.getTerm().getName());
+    private ArrayList<Varnode> get_float_parameter_register(PrototypeModel prototypeModel, Program ghidraProgram,
+            VarnodeContext context) {
+        ArrayList<Varnode> float_parameter_register = new ArrayList<Varnode>();
+
+        // get all possible parameter passing registers, including integer registers
+        List<VariableStorage> potential_register = new LinkedList<>(
+                Arrays.asList(prototypeModel.getPotentialInputRegisterStorage​​(ghidraProgram)));
+        potential_register.removeIf(reg -> reg.getRegister() == null);
+
+        // remove all integer parameter register
+        for (Varnode integer_register : get_integer_parameter_register(prototypeModel, ghidraProgram, context)) {
+            potential_register.removeIf(reg -> reg.getRegister().getName() == integer_register.getId());
         }
 
-        return blockTerms;
+        for (VariableStorage float_register : potential_register) {
+            float_parameter_register.add(new Varnode(float_register.getFirstVarnode(), context));
+        }
+
+        return float_parameter_register;
     }
 
-
     /**
+     * Returns the calling convention's first integer return register.
      * 
-     * @param block:     Blk Term to be filled with instructions
-     * @param listing:   Assembly instructions
-     * @param codeBlock: codeBlock for retrieving instructions
-     * @return: new array of Blk Terms
-     * 
-     * Iterates over assembly instructions and processes each of the pcode blocks.
-     * Handles empty block by adding a jump Term with fallthrough address
+     * *Limitation*: By definition, the first element of
+     * `PrototypeModel.getStorageLocations()` describes the
+     * return register. Composed registers are not supported.
+     * (https://ghidra.re/ghidra_docs/api/ghidra/program/model/lang/PrototypeModel.html)
      */
-    protected ArrayList<Term<Blk>> iterateInstructions(Term<Blk> block, Listing listing, CodeBlock codeBlock) {
-        PcodeBlockData.instructionIndex = 0;
-        InstructionIterator instructions = listing.getInstructions(codeBlock, true);
-        PcodeBlockData.numberOfInstructionsInBlock = StreamSupport.stream(listing.getInstructions(codeBlock, true).spliterator(), false).count();
-        PcodeBlockData.blocks = new ArrayList<Term<Blk>>();
-        PcodeBlockData.blocks.add(block);
+    public Varnode get_integer_return_register(PrototypeModel prototypeModel, Program ghidraProgram,
+            VarnodeContext context) {
+        // prepare a list of one integer parameters only
+        DataTypeManager dataTypeManager = ghidraProgram.getDataTypeManager();
+        PointerDataType[] pointer_parameter_list = { new PointerDataType(dataTypeManager) };
+        // first element of `getStorageLocations()` describes the return location
+        VariableStorage pointer_return_register = prototypeModel.getStorageLocations​(ghidraProgram,
+                pointer_parameter_list, false)[0];
 
-        for (Instruction instr : instructions) {
-            PcodeBlockData.instruction = instr;
-            analysePcodeBlockOfAssemblyInstruction();
-            PcodeBlockData.instructionIndex++;
-        }
-
-        if (PcodeBlockData.blocks.get(0).getTerm().getDefs().isEmpty() && PcodeBlockData.blocks.get(0).getTerm().getJmps().isEmpty()) {
-            handleEmptyBlock(codeBlock);
-        }
-
-        return PcodeBlockData.blocks;
+        return new Varnode(pointer_return_register.getFirstVarnode(), context);
     }
 
-
     /**
+     * Returns the calling convention's first float return register.
      * 
-     * @param codeBlock: Current empty block
-     * @return New jmp term containing fall through address
-     * 
-     * Adds fallthrough address jump to empty block if available
+     * *Approximation*: This function uses the double datatype to query the return
+     * register. The returned register
+     * is choosen according to the datatype size, thus sub-registers of the actual
+     * return register might be returned.
+     * *Limitation*: By definition, the first element of
+     * `PrototypeModel.getStorageLocations()` describes the
+     * return register. Composed registers are not supported.
+     * For x86_64 this can be considered a bug, since XMM0 and XMM1 (YMM0) can be
+     * such a composed retrun register.
+     * This property is not modeled in
+     * Ghidra/Processors/x86/data/languages/x86_64-*.cspec.
      */
-    protected void handleEmptyBlock(CodeBlock codeBlock) {
-        try {
-            CodeBlockReferenceIterator destinations = codeBlock.getDestinations(getMonitor());
-            if(destinations.hasNext()) {
-                Tid jmpTid = new Tid(String.format("instr_%s_%s", codeBlock.getFirstStartAddress().toString(), 0), codeBlock.getFirstStartAddress().toString());
-                Tid gotoTid = new Tid();
-                String destAddr = destinations.next().getDestinationBlock().getFirstStartAddress().toString();
-                gotoTid.setId(String.format("blk_%s", destAddr));
-                gotoTid.setAddress(destAddr);
-                PcodeBlockData.blocks.get(0).getTerm().addJmp(new Term<Jmp>(jmpTid, new Jmp(ExecutionType.JmpType.GOTO, "BRANCH", new Label((Tid) gotoTid), 0)));
-            }
-        } catch (CancelledException e) {
-            System.out.printf("Could not retrieve destinations for block at: %s\n", codeBlock.getFirstStartAddress().toString());
-        }
-    }
-
-
-    /**
-     * 
-     * Checks whether the assembly instruction is a nop instruction and adds a jump to the block.
-     * Checks whether a jump occured within a ghidra generated pcode block and fixes the control flow
-     * by adding missing jumps between artificially generated blocks.
-     * Checks whether an instruction is in a delay slot and, if so, ignores it 
-     * as Ghidra already includes the instruction before the jump
-     */
-    protected void analysePcodeBlockOfAssemblyInstruction() {
-        PcodeBlockData.ops = PcodeBlockData.instruction.getPcode(true);
-        if(PcodeBlockData.instruction.isInDelaySlot()) {
-            return;
-        }
-        if(PcodeBlockData.ops.length == 0) {
-            JumpProcessing.addBranchToCurrentBlock(PcodeBlockData.blocks.get(PcodeBlockData.blocks.size()-1).getTerm(), PcodeBlockData.instruction.getAddress().toString(), PcodeBlockData.instruction.getFallThrough().toString());
-            if(PcodeBlockData.instructionIndex < PcodeBlockData.numberOfInstructionsInBlock - 1) {
-                PcodeBlockData.blocks.add(TermCreator.createBlkTerm(PcodeBlockData.instruction.getFallThrough().toString(), null));
-            }
-            return;
+    public Varnode get_float_return_register(PrototypeModel prototypeModel, Program ghidraProgram,
+            VarnodeContext context) {
+        // prepare a list of one double parameters only
+        DataTypeManager dataTypeManager = ghidraProgram.getDataTypeManager();
+        DoubleDataType[] double_parameter_list = { new DoubleDataType(dataTypeManager) };
+        // first element of `getStorageLocations()` describes the return location
+        VariableStorage double_return_register = prototypeModel.getStorageLocations​(ghidraProgram,
+                double_parameter_list, false)[0];
+        Varnode double_return_Varnode_simple = new Varnode(double_return_register.getFirstVarnode(),
+                context);
+        if (double_return_Varnode_simple.toString()
+                .equals(get_integer_return_register(prototypeModel, ghidraProgram, context).toString())) {
+            return null;
         }
 
-        PcodeBlockData.temporaryDefStorage = new ArrayList<Term<Def>>();
-        Boolean intraInstructionJumpOccured = iteratePcode();
-
-        JumpProcessing.fixControlFlowWhenIntraInstructionJumpOccured(intraInstructionJumpOccured);
-
-        if(!PcodeBlockData.temporaryDefStorage.isEmpty()) {
-            PcodeBlockData.blocks.get(PcodeBlockData.blocks.size() - 1).getTerm().addMultipleDefs(PcodeBlockData.temporaryDefStorage);
-        }
-    }
-
-
-    /**
-     * 
-     * @return: indicator if jump occured within pcode block
-     * 
-     * Iterates over the Pcode instructions of the current assembly instruction.
-     */
-    protected Boolean iteratePcode() {
-        int numberOfPcodeOps = PcodeBlockData.ops.length;
-        int previousPcodeIndex = 0;
-        Boolean intraInstructionJumpOccured = false;
-        PcodeBlockData.pcodeIndex = 0;
-        for(PcodeOp op : PcodeBlockData.ops) {
-            PcodeBlockData.pcodeOp = op;
-            String mnemonic = PcodeBlockData.pcodeOp.getMnemonic();
-            if (previousPcodeIndex < PcodeBlockData.pcodeIndex -1) {
-                numberOfPcodeOps++;
-            }
-            previousPcodeIndex = PcodeBlockData.pcodeIndex;
-            if (JumpProcessing.jumps.contains(mnemonic) || PcodeBlockData.pcodeOp.getOpcode() == PcodeOp.UNIMPLEMENTED) {
-                intraInstructionJumpOccured = JumpProcessing.processJump(mnemonic, numberOfPcodeOps);
-            } else {
-                PcodeBlockData.temporaryDefStorage.add(TermCreator.createDefTerm());
-            }
-            PcodeBlockData.pcodeIndex++;
-        }
-
-        return intraInstructionJumpOccured;
-    }
-
-
-    /**
-     * @param program: program term
-     * @return: new Project
-     * 
-     * Creates the project object and adds the stack pointer register and program term.
-     */
-    protected Project createProject(Term<Program> program) {
-        Project project = new Project();
-        CompilerSpec comSpec = currentProgram.getCompilerSpec();
-        Register stackPointerRegister = comSpec.getStackPointer();
-        int stackPointerByteSize = (int) stackPointerRegister.getBitLength() / 8;
-        Variable stackPointerVar = new Variable(stackPointerRegister.getName(), stackPointerByteSize, false);
-        project.setProgram(program);
-        project.setStackPointerRegister(stackPointerVar);
-        project.setCpuArch(HelperFunctions.getCpuArchitecture());
-        try {
-            HashMap<String, RegisterConvention> conventions = new HashMap<String, RegisterConvention>();
-            ParseCspecContent.parseSpecs(currentProgram, conventions);
-            project.setRegisterConvention(new ArrayList<RegisterConvention>(conventions.values()));
-        } catch (FileNotFoundException e) {
-            System.out.println(e);
-        }
-        project.setRegisterProperties(HelperFunctions.getRegisterList());
-        project.setDatatypeProperties(HelperFunctions.createDatatypeProperties());
-
-        return project;
-    }
-
-
-    /**
-     * Adds all entry points of internal and external function to a global hash map
-     * This will later speed up the cast of indirect Calls.
-     */
-    protected void setFunctionEntryPoints() {
-        // Add internal function addresses
-        for(Function func : HelperFunctions.funcMan.getFunctions(true)) {
-            String address = func.getEntryPoint().toString();
-            HelperFunctions.functionEntryPoints.put(address, new Tid(String.format("sub_%s", address), address));
-        }
-
-        // Add thunk addresses for external functions
-        for(ExternSymbol sym : ExternSymbolCreator.externalSymbolMap.values()){
-            for(String address : sym.getAddresses()) {
-                HelperFunctions.functionEntryPoints.put(address, sym.getTid());
-            }
-        }
+        return new Varnode(double_return_register.getFirstVarnode(), context);
     }
 
 }
