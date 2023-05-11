@@ -80,13 +80,17 @@ public class PcodeExtractor extends GhidraScript {
         // collect function's pcode
         ArrayList<FunctionSimple> functions = new ArrayList<FunctionSimple>();
         for (Function func : funcMan.getFunctions(true)) {
-            // if the function shares the same name with an external function, it is most
-            // likely a thunk function,
+            // If a function is thunk for an external function, add the address to the external function
             // Note: We add the thunk function to the internal functions anyways.
-            if (externalFunctions.containsKey(func.getName())) {
-                externalFunctions.get(func.getName()).add_thunk_function_address(func.getEntryPoint());
+            if (func.isThunk()){
+                Function thunked_func = func.getThunkedFunction(true);
+                if (thunked_func.isExternal()){
+                    if (externalFunctions.containsKey(thunked_func.getName())) {
+                        externalFunctions.get(thunked_func.getName()).add_thunk_function_address(func.getEntryPoint());
+                    }
+                } 
             }
-
+            
             FunctionSimple function = new FunctionSimple(func, context, simpleBM, monitor, listing);
             functions.add(function);
         }
