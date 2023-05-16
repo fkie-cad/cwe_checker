@@ -55,9 +55,15 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
                 let mut extended_expression = expression.clone();
                 for input_var in expression.input_vars().into_iter() {
                     if let Some(expr) = insertable_expressions.get(input_var) {
-                        extended_expression.substitute_input_var(input_var, expr)
+                        // We limit the complexity of expressions to insert.
+                        // This prevents extremely large expressions that can lead to extremely high RAM usage.
+                        // FIXME: Right now this limit is quite arbitrary. Maybe there is a better way to achieve the same result?
+                        if expr.recursion_depth() < 10 {
+                            extended_expression.substitute_input_var(input_var, expr)
+                        }
                     }
                 }
+                extended_expression.substitute_trivial_operations();
                 insertable_expressions.insert(var.clone(), extended_expression.clone());
                 // Expressions dependent on the assigned variable are no longer insertable.
                 insertable_expressions.retain(|_input_var, input_expr| {
