@@ -1,5 +1,6 @@
 //! Utility functions for executing Ghidra and extracting P-Code from the output.
 
+use crate::ghidra_pcode::ProjectSimple;
 use crate::prelude::*;
 use crate::utils::binary::BareMetalConfig;
 use crate::utils::{get_ghidra_plugin_path, read_config_file};
@@ -9,7 +10,6 @@ use nix::{sys::stat, unistd};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::thread;
-use crate::ghidra_pcode::ProjectSimple;
 
 /// Execute the `p_code_extractor` plugin in Ghidra and parse its output into the `Project` data structure.
 ///
@@ -51,28 +51,36 @@ fn parse_pcode_project_to_ir_project(
     binary: &[u8],
     bare_metal_config_opt: &Option<BareMetalConfig>,
 ) -> Result<(Project, Vec<LogMessage>), Error> {
-    let bare_metal_base_address_opt = bare_metal_config_opt
-        .as_ref()
-        .map(|config| config.parse_binary_base_address());
-    let mut log_messages = pcode_project.normalize();
-    let project: Project = match crate::utils::get_binary_base_address(binary) {
-        Ok(binary_base_address) => pcode_project.into_ir_project(binary_base_address),
-        Err(_err) => {
-            if let Some(binary_base_address) = bare_metal_base_address_opt {
-                let mut project = pcode_project.into_ir_project(binary_base_address);
-                project.program.term.address_base_offset = 0;
-                project
-            } else {
-                log_messages.push(LogMessage::new_info("Could not determine binary base address. Using base address of Ghidra output as fallback."));
-                let mut project = pcode_project.into_ir_project(0);
-                // For PE files setting the address_base_offset to zero is a hack, which worked for the tested PE files.
-                // But this hack will probably not work in general!
-                project.program.term.address_base_offset = 0;
-                project
-            }
-        }
+    // let bare_metal_base_address_opt = bare_metal_config_opt
+    //     .as_ref()
+    //     .map(|config| config.parse_binary_base_address());
+    // let mut log_messages = pcode_project.normalize();
+    // let project: Project = match crate::utils::get_binary_base_address(binary) {
+    //     Ok(binary_base_address) => pcode_project.into_ir_project(binary_base_address),
+    //     Err(_err) => {
+    //         if let Some(binary_base_address) = bare_metal_base_address_opt {
+    //             let mut project = pcode_project.into_ir_project(binary_base_address);
+    //             project.program.term.address_base_offset = 0;
+    //             project
+    //         } else {
+    //             log_messages.push(LogMessage::new_info("Could not determine binary base address. Using base address of Ghidra output as fallback."));
+    //             let mut project = pcode_project.into_ir_project(0);
+    //             // For PE files setting the address_base_offset to zero is a hack, which worked for the tested PE files.
+    //             // But this hack will probably not work in general!
+    //             project.program.term.address_base_offset = 0;
+    //             project
+    //         }
+    //     }
+    // };
+    let project = Project {
+        program: todo!(),
+        cpu_architecture: todo!(),
+        stack_pointer_register: todo!(),
+        calling_conventions: todo!(),
+        register_set: todo!(),
+        datatype_properties: todo!(),
+        runtime_memory_image: todo!(),
     };
-    let project = Project { program: todo!(), cpu_architecture: todo!(), stack_pointer_register: todo!(), calling_conventions: todo!(), register_set: todo!(), datatype_properties: todo!(), runtime_memory_image: todo!() };
     let log_messages = vec![];
 
     Ok((project, log_messages))
@@ -122,7 +130,8 @@ fn execute_ghidra(
     // Open the FIFO
     let file = std::fs::File::open(fifo_path.clone()).expect("Could not open FIFO.");
 
-    let pcode_parsing_result: Result<ProjectSimple, serde_json::Error> = serde_json::from_reader(std::io::BufReader::new(file));
+    let pcode_parsing_result: Result<ProjectSimple, serde_json::Error> =
+        serde_json::from_reader(std::io::BufReader::new(file));
     // Clean up the FIFO pipe and propagate errors from the JSON parsing.
     std::fs::remove_file(fifo_path).context("Could not clean up FIFO pipe")?;
     Ok(pcode_parsing_result?)

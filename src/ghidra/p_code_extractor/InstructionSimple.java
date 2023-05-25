@@ -15,7 +15,7 @@ import java.util.ArrayList;
 public class InstructionSimple {
     private String mnemonic;
     private String address;
-    private ArrayList<PcodeOpSimple> pcodeOps = new ArrayList();
+    private ArrayList<PcodeOpSimple> pcode_ops = new ArrayList();
     private ArrayList<String> potential_targets;
 
 
@@ -24,7 +24,7 @@ public class InstructionSimple {
         this.address = "0x" + instruction.getAddressString(false, true);
         PcodeOp[] pcodes = instruction.getPcode(true);
         for (int i = 0; i < pcodes.length; i++) {
-            pcodeOps.add(new PcodeOpSimple(i, pcodes[i], context));
+            pcode_ops.add(new PcodeOpSimple(i, pcodes[i], context));
 
             // add potential targets if instruction contains indiect call or branch.
             // Note: All references are put together. Multiple CALLIND or BRANCHIND should not

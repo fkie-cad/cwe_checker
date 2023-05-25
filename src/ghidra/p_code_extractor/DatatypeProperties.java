@@ -7,28 +7,28 @@ import ghidra.program.model.data.DataOrganization;
  * This class is used for clean and simple serialization.
  */
 public class DatatypeProperties {
-    private int charSize;
-    private int doubleSize;
-    private int floatSize;
-    private int integerSize;
-    private int longDoubleSize;
-    private int longLongSize;
-    private int longSize;
-    private int pointerSize;
-    private int shortSize;
+    private int char_size;
+    private int double_size;
+    private int float_size;
+    private int integer_size;
+    private int long_double_size;
+    private int long_long_size;
+    private int long_size;
+    private int pointer_size;
+    private int short_size;
 
     public DatatypeProperties(Program currentProgram) {
         DataOrganization dataOrga = currentProgram.getDataTypeManager().getDataOrganization();
 
-        this.charSize = dataOrga.getCharSize();
-        this.doubleSize = dataOrga.getDoubleSize();
-        this.floatSize = dataOrga.getFloatSize();
-        this.integerSize = dataOrga.getIntegerSize();
-        this.longDoubleSize = dataOrga.getLongDoubleSize();
-        this.longLongSize = dataOrga.getLongLongSize();
-        this.longSize = dataOrga.getLongSize();
-        this.pointerSize = dataOrga.getPointerSize();
-        this.shortSize = dataOrga.getShortSize();
+        this.char_size = dataOrga.getCharSize();
+        this.double_size = dataOrga.getDoubleSize();
+        this.float_size = dataOrga.getFloatSize();
+        this.integer_size = dataOrga.getIntegerSize();
+        this.long_double_size = dataOrga.getLongDoubleSize();
+        this.long_long_size = dataOrga.getLongLongSize();
+        this.long_size = dataOrga.getLongSize();
+        this.pointer_size = dataOrga.getPointerSize();
+        this.short_size = dataOrga.getShortSize();
 
     }
 }
