@@ -200,7 +200,10 @@ impl PcodeOpSimple {
         return Some(explicit_loads);
     }
 
-    fn into_ir_def(self, address: &String) {
+    /// Translates a single pcode operation into at leas one `Def`.
+    ///
+    /// Adds additional `Def::Load`, if the pcode operation performs implicit loads from ram
+    fn into_ir_def(self, address: &String) -> Vec<Term<Def>> {
         let mut defs = vec![];
         // if the pcode operation contains implicit load operations, prepend them.
         if self.has_implicit_load() {
@@ -209,13 +212,51 @@ impl PcodeOpSimple {
             }
         }
 
-        match self.pcode_mnemonic {
-            PcodeOperation::ExpressionType(expr_type) => todo!(),
+        let def = match self.pcode_mnemonic {
+            PcodeOperation::ExpressionType(expr_type) => self.create_def(address, expr_type),
             PcodeOperation::JmpType(jmp_type) => todo!(),
+        };
+
+        defs.push(def);
+        defs
+    }
+
+    /// Creates `Def::Store`, `Def::Load` or `Def::Assign` according to the pcode operations'
+    /// expression type.
+    fn create_def(self, address: &String, expr_type: ExpressionType) -> Term<Def> {
+        match expr_type {
+            ExpressionType::LOAD => self.create_load(address),
+            ExpressionType::STORE => todo!(),
+            _ => todo!(),
         }
     }
 
-    fn create_def(self, expr_type: ExpressionType) {}
+    /// Translates pcode load operation into `Def::Load`
+    /// 
+    /// Panics, if load destination is not a variable.
+    fn create_load(self, address: &String) -> Term<Def> {
+        let target = self.input1.expect("Load without target");
+        if let Expression::Var(var) = target
+            .into_ir_expr()
+            .expect("Load target translation failed.")
+        {
+            let def = Def::Load {
+                var,
+                address: self
+                    .input0
+                    .into_ir_expr()
+                    .expect("Load source translation failed."),
+            };
+            return Term {
+                tid: Tid {
+                    id: format!("instr_{}_{}", address, self.pcode_index),
+                    address: address.to_string(),
+                },
+                term: def,
+            };
+        }
+        panic!("Load target is not a register")
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
