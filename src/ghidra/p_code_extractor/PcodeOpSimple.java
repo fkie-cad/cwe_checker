@@ -14,6 +14,7 @@ public class PcodeOpSimple {
     private String pcode_mnemonic;
     private VarnodeSimple input0;
     private VarnodeSimple input1;
+    private VarnodeSimple input2;
     private VarnodeSimple output;
 
     public PcodeOpSimple(int pcode_index, PcodeOp op, VarnodeContext context) {
@@ -24,6 +25,9 @@ public class PcodeOpSimple {
         }
         if (op.getInput(1) != null) {
             this.input1 = new VarnodeSimple(op.getInput(1), context);
+        }
+        if (op.getInput(2) != null) {
+            this.input2 = new VarnodeSimple(op.getInput(2), context);
         }
         if (op.getOutput() != null) {
             this.output = new VarnodeSimple(op.getOutput(), context);
