@@ -34,15 +34,10 @@ impl ProjectSimple {
             for blk in func.blocks {
                 for inst in blk.instructions {
                     for op in inst.pcode_ops {
-                        if !op.has_implicit_load() && !op.has_implicit_store() {
+                        if PcodeOperation::ExpressionType(ExpressionType::LOAD) == op.pcode_mnemonic
+                        {
                             println!("{:?}", op.pcode_mnemonic);
-                            let in0 = op.input0.into_ir_expr().unwrap();
-                            if let Some(v) = op.input1 {
-                                let in1 = v.into_ir_expr().unwrap();
-                            }
-                            if let Some(v) = op.output {
-                                let out = v.into_ir_expr().unwrap();
-                            }
+                            println!("{:?}", op.into_ir_def(&inst.address));
                         }
                     }
                 }
@@ -80,7 +75,7 @@ impl VarnodeSimple {
     ///
     /// Returns `Err` if the addressspace is neither `"const"`, `"register"` nor `"unique"`.
     fn into_ir_expr(self) -> Result<Expression> {
-        println!("{} : {} : {}", self.addressspace, self.id, self.size);
+        println!("\t{} : {} : {}", self.addressspace, self.id, self.size);
         match self.addressspace.as_str() {
             "const" => Ok(Expression::Const(Bitvector::from_u64(u64::from_str_radix(
                 &self.id.trim_start_matches("0x"),
@@ -232,20 +227,31 @@ impl PcodeOpSimple {
     }
 
     /// Translates pcode load operation into `Def::Load`
-    /// 
-    /// Panics, if load destination is not a variable.
+    ///
+    /// Pcode load instruction:
+    /// https://spinsel.dev/assets/2020-06-17-ghidra-brainfuck-processor-1/ghidra_docs/language_spec/html/pcodedescription.html#cpui_load
+    /// Note: input0 ("Constant ID of space to load from") is not considered.
+    ///
+    /// Panics, if any of the following applies:
+    /// * `output` is `None`
+    /// * load destination is not a variable
+    /// * `input1` is `None`
+    /// * `into_ir_expr()` returns `Err` on any varnode
     fn create_load(self, address: &String) -> Term<Def> {
-        let target = self.input1.expect("Load without target");
+        let target = self.output.expect("Load without output");
         if let Expression::Var(var) = target
             .into_ir_expr()
-            .expect("Load target translation failed.")
+            .expect("Load target translation failed")
         {
+            let source = self
+                .input1
+                .expect("Load without source")
+                .into_ir_expr()
+                .expect("Load source address translation failed");
+
             let def = Def::Load {
                 var,
-                address: self
-                    .input0
-                    .into_ir_expr()
-                    .expect("Load source translation failed."),
+                address: source,
             };
             return Term {
                 tid: Tid {
@@ -254,8 +260,17 @@ impl PcodeOpSimple {
                 },
                 term: def,
             };
+        } else {
+            panic!("Load target is not a variable")
         }
-        panic!("Load target is not a register")
+    }
+
+    fn create_store(self, address: &String) {
+        let target = self.input1.expect("Store without target");
+        // if let Expression::Const(offset) = target.into_ir_expr().expect("Store target translation failed."){
+        //     let def = Def::Store { address: Expression::Const(offset)
+        //         , value: self.input1 }
+        // }
     }
 }
 
