@@ -35,6 +35,8 @@ impl ProjectSimple {
                 for inst in blk.instructions {
                     for op in inst.pcode_ops {
                         if PcodeOperation::ExpressionType(ExpressionType::LOAD) == op.pcode_mnemonic
+                            || PcodeOperation::ExpressionType(ExpressionType::STORE)
+                                == op.pcode_mnemonic
                         {
                             println!("{:?}", op.pcode_mnemonic);
                             println!("{:?}", op.into_ir_def(&inst.address));
@@ -97,7 +99,7 @@ impl VarnodeSimple {
 
     /// Returns `Bitvector` representing a constant address in ram, if
     /// the varnode represents such address.
-    /// Panics if the address cannot be parsed
+    /// Panics if the address cannot be parsed.
     fn get_ram_address(&self) -> Option<Bitvector> {
         match self.addressspace.as_str() {
             "ram" => Some(Bitvector::from_u64(
@@ -115,6 +117,7 @@ pub struct PcodeOpSimple {
     pub pcode_mnemonic: PcodeOperation,
     pub input0: VarnodeSimple,
     pub input1: Option<VarnodeSimple>,
+    pub input2: Option<VarnodeSimple>,
     pub output: Option<VarnodeSimple>,
 }
 
@@ -221,7 +224,7 @@ impl PcodeOpSimple {
     fn create_def(self, address: &String, expr_type: ExpressionType) -> Term<Def> {
         match expr_type {
             ExpressionType::LOAD => self.create_load(address),
-            ExpressionType::STORE => todo!(),
+            ExpressionType::STORE => self.create_store(address),
             _ => todo!(),
         }
     }
@@ -265,12 +268,46 @@ impl PcodeOpSimple {
         }
     }
 
-    fn create_store(self, address: &String) {
-        let target = self.input1.expect("Store without target");
-        // if let Expression::Const(offset) = target.into_ir_expr().expect("Store target translation failed."){
-        //     let def = Def::Store { address: Expression::Const(offset)
-        //         , value: self.input1 }
-        // }
+    /// Translates pcode store operation into `Def::Load`
+    ///
+    /// Pcode load instruction:
+    /// https://spinsel.dev/assets/2020-06-17-ghidra-brainfuck-processor-1/ghidra_docs/language_spec/html/pcodedescription.html#cpui_store
+    /// Note: input0 ("	Constant ID of space to store into") is not considered.
+    ///
+    /// Panics, if any of the following applies:
+    /// * `input1` is None
+    /// * `input2` is None
+    /// * `into_ir_expr()` returns `Err` on any varnode
+    fn create_store(self, address: &String) -> Term<Def> {
+        let target_expr = self
+            .input1
+            .expect("Store without target")
+            .into_ir_expr()
+            .expect("Store target translation failed.");
+
+        let source = self.input2.expect("Store without source");
+        if !matches!(
+            source.addressspace.as_str(),
+            "unique" | "const" | "variable"
+        ) {
+            panic!("Store source is not a variable, temp variable nor constant.")
+        }
+
+        let source_expr = source
+            .into_ir_expr()
+            .expect("Store source translation failed");
+        let def = Def::Store {
+            address: target_expr,
+            value: source_expr,
+        };
+
+        return Term {
+            tid: Tid {
+                id: format!("instr_{}_{}", address, self.pcode_index),
+                address: address.to_string(),
+            },
+            term: def,
+        };
     }
 }
 
