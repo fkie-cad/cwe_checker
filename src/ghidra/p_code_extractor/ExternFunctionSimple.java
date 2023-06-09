@@ -30,6 +30,6 @@ public class ExternFunctionSimple {
     }
 
     public void add_thunk_function_address(Address address) {
-        this.thunks.add("0x" + address.toString(false, true));
+        this.thunks.add("0x" + address.toString(false, false));
     }
 }

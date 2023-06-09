@@ -21,7 +21,7 @@ public class InstructionSimple {
 
     public InstructionSimple(Instruction instruction, VarnodeContext context) {
         this.mnemonic = instruction.toString();
-        this.address = "0x" + instruction.getAddressString(false, true);
+        this.address = "0x" + instruction.getAddressString(false, false);
         PcodeOp[] pcodes = instruction.getPcode(true);
         for (int i = 0; i < pcodes.length; i++) {
             pcode_ops.add(new PcodeOpSimple(i, pcodes[i], context));
@@ -35,7 +35,7 @@ public class InstructionSimple {
                     potential_targets = new ArrayList<String>();
                 }
                 for (Reference ref : instruction.getReferencesFrom()){
-                    potential_targets.add("0x" + ref.getToAddress().toString(false, true));
+                    potential_targets.add("0x" + ref.getToAddress().toString(false, false));
                 }                    
             }
         }

@@ -14,7 +14,7 @@ public class BlockSimple {
     public ArrayList<InstructionSimple> instructions = new ArrayList();
 
     public BlockSimple(CodeBlock block, VarnodeContext context, Listing listing) {
-        this.address = block.getFirstStartAddress().toString(false, true);
+        this.address = block.getFirstStartAddress().toString(false, false);
         for (Instruction instr : listing.getInstructions(block, true)) {
             instructions.add(new InstructionSimple(instr, context));
         }
