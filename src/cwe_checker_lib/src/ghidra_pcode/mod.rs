@@ -1,5 +1,9 @@
-use std::collections::HashMap;
+//! This module defines the interface for parsing ghidra pcode provided by `PcodeExtractor.java`.
+//! The JSON representation is parsed and translatet into `cwe_checker`'s [intermediate represnetation](crate::intermediate_representation).
+//! Additionally, following normalization steps are performed:
+//! * implicit load operations are converted into explitict [Def::Load] representation.
 
+use std::collections::HashMap;
 use crate::intermediate_representation::*;
 use crate::pcode::{ExpressionType, JmpType};
 use anyhow::{anyhow, Result};
