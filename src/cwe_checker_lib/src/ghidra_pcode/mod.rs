@@ -84,7 +84,7 @@ impl VarnodeSimple {
         println!("\t{} : {} : {}", self.addressspace, self.id, self.size);
         match self.addressspace.as_str() {
             "const" => Ok(Expression::Const(Bitvector::from_u64(u64::from_str_radix(
-                &self.id.trim_start_matches("0x"),
+                self.id.trim_start_matches("0x"),
                 16,
             )?))),
             "register" => Ok(Expression::Var(Variable {
@@ -107,8 +107,8 @@ impl VarnodeSimple {
     fn get_ram_address(&self) -> Option<Bitvector> {
         match self.addressspace.as_str() {
             "ram" => Some(Bitvector::from_u64(
-                u64::from_str_radix(&self.id.trim_start_matches("0x"), 16)
-                    .expect(&format!("Cannot parse {}", &self.id)),
+                u64::from_str_radix(self.id.trim_start_matches("0x"), 16)
+                    .unwrap_or_else(|_| panic!("Cannot parse {}", &self.id)),
             )),
             _ => None,
         }
@@ -274,13 +274,13 @@ impl PcodeOpSimple {
                 var,
                 address: source,
             };
-            return Term {
+            Term {
                 tid: Tid {
                     id: format!("instr_{}_{}", address, self.pcode_index),
                     address: address.to_string(),
                 },
                 term: def,
-            };
+            }
         } else {
             panic!("Load target is not a variable")
         }
@@ -290,7 +290,7 @@ impl PcodeOpSimple {
     ///
     /// Pcode load instruction:
     /// https://spinsel.dev/assets/2020-06-17-ghidra-brainfuck-processor-1/ghidra_docs/language_spec/html/pcodedescription.html#cpui_store
-    /// Note: input0 ("	Constant ID of space to store into") is not considered.
+    /// Note: input0 ("Constant ID of space to store into") is not considered.
     ///
     /// Panics, if any of the following applies:
     /// * `input1` is None
@@ -322,13 +322,13 @@ impl PcodeOpSimple {
             value: source_expr,
         };
 
-        return Term {
+        Term {
             tid: Tid {
                 id: format!("instr_{}_{}", address, self.pcode_index),
                 address: address.to_string(),
             },
             term: def,
-        };
+        }
     }
 }
 

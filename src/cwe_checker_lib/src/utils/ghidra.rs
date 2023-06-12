@@ -51,9 +51,10 @@ fn parse_pcode_project_to_ir_project(
     binary: &[u8],
     bare_metal_config_opt: &Option<BareMetalConfig>,
 ) -> Result<(Project, Vec<LogMessage>), Error> {
-    // let bare_metal_base_address_opt = bare_metal_config_opt
-    //     .as_ref()
-    //     .map(|config| config.parse_binary_base_address());
+    let bare_metal_base_address_opt = bare_metal_config_opt
+        .as_ref()
+        .map(|config| config.parse_binary_base_address());
+    let project = pcode_project.into_ir_project();
     // let mut log_messages = pcode_project.normalize();
     // let project: Project = match crate::utils::get_binary_base_address(binary) {
     //     Ok(binary_base_address) => pcode_project.into_ir_project(binary_base_address),
@@ -72,15 +73,7 @@ fn parse_pcode_project_to_ir_project(
     //         }
     //     }
     // };
-    let project = Project {
-        program: todo!(),
-        cpu_architecture: todo!(),
-        stack_pointer_register: todo!(),
-        calling_conventions: todo!(),
-        register_set: todo!(),
-        datatype_properties: todo!(),
-        runtime_memory_image: todo!(),
-    };
+
     let log_messages = vec![];
 
     Ok((project, log_messages))
@@ -132,6 +125,10 @@ fn execute_ghidra(
 
     let pcode_parsing_result: Result<ProjectSimple, serde_json::Error> =
         serde_json::from_reader(std::io::BufReader::new(file));
+
+    ghidra_subprocess
+        .join()
+        .expect("The Ghidra thread to be joined has panicked!");
     // Clean up the FIFO pipe and propagate errors from the JSON parsing.
     std::fs::remove_file(fifo_path).context("Could not clean up FIFO pipe")?;
     Ok(pcode_parsing_result?)
