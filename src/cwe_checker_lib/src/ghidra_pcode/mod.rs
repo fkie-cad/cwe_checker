@@ -218,6 +218,9 @@ impl PcodeOpSimple {
             let mut explicit_loads = self.create_implicit_loads(address);
             defs.append(&mut explicit_loads);
         }
+        if self.has_implicit_store() {
+            todo!()
+        }
 
         let def = match self.pcode_mnemonic {
             PcodeOperation::ExpressionType(expr_type) => self.create_def(address, expr_type),
@@ -283,7 +286,7 @@ impl PcodeOpSimple {
         }
     }
 
-    /// Translates pcode store operation into `Def::Load`
+    /// Translates pcode store operation into `Def::Store`
     ///
     /// Pcode load instruction:
     /// https://spinsel.dev/assets/2020-06-17-ghidra-brainfuck-processor-1/ghidra_docs/language_spec/html/pcodedescription.html#cpui_store
@@ -306,15 +309,12 @@ impl PcodeOpSimple {
             .into_ir_expr()
             .expect("Store target translation failed.");
 
-        let source = self.input2.expect("Store without source");
-        if !matches!(
-            source.addressspace.as_str(),
-            "unique" | "const" | "variable"
-        ) {
-            panic!("Store source is not a variable, temp variable nor constant.")
+        let data = self.input2.expect("Store without source data");
+        if !matches!(data.addressspace.as_str(), "unique" | "const" | "variable") {
+            panic!("Store source data is not a variable, temp variable nor constant.")
         }
 
-        let source_expr = source
+        let source_expr = data
             .into_ir_expr()
             .expect("Store source translation failed");
         let def = Def::Store {
