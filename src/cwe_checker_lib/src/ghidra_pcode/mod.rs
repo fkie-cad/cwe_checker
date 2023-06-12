@@ -3,11 +3,11 @@
 //! Additionally, following normalization steps are performed:
 //! * implicit load operations are converted into explitict [Def::Load] representation.
 
-use std::collections::HashMap;
 use crate::intermediate_representation::*;
 use crate::pcode::{ExpressionType, JmpType};
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// The project struct for deserialization of the ghidra pcode extractor JSON.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
@@ -136,6 +136,11 @@ impl PcodeOpSimple {
                 return true;
             }
         }
+        if let Some(varnode) = &self.input2 {
+            if varnode.addressspace == "ram" {
+                return true;
+            }
+        }
         false
     }
     // Returns `true` if the output is ram located.
@@ -148,14 +153,15 @@ impl PcodeOpSimple {
         false
     }
     /// Returns artificial `Def::Load` instructions, if the operants are ram located.
+    /// Otherwise returns empty `Vec`.
     ///
     /// The created instructions use the virtual register `$load_tempX`, whereby `X` is
     /// either `0` or `1`representing which input is used.
     /// The created `Tid` is named `instr_<address>_<pcode index>_load<X>`.
-    fn create_implicit_loads(&self, address: &String) -> Option<Vec<Term<Def>>> {
+    fn create_implicit_loads(&self, address: &String) -> Vec<Term<Def>> {
         let mut explicit_loads = vec![];
         if self.input0.addressspace == "ram" {
-            let load0 = (Def::Load {
+            let load0 = Def::Load {
                 var: Variable {
                     name: "$load_temp0".into(),
                     size: self.input0.size.into(),
@@ -166,7 +172,7 @@ impl PcodeOpSimple {
                         .get_ram_address()
                         .expect("varnode's addressspace is not ram"),
                 ),
-            });
+            };
             explicit_loads.push(Term {
                 tid: Tid {
                     id: format!("instr_{}_{}_load0", address, self.pcode_index),
@@ -199,7 +205,7 @@ impl PcodeOpSimple {
             }
         }
 
-        return Some(explicit_loads);
+        explicit_loads
     }
 
     /// Translates a single pcode operation into at leas one `Def`.
@@ -209,9 +215,8 @@ impl PcodeOpSimple {
         let mut defs = vec![];
         // if the pcode operation contains implicit load operations, prepend them.
         if self.has_implicit_load() {
-            if let Some(mut explicit_loads) = self.create_implicit_loads(address) {
-                defs.append(&mut explicit_loads);
-            }
+            let mut explicit_loads = self.create_implicit_loads(address);
+            defs.append(&mut explicit_loads);
         }
 
         let def = match self.pcode_mnemonic {
@@ -245,6 +250,12 @@ impl PcodeOpSimple {
     /// * `input1` is `None`
     /// * `into_ir_expr()` returns `Err` on any varnode
     fn create_load(self, address: &String) -> Term<Def> {
+        if !matches!(
+            self.pcode_mnemonic,
+            PcodeOperation::ExpressionType(ExpressionType::LOAD)
+        ) {
+            panic!("Pcode operation is not LOAD")
+        }
         let target = self.output.expect("Load without output");
         if let Expression::Var(var) = target
             .into_ir_expr()
@@ -283,6 +294,12 @@ impl PcodeOpSimple {
     /// * `input2` is None
     /// * `into_ir_expr()` returns `Err` on any varnode
     fn create_store(self, address: &String) -> Term<Def> {
+        if !matches!(
+            self.pcode_mnemonic,
+            PcodeOperation::ExpressionType(ExpressionType::STORE)
+        ) {
+            panic!("Pcode operation is not STORE")
+        }
         let target_expr = self
             .input1
             .expect("Store without target")
@@ -392,3 +409,6 @@ pub enum PcodeOperation {
     ExpressionType(ExpressionType),
     JmpType(JmpType),
 }
+
+#[cfg(test)]
+mod tests;
