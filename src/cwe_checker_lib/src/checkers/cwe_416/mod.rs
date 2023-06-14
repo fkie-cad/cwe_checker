@@ -17,12 +17,23 @@
 //! To prevent duplicate CWE warnings with the same root cause
 //! the check also keeps track of objects for which a CWE warning was already generated.
 //!
+//! ### Symbols configurable in config.json
+//!
+//! The `deallocation_symbols` are the names of extern functions that deallocate memory.
+//! The check always assumes that the first parameter of such a function is the memory object to be freed.
+//! The check also assumes that memory is always freed by such a call,
+//! which can lead to false positive warnings for functions like `realloc`, where the memory object may not be freed by the call.
+//!
 //! ## False Positives
 //!
 //! - Since the analysis is not path-sensitive, infeasible paths may lead to false positives.
 //! - Any analysis imprecision of the pointer inference analysis
 //! that leads to assuming that a pointer can target more memory objects that it actually can target
 //! may lead to false positive CWE warnings in this check.
+//! - For extern functions that may or may not release memory,
+//! the check will produce false positives if the original pointer is used after calling the function.
+//! For example, `realloc` may return NULL, in which case it will not free memory and the original pointer remains valid.
+//! But the check will flag any access to the original pointer as a potential CWE, regardless of the return value of `realloc`.
 //!
 //! ## False Negatives
 //!
@@ -30,8 +41,7 @@
 //! Subsequently, CWEs corresponding to arrays of memory objects are not detected.
 //! - Memory objects not tracked by the Pointer Inference analysis or pointer targets missed by the Pointer Inference
 //! may lead to missed CWEs in this check.
-//! - The analysis currently only tracks pointers to objects that were freed by a call to `free`.
-//! If a memory object is freed by another external function then this may lead to false negatives in this check.
+//! - Pointers freed by other operations than calls to the deallocation symbols contained in the config.json will be missed by the analysis.
 
 use std::collections::BTreeSet;
 use std::collections::HashMap;
@@ -55,6 +65,14 @@ pub static CWE_MODULE: CweModule = CweModule {
     run: check_cwe,
 };
 
+/// The configuration struct
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
+pub struct Config {
+    /// The names of symbols that free memory (e.g. the "free" function of C).
+    /// The analysis always assumes that the memory object to be freed is the first parameter of the function.
+    deallocation_symbols: Vec<String>,
+}
+
 mod context;
 use context::Context;
 mod state;
@@ -68,11 +86,18 @@ use state::State;
 /// Returns collected log messages and CWE warnings.
 pub fn check_cwe(
     analysis_results: &AnalysisResults,
-    _config: &serde_json::Value,
+    config_json: &serde_json::Value,
 ) -> (Vec<LogMessage>, Vec<CweWarning>) {
+    let config: Config = serde_json::from_value(config_json.clone()).unwrap();
+    let deallocation_symbols = config.deallocation_symbols.iter().cloned().collect();
     let (cwe_warning_sender, cwe_warning_receiver) = crossbeam_channel::unbounded();
     let (log_sender, log_receiver) = crossbeam_channel::unbounded();
-    let context = Context::new(analysis_results, cwe_warning_sender, log_sender);
+    let context = Context::new(
+        analysis_results,
+        cwe_warning_sender,
+        log_sender,
+        deallocation_symbols,
+    );
 
     let mut fixpoint_computation =
         crate::analysis::forward_interprocedural_fixpoint::create_computation(context, None);
