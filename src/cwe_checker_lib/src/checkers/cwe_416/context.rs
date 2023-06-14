@@ -12,12 +12,16 @@ use crate::prelude::*;
 use crate::utils::log::CweWarning;
 use crate::utils::log::LogMessage;
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 /// The context struct for the fixpoint algorithm that contains references to the analysis results
 /// of other analyses used in this analysis.
 pub struct Context<'a> {
     /// A pointer to the project struct.
     pub project: &'a Project,
+    /// The names of extern functions that deallocate memory.
+    /// These functions will create dangling pointers during the analysis.
+    pub deallocation_symbols: BTreeSet<String>,
     /// A pointer to the control flow graph.
     pub graph: &'a Graph<'a>,
     /// A pointer to the results of the pointer inference analysis.
@@ -38,6 +42,7 @@ impl<'a> Context<'a> {
         analysis_results: &'b AnalysisResults<'a>,
         cwe_warning_collector: crossbeam_channel::Sender<WarningContext>,
         log_collector: crossbeam_channel::Sender<LogMessage>,
+        deallocation_symbols: BTreeSet<String>,
     ) -> Context<'a>
     where
         'a: 'b,
@@ -54,6 +59,7 @@ impl<'a> Context<'a> {
             };
         Context {
             project: analysis_results.project,
+            deallocation_symbols,
             graph: analysis_results.control_flow_graph,
             pointer_inference: analysis_results.pointer_inference.unwrap(),
             function_signatures: analysis_results.function_signatures.unwrap(),
@@ -312,7 +318,9 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
             _ => None,
         } {
             match extern_symbol.name.as_str() {
-                "free" => self.handle_call_to_free(&mut state, &call.tid, extern_symbol),
+                dealloc_sym if self.deallocation_symbols.contains(dealloc_sym) => {
+                    self.handle_call_to_free(&mut state, &call.tid, extern_symbol)
+                }
                 extern_symbol_name => {
                     if let Some(warning_causes) = self.collect_cwe_warnings_of_call_params(
                         &mut state,

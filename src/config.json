@@ -89,6 +89,15 @@
       ]
     ]
   },
+  "CWE416": {
+    "deallocation_symbols": [
+      "free",
+      "realloc",
+      "reallocarray",
+      "operator.delete",
+      "operator.delete[]"
+    ]
+  },
   "CWE426": {
     "_comment": "functions that change/drop privileges",
     "symbols": [
@@ -237,8 +246,11 @@
       "malloc",
       "calloc",
       "realloc",
+      "reallocarray",
       "xmalloc",
-      "strdup"
+      "strdup",
+      "operator.new",
+      "operator.new[]"
     ]
   },
   "StringAbstraction": {
