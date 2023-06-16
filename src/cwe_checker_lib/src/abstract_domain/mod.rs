@@ -5,25 +5,25 @@ use crate::intermediate_representation::*;
 use crate::prelude::*;
 
 mod bitvector;
-pub use bitvector::*;
+pub use bitvector::BitvectorDomain;
 
 mod identifier;
 pub use identifier::*;
 
 mod data;
-pub use data::*;
+pub use data::DataDomain;
 
 mod mem_region;
-pub use mem_region::*;
+pub use mem_region::MemRegion;
 
 mod interval;
-pub use interval::*;
+pub use interval::{Interval, IntervalDomain};
 
 mod bricks;
-pub use bricks::*;
+pub use bricks::{BrickDomain, BricksDomain};
 
 mod character_inclusion;
-pub use character_inclusion::*;
+pub use character_inclusion::{CharacterInclusionDomain, CharacterSet};
 
 mod strings;
 pub use strings::*;
