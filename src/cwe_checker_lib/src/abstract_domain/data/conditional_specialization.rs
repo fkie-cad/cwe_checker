@@ -76,7 +76,7 @@ impl<T: SpecializeByConditional + RegisterDomain> SpecializeByConditional for Da
     }
 
     /// Compute the intersetion of two DataDomains.
-    /// 
+    ///
     /// Note that this implementation is unsound for several reasons:
     /// - For example, it assumes that two different relative values cannot intersect.
     /// But that is not true if their offfsets are big enough
@@ -109,10 +109,14 @@ impl<T: SpecializeByConditional + RegisterDomain> SpecializeByConditional for Da
         };
         // If one domain contains relative values and the other absolute values,
         // then we have to assume that the relative values could represent any of the absolute values.
-        if let (true, Some(absolute_val)) = (self.relative_values.len() > 0, &other.absolute_value) {
+        if let (true, Some(absolute_val)) =
+            (!self.relative_values.is_empty(), &other.absolute_value)
+        {
             result = result.merge(&absolute_val.clone().into());
         }
-        if let (Some(absolute_val), true) = (&self.absolute_value, other.relative_values.len() > 0) {
+        if let (Some(absolute_val), true) =
+            (&self.absolute_value, !other.relative_values.is_empty())
+        {
             result = result.merge(&absolute_val.clone().into());
         }
 
