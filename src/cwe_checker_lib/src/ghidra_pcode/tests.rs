@@ -29,7 +29,7 @@ fn mock_pcode_op_add(
 }
 
 impl PcodeOpSimple {
-    fn set_mnemonic(&self, mnemonic: PcodeOperation) -> PcodeOpSimple {
+    fn with_mnemonic(&self, mnemonic: PcodeOperation) -> PcodeOpSimple {
         PcodeOpSimple {
             pcode_index: self.pcode_index,
             pcode_mnemonic: mnemonic,
