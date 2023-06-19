@@ -12,13 +12,13 @@ import ghidra.program.model.lang.Register;
  * This class is used for clean and simple serialization.
  */
 public class VarnodeSimple {
-    private String addressspace;
+    private String address_space;
     private String id;
     private int size;
 
     public VarnodeSimple(Varnode varnode, VarnodeContext context) {
         this.size = varnode.getSize();
-        this.addressspace = varnode.getAddress().getAddressSpace().getName();
+        this.address_space = varnode.getAddress().getAddressSpace().getName();
         this.id = varnode.getAddress().toString("0x");
         if (context.getRegister(varnode) != null) {
             this.id = context.getRegister(varnode).getName();
@@ -28,11 +28,11 @@ public class VarnodeSimple {
     public VarnodeSimple(Register register) {
         this.id = register.getName();
         this.size = (int) register.getBitLength() / 8;
-        this.addressspace = register.getAddressSpace().getName();
+        this.address_space = register.getAddressSpace().getName();
     }
 
     public String toString() {
-        return String.format("(%s, %s, %d)", this.addressspace, this.id, this.size);
+        return String.format("(%s, %s, %d)", this.address_space, this.id, this.size);
     }
 
     public String getId() {

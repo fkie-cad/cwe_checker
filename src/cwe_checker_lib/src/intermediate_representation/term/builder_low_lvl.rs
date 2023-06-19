@@ -1,5 +1,6 @@
 //! This module contains the implementations of various builder functions
-//! for lower intermediate representation terms [Expression](crate::intermediate_representation::Expression),
+//! for lower intermediate representation terms [Term](crate::intermediate_representation::Term)
+//! [Expression](crate::intermediate_representation::Expression),
 //! [Jmp](crate::intermediate_representation::Expression), [Def](crate::intermediate_representation::Expression),
 //! [DatatypeProperties](crate::intermediate_representation::Expression),
 //! [Blk](crate::intermediate_representation::Expression),
@@ -10,6 +11,16 @@
 //!
 #[cfg(test)]
 use crate::{expr, intermediate_representation::*, variable};
+
+#[cfg(test)]
+impl<T> Term<T> {
+    /// Sets the field `id` of `Tid`
+    #[cfg(test)]
+    pub fn with_tid_id(mut self, id: String) -> Term<T> {
+        self.tid.id = id;
+        self
+    }
+}
 
 #[cfg(test)]
 impl Expression {

@@ -1,5 +1,5 @@
 //! This module defines the interface for parsing ghidra pcode provided by `PcodeExtractor.java`.
-//! The JSON representation is parsed and translatet into `cwe_checker`'s [intermediate represnetation](crate::intermediate_representation).
+//! The JSON representation is parsed and translated into `cwe_checker`'s [intermediate represnetation](crate::intermediate_representation).
 //! Additionally, following normalization steps are performed:
 //! * implicit load operations are converted into explitict [Def::Load] representation.
 
@@ -69,24 +69,28 @@ impl ProjectSimple {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct VarnodeSimple {
     /// Addressspace, e.g. register or constant
-    pub addressspace: String,
+    pub address_space: String,
     /// Offset (value) in addressspace, or register name
     pub id: String,
     /// Size of the varnode
     pub size: u64,
 }
+
 impl VarnodeSimple {
     /// Translates into `Expression::Const` for constants or `Expression::Var` for registers or
     /// virtual registers.
     ///
     /// Returns `Err` if the addressspace is neither `"const"`, `"register"` nor `"unique"`.
     fn into_ir_expr(self) -> Result<Expression> {
-        println!("\t{} : {} : {}", self.addressspace, self.id, self.size);
-        match self.addressspace.as_str() {
-            "const" => Ok(Expression::Const(Bitvector::from_u64(u64::from_str_radix(
-                self.id.trim_start_matches("0x"),
-                16,
-            )?))),
+        match self.address_space.as_str() {
+            "const" => {
+                let constant =
+                    Bitvector::from_u64(u64::from_str_radix(self.id.trim_start_matches("0x"), 16)?);
+
+                Ok(Expression::Const(
+                    constant.into_resize_unsigned(self.size.into()),
+                ))
+            }
             "register" => Ok(Expression::Var(Variable {
                 name: self.id,
                 size: ByteSize::new(self.size),
@@ -105,13 +109,14 @@ impl VarnodeSimple {
     /// the varnode represents such address.
     /// Panics if the address cannot be parsed.
     fn get_ram_address(&self) -> Option<Bitvector> {
-        match self.addressspace.as_str() {
-            "ram" => Some(Bitvector::from_u64(
+        if self.address_space.as_str() == "ram" {
+            let offset = Bitvector::from_u64(
                 u64::from_str_radix(self.id.trim_start_matches("0x"), 16)
                     .unwrap_or_else(|_| panic!("Cannot parse {}", &self.id)),
-            )),
-            _ => None,
+            );
+            return Some(offset.into_resize_unsigned(self.size.into()));
         }
+        None
     }
 }
 
@@ -128,16 +133,16 @@ pub struct PcodeOpSimple {
 impl PcodeOpSimple {
     /// Returns `true` if at least one input is ram located.
     fn has_implicit_load(&self) -> bool {
-        if self.input0.addressspace == "ram" {
+        if self.input0.address_space == "ram" {
             return true;
         }
         if let Some(varnode) = &self.input1 {
-            if varnode.addressspace == "ram" {
+            if varnode.address_space == "ram" {
                 return true;
             }
         }
         if let Some(varnode) = &self.input2 {
-            if varnode.addressspace == "ram" {
+            if varnode.address_space == "ram" {
                 return true;
             }
         }
@@ -146,7 +151,7 @@ impl PcodeOpSimple {
     // Returns `true` if the output is ram located.
     fn has_implicit_store(&self) -> bool {
         if let Some(varnode) = &self.output {
-            if varnode.addressspace == "ram" {
+            if varnode.address_space == "ram" {
                 return true;
             }
         }
@@ -156,11 +161,11 @@ impl PcodeOpSimple {
     /// Otherwise returns empty `Vec`.
     ///
     /// The created instructions use the virtual register `$load_tempX`, whereby `X` is
-    /// either `0` or `1`representing which input is used.
+    /// either `0`, `1`or `2` representing which input is used.
     /// The created `Tid` is named `instr_<address>_<pcode index>_load<X>`.
     fn create_implicit_loads(&self, address: &String) -> Vec<Term<Def>> {
         let mut explicit_loads = vec![];
-        if self.input0.addressspace == "ram" {
+        if self.input0.address_space == "ram" {
             let load0 = Def::Load {
                 var: Variable {
                     name: "$load_temp0".into(),
@@ -182,7 +187,7 @@ impl PcodeOpSimple {
             })
         }
         if let Some(varnode) = &self.input1 {
-            if varnode.addressspace == "ram" {
+            if varnode.address_space == "ram" {
                 let load1 = Def::Load {
                     var: Variable {
                         name: "$load_temp1".into(),
@@ -201,6 +206,30 @@ impl PcodeOpSimple {
                         address: address.to_string(),
                     },
                     term: load1,
+                })
+            }
+        }
+
+        if let Some(varnode) = &self.input2 {
+            if varnode.address_space == "ram" {
+                let load2 = Def::Load {
+                    var: Variable {
+                        name: "$load_temp2".into(),
+                        size: varnode.size.into(),
+                        is_temp: true,
+                    },
+                    address: Expression::Const(
+                        varnode
+                            .get_ram_address()
+                            .expect("varnode's addressspace is not ram"),
+                    ),
+                };
+                explicit_loads.push(Term {
+                    tid: Tid {
+                        id: format!("instr_{}_{}_load2", address, self.pcode_index),
+                        address: address.to_string(),
+                    },
+                    term: load2,
                 })
             }
         }
@@ -310,7 +339,7 @@ impl PcodeOpSimple {
             .expect("Store target translation failed.");
 
         let data = self.input2.expect("Store without source data");
-        if !matches!(data.addressspace.as_str(), "unique" | "const" | "variable") {
+        if !matches!(data.address_space.as_str(), "unique" | "const" | "variable") {
             panic!("Store source data is not a variable, temp variable nor constant.")
         }
 
@@ -341,7 +370,9 @@ pub struct InstructionSimple {
 }
 
 impl InstructionSimple {
-    fn into_ir_def(&self) {}
+    fn into_ir_def(&self) {
+        todo!()
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
