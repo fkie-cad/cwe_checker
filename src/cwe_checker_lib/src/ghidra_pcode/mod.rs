@@ -38,12 +38,14 @@ impl ProjectSimple {
             for blk in func.blocks {
                 for inst in blk.instructions {
                     for op in inst.pcode_ops {
-                        if PcodeOperation::ExpressionType(ExpressionType::LOAD) == op.pcode_mnemonic
-                            || PcodeOperation::ExpressionType(ExpressionType::STORE)
-                                == op.pcode_mnemonic
+                        if let PcodeOperation::ExpressionType(t) = op.pcode_mnemonic
                         {
-                            println!("{:?}", op.pcode_mnemonic);
-                            println!("{:?}", op.into_ir_def(&inst.address));
+                            if t.into_ir_unop().is_some(){
+                                println!("{:?}", op.pcode_mnemonic);
+                                dbg!(op.into_ir_def(&inst.address));
+
+                            }
+                            
                         }
                     }
                 }
@@ -266,7 +268,10 @@ impl PcodeOpSimple {
         match expr_type {
             ExpressionType::LOAD => self.create_load(address),
             ExpressionType::STORE => self.create_store(address),
-            _ => todo!(),
+            _ if expr_type.into_ir_unop().is_some() => self.create_unop(address),
+            _ if expr_type.into_ir_biop().is_some() => todo!(),
+            _ if expr_type.into_ir_cast().is_some() => todo!(),
+            _ => panic!("Unsupported pcode operation"),
         }
     }
 
@@ -359,6 +364,34 @@ impl PcodeOpSimple {
             term: def,
         }
     }
+
+    fn create_unop(self, address: &String) -> Term<Def> {
+        if let PcodeOperation::ExpressionType(expr_type) = self.pcode_mnemonic {
+            if let Expression::Var(var) = self
+                .output
+                .unwrap()
+                .into_ir_expr()
+                .expect("Unary operation target translation failed")
+            {
+                let tid = Tid {
+                    id: format!("instr_{}_{}", address, self.pcode_index),
+                    address: address.to_string(),
+                };
+                let expr = Expression::UnOp {
+                    op: expr_type.into_ir_unop().unwrap(),
+                    arg: Box::new(self.input0.into_ir_expr().unwrap()),
+                };
+                return Term {
+                    tid,
+                    term: Def::Assign { var, value: expr },
+                };
+            } else {
+                panic!("Output varnode is not a variable")
+            }
+        } else {
+            panic!("Not an expression type")
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
@@ -439,6 +472,79 @@ pub struct CallingConventionsProperties {
 pub enum PcodeOperation {
     ExpressionType(ExpressionType),
     JmpType(JmpType),
+}
+
+impl ExpressionType {
+    pub fn into_ir_unop(&self) -> Option<UnOpType> {
+        use ExpressionType::*;
+        match self {
+            INT_NEGATE => Some(UnOpType::IntNegate),
+            INT_2COMP => Some(UnOpType::Int2Comp),
+            BOOL_NEGATE => Some(UnOpType::BoolNegate),
+            FLOAT_NEG => Some(UnOpType::FloatNegate),
+            FLOAT_ABS => Some(UnOpType::FloatAbs),
+            FLOAT_SQRT => Some(UnOpType::FloatSqrt),
+            FLOAT_CEIL => Some(UnOpType::FloatCeil),
+            FLOAT_FLOOR => Some(UnOpType::FloatFloor),
+            FLOAT_ROUND => Some(UnOpType::FloatRound),
+            FLOAT_NAN => Some(UnOpType::FloatNaN),
+            _ => None,
+        }
+    }
+
+    pub fn into_ir_biop(&self) -> Option<BinOpType> {
+        use ExpressionType::*;
+        match self {
+            PIECE => Some(BinOpType::Piece),
+            INT_EQUAL => Some(BinOpType::IntEqual),
+            INT_NOTEQUAL => Some(BinOpType::IntNotEqual),
+            INT_LESS => Some(BinOpType::IntLess),
+            INT_SLESS => Some(BinOpType::IntSLess),
+            INT_LESSEQUAL => Some(BinOpType::IntLessEqual),
+            INT_SLESSEQUAL => Some(BinOpType::IntSLessEqual),
+            INT_ADD => Some(BinOpType::IntAdd),
+            INT_SUB => Some(BinOpType::IntSub),
+            INT_CARRY => Some(BinOpType::IntCarry),
+            INT_SCARRY => Some(BinOpType::IntSCarry),
+            INT_SBORROW => Some(BinOpType::IntSBorrow),
+            INT_XOR => Some(BinOpType::IntXOr),
+            INT_AND => Some(BinOpType::IntAnd),
+            INT_OR => Some(BinOpType::IntOr),
+            INT_LEFT => Some(BinOpType::IntLeft),
+            INT_RIGHT => Some(BinOpType::IntRight),
+            INT_SRIGHT => Some(BinOpType::IntSRight),
+            INT_MULT => Some(BinOpType::IntMult),
+            INT_DIV => Some(BinOpType::IntDiv),
+            INT_REM => Some(BinOpType::IntRem),
+            INT_SDIV => Some(BinOpType::IntSDiv),
+            INT_SREM => Some(BinOpType::IntSRem),
+            BOOL_XOR => Some(BinOpType::BoolXOr),
+            BOOL_AND => Some(BinOpType::BoolAnd),
+            BOOL_OR => Some(BinOpType::BoolOr),
+            FLOAT_EQUAL => Some(BinOpType::FloatEqual),
+            FLOAT_NOTEQUAL => Some(BinOpType::FloatNotEqual),
+            FLOAT_LESS => Some(BinOpType::FloatLess),
+            FLOAT_LESSEQUAL => Some(BinOpType::FloatLessEqual),
+            FLOAT_ADD => Some(BinOpType::FloatAdd),
+            FLOAT_SUB => Some(BinOpType::FloatSub),
+            FLOAT_MULT => Some(BinOpType::FloatMult),
+            FLOAT_DIV => Some(BinOpType::FloatDiv),
+            _ => None,
+        }
+    }
+
+    pub fn into_ir_cast(&self) -> Option<CastOpType> {
+        use ExpressionType::*;
+        match self {
+            INT_ZEXT => Some(CastOpType::IntZExt),
+            INT_SEXT => Some(CastOpType::IntSExt),
+            INT2FLOAT => Some(CastOpType::Int2Float),
+            FLOAT2FLOAT => Some(CastOpType::Float2Float),
+            TRUNC => Some(CastOpType::Trunc),
+            POPCOUNT => Some(CastOpType::PopCount),
+            _ => None,
+        }
+    }
 }
 
 #[cfg(test)]
