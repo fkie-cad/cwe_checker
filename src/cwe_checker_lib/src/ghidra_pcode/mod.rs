@@ -40,12 +40,8 @@ impl ProjectSimple {
             for blk in func.blocks {
                 for inst in blk.instructions {
                     for op in inst.pcode_ops {
-                        if let PcodeOperation::ExpressionType(t) = op.pcode_mnemonic {
-                            if t.into_ir_unop().is_some() {
-                                println!("{:?}", op.pcode_mnemonic);
-                                dbg!(op.into_ir_def(&inst.address));
-                            }
-                        }
+                        dbg!(&op);
+                        op.into_ir_def(&inst.address);
                     }
                 }
             }
@@ -269,7 +265,7 @@ impl PcodeOpSimple {
             ExpressionType::STORE => self.create_store(address),
             _ if expr_type.into_ir_unop().is_some() => self.create_unop(address),
             _ if expr_type.into_ir_biop().is_some() => self.create_biop(address),
-            _ if expr_type.into_ir_cast().is_some() => todo!(),
+            _ if expr_type.into_ir_cast().is_some() => self.create_castop(address),
             _ => panic!("Unsupported pcode operation"),
         }
     }
@@ -364,7 +360,7 @@ impl PcodeOpSimple {
         }
     }
 
-    /// Translates pcode operations with one input into `Term<Def>` with unary `Expression`.
+    /// Translates pcode operation with one input into `Term<Def>` with unary `Expression`.
     /// The mapping is implemented in `into_ir_unop`.
     ///
     /// Panics if,
@@ -385,7 +381,7 @@ impl PcodeOpSimple {
         }
     }
 
-    /// Translates pcode operations with two inputs into `Term<Def>` with binary `Expression`.
+    /// Translates a pcode operation with two inputs into `Term<Def>` with binary `Expression`.
     /// The mapping is implemented in `into_ir_biop`.
     ///
     /// Panics if,
@@ -400,7 +396,8 @@ impl PcodeOpSimple {
                     .expect("Translation into binary operation type failed"),
                 lhs: Box::new(self.input0.into_ir_expr().unwrap()),
                 rhs: Box::new(
-                    self.input1.clone()
+                    self.input1
+                        .clone()
                         .expect("No input 1 for binary operation")
                         .into_ir_expr()
                         .unwrap(),
@@ -412,8 +409,35 @@ impl PcodeOpSimple {
         }
     }
 
+    /// Translates a cast pcode operation into `Term<Def>` with `Expression::Cast`.
+    /// The mapping is implemented in `into_ir_castop`.
+    ///
+    /// Panics if,
+    /// * `self.pcode_mnemonic` is not `PcodeOperation::ExpressionType`
+    /// * `self.output` is `None` or `into_it_expr()` returns not an `Expression::Var`
+    /// * `into_ir_expr()` returns `Err` on `self.output` or `self.input0`
+    pub fn create_castop(self, address: &String) -> Term<Def> {
+        if let PcodeOperation::ExpressionType(expr_type) = self.pcode_mnemonic {
+            let expr = Expression::Cast {
+                op: expr_type
+                    .into_ir_cast()
+                    .expect("Translation into cast operation failed"),
+                size: self
+                    .output
+                    .clone()
+                    .expect("No output for cast operation")
+                    .size
+                    .into(),
+                arg: Box::new(self.input0.into_ir_expr().unwrap()),
+            };
+            return self.create_assign(address, expr);
+        } else {
+            panic!("Not an expression type")
+        }
+    }
+
     /// Helper function for creating Assign operations.
-    /// 
+    ///
     /// Panics if,
     /// * self.output is `None` or `into_ir_expr()` returns `Err`
     /// * self.output is not `Expression::Var`
