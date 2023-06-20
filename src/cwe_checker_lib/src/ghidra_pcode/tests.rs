@@ -39,7 +39,8 @@ impl PcodeOpSimple {
             output: self.output.clone(),
         }
     }
-    fn set_varnodes(
+
+    fn with_varnodes(
         mut self,
         input0: VarnodeSimple,
         input1: Option<VarnodeSimple>,
@@ -130,34 +131,34 @@ fn test_pcode_op_has_implicit_load() {
     assert_eq!(
         pcode_op
             .clone()
-            .set_varnodes(varnode.clone(), Some(ram_varnode.clone()), None, None)
+            .with_varnodes(varnode.clone(), Some(ram_varnode.clone()), None, None)
             .has_implicit_load(),
         true
     );
     assert_eq!(
         pcode_op
             .clone()
-            .set_varnodes(varnode.clone(), None, Some(ram_varnode.clone()), None)
+            .with_varnodes(varnode.clone(), None, Some(ram_varnode.clone()), None)
             .has_implicit_load(),
         true
     );
     assert_eq!(
         pcode_op
             .clone()
-            .set_varnodes(varnode.clone(), None, None, None)
+            .with_varnodes(varnode.clone(), None, None, None)
             .has_implicit_load(),
         false
     );
     assert_eq!(
         pcode_op
             .clone()
-            .set_varnodes(varnode.clone(), Some(varnode.clone()), None, None)
+            .with_varnodes(varnode.clone(), Some(varnode.clone()), None, None)
             .has_implicit_load(),
         false
     );
     assert_eq!(
         pcode_op
-            .set_varnodes(varnode.clone(), None, Some(varnode.clone()), None)
+            .with_varnodes(varnode.clone(), None, Some(varnode.clone()), None)
             .has_implicit_load(),
         false
     );
