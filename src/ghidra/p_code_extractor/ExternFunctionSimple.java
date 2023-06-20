@@ -11,7 +11,7 @@ import ghidra.program.model.address.Address;
  */
 public class ExternFunctionSimple {
     private String name;
-    private String callingConvention;
+    private String calling_convention;
     private ArrayList<VarnodeSimple> parameters = new ArrayList<VarnodeSimple>();
     private VarnodeSimple return_location;
     private ArrayList<String> thunks;
@@ -21,7 +21,7 @@ public class ExternFunctionSimple {
     public ExternFunctionSimple(String name, String cconv, ArrayList<VarnodeSimple> parameters,
             VarnodeSimple return_location, Boolean has_no_return, Boolean has_var_args) {
         this.name = name;
-        this.callingConvention = cconv;
+        this.calling_convention = cconv;
         this.parameters = parameters;
         this.return_location = return_location;
         this.has_no_return = has_no_return;
@@ -30,6 +30,6 @@ public class ExternFunctionSimple {
     }
 
     public void add_thunk_function_address(Address address) {
-        this.thunks.add("0x" + address.toString(false, true));
+        this.thunks.add("0x" + address.toString(false, false));
     }
 }

@@ -11,19 +11,23 @@ import ghidra.program.model.pcode.Varnode;
  */
 public class PcodeOpSimple {
     private int pcode_index;
-    private String pcodeMnemonic;
+    private String pcode_mnemonic;
     private VarnodeSimple input0;
     private VarnodeSimple input1;
+    private VarnodeSimple input2;
     private VarnodeSimple output;
 
     public PcodeOpSimple(int pcode_index, PcodeOp op, VarnodeContext context) {
         this.pcode_index = pcode_index;
-        this.pcodeMnemonic = op.getMnemonic();
+        this.pcode_mnemonic = op.getMnemonic();
         if (op.getInput(0) != null) {
             this.input0 = new VarnodeSimple(op.getInput(0), context);
         }
         if (op.getInput(1) != null) {
             this.input1 = new VarnodeSimple(op.getInput(1), context);
+        }
+        if (op.getInput(2) != null) {
+            this.input2 = new VarnodeSimple(op.getInput(2), context);
         }
         if (op.getOutput() != null) {
             this.output = new VarnodeSimple(op.getOutput(), context);

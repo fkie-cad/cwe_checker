@@ -1,5 +1,6 @@
 //! Utility functions for executing Ghidra and extracting P-Code from the output.
 
+use crate::ghidra_pcode::ProjectSimple;
 use crate::prelude::*;
 use crate::utils::binary::BareMetalConfig;
 use crate::utils::{get_ghidra_plugin_path, read_config_file};
@@ -46,31 +47,34 @@ pub fn get_project_from_ghidra(
 /// Normalize the given P-Code project
 /// and then parse it into a project struct of the internally used intermediate representation.
 fn parse_pcode_project_to_ir_project(
-    mut pcode_project: crate::pcode::Project,
+    mut pcode_project: ProjectSimple,
     binary: &[u8],
     bare_metal_config_opt: &Option<BareMetalConfig>,
 ) -> Result<(Project, Vec<LogMessage>), Error> {
     let bare_metal_base_address_opt = bare_metal_config_opt
         .as_ref()
         .map(|config| config.parse_binary_base_address());
-    let mut log_messages = pcode_project.normalize();
-    let project: Project = match crate::utils::get_binary_base_address(binary) {
-        Ok(binary_base_address) => pcode_project.into_ir_project(binary_base_address),
-        Err(_err) => {
-            if let Some(binary_base_address) = bare_metal_base_address_opt {
-                let mut project = pcode_project.into_ir_project(binary_base_address);
-                project.program.term.address_base_offset = 0;
-                project
-            } else {
-                log_messages.push(LogMessage::new_info("Could not determine binary base address. Using base address of Ghidra output as fallback."));
-                let mut project = pcode_project.into_ir_project(0);
-                // For PE files setting the address_base_offset to zero is a hack, which worked for the tested PE files.
-                // But this hack will probably not work in general!
-                project.program.term.address_base_offset = 0;
-                project
-            }
-        }
-    };
+    let project = pcode_project.into_ir_project();
+    // let mut log_messages = pcode_project.normalize();
+    // let project: Project = match crate::utils::get_binary_base_address(binary) {
+    //     Ok(binary_base_address) => pcode_project.into_ir_project(binary_base_address),
+    //     Err(_err) => {
+    //         if let Some(binary_base_address) = bare_metal_base_address_opt {
+    //             let mut project = pcode_project.into_ir_project(binary_base_address);
+    //             project.program.term.address_base_offset = 0;
+    //             project
+    //         } else {
+    //             log_messages.push(LogMessage::new_info("Could not determine binary base address. Using base address of Ghidra output as fallback."));
+    //             let mut project = pcode_project.into_ir_project(0);
+    //             // For PE files setting the address_base_offset to zero is a hack, which worked for the tested PE files.
+    //             // But this hack will probably not work in general!
+    //             project.program.term.address_base_offset = 0;
+    //             project
+    //         }
+    //     }
+    // };
+
+    let log_messages = vec![];
 
     Ok((project, log_messages))
 }
@@ -82,7 +86,7 @@ fn execute_ghidra(
     mut ghidra_command: Command,
     fifo_path: &PathBuf,
     verbose_flag: bool,
-) -> Result<crate::pcode::Project, Error> {
+) -> Result<ProjectSimple, Error> {
     // Create a new fifo and give read and write rights to the owner
     unistd::mkfifo(fifo_path, stat::Mode::from_bits(0o600).unwrap())
         .context("Error creating FIFO pipe")?;
@@ -119,7 +123,9 @@ fn execute_ghidra(
     // Open the FIFO
     let file = std::fs::File::open(fifo_path.clone()).expect("Could not open FIFO.");
 
-    let pcode_parsing_result = serde_json::from_reader(std::io::BufReader::new(file));
+    let pcode_parsing_result: Result<ProjectSimple, serde_json::Error> =
+        serde_json::from_reader(std::io::BufReader::new(file));
+
     ghidra_subprocess
         .join()
         .expect("The Ghidra thread to be joined has panicked!");

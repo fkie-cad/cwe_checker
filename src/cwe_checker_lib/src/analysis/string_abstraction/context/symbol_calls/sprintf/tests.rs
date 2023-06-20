@@ -261,7 +261,7 @@ fn test_push_constant_subsequences_before_and_between_specifiers() {
     let mut specifier_ends: Vec<usize> = vec![0];
     specifier_ends.push(matches.get(0).unwrap().end());
 
-    for (index, (mat, spec_end)) in itertools::zip(matches, specifier_ends)
+    for (index, (mat, spec_end)) in std::iter::zip(matches, specifier_ends)
         .into_iter()
         .enumerate()
     {

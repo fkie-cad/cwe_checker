@@ -1,5 +1,6 @@
 //! This module contains the implementations of various builder functions
-//! for lower intermediate representation terms [Expression](crate::intermediate_representation::Expression),
+//! for lower intermediate representation terms [Term](crate::intermediate_representation::Term),
+//! [Expression](crate::intermediate_representation::Expression),
 //! [Jmp](crate::intermediate_representation::Expression), [Def](crate::intermediate_representation::Expression),
 //! [DatatypeProperties](crate::intermediate_representation::Expression),
 //! [Blk](crate::intermediate_representation::Expression),
@@ -12,9 +13,17 @@
 use crate::{expr, intermediate_representation::*, variable};
 
 #[cfg(test)]
+impl<T> Term<T> {
+    /// Sets the field `id` of `Tid`
+    pub fn with_tid_id(mut self, id: String) -> Term<T> {
+        self.tid.id = id;
+        self
+    }
+}
+
+#[cfg(test)]
 impl Expression {
     /// Shortcut for creating a cast expression
-    #[cfg(test)]
     pub fn cast(self, op: CastOpType) -> Expression {
         Expression::Cast {
             op,
@@ -24,7 +33,6 @@ impl Expression {
     }
 
     /// Shortcut for creating a subpiece expression
-    #[cfg(test)]
     pub fn subpiece(self, low_byte: ByteSize, size: ByteSize) -> Expression {
         Expression::Subpiece {
             low_byte,
@@ -34,7 +42,6 @@ impl Expression {
     }
 
     /// Shortcut for creating unary operation expressions.
-    #[cfg(test)]
     pub fn un_op(self, op: UnOpType) -> Expression {
         Expression::UnOp {
             op,

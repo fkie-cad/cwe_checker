@@ -8,7 +8,7 @@ mod builder_low_lvl;
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
 pub struct Tid {
     /// The unique ID of the term.
-    id: String,
+    pub id: String,
     /// The address where the term is located.
     pub address: String,
 }

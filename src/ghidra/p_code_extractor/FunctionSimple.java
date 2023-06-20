@@ -21,7 +21,7 @@ public class FunctionSimple {
 
     public FunctionSimple(Function function, VarnodeContext context, SimpleBlockModel blockModel, TaskMonitor monitor,
             Listing listing) {
-        this.address = "0x" + function.getEntryPoint().toString(false, true);
+        this.address = "0x" + function.getEntryPoint().toString(false, false);
         this.name = function.getName();
         try {
             for (CodeBlock block : blockModel.getCodeBlocksContaining​(function.getBody(), monitor)) {

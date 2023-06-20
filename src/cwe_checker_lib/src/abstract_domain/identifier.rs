@@ -105,6 +105,16 @@ impl AbstractIdentifier {
         }
     }
 
+    /// Create a new abstract identifier by removing the last path hint from the path hint array of `self`.
+    /// Return the new identifier together with the removed path hint (or none if `self` has no path hints).
+    pub fn without_last_path_hint(&self) -> (Self, Option<Tid>) {
+        let mut new_id = self.clone();
+        let inner = Arc::make_mut(&mut new_id.0);
+        let last_path_hint = inner.path_hints.pop();
+
+        (new_id, last_path_hint)
+    }
+
     /// Get the path hints array of `self`.
     pub fn get_path_hints(&self) -> &[Tid] {
         &self.path_hints

@@ -15,16 +15,16 @@ import java.util.ArrayList;
 public class InstructionSimple {
     private String mnemonic;
     private String address;
-    private ArrayList<PcodeOpSimple> pcodeOps = new ArrayList();
+    private ArrayList<PcodeOpSimple> pcode_ops = new ArrayList();
     private ArrayList<String> potential_targets;
 
 
     public InstructionSimple(Instruction instruction, VarnodeContext context) {
         this.mnemonic = instruction.toString();
-        this.address = "0x" + instruction.getAddressString(false, true);
+        this.address = "0x" + instruction.getAddressString(false, false);
         PcodeOp[] pcodes = instruction.getPcode(true);
         for (int i = 0; i < pcodes.length; i++) {
-            pcodeOps.add(new PcodeOpSimple(i, pcodes[i], context));
+            pcode_ops.add(new PcodeOpSimple(i, pcodes[i], context));
 
             // add potential targets if instruction contains indiect call or branch.
             // Note: All references are put together. Multiple CALLIND or BRANCHIND should not
@@ -35,7 +35,7 @@ public class InstructionSimple {
                     potential_targets = new ArrayList<String>();
                 }
                 for (Reference ref : instruction.getReferencesFrom()){
-                    potential_targets.add("0x" + ref.getToAddress().toString(false, true));
+                    potential_targets.add("0x" + ref.getToAddress().toString(false, false));
                 }                    
             }
         }

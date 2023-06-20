@@ -98,7 +98,7 @@ public class PcodeExtractor extends GhidraScript {
         // collect entry points to the binary
         ArrayList<String> entry_points = new ArrayList<String>();
         for (Address address : (currentProgram.getSymbolTable().getExternalEntryPointIterator())) {
-            entry_points.add(address.toString(false, true));
+            entry_points.add(address.toString(false, false));
         }
 
         // collect register properties
@@ -118,7 +118,7 @@ public class PcodeExtractor extends GhidraScript {
         DatatypeProperties dataTypeProperties = new DatatypeProperties(ghidraProgram);
 
         // collect image base offset
-        String imageBase = "0x" + ghidraProgram.getImageBase().toString(false, true);
+        String imageBase = "0x" + ghidraProgram.getImageBase().toString(false, false);
 
         // collect calling conventions
         HashMap<String, CallingConventionSimple> callingConventions = new HashMap<String, CallingConventionSimple>();
