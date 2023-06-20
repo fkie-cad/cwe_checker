@@ -8,6 +8,8 @@ use crate::pcode::{ExpressionType, JmpType};
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+mod pcode_operations;
+use pcode_operations::*;
 
 /// The project struct for deserialization of the ghidra pcode extractor JSON.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
@@ -38,14 +40,11 @@ impl ProjectSimple {
             for blk in func.blocks {
                 for inst in blk.instructions {
                     for op in inst.pcode_ops {
-                        if let PcodeOperation::ExpressionType(t) = op.pcode_mnemonic
-                        {
-                            if t.into_ir_unop().is_some(){
+                        if let PcodeOperation::ExpressionType(t) = op.pcode_mnemonic {
+                            if t.into_ir_unop().is_some() {
                                 println!("{:?}", op.pcode_mnemonic);
                                 dbg!(op.into_ir_def(&inst.address));
-
                             }
-                            
                         }
                     }
                 }
@@ -83,7 +82,7 @@ impl VarnodeSimple {
     /// virtual registers.
     ///
     /// Returns `Err` if the addressspace is neither `"const"`, `"register"` nor `"unique"`.
-    fn into_ir_expr(self) -> Result<Expression> {
+    fn into_ir_expr(&self) -> Result<Expression> {
         match self.address_space.as_str() {
             "const" => {
                 let constant =
@@ -94,7 +93,7 @@ impl VarnodeSimple {
                 ))
             }
             "register" => Ok(Expression::Var(Variable {
-                name: self.id,
+                name: self.id.clone(),
                 size: ByteSize::new(self.size),
                 is_temp: false,
             })),
@@ -269,7 +268,7 @@ impl PcodeOpSimple {
             ExpressionType::LOAD => self.create_load(address),
             ExpressionType::STORE => self.create_store(address),
             _ if expr_type.into_ir_unop().is_some() => self.create_unop(address),
-            _ if expr_type.into_ir_biop().is_some() => todo!(),
+            _ if expr_type.into_ir_biop().is_some() => self.create_biop(address),
             _ if expr_type.into_ir_cast().is_some() => todo!(),
             _ => panic!("Unsupported pcode operation"),
         }
@@ -365,31 +364,76 @@ impl PcodeOpSimple {
         }
     }
 
+    /// Translates pcode operations with one input into `Term<Def>` with unary `Expression`.
+    /// The mapping is implemented in `into_ir_unop`.
+    ///
+    /// Panics if,
+    /// * `self.pcode_mnemonic` is not `PcodeOperation::ExpressionType`
+    /// * `self.output` is `None` or `into_it_expr()` returns not an `Expression::Var`
+    /// * `into_ir_expr()` returns `Err` on `self.output` or `self.input0`
     fn create_unop(self, address: &String) -> Term<Def> {
         if let PcodeOperation::ExpressionType(expr_type) = self.pcode_mnemonic {
-            if let Expression::Var(var) = self
-                .output
-                .unwrap()
-                .into_ir_expr()
-                .expect("Unary operation target translation failed")
-            {
-                let tid = Tid {
-                    id: format!("instr_{}_{}", address, self.pcode_index),
-                    address: address.to_string(),
-                };
-                let expr = Expression::UnOp {
-                    op: expr_type.into_ir_unop().unwrap(),
-                    arg: Box::new(self.input0.into_ir_expr().unwrap()),
-                };
-                return Term {
-                    tid,
-                    term: Def::Assign { var, value: expr },
-                };
-            } else {
-                panic!("Output varnode is not a variable")
-            }
+            let expr = Expression::UnOp {
+                op: expr_type
+                    .into_ir_unop()
+                    .expect("Translation into unary operation type failed"),
+                arg: Box::new(self.input0.into_ir_expr().unwrap()),
+            };
+            return self.create_assign(address, expr);
         } else {
             panic!("Not an expression type")
+        }
+    }
+
+    /// Translates pcode operations with two inputs into `Term<Def>` with binary `Expression`.
+    /// The mapping is implemented in `into_ir_biop`.
+    ///
+    /// Panics if,
+    /// * `self.pcode_mnemonic` is not `PcodeOperation::ExpressionType`
+    /// * `self.output` is `None` or `into_it_expr()` returns not an `Expression::Var`
+    /// * `into_ir_expr()` returns `Err` on `self.output`, `self.input0` or `self.input1`
+    pub fn create_biop(self, address: &String) -> Term<Def> {
+        if let PcodeOperation::ExpressionType(expr_type) = self.pcode_mnemonic {
+            let expr = Expression::BinOp {
+                op: expr_type
+                    .into_ir_biop()
+                    .expect("Translation into binary operation type failed"),
+                lhs: Box::new(self.input0.into_ir_expr().unwrap()),
+                rhs: Box::new(
+                    self.input1.clone()
+                        .expect("No input 1 for binary operation")
+                        .into_ir_expr()
+                        .unwrap(),
+                ),
+            };
+            return self.create_assign(address, expr);
+        } else {
+            panic!("Not an expression type")
+        }
+    }
+
+    /// Helper function for creating Assign operations.
+    /// 
+    /// Panics if,
+    /// * self.output is `None` or `into_ir_expr()` returns `Err`
+    /// * self.output is not `Expression::Var`
+    pub fn create_assign(self, address: &String, expr: Expression) -> Term<Def> {
+        if let Expression::Var(var) = self
+            .output
+            .expect("No output varnode")
+            .into_ir_expr()
+            .unwrap()
+        {
+            let tid = Tid {
+                id: format!("instr_{}_{}", address, self.pcode_index),
+                address: address.to_string(),
+            };
+            return Term {
+                tid,
+                term: Def::Assign { var, value: expr },
+            };
+        } else {
+            panic!("Output varnode is not a variable")
         }
     }
 }
@@ -462,89 +506,6 @@ pub struct CallingConventionsProperties {
     pub float_return_register: Option<VarnodeSimple>,
     pub unaffected_register: Vec<VarnodeSimple>,
     pub killed_by_call_register: Vec<VarnodeSimple>,
-}
-
-/// P-Code operation wrapper type
-///
-/// Wrapps expression and jump types for direct deserializations.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
-#[serde(untagged)]
-pub enum PcodeOperation {
-    ExpressionType(ExpressionType),
-    JmpType(JmpType),
-}
-
-impl ExpressionType {
-    pub fn into_ir_unop(&self) -> Option<UnOpType> {
-        use ExpressionType::*;
-        match self {
-            INT_NEGATE => Some(UnOpType::IntNegate),
-            INT_2COMP => Some(UnOpType::Int2Comp),
-            BOOL_NEGATE => Some(UnOpType::BoolNegate),
-            FLOAT_NEG => Some(UnOpType::FloatNegate),
-            FLOAT_ABS => Some(UnOpType::FloatAbs),
-            FLOAT_SQRT => Some(UnOpType::FloatSqrt),
-            FLOAT_CEIL => Some(UnOpType::FloatCeil),
-            FLOAT_FLOOR => Some(UnOpType::FloatFloor),
-            FLOAT_ROUND => Some(UnOpType::FloatRound),
-            FLOAT_NAN => Some(UnOpType::FloatNaN),
-            _ => None,
-        }
-    }
-
-    pub fn into_ir_biop(&self) -> Option<BinOpType> {
-        use ExpressionType::*;
-        match self {
-            PIECE => Some(BinOpType::Piece),
-            INT_EQUAL => Some(BinOpType::IntEqual),
-            INT_NOTEQUAL => Some(BinOpType::IntNotEqual),
-            INT_LESS => Some(BinOpType::IntLess),
-            INT_SLESS => Some(BinOpType::IntSLess),
-            INT_LESSEQUAL => Some(BinOpType::IntLessEqual),
-            INT_SLESSEQUAL => Some(BinOpType::IntSLessEqual),
-            INT_ADD => Some(BinOpType::IntAdd),
-            INT_SUB => Some(BinOpType::IntSub),
-            INT_CARRY => Some(BinOpType::IntCarry),
-            INT_SCARRY => Some(BinOpType::IntSCarry),
-            INT_SBORROW => Some(BinOpType::IntSBorrow),
-            INT_XOR => Some(BinOpType::IntXOr),
-            INT_AND => Some(BinOpType::IntAnd),
-            INT_OR => Some(BinOpType::IntOr),
-            INT_LEFT => Some(BinOpType::IntLeft),
-            INT_RIGHT => Some(BinOpType::IntRight),
-            INT_SRIGHT => Some(BinOpType::IntSRight),
-            INT_MULT => Some(BinOpType::IntMult),
-            INT_DIV => Some(BinOpType::IntDiv),
-            INT_REM => Some(BinOpType::IntRem),
-            INT_SDIV => Some(BinOpType::IntSDiv),
-            INT_SREM => Some(BinOpType::IntSRem),
-            BOOL_XOR => Some(BinOpType::BoolXOr),
-            BOOL_AND => Some(BinOpType::BoolAnd),
-            BOOL_OR => Some(BinOpType::BoolOr),
-            FLOAT_EQUAL => Some(BinOpType::FloatEqual),
-            FLOAT_NOTEQUAL => Some(BinOpType::FloatNotEqual),
-            FLOAT_LESS => Some(BinOpType::FloatLess),
-            FLOAT_LESSEQUAL => Some(BinOpType::FloatLessEqual),
-            FLOAT_ADD => Some(BinOpType::FloatAdd),
-            FLOAT_SUB => Some(BinOpType::FloatSub),
-            FLOAT_MULT => Some(BinOpType::FloatMult),
-            FLOAT_DIV => Some(BinOpType::FloatDiv),
-            _ => None,
-        }
-    }
-
-    pub fn into_ir_cast(&self) -> Option<CastOpType> {
-        use ExpressionType::*;
-        match self {
-            INT_ZEXT => Some(CastOpType::IntZExt),
-            INT_SEXT => Some(CastOpType::IntSExt),
-            INT2FLOAT => Some(CastOpType::Int2Float),
-            FLOAT2FLOAT => Some(CastOpType::Float2Float),
-            TRUNC => Some(CastOpType::Trunc),
-            POPCOUNT => Some(CastOpType::PopCount),
-            _ => None,
-        }
-    }
 }
 
 #[cfg(test)]
