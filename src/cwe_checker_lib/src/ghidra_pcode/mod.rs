@@ -40,8 +40,10 @@ impl ProjectSimple {
             for blk in func.blocks {
                 for inst in blk.instructions {
                     for op in inst.pcode_ops {
-                        dbg!(&op);
-                        op.into_ir_def(&inst.address);
+                        if matches!(op.pcode_mnemonic, PcodeOperation::ExpressionType(_)) {
+                            dbg!(&op);
+                            op.into_ir_def(&inst.address);
+                        }
                     }
                 }
             }
@@ -155,12 +157,13 @@ impl PcodeOpSimple {
         false
     }
     /// Returns artificial `Def::Load` instructions, if the operants are ram located.
-    /// Otherwise returns empty `Vec`.
+    /// Otherwise returns empty `Vec`. Changes ram varnodes into virtual register varnodes
+    /// using the explicitly loaded value.
     ///
     /// The created instructions use the virtual register `$load_tempX`, whereby `X` is
     /// either `0`, `1`or `2` representing which input is used.
     /// The created `Tid` is named `instr_<address>_<pcode index>_load<X>`.
-    fn create_implicit_loads(&self, address: &String) -> Vec<Term<Def>> {
+    fn create_implicit_loads(&mut self, address: &String) -> Vec<Term<Def>> {
         let mut explicit_loads = vec![];
         if self.input0.address_space == "ram" {
             let load0 = Def::Load {
@@ -181,7 +184,11 @@ impl PcodeOpSimple {
                     address: address.to_string(),
                 },
                 term: load0,
-            })
+            });
+
+            // Change varnode to virtual register
+            self.input0.id = "$load_temp0".into();
+            self.input0.address_space = "unique".into();
         }
         if let Some(varnode) = &self.input1 {
             if varnode.address_space == "ram" {
@@ -203,7 +210,11 @@ impl PcodeOpSimple {
                         address: address.to_string(),
                     },
                     term: load1,
-                })
+                });
+
+                // Change varnode to virtual register
+                self.input0.id = "$load_temp1".into();
+                self.input0.address_space = "unique".into();
             }
         }
 
@@ -227,7 +238,11 @@ impl PcodeOpSimple {
                         address: address.to_string(),
                     },
                     term: load2,
-                })
+                });
+
+                // Change varnode to virtual register
+                self.input0.id = "$load_temp1".into();
+                self.input0.address_space = "unique".into();
             }
         }
 
@@ -237,7 +252,7 @@ impl PcodeOpSimple {
     /// Translates a single pcode operation into at leas one `Def`.
     ///
     /// Adds additional `Def::Load`, if the pcode operation performs implicit loads from ram
-    fn into_ir_def(self, address: &String) -> Vec<Term<Def>> {
+    fn into_ir_def(mut self, address: &String) -> Vec<Term<Def>> {
         let mut defs = vec![];
         // if the pcode operation contains implicit load operations, prepend them.
         if self.has_implicit_load() {
@@ -263,6 +278,7 @@ impl PcodeOpSimple {
         match expr_type {
             ExpressionType::LOAD => self.create_load(address),
             ExpressionType::STORE => self.create_store(address),
+            ExpressionType::COPY => self.create_assign(address),
             _ if expr_type.into_ir_unop().is_some() => self.create_unop(address),
             _ if expr_type.into_ir_biop().is_some() => self.create_biop(address),
             _ if expr_type.into_ir_cast().is_some() => self.create_castop(address),
@@ -375,7 +391,7 @@ impl PcodeOpSimple {
                     .expect("Translation into unary operation type failed"),
                 arg: Box::new(self.input0.into_ir_expr().unwrap()),
             };
-            return self.create_assign(address, expr);
+            return self.wrap_in_assign(address, expr);
         } else {
             panic!("Not an expression type")
         }
@@ -403,7 +419,7 @@ impl PcodeOpSimple {
                         .unwrap(),
                 ),
             };
-            return self.create_assign(address, expr);
+            return self.wrap_in_assign(address, expr);
         } else {
             panic!("Not an expression type")
         }
@@ -430,9 +446,19 @@ impl PcodeOpSimple {
                     .into(),
                 arg: Box::new(self.input0.into_ir_expr().unwrap()),
             };
-            return self.create_assign(address, expr);
+            return self.wrap_in_assign(address, expr);
         } else {
             panic!("Not an expression type")
+        }
+    }
+
+    /// Translates PcodeOperation::COPY into Term<Def::Assign>.
+    pub fn create_assign(self, address: &String) -> Term<Def> {
+        if let PcodeOperation::ExpressionType(ExpressionType::COPY) = self.pcode_mnemonic {
+            let expr = self.input0.into_ir_expr().unwrap();
+            return self.wrap_in_assign(address, expr);
+        } else {
+            panic!("PcodeOperation is not COPY")
         }
     }
 
@@ -441,7 +467,7 @@ impl PcodeOpSimple {
     /// Panics if,
     /// * self.output is `None` or `into_ir_expr()` returns `Err`
     /// * self.output is not `Expression::Var`
-    pub fn create_assign(self, address: &String, expr: Expression) -> Term<Def> {
+    pub fn wrap_in_assign(self, address: &String, expr: Expression) -> Term<Def> {
         if let Expression::Var(var) = self
             .output
             .expect("No output varnode")
