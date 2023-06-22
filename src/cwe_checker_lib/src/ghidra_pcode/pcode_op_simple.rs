@@ -141,11 +141,8 @@ impl PcodeOpSimple {
             let mut explicit_loads = self.create_implicit_loads(address);
             defs.append(&mut explicit_loads);
         }
-        if self.has_implicit_store() {
-            todo!()
-        }
 
-        let def = match self.pcode_mnemonic {
+        let mut def = match self.pcode_mnemonic {
             PcodeOperation::ExpressionType(expr_type) => self.create_def(address, expr_type),
             PcodeOperation::JmpType(jmp_type) => todo!(),
         };
@@ -156,11 +153,12 @@ impl PcodeOpSimple {
 
     /// Creates `Def::Store`, `Def::Load` or `Def::Assign` according to the pcode operations'
     /// expression type.
-    fn create_def(self, address: &String, expr_type: ExpressionType) -> Term<Def> {
+    fn create_def(&self, address: &String, expr_type: ExpressionType) -> Term<Def> {
         match expr_type {
             ExpressionType::LOAD => self.create_load(address),
             ExpressionType::STORE => self.create_store(address),
             ExpressionType::COPY => self.create_assign(address),
+            ExpressionType::SUBPIECE => self.create_subpice(address),
             _ if expr_type.into_ir_unop().is_some() => self.create_unop(address),
             _ if expr_type.into_ir_biop().is_some() => self.create_biop(address),
             _ if expr_type.into_ir_cast().is_some() => self.create_castop(address),
@@ -179,20 +177,21 @@ impl PcodeOpSimple {
     /// * load destination is not a variable
     /// * `input1` is `None`
     /// * `into_ir_expr()` returns `Err` on any varnode
-    fn create_load(self, address: &String) -> Term<Def> {
+    fn create_load(&self, address: &String) -> Term<Def> {
         if !matches!(
             self.pcode_mnemonic,
             PcodeOperation::ExpressionType(ExpressionType::LOAD)
         ) {
             panic!("Pcode operation is not LOAD")
         }
-        let target = self.output.expect("Load without output");
+        let target = self.output.as_ref().expect("Load without output");
         if let Expression::Var(var) = target
             .into_ir_expr()
             .expect("Load target translation failed")
         {
             let source = self
                 .input1
+                .as_ref()
                 .expect("Load without source")
                 .into_ir_expr()
                 .expect("Load source address translation failed");
@@ -223,7 +222,7 @@ impl PcodeOpSimple {
     /// * `input1` is None
     /// * `input2` is None
     /// * `into_ir_expr()` returns `Err` on any varnode
-    fn create_store(self, address: &String) -> Term<Def> {
+    fn create_store(&self, address: &String) -> Term<Def> {
         if !matches!(
             self.pcode_mnemonic,
             PcodeOperation::ExpressionType(ExpressionType::STORE)
@@ -232,11 +231,12 @@ impl PcodeOpSimple {
         }
         let target_expr = self
             .input1
+            .as_ref()
             .expect("Store without target")
             .into_ir_expr()
             .expect("Store target translation failed.");
 
-        let data = self.input2.expect("Store without source data");
+        let data = self.input2.as_ref().expect("Store without source data");
         if !matches!(data.address_space.as_str(), "unique" | "const" | "variable") {
             panic!("Store source data is not a variable, temp variable nor constant.")
         }
@@ -258,6 +258,40 @@ impl PcodeOpSimple {
         }
     }
 
+    /// Translates pcode SUBPIECE instruction into Def with Expression::Subpice.
+    ///
+    /// Panics, if
+    /// * self.input1 is `None` or cannot be translated into `Expression:Const`
+    /// * Amount of bytes to truncate cannot be translated into `u64`
+    /// * `into_ir_expr()` returns `Err` `on self.input0`
+    fn create_subpice(&self, address: &String) -> Term<Def> {
+        if let Expression::Const(truncate) = self
+            .input1
+            .as_ref()
+            .expect("input0 of subpice is None")
+            .into_ir_expr()
+            .expect("Subpice truncation number translation failed")
+        {
+            let expr = Expression::Subpiece {
+                low_byte: truncate.try_to_u64().unwrap().into(),
+                size: self
+                    .output
+                    .as_ref()
+                    .expect("Subpice output is None")
+                    .size
+                    .into(),
+                arg: Box::new(
+                    self.input0
+                        .into_ir_expr()
+                        .expect("Subpice source data translation failed"),
+                ),
+            };
+            return self.wrap_in_assign_or_store(address, expr);
+        } else {
+            panic!("Number of truncation bytes is not a constant")
+        }
+    }
+
     /// Translates pcode operation with one input into `Term<Def>` with unary `Expression`.
     /// The mapping is implemented in `into_ir_unop`.
     ///
@@ -265,7 +299,7 @@ impl PcodeOpSimple {
     /// * `self.pcode_mnemonic` is not `PcodeOperation::ExpressionType`
     /// * `self.output` is `None` or `into_it_expr()` returns not an `Expression::Var`
     /// * `into_ir_expr()` returns `Err` on `self.output` or `self.input0`
-    fn create_unop(self, address: &String) -> Term<Def> {
+    fn create_unop(&self, address: &String) -> Term<Def> {
         if let PcodeOperation::ExpressionType(expr_type) = self.pcode_mnemonic {
             let expr = Expression::UnOp {
                 op: expr_type
@@ -273,7 +307,7 @@ impl PcodeOpSimple {
                     .expect("Translation into unary operation type failed"),
                 arg: Box::new(self.input0.into_ir_expr().unwrap()),
             };
-            return self.wrap_in_assign(address, expr);
+            return self.wrap_in_assign_or_store(address, expr);
         } else {
             panic!("Not an expression type")
         }
@@ -286,7 +320,7 @@ impl PcodeOpSimple {
     /// * `self.pcode_mnemonic` is not `PcodeOperation::ExpressionType`
     /// * `self.output` is `None` or `into_it_expr()` returns not an `Expression::Var`
     /// * `into_ir_expr()` returns `Err` on `self.output`, `self.input0` or `self.input1`
-    pub fn create_biop(self, address: &String) -> Term<Def> {
+    pub fn create_biop(&self, address: &String) -> Term<Def> {
         if let PcodeOperation::ExpressionType(expr_type) = self.pcode_mnemonic {
             let expr = Expression::BinOp {
                 op: expr_type
@@ -295,13 +329,13 @@ impl PcodeOpSimple {
                 lhs: Box::new(self.input0.into_ir_expr().unwrap()),
                 rhs: Box::new(
                     self.input1
-                        .clone()
+                        .as_ref()
                         .expect("No input 1 for binary operation")
                         .into_ir_expr()
                         .unwrap(),
                 ),
             };
-            return self.wrap_in_assign(address, expr);
+            return self.wrap_in_assign_or_store(address, expr);
         } else {
             panic!("Not an expression type")
         }
@@ -314,7 +348,7 @@ impl PcodeOpSimple {
     /// * `self.pcode_mnemonic` is not `PcodeOperation::ExpressionType`
     /// * `self.output` is `None` or `into_it_expr()` returns not an `Expression::Var`
     /// * `into_ir_expr()` returns `Err` on `self.output` or `self.input0`
-    pub fn create_castop(self, address: &String) -> Term<Def> {
+    pub fn create_castop(&self, address: &String) -> Term<Def> {
         if let PcodeOperation::ExpressionType(expr_type) = self.pcode_mnemonic {
             let expr = Expression::Cast {
                 op: expr_type
@@ -328,44 +362,63 @@ impl PcodeOpSimple {
                     .into(),
                 arg: Box::new(self.input0.into_ir_expr().unwrap()),
             };
-            return self.wrap_in_assign(address, expr);
+            return self.wrap_in_assign_or_store(address, expr);
         } else {
             panic!("Not an expression type")
         }
     }
 
     /// Translates PcodeOperation::COPY into Term<Def::Assign>.
-    pub fn create_assign(self, address: &String) -> Term<Def> {
+    pub fn create_assign(&self, address: &String) -> Term<Def> {
         if let PcodeOperation::ExpressionType(ExpressionType::COPY) = self.pcode_mnemonic {
             let expr = self.input0.into_ir_expr().unwrap();
-            return self.wrap_in_assign(address, expr);
+            return self.wrap_in_assign_or_store(address, expr);
         } else {
             panic!("PcodeOperation is not COPY")
         }
     }
 
-    /// Helper function for creating Assign operations.
+    /// Helper function for creating a Def::Assign operation, or Def::Store if an implicit
+    /// store instruction is present.
     ///
     /// Panics if,
-    /// * self.output is `None` or `into_ir_expr()` returns `Err`
-    /// * self.output is not `Expression::Var`
-    pub fn wrap_in_assign(self, address: &String, expr: Expression) -> Term<Def> {
-        if let Expression::Var(var) = self
-            .output
-            .expect("No output varnode")
-            .into_ir_expr()
-            .unwrap()
-        {
-            let tid = Tid {
-                id: format!("instr_{}_{}", address, self.pcode_index),
-                address: address.to_string(),
-            };
+    /// * for Assign case: self.output is `None` or `into_ir_expr()` returns `Err`
+    /// * for Assign case: self.output is not `Expression::Var`
+    /// * for Store case: self.output is `None` or `get_ram_address()` returns `None`
+    pub fn wrap_in_assign_or_store(&self, address: &String, expr: Expression) -> Term<Def> {
+        let tid = Tid {
+            id: format!("instr_{}_{}", address, self.pcode_index),
+            address: address.to_string(),
+        };
+        if self.has_implicit_store() {
             return Term {
                 tid,
-                term: Def::Assign { var, value: expr },
+                term: Def::Store {
+                    address: Expression::Const(
+                        self.output
+                            .as_ref()
+                            .expect("No output varnode")
+                            .get_ram_address()
+                            .expect("Output varnode is not ram"),
+                    ),
+                    value: expr,
+                },
             };
         } else {
-            panic!("Output varnode is not a variable")
+            if let Expression::Var(var) = self
+                .output
+                .as_ref()
+                .expect("No output varnode")
+                .into_ir_expr()
+                .unwrap()
+            {
+                return Term {
+                    tid,
+                    term: Def::Assign { var, value: expr },
+                };
+            } else {
+                panic!("Output varnode is not a variable")
+            }
         }
     }
 }
