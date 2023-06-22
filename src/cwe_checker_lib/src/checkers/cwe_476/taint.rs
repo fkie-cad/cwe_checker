@@ -23,8 +23,8 @@ impl Display for Taint {
     /// Print the value of a `Taint` object.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Tainted(size) => write!(f, "Tainted:{}", size),
-            Self::Top(size) => write!(f, "Top:{}", size),
+            Self::Tainted(size) => write!(f, "Tainted:{size}"),
+            Self::Top(size) => write!(f, "Top:{size}"),
         }
     }
 }

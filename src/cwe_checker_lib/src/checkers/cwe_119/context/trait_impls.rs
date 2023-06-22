@@ -1,6 +1,7 @@
 use super::super::State;
 use super::*;
 use crate::analysis::graph::Graph;
+use crate::checkers::cwe_119::stubs::ExternCallHandler;
 
 impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
     type Value = State;
@@ -115,14 +116,9 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
         match &call.term {
             Jmp::Call { target, .. } => {
                 if let Some(extern_symbol) = self.project.program.term.extern_symbols.get(target) {
-                    for param in &extern_symbol.parameters {
-                        self.check_param_at_call(
-                            &mut state,
-                            param,
-                            &call.tid,
-                            Some(&extern_symbol.name),
-                        );
-                    }
+                    let mut extern_call_handler =
+                        ExternCallHandler::new(self, &mut state, extern_symbol, call);
+                    extern_call_handler.handle_call();
                 } else {
                     self.log_debug(
                         &call.tid,

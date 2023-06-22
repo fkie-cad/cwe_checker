@@ -1,4 +1,5 @@
 use crate::abstract_domain::*;
+use crate::analysis::function_signature::AccessPattern;
 use crate::analysis::function_signature::FunctionSignature;
 use crate::analysis::graph::Graph;
 use crate::intermediate_representation::*;
@@ -6,11 +7,14 @@ use crate::prelude::*;
 use crate::utils::log::*;
 use std::collections::{BTreeMap, BTreeSet};
 
+use super::object::AbstractObject;
 use super::state::State;
 use super::{Config, Data, VERSION};
 
 /// Contains methods of the `Context` struct that deal with the manipulation of abstract IDs.
 mod id_manipulation;
+/// Methods and functions for handling extern symbol stubs.
+mod stubs;
 /// Contains trait implementations for the `Context` struct,
 /// especially the implementation of the [`forward_interprocedural_fixpoint::Context`](crate::analysis::forward_interprocedural_fixpoint::Context) trait.
 mod trait_impls;
@@ -27,6 +31,8 @@ pub struct Context<'a> {
     pub extern_symbol_map: &'a BTreeMap<Tid, ExternSymbol>,
     /// Maps the TIDs of internal functions to the function signatures computed for it.
     pub fn_signatures: &'a BTreeMap<Tid, FunctionSignature>,
+    /// Maps the names of stubbed extern symbols to the corresponding function signatures.
+    pub extern_fn_param_access_patterns: BTreeMap<&'static str, Vec<AccessPattern>>,
     /// A channel where found CWE warnings and log messages should be sent to.
     /// The receiver may filter or modify the warnings before presenting them to the user.
     /// For example, the same CWE warning will be found several times
@@ -50,6 +56,8 @@ impl<'a> Context<'a> {
             project: analysis_results.project,
             extern_symbol_map: &analysis_results.project.program.term.extern_symbols,
             fn_signatures: analysis_results.function_signatures.unwrap(),
+            extern_fn_param_access_patterns:
+                crate::analysis::function_signature::stubs::generate_param_access_stubs(),
             log_collector,
             allocation_symbols: config.allocation_symbols,
         }
@@ -81,7 +89,7 @@ impl<'a> Context<'a> {
     pub fn log_debug(&self, result: Result<(), Error>, location: Option<&Tid>) {
         if let Err(err) = result {
             let mut log_message =
-                LogMessage::new_debug(format!("{}", err)).source("Pointer Inference");
+                LogMessage::new_debug(format!("{err}")).source("Pointer Inference");
             if let Some(loc) = location {
                 log_message = log_message.location(loc.clone());
             };
@@ -278,7 +286,7 @@ impl<'a> Context<'a> {
             name: "CWE476".to_string(),
             version: VERSION.to_string(),
             addresses: vec![tid.address.clone()],
-            tids: vec![format!("{}", tid)],
+            tids: vec![format!("{tid}")],
             symbols: Vec::new(),
             other: Vec::new(),
             description: format!(
@@ -287,6 +295,115 @@ impl<'a> Context<'a> {
             ),
         };
         let _ = self.log_collector.send(LogThreadMsg::Cwe(warning));
+    }
+
+    /// Merge global memory data from the callee global memory object to the caller global memory object
+    /// if the corresponding global variable is marked as mutable in both the caller and callee.
+    fn merge_global_mem_from_callee(
+        &self,
+        caller_state: &mut State,
+        callee_global_mem: &AbstractObject,
+        replacement_map: &BTreeMap<AbstractIdentifier, Data>,
+        callee_fn_sig: &FunctionSignature,
+        call_tid: &Tid,
+    ) {
+        let caller_global_mem_id = caller_state.get_global_mem_id();
+        let caller_fn_sig = self.fn_signatures.get(caller_state.get_fn_tid()).unwrap();
+        let caller_global_mem = caller_state
+            .memory
+            .get_object_mut(&caller_global_mem_id)
+            .unwrap();
+
+        // Get the intervals corresponding to global variables
+        // and the access pattern that denotes which globals should be overwritten by callee data.
+        let intervals =
+            compute_call_return_global_var_access_intervals(caller_fn_sig, callee_fn_sig);
+
+        let mut caller_mem_region = caller_global_mem.get_mem_region().clone();
+        mark_values_in_caller_global_mem_as_potentially_overwritten(
+            &mut caller_mem_region,
+            &intervals,
+        );
+
+        // Insert values from the callee into the memory object.
+        let mut referenced_ids = BTreeSet::new();
+        for (index, value) in callee_global_mem.get_mem_region().iter() {
+            if let Some((_interval_start, access_pattern)) =
+                intervals.range(..((*index + 1) as u64)).last()
+            {
+                if access_pattern.is_mutably_dereferenced() {
+                    let mut value = value.clone();
+                    value.replace_all_ids(replacement_map);
+                    referenced_ids.extend(value.referenced_ids().cloned());
+                    caller_mem_region.insert_at_byte_index(value, *index);
+                }
+            } else {
+                self.log_debug(
+                    Err(anyhow!("Unexpected occurrence of global variables.")),
+                    Some(call_tid),
+                );
+            }
+        }
+
+        caller_global_mem.overwrite_mem_region(caller_mem_region);
+        caller_global_mem.add_ids_to_pointer_targets(referenced_ids);
+    }
+}
+
+/// Generate a list of global indices as a union of the global indices known to caller and callee.
+/// The corresponding access patterns are mutably derefenced
+/// if and only if they are mutably dereferenced in both the caller and the callee.
+///
+/// Note that each index is supposed to denote the interval from that index until the next index in the map.
+/// This is a heuristic approximation, since we do not know the actual sizes of the global variables here.
+fn compute_call_return_global_var_access_intervals(
+    caller_fn_sig: &FunctionSignature,
+    callee_fn_sig: &FunctionSignature,
+) -> BTreeMap<u64, AccessPattern> {
+    let mut intervals: BTreeMap<u64, AccessPattern> = caller_fn_sig
+        .global_parameters
+        .keys()
+        .chain(callee_fn_sig.global_parameters.keys())
+        .map(|index| (*index, AccessPattern::new()))
+        .collect();
+    for (index, access_pattern) in intervals.iter_mut() {
+        if let (Some(caller_pattern), Some(callee_pattern)) = (
+            caller_fn_sig.global_parameters.get(index),
+            callee_fn_sig.global_parameters.get(index),
+        ) {
+            if caller_pattern.is_mutably_dereferenced() && callee_pattern.is_mutably_dereferenced()
+            {
+                access_pattern.set_mutably_dereferenced_flag();
+            }
+        }
+    }
+
+    intervals
+}
+
+/// Mark all values in the caller memory object representing global memory,
+/// that may have been overwritten by the callee, as potential `Top` values.
+fn mark_values_in_caller_global_mem_as_potentially_overwritten(
+    caller_global_mem_region: &mut MemRegion<Data>,
+    access_intervals: &BTreeMap<u64, AccessPattern>,
+) {
+    let mut interval_iter = access_intervals.iter().peekable();
+    while let Some((index, access_pattern)) = interval_iter.next() {
+        if access_pattern.is_mutably_dereferenced() {
+            if let Some((next_index, _next_pattern)) = interval_iter.peek() {
+                caller_global_mem_region.mark_interval_values_as_top(
+                    *index as i64,
+                    (**next_index - 1) as i64,
+                    ByteSize::new(1),
+                );
+            } else {
+                caller_global_mem_region.mark_interval_values_as_top(
+                    *index as i64,
+                    std::i64::MAX - 1,
+                    ByteSize::new(1),
+                );
+            }
+        }
     }
 }
 

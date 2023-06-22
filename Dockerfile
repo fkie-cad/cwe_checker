@@ -1,11 +1,11 @@
-FROM rust:1.57 AS builder
+FROM rust:1.69 AS builder
 
 WORKDIR /cwe_checker
 
 COPY . .
 RUN cargo build --release
 
-FROM fkiecad/ghidra_headless_base:10.1.2 as runtime
+FROM ghcr.io/fkie-cad/ghidra_headless_base:10.2.3 as runtime
 
 RUN apt-get -y update \
     && apt-get -y install sudo \

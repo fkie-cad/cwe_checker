@@ -37,19 +37,21 @@ struct Inner {
     pointer_targets: BTreeSet<AbstractIdentifier>,
     /// Tracks whether this may represent more than one actual memory object.
     is_unique: bool,
-    /// Is the object a stack frame or a heap object
+    /// Is the object a stack frame, a heap object, or a global memory object.
     type_: Option<ObjectType>,
     /// The actual content of the memory object
     memory: MemRegion<Data>,
 }
 
-/// An object is either a stack or a heap object.
+/// An object can be a stack, a heap, or a global memory object.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy, PartialOrd, Ord)]
 pub enum ObjectType {
     /// A stack object, i.e. the stack frame of a function.
     Stack,
     /// A memory object located on the heap.
     Heap,
+    /// A memory oject indicating the global memory space.
+    GlobalMem,
 }
 
 #[allow(clippy::from_over_into)]
@@ -149,6 +151,24 @@ impl AbstractObject {
             inner.memory = MemRegion::new(inner.memory.get_address_bytesize());
         }
     }
+
+    /// Get the memory region abstract domain associated to the memory object.
+    pub fn get_mem_region(&self) -> &MemRegion<Data> {
+        &self.inner.memory
+    }
+
+    /// Overwrite the memory region abstract domain associated to the memory object.
+    /// Note that this function does not update the list of known pointer targets accordingly!
+    pub fn overwrite_mem_region(&mut self, new_memory_region: MemRegion<Data>) {
+        let inner = Arc::make_mut(&mut self.inner);
+        inner.memory = new_memory_region;
+    }
+
+    /// Add IDs to the list of pointer targets for the memory object.
+    pub fn add_ids_to_pointer_targets(&mut self, mut ids_to_add: BTreeSet<AbstractIdentifier>) {
+        let inner = Arc::make_mut(&mut self.inner);
+        inner.pointer_targets.append(&mut ids_to_add);
+    }
 }
 
 impl AbstractDomain for AbstractObject {
@@ -196,7 +216,7 @@ impl AbstractObject {
             .inner
             .memory
             .iter()
-            .map(|(index, value)| (format!("{}", index), value.to_json_compact()));
+            .map(|(index, value)| (format!("{index}"), value.to_json_compact()));
         elements.push((
             "memory".to_string(),
             serde_json::Value::Object(memory.collect()),

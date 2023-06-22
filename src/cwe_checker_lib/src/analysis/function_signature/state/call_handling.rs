@@ -5,15 +5,16 @@ impl State {
     ///
     /// Marks every possible input ID as accessed and writes to every return register a value
     /// that may point to any of the input IDs.
-    pub fn handle_extern_symbol(
+    pub fn handle_generic_extern_symbol(
         &mut self,
-        call: &Term<Jmp>,
+        call_tid: &Tid,
         extern_symbol: &ExternSymbol,
         calling_convention: &CallingConvention,
+        global_memory: &RuntimeMemoryImage,
     ) {
-        let input_ids = self.collect_input_ids_of_call(&extern_symbol.parameters);
+        let input_ids = self.collect_input_ids_of_call(&extern_symbol.parameters, global_memory);
         self.clear_non_callee_saved_register(&calling_convention.callee_saved_register);
-        self.generate_return_values_for_call(&input_ids, &extern_symbol.return_values, &call.tid);
+        self.generate_return_values_for_call(&input_ids, &extern_symbol.return_values, call_tid);
     }
 
     /// Handle a call to a completely unknown function
@@ -26,6 +27,7 @@ impl State {
         &mut self,
         call: &Term<Jmp>,
         calling_convention: &CallingConvention,
+        global_memory: &RuntimeMemoryImage,
     ) {
         let mut parameters =
             generate_args_from_registers(&calling_convention.integer_parameter_register);
@@ -43,22 +45,24 @@ impl State {
                 data_type: None,
             });
         }
-        let input_ids = self.collect_input_ids_of_call(&parameters);
+        let input_ids = self.collect_input_ids_of_call(&parameters, global_memory);
         self.clear_non_callee_saved_register(&calling_convention.callee_saved_register);
         self.generate_return_values_for_call(&input_ids, &return_register, &call.tid);
     }
 
     /// Get all input IDs referenced in the parameters of a call.
-    /// Marks every input ID as accessed (with access flags for unknown access)
-    /// and generates stack parameter IDs for the current function if necessary.
-    fn collect_input_ids_of_call(&mut self, parameters: &[Arg]) -> BTreeSet<AbstractIdentifier> {
+    /// Marks every input ID as accessed (with access flags for unknown access).
+    /// Also generates stack parameter IDs and global memory IDs for the current function if necessary.
+    fn collect_input_ids_of_call(
+        &mut self,
+        parameters: &[Arg],
+        global_memory: &RuntimeMemoryImage,
+    ) -> BTreeSet<AbstractIdentifier> {
         let mut input_ids = BTreeSet::new();
         for input_param in parameters {
-            for (id, offset) in self
-                .eval_parameter_arg(input_param)
-                .get_relative_values()
-                .iter()
-            {
+            let param = self.eval_parameter_arg(input_param);
+            let param = self.substitute_global_mem_address(param, global_memory);
+            for (id, offset) in param.get_relative_values() {
                 input_ids.insert(id.clone());
                 // If the relative value points to the stack we also have to collect all IDs contained in the pointed-to value.
                 if *id == self.stack_id {
@@ -131,18 +135,38 @@ impl State {
         let mut params = Vec::new();
         for (id, access_pattern) in self.tracked_ids.iter() {
             if id.get_tid() == self.get_current_function_tid() {
-                if access_pattern.is_accessed() {
-                    params.push((generate_arg_from_abstract_id(id), *access_pattern));
-                } else if matches!(id.get_location(), &AbstractLocation::Pointer { .. }) {
-                    // This is a stack parameter.
-                    // If it was only loaded into a register but otherwise not used, then the read-flag needs to be set.
-                    let mut access_pattern = *access_pattern;
-                    access_pattern.set_read_flag();
-                    params.push((generate_arg_from_abstract_id(id), access_pattern));
+                if let Ok(param_arg) = generate_param_arg_from_abstract_id(id) {
+                    if access_pattern.is_accessed() {
+                        params.push((param_arg, *access_pattern));
+                    } else if matches!(id.get_location(), &AbstractLocation::Pointer { .. }) {
+                        // This is a stack parameter.
+                        // If it was only loaded into a register but otherwise not used, then the read-flag needs to be set.
+                        let mut access_pattern = *access_pattern;
+                        access_pattern.set_read_flag();
+                        params.push((param_arg, access_pattern));
+                    }
                 }
             }
         }
         params
+    }
+
+    /// Return a list of all potential global memory addresses
+    /// for which any type of access has been tracked by the current state.
+    pub fn get_global_mem_params_of_current_function(&self) -> Vec<(u64, AccessPattern)> {
+        let mut global_params = Vec::new();
+        for (id, access_pattern) in self.tracked_ids.iter() {
+            if id.get_tid() == self.get_current_function_tid() {
+                match id.get_location() {
+                    AbstractLocation::GlobalPointer(address, _)
+                    | AbstractLocation::GlobalAddress { address, .. } => {
+                        global_params.push((*address, *access_pattern));
+                    }
+                    AbstractLocation::Pointer(_, _) | AbstractLocation::Register(_) => (),
+                }
+            }
+        }
+        global_params
     }
 
     /// Merges the access patterns of callee parameters with those of the caller (represented by `self`).
@@ -151,9 +175,15 @@ impl State {
     /// If a parameter is a pointer to the stack frame of self, it is dereferenced
     /// to set the access patterns of the target.
     /// Note that this may create new stack parameter objects for self.
-    pub fn merge_parameter_access(&mut self, params: &[(Arg, AccessPattern)]) {
+    pub fn merge_parameter_access(
+        &mut self,
+        params: &[(Arg, AccessPattern)],
+        global_memory: &RuntimeMemoryImage,
+    ) {
         for (parameter, call_access_pattern) in params {
-            for (id, offset) in self.eval_parameter_arg(parameter).get_relative_values() {
+            let param_value = self.eval_parameter_arg(parameter);
+            let param_value = self.substitute_global_mem_address(param_value, global_memory);
+            for (id, offset) in param_value.get_relative_values() {
                 if let Some(object) = self.tracked_ids.get_mut(id) {
                     *object = object.merge(call_access_pattern);
                 }
@@ -188,7 +218,7 @@ impl State {
     /// then return an argument object corresponding to the parameter.
     pub fn get_arg_corresponding_to_id(&self, id: &AbstractIdentifier) -> Option<Arg> {
         if id.get_tid() == self.stack_id.get_tid() {
-            Some(generate_arg_from_abstract_id(id))
+            generate_param_arg_from_abstract_id(id).ok()
         } else {
             None
         }
@@ -205,19 +235,23 @@ fn generate_args_from_registers(registers: &[Variable]) -> Vec<Arg> {
 
 /// Generate an argument representing the location in the given abstract ID.
 /// If the location is a pointer, it is assumed that the pointer points to the stack.
-/// Panics if the location contains a second level of indirection.
-fn generate_arg_from_abstract_id(id: &AbstractIdentifier) -> Arg {
+/// Returns an error if the location contains a second level of indirection
+/// or if the location is associated to global memory.
+fn generate_param_arg_from_abstract_id(id: &AbstractIdentifier) -> Result<Arg, Error> {
     match id.get_location() {
-        AbstractLocation::Register(var) => Arg::from_var(var.clone(), None),
+        AbstractLocation::Register(var) => Ok(Arg::from_var(var.clone(), None)),
         AbstractLocation::Pointer(var, mem_location) => match mem_location {
-            AbstractMemoryLocation::Location { offset, size } => Arg::Stack {
+            AbstractMemoryLocation::Location { offset, size } => Ok(Arg::Stack {
                 address: Expression::Var(var.clone()).plus_const(*offset),
                 size: *size,
                 data_type: None,
-            },
+            }),
             AbstractMemoryLocation::Pointer { .. } => {
-                panic!("Memory location is not a stack offset.")
+                Err(anyhow!("Memory location is not a stack offset."))
             }
         },
+        AbstractLocation::GlobalAddress { .. } | AbstractLocation::GlobalPointer(_, _) => {
+            Err(anyhow!("Global values are not parameters."))
+        }
     }
 }

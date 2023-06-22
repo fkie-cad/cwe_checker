@@ -138,7 +138,7 @@ pub fn check_cwe(
         };
     }
 
-    let cwe_warnings = cwe_warnings.into_iter().map(|(_, cwe)| cwe).collect();
+    let cwe_warnings = cwe_warnings.into_values().collect();
     let log_messages = log_receiver.try_iter().collect();
 
     (log_messages, cwe_warnings)
@@ -247,7 +247,7 @@ pub fn generate_cwe_warning(sub_name: &str, jmp_tid: &Tid, symbol_name: &str) ->
         description,
     )
     .addresses(vec![jmp_tid.address.clone()])
-    .tids(vec![format!("{}", jmp_tid)])
+    .tids(vec![format!("{jmp_tid}")])
     .symbols(vec![String::from(sub_name)])
     .other(vec![vec![
         String::from("OS Command Injection"),

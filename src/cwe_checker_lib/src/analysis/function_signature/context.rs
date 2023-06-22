@@ -1,4 +1,8 @@
-use crate::abstract_domain::{AbstractDomain, AbstractIdentifier, BitvectorDomain, DataDomain};
+use crate::abstract_domain::{
+    AbstractDomain, AbstractIdentifier, AbstractLocation, BitvectorDomain, DataDomain, SizedDomain,
+    TryToBitvec,
+};
+use crate::utils::arguments;
 use crate::{
     analysis::{forward_interprocedural_fixpoint, graph::Graph},
     intermediate_representation::Project,
@@ -10,12 +14,22 @@ use super::*;
 pub struct Context<'a> {
     graph: &'a Graph<'a>,
     project: &'a Project,
+    /// Parameter access patterns for stubbed extern symbols.
+    param_access_stubs: BTreeMap<&'static str, Vec<AccessPattern>>,
+    /// Assigns to the name of a stubbed variadic symbol the index of its format string parameter
+    /// and the access pattern for all variadic parameters.
+    stubbed_variadic_symbols: BTreeMap<&'static str, (usize, AccessPattern)>,
 }
 
 impl<'a> Context<'a> {
     /// Generate a new context object.
     pub fn new(project: &'a Project, graph: &'a Graph<'a>) -> Self {
-        Context { graph, project }
+        Context {
+            graph,
+            project,
+            param_access_stubs: stubs::generate_param_access_stubs(),
+            stubbed_variadic_symbols: stubs::get_stubbed_variadic_symbols(),
+        }
     }
 
     /// Compute the return values of a call and return them (without adding them to the caller state).
@@ -80,8 +94,25 @@ impl<'a> Context<'a> {
         // If yes, we can compute it relative to the value of the parameter at the callsite and add the result to the return value.
         // Else we just set the Top-flag of the return value to indicate some value originating in the callee.
         for (callee_id, callee_offset) in callee_value.get_relative_values() {
-            if let Some(param_arg) = callee_state.get_arg_corresponding_to_id(callee_id) {
+            if callee_id.get_tid() == callee_state.get_current_function_tid()
+                && matches!(
+                    callee_id.get_location(),
+                    AbstractLocation::GlobalAddress { .. }
+                )
+            {
+                // Globals get the same ID as if the global pointer originated in the caller.
+                let caller_global_id = AbstractIdentifier::new(
+                    caller_state.get_current_function_tid().clone(),
+                    callee_id.get_location().clone(),
+                );
+                caller_state.add_id_to_tracked_ids(&caller_global_id);
+                let caller_global =
+                    DataDomain::from_target(caller_global_id, callee_offset.clone());
+                return_value = return_value.merge(&caller_global);
+            } else if let Some(param_arg) = callee_state.get_arg_corresponding_to_id(callee_id) {
                 let param_value = caller_state.eval_parameter_arg(&param_arg);
+                let param_value = caller_state
+                    .substitute_global_mem_address(param_value, &self.project.runtime_memory_image);
                 if param_value.contains_top() || param_value.get_absolute_value().is_some() {
                     return_value.set_contains_top_flag()
                 }
@@ -108,6 +139,181 @@ impl<'a> Context<'a> {
 
         return_value
     }
+
+    /// Handle a call to a specific extern symbol.
+    /// If function stubs exist for the symbol, then these are used to compute the effect of the call.
+    /// Else the [generic symbol handler](State::handle_generic_extern_symbol) is called.
+    fn handle_extern_symbol_call(
+        &self,
+        state: &mut State,
+        extern_symbol: &ExternSymbol,
+        call_tid: &Tid,
+    ) {
+        let cconv = self.project.get_calling_convention(extern_symbol);
+        if let Some(param_access_list) = self.param_access_stubs.get(extern_symbol.name.as_str()) {
+            // Set access flags for parameter access
+            for (param, access_pattern) in extern_symbol.parameters.iter().zip(param_access_list) {
+                let param_value = state.eval_parameter_arg(param);
+                let param_value = state
+                    .substitute_global_mem_address(param_value, &self.project.runtime_memory_image);
+                for id in param_value.get_relative_values().keys() {
+                    state.merge_access_pattern_of_id(id, access_pattern);
+                }
+            }
+            if self
+                .stubbed_variadic_symbols
+                .get(extern_symbol.name.as_str())
+                .is_some()
+                && self
+                    .set_access_flags_for_variadic_parameters(state, extern_symbol)
+                    .is_none()
+            {
+                self.set_access_flags_for_generic_variadic_parameters(state, extern_symbol);
+            }
+            let return_val = stubs::compute_return_value_for_stubbed_function(
+                self.project,
+                state,
+                extern_symbol,
+                call_tid,
+            );
+            state.clear_non_callee_saved_register(&cconv.callee_saved_register);
+            state.set_register(&cconv.integer_return_register[0], return_val);
+        } else {
+            state.handle_generic_extern_symbol(
+                call_tid,
+                extern_symbol,
+                cconv,
+                &self.project.runtime_memory_image,
+            );
+        }
+    }
+
+    /// Merges the access patterns for all variadic parameters of the given symbol.
+    ///
+    /// This function can only handle stubbed symbols where the number of variadic parameters can be parsed from a format string.
+    /// If the parsing of the variadic parameters failed for any reason
+    /// (e.g. because the format string could not be statically determined)
+    /// then this function does not modify any access patterns.
+    ///
+    /// If the variadic access pattern contains the mutable dereference flag
+    /// then all variadic parameters are assumed to be pointers.
+    fn set_access_flags_for_variadic_parameters(
+        &self,
+        state: &mut State,
+        extern_symbol: &ExternSymbol,
+    ) -> Option<()> {
+        let (format_string_index, variadic_access_pattern) = self
+            .stubbed_variadic_symbols
+            .get(extern_symbol.name.as_str())?;
+        let format_string_address =
+            state.eval_parameter_arg(&extern_symbol.parameters[*format_string_index]); // TODO: potential problem: What if the address is now an abstract ID? And how do we handle format strings in writeable memory anyway?
+        let format_string_address = state.substitute_global_mem_address(
+            format_string_address,
+            &self.project.runtime_memory_image,
+        );
+        let format_string_address = self.get_global_mem_address(&format_string_address)?;
+        let format_string = arguments::parse_format_string_destination_and_return_content(
+            format_string_address,
+            &self.project.runtime_memory_image,
+        )
+        .ok()?;
+        let mut format_string_params = arguments::parse_format_string_parameters(
+            &format_string,
+            &self.project.datatype_properties,
+        )
+        .ok()?;
+        if variadic_access_pattern.is_mutably_dereferenced() {
+            // All parameters are pointers to where values shall be written.
+            format_string_params =
+                vec![
+                    (Datatype::Pointer, self.project.stack_pointer_register.size);
+                    format_string_params.len()
+                ];
+        }
+        let format_string_args = arguments::calculate_parameter_locations(
+            format_string_params,
+            extern_symbol,
+            self.project,
+        );
+        for param in format_string_args {
+            let param_value = state.eval_parameter_arg(&param);
+            let param_value = state
+                .substitute_global_mem_address(param_value, &self.project.runtime_memory_image);
+            for id in param_value.get_relative_values().keys() {
+                state.merge_access_pattern_of_id(id, variadic_access_pattern);
+            }
+        }
+        Some(())
+    }
+
+    /// Sets access patterns for variadic parameters
+    /// of a call to a variadic function with unknown number of variadic parameters.
+    /// This function assumes that all remaining integer parameter registers of the corresponding calling convention
+    /// are filled with variadic parameters,
+    /// but no variadic parameters are supplied as stack parameters.
+    fn set_access_flags_for_generic_variadic_parameters(
+        &self,
+        state: &mut State,
+        extern_symbol: &ExternSymbol,
+    ) {
+        let (_, variadic_access_pattern) = self
+            .stubbed_variadic_symbols
+            .get(extern_symbol.name.as_str())
+            .unwrap();
+        let cconv = self.project.get_calling_convention(extern_symbol);
+        if extern_symbol.parameters.len() < cconv.integer_parameter_register.len() {
+            for index in [
+                extern_symbol.parameters.len(),
+                cconv.integer_parameter_register.len() - 1,
+            ] {
+                let param = state.get_register(&cconv.integer_parameter_register[index]);
+                let param =
+                    state.substitute_global_mem_address(param, &self.project.runtime_memory_image);
+                for id in param.get_relative_values().keys() {
+                    state.merge_access_pattern_of_id(id, variadic_access_pattern);
+                }
+            }
+        }
+    }
+
+    /// If the given data is either an absolute value or a unique relative value, where the corresponding abstract ID denotes a global memory address,
+    /// then return the resulting global memory address.
+    /// If the resulting constant value does not denote a global address then `None` is returned.
+    ///
+    /// If the data may denote more than one value, then also return `None`.
+    fn get_global_mem_address(&self, data: &DataDomain<BitvectorDomain>) -> Option<Bitvector> {
+        if let Some((id, offset)) = data.get_if_unique_target() {
+            // Check if the relative value is a global memory address (in writeable memory)
+            if let AbstractLocation::GlobalAddress { address, size: _ } = id.get_location() {
+                if let Ok(offset_bitvec) = offset.try_to_bitvec() {
+                    let mut global_address = Bitvector::from_u64(*address)
+                        .into_truncate(offset.bytesize())
+                        .ok()?;
+                    global_address += &offset_bitvec;
+                    if self
+                        .project
+                        .runtime_memory_image
+                        .is_global_memory_address(&global_address)
+                    {
+                        return Some(global_address);
+                    }
+                }
+            }
+        } else {
+            // Global addresses in read-only memory are still handled as absolute values.
+            let global_address = data
+                .get_if_absolute_value()
+                .map(|value| value.try_to_bitvec().ok())??;
+            if self
+                .project
+                .runtime_memory_image
+                .is_global_memory_address(&global_address)
+            {
+                return Some(global_address);
+            }
+        }
+        None
+    }
 }
 
 impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
@@ -126,26 +332,47 @@ impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
         match &def.term {
             Def::Assign { var, value } => {
                 new_state.set_read_flag_for_input_ids_of_expression(value);
-                new_state.set_register(var, state.eval(value));
+                let value = new_state.substitute_global_mem_address(
+                    state.eval(value),
+                    &self.project.runtime_memory_image,
+                );
+                new_state.set_register(var, value);
             }
             Def::Load { var, address } => {
                 new_state.set_deref_flag_for_input_ids_of_expression(address);
-                let value = new_state.load_value(new_state.eval(address), var.size);
+                let address = new_state.substitute_global_mem_address(
+                    state.eval(address),
+                    &self.project.runtime_memory_image,
+                );
+                new_state.set_deref_flag_for_contained_ids(&address);
+                let value = new_state.load_value(
+                    address,
+                    var.size,
+                    Some(&self.project.runtime_memory_image),
+                );
+                let value = new_state
+                    .substitute_global_mem_address(value, &self.project.runtime_memory_image);
                 new_state.set_register(var, value);
             }
             Def::Store { address, value } => {
                 new_state.set_mutable_deref_flag_for_input_ids_of_expression(address);
-                if state
-                    .get_offset_if_exact_stack_pointer(&state.eval(address))
-                    .is_some()
-                {
+                let address = new_state.substitute_global_mem_address(
+                    state.eval(address),
+                    &self.project.runtime_memory_image,
+                );
+                new_state.set_deref_mut_flag_for_contained_ids(&address);
+                if state.get_offset_if_exact_stack_pointer(&address).is_some() {
                     // Only flag inputs of non-trivial expressions as accessed to prevent flagging callee-saved registers as parameters.
                     // Sometimes parameter registers are callee-saved (for no apparent reason).
                     new_state.set_read_flag_for_input_ids_of_nontrivial_expression(value);
                 } else {
                     new_state.set_read_flag_for_input_ids_of_expression(value);
                 }
-                new_state.write_value(new_state.eval(address), new_state.eval(value));
+                let value = new_state.substitute_global_mem_address(
+                    state.eval(value),
+                    &self.project.runtime_memory_image,
+                );
+                new_state.write_value(address, value);
             }
         }
         Some(new_state)
@@ -188,25 +415,32 @@ impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
             Jmp::CallInd { target, .. } => {
                 new_state.set_read_flag_for_input_ids_of_expression(target);
                 if let Some(cconv) = self.project.get_standard_calling_convention() {
-                    new_state.handle_unknown_function_stub(call, cconv);
+                    new_state.handle_unknown_function_stub(
+                        call,
+                        cconv,
+                        &self.project.runtime_memory_image,
+                    );
                     return Some(new_state);
                 }
             }
             Jmp::Call { target, .. } => {
                 if let Some(extern_symbol) = self.project.program.term.extern_symbols.get(target) {
-                    let cconv = self.project.get_calling_convention(extern_symbol);
-                    new_state.handle_extern_symbol(call, extern_symbol, cconv);
+                    self.handle_extern_symbol_call(&mut new_state, extern_symbol, &call.tid);
                     if !extern_symbol.no_return {
                         return Some(new_state);
                     }
                 } else if let Some(cconv) = self.project.get_standard_calling_convention() {
-                    new_state.handle_unknown_function_stub(call, cconv);
+                    new_state.handle_unknown_function_stub(
+                        call,
+                        cconv,
+                        &self.project.runtime_memory_image,
+                    );
                     return Some(new_state);
                 }
             }
             _ => (),
         }
-        // The call could not be properly handled, so we treat it as a dead end in the control flow graph.
+        // The call could not be properly handled or is a non-returning function, so we treat it as a dead end in the control flow graph.
         None
     }
 
@@ -230,7 +464,7 @@ impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
         let mut new_state = old_state.clone();
         // Merge parameter access patterns with the access patterns from the callee.
         let parameters = callee_state.get_params_of_current_function();
-        new_state.merge_parameter_access(&parameters);
+        new_state.merge_parameter_access(&parameters, &self.project.runtime_memory_image);
         // Compute values for return register (but do not add them to `new_state` yet)
         let return_value_list = self.compute_return_values_of_call(
             &mut new_state,

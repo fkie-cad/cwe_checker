@@ -1,6 +1,7 @@
 use crate::prelude::*;
 
-mod builder;
+mod builder_high_lvl;
+mod builder_low_lvl;
 
 /// A term identifier consisting of an ID string (which is required to be unique)
 /// and an address to indicate where the term is located.
@@ -37,7 +38,7 @@ impl Tid {
     /// the returned block ID is the one that would be executed first if a jump to the given address happened.
     pub fn blk_id_at_address(address: &str) -> Tid {
         Tid {
-            id: format!("blk_{}", address),
+            id: format!("blk_{address}"),
             address: address.to_string(),
         }
     }

@@ -15,7 +15,7 @@ mod trait_impl;
 /// An abstract domain representing a set of base values plus offsets or an absolute value (or both).
 ///
 /// The base values are represented as abstract IDs,
-/// i.e. they are treated as variables with unknown absolute value.
+/// i.e. they are treated as variables with unknown absolute value, e.g. the returned pointer by malloc.
 /// For each base value the offset is given by an abstract domain `T`,
 /// which should specialize in representing absolute values (e.g. an interval domain).
 /// Note that the domain assumes pointer semantics for these values.
@@ -215,8 +215,8 @@ impl<T: RegisterDomain + Display> DataDomain<T> {
         if !self.relative_values.is_empty() {
             let target_iter = self.relative_values.iter().map(|(id, offset)| {
                 (
-                    format!("{}", id),
-                    serde_json::Value::String(format!("{}", offset)),
+                    format!("{id}"),
+                    serde_json::Value::String(format!("{offset}")),
                 )
             });
             let targets = serde_json::Value::Object(target_iter.collect());
@@ -226,8 +226,7 @@ impl<T: RegisterDomain + Display> DataDomain<T> {
         }
         if let Some(absolute_value) = &self.absolute_value {
             values.push(serde_json::Value::String(format!(
-                "Value: {}",
-                absolute_value
+                "Value: {absolute_value}"
             )));
         }
         if self.contains_top_values {
@@ -248,6 +247,7 @@ impl<T: RegisterDomain + Display> DataDomain<T> {
 mod tests {
     use super::super::*;
     use super::*;
+    use crate::{bitvec, variable};
 
     impl<T: RegisterDomain> DataDomain<T> {
         /// Return a new domain representing a set of relative values.
@@ -267,13 +267,13 @@ mod tests {
     }
 
     fn bv(value: i64) -> BitvectorDomain {
-        BitvectorDomain::Value(Bitvector::from_i64(value))
+        bitvec!(format!("{}:8", value)).into()
     }
 
     fn new_id(name: &str) -> AbstractIdentifier {
         AbstractIdentifier::new(
             Tid::new("time0"),
-            AbstractLocation::Register(Variable::mock(name, ByteSize::new(8))),
+            AbstractLocation::Register(variable!(format!("{}:8", name))),
         )
     }
 

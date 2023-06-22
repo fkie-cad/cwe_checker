@@ -66,8 +66,7 @@ pub fn generate_cwe_warnings<'a>(
     for (sub_name, jmp_tid, target_name) in dangerous_calls.iter() {
         let address: &String = &jmp_tid.address;
         let description: String = format!(
-            "(Use of Potentially Dangerous Function) {} ({}) -> {}",
-            sub_name, address, target_name
+            "(Use of Potentially Dangerous Function) {sub_name} ({address}) -> {target_name}"
         );
         let cwe_warning = CweWarning::new(
             String::from(CWE_MODULE.name),
@@ -75,7 +74,7 @@ pub fn generate_cwe_warnings<'a>(
             description,
         )
         .addresses(vec![address.clone()])
-        .tids(vec![format!("{}", jmp_tid)])
+        .tids(vec![format!("{jmp_tid}")])
         .symbols(vec![String::from(*sub_name)])
         .other(vec![vec![
             String::from("dangerous_function"),
@@ -85,7 +84,6 @@ pub fn generate_cwe_warnings<'a>(
         cwe_warnings.push(cwe_warning);
     }
 
-    cwe_warnings.sort();
     cwe_warnings
 }
 

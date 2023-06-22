@@ -1,173 +1,66 @@
-use crate::intermediate_representation::*;
-
-pub struct Setup;
-
-impl Setup {
-    pub fn new() -> Self {
-        Setup
-    }
-
-    pub fn format_string_constant(&self, tid: &str, register: &str) -> Term<Def> {
-        Def::assign(
-            tid,
-            Variable::mock(register, 4),
-            Expression::const_from_i32(0x6000),
-        )
-    }
-
-    pub fn string_input_constant(&self, tid: &str, register: &str, address: i32) -> Term<Def> {
-        Def::assign(
-            tid,
-            Variable::mock(register, 4),
-            Expression::const_from_i32(address),
-        )
-    }
-
-    // FIXME: Move this function to the intermediate_representation module
-    pub fn pointer_plus_offset(
-        &self,
-        tid: &str,
-        output: &str,
-        pointer: &str,
-        offset: i64,
-    ) -> Term<Def> {
-        Def::assign(
-            tid,
-            Variable::mock(output, 4),
-            Expression::var(pointer, 4).plus_const(offset),
-        )
-    }
-
-    // FIXME: Move this function to the intermediate_representation module
-    pub fn pointer_minus_offset(
-        &self,
-        tid: &str,
-        output: &str,
-        pointer: &str,
-        offset: i64,
-    ) -> Term<Def> {
-        Def::assign(
-            tid,
-            Variable::mock(output, 4),
-            Expression::var(pointer, 4).minus_const(offset),
-        )
-    }
-
-    // FIXME: Move this function to the intermediate_representation module
-    pub fn pointer_plus_offset_to_temp_var(
-        &self,
-        tid: &str,
-        tmp_name: &str,
-        pointer: &str,
-        offset: i64,
-    ) -> Term<Def> {
-        Def::assign(
-            tid,
-            Variable {
-                name: String::from(tmp_name),
-                size: ByteSize::new(4),
-                is_temp: true,
-            },
-            Expression::var(pointer, 4).plus_const(offset),
-        )
-    }
-
-    // FIXME: Move this function to the intermediate_representation module
-    pub fn store_var_content_at_temp_var(&self, tid: &str, tmp_name: &str, var: &str) -> Term<Def> {
-        Def::store(
-            tid,
-            Expression::Var(Variable {
-                name: String::from(tmp_name),
-                size: ByteSize::new(4),
-                is_temp: true,
-            }),
-            Expression::var(var, 4),
-        )
-    }
-
-    // FIXME: Move this function to the intermediate_representation module
-    pub fn load_var_content_from_temp_var(
-        &self,
-        tid: &str,
-        var: &str,
-        tmp_name: &str,
-    ) -> Term<Def> {
-        Def::load(
-            tid,
-            Variable::mock(var, 4 as u64),
-            Expression::Var(Variable {
-                name: String::from(tmp_name),
-                size: ByteSize::new(4),
-                is_temp: true,
-            }),
-        )
-    }
-}
+use crate::{def, defs, intermediate_representation::*};
 
 fn mock_defs_for_sprintf(format_known: bool, blk_num: usize) -> Vec<Term<Def>> {
-    let setup = Setup::new();
-    let mut defs: Vec<Term<Def>> = Vec::new();
-
     /*
         r11 = INT_ADD sp, 4:4
-
         r12 = COPY 0x3002:4
-
         r0 = INT_SUB r11, 0x58:4   // Destination string pointer
-
         r1 = COPY 0x6000:4    // Constant format string
         OR
         r1 = INT_SUB r11, 0x62:4   // Variable format string
-
         r2 = INT_ADD sp, 24:4    // Variable input in register
-
         r3 = INT_ADD sp, 16:4      // Variable input in register
-
         $U1050:4 = INT_ADD sp, 0:4    // Constant string input 'Hello World' on stack
         STORE ram($U1050:4), r12
-
         r12 = INT_ADD r11, 0x66:4
-
         $U1050:4 = INT_ADD sp, 4:4 // Second variable input on stack
         STORE ram($U1050:4), r12
     */
 
-    defs.push(setup.pointer_plus_offset(&format!("def_0_blk_{}", blk_num), "r11", "sp", 4));
-    defs.push(setup.string_input_constant(&format!("def_1_blk_{}", blk_num), "r12", 0x3002));
-
-    defs.push(setup.pointer_minus_offset(&format!("def_2_blk_{}", blk_num), "r0", "r11", 0x58));
+    let mut defs = defs![
+        format!("def_0_blk_{}: r11:4 = sp:4 + 0x4:4", blk_num),
+        format!("def_1_blk_{}: r12:4 = 0x3002:4", blk_num),
+        format!("def_2_blk_{}: r0:4 = r11:4 - 0x58:4", blk_num)
+    ];
 
     if format_known {
-        defs.push(setup.format_string_constant(&format!("def_3_blk_{}", blk_num), "r1"));
+        defs.append(defs![&format!("def_3_blk_{}: r1:4 = 0x6000:4", blk_num)].as_mut());
     } else {
-        defs.push(setup.pointer_minus_offset(&format!("def_3_blk_{}", blk_num), "r1", "r11", 0x62));
+        defs.append(defs![&format!("def_3_blk_{}: r1:4 = r11:4 - 0x62:4", blk_num)].as_mut());
     }
 
-    defs.push(setup.pointer_plus_offset(&format!("def_4_blk_{}", blk_num), "r2", "sp", 24));
+    defs.append(
+        defs![
+            &format!("def_4_blk_{}: r2:4 = sp:4 + 0x18:4", blk_num),
+            &format!("def_5_blk_{}: r3:4 = sp:4 + 0x10:4", blk_num)
+        ]
+        .as_mut(),
+    );
 
-    defs.push(setup.pointer_plus_offset(&format!("def_5_blk_{}", blk_num), "r3", "sp", 16));
-
-    defs.push(setup.pointer_plus_offset_to_temp_var(
+    defs.push(Def::pointer_plus_offset_to_temp_var(
         &format!("def_6_blk_{}", blk_num),
         "$U1050",
         "sp",
         0,
     ));
-    defs.push(setup.store_var_content_at_temp_var(
+    defs.push(Def::store_var_content_at_temp_var(
         &format!("def_7_blk_{}", blk_num),
         "$U1050",
         "r12",
     ));
 
-    defs.push(setup.pointer_plus_offset(&format!("def_8_blk_{}", blk_num), "r12", "r11", 0x66));
+    defs.push(def![&format!(
+        "def_8_blk_{}: r12:4 = r11:4 + 0x66:4",
+        blk_num
+    )]);
 
-    defs.push(setup.pointer_plus_offset_to_temp_var(
+    defs.push(Def::pointer_plus_offset_to_temp_var(
         &format!("def_9_blk_{}", blk_num),
         "$U1050",
         "sp",
         4,
     ));
-    defs.push(setup.store_var_content_at_temp_var(
+    defs.push(Def::store_var_content_at_temp_var(
         &format!("def_10_blk_{}", blk_num),
         "$U1050",
         "r12",
@@ -177,67 +70,60 @@ fn mock_defs_for_sprintf(format_known: bool, blk_num: usize) -> Vec<Term<Def>> {
 }
 
 fn mock_defs_for_scanf(format_known: bool, blk_num: usize) -> Vec<Term<Def>> {
-    let setup = Setup::new();
-    let mut defs: Vec<Term<Def>> = Vec::new();
-
     /*
        r11 = INT_ADD sp, 4:4
-
        r0 = INT_SUB r11, 0x3c:4
-
        $U1050 = INT_ADD sp, 0:4
        STORE ram($U1050:4), r0  - variable output 4
-
        r3 = INT_SUB r11, 0x50:4 - variable output 3
-
        r2 = INT_SUB r11, 0x62:4 - variable output 2
-
        r1 = INT_SUB r11, 0x78:4 - variable output 1
-
        r0 = LOAD ram(0x6000)    - constant format string
        OR
        r0 = INT_SUB r11, 0x82:4 - variable format string
-
     */
 
-    defs.push(setup.pointer_plus_offset(&format!("def_0_blk_{}", blk_num), "r11", "sp", 4));
+    let mut defs = defs![
+        format!("def_0_blk_{}: r11:4 = sp:4 + 4:4", blk_num),
+        format!("def_1_blk_{}: r0:4 = r11:4 - 0x3c:4", blk_num)
+    ];
 
-    defs.push(setup.pointer_minus_offset(&format!("def_1_blk_{}", blk_num), "r0", "r11", 0x3c));
-
-    defs.push(setup.pointer_plus_offset_to_temp_var(
+    defs.push(Def::pointer_plus_offset_to_temp_var(
         &format!("def_2_blk_{}", blk_num),
         "$U1050",
         "sp",
         0,
     ));
-    defs.push(setup.store_var_content_at_temp_var(
+
+    defs.push(Def::store_var_content_at_temp_var(
         &format!("def_3_blk_{}", blk_num),
         "$U1050",
         "r0",
     ));
-
-    defs.push(setup.pointer_minus_offset(&format!("def_4_blk_{}", blk_num), "r3", "r11", 0x50));
-
-    defs.push(setup.pointer_minus_offset(&format!("def_5_blk_{}", blk_num), "r2", "r11", 0x62));
-
-    defs.push(setup.pointer_minus_offset(&format!("def_6_blk_{}", blk_num), "r1", "r11", 0x78));
+    defs.append(
+        defs![
+            format!("def_4_blk_{}: r3:4 = r11:4 - 0x50:4", blk_num),
+            format!("def_5_blk_{}: r2:4 = r11:4 - 0x62:4", blk_num),
+            format!("def_6_blk_{}: r1:4 = r11:4 - 0x78:4", blk_num)
+        ]
+        .as_mut(),
+    );
 
     if format_known {
-        defs.push(setup.format_string_constant(&format!("def_7_blk_{}", blk_num), "r0"));
+        defs.push(def![format!("def_7_blk_{}: r0:4 = 0x6000:4", blk_num)]);
     } else {
-        defs.push(setup.pointer_minus_offset(&format!("def_7_blk_{}", blk_num), "r0", "r11", 0x82));
+        defs.push(def![format!(
+            "def_7_blk_{}: r0:4 = r11:4 - 0x82:4",
+            blk_num
+        )]);
     }
 
     defs
 }
 
 fn mock_defs_for_sscanf(source_known: bool, format_known: bool, blk_num: usize) -> Vec<Term<Def>> {
-    let setup = Setup::new();
-    let mut defs: Vec<Term<Def>> = Vec::new();
-
     /*
        r11 = INT_ADD sp, 4:4
-
        r3 = INT_SUB r11, 0x96:4
 
        $U1050:4 = INT_ADD sp, 0:4
@@ -261,134 +147,125 @@ fn mock_defs_for_sscanf(source_known: bool, format_known: bool, blk_num: usize) 
        r0 = INT_SUB r11, 048:4     - variable source string
 
     */
+    let mut defs = defs![
+        format!("def_0_blk_{}: r11:4 = sp:4 + 4:4", blk_num),
+        format!("def_1_blk_{}: r3:4 = r11:4 - 0x96:4", blk_num)
+    ];
 
-    defs.push(setup.pointer_plus_offset(&format!("def_0_blk_{}", blk_num), "r11", "sp", 4));
-
-    defs.push(setup.pointer_minus_offset(&format!("def_1_blk_{}", blk_num), "r3", "r11", 0x96));
-
-    defs.push(setup.pointer_plus_offset_to_temp_var(
+    defs.push(Def::pointer_plus_offset_to_temp_var(
         &format!("def_2_blk_{}", blk_num),
         "$U1050",
         "sp",
         0,
     ));
-    defs.push(setup.store_var_content_at_temp_var(
+
+    defs.push(Def::store_var_content_at_temp_var(
         &format!("def_3_blk_{}", blk_num),
         "$U1050",
         "r3",
     ));
 
-    defs.push(setup.pointer_minus_offset(&format!("def_4_blk_{}", blk_num), "r3", "r11", 0x88));
+    defs.push(def![format!(
+        "def_4_blk_{}: r3:4 = r11:4 - 0x88:4",
+        blk_num
+    )]);
 
-    defs.push(setup.pointer_plus_offset_to_temp_var(
+    defs.push(Def::pointer_plus_offset_to_temp_var(
         &format!("def_5_blk_{}", blk_num),
         "$U1050",
         "sp",
         4,
     ));
-    defs.push(setup.store_var_content_at_temp_var(
+    defs.push(Def::store_var_content_at_temp_var(
         &format!("def_6_blk_{}", blk_num),
         "$U1050",
         "r3",
     ));
 
-    defs.push(setup.pointer_minus_offset(&format!("def_7_blk_{}", blk_num), "r3", "r11", 0x6c));
-
-    defs.push(setup.pointer_minus_offset(&format!("def_8_blk_{}", blk_num), "r2", "r11", 0x80));
+    defs.append(
+        defs![
+            format!("def_7_blk_{}: r3:4 = r11:4 - 0x6c:4", blk_num),
+            format!("def_8_blk_{}: r2:4 = r11:4 - 0x80:4", blk_num)
+        ]
+        .as_mut(),
+    );
 
     if format_known {
-        defs.push(setup.format_string_constant(&format!("def_9_blk_{}", blk_num), "r1"));
+        defs.push(def![format!("def_9_blk_{}: r1:4 = 0x6000:4", blk_num)]);
     } else {
-        defs.push(setup.pointer_minus_offset(&format!("def_9_blk_{}", blk_num), "r1", "r11", 0x40));
+        defs.push(def![format!(
+            "def_9_blk_{}: r1:4 = r11:4 - 0x40:4",
+            blk_num
+        )]);
     }
 
     if source_known {
-        defs.push(setup.string_input_constant(&format!("def_10_blk_{}", blk_num), "r0", 0x7000));
+        defs.push(def![format!("def_10_blk_{}: r0:4 = 0x7000:4", blk_num)]);
     } else {
-        defs.push(setup.pointer_minus_offset(
-            &format!("def_10_blk_{}", blk_num),
-            "r0",
-            "r11",
-            0x48,
-        ));
+        defs.push(def![format!(
+            "def_10_blk_{}: r0:4 = r11:4 - 0x48:4",
+            blk_num
+        )]);
     }
 
     defs
 }
 
 fn mock_defs_for_strcat(second_input_known: bool, blk_num: usize) -> Vec<Term<Def>> {
-    let setup = Setup::new();
-    let mut defs: Vec<Term<Def>> = Vec::new();
-
     /*
         r11 = INT_ADD sp, 4:4
-
         r0 = INT_SUB r11, 40:4,
-
             r1 = LOAD ram(0x7000)
 
             OR
 
             r1 = INT_ADD r11, 0x24:4
     */
-
-    defs.push(setup.pointer_plus_offset(&format!("def_0_blk_{}", blk_num), "r11", "sp", 4));
-
-    defs.push(setup.pointer_minus_offset(&format!("def_1_blk_{}", blk_num), "r0", "r11", 0x40));
+    let mut def = defs![
+        format!("def_0_blk_{}: r11:4 = sp:4 + 4:4", blk_num),
+        format!("def_1_blk_{}: r0:4 = r11:4 - 0x40:4", blk_num)
+    ];
 
     if second_input_known {
-        defs.push(setup.string_input_constant(&format!("def_2_blk_{}", blk_num), "r1", 0x7000));
+        def.push(def![format!("def_2_blk_{}: r1:4 = 0x7000:4", blk_num)]);
     } else {
-        defs.push(setup.pointer_plus_offset(&format!("def_3_blk_{}", blk_num), "r1", "r11", 0x24));
+        def.push(def![format!(
+            "def_3_blk_{}: r1:4 = r11:4 + 0x24:4",
+            blk_num
+        )]);
     }
-
-    defs
-}
-
-fn mock_defs_for_free(_blk_num: usize) -> Vec<Term<Def>> {
-    vec![]
+    def
 }
 
 fn mock_defs_for_malloc(blk_num: usize) -> Vec<Term<Def>> {
-    let setup = Setup::new();
-    let mut defs: Vec<Term<Def>> = Vec::new();
-
     /*
         r0 = COPY 0xf
     */
-
-    defs.push(setup.string_input_constant(&format!("def_0_blk_{}", blk_num), "r0", 0xf));
-
-    defs
+    defs![format!("def_0_blk_{}: r0:4 = 0xf:4", blk_num)]
 }
 
 fn mock_defs_for_memcpy(copy_from_global: bool, blk_num: usize) -> Vec<Term<Def>> {
-    let setup = Setup::new();
-    let mut defs: Vec<Term<Def>> = Vec::new();
-
     /*
         r11 = INT_ADD sp, 4:4
-
         r0 = INT_SUB r11, 0x40:4,
-
             r1 = LOAD ram(0x7000)
-
             OR
-
             r1 = INT_ADD r11, 0x24:4
     */
-
-    defs.push(setup.pointer_plus_offset(&format!("def_0_blk_{}", blk_num), "r11", "sp", 4));
-
-    defs.push(setup.pointer_minus_offset(&format!("def_1_blk_{}", blk_num), "r0", "r11", 0x40));
+    let mut def = defs![
+        format!("def_0_blk_{}: r11:4 = sp:4 + 4:4", blk_num),
+        format!("def_1_blk_{}: r0:4 = r11:4 - 0x40:4", blk_num)
+    ];
 
     if copy_from_global {
-        defs.push(setup.string_input_constant(&format!("def_2_blk_{}", blk_num), "r1", 0x7000));
+        def.push(def![format!("def_2_blk_{}: r1:4 = 0x7000:4", blk_num)]);
     } else {
-        defs.push(setup.pointer_plus_offset(&format!("def_3_blk_{}", blk_num), "r1", "r11", 0x24));
+        def.push(def![format!(
+            "def_3_blk_{}: r1:4 = r11:4 + 0x24:4",
+            blk_num
+        )])
     }
-
-    defs
+    def
 }
 
 impl ExternSymbol {
@@ -495,7 +372,7 @@ fn mock_block_with_function_call(
         "scanf" => mock_defs_for_scanf(*config.get(0).unwrap(), blk_num),
         "sscanf" => mock_defs_for_sscanf(*config.get(0).unwrap(), *config.get(1).unwrap(), blk_num),
         "strcat" => mock_defs_for_strcat(*config.get(0).unwrap(), blk_num),
-        "free" => mock_defs_for_free(blk_num),
+        "free" => vec![],
         "malloc" => mock_defs_for_malloc(blk_num),
         "memcpy" => mock_defs_for_memcpy(*config.get(0).unwrap(), blk_num),
         _ => panic!("Invalid symbol name for def mock"),

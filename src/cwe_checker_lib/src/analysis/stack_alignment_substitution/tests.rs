@@ -1,4 +1,5 @@
 use super::*;
+use crate::{def, defs, expr, variable};
 use std::borrow::BorrowMut;
 
 /// Creates a x64 or ARM32 Project for easy addidion of assignments.
@@ -30,9 +31,7 @@ fn unexpected_alignment() {
                 lhs: Box::new(Expression::Var(
                     Project::mock_x64().stack_pointer_register.clone(),
                 )),
-                rhs: Box::new(Expression::const_from_apint(ApInt::from_u32(
-                    0xFFFFFFFF << i,
-                ))),
+                rhs: Box::new(expr!(format!("{}:4", 0xFFFFFFFF_u32 << i))),
             },
         )];
         let mut proj_x64 = setup(def_x64, true);
@@ -55,9 +54,7 @@ fn unexpected_alignment() {
                 lhs: Box::new(Expression::Var(
                     Project::mock_arm32().stack_pointer_register.clone(),
                 )),
-                rhs: Box::new(Expression::const_from_apint(ApInt::from_u32(
-                    0xFFFFFFFF << i,
-                ))),
+                rhs: Box::new(expr!(format!("{}:4", 0xFFFFFFFF_u32 << i))),
             },
         )];
         let mut proj_arm = setup(def_arm, false);
@@ -77,26 +74,15 @@ fn unexpected_alignment() {
 /// Tests the substituted offset meets the alignment for x64. Tests only the logical AND case.
 fn compute_correct_offset_x64() {
     for i in 0..=33 {
-        let sub_from_sp = Def::assign(
-            "tid_alter_sp",
-            Project::mock_x64().stack_pointer_register.clone(),
-            Expression::minus(
-                Expression::Var(Project::mock_x64().stack_pointer_register.clone()),
-                Expression::const_from_apint(ApInt::from_u64(i)),
-            ),
-        );
+        let sub_from_sp = def![format!("tid_alter_sp: RSP:8 = RSP:8 - {}:8", i)];
 
         let byte_alignment_as_and = Def::assign(
             "tid_to_be_substituted",
-            Project::mock_x64().stack_pointer_register.clone(),
+            variable!("RSP:8"),
             Expression::BinOp {
                 op: BinOpType::IntAnd,
-                lhs: Box::new(Expression::Var(
-                    Project::mock_x64().stack_pointer_register.clone(),
-                )),
-                rhs: Box::new(Expression::const_from_apint(ApInt::from_u64(
-                    0xFFFFFFFF_FFFFFFFF << 4, // 16 Byte alignment
-                ))),
+                lhs: Box::new(expr!("RSP:8")),
+                rhs: Box::new(expr!(format!("{}:8", 0xFFFFFFFF_FFFFFFFF_u64 << 4))),
             },
         );
         let mut proj = setup(
@@ -110,20 +96,15 @@ fn compute_correct_offset_x64() {
                     if def.tid == byte_alignment_as_and.tid.clone() {
                         let expected_offset: u64 = match i % 16 {
                             0 => 0,
-                            _ => (16 - (i % 16)).into(),
+                            _ => 16 - (i % 16),
                         };
                         // translated alignment as substraction
-                        let expected_def = Def::Assign {
-                            var: proj.stack_pointer_register.clone(),
-                            value: Expression::BinOp {
-                                op: BinOpType::IntSub,
-                                lhs: Box::new(Expression::Var(proj.stack_pointer_register.clone())),
-                                rhs: Box::new(Expression::const_from_apint(ApInt::from_u64(
-                                    expected_offset,
-                                ))),
-                            },
-                        };
-                        assert_eq!(expected_def, def.term);
+                        let expected_def = def![format!(
+                            "{} = RSP:8 - {}:8",
+                            proj.stack_pointer_register, expected_offset
+                        )];
+
+                        assert_eq!(expected_def.term, def.term);
                         assert!(log.is_none());
                     }
                 }
@@ -136,25 +117,15 @@ fn compute_correct_offset_x64() {
 /// Tests the substituted offset meets the alignment for arm32. Tests only the logical AND case.
 fn compute_correct_offset_arm32() {
     for i in 0..=33 {
-        let sub_from_sp = Def::assign(
-            "tid_alter_sp",
-            Project::mock_arm32().stack_pointer_register.clone(),
-            Expression::minus(
-                Expression::Var(Project::mock_arm32().stack_pointer_register.clone()),
-                Expression::const_from_apint(ApInt::from_u32(i)),
-            ),
-        );
+        let sub_from_sp = def!(format!("tid_alter_sp: sp:4 = sp:4 - {}:4", i));
+
         let byte_alignment_as_and = Def::assign(
             "tid_to_be_substituted",
-            Project::mock_arm32().stack_pointer_register.clone(),
+            variable!("sp:4"),
             Expression::BinOp {
                 op: BinOpType::IntAnd,
-                lhs: Box::new(Expression::Var(
-                    Project::mock_arm32().stack_pointer_register.clone(),
-                )),
-                rhs: Box::new(Expression::const_from_apint(ApInt::from_u32(
-                    0xFFFFFFFF << 2, // 4 Byte alignment
-                ))),
+                lhs: Box::new(expr!("sp:4")),
+                rhs: Box::new(expr!(format!("{}:4", 0xFFFFFFFF_u32 << 2))), // 4 Byte alignment
             },
         );
         let mut proj = setup(
@@ -171,17 +142,8 @@ fn compute_correct_offset_arm32() {
                             _ => 4 - (i % 4),
                         };
                         // translated alignment as substraction
-                        let expected_def = Def::Assign {
-                            var: proj.stack_pointer_register.clone(),
-                            value: Expression::BinOp {
-                                op: BinOpType::IntSub,
-                                lhs: Box::new(Expression::Var(proj.stack_pointer_register.clone())),
-                                rhs: Box::new(Expression::const_from_apint(ApInt::from_u32(
-                                    expected_offset,
-                                ))),
-                            },
-                        };
-                        assert_eq!(expected_def, def.term);
+                        let expected_def = def!(format!("sp:4 = sp:4 - {}:4", expected_offset));
+                        assert_eq!(expected_def.term, def.term);
                         assert!(log.is_none());
                     }
                 }
@@ -202,24 +164,20 @@ fn check_bin_operations() {
     ] {
         let unsupported_def_x64 = Def::assign(
             "tid_to_be_substituted",
-            Project::mock_x64().stack_pointer_register.clone(),
+            variable!("RSP:8"),
             Expression::BinOp {
                 op: biopty,
-                lhs: Box::new(Expression::Var(
-                    Project::mock_x64().stack_pointer_register.clone(),
-                )),
-                rhs: Box::new(Expression::const_from_i32(0)),
+                lhs: Box::new(expr!("RSP:8")),
+                rhs: Box::new(expr!("0:4")),
             },
         );
         let unsupported_def_arm32 = Def::assign(
             "tid_to_be_substituted",
-            Project::mock_arm32().stack_pointer_register.clone(),
+            variable!("sp:4"),
             Expression::BinOp {
                 op: biopty,
-                lhs: Box::new(Expression::Var(
-                    Project::mock_arm32().stack_pointer_register.clone(),
-                )),
-                rhs: Box::new(Expression::const_from_i32(0)),
+                lhs: Box::new(expr!("sp:4")),
+                rhs: Box::new(expr!("0:4")),
             },
         );
         let mut proj_x64 = setup(vec![unsupported_def_x64.clone()], true);
@@ -267,9 +225,9 @@ fn substitution_ends_if_unsubstituable() {
             lhs: Box::new(Expression::Var(
                 Project::mock_x64().stack_pointer_register.clone(),
             )),
-            rhs: Box::new(Expression::const_from_apint(ApInt::from_u64(
-                0xFFFFFFFF_FFFFFFFF << 4, // 16 Byte alignment
-            ))),
+            rhs: Box::new(
+                expr!(format!("{}:8", 0xFFFFFFFF_FFFFFFFF_u64 << 4)), // 16 Byte alignment
+            ),
         },
     );
 
@@ -278,10 +236,8 @@ fn substitution_ends_if_unsubstituable() {
         Project::mock_x64().stack_pointer_register.clone(),
         Expression::BinOp {
             op: BinOpType::Piece,
-            lhs: Box::new(Expression::Var(
-                Project::mock_x64().stack_pointer_register.clone(),
-            )),
-            rhs: Box::new(Expression::const_from_i64(0)),
+            lhs: Box::new(expr!("RSP:8")),
+            rhs: Box::new(expr!("0:8")),
         },
     );
     let mut proj = setup(
@@ -302,17 +258,9 @@ fn substitution_ends_if_unsubstituable() {
         .text
         .contains("Unsubstitutable Operation on SP"));
 
-    let exp_16_byte_alignment_substituted = Def::assign(
-        "tid_to_be_substituted",
-        Project::mock_x64().stack_pointer_register.clone(),
-        Expression::BinOp {
-            op: BinOpType::IntSub,
-            lhs: Box::new(Expression::Var(
-                Project::mock_x64().stack_pointer_register.clone(),
-            )),
-            rhs: Box::new(Expression::const_from_apint(ApInt::from_u64(0))),
-        },
-    );
+    let exp_16_byte_alignment_substituted = defs!["tid_to_be_substituted: RSP:8 = RSP:8 - 0x0:8"]
+        .pop()
+        .unwrap();
 
     for sub in proj.program.term.subs.into_values() {
         for blk in sub.term.blocks {
@@ -333,15 +281,11 @@ fn substitution_ends_if_unsubstituable() {
 fn supports_commutative_and() {
     let var_and_bitmask = Def::assign(
         "tid_to_be_substituted",
-        Project::mock_x64().stack_pointer_register.clone(),
+        variable!("RSP:8"),
         Expression::BinOp {
             op: BinOpType::IntAnd,
-            lhs: Box::new(Expression::Var(
-                Project::mock_x64().stack_pointer_register.clone(),
-            )),
-            rhs: Box::new(Expression::const_from_apint(ApInt::from_u64(
-                0xFFFFFFFF_FFFFFFFF << 4, // 16 Byte alignment
-            ))),
+            lhs: Box::new(expr!("RSP:8")),
+            rhs: Box::new(expr!(format!("{}:8", 0xFFFFFFFF_FFFFFFFF_u64 << 4))),
         },
     );
     let bitmask_and_var = Def::assign(
@@ -349,12 +293,8 @@ fn supports_commutative_and() {
         Project::mock_x64().stack_pointer_register.clone(),
         Expression::BinOp {
             op: BinOpType::IntAnd,
-            lhs: Box::new(Expression::const_from_apint(ApInt::from_u64(
-                0xFFFFFFFF_FFFFFFFF << 4, // 16 Byte alignment
-            ))),
-            rhs: Box::new(Expression::Var(
-                Project::mock_x64().stack_pointer_register.clone(),
-            )),
+            lhs: Box::new(expr!(format!("{}:8", 0xFFFFFFFF_FFFFFFFF_u64 << 4))),
+            rhs: Box::new(expr!("RSP:8")),
         },
     );
 
@@ -362,17 +302,9 @@ fn supports_commutative_and() {
     let log = substitute_and_on_stackpointer(proj.borrow_mut());
     assert!(log.is_none());
 
-    let expected_def = Def::assign(
-        "tid_to_be_substituted",
-        Project::mock_x64().stack_pointer_register.clone(),
-        Expression::BinOp {
-            op: BinOpType::IntSub,
-            lhs: Box::new(Expression::Var(
-                Project::mock_x64().stack_pointer_register.clone(),
-            )),
-            rhs: Box::new(Expression::const_from_apint(ApInt::from_u64(0))),
-        },
-    );
+    let expected_def = defs!["tid_to_be_substituted: RSP:8 = RSP:8 - 0x0:8"]
+        .pop()
+        .unwrap();
 
     for sub in proj.program.term.subs.into_values() {
         for blk in sub.term.blocks {
@@ -381,4 +313,97 @@ fn supports_commutative_and() {
             }
         }
     }
+}
+#[test]
+/// Some functions have leading blocks without any defs. This might be due to `endbr`-like instructions.
+/// We skip those empty blocks and start substituting for rhe first non-empty block.
+fn skips_empty_blocks() {
+    let sub_from_sp = def!["tid_alter_sp: RSP:8 = RSP:8 - 1:8"];
+
+    let byte_alignment_as_and = Def::assign(
+        "tid_to_be_substituted",
+        variable!("RSP:8"),
+        Expression::BinOp {
+            op: BinOpType::IntAnd,
+            lhs: Box::new(Expression::Var(
+                Project::mock_x64().stack_pointer_register.clone(),
+            )),
+            rhs: Box::new(expr!(format!("{}:8", 0xFFFFFFFF_FFFFFFFF_u64 << 4))),
+        },
+    );
+    // get project with empty block
+    let mut proj = setup(vec![], true);
+    // add jmp
+    proj.program
+        .term
+        .subs
+        .get_mut(&Tid::new("sub_tid"))
+        .unwrap()
+        .term
+        .blocks[0]
+        .term
+        .jmps
+        .push(Term {
+            tid: Tid::new("tid"),
+            term: Jmp::Branch(Tid::new("not_empty_blk")),
+        });
+
+    let mut blk = Blk::mock_with_tid("not_empty_blk");
+    blk.term.defs.push(sub_from_sp.clone());
+    blk.term.defs.push(byte_alignment_as_and.clone());
+
+    // add block with substitutional def
+    proj.program
+        .term
+        .subs
+        .get_mut(&Tid::new("sub_tid"))
+        .unwrap()
+        .term
+        .blocks
+        .push(blk);
+
+    let expected_def = def!["tid_to_be_substituted: RSP:8 = RSP:8 - 15:8"];
+
+    substitute_and_on_stackpointer(&mut proj);
+
+    assert_eq!(
+        proj.program
+            .term
+            .subs
+            .get(&Tid::new("sub_tid"))
+            .unwrap()
+            .term
+            .blocks[1]
+            .term
+            .defs,
+        vec![sub_from_sp.clone(), expected_def]
+    );
+}
+
+#[test]
+fn skip_busy_loop() {
+    let mut proj = setup(vec![], true);
+    proj.program
+        .term
+        .subs
+        .get_mut(&Tid::new("sub_tid"))
+        .unwrap()
+        .term
+        .blocks[0]
+        .term
+        .jmps
+        .push(Jmp::branch("jmp_to_1st_blk", "block"));
+
+    assert_eq!(
+        get_first_blk_with_defs(
+            &proj
+                .program
+                .term
+                .subs
+                .get_mut(&Tid::new("sub_tid"))
+                .unwrap()
+                .term
+        ),
+        None
+    );
 }

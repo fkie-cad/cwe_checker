@@ -3,13 +3,13 @@ use std::collections::BTreeSet;
 use super::*;
 use crate::abstract_domain::{AbstractIdentifier, AbstractLocation};
 use crate::analysis::pointer_inference::PointerInference as PointerInferenceComputation;
-use crate::intermediate_representation::{Bitvector, Expression, Tid, Variable};
 use crate::{
     abstract_domain::{CharacterInclusionDomain, CharacterSet},
     analysis::string_abstraction::{
         context::symbol_calls::tests::Setup, tests::mock_project_with_intraprocedural_control_flow,
     },
 };
+use crate::{bitvec, expr, intermediate_representation::*, variable};
 
 #[test]
 fn test_handle_sprintf_and_snprintf_calls() {
@@ -29,10 +29,10 @@ fn test_handle_sprintf_and_snprintf_calls() {
 
     let stack_id = AbstractIdentifier::new(
         Tid::new("func"),
-        AbstractLocation::from_var(&Variable::mock("sp", 4)).unwrap(),
+        AbstractLocation::from_var(&variable!("sp:4")).unwrap(),
     );
     let return_pointer: DataDomain<IntervalDomain> =
-        DataDomain::from_target(stack_id, IntervalDomain::from(Bitvector::from_i32(-84)));
+        DataDomain::from_target(stack_id, IntervalDomain::from(bitvec!("-84:4")));
 
     assert_eq!(
         return_pointer,
@@ -68,10 +68,10 @@ fn test_parse_format_string_and_add_new_string_domain() {
     let format_string_index: usize = 1;
     let stack_id = AbstractIdentifier::new(
         Tid::new("func"),
-        AbstractLocation::from_var(&Variable::mock("sp", 4)).unwrap(),
+        AbstractLocation::from_var(&variable!("sp:4")).unwrap(),
     );
     let return_pointer: DataDomain<IntervalDomain> =
-        DataDomain::from_target(stack_id, IntervalDomain::from(Bitvector::from_i32(-84)));
+        DataDomain::from_target(stack_id, IntervalDomain::from(bitvec!("-84:4")));
 
     let project = mock_project_with_intraprocedural_control_flow(
         vec![(sprintf_symbol.clone(), vec![true])],
@@ -174,15 +174,15 @@ fn test_create_string_domain_using_data_type_approximations() {
 fn test_create_string_domain_using_constants_and_sub_domains() {
     let sprintf_symbol = ExternSymbol::mock_sprintf_symbol_arm();
     let string_arg = Arg::Register {
-        expr: Expression::Var(Variable::mock("r6", 4)),
+        expr: Expression::Var(variable!("r6:4")),
         data_type: Some(Datatype::Pointer),
     };
     let integer_arg = Arg::Register {
-        expr: Expression::Var(Variable::mock("r7", 4)),
+        expr: Expression::Var(variable!("r7:4")),
         data_type: Some(Datatype::Integer),
     };
     let char_arg = Arg::Register {
-        expr: Expression::Var(Variable::mock("r8", 4)),
+        expr: Expression::Var(variable!("r8:4")),
         data_type: Some(Datatype::Char),
     };
 
@@ -199,27 +199,21 @@ fn test_create_string_domain_using_constants_and_sub_domains() {
     let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
     setup.pi_state_before_symbol_call.set_register(
-        &Variable::mock("r6", 4),
+        &variable!("r6:4"),
         DataDomain::from(IntervalDomain::new(
-            Bitvector::from_u64(0x3002),
-            Bitvector::from_u64(0x3002),
+            bitvec!("0x3002:8"),
+            bitvec!("0x3002:8"),
         )),
     );
 
     setup.pi_state_before_symbol_call.set_register(
-        &Variable::mock("r7", 4),
-        DataDomain::from(IntervalDomain::new(
-            Bitvector::from_u64(2),
-            Bitvector::from_u64(2),
-        )),
+        &variable!("r7:4"),
+        DataDomain::from(IntervalDomain::new(bitvec!("2:8"), bitvec!("2:8"))),
     );
 
     setup.pi_state_before_symbol_call.set_register(
-        &Variable::mock("r8", 4),
-        DataDomain::from(IntervalDomain::new(
-            Bitvector::from_u64(0x42),
-            Bitvector::from_u64(0x42),
-        )),
+        &variable!("r8:4"),
+        DataDomain::from(IntervalDomain::new(bitvec!("0x42:8"), bitvec!("0x42:8"))),
     );
 
     let result_domain = setup
@@ -267,7 +261,7 @@ fn test_push_constant_subsequences_before_and_between_specifiers() {
     let mut specifier_ends: Vec<usize> = vec![0];
     specifier_ends.push(matches.get(0).unwrap().end());
 
-    for (index, (mat, spec_end)) in itertools::zip(matches, specifier_ends)
+    for (index, (mat, spec_end)) in std::iter::zip(matches, specifier_ends)
         .into_iter()
         .enumerate()
     {
@@ -341,15 +335,15 @@ fn test_no_specifiers() {
 fn test_fetch_constant_and_domain_for_format_specifier() {
     let sprintf_symbol = ExternSymbol::mock_sprintf_symbol_arm();
     let string_arg = Arg::Register {
-        expr: Expression::Var(Variable::mock("r6", 4)),
+        expr: expr!("r6:4"),
         data_type: Some(Datatype::Pointer),
     };
     let integer_arg = Arg::Register {
-        expr: Expression::Var(Variable::mock("r7", 4)),
+        expr: expr!("r7:4"),
         data_type: Some(Datatype::Integer),
     };
     let char_arg = Arg::Register {
-        expr: Expression::Var(Variable::mock("r8", 4)),
+        expr: expr!("r8:4"),
         data_type: Some(Datatype::Char),
     };
 
@@ -408,11 +402,8 @@ fn test_fetch_constant_and_domain_for_format_specifier() {
 
     // Test Case 4: Integer and tracked constant.
     setup.pi_state_before_symbol_call.set_register(
-        &Variable::mock("r7", 4),
-        DataDomain::from(IntervalDomain::new(
-            Bitvector::from_u64(2),
-            Bitvector::from_u64(2),
-        )),
+        &variable!("r7:4"),
+        DataDomain::from(IntervalDomain::new(bitvec!("2:8"), bitvec!("2:8"))),
     );
 
     assert_eq!(
@@ -429,11 +420,8 @@ fn test_fetch_constant_and_domain_for_format_specifier() {
 
     // Test Case 5: Char and tracked constant.
     setup.pi_state_before_symbol_call.set_register(
-        &Variable::mock("r8", 4),
-        DataDomain::from(IntervalDomain::new(
-            Bitvector::from_u32(0x42),
-            Bitvector::from_u32(0x42),
-        )),
+        &variable!("r8:4"),
+        DataDomain::from(IntervalDomain::new(bitvec!("0x42:4"), bitvec!("0x42:4"))),
     );
 
     assert_eq!(
@@ -450,10 +438,10 @@ fn test_fetch_constant_and_domain_for_format_specifier() {
 
     // Test Case 6: String and tracked constant.
     setup.pi_state_before_symbol_call.set_register(
-        &Variable::mock("r6", 4),
+        &variable!("r6:4"),
         DataDomain::from(IntervalDomain::new(
-            Bitvector::from_u32(0x3002),
-            Bitvector::from_u32(0x3002),
+            bitvec!("0x3002:4"),
+            bitvec!("0x3002:4"),
         )),
     );
 
@@ -471,22 +459,22 @@ fn test_fetch_constant_and_domain_for_format_specifier() {
 
     let stack_id = AbstractIdentifier::new(
         Tid::new("func"),
-        AbstractLocation::from_var(&Variable::mock("sp", 4)).unwrap(),
+        AbstractLocation::from_var(&variable!("sp:4")).unwrap(),
     );
 
     let mut pointer: DataDomain<IntervalDomain> = DataDomain::from_target(
         stack_id,
-        IntervalDomain::new(Bitvector::from_i32(16), Bitvector::from_i32(16)),
+        IntervalDomain::new(bitvec!("16:4"), bitvec!("16:4")),
     );
 
     let heap_id = AbstractIdentifier::new(
         Tid::new("func"),
-        AbstractLocation::from_var(&Variable::mock("r9", 4)).unwrap(),
+        AbstractLocation::from_var(&variable!("r9:4")).unwrap(),
     );
 
     pointer.insert_relative_value(
         heap_id.clone(),
-        IntervalDomain::new(Bitvector::from_i32(0), Bitvector::from_i32(0)),
+        IntervalDomain::new(bitvec!("0:4"), bitvec!("0:4")),
     );
 
     setup
@@ -499,7 +487,7 @@ fn test_fetch_constant_and_domain_for_format_specifier() {
     // Test Case 5: String and tracked domain.
     setup
         .pi_state_before_symbol_call
-        .set_register(&Variable::mock("r6", 4), pointer);
+        .set_register(&variable!("r6:4"), pointer);
 
     let expected_domain = CharacterInclusionDomain::Value((
         CharacterSet::Value(BTreeSet::new()),
@@ -557,7 +545,7 @@ fn test_fetch_subdomains_if_available() {
 
     let stack_id = AbstractIdentifier::new(
         Tid::new("func"),
-        AbstractLocation::from_var(&Variable::mock("sp", 4)).unwrap(),
+        AbstractLocation::from_var(&variable!("sp:4")).unwrap(),
     );
 
     // Test Case 2: Target value is not of type string pointer.
@@ -600,13 +588,13 @@ fn test_fetch_constant_domain_if_available() {
     pi_results.compute(false);
 
     let setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
-    let string_data: DataDomain<IntervalDomain> = DataDomain::from(Bitvector::from_i32(0x7000));
+    let string_data: DataDomain<IntervalDomain> = DataDomain::from(bitvec!("0x7000:4"));
     let string_arg: Arg = Arg::mock_pointer_register("r0", 4);
 
-    let integer_data: DataDomain<IntervalDomain> = DataDomain::from(Bitvector::from_i32(2));
+    let integer_data: DataDomain<IntervalDomain> = DataDomain::from(bitvec!("2:4"));
     let integer_arg: Arg = Arg::mock_register_with_data_type("r0", 4, Some(Datatype::Integer));
 
-    let char_data: DataDomain<IntervalDomain> = DataDomain::from(Bitvector::from_i32(0x61));
+    let char_data: DataDomain<IntervalDomain> = DataDomain::from(bitvec!("0x61:4"));
     let char_arg: Arg = Arg::mock_register_with_data_type("r0", 4, Some(Datatype::Char));
 
     assert_eq!(

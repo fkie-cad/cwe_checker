@@ -89,6 +89,15 @@
       ]
     ]
   },
+  "CWE416": {
+    "deallocation_symbols": [
+      "free",
+      "realloc",
+      "reallocarray",
+      "operator.delete",
+      "operator.delete[]"
+    ]
+  },
   "CWE426": {
     "_comment": "functions that change/drop privileges",
     "symbols": [
@@ -214,6 +223,16 @@
   "CWE782": {
     "symbols": []
   },
+  "CWE789": {
+    "stack_threshold": 7500,
+    "heap_threshold": 1000000,
+    "symbols": [
+      "xmalloc",
+      "malloc",
+      "realloc",
+      "calloc"
+    ]
+  },
   "check_path": {
     "_comment": "functions that take direct user input",
     "symbols": [
@@ -227,7 +246,11 @@
       "malloc",
       "calloc",
       "realloc",
-      "xmalloc"
+      "reallocarray",
+      "xmalloc",
+      "strdup",
+      "operator.new",
+      "operator.new[]"
     ]
   },
   "StringAbstraction": {

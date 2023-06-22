@@ -313,6 +313,33 @@ public class ParseCspecContent {
     /**
      * 
      * @param parser: parser for .cspec file
+     * @param integerRegisters: the list of known integer registers
+     * @param floatRegisters: the list of known float registers
+     *
+     * Parses a single parameter from the given parser and adds it either to the list of integer registers
+     * or to the list of float registers
+     */
+    public static void parseSingleRegister(XmlPullParser parser, ArrayList<String> integerRegisters, ArrayList<String> floatRegisters) {
+        XmlElement pentry = parser.peek();
+        parser.start("pentry");
+        XmlElement entry = parser.peek();
+        if(entry.getName().equals("register")) {
+            parser.start("register");
+            if(isFloatRegister(pentry)) {
+                floatRegisters.add(entry.getAttribute("name"));
+            } else {
+                integerRegisters.add(entry.getAttribute("name"));
+            }
+            parser.end();
+        } else {
+            discardSubTree(parser);
+        }
+        parser.end();
+    }
+
+    /**
+     * 
+     * @param parser: parser for .cspec file
      * @param convention: convention object for later serialization
      * 
      * Parses the parameter registers for an external symbol.
@@ -323,21 +350,15 @@ public class ParseCspecContent {
         ArrayList<String> floatRegisters = new ArrayList<String>(); 
         parser.start("input");
         while(parser.peek().isStart()) {
-            XmlElement pentry = parser.peek();
-            parser.start("pentry");
-            XmlElement entry = parser.peek();
-            if(entry.getName().equals("register")) {
-                parser.start("register");
-                if(isFloatRegister(pentry)) {
-                    floatRegisters.add(entry.getAttribute("name"));
-                } else {
-                    integerRegisters.add(entry.getAttribute("name"));
+            if(parser.softStart("group") != null) {
+                // The x86-64-win.cspec file has some registers that are additionally nested in "group" items
+                while(parser.peek().isStart()) {
+                    parseSingleRegister(parser, integerRegisters, floatRegisters);
                 }
                 parser.end();
             } else {
-                discardSubTree(parser);
+                parseSingleRegister(parser, integerRegisters, floatRegisters);
             }
-            parser.end();
         }
         parser.end();
 

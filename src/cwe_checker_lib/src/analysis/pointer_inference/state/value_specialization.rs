@@ -92,19 +92,20 @@ impl State {
     ) -> Result<(), Error> {
         match op {
             BinOpType::IntAdd => {
-                let intermediate_result = result.clone() - self.eval(lhs);
+                let intermediate_result = result.clone() - self.eval(lhs).without_widening_hints();
                 self.specialize_by_expression_result(rhs, intermediate_result)?;
 
-                let intermediate_result = result - self.eval(rhs);
+                let intermediate_result = result - self.eval(rhs).without_widening_hints();
                 self.specialize_by_expression_result(lhs, intermediate_result)?;
 
                 return Ok(());
             }
             BinOpType::IntSub => {
-                let intermediate_result: Data = self.eval(lhs) - result.clone();
+                let intermediate_result: Data =
+                    self.eval(lhs).without_widening_hints() - result.clone();
                 self.specialize_by_expression_result(rhs, intermediate_result)?;
 
-                let intermediate_result = result + self.eval(rhs);
+                let intermediate_result = result + self.eval(rhs).without_widening_hints();
                 self.specialize_by_expression_result(lhs, intermediate_result)?;
 
                 return Ok(());
@@ -185,11 +186,17 @@ impl State {
                         (BinOpType::IntEqual, false) | (BinOpType::IntNotEqual, true) => {
                             // lhs != rhs
                             if let Ok(bitvec) = self.eval(lhs).try_to_bitvec() {
-                                let new_result = self.eval(rhs).add_not_equal_bound(&bitvec)?;
+                                let new_result = self
+                                    .eval(rhs)
+                                    .without_widening_hints()
+                                    .add_not_equal_bound(&bitvec)?;
                                 self.specialize_by_expression_result(rhs, new_result)?;
                             }
                             if let Ok(bitvec) = self.eval(rhs).try_to_bitvec() {
-                                let new_result = self.eval(lhs).add_not_equal_bound(&bitvec)?;
+                                let new_result = self
+                                    .eval(lhs)
+                                    .without_widening_hints()
+                                    .add_not_equal_bound(&bitvec)?;
                                 self.specialize_by_expression_result(lhs, new_result)?;
                             }
                             // Also specialize cases of pointer comparisons
@@ -251,7 +258,10 @@ impl State {
         lhs: &Expression,
         rhs: &Expression,
     ) -> Result<(), Error> {
-        let (lhs_pointer, rhs_pointer) = (self.eval(lhs), self.eval(rhs));
+        let (lhs_pointer, rhs_pointer) = (
+            self.eval(lhs).without_widening_hints(),
+            self.eval(rhs).without_widening_hints(),
+        );
         match (
             lhs_pointer.get_if_unique_target(),
             rhs_pointer.get_if_unique_target(),
@@ -308,11 +318,17 @@ impl State {
                         return Err(anyhow!("Unsatisfiable bound"));
                     }
                     lhs_bound += &Bitvector::one(lhs_bound.width());
-                    let new_result = self.eval(rhs).add_signed_greater_equal_bound(&lhs_bound)?;
+                    let new_result = self
+                        .eval(rhs)
+                        .without_widening_hints()
+                        .add_signed_greater_equal_bound(&lhs_bound)?;
                     self.specialize_by_expression_result(rhs, new_result)?;
                 }
                 IntSLessEqual => {
-                    let new_result = self.eval(rhs).add_signed_greater_equal_bound(&lhs_bound)?;
+                    let new_result = self
+                        .eval(rhs)
+                        .without_widening_hints()
+                        .add_signed_greater_equal_bound(&lhs_bound)?;
                     self.specialize_by_expression_result(rhs, new_result)?;
                 }
                 IntLess => {
@@ -322,12 +338,14 @@ impl State {
                     lhs_bound += &Bitvector::one(lhs_bound.width());
                     let new_result = self
                         .eval(rhs)
+                        .without_widening_hints()
                         .add_unsigned_greater_equal_bound(&lhs_bound)?;
                     self.specialize_by_expression_result(rhs, new_result)?;
                 }
                 IntLessEqual => {
                     let new_result = self
                         .eval(rhs)
+                        .without_widening_hints()
                         .add_unsigned_greater_equal_bound(&lhs_bound)?;
                     self.specialize_by_expression_result(rhs, new_result)?;
                 }
@@ -341,11 +359,17 @@ impl State {
                         return Err(anyhow!("Unsatisfiable bound"));
                     }
                     rhs_bound -= &Bitvector::one(rhs_bound.width());
-                    let new_result = self.eval(lhs).add_signed_less_equal_bound(&rhs_bound)?;
+                    let new_result = self
+                        .eval(lhs)
+                        .without_widening_hints()
+                        .add_signed_less_equal_bound(&rhs_bound)?;
                     self.specialize_by_expression_result(lhs, new_result)?;
                 }
                 IntSLessEqual => {
-                    let new_result = self.eval(lhs).add_signed_less_equal_bound(&rhs_bound)?;
+                    let new_result = self
+                        .eval(lhs)
+                        .without_widening_hints()
+                        .add_signed_less_equal_bound(&rhs_bound)?;
                     self.specialize_by_expression_result(lhs, new_result)?;
                 }
                 IntLess => {
@@ -353,11 +377,17 @@ impl State {
                         return Err(anyhow!("Unsatisfiable bound"));
                     }
                     rhs_bound -= &Bitvector::one(rhs_bound.width());
-                    let new_result = self.eval(lhs).add_unsigned_less_equal_bound(&rhs_bound)?;
+                    let new_result = self
+                        .eval(lhs)
+                        .without_widening_hints()
+                        .add_unsigned_less_equal_bound(&rhs_bound)?;
                     self.specialize_by_expression_result(lhs, new_result)?;
                 }
                 IntLessEqual => {
-                    let new_result = self.eval(lhs).add_unsigned_less_equal_bound(&rhs_bound)?;
+                    let new_result = self
+                        .eval(lhs)
+                        .without_widening_hints()
+                        .add_unsigned_less_equal_bound(&rhs_bound)?;
                     self.specialize_by_expression_result(lhs, new_result)?;
                 }
                 _ => panic!(),

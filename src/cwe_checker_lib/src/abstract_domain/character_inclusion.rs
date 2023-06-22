@@ -169,7 +169,7 @@ impl fmt::Display for CharacterInclusionDomain {
         match self {
             CharacterInclusionDomain::Top => write!(f, "Top"),
             CharacterInclusionDomain::Value((certain_set, possible_set)) => {
-                write!(f, "Certain: {}, Possible: {}", certain_set, possible_set)
+                write!(f, "Certain: {certain_set}, Possible: {possible_set}")
             }
         }
     }
@@ -243,7 +243,7 @@ impl fmt::Display for CharacterSet {
         match self {
             CharacterSet::Top => write!(f, "Top"),
             CharacterSet::Value(char_set) => {
-                write!(f, "{:?}", char_set)
+                write!(f, "{char_set:?}")
             }
         }
     }

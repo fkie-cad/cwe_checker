@@ -99,7 +99,7 @@ fn generate_cwe_warning(sub: &Term<Sub>, callsite: &Tid) -> CweWarning {
             "(The program utilizes chroot without dropping privileges and/or changing the directory) at {} ({})",
             callsite.address, sub.term.name
         ))
-        .tids(vec![format!("{}", callsite)])
+        .tids(vec![format!("{callsite}")])
         .addresses(vec![callsite.address.clone()])
         .symbols(vec![sub.term.name.clone()])
 }
@@ -175,6 +175,5 @@ pub fn check_cwe(
         }
     }
 
-    cwe_warnings.sort();
     (Vec::new(), cwe_warnings)
 }

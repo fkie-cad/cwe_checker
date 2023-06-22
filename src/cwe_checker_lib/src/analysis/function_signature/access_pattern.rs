@@ -23,6 +23,33 @@ impl AccessPattern {
         }
     }
 
+    /// Generate a new `AccessPattern` object with all access flags set to true (to model unknown access).
+    pub fn new_unknown_access() -> Self {
+        Self {
+            dereferenced: true,
+            read: true,
+            mutably_dereferenced: true,
+        }
+    }
+
+    /// Set the access flag for read access and return `self`.
+    pub fn with_read_flag(mut self) -> Self {
+        self.read = true;
+        self
+    }
+
+    /// Set the access flag for immutable pointer dereference and return `self`.
+    pub fn with_dereference_flag(mut self) -> Self {
+        self.dereferenced = true;
+        self
+    }
+
+    /// Set the access flag for pointer dereference with write access to the pointer target and return `self`.
+    pub fn with_mutably_dereferenced_flag(mut self) -> Self {
+        self.mutably_dereferenced = true;
+        self
+    }
+
     /// Set the access flag for immutable pointer dereference.
     pub fn set_dereference_flag(&mut self) {
         self.dereferenced = true;

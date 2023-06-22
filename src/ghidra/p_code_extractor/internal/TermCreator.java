@@ -189,8 +189,14 @@ public class TermCreator {
     public static Variable createVariable(Varnode node) {
         Variable var = new Variable();
         if (node.isRegister()) {
-            var.setName(HelperFunctions.context.getRegister(node).getName());
-            var.setIsVirtual(false);
+            if (HelperFunctions.context.getRegister(node) == null) {
+                // This is a workaround for nameless registers encountered in some Aarch64 binaries.
+                var.setName(String.format("$U{}_unnamed", node.getAddress().toString()));
+                var.setIsVirtual(true);
+            } else {
+                var.setName(HelperFunctions.context.getRegister(node).getName());
+                var.setIsVirtual(false);
+            }
         } else if (node.isUnique()) {
             var.setName(HelperFunctions.renameVirtualRegister(node.getAddress().toString()));
             var.setIsVirtual(true);
@@ -259,7 +265,18 @@ public class TermCreator {
                 case PcodeOp.UNIMPLEMENTED:
                     jumpLabel = null;
                     break;
+                case PcodeOp.CBRANCH:
+                    // If the target a constant, an intra Pcode jump is performed.
+                    if (PcodeBlockData.pcodeOp.getInput(0).isConstant()) {                       
+                        int offset = (int) PcodeBlockData.pcodeOp.getInput(0).getAddress().getOffset();
+                        // if the target pcodeOp is not contained within the current instruction, go to next
+                        if (PcodeBlockData.pcodeIndex + offset >= PcodeBlockData.ops.length){
+                            jumpLabel = new Label((Tid) new Tid(String.format("blk_%s", PcodeBlockData.instruction.getNext().getAddress().toString()), PcodeBlockData.instruction.getNext().getAddress().toString()));
+                            break;
+                        }                        
+                    }
                 default:
+                    // Note: If getInput() returns a constant, the resulting Tid is invalid
                     jumpLabel = new Label((Tid) new Tid(String.format("blk_%s", PcodeBlockData.pcodeOp.getInput(0).getAddress().toString()), PcodeBlockData.pcodeOp.getInput(0).getAddress().toString()));
                     break;
             }

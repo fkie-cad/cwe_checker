@@ -1,34 +1,30 @@
-use crate::intermediate_representation::{Bitvector, Tid};
+use std::collections::BTreeSet;
+
+use crate::{abstract_domain::IntervalDomain, expr, intermediate_representation::*, variable};
 
 use super::*;
 
 fn mock_pi_state() -> PointerInferenceState {
-    PointerInferenceState::new(&Variable::mock("RSP", 8 as u64), Tid::new("func"))
+    PointerInferenceState::new(&variable!("RSP:8"), Tid::new("func"), BTreeSet::new())
 }
 
 #[test]
 /// Tests extraction of format string parameters '/dev/sd%c%d' and 'cat %s'.
 fn test_get_variable_parameters() {
     let mut pi_state = mock_pi_state();
-    let sprintf_symbol = ExternSymbol::mock_string();
+    let sprintf_symbol = ExternSymbol::mock_sprintf_x64();
     let mut format_string_index_map: HashMap<String, usize> = HashMap::new();
     format_string_index_map.insert("sprintf".to_string(), 1);
     let global_address = Bitvector::from_str_radix(16, "5000").unwrap();
     pi_state.set_register(
-        &Variable::mock("RSI", 8 as u64),
+        &variable!("RSI:8"),
         IntervalDomain::new(global_address.clone(), global_address).into(),
     );
     let project = Project::mock_x64();
 
     let mut output: Vec<Arg> = Vec::new();
-    output.push(Arg::from_var(
-        Variable::mock("RDX", 8),
-        Some(Datatype::Char),
-    ));
-    output.push(Arg::from_var(
-        Variable::mock("RCX", 8),
-        Some(Datatype::Integer),
-    ));
+    output.push(Arg::from_var(variable!("RDX:8"), Some(Datatype::Char)));
+    output.push(Arg::from_var(variable!("RCX:8"), Some(Datatype::Integer)));
 
     assert_eq!(
         output,
@@ -41,14 +37,11 @@ fn test_get_variable_parameters() {
         .unwrap()
     );
 
-    output = vec![Arg::from_var(
-        Variable::mock("RDX", 8),
-        Some(Datatype::Pointer),
-    )];
+    output = vec![Arg::from_var(variable!("RDX:8"), Some(Datatype::Pointer))];
 
     let global_address = Bitvector::from_str_radix(16, "500c").unwrap();
     pi_state.set_register(
-        &Variable::mock("RSI", 8 as u64),
+        &variable!("RSI:8"),
         IntervalDomain::new(global_address.clone(), global_address).into(),
     );
 
@@ -68,11 +61,11 @@ fn test_get_variable_parameters() {
 fn test_get_input_format_string() {
     let mem_image = RuntimeMemoryImage::mock();
     let mut pi_state = mock_pi_state();
-    let sprintf_symbol = ExternSymbol::mock_string();
+    let sprintf_symbol = ExternSymbol::mock_sprintf_x64();
 
     let global_address = Bitvector::from_str_radix(16, "3002").unwrap();
     pi_state.set_register(
-        &Variable::mock("RSI", 8 as u64),
+        &variable!("RSI:8"),
         IntervalDomain::new(global_address.clone(), global_address).into(),
     );
 
@@ -85,13 +78,40 @@ fn test_get_input_format_string() {
 #[test]
 fn test_parse_format_string_destination_and_return_content() {
     let mem_image = RuntimeMemoryImage::mock();
-    let string_address_vector = Bitvector::from_str_radix(16, "3002").unwrap();
-    let string_address = IntervalDomain::new(string_address_vector.clone(), string_address_vector);
+    let string_address = Bitvector::from_str_radix(16, "3002").unwrap();
 
     assert_eq!(
         "Hello World",
         parse_format_string_destination_and_return_content(string_address, &mem_image).unwrap()
     );
+}
+
+/// Test the regular expression used for format string parameter parsing on specific cases.
+#[test]
+fn test_format_string_regex() {
+    let regex = Regex::new(r#"%[+\-#0]{0,1}\d*[\.]?\d*([cCdiouxXeEfFgGaAnpsS]|hi|hd|hu|li|ld|lu|lli|lld|llu|lf|lg|le|la|lF|lG|lE|lA|Lf|Lg|Le|La|LF|LG|LE|LA)"#)
+        .expect("No valid regex!");
+
+    let format_string = "one %s, two %.2lf%%, three %.2lf%%";
+    let results: Vec<_> = regex
+        .captures_iter(format_string)
+        .map(|cap| cap[1].to_string())
+        .collect();
+    assert_eq!(&results[..], vec!["s", "lf", "lf"]);
+
+    let format_string = "test %+2.300f,%-2.300f%#2.300f%02.300f";
+    let results: Vec<_> = regex
+        .captures_iter(format_string)
+        .map(|cap| cap[1].to_string())
+        .collect();
+    assert_eq!(&results[..], vec!["f", "f", "f", "f"]);
+
+    let format_string = r#"%cCd %ss %256s /dev/bus/usb/%03d/%s"#;
+    let results: Vec<_> = regex
+        .captures_iter(format_string)
+        .map(|cap| cap[1].to_string())
+        .collect();
+    assert_eq!(&results[..], vec!["c", "s", "s", "d", "s"]);
 }
 
 #[test]
@@ -154,8 +174,8 @@ fn test_parse_format_string_parameters() {
 #[test]
 /// Tests tracking of parameters according to format string
 fn test_calculate_parameter_locations() {
-    let cconv = CallingConvention::mock_x64();
-    let format_string_index: usize = 1;
+    let project = Project::mock_x64();
+    let extern_symbol = ExternSymbol::mock_sprintf_x64();
     let mut parameters: Vec<(Datatype, ByteSize)> = Vec::new();
     parameters.push(("d".to_string().into(), ByteSize::new(8)));
     parameters.push(("f".to_string().into(), ByteSize::new(16)));
@@ -163,19 +183,15 @@ fn test_calculate_parameter_locations() {
 
     let mut expected_args = vec![
         Arg::Register {
-            expr: Expression::Var(Variable::mock("RDX", ByteSize::new(8))),
+            expr: expr!("RDX:8"),
             data_type: Some(Datatype::Integer),
         },
         Arg::Register {
-            expr: Expression::subpiece(
-                Expression::Var(Variable::mock("ZMM0", 64)),
-                ByteSize::new(0),
-                ByteSize::new(8),
-            ),
+            expr: Expression::subpiece(expr!("ZMM0:64"), ByteSize::new(0), ByteSize::new(8)),
             data_type: Some(Datatype::Double),
         },
         Arg::Register {
-            expr: Expression::Var(Variable::mock("RCX", ByteSize::new(8))),
+            expr: expr!("RCX:8"),
             data_type: Some(Datatype::Pointer),
         },
     ];
@@ -183,13 +199,7 @@ fn test_calculate_parameter_locations() {
     // Test Case 1: The string parameter is still written in the RCX register since 'f' is contained in the float register.
     assert_eq!(
         expected_args,
-        calculate_parameter_locations(
-            parameters.clone(),
-            &cconv,
-            format_string_index,
-            &Variable::mock("RSP", 8),
-            "x86_64"
-        )
+        calculate_parameter_locations(parameters.clone(), &extern_symbol, &project,)
     );
 
     parameters.push(("s".to_string().into(), ByteSize::new(8)));
@@ -197,15 +207,15 @@ fn test_calculate_parameter_locations() {
     parameters.push(("s".to_string().into(), ByteSize::new(8)));
 
     expected_args.push(Arg::Register {
-        expr: Expression::Var(Variable::mock("R8", ByteSize::new(8))),
+        expr: expr!("R8:8"),
         data_type: Some(Datatype::Pointer),
     });
     expected_args.push(Arg::Register {
-        expr: Expression::Var(Variable::mock("R9", ByteSize::new(8))),
+        expr: expr!("R9:8"),
         data_type: Some(Datatype::Pointer),
     });
     expected_args.push(Arg::Stack {
-        address: Expression::Var(Variable::mock("RSP", 8)).plus_const(8),
+        address: expr!("RSP:8 + 8:8"),
         size: ByteSize::new(8),
         data_type: Some(Datatype::Pointer),
     });
@@ -213,13 +223,7 @@ fn test_calculate_parameter_locations() {
     // Test Case 2: Three further string parameter does not fit into the registers anymore and one is written into the stack.
     assert_eq!(
         expected_args,
-        calculate_parameter_locations(
-            parameters,
-            &cconv,
-            format_string_index,
-            &Variable::mock("RSP", 8),
-            "x86_64"
-        )
+        calculate_parameter_locations(parameters, &extern_symbol, &project)
     );
 }
 
@@ -227,15 +231,10 @@ fn test_calculate_parameter_locations() {
 fn test_create_stack_arg() {
     assert_eq!(
         Arg::Stack {
-            address: Expression::Var(Variable::mock("RSP", 8)).plus_const(8),
+            address: expr!("RSP:8 + 8:8"),
             size: ByteSize::new(8),
             data_type: Some(Datatype::Pointer),
         },
-        create_stack_arg(
-            ByteSize::new(8),
-            8,
-            Datatype::Pointer,
-            &Variable::mock("RSP", 8)
-        ),
+        create_stack_arg(ByteSize::new(8), 8, Datatype::Pointer, &variable!("RSP:8")),
     )
 }

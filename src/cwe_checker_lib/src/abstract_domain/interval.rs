@@ -503,6 +503,13 @@ impl SpecializeByConditional for IntervalDomain {
 
         Ok(intersected_domain)
     }
+
+    fn without_widening_hints(mut self) -> Self {
+        self.widening_lower_bound = None;
+        self.widening_upper_bound = None;
+        self.widening_delay = 0;
+        self
+    }
 }
 
 impl AbstractDomain for IntervalDomain {

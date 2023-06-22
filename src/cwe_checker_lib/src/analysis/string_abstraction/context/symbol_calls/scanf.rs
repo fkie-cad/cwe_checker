@@ -199,7 +199,7 @@ mod tests {
     use crate::abstract_domain::{AbstractIdentifier, AbstractLocation, CharacterInclusionDomain};
     use crate::analysis::pointer_inference::PointerInference as PointerInferenceComputation;
     use crate::analysis::string_abstraction::tests::mock_project_with_intraprocedural_control_flow;
-    use crate::intermediate_representation::{Expression, Variable};
+    use crate::{expr, intermediate_representation::*, variable};
 
     #[test]
     fn test_handle_scanf_calls() {
@@ -222,7 +222,7 @@ mod tests {
 
         let stack_id = AbstractIdentifier::new(
             Tid::new("func"),
-            AbstractLocation::from_var(&Variable::mock("sp", 4)).unwrap(),
+            AbstractLocation::from_var(&variable!("sp:4")).unwrap(),
         );
 
         assert!(new_state
@@ -285,7 +285,7 @@ mod tests {
 
     #[test]
     fn test_create_abstract_domain_entries_for_function_return_values_with_known_values() {
-        let r2_reg = Variable::mock("r2", 4);
+        let r2_reg = variable!("r2:4");
         let sscanf_symbol = ExternSymbol::mock_sscanf_symbol_arm();
 
         let project = mock_project_with_intraprocedural_control_flow(
@@ -299,7 +299,7 @@ mod tests {
 
         let stack_id = AbstractIdentifier::new(
             Tid::new("func"),
-            AbstractLocation::from_var(&Variable::mock("sp", 4)).unwrap(),
+            AbstractLocation::from_var(&variable!("sp:4")).unwrap(),
         );
 
         let mut arg_to_value_map: HashMap<Arg, Option<String>> = HashMap::new();
@@ -309,7 +309,7 @@ mod tests {
             data_type: Some(Datatype::Pointer),
         };
         let stack_arg = Arg::Stack {
-            address: Expression::Var(Variable::mock("sp", 4)),
+            address: expr!("sp:4"),
             size: ByteSize::new(4),
             data_type: Some(Datatype::Pointer),
         };
@@ -361,7 +361,7 @@ mod tests {
 
     #[test]
     fn test_create_abstract_domain_entries_for_function_return_values_with_unknown_values() {
-        let r1_reg = Variable::mock("r1", 4);
+        let r1_reg = variable!("r1:4");
         let scanf_symbol = ExternSymbol::mock_scanf_symbol_arm();
 
         let project = mock_project_with_intraprocedural_control_flow(
@@ -375,7 +375,7 @@ mod tests {
 
         let stack_id = AbstractIdentifier::new(
             Tid::new("func"),
-            AbstractLocation::from_var(&Variable::mock("sp", 4)).unwrap(),
+            AbstractLocation::from_var(&variable!("sp:4")).unwrap(),
         );
 
         let mut arg_to_value_map: HashMap<Arg, Option<String>> = HashMap::new();
@@ -384,7 +384,7 @@ mod tests {
             data_type: Some(Datatype::Pointer),
         };
         let stack_arg = Arg::Stack {
-            address: Expression::Var(Variable::mock("sp", 4)),
+            address: expr!("sp:4"),
             size: ByteSize::new(4),
             data_type: Some(Datatype::Pointer),
         };
@@ -448,7 +448,7 @@ mod tests {
 
         let stack_id = AbstractIdentifier::new(
             Tid::new("func"),
-            AbstractLocation::from_var(&Variable::mock("sp", 4)).unwrap(),
+            AbstractLocation::from_var(&variable!("sp:4")).unwrap(),
         );
 
         let return_target: DataDomain<IntervalDomain> =
@@ -532,7 +532,7 @@ mod tests {
 
         let stack_id = AbstractIdentifier::new(
             Tid::new("func"),
-            AbstractLocation::from_var(&Variable::mock("sp", 4)).unwrap(),
+            AbstractLocation::from_var(&variable!("sp:4")).unwrap(),
         );
 
         let new_state = setup
@@ -585,7 +585,7 @@ mod tests {
 
         let stack_id = AbstractIdentifier::new(
             Tid::new("func"),
-            AbstractLocation::from_var(&Variable::mock("sp", 4)).unwrap(),
+            AbstractLocation::from_var(&variable!("sp:4")).unwrap(),
         );
 
         let new_state = setup
@@ -734,7 +734,7 @@ mod tests {
             ),
             (
                 Arg::Stack {
-                    address: Expression::Var(Variable::mock("sp", 4)),
+                    address: expr!("sp:4"),
                     size: ByteSize::new(4),
                     data_type: Some(Datatype::Pointer),
                 },
@@ -742,7 +742,7 @@ mod tests {
             ),
             (
                 Arg::Stack {
-                    address: Expression::Var(Variable::mock("sp", 4)).plus_const(4),
+                    address: expr!("sp:4 + 4:4"),
                     size: ByteSize::new(4),
                     data_type: Some(Datatype::Pointer),
                 },

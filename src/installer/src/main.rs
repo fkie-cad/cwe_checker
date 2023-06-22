@@ -2,24 +2,23 @@
 //! It creates config files, copies the Ghida-Plugin and can search for a Ghidra installation at commonly used locations.
 
 use anyhow::{anyhow, Result};
+use clap::Parser;
 use directories::{BaseDirs, ProjectDirs, UserDirs};
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
-use structopt::StructOpt;
 use walkdir::WalkDir;
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
 /// Installs cwe_checker
 struct CmdlineArgs {
-    #[structopt()]
     /// Path to a ghidra installation.
     ///
     /// If this option is set then the installation will use ghidra at this location.
     ghidra_path: Option<String>,
 
-    #[structopt(long, short)]
+    #[arg(long, short)]
     /// If true, cwe_checker will be uninstalled.
     uninstall: bool,
 }
@@ -35,7 +34,7 @@ struct GhidraConfig {
 fn copy_config_json(location: &Path) -> Result<()> {
     let repo_dir = env::current_dir().unwrap();
     std::fs::copy(
-        &repo_dir.join("src/config.json"),
+        repo_dir.join("src/config.json"),
         location.join("config.json"),
     )?;
     Ok(())
@@ -83,7 +82,7 @@ fn get_search_locations() -> Vec<PathBuf> {
 fn find_ghidra() -> Result<PathBuf> {
     let mut ghidra_locations: Vec<PathBuf> = get_search_locations()
         .into_iter()
-        .filter_map(|x| search_for_ghidrarun(&x))
+        .flat_map(|x| search_for_ghidrarun(&x))
         .collect();
 
     ghidra_locations.sort();
@@ -96,20 +95,31 @@ fn find_ghidra() -> Result<PathBuf> {
     }
 }
 
+/// check whether a path starts with ".", indicating a hidden file or folder on Linux.
+fn is_hidden(path: &walkdir::DirEntry) -> bool {
+    path.file_name()
+        .to_str()
+        .map(|s| s.starts_with('.'))
+        .unwrap_or(false)
+}
+
 /// Searches for a file containing "ghidraRun" at provided path recursively.
-fn search_for_ghidrarun(entry_path: &Path) -> Option<PathBuf> {
+fn search_for_ghidrarun(entry_path: &Path) -> Vec<PathBuf> {
+    let mut hits = Vec::new();
     for entry in WalkDir::new(entry_path)
+        .max_depth(8)
         .into_iter()
+        .filter_entry(|e| !is_hidden(e))
         .filter_map(|e| e.ok())
         .filter(|e| e.metadata().unwrap().is_file())
     {
         if entry.file_name().to_str().unwrap() == "ghidraRun" {
             let mut hit = entry.into_path();
             hit.pop();
-            return Some(hit);
+            hits.push(hit);
         }
     }
-    None
+    hits
 }
 
 /// Determines if a path is a ghidra installation
@@ -231,7 +241,7 @@ fn uninstall(conf_dir: &Path, data_dir: &Path) -> Result<()> {
 
 fn main() -> Result<()> {
     let cwe_checker_proj_dir = ProjectDirs::from("", "", "cwe_checker").unwrap();
-    let cmdline_args = CmdlineArgs::from_args();
+    let cmdline_args = CmdlineArgs::parse();
 
     match cmdline_args.uninstall {
         true => {

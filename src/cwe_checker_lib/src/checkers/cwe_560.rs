@@ -29,6 +29,7 @@ use crate::prelude::*;
 use crate::utils::log::{CweWarning, LogMessage};
 use crate::utils::symbol_utils::{get_callsites, get_symbol_map};
 use crate::CweModule;
+use std::collections::BTreeSet;
 
 /// The module name and version
 pub static CWE_MODULE: CweModule = CweModule {
@@ -51,7 +52,7 @@ fn get_umask_permission_arg(
     project: &Project,
 ) -> Result<u64, Error> {
     let stack_register = &project.stack_pointer_register;
-    let mut state = State::new(stack_register, block.tid.clone());
+    let mut state = State::new(stack_register, block.tid.clone(), BTreeSet::new());
 
     for def in block.term.defs.iter() {
         match &def.term {
@@ -59,7 +60,7 @@ fn get_umask_permission_arg(
                 let _ = state.handle_store(address, value, &project.runtime_memory_image);
             }
             Def::Assign { var, value } => {
-                let _ = state.handle_register_assign(var, value);
+                state.handle_register_assign(var, value);
             }
             Def::Load { var, address } => {
                 let _ = state.handle_load(var, address, &project.runtime_memory_image);
@@ -91,7 +92,7 @@ fn generate_cwe_warning(sub: &Term<Sub>, jmp: &Term<Jmp>, permission_const: u64)
         .addresses(vec![jmp.tid.address.clone()])
         .other(vec![vec![
             "umask_arg".to_string(),
-            format!("{:#o}", permission_const),
+            format!("{permission_const:#o}"),
         ]])
 }
 
@@ -121,8 +122,7 @@ pub fn check_cwe(
                     }
                     Err(err) => {
                         let log = LogMessage::new_info(format!(
-                            "Could not determine umask argument: {}",
-                            err
+                            "Could not determine umask argument: {err}"
                         ))
                         .location(jmp.tid.clone())
                         .source(CWE_MODULE.name);
@@ -133,6 +133,5 @@ pub fn check_cwe(
         }
     }
 
-    cwes.sort();
     (log_messages, cwes)
 }

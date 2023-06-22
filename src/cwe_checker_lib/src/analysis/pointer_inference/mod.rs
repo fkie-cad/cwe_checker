@@ -20,7 +20,7 @@
 //! In cases where we cannot know
 //! whether an error is due to an error in the memory management of the program under analysis
 //! or due to inexactness of the pointer inference analysis itself,
-//! we try to treat is as the more likely (but not necessarily true) case of the two.
+//! we try to treat it as the more likely (but not necessarily true) case of the two.
 //!
 //! See the `Config` struct for configurable analysis parameters.
 
@@ -108,7 +108,7 @@ impl<'a> PointerInference<'a> {
         let sub_to_entry_node_map = crate::analysis::graph::get_entry_nodes_of_subs(context.graph);
 
         let mut fixpoint_computation =
-            super::forward_interprocedural_fixpoint::create_computation_with_alternate_worklist_order(context, None);
+            super::forward_interprocedural_fixpoint::create_computation_with_bottom_up_worklist_order(context, None);
         if print_stats {
             let _ = log_sender.send(LogThreadMsg::Log(
                 LogMessage::new_info(format!(
@@ -156,9 +156,8 @@ impl<'a> PointerInference<'a> {
         }
         if !self.computation.has_stabilized() {
             let worklist_size = self.computation.get_worklist().len();
-            let _ = self.log_info(format!(
-                "Fixpoint did not stabilize. Remaining worklist size: {}",
-                worklist_size,
+            self.log_info(format!(
+                "Fixpoint did not stabilize. Remaining worklist size: {worklist_size}"
             ));
         }
         if print_stats {
@@ -172,11 +171,10 @@ impl<'a> PointerInference<'a> {
         for (node_index, value) in self.computation.node_values().iter() {
             let node = graph.node_weight(*node_index).unwrap();
             if let Ok(string) = serde_yaml::to_string(&(node, value)) {
-                println!("{}", string);
+                println!("{string}");
             } else {
                 println!(
-                    "Serializing failed at {:?} with {:?}",
-                    node_index,
+                    "Serializing failed at {node_index:?} with {:?}",
                     serde_yaml::to_string(value)
                 );
             }
@@ -192,7 +190,7 @@ impl<'a> PointerInference<'a> {
         for (node_index, node_value) in self.computation.node_values().iter() {
             let node = graph.node_weight(*node_index).unwrap();
             if let NodeValue::Value(value) = node_value {
-                json_nodes.insert(format!("{}", node), value.to_json_compact());
+                json_nodes.insert(format!("{node}"), value.to_json_compact());
             }
         }
         serde_json::Value::Object(json_nodes)
@@ -237,8 +235,7 @@ impl<'a> PointerInference<'a> {
             }
         }
         self.log_info(format!(
-            "Blocks with state: {} / {}",
-            stateful_blocks, all_blocks
+            "Blocks with state: {stateful_blocks} / {all_blocks}"
         ));
     }
 

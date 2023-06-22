@@ -1,5 +1,5 @@
 use super::*;
-use crate::intermediate_representation::{BinOpType, CastOpType, Variable as IrVariable};
+use crate::intermediate_representation::Variable as IrVariable;
 
 struct Setup {
     project: Project,
@@ -752,11 +752,6 @@ fn from_project_to_ir_project() {
     mock_project.program.term.subs.push(sub.clone());
 
     let ir_program = mock_project.into_ir_project(10000).program.term;
-    let ir_rdi_var = IrVariable {
-        name: String::from("RDI"),
-        size: ByteSize::new(8),
-        is_temp: false,
-    };
     let ir_rax_var = IrVariable {
         name: String::from("RAX"),
         size: ByteSize::new(8),
@@ -764,116 +759,18 @@ fn from_project_to_ir_project() {
     };
 
     // From: EDI = LOAD EDI
-    // To: RDI = PIECE(SUBPIECE(RDI, 4, 4), (LOAD SUBPIECE(RDI, 0, 4)))
-    let expected_def_0 = IrDef::Load {
-        var: ir_rdi_var.clone(),
-        address: IrExpression::BinOp {
-            op: BinOpType::Piece,
-            lhs: Box::new(IrExpression::Subpiece {
-                low_byte: ByteSize::new(4),
-                size: ByteSize::new(4),
-                arg: Box::new(IrExpression::Var(ir_rdi_var.clone())),
-            }),
-            rhs: Box::new(IrExpression::Subpiece {
-                low_byte: ByteSize::new(0),
-                size: ByteSize::new(4),
-                arg: Box::new(IrExpression::Var(ir_rdi_var.clone())),
-            }),
-        },
-    };
     // From: AH = AH INT_XOR AH
-    // To: RAX = PIECE(PIECE(SUBPIECE(RAX, 2, 6), (SUBPIECE(RAX, 1, 1) INT_XOR SUBPIECE(RAX, 1, 1))), SUBPIECE(RAX, 0, 1))
-    let expected_def_1 = IrDef::Assign {
-        var: ir_rax_var.clone(),
-        value: IrExpression::BinOp {
-            op: BinOpType::Piece,
-            lhs: Box::new(IrExpression::BinOp {
-                op: BinOpType::Piece,
-                lhs: Box::new(IrExpression::Subpiece {
-                    low_byte: ByteSize::new(2),
-                    size: ByteSize::new(6),
-                    arg: Box::new(IrExpression::Var(ir_rax_var.clone())),
-                }),
-                rhs: Box::new(IrExpression::BinOp {
-                    op: BinOpType::IntXOr,
-                    lhs: Box::new(IrExpression::Subpiece {
-                        low_byte: ByteSize::new(1),
-                        size: ByteSize::new(1),
-                        arg: Box::new(IrExpression::Var(ir_rax_var.clone())),
-                    }),
-                    rhs: Box::new(IrExpression::Subpiece {
-                        low_byte: ByteSize::new(1),
-                        size: ByteSize::new(1),
-                        arg: Box::new(IrExpression::Var(ir_rax_var.clone())),
-                    }),
-                }),
-            }),
-            rhs: Box::new(IrExpression::Subpiece {
-                low_byte: ByteSize::new(0),
-                size: ByteSize::new(1),
-                arg: Box::new(IrExpression::Var(ir_rax_var.clone())),
-            }),
-        },
-    };
-
-    // From: EAX = COPY EDI && RAX = INT_ZEXT EAX
-    // To: RAX = INT_ZEXT SUBPIECE(RDI, 0, 4)
-    let expected_def_3 = IrDef::Assign {
-        var: ir_rax_var.clone(),
-        value: IrExpression::Cast {
-            op: CastOpType::IntZExt,
-            size: ByteSize::new(8),
-            arg: Box::new(IrExpression::Subpiece {
-                low_byte: ByteSize::new(0),
-                size: ByteSize::new(4),
-                arg: Box::new(IrExpression::Var(ir_rdi_var.clone())),
-            }),
-        },
-    };
-
+    // From: EAX = COPY EDI
+    //       RAX = INT_ZEXT EAX
     // From: EAX = PIECE(0:2, AX)
-    // To: RAX = PIECE(SUBPIECE(RAX, 4, 4), PIECE(0:2, SUBPIECE(RAX, 0, 2)))
-    let expected_def_4 = IrDef::Assign {
-        var: ir_rax_var.clone(),
-        value: IrExpression::BinOp {
-            op: BinOpType::Piece,
-            lhs: Box::new(IrExpression::Subpiece {
-                low_byte: ByteSize::new(4),
-                size: ByteSize::new(4),
-                arg: Box::new(IrExpression::Var(ir_rax_var.clone())),
-            }),
-            rhs: Box::new(IrExpression::BinOp {
-                op: BinOpType::Piece,
-                lhs: Box::new(IrExpression::Const(Bitvector::zero(
-                    ByteSize::new(2).into(),
-                ))),
-                rhs: Box::new(IrExpression::Subpiece {
-                    low_byte: ByteSize::new(0),
-                    size: ByteSize::new(2),
-                    arg: Box::new(IrExpression::Var(ir_rax_var.clone())),
-                }),
-            }),
-        },
-    };
-
     // From: AX = SUBPIECE(EDI, 1, 2)
+
+    // To: Temp = PIECE(SUBPIECE(RDI, 4, 4), (LOAD SUBPIECE(RDI, 0, 4)))
+    //     RDI = PIECE(SUBPIECE(RAX, 4, 4), Temp)
+    // To: RAX = PIECE(PIECE(SUBPIECE(RAX, 2, 6), (SUBPIECE(RAX, 1, 1) INT_XOR SUBPIECE(RAX, 1, 1))), SUBPIECE(RAX, 0, 1))
+    // To: RAX = INT_ZEXT SUBPIECE(RDI, 0, 4)
+    // To: RAX = PIECE(SUBPIECE(RAX, 4, 4), PIECE(0:2, SUBPIECE(RAX, 0, 2)))
     // To: RAX = PIECE(SUBPIECE(RAX, 2, 6), SUBPIECE(RDI, 1, 2))
-    let expected_def_5 = IrDef::Assign {
-        var: ir_rax_var.clone(),
-        value: IrExpression::BinOp {
-            op: BinOpType::Piece,
-            lhs: Box::new(IrExpression::Subpiece {
-                low_byte: ByteSize::new(2),
-                size: ByteSize::new(6),
-                arg: Box::new(IrExpression::Var(ir_rax_var.clone())),
-            }),
-            rhs: Box::new(IrExpression::Subpiece {
-                low_byte: ByteSize::new(1),
-                size: ByteSize::new(2),
-                arg: Box::new(IrExpression::Var(ir_rdi_var.clone())),
-            }),
-        },
-    };
 
     let mut target_tid = Tid::new("blk_00102016");
     target_tid.address = String::from("00102016");
@@ -889,15 +786,34 @@ fn from_project_to_ir_project() {
         return_: Some(target_tid.clone()),
     };
 
-    // Checks whether the zero extension was correctly removed; leaving only 5 definitions behind.
     let ir_block = &ir_program.subs.get(&sub_tid).unwrap().term.blocks[0].term;
-    assert_eq!(ir_block.defs.len(), 5);
+    assert_eq!(ir_block.defs.len(), 6);
 
     // Checks if the other definitions and the jump were correctly casted.
-    assert_eq!(ir_block.defs[0].term, expected_def_0);
-    assert_eq!(ir_block.defs[1].term, expected_def_1);
-    assert_eq!(ir_block.defs[2].term, expected_def_3);
-    assert_eq!(ir_block.defs[3].term, expected_def_4);
-    assert_eq!(ir_block.defs[4].term, expected_def_5);
+    assert_eq!(
+        format!("{}", ir_block.defs[0].term),
+        "loaded_value:4(temp) := Load from (RDI:8)[0-3]".to_string()
+    );
+    assert_eq!(
+        format!("{}", ir_block.defs[1].term),
+        "RDI:8 = ((RDI:8)[4-7] Piece loaded_value:4(temp))".to_string()
+    );
+    assert_eq!(
+        format!("{}", ir_block.defs[2].term),
+        "RAX:8 = (((RAX:8)[2-7] Piece ((RAX:8)[1-1] ^ (RAX:8)[1-1])) Piece (RAX:8)[0-0])"
+            .to_string()
+    );
+    assert_eq!(
+        format!("{}", ir_block.defs[3].term),
+        "RAX:8 = IntZExt((RDI:8)[0-3])".to_string()
+    );
+    assert_eq!(
+        format!("{}", ir_block.defs[4].term),
+        "RAX:8 = ((RAX:8)[4-7] Piece (0x0:2 Piece (RAX:8)[0-1]))".to_string()
+    );
+    assert_eq!(
+        format!("{}", ir_block.defs[5].term),
+        "RAX:8 = ((RAX:8)[2-7] Piece ((RDI:8)[0-3])[1-2])".to_string()
+    );
     assert_eq!(ir_block.jmps[0].term, expected_jmp);
 }

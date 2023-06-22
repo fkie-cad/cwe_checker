@@ -48,9 +48,7 @@ fn generate_cwe_warning(secure_initializer_func: &str, rand_func: &str) -> CweWa
         CWE_MODULE.name,
         CWE_MODULE.version,
         format!(
-            "(Insufficient Entropy in PRNG) program uses {} without calling {} before",
-            rand_func, secure_initializer_func
-        ),
+            "(Insufficient Entropy in PRNG) program uses {rand_func} without calling {secure_initializer_func} before"),
     )
 }
 
@@ -70,6 +68,5 @@ pub fn check_cwe(
             cwe_warnings.push(generate_cwe_warning(secure_initializer_func, rand_func));
         }
     }
-    cwe_warnings.sort();
     (Vec::new(), cwe_warnings)
 }

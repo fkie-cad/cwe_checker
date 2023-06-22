@@ -66,6 +66,31 @@ impl State {
         }
     }
 
+    /// Set the MIPS link register `t9` to the address of the function TID.
+    ///
+    /// According to the System V ABI for MIPS the caller has to save the callee address in register `t9`
+    /// on a function call to position-independent code.
+    /// This function manually sets `t9` to the correct value.
+    ///
+    /// Returns an error if the function address could not be parsed (e.g. for `UNKNOWN` addresses).
+    pub fn set_mips_link_register(
+        &mut self,
+        fn_tid: &Tid,
+        generic_pointer_size: ByteSize,
+    ) -> Result<(), Error> {
+        let link_register = Variable {
+            name: "t9".into(),
+            size: generic_pointer_size,
+            is_temp: false,
+        };
+        let address = Bitvector::from_u64(u64::from_str_radix(&fn_tid.address, 16)?)
+            .into_resize_unsigned(generic_pointer_size);
+        // Note that we do not replace the absolute value by a relative value representing a global memory pointer.
+        // Else we would risk every global variable to get assigned the same abstract ID.
+        self.set_register(&link_register, address.into());
+        Ok(())
+    }
+
     /// Get the value of the given register in the current state.
     pub fn get_register(&self, register: &Variable) -> DataDomain<BitvectorDomain> {
         self.register
@@ -99,9 +124,18 @@ impl State {
         &mut self,
         address: DataDomain<BitvectorDomain>,
         size: ByteSize,
+        global_memory: Option<&RuntimeMemoryImage>,
     ) -> DataDomain<BitvectorDomain> {
         if let Some(stack_offset) = self.get_offset_if_exact_stack_pointer(&address) {
             self.load_value_from_stack(stack_offset, size)
+        } else if let (Ok(global_address), Some(global_mem)) =
+            (address.try_to_bitvec(), global_memory)
+        {
+            if let Ok(Some(value)) = global_mem.read(&global_address, size) {
+                value.into()
+            } else {
+                DataDomain::new_top(size)
+            }
         } else {
             DataDomain::new_top(size)
         }
@@ -186,6 +220,14 @@ impl State {
         }
     }
 
+    /// Add an abstract ID to the set of tracked IDs if it is not already tracked.
+    /// No access flags are set if the ID was not already tracked.
+    pub fn add_id_to_tracked_ids(&mut self, id: &AbstractIdentifier) {
+        if self.tracked_ids.get(id).is_none() {
+            self.tracked_ids.insert(id.clone(), AccessPattern::new());
+        }
+    }
+
     /// Get the value located at a positive stack offset.
     ///
     /// If no corresponding stack parameter ID exists for the value,
@@ -218,6 +260,19 @@ impl State {
             }
         }
         None
+    }
+
+    /// Merges the access pattern of the given abstract identifer in `self` with the provided access pattern.
+    ///
+    /// Does not add the identifier to the list of tracked identifiers if it is not already tracked in `self`.
+    pub fn merge_access_pattern_of_id(
+        &mut self,
+        id: &AbstractIdentifier,
+        access_pattern: &AccessPattern,
+    ) {
+        if let Some(object) = self.tracked_ids.get_mut(id) {
+            *object = object.merge(access_pattern);
+        }
     }
 
     /// Evaluate the value of the given expression on the current state.
@@ -255,7 +310,7 @@ impl State {
             } => {
                 self.set_deref_flag_for_input_ids_of_expression(address);
                 let address = self.eval(address);
-                self.load_value(address, *size)
+                self.load_value(address, *size, None)
             }
         }
     }
@@ -286,30 +341,75 @@ impl State {
         }
     }
 
-    /// Set the read and dereferenced flag for every ID
+    /// Set the read and dereferenced flag for every tracked ID
     /// that may be referenced when computing the value of the expression.
     pub fn set_deref_flag_for_input_ids_of_expression(&mut self, expression: &Expression) {
         for register in expression.input_vars() {
-            for id in self.get_register(register).referenced_ids() {
-                if let Some(object) = self.tracked_ids.get_mut(id) {
-                    object.set_read_flag();
-                    object.set_dereference_flag();
-                }
+            self.set_deref_flag_for_contained_ids(&self.get_register(register));
+        }
+    }
+
+    /// Set the read and mutably dereferenced flag for every tracked ID
+    /// that may be referenced when computing the value of the expression.
+    pub fn set_mutable_deref_flag_for_input_ids_of_expression(&mut self, expression: &Expression) {
+        for register in expression.input_vars() {
+            self.set_deref_mut_flag_for_contained_ids(&self.get_register(register));
+        }
+    }
+
+    /// Set the read and dereferenced flag for every tracked ID contained in the given value.
+    pub fn set_deref_flag_for_contained_ids(&mut self, value: &DataDomain<BitvectorDomain>) {
+        for id in value.referenced_ids() {
+            if let Some(object) = self.tracked_ids.get_mut(id) {
+                object.set_read_flag();
+                object.set_dereference_flag();
             }
         }
     }
 
-    /// Set the read and mutably dereferenced flag for every ID
-    /// that may be referenced when computing the value of the expression.
-    pub fn set_mutable_deref_flag_for_input_ids_of_expression(&mut self, expression: &Expression) {
-        for register in expression.input_vars() {
-            for id in self.get_register(register).referenced_ids() {
-                if let Some(object) = self.tracked_ids.get_mut(id) {
-                    object.set_read_flag();
-                    object.set_mutably_dereferenced_flag();
+    /// Set the read and mutably dereferenced flag for every tracked ID contained in the given value.
+    pub fn set_deref_mut_flag_for_contained_ids(&mut self, value: &DataDomain<BitvectorDomain>) {
+        for id in value.referenced_ids() {
+            if let Some(object) = self.tracked_ids.get_mut(id) {
+                object.set_read_flag();
+                object.set_mutably_dereferenced_flag();
+            }
+        }
+    }
+
+    /// If the absolute value part of the given value might represent an address into writeable global memory
+    /// then substitute it by a relative value relative to a new global memory ID.
+    ///
+    /// The generated ID will be also added to the tracked IDs of `self`.
+    /// However, no access flags will be set for the newly generated ID.
+    pub fn substitute_global_mem_address(
+        &mut self,
+        mut value: DataDomain<BitvectorDomain>,
+        global_memory: &RuntimeMemoryImage,
+    ) -> DataDomain<BitvectorDomain> {
+        if value.bytesize() != self.stack_id.bytesize() {
+            // Only pointer-sized values can represent global addresses.
+            return value;
+        } else if let Some(absolute_value) = value.get_absolute_value() {
+            if let Ok(bitvec) = absolute_value.try_to_bitvec() {
+                if let Ok(true) = global_memory.is_address_writeable(&bitvec) {
+                    // The absolute value might be a pointer to global memory.
+                    let global_id = AbstractIdentifier::from_global_address(
+                        self.get_current_function_tid(),
+                        &bitvec,
+                    );
+                    // Add the ID to the set of tracked IDs for the state.
+                    self.add_id_to_tracked_ids(&global_id);
+                    // Convert the absolute value to a relative value (relative the new global ID).
+                    value = value.merge(&DataDomain::from_target(
+                        global_id,
+                        Bitvector::zero(value.bytesize().into()).into(),
+                    ));
+                    value.set_absolute_value(None);
                 }
             }
         }
+        value
     }
 }
 
@@ -344,7 +444,7 @@ impl State {
         let regs = self
             .register
             .iter()
-            .map(|(var, value)| (format!("{}", var), value.to_json_compact()))
+            .map(|(var, value)| (format!("{var}"), value.to_json_compact()))
             .collect();
         json_map.insert("Register".to_string(), serde_json::Value::Object(regs));
         let access_patterns = self
@@ -352,8 +452,8 @@ impl State {
             .iter()
             .map(|(id, pattern)| {
                 (
-                    format!("{}", id),
-                    serde_json::Value::String(format!("{}", pattern)),
+                    format!("{id}"),
+                    serde_json::Value::String(format!("{pattern}")),
                 )
             })
             .collect();

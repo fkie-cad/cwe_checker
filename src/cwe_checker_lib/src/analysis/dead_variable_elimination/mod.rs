@@ -14,14 +14,7 @@ use alive_vars_computation::*;
 /// Returns a map that assigns to each basic block `Tid` the set of all variables
 /// that are alive at the end of the basic block.
 pub fn compute_alive_vars(project: &Project) -> HashMap<Tid, BTreeSet<Variable>> {
-    let extern_subs = project
-        .program
-        .term
-        .extern_symbols
-        .keys()
-        .cloned()
-        .collect();
-    let mut graph = crate::analysis::graph::get_program_cfg(&project.program, extern_subs);
+    let mut graph = crate::analysis::graph::get_program_cfg(&project.program);
     graph.reverse();
     let context = Context::new(project, &graph);
     let all_physical_registers = context.all_physical_registers.clone();
@@ -127,25 +120,18 @@ pub fn remove_dead_var_assignments(project: &mut Project) {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn def_assign_term(term_index: u64, input: &str, output: &str) -> Term<Def> {
-        Def::assign(
-            &format!("def_{}", term_index),
-            Variable::mock(output, 8),
-            Expression::Var(Variable::mock(input, 8)),
-        )
-    }
+    use crate::defs;
 
     #[test]
     fn dead_assignment_removal() {
-        let defs = vec![
-            def_assign_term(1, "A", "B"),
-            def_assign_term(2, "B", "C"),
-            def_assign_term(3, "C", "RAX"), // dead assignment
-            def_assign_term(4, "B", "RAX"),
-            def_assign_term(5, "C", "RBX"),
-            def_assign_term(6, "A", "B"), // dead assignment, since the next assignment is dead
-            def_assign_term(7, "B", "C"), // dead assignment, since C is not a physical register
+        let defs = defs![
+            "def_1: B:8 = A:8",
+            "def_2: C:8 = B:8",
+            "def_3: RAX:8 = C:8",
+            "def_4: RAX:8 = B:8",
+            "def_5: RBX:8 = C:8",
+            "def_6: B:8 = A:8",
+            "def_7: C:8 = B:8"
         ];
         let block = Term {
             tid: Tid::new("block"),
@@ -167,11 +153,11 @@ mod tests {
         project.program.term.subs.insert(sub.tid.clone(), sub);
         remove_dead_var_assignments(&mut project);
 
-        let cleaned_defs = vec![
-            def_assign_term(1, "A", "B"),
-            def_assign_term(2, "B", "C"),
-            def_assign_term(4, "B", "RAX"),
-            def_assign_term(5, "C", "RBX"),
+        let cleaned_defs = defs![
+            "def_1: B:8 = A:8",
+            "def_2: C:8 = B:8",
+            "def_4: RAX:8 = B:8",
+            "def_5: RBX:8 = C:8"
         ];
         assert_eq!(
             &project.program.term.subs[&Tid::new("sub")].term.blocks[0]

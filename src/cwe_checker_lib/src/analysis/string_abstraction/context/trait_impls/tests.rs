@@ -7,12 +7,11 @@ use crate::{
     analysis::pointer_inference::PointerInference as PointerInferenceComputation,
     analysis::{
         forward_interprocedural_fixpoint::Context,
-        string_abstraction::{
-            context::symbol_calls::tests::Setup,
-            tests::mock_project_with_intraprocedural_control_flow, tests::Setup as ProjectSetup,
-        },
+        string_abstraction::{context::symbol_calls::tests::Setup, tests::*},
     },
-    intermediate_representation::{Bitvector, Blk, ByteSize, ExternSymbol, Jmp, Tid, Variable},
+    bitvec, def,
+    intermediate_representation::*,
+    variable,
 };
 
 #[test]
@@ -28,29 +27,28 @@ fn test_update_def() {
     let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
     setup.context.block_first_def_set = HashSet::new();
 
-    let project_setup = ProjectSetup::new();
-    let assign_def = project_setup.string_input_constant("assign_def", "r1", 0x7000);
-    let load_def = project_setup.load_var_content_from_temp_var("load_def", "r5", "r2");
-    let store_def = project_setup.store_var_content_at_temp_var("store_def", "r0", "r5");
+    let assign_def = def!["assign_def: r1:4 = 0x7000:4"];
+    let load_def = Def::load_var_content_from_temp_var("load_def", "r5", "r2");
+    let store_def = Def::store_var_content_at_temp_var("store_def", "r0", "r5");
 
     let new_state = setup
         .context
         .update_def(&setup.state_before_call, &assign_def)
         .unwrap();
 
-    let absolute_target = DataDomain::from(Bitvector::from_i32(0x7000));
+    let absolute_target = DataDomain::from(bitvec!("0x7000:4"));
 
     assert_eq!(
         absolute_target,
         *new_state
             .get_variable_to_pointer_map()
-            .get(&Variable::mock("r1", 4))
+            .get(&variable!("r1:4"))
             .unwrap()
     );
 
     let stack_id = AbstractIdentifier::new(
         Tid::new("func"),
-        AbstractLocation::from_var(&Variable::mock("sp", 4)).unwrap(),
+        AbstractLocation::from_var(&variable!("sp:4")).unwrap(),
     );
 
     let loaded_pointer = DataDomain::from_target(stack_id.clone(), IntervalDomain::mock_i32(4, 4));
@@ -64,7 +62,7 @@ fn test_update_def() {
     );
 
     let r2_reg = Variable {
-        name: String::from("r2"),
+        name: "r2".into(),
         size: ByteSize::new(4),
         is_temp: true,
     };
@@ -79,7 +77,7 @@ fn test_update_def() {
 
     setup
         .state_before_call
-        .add_new_variable_to_pointer_entry(Variable::mock("r3", 4), loaded_pointer.clone());
+        .add_new_variable_to_pointer_entry(variable!("r3:4"), loaded_pointer.clone());
 
     let new_state = setup
         .context
@@ -90,14 +88,14 @@ fn test_update_def() {
         loaded_pointer,
         *new_state
             .get_variable_to_pointer_map()
-            .get(&Variable::mock("r5", 4))
+            .get(&variable!("r5:4"))
             .unwrap()
     );
 
     let store_target = DataDomain::from_target(stack_id, IntervalDomain::mock_i32(12, 12));
 
     let r0_reg = Variable {
-        name: String::from("r0"),
+        name: "r0".into(),
         size: ByteSize::new(4),
         is_temp: true,
     };
@@ -108,7 +106,7 @@ fn test_update_def() {
 
     setup
         .pi_state_before_symbol_call
-        .set_register(&Variable::mock("r5", 4), absolute_target.clone());
+        .set_register(&variable!("r5:4"), absolute_target.clone());
 
     setup
         .state_before_call
@@ -165,9 +163,9 @@ fn test_update_return() {
 
     let mut setup: Setup<CharacterInclusionDomain> = Setup::new(&pi_results);
 
-    let pointer = DataDomain::from(Bitvector::from_i32(0x6000));
-    let callee_saved_reg = Variable::mock("r11", 4);
-    let non_callee_saved_reg = Variable::mock("r0", 4);
+    let pointer = DataDomain::from(bitvec!("0x6000:4"));
+    let callee_saved_reg = variable!("r11:4");
+    let non_callee_saved_reg = variable!("r0:4");
 
     setup
         .state_before_call

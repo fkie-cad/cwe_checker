@@ -50,16 +50,14 @@ pub fn generate_cwe_warning(calls: &[(&str, &Tid, &str)]) -> Vec<CweWarning> {
     for (sub_name, jmp_tid, _) in calls.iter() {
         let address: &String = &jmp_tid.address;
         let description = format!(
-            "(Exposed IOCTL with Insufficient Access Control) Program uses ioctl at {} ({}). Be sure to double check the program and the corresponding driver.",
-            sub_name, address
-        );
+            "(Exposed IOCTL with Insufficient Access Control) Program uses ioctl at {sub_name} ({address}). Be sure to double check the program and the corresponding driver.");
         let cwe_warning = CweWarning::new(
             String::from(CWE_MODULE.name),
             String::from(CWE_MODULE.version),
             description,
         )
         .addresses(vec![address.clone()])
-        .tids(vec![format!("{}", jmp_tid)])
+        .tids(vec![format!("{jmp_tid}")])
         .symbols(vec![String::from(*sub_name)]);
 
         cwe_warnings.push(cwe_warning);
@@ -82,6 +80,6 @@ pub fn check_cwe(
             .values()
             .for_each(|sub| warnings.append(&mut handle_sub(sub, symbol)));
     }
-    warnings.sort();
+
     (vec![], warnings)
 }

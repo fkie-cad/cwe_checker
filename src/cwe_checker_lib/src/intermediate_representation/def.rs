@@ -1,3 +1,5 @@
+use std::fmt;
+
 use super::{CastOpType, Expression, Variable};
 use crate::prelude::*;
 
@@ -86,44 +88,31 @@ impl Term<Def> {
     }
 }
 
+impl fmt::Display for Def {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Def::Load { var, address } => write!(f, "{var} := Load from {address}"),
+            Def::Store { address, value } => write!(f, "Store at {address} := {value}"),
+            Def::Assign { var, value } => write!(f, "{var} = {value}"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::intermediate_representation::BinOpType;
+    use crate::{expr, intermediate_representation::*, variable};
 
     #[test]
     fn zero_extension_check() {
-        let eax_variable = Expression::Var(Variable {
-            name: String::from("EAX"),
-            size: ByteSize::new(4),
-            is_temp: false,
-        });
-        let int_sub_expr = Expression::BinOp {
-            op: BinOpType::IntSub,
-            lhs: Box::new(Expression::Var(Variable {
-                name: String::from("EAX"),
-                size: ByteSize::new(4),
-                is_temp: false,
-            })),
-            rhs: Box::new(Expression::Var(Variable {
-                name: String::from("ECX"),
-                size: ByteSize::new(4),
-                is_temp: false,
-            })),
-        };
-
         let zero_extend_def = Term {
             tid: Tid::new("zero_tid"),
             term: Def::Assign {
-                var: Variable {
-                    name: String::from("RAX"),
-                    size: ByteSize::new(8),
-                    is_temp: false,
-                },
+                var: variable!("RAX:8"),
                 value: Expression::Cast {
                     op: CastOpType::IntZExt,
                     size: ByteSize::new(8),
-                    arg: Box::new(eax_variable.clone()),
+                    arg: Box::new(expr!("EAX:8")),
                 },
             },
         };
@@ -131,15 +120,11 @@ mod tests {
         let zero_extend_but_no_var_def = Term {
             tid: Tid::new("zero_tid"),
             term: Def::Assign {
-                var: Variable {
-                    name: String::from("RAX"),
-                    size: ByteSize::new(8),
-                    is_temp: false,
-                },
+                var: variable!("RAX:8"),
                 value: Expression::Cast {
                     op: CastOpType::IntZExt,
                     size: ByteSize::new(8),
-                    arg: Box::new(int_sub_expr.clone()),
+                    arg: Box::new(expr!("EAX:8 - ECX:8")),
                 },
             },
         };
@@ -147,15 +132,11 @@ mod tests {
         let non_zero_extend_def = Term {
             tid: Tid::new("zero_tid"),
             term: Def::Assign {
-                var: Variable {
-                    name: String::from("RAX"),
-                    size: ByteSize::new(8),
-                    is_temp: false,
-                },
+                var: variable!("RAX:8"),
                 value: Expression::Cast {
                     op: CastOpType::IntSExt,
                     size: ByteSize::new(8),
-                    arg: Box::new(eax_variable.clone()),
+                    arg: Box::new(expr!("EAX:8")),
                 },
             },
         };

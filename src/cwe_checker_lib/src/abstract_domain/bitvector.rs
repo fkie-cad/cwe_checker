@@ -180,11 +180,12 @@ impl std::fmt::Display for BitvectorDomain {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
+    use crate::bitvec;
 
     fn bv(value: i64) -> BitvectorDomain {
-        BitvectorDomain::Value(Bitvector::from_i64(value))
+        bitvec!(format!("{}:8", value)).into()
     }
 
     #[test]
@@ -211,11 +212,11 @@ mod tests {
 
         assert_eq!(
             sixteen.bin_op(IntEqual, &bv(16)),
-            BitvectorDomain::Value(Bitvector::from_u8(true as u8))
+            BitvectorDomain::Value(bitvec!(format!("{}:1", true as u8)))
         );
         assert_eq!(
             sixteen.bin_op(IntNotEqual, &bv(16)),
-            BitvectorDomain::Value(Bitvector::from_u8(false as u8))
+            BitvectorDomain::Value(bitvec!(format!("{}:1", false as u8)))
         );
 
         assert_eq!(sixteen.un_op(Int2Comp), bv(-16));
@@ -223,27 +224,26 @@ mod tests {
 
         assert_eq!(
             sixteen.subpiece(ByteSize::new(0), ByteSize::new(4)),
-            BitvectorDomain::Value(Bitvector::from_i32(16))
+            BitvectorDomain::Value(bitvec!("16:4"))
         );
         assert_eq!(
             sixteen.subpiece(ByteSize::new(4), ByteSize::new(4)),
-            BitvectorDomain::Value(Bitvector::from_i32(0))
+            BitvectorDomain::Value(bitvec!("0:4"))
         );
 
         assert_eq!(
-            BitvectorDomain::Value(Bitvector::from_i32(2)),
-            BitvectorDomain::Value(Bitvector::from_i64(2 << 32))
-                .subpiece(ByteSize::new(4), ByteSize::new(4))
+            BitvectorDomain::Value(bitvec!("2:4")),
+            bv(2 << 32).subpiece(ByteSize::new(4), ByteSize::new(4))
         );
 
         assert_eq!(
-            BitvectorDomain::Value(Bitvector::from_i32(-1))
-                .bin_op(Piece, &BitvectorDomain::Value(Bitvector::from_i32(-1))),
+            BitvectorDomain::Value(bitvec!("-1:4"))
+                .bin_op(Piece, &BitvectorDomain::Value(bitvec!("-1:4"))),
             bv(-1)
         );
 
         assert_eq!(
-            BitvectorDomain::Value(Bitvector::from_i32(-1)).cast(PopCount, ByteSize::new(8)),
+            BitvectorDomain::Value(bitvec!("-1:4")).cast(PopCount, ByteSize::new(8)),
             bv(32)
         )
     }
@@ -262,26 +262,14 @@ mod tests {
     #[test]
     fn arshift() {
         use BinOpType::IntSRight;
-        let positive_x = BitvectorDomain::Value(Bitvector::from_i64(31));
-        let negative_x = BitvectorDomain::Value(Bitvector::from_i64(-31));
-        let shift_3 = BitvectorDomain::Value(Bitvector::from_u8(3));
-        let shift_70 = BitvectorDomain::Value(Bitvector::from_u8(70));
-        assert_eq!(
-            positive_x.bin_op(IntSRight, &shift_3),
-            BitvectorDomain::Value(Bitvector::from_i64(3))
-        );
-        assert_eq!(
-            positive_x.bin_op(IntSRight, &shift_70),
-            BitvectorDomain::Value(Bitvector::from_i64(0))
-        );
-        assert_eq!(
-            negative_x.bin_op(IntSRight, &shift_3),
-            BitvectorDomain::Value(Bitvector::from_i64(-4))
-        );
-        assert_eq!(
-            negative_x.bin_op(IntSRight, &shift_70),
-            BitvectorDomain::Value(Bitvector::from_i64(-1))
-        );
+        let positive_x = bv(31);
+        let negative_x = bv(-31);
+        let shift_3 = BitvectorDomain::Value(bitvec!("3:1"));
+        let shift_70 = BitvectorDomain::Value(bitvec!("70:1"));
+        assert_eq!(positive_x.bin_op(IntSRight, &shift_3), bv(3));
+        assert_eq!(positive_x.bin_op(IntSRight, &shift_70), bv(0));
+        assert_eq!(negative_x.bin_op(IntSRight, &shift_3), bv(-4));
+        assert_eq!(negative_x.bin_op(IntSRight, &shift_70), bv(-1));
     }
 
     #[test]

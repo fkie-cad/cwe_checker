@@ -5,25 +5,25 @@ use crate::intermediate_representation::*;
 use crate::prelude::*;
 
 mod bitvector;
-pub use bitvector::*;
+pub use bitvector::BitvectorDomain;
 
 mod identifier;
 pub use identifier::*;
 
 mod data;
-pub use data::*;
+pub use data::DataDomain;
 
 mod mem_region;
-pub use mem_region::*;
+pub use mem_region::MemRegion;
 
 mod interval;
-pub use interval::*;
+pub use interval::{Interval, IntervalDomain};
 
 mod bricks;
-pub use bricks::*;
+pub use bricks::{BrickDomain, BricksDomain};
 
 mod character_inclusion;
-pub use character_inclusion::*;
+pub use character_inclusion::{CharacterInclusionDomain, CharacterSet};
 
 mod strings;
 pub use strings::*;
@@ -76,15 +76,19 @@ pub trait HasTop {
 /// It has a *Top* element, which is only characterized by its bytesize.
 pub trait RegisterDomain: AbstractDomain + SizedDomain + HasTop {
     /// Compute the (abstract) result of a binary operation
+    #[must_use]
     fn bin_op(&self, op: BinOpType, rhs: &Self) -> Self;
 
     /// Compute the (abstract) result of a unary operation
+    #[must_use]
     fn un_op(&self, op: UnOpType) -> Self;
 
     /// Extract a sub-bitvector
+    #[must_use]
     fn subpiece(&self, low_byte: ByteSize, size: ByteSize) -> Self;
 
     /// Perform a typecast to extend a bitvector or to cast between integer and floating point types.
+    #[must_use]
     fn cast(&self, kind: CastOpType, width: ByteSize) -> Self;
 
     /// Return the bytesize of the result of the given binary operation.
@@ -166,4 +170,9 @@ pub trait SpecializeByConditional: Sized {
 
     /// Return the intersection of two values or an error if the intersection is empty.
     fn intersect(self, other: &Self) -> Result<Self, Error>;
+
+    /// Remove all widening hints from `self`.
+    /// Necessary for cases where several sources have widening hints,
+    /// but only one source should contribute widening hints to the result.
+    fn without_widening_hints(self) -> Self;
 }

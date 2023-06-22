@@ -1,4 +1,5 @@
 use crate::abstract_domain::*;
+use crate::analysis::callgraph::CallGraph;
 use crate::analysis::function_signature::FunctionSignature;
 use crate::analysis::graph::Graph;
 use crate::analysis::pointer_inference::{Data, PointerInference};
@@ -33,11 +34,13 @@ pub struct Context<'a> {
     /// A map that maps abstract identifiers representing the values of parameters at callsites
     /// to the corresponding value (in the context of the caller) according to the pointer inference analysis.
     pub param_replacement_map: HashMap<AbstractIdentifier, Data>,
-    /// A map that maps the TIDs of calls to allocatingfunctions (like malloc, realloc and calloc)
+    /// A map that maps the TIDs of calls to allocating functions (like malloc, realloc and calloc)
     /// to the value representing the size of the allocated memory object according to the pointer inference analysis.
     pub malloc_tid_to_object_size_map: HashMap<Tid, Data>,
     /// A map that maps the TIDs of jump instructions to the function TID of the caller.
     pub call_to_caller_fn_map: HashMap<Tid, Tid>,
+    /// The callgraph corresponding to the project.
+    pub callgraph: CallGraph<'a>,
     /// A sender channel that can be used to collect logs in the corresponding logging thread.
     pub log_collector: crossbeam_channel::Sender<LogThreadMsg>,
 }
@@ -52,6 +55,7 @@ impl<'a> Context<'a> {
         'a: 'b,
     {
         let project = analysis_results.project;
+        let callgraph = crate::analysis::callgraph::get_program_callgraph(&project.program);
         Context {
             project,
             graph: analysis_results.control_flow_graph,
@@ -63,6 +67,7 @@ impl<'a> Context<'a> {
             ),
             malloc_tid_to_object_size_map: compute_size_values_of_malloc_calls(analysis_results),
             call_to_caller_fn_map: compute_call_to_caller_map(project),
+            callgraph,
             log_collector,
         }
     }
@@ -95,15 +100,25 @@ impl<'a> Context<'a> {
             let object_size = match object_size.get_absolute_value() {
                 Some(size) => {
                     if let Ok((lower_bound, upper_bound)) = size.try_to_offset_interval() {
-                        // If the lower bound is a reasonable value we approximate the object size by the lower bound instead of the upper bound.
-                        let bound = if lower_bound > 0 {
-                            lower_bound
+                        let (lower_bound, upper_bound) = (
+                            Bitvector::from_i64(lower_bound)
+                                .into_resize_signed(object_size.bytesize()),
+                            Bitvector::from_i64(upper_bound)
+                                .into_resize_signed(object_size.bytesize()),
+                        );
+                        if lower_bound.is_zero() || upper_bound.is_zero() {
+                            self.log_info(object_id.get_tid(), "Heap object may have size zero. This may indicate an instance of CWE-687.");
+                        }
+                        if upper_bound.sign_bit().to_bool() || upper_bound.is_zero() {
+                            // Both bounds seem to be bogus values (because both are non-positive values).
+                            BitvectorDomain::new_top(object_size.bytesize())
+                        } else if lower_bound.sign_bit().to_bool() || lower_bound.is_zero() {
+                            // The lower bound is bogus, but we can approximate by the upper bound instead.
+                            upper_bound.into()
                         } else {
-                            upper_bound
-                        };
-                        Bitvector::from_i64(bound)
-                            .into_resize_signed(object_size.bytesize())
-                            .into()
+                            // We approximate the object size with the smallest possible value.
+                            lower_bound.into()
+                        }
                     } else {
                         BitvectorDomain::new_top(object_size.bytesize())
                     }
@@ -117,7 +132,7 @@ impl<'a> Context<'a> {
     }
 
     /// Log a debug log message in the log collector of `self`.
-    fn log_debug(&self, tid: &Tid, msg: impl ToString) {
+    pub fn log_debug(&self, tid: &Tid, msg: impl ToString) {
         let log_msg = LogMessage {
             text: msg.to_string(),
             level: crate::utils::log::LogLevel::Debug,
@@ -127,9 +142,20 @@ impl<'a> Context<'a> {
         self.log_collector.send(log_msg.into()).unwrap();
     }
 
+    /// Log an info log message in the log collector of `self`.
+    pub fn log_info(&self, tid: &Tid, msg: impl ToString) {
+        let log_msg = LogMessage {
+            text: msg.to_string(),
+            level: crate::utils::log::LogLevel::Info,
+            location: Some(tid.clone()),
+            source: Some(super::CWE_MODULE.name.to_string()),
+        };
+        self.log_collector.send(log_msg.into()).unwrap();
+    }
+
     /// Check whether the given parameter at the given callsite may point outside of its corresponding memory object.
     /// If yes, then generate a CWE warning.
-    fn check_param_at_call(
+    pub fn check_param_at_call(
         &self,
         state: &mut State,
         param: &Arg,
@@ -154,7 +180,7 @@ impl<'a> Context<'a> {
                 };
                 let mut cwe_warning =
                     CweWarning::new("CWE119", super::CWE_MODULE.version, description);
-                cwe_warning.tids = vec![format!("{}", call_tid)];
+                cwe_warning.tids = vec![format!("{call_tid}")];
                 cwe_warning.addresses = vec![call_tid.address.to_string()];
                 cwe_warning.other = vec![warnings];
                 self.log_collector.send(cwe_warning.into()).unwrap();
@@ -212,14 +238,14 @@ fn compute_size_values_of_malloc_calls(analysis_results: &AnalysisResults) -> Ha
 /// Compute the size value of a call to a malloc-like function according to the pointer inference and return it.
 /// Returns `None` if the called symbol is not an allocating function or the size computation for the symbol is not yet implemented.
 ///
-/// Currently this function computes the size values for the symbols `malloc`, `realloc` and `calloc`.
+/// Currently this function computes the size values for the symbols `malloc`, `realloc`, `reallocarray`, `calloc` and the C++-`new` operator.
 fn compute_size_value_of_malloc_like_call(
     jmp_tid: &Tid,
     called_symbol: &ExternSymbol,
     pointer_inference: &PointerInference,
 ) -> Option<Data> {
     match called_symbol.name.as_str() {
-        "malloc" => {
+        "malloc" | "operator.new" | "operator.new[]" => {
             let size_param = &called_symbol.parameters[0];
             match pointer_inference.eval_parameter_arg_at_call(jmp_tid, size_param) {
                 Some(size_value) => Some(size_value),
@@ -231,6 +257,19 @@ fn compute_size_value_of_malloc_like_call(
             match pointer_inference.eval_parameter_arg_at_call(jmp_tid, size_param) {
                 Some(size_value) => Some(size_value),
                 None => Some(Data::new_top(size_param.bytesize())),
+            }
+        }
+        "reallocarray" => {
+            let count_param = &called_symbol.parameters[1];
+            let size_param = &called_symbol.parameters[2];
+            match (
+                pointer_inference.eval_parameter_arg_at_call(jmp_tid, count_param),
+                pointer_inference.eval_parameter_arg_at_call(jmp_tid, size_param),
+            ) {
+                (Some(count_value), Some(size_value)) => {
+                    Some(count_value.bin_op(BinOpType::IntMult, &size_value))
+                }
+                _ => Some(Data::new_top(size_param.bytesize())),
             }
         }
         "calloc" => {

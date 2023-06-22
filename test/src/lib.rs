@@ -16,6 +16,7 @@ pub const WINDOWS_ARCHITECTURES: &[&str] = &["x64", "x86"];
 pub const WINDOWS_COMPILERS: &[&str] = &["mingw32-gcc"];
 
 /// A test case containing the necessary information to run an acceptance test.
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct CweTestCase {
     /// The name of the cwe (according to the test file)
     cwe: &'static str,
@@ -69,8 +70,7 @@ impl CweTestCase {
             } else {
                 println!("{} \t {}", filepath, "[FAILED]".red());
                 Err(format!(
-                    "Expected occurrences: {}. Found: {}",
-                    num_expected_occurences, num_cwes
+                    "Expected occurrences: {num_expected_occurences}. Found: {num_cwes}"
                 ))
             }
         } else {
@@ -78,7 +78,7 @@ impl CweTestCase {
             match output.status.code() {
                 Some(_code) => Err(String::from_utf8(output.stdout).unwrap()
                     + &String::from_utf8(output.stderr).unwrap()),
-                None => Err(format!("Execution failed for file {}", filepath)),
+                None => Err(format!("Execution failed for file {filepath}")),
             }
         }
     }
@@ -159,8 +159,8 @@ pub fn all_test_cases(cwe: &'static str, check_name: &'static str) -> Vec<CweTes
 /// The `error_log` tuples are of the form `(check_filename, error_message)`.
 pub fn print_errors(error_log: Vec<(String, String)>) {
     for (filepath, error) in error_log {
-        println!("{}", format!("+++ Error for {} +++", filepath).red());
-        println!("{}", error);
+        println!("{}", format!("+++ Error for {filepath} +++").red());
+        println!("{error}");
     }
 }
 
@@ -638,6 +638,28 @@ mod tests {
         if !error_log.is_empty() {
             print_errors(error_log);
             panic!();
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn cwe_789() {
+        let mut error_log = Vec::new();
+        let mut tests = all_test_cases("cwe_789", "CWE789");
+
+        mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
+        mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.
+
+        mark_compiler_skipped(&mut tests, "mingw32-gcc"); // TODO: Check reason for failure!
+
+        for test_case in tests {
+            let num_expected_occurences = 2;
+            if let Err(error) = test_case.run_test("[CWE789]", num_expected_occurences) {
+                error_log.push((test_case.get_filepath(), error));
+            }
+        }
+        if !error_log.is_empty() {
+            print_errors(error_log);
         }
     }
 }

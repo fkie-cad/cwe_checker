@@ -20,7 +20,7 @@
 //! ## False Positives
 //!
 //! - Any analysis imprecision of the Pointer Inference analysis may lead to false positive results in this check.
-//! - If no exact bounds for a memory object could be inferred then the strictest bounds found are used,
+//! - If no exact bounds for a memory object could be inferred then the strictest (smallest) bounds found are used,
 //! which can lead to false positive warnings.
 //!
 //! ## False Negatives
@@ -31,7 +31,11 @@
 //! - The Pointer Inference analysis cannot distinguish different objects located on the same stack frame.
 //! Thus buffer overflows on the stack can only be detected if they may reach outside of the whole stack frame.
 //! This leads to false negatives, especially for buffer overflows caused by off-by-one bugs.
-//! - For parameters of extern function calls the check only checks whether the parameter itself may point outside of the boundaries of a memory object.
+//! - For parameters of extern calls where a corresponding call stub is defined
+//! the analysis approximates size parameters as small as possible, which can lead to false negatives.
+//! Currently, analysis imprecision would lead to too many false positives if we would approximate by larger possible size parameters.
+//! - For parameters of extern function calls without corresponding function stubs
+//! the check only checks whether the parameter itself may point outside of the boundaries of a memory object.
 //! But since we generally do not know what size the called function expects the pointed-to object to have
 //! this still may miss buffer overflows occuring in the called function.
 //! - Right now the check only considers buffers on the stack or the heap, but not buffers in global memory.
@@ -46,6 +50,7 @@ mod context;
 use context::Context;
 mod state;
 use state::State;
+mod stubs;
 
 /// The module name and version
 pub static CWE_MODULE: CweModule = CweModule {
@@ -84,7 +89,6 @@ pub fn check_cwe(
 
     fixpoint_computation.compute_with_max_steps(100);
 
-    let (logs, mut cwe_warnings) = log_thread.collect();
-    cwe_warnings.sort();
+    let (logs, cwe_warnings) = log_thread.collect();
     (logs, cwe_warnings)
 }
