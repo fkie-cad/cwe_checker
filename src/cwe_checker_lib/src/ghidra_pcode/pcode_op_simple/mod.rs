@@ -13,7 +13,7 @@ pub struct PcodeOpSimple {
 
 impl PcodeOpSimple {
     /// Returns `true` if at least one input is ram located.
-    fn has_implicit_load(&self) -> bool {
+    pub fn has_implicit_load(&self) -> bool {
         if self.input0.address_space == "ram" {
             return true;
         }
@@ -30,7 +30,7 @@ impl PcodeOpSimple {
         false
     }
     // Returns `true` if the output is ram located.
-    fn has_implicit_store(&self) -> bool {
+    pub fn has_implicit_store(&self) -> bool {
         if let Some(varnode) = &self.output {
             if varnode.address_space == "ram" {
                 return true;
@@ -45,7 +45,7 @@ impl PcodeOpSimple {
     /// The created instructions use the virtual register `$load_tempX`, whereby `X` is
     /// either `0`, `1`or `2` representing which input is used.
     /// The created `Tid` is named `instr_<address>_<pcode index>_load<X>`.
-    fn create_implicit_loads(&mut self, address: &String) -> Vec<Term<Def>> {
+    pub fn create_implicit_loads(&mut self, address: &String) -> Vec<Term<Def>> {
         let mut explicit_loads = vec![];
         if self.input0.address_space == "ram" {
             let load0 = Def::Load {
@@ -177,7 +177,7 @@ impl PcodeOpSimple {
     /// * load destination is not a variable
     /// * `input1` is `None`
     /// * `into_ir_expr()` returns `Err` on any varnode
-    fn create_load(&self, address: &String) -> Term<Def> {
+    pub fn create_load(&self, address: &String) -> Term<Def> {
         if !matches!(
             self.pcode_mnemonic,
             PcodeOperation::ExpressionType(ExpressionType::LOAD)
@@ -422,3 +422,6 @@ impl PcodeOpSimple {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;
