@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["check_cwe","Run the check for CWE-119: Buffer Overflows."]],"static":[["CWE_MODULE","The module name and version"]]});
+window.SIDEBAR_ITEMS = {"fn":["check_cwe"],"static":["CWE_MODULE"]};

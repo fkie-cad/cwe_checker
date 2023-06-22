@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["Computation","The computation struct contains an intermediate result of a fixpoint computation and provides methods for continuing the fixpoint computation or extracting the (intermediate or final) results."]],"trait":[["Context","The context of a fixpoint computation."]]});
+window.SIDEBAR_ITEMS = {"struct":["Computation"],"trait":["Context"]};

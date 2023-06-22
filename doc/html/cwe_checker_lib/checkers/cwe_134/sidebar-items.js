@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["StringLocation","The categorization of the string location based on kinds of different memory."]],"fn":[["check_cwe","This check searches for external symbols that take a format string as an input parameter. It then checks whether the parameter points to read only memory. If not, a CWE warning is generated."]],"static":[["CWE_MODULE","The module name and version"]],"struct":[["Config","The configuration struct"]]});
+window.SIDEBAR_ITEMS = {"enum":["StringLocation"],"fn":["check_cwe"],"static":["CWE_MODULE"],"struct":["Config"]};

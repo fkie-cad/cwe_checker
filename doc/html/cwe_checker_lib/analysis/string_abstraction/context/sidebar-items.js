@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["symbol_calls","This module handles the string processing at external symbol calls."]],"struct":[["Context","Contains all context information needed for the string abstract fixpoint computation."]]});
+window.SIDEBAR_ITEMS = {"mod":["symbol_calls"],"struct":["Context"]};

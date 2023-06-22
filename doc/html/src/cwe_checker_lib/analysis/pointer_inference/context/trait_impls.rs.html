@@ -1,546 +1,625 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/analysis/pointer_inference/context/trait_impls.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>trait_impls.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../../storage.js"></script><script src="../../../../../crates.js"></script><script defer src="../../../../../main.js"></script><script defer src="../../../../../source-script.js"></script><script defer src="../../../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../../../cwe_checker_lib/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../../../../cwe_checker_lib/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../../../cwe_checker_lib/index.html"><img class="rust-logo" src="../../../../../rust-logo.svg" alt="logo"></a><nav class="sub"><div class="theme-picker hidden"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="22" height="22" alt="Pick another theme!" src="../../../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
-<span id="100">100</span>
-<span id="101">101</span>
-<span id="102">102</span>
-<span id="103">103</span>
-<span id="104">104</span>
-<span id="105">105</span>
-<span id="106">106</span>
-<span id="107">107</span>
-<span id="108">108</span>
-<span id="109">109</span>
-<span id="110">110</span>
-<span id="111">111</span>
-<span id="112">112</span>
-<span id="113">113</span>
-<span id="114">114</span>
-<span id="115">115</span>
-<span id="116">116</span>
-<span id="117">117</span>
-<span id="118">118</span>
-<span id="119">119</span>
-<span id="120">120</span>
-<span id="121">121</span>
-<span id="122">122</span>
-<span id="123">123</span>
-<span id="124">124</span>
-<span id="125">125</span>
-<span id="126">126</span>
-<span id="127">127</span>
-<span id="128">128</span>
-<span id="129">129</span>
-<span id="130">130</span>
-<span id="131">131</span>
-<span id="132">132</span>
-<span id="133">133</span>
-<span id="134">134</span>
-<span id="135">135</span>
-<span id="136">136</span>
-<span id="137">137</span>
-<span id="138">138</span>
-<span id="139">139</span>
-<span id="140">140</span>
-<span id="141">141</span>
-<span id="142">142</span>
-<span id="143">143</span>
-<span id="144">144</span>
-<span id="145">145</span>
-<span id="146">146</span>
-<span id="147">147</span>
-<span id="148">148</span>
-<span id="149">149</span>
-<span id="150">150</span>
-<span id="151">151</span>
-<span id="152">152</span>
-<span id="153">153</span>
-<span id="154">154</span>
-<span id="155">155</span>
-<span id="156">156</span>
-<span id="157">157</span>
-<span id="158">158</span>
-<span id="159">159</span>
-<span id="160">160</span>
-<span id="161">161</span>
-<span id="162">162</span>
-<span id="163">163</span>
-<span id="164">164</span>
-<span id="165">165</span>
-<span id="166">166</span>
-<span id="167">167</span>
-<span id="168">168</span>
-<span id="169">169</span>
-<span id="170">170</span>
-<span id="171">171</span>
-<span id="172">172</span>
-<span id="173">173</span>
-<span id="174">174</span>
-<span id="175">175</span>
-<span id="176">176</span>
-<span id="177">177</span>
-<span id="178">178</span>
-<span id="179">179</span>
-<span id="180">180</span>
-<span id="181">181</span>
-<span id="182">182</span>
-<span id="183">183</span>
-<span id="184">184</span>
-<span id="185">185</span>
-<span id="186">186</span>
-<span id="187">187</span>
-<span id="188">188</span>
-<span id="189">189</span>
-<span id="190">190</span>
-<span id="191">191</span>
-<span id="192">192</span>
-<span id="193">193</span>
-<span id="194">194</span>
-<span id="195">195</span>
-<span id="196">196</span>
-<span id="197">197</span>
-<span id="198">198</span>
-<span id="199">199</span>
-<span id="200">200</span>
-<span id="201">201</span>
-<span id="202">202</span>
-<span id="203">203</span>
-<span id="204">204</span>
-<span id="205">205</span>
-<span id="206">206</span>
-<span id="207">207</span>
-<span id="208">208</span>
-<span id="209">209</span>
-<span id="210">210</span>
-<span id="211">211</span>
-<span id="212">212</span>
-<span id="213">213</span>
-<span id="214">214</span>
-<span id="215">215</span>
-<span id="216">216</span>
-<span id="217">217</span>
-<span id="218">218</span>
-<span id="219">219</span>
-<span id="220">220</span>
-<span id="221">221</span>
-<span id="222">222</span>
-<span id="223">223</span>
-<span id="224">224</span>
-<span id="225">225</span>
-<span id="226">226</span>
-<span id="227">227</span>
-<span id="228">228</span>
-<span id="229">229</span>
-<span id="230">230</span>
-<span id="231">231</span>
-<span id="232">232</span>
-<span id="233">233</span>
-<span id="234">234</span>
-<span id="235">235</span>
-<span id="236">236</span>
-<span id="237">237</span>
-<span id="238">238</span>
-<span id="239">239</span>
-<span id="240">240</span>
-<span id="241">241</span>
-<span id="242">242</span>
-<span id="243">243</span>
-<span id="244">244</span>
-<span id="245">245</span>
-<span id="246">246</span>
-<span id="247">247</span>
-<span id="248">248</span>
-<span id="249">249</span>
-<span id="250">250</span>
-<span id="251">251</span>
-<span id="252">252</span>
-<span id="253">253</span>
-<span id="254">254</span>
-<span id="255">255</span>
-<span id="256">256</span>
-<span id="257">257</span>
-<span id="258">258</span>
-<span id="259">259</span>
-<span id="260">260</span>
-<span id="261">261</span>
-<span id="262">262</span>
-<span id="263">263</span>
-<span id="264">264</span>
-<span id="265">265</span>
-<span id="266">266</span>
-<span id="267">267</span>
-<span id="268">268</span>
-<span id="269">269</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/analysis/pointer_inference/context/trait_impls.rs`."><title>trait_impls.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../../../static.files/rustdoc-ba5701c5741a7b69.css" id="mainThemeStyle"><div id="rustdoc-vars" data-root-path="../../../../../" data-static-root-path="../../../../../static.files/" data-current-crate="cwe_checker_lib" data-themes="" data-resource-suffix="" data-rustdoc-version="1.70.0 (90c541806 2023-05-31)" data-search-js="search-e077946657036a58.js" data-settings-js="settings-298e1ea74db45b39.js" data-settings-css="settings-7bfb4c59cc6bc502.css" data-theme-light-css="light-0f8c037637f9eb3e.css" data-theme-dark-css="dark-1097f8e92a01e3cf.css" data-theme-ayu-css="ayu-614652228113ac93.css" ></div><script src="../../../../../static.files/storage-62ce34ea385b278a.js"></script><script defer src="../../../../../static.files/source-script-905937fbbdc8e9ea.js"></script><script defer src="../../../../../source-files.js"></script><script defer src="../../../../../static.files/main-f61008743c98d196.js"></script><noscript><link rel="stylesheet" media="(prefers-color-scheme:light)" href="../../../../../static.files/light-0f8c037637f9eb3e.css"><link rel="stylesheet" media="(prefers-color-scheme:dark)" href="../../../../../static.files/dark-1097f8e92a01e3cf.css"><link rel="stylesheet" href="../../../../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../../../../cwe_checker_lib/index.html"><img class="rust-logo" src="../../../../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<a href="#2" id="2">2</a>
+<a href="#3" id="3">3</a>
+<a href="#4" id="4">4</a>
+<a href="#5" id="5">5</a>
+<a href="#6" id="6">6</a>
+<a href="#7" id="7">7</a>
+<a href="#8" id="8">8</a>
+<a href="#9" id="9">9</a>
+<a href="#10" id="10">10</a>
+<a href="#11" id="11">11</a>
+<a href="#12" id="12">12</a>
+<a href="#13" id="13">13</a>
+<a href="#14" id="14">14</a>
+<a href="#15" id="15">15</a>
+<a href="#16" id="16">16</a>
+<a href="#17" id="17">17</a>
+<a href="#18" id="18">18</a>
+<a href="#19" id="19">19</a>
+<a href="#20" id="20">20</a>
+<a href="#21" id="21">21</a>
+<a href="#22" id="22">22</a>
+<a href="#23" id="23">23</a>
+<a href="#24" id="24">24</a>
+<a href="#25" id="25">25</a>
+<a href="#26" id="26">26</a>
+<a href="#27" id="27">27</a>
+<a href="#28" id="28">28</a>
+<a href="#29" id="29">29</a>
+<a href="#30" id="30">30</a>
+<a href="#31" id="31">31</a>
+<a href="#32" id="32">32</a>
+<a href="#33" id="33">33</a>
+<a href="#34" id="34">34</a>
+<a href="#35" id="35">35</a>
+<a href="#36" id="36">36</a>
+<a href="#37" id="37">37</a>
+<a href="#38" id="38">38</a>
+<a href="#39" id="39">39</a>
+<a href="#40" id="40">40</a>
+<a href="#41" id="41">41</a>
+<a href="#42" id="42">42</a>
+<a href="#43" id="43">43</a>
+<a href="#44" id="44">44</a>
+<a href="#45" id="45">45</a>
+<a href="#46" id="46">46</a>
+<a href="#47" id="47">47</a>
+<a href="#48" id="48">48</a>
+<a href="#49" id="49">49</a>
+<a href="#50" id="50">50</a>
+<a href="#51" id="51">51</a>
+<a href="#52" id="52">52</a>
+<a href="#53" id="53">53</a>
+<a href="#54" id="54">54</a>
+<a href="#55" id="55">55</a>
+<a href="#56" id="56">56</a>
+<a href="#57" id="57">57</a>
+<a href="#58" id="58">58</a>
+<a href="#59" id="59">59</a>
+<a href="#60" id="60">60</a>
+<a href="#61" id="61">61</a>
+<a href="#62" id="62">62</a>
+<a href="#63" id="63">63</a>
+<a href="#64" id="64">64</a>
+<a href="#65" id="65">65</a>
+<a href="#66" id="66">66</a>
+<a href="#67" id="67">67</a>
+<a href="#68" id="68">68</a>
+<a href="#69" id="69">69</a>
+<a href="#70" id="70">70</a>
+<a href="#71" id="71">71</a>
+<a href="#72" id="72">72</a>
+<a href="#73" id="73">73</a>
+<a href="#74" id="74">74</a>
+<a href="#75" id="75">75</a>
+<a href="#76" id="76">76</a>
+<a href="#77" id="77">77</a>
+<a href="#78" id="78">78</a>
+<a href="#79" id="79">79</a>
+<a href="#80" id="80">80</a>
+<a href="#81" id="81">81</a>
+<a href="#82" id="82">82</a>
+<a href="#83" id="83">83</a>
+<a href="#84" id="84">84</a>
+<a href="#85" id="85">85</a>
+<a href="#86" id="86">86</a>
+<a href="#87" id="87">87</a>
+<a href="#88" id="88">88</a>
+<a href="#89" id="89">89</a>
+<a href="#90" id="90">90</a>
+<a href="#91" id="91">91</a>
+<a href="#92" id="92">92</a>
+<a href="#93" id="93">93</a>
+<a href="#94" id="94">94</a>
+<a href="#95" id="95">95</a>
+<a href="#96" id="96">96</a>
+<a href="#97" id="97">97</a>
+<a href="#98" id="98">98</a>
+<a href="#99" id="99">99</a>
+<a href="#100" id="100">100</a>
+<a href="#101" id="101">101</a>
+<a href="#102" id="102">102</a>
+<a href="#103" id="103">103</a>
+<a href="#104" id="104">104</a>
+<a href="#105" id="105">105</a>
+<a href="#106" id="106">106</a>
+<a href="#107" id="107">107</a>
+<a href="#108" id="108">108</a>
+<a href="#109" id="109">109</a>
+<a href="#110" id="110">110</a>
+<a href="#111" id="111">111</a>
+<a href="#112" id="112">112</a>
+<a href="#113" id="113">113</a>
+<a href="#114" id="114">114</a>
+<a href="#115" id="115">115</a>
+<a href="#116" id="116">116</a>
+<a href="#117" id="117">117</a>
+<a href="#118" id="118">118</a>
+<a href="#119" id="119">119</a>
+<a href="#120" id="120">120</a>
+<a href="#121" id="121">121</a>
+<a href="#122" id="122">122</a>
+<a href="#123" id="123">123</a>
+<a href="#124" id="124">124</a>
+<a href="#125" id="125">125</a>
+<a href="#126" id="126">126</a>
+<a href="#127" id="127">127</a>
+<a href="#128" id="128">128</a>
+<a href="#129" id="129">129</a>
+<a href="#130" id="130">130</a>
+<a href="#131" id="131">131</a>
+<a href="#132" id="132">132</a>
+<a href="#133" id="133">133</a>
+<a href="#134" id="134">134</a>
+<a href="#135" id="135">135</a>
+<a href="#136" id="136">136</a>
+<a href="#137" id="137">137</a>
+<a href="#138" id="138">138</a>
+<a href="#139" id="139">139</a>
+<a href="#140" id="140">140</a>
+<a href="#141" id="141">141</a>
+<a href="#142" id="142">142</a>
+<a href="#143" id="143">143</a>
+<a href="#144" id="144">144</a>
+<a href="#145" id="145">145</a>
+<a href="#146" id="146">146</a>
+<a href="#147" id="147">147</a>
+<a href="#148" id="148">148</a>
+<a href="#149" id="149">149</a>
+<a href="#150" id="150">150</a>
+<a href="#151" id="151">151</a>
+<a href="#152" id="152">152</a>
+<a href="#153" id="153">153</a>
+<a href="#154" id="154">154</a>
+<a href="#155" id="155">155</a>
+<a href="#156" id="156">156</a>
+<a href="#157" id="157">157</a>
+<a href="#158" id="158">158</a>
+<a href="#159" id="159">159</a>
+<a href="#160" id="160">160</a>
+<a href="#161" id="161">161</a>
+<a href="#162" id="162">162</a>
+<a href="#163" id="163">163</a>
+<a href="#164" id="164">164</a>
+<a href="#165" id="165">165</a>
+<a href="#166" id="166">166</a>
+<a href="#167" id="167">167</a>
+<a href="#168" id="168">168</a>
+<a href="#169" id="169">169</a>
+<a href="#170" id="170">170</a>
+<a href="#171" id="171">171</a>
+<a href="#172" id="172">172</a>
+<a href="#173" id="173">173</a>
+<a href="#174" id="174">174</a>
+<a href="#175" id="175">175</a>
+<a href="#176" id="176">176</a>
+<a href="#177" id="177">177</a>
+<a href="#178" id="178">178</a>
+<a href="#179" id="179">179</a>
+<a href="#180" id="180">180</a>
+<a href="#181" id="181">181</a>
+<a href="#182" id="182">182</a>
+<a href="#183" id="183">183</a>
+<a href="#184" id="184">184</a>
+<a href="#185" id="185">185</a>
+<a href="#186" id="186">186</a>
+<a href="#187" id="187">187</a>
+<a href="#188" id="188">188</a>
+<a href="#189" id="189">189</a>
+<a href="#190" id="190">190</a>
+<a href="#191" id="191">191</a>
+<a href="#192" id="192">192</a>
+<a href="#193" id="193">193</a>
+<a href="#194" id="194">194</a>
+<a href="#195" id="195">195</a>
+<a href="#196" id="196">196</a>
+<a href="#197" id="197">197</a>
+<a href="#198" id="198">198</a>
+<a href="#199" id="199">199</a>
+<a href="#200" id="200">200</a>
+<a href="#201" id="201">201</a>
+<a href="#202" id="202">202</a>
+<a href="#203" id="203">203</a>
+<a href="#204" id="204">204</a>
+<a href="#205" id="205">205</a>
+<a href="#206" id="206">206</a>
+<a href="#207" id="207">207</a>
+<a href="#208" id="208">208</a>
+<a href="#209" id="209">209</a>
+<a href="#210" id="210">210</a>
+<a href="#211" id="211">211</a>
+<a href="#212" id="212">212</a>
+<a href="#213" id="213">213</a>
+<a href="#214" id="214">214</a>
+<a href="#215" id="215">215</a>
+<a href="#216" id="216">216</a>
+<a href="#217" id="217">217</a>
+<a href="#218" id="218">218</a>
+<a href="#219" id="219">219</a>
+<a href="#220" id="220">220</a>
+<a href="#221" id="221">221</a>
+<a href="#222" id="222">222</a>
+<a href="#223" id="223">223</a>
+<a href="#224" id="224">224</a>
+<a href="#225" id="225">225</a>
+<a href="#226" id="226">226</a>
+<a href="#227" id="227">227</a>
+<a href="#228" id="228">228</a>
+<a href="#229" id="229">229</a>
+<a href="#230" id="230">230</a>
+<a href="#231" id="231">231</a>
+<a href="#232" id="232">232</a>
+<a href="#233" id="233">233</a>
+<a href="#234" id="234">234</a>
+<a href="#235" id="235">235</a>
+<a href="#236" id="236">236</a>
+<a href="#237" id="237">237</a>
+<a href="#238" id="238">238</a>
+<a href="#239" id="239">239</a>
+<a href="#240" id="240">240</a>
+<a href="#241" id="241">241</a>
+<a href="#242" id="242">242</a>
+<a href="#243" id="243">243</a>
+<a href="#244" id="244">244</a>
+<a href="#245" id="245">245</a>
+<a href="#246" id="246">246</a>
+<a href="#247" id="247">247</a>
+<a href="#248" id="248">248</a>
+<a href="#249" id="249">249</a>
+<a href="#250" id="250">250</a>
+<a href="#251" id="251">251</a>
+<a href="#252" id="252">252</a>
+<a href="#253" id="253">253</a>
+<a href="#254" id="254">254</a>
+<a href="#255" id="255">255</a>
+<a href="#256" id="256">256</a>
+<a href="#257" id="257">257</a>
+<a href="#258" id="258">258</a>
+<a href="#259" id="259">259</a>
+<a href="#260" id="260">260</a>
+<a href="#261" id="261">261</a>
+<a href="#262" id="262">262</a>
+<a href="#263" id="263">263</a>
+<a href="#264" id="264">264</a>
+<a href="#265" id="265">265</a>
+<a href="#266" id="266">266</a>
+<a href="#267" id="267">267</a>
+<a href="#268" id="268">268</a>
+<a href="#269" id="269">269</a>
+<a href="#270" id="270">270</a>
+<a href="#271" id="271">271</a>
+<a href="#272" id="272">272</a>
+<a href="#273" id="273">273</a>
+<a href="#274" id="274">274</a>
+<a href="#275" id="275">275</a>
+<a href="#276" id="276">276</a>
+<a href="#277" id="277">277</a>
+<a href="#278" id="278">278</a>
+<a href="#279" id="279">279</a>
+<a href="#280" id="280">280</a>
+<a href="#281" id="281">281</a>
+<a href="#282" id="282">282</a>
+<a href="#283" id="283">283</a>
+<a href="#284" id="284">284</a>
+<a href="#285" id="285">285</a>
+<a href="#286" id="286">286</a>
+<a href="#287" id="287">287</a>
+<a href="#288" id="288">288</a>
+<a href="#289" id="289">289</a>
+<a href="#290" id="290">290</a>
+<a href="#291" id="291">291</a>
+<a href="#292" id="292">292</a>
+<a href="#293" id="293">293</a>
+<a href="#294" id="294">294</a>
+<a href="#295" id="295">295</a>
+<a href="#296" id="296">296</a>
+<a href="#297" id="297">297</a>
+<a href="#298" id="298">298</a>
+<a href="#299" id="299">299</a>
+<a href="#300" id="300">300</a>
+<a href="#301" id="301">301</a>
+<a href="#302" id="302">302</a>
+<a href="#303" id="303">303</a>
+<a href="#304" id="304">304</a>
+<a href="#305" id="305">305</a>
+<a href="#306" id="306">306</a>
+<a href="#307" id="307">307</a>
+<a href="#308" id="308">308</a>
+<a href="#309" id="309">309</a>
+<a href="#310" id="310">310</a>
+<a href="#311" id="311">311</a>
+<a href="#312" id="312">312</a>
+</pre></div><pre class="rust"><code><span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident"><span class="kw">crate</span>::analysis::forward_interprocedural_fixpoint::Context</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Context</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">Value</span> <span class="op">=</span> <span class="ident">State</span>;
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; <span class="kw">crate</span>::analysis::forward_interprocedural_fixpoint::Context&lt;<span class="lifetime">&#39;a</span>&gt; <span class="kw">for </span>Context&lt;<span class="lifetime">&#39;a</span>&gt; {
+    <span class="kw">type </span>Value = State;
 
-    <span class="doccomment">/// Get the underlying graph on which the analysis operates.</span>
-    <span class="kw">fn</span> <span class="ident">get_graph</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">Graph</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">graph</span>
+    <span class="doccomment">/// Get the underlying graph on which the analysis operates.
+    </span><span class="kw">fn </span>get_graph(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Graph&lt;<span class="lifetime">&#39;a</span>&gt; {
+        <span class="self">self</span>.graph
     }
 
-    <span class="doccomment">/// Merge two state values.</span>
-    <span class="kw">fn</span> <span class="ident">merge</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">value1</span>: <span class="kw-2">&amp;</span><span class="ident">State</span>, <span class="ident">value2</span>: <span class="kw-2">&amp;</span><span class="ident">State</span>) -&gt; <span class="ident">State</span> {
-        <span class="ident">value1</span>.<span class="ident">merge</span>(<span class="ident">value2</span>)
+    <span class="doccomment">/// Merge two state values.
+    </span><span class="kw">fn </span>merge(<span class="kw-2">&amp;</span><span class="self">self</span>, value1: <span class="kw-2">&amp;</span>State, value2: <span class="kw-2">&amp;</span>State) -&gt; State {
+        value1.merge(value2)
     }
 
-    <span class="doccomment">/// Update the state according to the effects of the given `Def` term.</span>
-    <span class="kw">fn</span> <span class="ident">update_def</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">state</span>: <span class="kw-2">&amp;</span><span class="ident"><span class="self">Self</span>::Value</span>, <span class="ident">def</span>: <span class="kw-2">&amp;</span><span class="ident">Term</span><span class="op">&lt;</span><span class="ident">Def</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Value</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_state</span> <span class="op">=</span> <span class="ident">state</span>.<span class="ident">clone</span>();
-        <span class="comment">// check for null dereferences</span>
-        <span class="kw">match</span> <span class="ident">new_state</span>.<span class="ident">check_def_for_null_dereferences</span>(<span class="ident">def</span>) {
+    <span class="doccomment">/// Update the state according to the effects of the given `Def` term.
+    </span><span class="kw">fn </span>update_def(<span class="kw-2">&amp;</span><span class="self">self</span>, state: <span class="kw-2">&amp;</span><span class="self">Self</span>::Value, def: <span class="kw-2">&amp;</span>Term&lt;Def&gt;) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::Value&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>new_state = state.clone();
+        <span class="comment">// check for null dereferences
+        </span><span class="kw">match </span>new_state.check_def_for_null_dereferences(def) {
             <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
-                <span class="self">self</span>.<span class="ident">report_null_deref</span>(<span class="kw-2">&amp;</span><span class="ident">def</span>.<span class="ident">tid</span>);
-                <span class="kw">return</span> <span class="prelude-val">None</span>;
+                <span class="self">self</span>.report_null_deref(<span class="kw-2">&amp;</span>def.tid);
+                <span class="kw">return </span><span class="prelude-val">None</span>;
             }
-            <span class="prelude-val">Ok</span>(<span class="bool-val">true</span>) =&gt; <span class="self">self</span>.<span class="ident">report_null_deref</span>(<span class="kw-2">&amp;</span><span class="ident">def</span>.<span class="ident">tid</span>),
-            <span class="prelude-val">Ok</span>(<span class="bool-val">false</span>) =&gt; (), <span class="comment">// no null dereference detected</span>
-        }
+            <span class="prelude-val">Ok</span>(<span class="bool-val">true</span>) =&gt; <span class="self">self</span>.report_null_deref(<span class="kw-2">&amp;</span>def.tid),
+            <span class="prelude-val">Ok</span>(<span class="bool-val">false</span>) =&gt; (), <span class="comment">// no null dereference detected
+        </span>}
 
-        <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="ident">def</span>.<span class="ident">term</span> {
-            <span class="ident">Def::Store</span> { <span class="ident">address</span>, <span class="ident">value</span> } =&gt; {
-                <span class="self">self</span>.<span class="ident">log_debug</span>(
-                    <span class="ident">new_state</span>.<span class="ident">handle_store</span>(<span class="ident">address</span>, <span class="ident">value</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">project</span>.<span class="ident">runtime_memory_image</span>),
-                    <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">def</span>.<span class="ident">tid</span>),
+        <span class="kw">match </span><span class="kw-2">&amp;</span>def.term {
+            Def::Store { address, value } =&gt; {
+                <span class="self">self</span>.log_debug(
+                    new_state.handle_store(address, value, <span class="kw-2">&amp;</span><span class="self">self</span>.project.runtime_memory_image),
+                    <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>def.tid),
                 );
-                <span class="prelude-val">Some</span>(<span class="ident">new_state</span>)
+                <span class="prelude-val">Some</span>(new_state)
             }
-            <span class="ident">Def::Assign</span> { <span class="ident">var</span>, <span class="ident">value</span> } =&gt; {
-                <span class="ident">new_state</span>.<span class="ident">handle_register_assign</span>(<span class="ident">var</span>, <span class="ident">value</span>);
-                <span class="prelude-val">Some</span>(<span class="ident">new_state</span>)
+            Def::Assign { var, value } =&gt; {
+                new_state.handle_register_assign(var, value);
+                <span class="prelude-val">Some</span>(new_state)
             }
-            <span class="ident">Def::Load</span> { <span class="ident">var</span>, <span class="ident">address</span> } =&gt; {
-                <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">is_mips_gp_load_to_top_value</span>(<span class="ident">state</span>, <span class="ident">var</span>, <span class="ident">address</span>) {
-                    <span class="self">self</span>.<span class="ident">log_debug</span>(
-                        <span class="ident">new_state</span>.<span class="ident">handle_load</span>(<span class="ident">var</span>, <span class="ident">address</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">project</span>.<span class="ident">runtime_memory_image</span>),
-                        <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">def</span>.<span class="ident">tid</span>),
+            Def::Load { var, address } =&gt; {
+                <span class="kw">if </span>!<span class="self">self</span>.is_mips_gp_load_to_top_value(state, var, address) {
+                    <span class="self">self</span>.log_debug(
+                        new_state.handle_load(var, address, <span class="kw-2">&amp;</span><span class="self">self</span>.project.runtime_memory_image),
+                        <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>def.tid),
                     );
                 }
-                <span class="comment">// Else we ignore the load and hope that the value still contained in the gp register is still correct.</span>
-                <span class="comment">// This only works because gp is (incorrectly) marked as a callee-saved register.</span>
-                <span class="comment">// FIXME: If the rest of the analysis becomes good enough so that this case is not common anymore,</span>
-                <span class="comment">// we should log it.</span>
-                <span class="prelude-val">Some</span>(<span class="ident">new_state</span>)
+                <span class="comment">// Else we ignore the load and hope that the value still contained in the gp register is still correct.
+                // This only works because gp is (incorrectly) marked as a callee-saved register.
+                // FIXME: If the rest of the analysis becomes good enough so that this case is not common anymore,
+                // we should log it.
+                </span><span class="prelude-val">Some</span>(new_state)
             }
         }
     }
 
-    <span class="doccomment">/// Update the state according to the effects of the given `Jmp` term.</span>
-    <span class="kw">fn</span> <span class="ident">update_jump</span>(
+    <span class="doccomment">/// Update the state according to the effects of the given `Jmp` term.
+    </span><span class="kw">fn </span>update_jump(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">state</span>: <span class="kw-2">&amp;</span><span class="ident">State</span>,
-        <span class="ident">_jump</span>: <span class="kw-2">&amp;</span><span class="ident">Term</span><span class="op">&lt;</span><span class="ident">Jmp</span><span class="op">&gt;</span>,
-        <span class="ident">_untaken_conditional</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">Term</span><span class="op">&lt;</span><span class="ident">Jmp</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-        <span class="ident">_target</span>: <span class="kw-2">&amp;</span><span class="ident">Term</span><span class="op">&lt;</span><span class="ident">Blk</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">new_state</span> <span class="op">=</span> <span class="ident">state</span>.<span class="ident">clone</span>();
-        <span class="prelude-val">Some</span>(<span class="ident">new_state</span>)
+        state: <span class="kw-2">&amp;</span>State,
+        _jump: <span class="kw-2">&amp;</span>Term&lt;Jmp&gt;,
+        _untaken_conditional: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>Term&lt;Jmp&gt;&gt;,
+        _target: <span class="kw-2">&amp;</span>Term&lt;Blk&gt;,
+    ) -&gt; <span class="prelude-ty">Option</span>&lt;State&gt; {
+        <span class="kw">let </span>new_state = state.clone();
+        <span class="prelude-val">Some</span>(new_state)
     }
 
-    <span class="doccomment">/// Update the state according to the effects of the given `Call` term.</span>
-    <span class="doccomment">/// The resulting state is the state at the start of the call target function.</span>
-    <span class="kw">fn</span> <span class="ident">update_call</span>(
+    <span class="doccomment">/// Update the state according to the effects of the given `Call` term.
+    /// The resulting state is the state at the start of the call target function.
+    </span><span class="kw">fn </span>update_call(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">_state</span>: <span class="kw-2">&amp;</span><span class="ident">State</span>,
-        <span class="ident">call_term</span>: <span class="kw-2">&amp;</span><span class="ident">Term</span><span class="op">&lt;</span><span class="ident">Jmp</span><span class="op">&gt;</span>,
-        <span class="ident">_target_node</span>: <span class="kw-2">&amp;</span><span class="ident"><span class="kw">crate</span>::analysis::graph::Node</span>,
-        <span class="ident">_calling_convention</span>: <span class="kw-2">&amp;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="ident">Jmp::Call</span> { .. } <span class="op">=</span> <span class="ident">call_term</span>.<span class="ident">term</span> {
-            <span class="comment">// No information flows from caller to the callee in the analysis.</span>
-            <span class="prelude-val">None</span>
-        } <span class="kw">else</span> <span class="kw">if</span> <span class="kw">let</span> <span class="ident">Jmp::CallInd</span> { .. } <span class="op">=</span> <span class="ident">call_term</span>.<span class="ident">term</span> {
+        _state: <span class="kw-2">&amp;</span>State,
+        call_term: <span class="kw-2">&amp;</span>Term&lt;Jmp&gt;,
+        _target_node: <span class="kw-2">&amp;</span><span class="kw">crate</span>::analysis::graph::Node,
+        _calling_convention: <span class="kw-2">&amp;</span><span class="prelude-ty">Option</span>&lt;String&gt;,
+    ) -&gt; <span class="prelude-ty">Option</span>&lt;State&gt; {
+        <span class="kw">if let </span>Jmp::Call { .. } = call_term.term {
+            <span class="comment">// No information flows from caller to the callee in the analysis.
+            </span><span class="prelude-val">None
+        </span>} <span class="kw">else if let </span>Jmp::CallInd { .. } = call_term.term {
             <span class="macro">panic!</span>(<span class="string">&quot;Indirect call edges not yet supported.&quot;</span>)
-        } <span class="kw">else</span> {
+        } <span class="kw">else </span>{
             <span class="macro">panic!</span>(<span class="string">&quot;Malformed control flow graph: Call edge was not a call.&quot;</span>)
         }
     }
 
-    <span class="doccomment">/// Update the state according to the effects of the given return instruction.</span>
-    <span class="doccomment">/// The `state_before_call` is used to reconstruct caller-specific information like the caller stack frame.</span>
-    <span class="kw">fn</span> <span class="ident">update_return</span>(
+    <span class="doccomment">/// Update the state according to the effects of the given return instruction.
+    /// The `state_before_call` is used to reconstruct caller-specific information like the caller stack frame.
+    </span><span class="kw">fn </span>update_return(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">state_before_return</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">State</span><span class="op">&gt;</span>,
-        <span class="ident">state_before_call</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">State</span><span class="op">&gt;</span>,
-        <span class="ident">call_term</span>: <span class="kw-2">&amp;</span><span class="ident">Term</span><span class="op">&lt;</span><span class="ident">Jmp</span><span class="op">&gt;</span>,
-        <span class="ident">return_term</span>: <span class="kw-2">&amp;</span><span class="ident">Term</span><span class="op">&lt;</span><span class="ident">Jmp</span><span class="op">&gt;</span>,
-        <span class="ident">calling_convention_opt</span>: <span class="kw-2">&amp;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> (<span class="ident">state_before_call</span>, <span class="ident">state_before_return</span>) <span class="op">=</span>
-            <span class="kw">match</span> (<span class="ident">state_before_call</span>, <span class="ident">state_before_return</span>) {
-                (<span class="prelude-val">Some</span>(<span class="ident">state_call</span>), <span class="prelude-val">Some</span>(<span class="ident">state_return</span>)) =&gt; (<span class="ident">state_call</span>, <span class="ident">state_return</span>),
-                (<span class="prelude-val">Some</span>(<span class="ident">state_call</span>), <span class="prelude-val">None</span>) =&gt; {
-                    <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_indirect_call_with_top_target</span>(<span class="ident">state_call</span>, <span class="ident">call_term</span>) {
-                        <span class="comment">// We know nothing about the call target.</span>
-                        <span class="kw">return</span> <span class="self">self</span>.<span class="ident">handle_call_to_generic_unknown_function</span>(<span class="ident">state_call</span>);
-                    } <span class="kw">else</span> {
-                        <span class="comment">// We know at least something about the call target.</span>
-                        <span class="comment">// Since we don&#39;t have a return value,</span>
-                        <span class="comment">// we assume that the called function may not return at all.</span>
-                        <span class="kw">return</span> <span class="prelude-val">None</span>;
+        state_before_return: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>State&gt;,
+        state_before_call: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>State&gt;,
+        call_term: <span class="kw-2">&amp;</span>Term&lt;Jmp&gt;,
+        return_term: <span class="kw-2">&amp;</span>Term&lt;Jmp&gt;,
+        calling_convention_opt: <span class="kw-2">&amp;</span><span class="prelude-ty">Option</span>&lt;String&gt;,
+    ) -&gt; <span class="prelude-ty">Option</span>&lt;State&gt; {
+        <span class="kw">let </span>(state_before_call, state_before_return) =
+            <span class="kw">match </span>(state_before_call, state_before_return) {
+                (<span class="prelude-val">Some</span>(state_call), <span class="prelude-val">Some</span>(state_return)) =&gt; (state_call, state_return),
+                (<span class="prelude-val">Some</span>(state_call), <span class="prelude-val">None</span>) =&gt; {
+                    <span class="kw">if </span><span class="self">self</span>.is_indirect_call_with_top_target(state_call, call_term) {
+                        <span class="comment">// We know nothing about the call target.
+                        </span><span class="kw">return </span><span class="self">self</span>.handle_call_to_generic_unknown_function(state_call);
+                    } <span class="kw">else </span>{
+                        <span class="comment">// We know at least something about the call target.
+                        // Since we don&#39;t have a return value,
+                        // we assume that the called function may not return at all.
+                        </span><span class="kw">return </span><span class="prelude-val">None</span>;
                     }
                 }
-                (<span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="ident">_state_return</span>)) =&gt; <span class="kw">return</span> <span class="prelude-val">None</span>, <span class="comment">// we only return to functions with a value before the call to prevent returning to dead code</span>
-                (<span class="prelude-val">None</span>, <span class="prelude-val">None</span>) =&gt; <span class="kw">return</span> <span class="prelude-val">None</span>,
+                (<span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(_state_return)) =&gt; <span class="kw">return </span><span class="prelude-val">None</span>, <span class="comment">// we only return to functions with a value before the call to prevent returning to dead code
+                </span>(<span class="prelude-val">None</span>, <span class="prelude-val">None</span>) =&gt; <span class="kw">return </span><span class="prelude-val">None</span>,
             };
 
-        <span class="kw">let</span> <span class="ident">cconv</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>
-            .<span class="ident">project</span>
-            .<span class="ident">get_specific_calling_convention</span>(<span class="ident">calling_convention_opt</span>)
+        <span class="kw">let </span>cconv = <span class="kw">match </span><span class="self">self
+            </span>.project
+            .get_specific_calling_convention(calling_convention_opt)
         {
-            <span class="prelude-val">Some</span>(<span class="ident">cconv</span>) =&gt; <span class="ident">cconv</span>,
-            <span class="prelude-val">None</span> =&gt; {
-                <span class="comment">// If we neither know the specific nor a default calling convention for the function,</span>
-                <span class="comment">// then we treat it as a dead end in the control flow graph.</span>
-                <span class="kw">return</span> <span class="prelude-val">None</span>;
+            <span class="prelude-val">Some</span>(cconv) =&gt; cconv,
+            <span class="prelude-val">None </span>=&gt; {
+                <span class="comment">// If we neither know the specific nor a default calling convention for the function,
+                // then we treat it as a dead end in the control flow graph.
+                </span><span class="kw">return </span><span class="prelude-val">None</span>;
             }
         };
 
-        <span class="comment">// Detect possible information loss on the stack pointer and report it.</span>
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">err</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">detect_stack_pointer_information_loss_on_return</span>(<span class="ident">state_before_return</span>)
+        <span class="comment">// Detect possible information loss on the stack pointer and report it.
+        </span><span class="kw">if let </span><span class="prelude-val">Err</span>(err) = <span class="self">self</span>.detect_stack_pointer_information_loss_on_return(state_before_return)
         {
-            <span class="self">self</span>.<span class="ident">log_debug</span>(<span class="prelude-val">Err</span>(<span class="ident">err</span>), <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">return_term</span>.<span class="ident">tid</span>));
-            <span class="comment">// This is an indicator of an analysis error</span>
-            <span class="comment">// or a call to a non-returning extern function that was not marked as non-returning.</span>
-            <span class="kw">return</span> <span class="prelude-val">None</span>;
+            <span class="self">self</span>.log_debug(<span class="prelude-val">Err</span>(err), <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>return_term.tid));
+            <span class="comment">// This is an indicator of an analysis error
+            // or a call to a non-returning extern function that was not marked as non-returning.
+            </span><span class="kw">return </span><span class="prelude-val">None</span>;
         }
 
-        <span class="comment">// Create a mapping of IDs from the callee to IDs that should be used in the caller.</span>
-        <span class="kw">let</span> <span class="ident">id_map</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">create_callee_id_to_caller_data_map</span>(
-            <span class="ident">state_before_call</span>,
-            <span class="ident">state_before_return</span>,
-            <span class="kw-2">&amp;</span><span class="ident">call_term</span>.<span class="ident">tid</span>,
+        <span class="comment">// Create a mapping of IDs from the callee to IDs that should be used in the caller.
+        </span><span class="kw">let </span>id_map = <span class="self">self</span>.create_callee_id_to_caller_data_map(
+            state_before_call,
+            state_before_return,
+            <span class="kw-2">&amp;</span>call_term.tid,
         );
-        <span class="kw">let</span> <span class="ident">callee_id_to_access_pattern_map</span> <span class="op">=</span>
-            <span class="self">self</span>.<span class="ident">create_id_to_access_pattern_map</span>(<span class="ident">state_before_return</span>);
-        <span class="comment">// Identify caller IDs for which the callee analysis may be unsound for this callsite.</span>
-        <span class="kw">let</span> <span class="ident">unsound_caller_ids</span> <span class="op">=</span>
-            <span class="self">self</span>.<span class="ident">get_unsound_caller_ids</span>(<span class="kw-2">&amp;</span><span class="ident">id_map</span>, <span class="kw-2">&amp;</span><span class="ident">callee_id_to_access_pattern_map</span>);
-        <span class="comment">// TODO: Unsound caller IDs occur too often to log the cases right now.</span>
-        <span class="comment">// We have to investigate the reasons for it (maybe too many parameters on the caller stack?)</span>
-        <span class="comment">// and find better heuristics to prevent them poisoning the analysis soundness.</span>
+        <span class="kw">let </span>callee_id_to_access_pattern_map =
+            <span class="self">self</span>.create_id_to_access_pattern_map(state_before_return);
+        <span class="comment">// Identify caller IDs for which the callee analysis may be unsound for this callsite.
+        </span><span class="kw">let </span>unsound_caller_ids =
+            <span class="self">self</span>.get_unsound_caller_ids(<span class="kw-2">&amp;</span>id_map, <span class="kw-2">&amp;</span>callee_id_to_access_pattern_map);
+        <span class="comment">// TODO: Unsound caller IDs occur too often to log the cases right now.
+        // We have to investigate the reasons for it (maybe too many parameters on the caller stack?)
+        // and find better heuristics to prevent them poisoning the analysis soundness.
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">state_after_return</span> <span class="op">=</span> <span class="ident">state_before_call</span>.<span class="ident">clone</span>();
-        <span class="comment">// Adjust register values of state_after_return</span>
-        <span class="ident">state_after_return</span>.<span class="ident">remove_non_callee_saved_register</span>(<span class="ident">cconv</span>);
-        <span class="self">self</span>.<span class="ident">adjust_stack_register_on_return_from_call</span>(<span class="ident">state_before_call</span>, <span class="kw-2">&amp;mut</span> <span class="ident">state_after_return</span>);
-        <span class="kw">for</span> <span class="ident">return_reg</span> <span class="kw">in</span> <span class="ident">cconv</span>.<span class="ident">get_all_return_register</span>() {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">return_value</span> <span class="op">=</span> <span class="ident">state_before_return</span>.<span class="ident">get_register</span>(<span class="ident">return_reg</span>);
-            <span class="ident">return_value</span>.<span class="ident">replace_all_ids</span>(<span class="kw-2">&amp;</span><span class="ident">id_map</span>);
-            <span class="kw">if</span> <span class="op">!</span><span class="ident">return_value</span>.<span class="ident">is_top</span>() {
-                <span class="ident">state_after_return</span>.<span class="ident">set_register</span>(<span class="ident">return_reg</span>, <span class="ident">return_value</span>);
+        </span><span class="kw">let </span><span class="kw-2">mut </span>state_after_return = state_before_call.clone();
+        <span class="comment">// Adjust register values of state_after_return
+        </span>state_after_return.remove_non_callee_saved_register(cconv);
+        <span class="self">self</span>.adjust_stack_register_on_return_from_call(state_before_call, <span class="kw-2">&amp;mut </span>state_after_return);
+        <span class="kw">for </span>return_reg <span class="kw">in </span>cconv.get_all_return_register() {
+            <span class="kw">let </span><span class="kw-2">mut </span>return_value = state_before_return.get_register(return_reg);
+            return_value.replace_all_ids(<span class="kw-2">&amp;</span>id_map);
+            <span class="kw">if </span>!return_value.is_top() {
+                state_after_return.set_register(return_reg, return_value);
             }
         }
-        <span class="comment">// Merge or add memory objects from the callee to the caller state.</span>
-        <span class="kw">for</span> (<span class="ident">callee_object_id</span>, <span class="ident">callee_object</span>) <span class="kw">in</span> <span class="ident">state_before_return</span>.<span class="ident">memory</span>.<span class="ident">iter</span>() {
-            <span class="kw">if</span> <span class="kw-2">*</span><span class="ident">callee_object_id</span> <span class="op">==</span> <span class="ident">state_before_return</span>.<span class="ident">stack_id</span> {
-                <span class="comment">// The callee stack frame does not exist anymore after return to the caller.</span>
+        <span class="comment">// Merge or add memory objects from the callee to the caller state.
+        </span><span class="kw">for </span>(callee_object_id, callee_object) <span class="kw">in </span>state_before_return.memory.iter() {
+            <span class="kw">if </span><span class="kw-2">*</span>callee_object_id == state_before_return.stack_id {
+                <span class="comment">// The callee stack frame does not exist anymore after return to the caller.
+                </span><span class="kw">continue</span>;
+            }
+            <span class="kw">if </span><span class="kw-2">*</span>callee_object_id == state_before_return.get_global_mem_id() {
+                <span class="kw">let </span>callee_fn_sig = <span class="self">self
+                    </span>.fn_signatures
+                    .get(state_before_return.get_fn_tid())
+                    .unwrap();
+                <span class="self">self</span>.merge_global_mem_from_callee(
+                    <span class="kw-2">&amp;mut </span>state_after_return,
+                    callee_object,
+                    <span class="kw-2">&amp;</span>id_map,
+                    callee_fn_sig,
+                    <span class="kw-2">&amp;</span>call_term.tid,
+                );
                 <span class="kw">continue</span>;
             }
-            <span class="kw">if</span> <span class="prelude-val">Some</span>(<span class="bool-val">false</span>)
-                <span class="op">==</span> <span class="ident">callee_id_to_access_pattern_map</span>
-                    .<span class="ident">get</span>(<span class="ident">callee_object_id</span>)
-                    .<span class="ident">map</span>(<span class="op">|</span><span class="ident">access_pattern</span><span class="op">|</span> <span class="ident">access_pattern</span>.<span class="ident">is_mutably_dereferenced</span>())
+            <span class="kw">if </span><span class="prelude-val">Some</span>(<span class="bool-val">false</span>)
+                == callee_id_to_access_pattern_map
+                    .get(callee_object_id)
+                    .map(|access_pattern| access_pattern.is_mutably_dereferenced())
             {
-                <span class="comment">// We do not have to modify anything for parameter objects that are only read but not written to.</span>
-                <span class="kw">continue</span>;
+                <span class="comment">// We do not have to modify anything for parameter objects that are only read but not written to.
+                </span><span class="kw">continue</span>;
             }
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">callee_object</span> <span class="op">=</span> <span class="ident">callee_object</span>.<span class="ident">clone</span>();
-            <span class="ident">callee_object</span>.<span class="ident">replace_ids</span>(<span class="kw-2">&amp;</span><span class="ident">id_map</span>);
+            <span class="kw">let </span><span class="kw-2">mut </span>callee_object = callee_object.clone();
+            callee_object.replace_ids(<span class="kw-2">&amp;</span>id_map);
 
-            <span class="kw">if</span> <span class="ident">callee_id_to_access_pattern_map</span>
-                .<span class="ident">get</span>(<span class="ident">callee_object_id</span>)
-                .<span class="ident">is_none</span>()
+            <span class="kw">if </span>callee_id_to_access_pattern_map
+                .get(callee_object_id)
+                .is_none()
             {
-                <span class="comment">// Add a callee object that does not correspond to a parameter to the caller or the stack of the callee.</span>
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">new_object_id</span>) <span class="op">=</span> <span class="ident">callee_object_id</span>.<span class="ident">with_path_hint</span>(<span class="ident">call_term</span>.<span class="ident">tid</span>.<span class="ident">clone</span>()) {
-                    <span class="ident">state_after_return</span>
-                        .<span class="ident">memory</span>
-                        .<span class="ident">insert</span>(<span class="ident">new_object_id</span>, <span class="ident">callee_object</span>);
+                <span class="comment">// Add a callee object that does not correspond to a parameter to the caller or the stack of the callee.
+                </span><span class="kw">if let </span><span class="prelude-val">Ok</span>(new_object_id) = callee_object_id.with_path_hint(call_term.tid.clone()) {
+                    state_after_return
+                        .memory
+                        .insert(new_object_id, callee_object);
                 }
-            } <span class="kw">else</span> {
-                <span class="comment">// The callee object is a parameter object.</span>
-                <span class="self">self</span>.<span class="ident">log_debug</span>(
-                    <span class="ident">state_after_return</span>.<span class="ident">add_param_object_from_callee</span>(
-                        <span class="ident">callee_object</span>,
-                        <span class="ident">id_map</span>.<span class="ident">get</span>(<span class="ident">callee_object_id</span>).<span class="ident">unwrap</span>(),
+            } <span class="kw">else </span>{
+                <span class="comment">// The callee object is a parameter object.
+                </span><span class="self">self</span>.log_debug(
+                    state_after_return.add_param_object_from_callee(
+                        callee_object,
+                        id_map.get(callee_object_id).unwrap(),
                     ),
-                    <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">call_term</span>.<span class="ident">tid</span>),
+                    <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>call_term.tid),
                 );
             }
         }
-        <span class="comment">// Additionally assume arbitrary writes for every caller ID where the callee handling might be unsound.</span>
-        <span class="kw">for</span> <span class="ident">id</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">unsound_caller_ids</span> {
-            <span class="ident">state_after_return</span>
-                .<span class="ident">memory</span>
-                .<span class="ident">assume_arbitrary_writes_to_object</span>(<span class="ident">id</span>, <span class="kw-2">&amp;</span><span class="ident">BTreeSet::new</span>());
-            <span class="comment">// TODO: We should specify more possible reference targets.</span>
-        }
-        <span class="comment">// Cleanup</span>
-        <span class="ident">state_after_return</span>.<span class="ident">remove_unreferenced_objects</span>();
+        <span class="comment">// Additionally assume arbitrary writes for every caller ID where the callee handling might be unsound.
+        </span><span class="kw">for </span>id <span class="kw">in </span><span class="kw-2">&amp;</span>unsound_caller_ids {
+            state_after_return
+                .memory
+                .assume_arbitrary_writes_to_object(id, <span class="kw-2">&amp;</span>BTreeSet::new());
+            <span class="comment">// TODO: We should specify more possible reference targets.
+        </span>}
+        <span class="comment">// Cleanup
+        </span>state_after_return.remove_unreferenced_objects();
 
-        <span class="prelude-val">Some</span>(<span class="ident">state_after_return</span>)
+        <span class="prelude-val">Some</span>(state_after_return)
     }
 
-    <span class="doccomment">/// Update the state according to the effect of a call to an extern symbol</span>
-    <span class="doccomment">/// or an indirect call where nothing is known about the call target.</span>
-    <span class="kw">fn</span> <span class="ident">update_call_stub</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">state</span>: <span class="kw-2">&amp;</span><span class="ident">State</span>, <span class="ident">call</span>: <span class="kw-2">&amp;</span><span class="ident">Term</span><span class="op">&lt;</span><span class="ident">Jmp</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">call_target</span> <span class="op">=</span> <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="ident">call</span>.<span class="ident">term</span> {
-            <span class="ident">Jmp::Call</span> { <span class="ident">target</span>, .. } =&gt; <span class="ident">target</span>,
-            <span class="ident">Jmp::CallInd</span> { .. } =&gt; {
-                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_indirect_call_with_top_target</span>(<span class="ident">state</span>, <span class="ident">call</span>) {
-                    <span class="comment">// We know nothing about the call target.</span>
-                    <span class="kw">return</span> <span class="self">self</span>.<span class="ident">handle_call_to_generic_unknown_function</span>(<span class="ident">state</span>);
-                } <span class="kw">else</span> {
-                    <span class="kw">return</span> <span class="prelude-val">None</span>;
+    <span class="doccomment">/// Update the state according to the effect of a call to an extern symbol
+    /// or an indirect call where nothing is known about the call target.
+    </span><span class="kw">fn </span>update_call_stub(<span class="kw-2">&amp;</span><span class="self">self</span>, state: <span class="kw-2">&amp;</span>State, call: <span class="kw-2">&amp;</span>Term&lt;Jmp&gt;) -&gt; <span class="prelude-ty">Option</span>&lt;State&gt; {
+        <span class="kw">let </span>call_target = <span class="kw">match </span><span class="kw-2">&amp;</span>call.term {
+            Jmp::Call { target, .. } =&gt; target,
+            Jmp::CallInd { .. } =&gt; {
+                <span class="kw">if </span><span class="self">self</span>.is_indirect_call_with_top_target(state, call) {
+                    <span class="comment">// We know nothing about the call target.
+                    </span><span class="kw">return </span><span class="self">self</span>.handle_call_to_generic_unknown_function(state);
+                } <span class="kw">else </span>{
+                    <span class="kw">return </span><span class="prelude-val">None</span>;
                 }
             }
-            <span class="kw">_</span> =&gt; <span class="macro">panic!</span>(<span class="string">&quot;Malformed control flow graph encountered.&quot;</span>),
+            <span class="kw">_ </span>=&gt; <span class="macro">panic!</span>(<span class="string">&quot;Malformed control flow graph encountered.&quot;</span>),
         };
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_state</span> <span class="op">=</span> <span class="ident">state</span>.<span class="ident">clone</span>();
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">extern_symbol</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">extern_symbol_map</span>.<span class="ident">get</span>(<span class="ident">call_target</span>) {
-            <span class="comment">// Clear non-callee-saved registers from the state.</span>
-            <span class="kw">let</span> <span class="ident">cconv</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">project</span>.<span class="ident">get_calling_convention</span>(<span class="ident">extern_symbol</span>);
-            <span class="ident">new_state</span>.<span class="ident">clear_non_callee_saved_register</span>(<span class="kw-2">&amp;</span><span class="ident">cconv</span>.<span class="ident">callee_saved_register</span>[..]);
-            <span class="comment">// Adjust stack register value (for x86 architecture).</span>
-            <span class="self">self</span>.<span class="ident">adjust_stack_register_on_return_from_call</span>(<span class="ident">state</span>, <span class="kw-2">&amp;mut</span> <span class="ident">new_state</span>);
+        <span class="kw">let </span><span class="kw-2">mut </span>new_state = state.clone();
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(extern_symbol) = <span class="self">self</span>.extern_symbol_map.get(call_target) {
+            <span class="comment">// Clear non-callee-saved registers from the state.
+            </span><span class="kw">let </span>cconv = <span class="self">self</span>.project.get_calling_convention(extern_symbol);
+            new_state.clear_non_callee_saved_register(<span class="kw-2">&amp;</span>cconv.callee_saved_register[..]);
+            <span class="comment">// Adjust stack register value (for x86 architecture).
+            </span><span class="self">self</span>.adjust_stack_register_on_return_from_call(state, <span class="kw-2">&amp;mut </span>new_state);
 
-            <span class="kw">match</span> <span class="ident">extern_symbol</span>.<span class="ident">name</span>.<span class="ident">as_str</span>() {
-                <span class="ident">malloc_like_fn</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">allocation_symbols</span>.<span class="ident">iter</span>().<span class="ident">any</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span> <span class="op">==</span> <span class="ident">malloc_like_fn</span>) =&gt; {
-                    <span class="prelude-val">Some</span>(<span class="self">self</span>.<span class="ident">add_new_object_in_call_return_register</span>(
-                        <span class="ident">new_state</span>,
-                        <span class="ident">call</span>,
-                        <span class="ident">extern_symbol</span>,
+            <span class="kw">match </span>extern_symbol.name.as_str() {
+                <span class="string">&quot;sscanf&quot; </span>=&gt; {
+                    <span class="self">self</span>.log_debug(
+                        <span class="self">self</span>.handle_params_of_sscanf_call(
+                            state,
+                            <span class="kw-2">&amp;mut </span>new_state,
+                            extern_symbol,
+                            <span class="kw-2">&amp;</span>call.tid,
+                        ),
+                        <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>call.tid),
+                    );
+                    <span class="prelude-val">Some</span>(new_state)
+                }
+                malloc_like_fn <span class="kw">if </span><span class="self">self</span>.allocation_symbols.iter().any(|x| x == malloc_like_fn) =&gt; {
+                    <span class="prelude-val">Some</span>(<span class="self">self</span>.add_new_object_in_call_return_register(
+                        new_state,
+                        call,
+                        extern_symbol,
                     ))
                 }
-                <span class="kw">_</span> =&gt; <span class="prelude-val">Some</span>(<span class="self">self</span>.<span class="ident">handle_generic_extern_call</span>(<span class="ident">state</span>, <span class="ident">new_state</span>, <span class="ident">call</span>, <span class="ident">extern_symbol</span>)),
+                stubbed_fn
+                    <span class="kw">if </span><span class="self">self
+                        </span>.extern_fn_param_access_patterns
+                        .contains_key(stubbed_fn) =&gt;
+                {
+                    <span class="self">self</span>.handle_parameter_access_for_stubbed_functions(
+                        state,
+                        <span class="kw-2">&amp;mut </span>new_state,
+                        extern_symbol,
+                    );
+
+                    <span class="kw">let </span>return_value =
+                        <span class="self">self</span>.compute_return_value_for_stubbed_function(state, extern_symbol);
+                    new_state.set_register(<span class="kw-2">&amp;</span>cconv.integer_return_register[<span class="number">0</span>], return_value);
+
+                    <span class="prelude-val">Some</span>(new_state)
+                }
+                <span class="kw">_ </span>=&gt; <span class="prelude-val">Some</span>(<span class="self">self</span>.handle_generic_extern_call(state, new_state, call, extern_symbol)),
             }
-        } <span class="kw">else</span> {
+        } <span class="kw">else </span>{
             <span class="macro">panic!</span>(<span class="string">&quot;Extern symbol not found.&quot;</span>);
         }
     }
 
-    <span class="doccomment">/// Update the state with the knowledge that some conditional evaluated to true or false.</span>
-    <span class="kw">fn</span> <span class="ident">specialize_conditional</span>(
+    <span class="doccomment">/// Update the state with the knowledge that some conditional evaluated to true or false.
+    </span><span class="kw">fn </span>specialize_conditional(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">state</span>: <span class="kw-2">&amp;</span><span class="ident">State</span>,
-        <span class="ident">condition</span>: <span class="kw-2">&amp;</span><span class="ident">Expression</span>,
-        <span class="ident">_block_before_condition</span>: <span class="kw-2">&amp;</span><span class="ident">Term</span><span class="op">&lt;</span><span class="ident">Blk</span><span class="op">&gt;</span>,
-        <span class="ident">is_true</span>: <span class="ident">bool</span>,
-    ) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">specialized_state</span> <span class="op">=</span> <span class="ident">state</span>.<span class="ident">clone</span>();
-        <span class="kw">match</span> <span class="ident">specialized_state</span>
-            .<span class="ident">specialize_by_expression_result</span>(<span class="ident">condition</span>, <span class="ident">Bitvector::from_u8</span>(<span class="ident">is_true</span> <span class="kw">as</span> <span class="ident">u8</span>).<span class="ident">into</span>())
+        state: <span class="kw-2">&amp;</span>State,
+        condition: <span class="kw-2">&amp;</span>Expression,
+        _block_before_condition: <span class="kw-2">&amp;</span>Term&lt;Blk&gt;,
+        is_true: bool,
+    ) -&gt; <span class="prelude-ty">Option</span>&lt;State&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>specialized_state = state.clone();
+        <span class="kw">match </span>specialized_state
+            .specialize_by_expression_result(condition, Bitvector::from_u8(is_true <span class="kw">as </span>u8).into())
         {
-            <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Some</span>(<span class="ident">specialized_state</span>),
-            <span class="comment">// State is unsatisfiable</span>
-            <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">None</span>,
+            <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Some</span>(specialized_state),
+            <span class="comment">// State is unsatisfiable
+            </span><span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">None</span>,
         }
     }
 }
-</code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../../" data-current-crate="cwe_checker_lib" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.60.0 (7737e0b5c 2022-04-04)" ></div>
-</body></html>
+</code></pre></div></section></main></body></html>

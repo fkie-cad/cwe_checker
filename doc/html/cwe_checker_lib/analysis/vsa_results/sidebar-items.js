@@ -1,1 +1,1 @@
-initSidebarItems({"trait":[["VsaResult","A trait providing an interface for accessing the results of a value set analysis. Note that the returned values may be any type of information associated with values at certain program points, i.e. the trait can also be used for other analyses than just value set analyses."]]});
+window.SIDEBAR_ITEMS = {"trait":["VsaResult"]};

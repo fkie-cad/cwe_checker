@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["check_cwe","Run the check. See the module-level documentation for more information."]],"static":[["CWE_MODULE","The module name and version"]]});
+window.SIDEBAR_ITEMS = {"fn":["check_cwe"],"static":["CWE_MODULE"]};

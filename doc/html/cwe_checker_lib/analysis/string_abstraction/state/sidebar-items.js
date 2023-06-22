@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["State","Contains all information known about the state of a program at a specific point of time."]]});
+window.SIDEBAR_ITEMS = {"struct":["State"]};

@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["ObjectType","An object is either a stack or a heap object."]],"struct":[["AbstractObject","An abstract object contains all knowledge tracked about a particular memory object."]]});
+window.SIDEBAR_ITEMS = {"enum":["ObjectType"],"struct":["AbstractObject"]};

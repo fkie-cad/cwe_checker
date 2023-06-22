@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["compute_function_signatures","Compute the function signatures for all functions in the project."]],"struct":[["AccessPattern","Access flags to track different kind of access/usage patterns of a variable."],["FunctionSignature","The signature of a function. Currently only contains information on the parameters of a function and their access patterns."]]});
+window.SIDEBAR_ITEMS = {"fn":["compute_function_signatures"],"mod":["stubs"],"struct":["AccessPattern","FunctionSignature"]};

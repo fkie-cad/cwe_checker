@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["parse_hex_string_to_u64","A helper function to parse a hex string to an integer."]],"struct":[["BareMetalConfig","Contains all information parsed out of the bare metal configuration JSON file."],["MemorySegment","A continuous segment in the memory image."]]});
+window.SIDEBAR_ITEMS = {"fn":["parse_hex_string_to_u64"],"struct":["BareMetalConfig","MemorySegment"]};

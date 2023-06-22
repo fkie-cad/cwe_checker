@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["NodeValue","NodeValue that can either be a single abstract value or a composition of the abstract value computed following an interprocedural call in the graph and of the abstract value before or after the call (depending on the direction of the fixpoint analysis). The CallFlowCombinator then allows for a merge of the values computed over both paths."]],"fn":[["merge_option","Helper function to merge to values wrapped in `Option<..>`. Merges `(Some(x), None)` to `Some(x)`."]]});
+window.SIDEBAR_ITEMS = {"enum":["NodeValue"],"fn":["merge_option"]};

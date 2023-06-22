@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["compute_return_value_for_stubbed_function","generate_param_access_stubs","get_stubbed_variadic_symbols"],"mod":["return_value_stubs"]};

@@ -1,3 +1,3 @@
-(function() {var implementors = {};
-implementors["cwe_checker_lib"] = [{"text":"impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.60.0/core/fmt/trait.UpperHex.html\" title=\"trait core::fmt::UpperHex\">UpperHex</a> for <a class=\"struct\" href=\"cwe_checker_lib/intermediate_representation/struct.ByteSize.html\" title=\"struct cwe_checker_lib::intermediate_representation::ByteSize\">ByteSize</a>","synthetic":false,"types":["cwe_checker_lib::intermediate_representation::ByteSize"]}];
-if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
+(function() {var implementors = {
+"cwe_checker_lib":[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.70.0/core/fmt/trait.UpperHex.html\" title=\"trait core::fmt::UpperHex\">UpperHex</a> for <a class=\"struct\" href=\"cwe_checker_lib/intermediate_representation/struct.ByteSize.html\" title=\"struct cwe_checker_lib::intermediate_representation::ByteSize\">ByteSize</a>"]]
+};if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
