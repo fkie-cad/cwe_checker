@@ -237,7 +237,7 @@ impl PcodeOpSimple {
             .expect("Store target translation failed.");
 
         let data = self.input2.as_ref().expect("Store without source data");
-        if !matches!(data.address_space.as_str(), "unique" | "const" | "variable") {
+        if !matches!(data.address_space.as_str(), "unique" | "const" | "register") {
             panic!("Store source data is not a variable, temp variable nor constant.")
         }
 
