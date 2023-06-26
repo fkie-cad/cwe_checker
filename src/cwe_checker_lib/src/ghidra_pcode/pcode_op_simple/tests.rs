@@ -1,5 +1,3 @@
-use serde::de::Expected;
-
 use super::*;
 use crate::ghidra_pcode::tests::*;
 use crate::ghidra_pcode::ExpressionType::*;
@@ -432,14 +430,12 @@ fn test_create_unop_not_unop_type() {
 
 #[test]
 fn test_create_biop() {
-    let op = PcodeOpSimple {
-        pcode_index: 1,
-        pcode_mnemonic: ExpressionType(INT_ADD),
-        input0: mock_varnode("register", "RAX", 8),
-        input1: Some(mock_varnode("const", "0xCAFE", 4)),
-        input2: None,
-        output: Some(mock_varnode("register", "RAX", 8)),
-    };
+    let op = mock_pcode_op_add(
+        mock_varnode("register", "RAX", 8),
+        Some(mock_varnode("const", "0xCAFE", 4)),
+        Some(mock_varnode("register", "RAX", 8)),
+    );
+
     let expected = Term {
         tid: Tid {
             id: "instr_0x1234_1".into(),
@@ -570,14 +566,12 @@ fn test_create_assign_not_copy_type() {
 
 #[test]
 fn test_wrap_in_assign_or_store() {
-    let mut op = PcodeOpSimple {
-        pcode_index: 1,
-        pcode_mnemonic: ExpressionType(INT_ADD),
-        input0: mock_varnode("register", "EAX", 4),
-        input1: Some(mock_varnode("const", "0xCAFE", 4)),
-        input2: None,
-        output: Some(mock_varnode("register", "EAX", 4)),
-    };
+    let mut op = mock_pcode_op_add(
+        mock_varnode("register", "EAX", 4),
+        Some(mock_varnode("const", "0xCAFE", 4)),
+        Some(mock_varnode("register", "EAX", 4)),
+    );
+
     let expr = expr!("EAX:4 + 0xCAFE:4");
     // test Assign
     let mut expected = Term {
@@ -604,13 +598,10 @@ fn test_wrap_in_assign_or_store() {
 #[test]
 #[should_panic]
 fn test_wrap_in_assign_or_store_output_not_variable_nor_implicit_store() {
-    PcodeOpSimple {
-        pcode_index: 1,
-        pcode_mnemonic: ExpressionType(INT_ADD),
-        input0: mock_varnode("register", "EAX", 4),
-        input1: Some(mock_varnode("const", "0xCAFE", 4)),
-        input2: None,
-        output: Some(mock_varnode("const", "0xFFFF", 4)),
-    }
+    mock_pcode_op_add(
+        mock_varnode("register", "EAX", 4),
+        Some(mock_varnode("const", "0xCAFE", 4)),
+        Some(mock_varnode("const", "0xFFFF", 4)),
+    )
     .wrap_in_assign_or_store(&"0x1234".to_string(), expr!("0x1111:4"));
 }

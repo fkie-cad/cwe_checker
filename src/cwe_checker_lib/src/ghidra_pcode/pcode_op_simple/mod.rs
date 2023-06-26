@@ -288,7 +288,7 @@ impl PcodeOpSimple {
                         .expect("Subpice source data translation failed"),
                 ),
             };
-            return self.wrap_in_assign_or_store(address, expr);
+            self.wrap_in_assign_or_store(address, expr)
         } else {
             panic!("Number of truncation bytes is not a constant")
         }
@@ -309,7 +309,7 @@ impl PcodeOpSimple {
                     .expect("Translation into unary operation type failed"),
                 arg: Box::new(self.input0.into_ir_expr().unwrap()),
             };
-            return self.wrap_in_assign_or_store(address, expr);
+            self.wrap_in_assign_or_store(address, expr)
         } else {
             panic!("Not an expression type")
         }
@@ -337,7 +337,7 @@ impl PcodeOpSimple {
                         .unwrap(),
                 ),
             };
-            return self.wrap_in_assign_or_store(address, expr);
+            self.wrap_in_assign_or_store(address, expr)
         } else {
             panic!("Not an expression type")
         }
@@ -364,7 +364,7 @@ impl PcodeOpSimple {
                     .into(),
                 arg: Box::new(self.input0.into_ir_expr().unwrap()),
             };
-            return self.wrap_in_assign_or_store(address, expr);
+            self.wrap_in_assign_or_store(address, expr)
         } else {
             panic!("Not an expression type")
         }
@@ -374,7 +374,7 @@ impl PcodeOpSimple {
     pub fn create_assign(&self, address: &String) -> Term<Def> {
         if let PcodeOperation::ExpressionType(ExpressionType::COPY) = self.pcode_mnemonic {
             let expr = self.input0.into_ir_expr().unwrap();
-            return self.wrap_in_assign_or_store(address, expr);
+         self.wrap_in_assign_or_store(address, expr)
         } else {
             panic!("PcodeOperation is not COPY")
         }
@@ -414,10 +414,10 @@ impl PcodeOpSimple {
                 .into_ir_expr()
                 .unwrap()
             {
-                return Term {
+                Term {
                     tid,
                     term: Def::Assign { var, value: expr },
-                };
+                }
             } else {
                 panic!("Output varnode is not a variable")
             }
