@@ -87,7 +87,6 @@ impl VarnodeSimple {
             "const" => {
                 let constant =
                     Bitvector::from_u64(u64::from_str_radix(self.id.trim_start_matches("0x"), 16)?);
-
                 Ok(Expression::Const(
                     constant.into_resize_unsigned(self.size.into()),
                 ))

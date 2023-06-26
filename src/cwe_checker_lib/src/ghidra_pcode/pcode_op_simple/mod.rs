@@ -142,7 +142,7 @@ impl PcodeOpSimple {
             defs.append(&mut explicit_loads);
         }
 
-        let mut def = match self.pcode_mnemonic {
+        let def = match self.pcode_mnemonic {
             PcodeOperation::ExpressionType(expr_type) => self.create_def(address, expr_type),
             PcodeOperation::JmpType(jmp_type) => todo!(),
         };
@@ -258,7 +258,9 @@ impl PcodeOpSimple {
         }
     }
 
-    /// Translates pcode SUBPIECE instruction into Def with Expression::Subpice.
+    /// Translates pcode SUBPIECE instruction into `Def` with `Expression::Subpice`.
+    ///
+    /// https://spinsel.dev/assets/2020-06-17-ghidra-brainfuck-processor-1/ghidra_docs/language_spec/html/pcodedescription.html#cpui_subpiece
     ///
     /// Panics, if
     /// * self.input1 is `None` or cannot be translated into `Expression:Const`
@@ -330,7 +332,7 @@ impl PcodeOpSimple {
                 rhs: Box::new(
                     self.input1
                         .as_ref()
-                        .expect("No input 1 for binary operation")
+                        .expect("No input1 for binary operation")
                         .into_ir_expr()
                         .unwrap(),
                 ),
@@ -368,7 +370,7 @@ impl PcodeOpSimple {
         }
     }
 
-    /// Translates PcodeOperation::COPY into Term<Def::Assign>.
+    /// Translates `PcodeOperation::COPY` into `Term` containing `Def::Assign`.
     pub fn create_assign(&self, address: &String) -> Term<Def> {
         if let PcodeOperation::ExpressionType(ExpressionType::COPY) = self.pcode_mnemonic {
             let expr = self.input0.into_ir_expr().unwrap();
