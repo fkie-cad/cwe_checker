@@ -158,7 +158,7 @@ impl PcodeOpSimple {
             ExpressionType::LOAD => self.create_load(address),
             ExpressionType::STORE => self.create_store(address),
             ExpressionType::COPY => self.create_assign(address),
-            ExpressionType::SUBPIECE => self.create_subpice(address),
+            ExpressionType::SUBPIECE => self.create_subpiece(address),
             _ if expr_type.into_ir_unop().is_some() => self.create_unop(address),
             _ if expr_type.into_ir_biop().is_some() => self.create_biop(address),
             _ if expr_type.into_ir_cast().is_some() => self.create_castop(address),
@@ -258,7 +258,7 @@ impl PcodeOpSimple {
         }
     }
 
-    /// Translates pcode SUBPIECE instruction into `Def` with `Expression::Subpice`.
+    /// Translates pcode SUBPIECE instruction into `Def` with `Expression::Subpiece`.
     ///
     /// https://spinsel.dev/assets/2020-06-17-ghidra-brainfuck-processor-1/ghidra_docs/language_spec/html/pcodedescription.html#cpui_subpiece
     ///
@@ -266,26 +266,26 @@ impl PcodeOpSimple {
     /// * self.input1 is `None` or cannot be translated into `Expression:Const`
     /// * Amount of bytes to truncate cannot be translated into `u64`
     /// * `into_ir_expr()` returns `Err` `on self.input0`
-    fn create_subpice(&self, address: &String) -> Term<Def> {
+    fn create_subpiece(&self, address: &String) -> Term<Def> {
         if let Expression::Const(truncate) = self
             .input1
             .as_ref()
-            .expect("input0 of subpice is None")
+            .expect("input0 of subpiece is None")
             .into_ir_expr()
-            .expect("Subpice truncation number translation failed")
+            .expect("Subpiece truncation number translation failed")
         {
             let expr = Expression::Subpiece {
                 low_byte: truncate.try_to_u64().unwrap().into(),
                 size: self
                     .output
                     .as_ref()
-                    .expect("Subpice output is None")
+                    .expect("Subpiece output is None")
                     .size
                     .into(),
                 arg: Box::new(
                     self.input0
                         .into_ir_expr()
-                        .expect("Subpice source data translation failed"),
+                        .expect("Subpiece source data translation failed"),
                 ),
             };
             self.wrap_in_assign_or_store(address, expr)

@@ -361,12 +361,12 @@ fn test_create_subpice() {
             value: expected_expr,
         },
     };
-    assert_eq!(op.create_subpice(&"0x1234".to_string()), expected);
+    assert_eq!(op.create_subpiece(&"0x1234".to_string()), expected);
 }
 
 #[test]
 #[should_panic]
-fn test_create_subpice_with_non_constant() {
+fn test_create_subpiece_with_non_constant() {
     PcodeOpSimple {
         pcode_index: 1,
         pcode_mnemonic: ExpressionType(SUBPIECE),
@@ -375,7 +375,7 @@ fn test_create_subpice_with_non_constant() {
         input2: None,
         output: Some(mock_varnode("register", "EAX", 4)),
     }
-    .create_subpice(&"0x1234".to_string());
+    .create_subpiece(&"0x1234".to_string());
 }
 
 #[test]
