@@ -4,7 +4,7 @@
 //! [CastOpType](crate::intermediate_representation::CastOpType).
 
 use crate::{
-    intermediate_representation::{BinOpType, CastOpType, UnOpType},
+    intermediate_representation::{BinOpType, CastOpType, Expression, Jmp, Tid, UnOpType},
     pcode::{ExpressionType, JmpType},
 };
 use serde::{Deserialize, Serialize};
@@ -91,6 +91,59 @@ impl ExpressionType {
             TRUNC => Some(CastOpType::Trunc),
             POPCOUNT => Some(CastOpType::PopCount),
             _ => None,
+        }
+    }
+}
+
+impl JmpType {
+    pub fn into_ir_branch(&self, target: Tid) -> Jmp {
+        if matches!(self, JmpType::BRANCH) {
+            Jmp::Branch(target)
+        } else {
+            panic!("Not a branch operation")
+        }
+    }
+
+    pub fn into_ir_cbranch(&self, target: Tid, condition: Expression) -> Jmp {
+        if matches!(self, JmpType::CBRANCH) {
+            Jmp::CBranch { target, condition }
+        } else {
+            panic!("Not a conditional branch operation")
+        }
+    }
+
+    pub fn into_ir_return(&self, expression: Expression) -> Jmp {
+        if matches!(self, JmpType::RETURN) {
+            Jmp::Return(expression)
+        } else {
+            panic!("Not a return operation")
+        }
+    }
+
+    pub fn into_ir_branch_indirect(&self, target: Expression, return_: Option<Tid>) -> Jmp {
+        if matches!(self, JmpType::CALLIND) {
+            Jmp::CallInd { target, return_ }
+        } else {
+            panic!("Not a call indirect operation")
+        }
+    }
+
+    pub fn into_ir_call(&self, target: Tid, return_: Option<Tid>) -> Jmp {
+        if matches!(self, JmpType::CALL) {
+            Jmp::Call { target, return_ }
+        } else {
+            panic!("Not a call operation")
+        }
+    }
+
+    pub fn into_ir_call_other(&self, description: String, return_: Option<Tid>) -> Jmp {
+        if matches!(self, JmpType::CALL) {
+            Jmp::CallOther {
+                description,
+                return_,
+            }
+        } else {
+            panic!("Not a call operation")
         }
     }
 }

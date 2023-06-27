@@ -374,7 +374,7 @@ impl PcodeOpSimple {
     pub fn create_assign(&self, address: &String) -> Term<Def> {
         if let PcodeOperation::ExpressionType(ExpressionType::COPY) = self.pcode_mnemonic {
             let expr = self.input0.into_ir_expr().unwrap();
-         self.wrap_in_assign_or_store(address, expr)
+            self.wrap_in_assign_or_store(address, expr)
         } else {
             panic!("PcodeOperation is not COPY")
         }
