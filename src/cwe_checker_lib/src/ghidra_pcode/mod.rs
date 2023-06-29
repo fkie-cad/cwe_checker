@@ -8,6 +8,10 @@ use crate::pcode::{ExpressionType, JmpType};
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+mod pcode_operations;
+use pcode_operations::*;
+mod pcode_op_simple;
+use pcode_op_simple::*;
 
 /// The project struct for deserialization of the ghidra pcode extractor JSON.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
@@ -38,12 +42,9 @@ impl ProjectSimple {
             for blk in func.blocks {
                 for inst in blk.instructions {
                     for op in inst.pcode_ops {
-                        if PcodeOperation::ExpressionType(ExpressionType::LOAD) == op.pcode_mnemonic
-                            || PcodeOperation::ExpressionType(ExpressionType::STORE)
-                                == op.pcode_mnemonic
-                        {
-                            println!("{:?}", op.pcode_mnemonic);
-                            println!("{:?}", op.into_ir_def(&inst.address));
+                        if matches!(op.pcode_mnemonic, PcodeOperation::ExpressionType(_)) {
+                            dbg!(&op);
+                            op.into_ir_def(&inst.address);
                         }
                     }
                 }
@@ -81,18 +82,17 @@ impl VarnodeSimple {
     /// virtual registers.
     ///
     /// Returns `Err` if the addressspace is neither `"const"`, `"register"` nor `"unique"`.
-    fn into_ir_expr(self) -> Result<Expression> {
+    fn into_ir_expr(&self) -> Result<Expression> {
         match self.address_space.as_str() {
             "const" => {
                 let constant =
                     Bitvector::from_u64(u64::from_str_radix(self.id.trim_start_matches("0x"), 16)?);
-
                 Ok(Expression::Const(
                     constant.into_resize_unsigned(self.size.into()),
                 ))
             }
             "register" => Ok(Expression::Var(Variable {
-                name: self.id,
+                name: self.id.clone(),
                 size: ByteSize::new(self.size),
                 is_temp: false,
             })),
@@ -118,245 +118,41 @@ impl VarnodeSimple {
         }
         None
     }
-}
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
-pub struct PcodeOpSimple {
-    pub pcode_index: u64,
-    pub pcode_mnemonic: PcodeOperation,
-    pub input0: VarnodeSimple,
-    pub input1: Option<VarnodeSimple>,
-    pub input2: Option<VarnodeSimple>,
-    pub output: Option<VarnodeSimple>,
-}
-
-impl PcodeOpSimple {
-    /// Returns `true` if at least one input is ram located.
-    fn has_implicit_load(&self) -> bool {
-        if self.input0.address_space == "ram" {
-            return true;
-        }
-        if let Some(varnode) = &self.input1 {
-            if varnode.address_space == "ram" {
-                return true;
-            }
-        }
-        if let Some(varnode) = &self.input2 {
-            if varnode.address_space == "ram" {
-                return true;
-            }
-        }
-        false
-    }
-    // Returns `true` if the output is ram located.
-    fn has_implicit_store(&self) -> bool {
-        if let Some(varnode) = &self.output {
-            if varnode.address_space == "ram" {
-                return true;
-            }
-        }
-        false
-    }
-    /// Returns artificial `Def::Load` instructions, if the operants are ram located.
-    /// Otherwise returns empty `Vec`.
+    /// Returns `Term<Def::Load>`, if the varnode describes an implicit load operation.
     ///
-    /// The created instructions use the virtual register `$load_tempX`, whereby `X` is
-    /// either `0`, `1`or `2` representing which input is used.
-    /// The created `Tid` is named `instr_<address>_<pcode index>_load<X>`.
-    fn create_implicit_loads(&self, address: &String) -> Vec<Term<Def>> {
-        let mut explicit_loads = vec![];
-        if self.input0.address_space == "ram" {
-            let load0 = Def::Load {
-                var: Variable {
-                    name: "$load_temp0".into(),
-                    size: self.input0.size.into(),
-                    is_temp: true,
-                },
-                address: Expression::Const(
-                    self.input0
-                        .get_ram_address()
-                        .expect("varnode's addressspace is not ram"),
-                ),
-            };
-            explicit_loads.push(Term {
-                tid: Tid {
-                    id: format!("instr_{}_{}_load0", address, self.pcode_index),
-                    address: address.to_string(),
-                },
-                term: load0,
-            })
-        }
-        if let Some(varnode) = &self.input1 {
-            if varnode.address_space == "ram" {
-                let load1 = Def::Load {
-                    var: Variable {
-                        name: "$load_temp1".into(),
-                        size: varnode.size.into(),
-                        is_temp: true,
-                    },
-                    address: Expression::Const(
-                        varnode
-                            .get_ram_address()
-                            .expect("varnode's addressspace is not ram"),
-                    ),
-                };
-                explicit_loads.push(Term {
-                    tid: Tid {
-                        id: format!("instr_{}_{}_load1", address, self.pcode_index),
-                        address: address.to_string(),
-                    },
-                    term: load1,
-                })
-            }
-        }
-
-        if let Some(varnode) = &self.input2 {
-            if varnode.address_space == "ram" {
-                let load2 = Def::Load {
-                    var: Variable {
-                        name: "$load_temp2".into(),
-                        size: varnode.size.into(),
-                        is_temp: true,
-                    },
-                    address: Expression::Const(
-                        varnode
-                            .get_ram_address()
-                            .expect("varnode's addressspace is not ram"),
-                    ),
-                };
-                explicit_loads.push(Term {
-                    tid: Tid {
-                        id: format!("instr_{}_{}_load2", address, self.pcode_index),
-                        address: address.to_string(),
-                    },
-                    term: load2,
-                })
-            }
-        }
-
-        explicit_loads
-    }
-
-    /// Translates a single pcode operation into at leas one `Def`.
+    /// Changes the varnode's `id` and `address_space` to the virtual variable.
     ///
-    /// Adds additional `Def::Load`, if the pcode operation performs implicit loads from ram
-    fn into_ir_def(self, address: &String) -> Vec<Term<Def>> {
-        let mut defs = vec![];
-        // if the pcode operation contains implicit load operations, prepend them.
-        if self.has_implicit_load() {
-            let mut explicit_loads = self.create_implicit_loads(address);
-            defs.append(&mut explicit_loads);
-        }
-        if self.has_implicit_store() {
-            todo!()
-        }
-
-        let def = match self.pcode_mnemonic {
-            PcodeOperation::ExpressionType(expr_type) => self.create_def(address, expr_type),
-            PcodeOperation::JmpType(jmp_type) => todo!(),
+    /// Panics, if varnode's address_space is not `ram`
+    fn into_explicit_load(
+        &mut self,
+        var_name: String,
+        tid_suffix: String,
+        address: &String,
+        pcode_index: u64,
+    ) -> Term<Def> {
+        let load = Def::Load {
+            var: Variable {
+                name: var_name.clone(),
+                size: self.size.into(),
+                is_temp: true,
+            },
+            address: Expression::Const(
+                self.get_ram_address()
+                    .expect("varnode's addressspace is not ram"),
+            ),
         };
 
-        defs.push(def);
-        defs
-    }
-
-    /// Creates `Def::Store`, `Def::Load` or `Def::Assign` according to the pcode operations'
-    /// expression type.
-    fn create_def(self, address: &String, expr_type: ExpressionType) -> Term<Def> {
-        match expr_type {
-            ExpressionType::LOAD => self.create_load(address),
-            ExpressionType::STORE => self.create_store(address),
-            _ => todo!(),
-        }
-    }
-
-    /// Translates pcode load operation into `Def::Load`
-    ///
-    /// Pcode load instruction:
-    /// https://spinsel.dev/assets/2020-06-17-ghidra-brainfuck-processor-1/ghidra_docs/language_spec/html/pcodedescription.html#cpui_load
-    /// Note: input0 ("Constant ID of space to load from") is not considered.
-    ///
-    /// Panics, if any of the following applies:
-    /// * `output` is `None`
-    /// * load destination is not a variable
-    /// * `input1` is `None`
-    /// * `into_ir_expr()` returns `Err` on any varnode
-    fn create_load(self, address: &String) -> Term<Def> {
-        if !matches!(
-            self.pcode_mnemonic,
-            PcodeOperation::ExpressionType(ExpressionType::LOAD)
-        ) {
-            panic!("Pcode operation is not LOAD")
-        }
-        let target = self.output.expect("Load without output");
-        if let Expression::Var(var) = target
-            .into_ir_expr()
-            .expect("Load target translation failed")
-        {
-            let source = self
-                .input1
-                .expect("Load without source")
-                .into_ir_expr()
-                .expect("Load source address translation failed");
-
-            let def = Def::Load {
-                var,
-                address: source,
-            };
-            Term {
-                tid: Tid {
-                    id: format!("instr_{}_{}", address, self.pcode_index),
-                    address: address.to_string(),
-                },
-                term: def,
-            }
-        } else {
-            panic!("Load target is not a variable")
-        }
-    }
-
-    /// Translates pcode store operation into `Def::Store`
-    ///
-    /// Pcode load instruction:
-    /// https://spinsel.dev/assets/2020-06-17-ghidra-brainfuck-processor-1/ghidra_docs/language_spec/html/pcodedescription.html#cpui_store
-    /// Note: input0 ("Constant ID of space to store into") is not considered.
-    ///
-    /// Panics, if any of the following applies:
-    /// * `input1` is None
-    /// * `input2` is None
-    /// * `into_ir_expr()` returns `Err` on any varnode
-    fn create_store(self, address: &String) -> Term<Def> {
-        if !matches!(
-            self.pcode_mnemonic,
-            PcodeOperation::ExpressionType(ExpressionType::STORE)
-        ) {
-            panic!("Pcode operation is not STORE")
-        }
-        let target_expr = self
-            .input1
-            .expect("Store without target")
-            .into_ir_expr()
-            .expect("Store target translation failed.");
-
-        let data = self.input2.expect("Store without source data");
-        if !matches!(data.address_space.as_str(), "unique" | "const" | "variable") {
-            panic!("Store source data is not a variable, temp variable nor constant.")
-        }
-
-        let source_expr = data
-            .into_ir_expr()
-            .expect("Store source translation failed");
-        let def = Def::Store {
-            address: target_expr,
-            value: source_expr,
-        };
+        // Change varnode to newly introduced explicit variable
+        self.id = var_name.into();
+        self.address_space = "unique".into();
 
         Term {
             tid: Tid {
-                id: format!("instr_{}_{}", address, self.pcode_index),
+                id: format!("instr_{}_{}_{}", address, pcode_index, tid_suffix),
                 address: address.to_string(),
             },
-            term: def,
+            term: load,
         }
     }
 }
@@ -429,16 +225,6 @@ pub struct CallingConventionsProperties {
     pub float_return_register: Option<VarnodeSimple>,
     pub unaffected_register: Vec<VarnodeSimple>,
     pub killed_by_call_register: Vec<VarnodeSimple>,
-}
-
-/// P-Code operation wrapper type
-///
-/// Wrapps expression and jump types for direct deserializations.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
-#[serde(untagged)]
-pub enum PcodeOperation {
-    ExpressionType(ExpressionType),
-    JmpType(JmpType),
 }
 
 #[cfg(test)]
