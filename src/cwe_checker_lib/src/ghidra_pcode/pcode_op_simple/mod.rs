@@ -164,7 +164,7 @@ impl PcodeOpSimple {
     /// Translates pcode store operation into `Def::Store`
     ///
     /// Pcode store instruction:
-    /// ($GHIDRA_PATH)docs/language_spec/html/pcodedescription.html#cpui_store
+    /// ($GHIDRA_PATH)/docs/languages/html/pcoderef.html#cpui_store
     /// Note: input0 ("Constant ID of space to store into") is not considered.
     ///
     /// Panics, if any of the following applies:
