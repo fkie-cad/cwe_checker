@@ -1,5 +1,6 @@
 use super::*;
 use serde::{Deserialize, Serialize};
+mod jumps;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct PcodeOpSimple {
@@ -48,83 +49,31 @@ impl PcodeOpSimple {
     pub fn create_implicit_loads(&mut self, address: &String) -> Vec<Term<Def>> {
         let mut explicit_loads = vec![];
         if self.input0.address_space == "ram" {
-            let load0 = Def::Load {
-                var: Variable {
-                    name: "$load_temp0".into(),
-                    size: self.input0.size.into(),
-                    is_temp: true,
-                },
-                address: Expression::Const(
-                    self.input0
-                        .get_ram_address()
-                        .expect("varnode's addressspace is not ram"),
-                ),
-            };
-            explicit_loads.push(Term {
-                tid: Tid {
-                    id: format!("instr_{}_{}_load0", address, self.pcode_index),
-                    address: address.to_string(),
-                },
-                term: load0,
-            });
-
-            // Change varnode to virtual register
-            self.input0.id = "$load_temp0".into();
-            self.input0.address_space = "unique".into();
+            explicit_loads.push(self.input0.into_explicit_load(
+                "$load_temp0".to_string(),
+                "load0".to_string(),
+                address,
+                self.pcode_index,
+            ));
         }
-        if let Some(varnode) = &self.input1 {
+        if let Some(varnode) = self.input1.as_mut() {
             if varnode.address_space == "ram" {
-                let load1 = Def::Load {
-                    var: Variable {
-                        name: "$load_temp1".into(),
-                        size: varnode.size.into(),
-                        is_temp: true,
-                    },
-                    address: Expression::Const(
-                        varnode
-                            .get_ram_address()
-                            .expect("varnode's addressspace is not ram"),
-                    ),
-                };
-                explicit_loads.push(Term {
-                    tid: Tid {
-                        id: format!("instr_{}_{}_load1", address, self.pcode_index),
-                        address: address.to_string(),
-                    },
-                    term: load1,
-                });
-
-                // Change varnode to virtual register
-                self.input0.id = "$load_temp1".into();
-                self.input0.address_space = "unique".into();
+                explicit_loads.push(varnode.into_explicit_load(
+                    "$load_temp1".to_string(),
+                    "load1".to_string(),
+                    address,
+                    self.pcode_index,
+                ));
             }
         }
-
-        if let Some(varnode) = &self.input2 {
+        if let Some(varnode) = self.input2.as_mut() {
             if varnode.address_space == "ram" {
-                let load2 = Def::Load {
-                    var: Variable {
-                        name: "$load_temp2".into(),
-                        size: varnode.size.into(),
-                        is_temp: true,
-                    },
-                    address: Expression::Const(
-                        varnode
-                            .get_ram_address()
-                            .expect("varnode's addressspace is not ram"),
-                    ),
-                };
-                explicit_loads.push(Term {
-                    tid: Tid {
-                        id: format!("instr_{}_{}_load2", address, self.pcode_index),
-                        address: address.to_string(),
-                    },
-                    term: load2,
-                });
-
-                // Change varnode to virtual register
-                self.input0.id = "$load_temp1".into();
-                self.input0.address_space = "unique".into();
+                explicit_loads.push(varnode.into_explicit_load(
+                    "$load_temp2".to_string(),
+                    "load2".to_string(),
+                    address,
+                    self.pcode_index,
+                ));
             }
         }
 
@@ -169,7 +118,7 @@ impl PcodeOpSimple {
     /// Translates pcode load operation into `Def::Load`
     ///
     /// Pcode load instruction:
-    /// https://spinsel.dev/assets/2020-06-17-ghidra-brainfuck-processor-1/ghidra_docs/language_spec/html/pcodedescription.html#cpui_load
+    /// ($GHIDRA_PATH)/docs/languages/html/pcoderef.html#cpui_load
     /// Note: input0 ("Constant ID of space to load from") is not considered.
     ///
     /// Panics, if any of the following applies:
@@ -214,8 +163,8 @@ impl PcodeOpSimple {
 
     /// Translates pcode store operation into `Def::Store`
     ///
-    /// Pcode load instruction:
-    /// https://spinsel.dev/assets/2020-06-17-ghidra-brainfuck-processor-1/ghidra_docs/language_spec/html/pcodedescription.html#cpui_store
+    /// Pcode store instruction:
+    /// ($GHIDRA_PATH)docs/language_spec/html/pcodedescription.html#cpui_store
     /// Note: input0 ("Constant ID of space to store into") is not considered.
     ///
     /// Panics, if any of the following applies:
@@ -260,7 +209,7 @@ impl PcodeOpSimple {
 
     /// Translates pcode SUBPIECE instruction into `Def` with `Expression::Subpiece`.
     ///
-    /// https://spinsel.dev/assets/2020-06-17-ghidra-brainfuck-processor-1/ghidra_docs/language_spec/html/pcodedescription.html#cpui_subpiece
+    /// ($GHIDRA_PATH)/docs/languages/html/pcoderef.html#cpui_subpiece
     ///
     /// Panics, if
     /// * self.input1 is `None` or cannot be translated into `Expression:Const`

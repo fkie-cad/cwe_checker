@@ -118,6 +118,43 @@ impl VarnodeSimple {
         }
         None
     }
+
+    /// Returns `Term<Def::Load>`, if the varnode describes an implicit load operation.
+    ///
+    /// Changes the varnode's `id` and `address_space` to the virtual variable.
+    ///
+    /// Panics, if varnode's address_space is not `ram`
+    fn into_explicit_load(
+        &mut self,
+        var_name: String,
+        tid_suffix: String,
+        address: &String,
+        pcode_index: u64,
+    ) -> Term<Def> {
+        let load = Def::Load {
+            var: Variable {
+                name: var_name.clone(),
+                size: self.size.into(),
+                is_temp: true,
+            },
+            address: Expression::Const(
+                self.get_ram_address()
+                    .expect("varnode's addressspace is not ram"),
+            ),
+        };
+
+        // Change varnode to newly introduced explicit variable
+        self.id = var_name.into();
+        self.address_space = "unique".into();
+
+        Term {
+            tid: Tid {
+                id: format!("instr_{}_{}_{}", address, pcode_index, tid_suffix),
+                address: address.to_string(),
+            },
+            term: load,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
