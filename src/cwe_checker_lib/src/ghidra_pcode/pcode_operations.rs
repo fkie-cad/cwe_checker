@@ -137,7 +137,7 @@ impl JmpType {
     }
 
     pub fn into_ir_call_other(&self, description: String, return_: Option<Tid>) -> Jmp {
-        if matches!(self, JmpType::CALL) {
+        if matches!(self, JmpType::CALLOTHER) {
             Jmp::CallOther {
                 description,
                 return_,
