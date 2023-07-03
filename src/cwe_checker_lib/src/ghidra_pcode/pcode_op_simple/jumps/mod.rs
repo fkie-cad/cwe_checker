@@ -1,12 +1,48 @@
 use crate::{
     ghidra_pcode::pcode_operations::PcodeOperation,
-    intermediate_representation::{Jmp, Term, Tid},
+    intermediate_representation::{Expression, Jmp, Term, Tid},
     pcode::JmpType,
 };
 
 use super::PcodeOpSimple;
 
+/// A jump target is either a pcode operation (pcode relative jump), or another
+/// machine code instruction (absolute jump).
+pub enum JmpTarget {
+    /// Pcode relative jump `(start, n)` from `start` pcode operation index to
+    /// to the `n`-th pcode operation index.
+    Relative((u64, u64)),
+    /// Machine code instruction jump target with absolute address.
+    Absolut(u64),
+}
+
 impl PcodeOpSimple {
+    /// Returns the jump target, if the `PcodeOperation` is a `JmpType` variant.
+    ///
+    /// The target is either a pcode operation relative target, or an absolute machine instruction target.
+    pub fn get_jump_target(&self) -> Option<JmpTarget> {
+        use crate::pcode::JmpType::*;
+        if let PcodeOperation::JmpType(jmp_type) = &self.pcode_mnemonic {
+            // Pcode definition distinguishes between `location` and `offset`.
+            // Note: $(GHIDRA_PATH)/docs/languages/html/pcodedescription.html#cpui_branch
+            // Currently, the IR does not distinguishes these cases.
+            // We do nothing here.
+            match jmp_type {
+                BRANCH | CBRANCH | CALL => (),                  // case `location`
+                BRANCHIND | CALLIND | CALLOTHER | RETURN => (), // case `offset`
+            }
+            if let Some(target) = self.input0.get_ram_address() {
+                return Some(JmpTarget::Absolut(target.try_to_u64().unwrap()));
+            } else if let Expression::Const(jmp_offset) = self.input0.into_ir_expr().unwrap() {
+                return Some(JmpTarget::Relative((
+                    self.pcode_index,
+                    jmp_offset.try_to_u64().unwrap(),
+                )));
+            }
+        }
+        None
+    }
+
     pub fn create_jump(&self, address: &String) -> Term<Jmp> {
         if let PcodeOperation::JmpType(a) = self.pcode_mnemonic {
             match a {

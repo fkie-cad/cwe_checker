@@ -4,10 +4,10 @@
 //! * implicit load operations are converted into explitict [Def::Load] representation.
 
 use crate::intermediate_representation::*;
-use crate::pcode::{ExpressionType, JmpType};
+use crate::pcode::ExpressionType;
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 mod pcode_operations;
 use pcode_operations::*;
 mod pcode_op_simple;
@@ -39,16 +39,19 @@ pub struct ProjectSimple {
 impl ProjectSimple {
     pub fn into_ir_project(self) -> Project {
         for func in self.functions {
+            let mut targets: HashSet<u64> = HashSet::new();
             for blk in func.blocks {
+                let t = &blk.into_ir_blk();
+                targets.extend(t.iter());
                 for inst in blk.instructions {
-                    for op in inst.pcode_ops {
+                    for mut op in inst.pcode_ops {
                         if matches!(op.pcode_mnemonic, PcodeOperation::ExpressionType(_)) {
-                            dbg!(&op);
                             op.into_ir_def(&inst.address);
                         }
                     }
                 }
             }
+            //dbg!(&targets);
         }
 
         Project {
@@ -166,8 +169,11 @@ pub struct InstructionSimple {
 }
 
 impl InstructionSimple {
-    fn into_ir_def(&self) {
-        todo!()
+    fn into_ir_def(self) {
+        let mut ops = vec![];
+        for mut op in self.pcode_ops {
+            ops.append(&mut op.into_ir_def(&self.address))
+        }
     }
 }
 
@@ -175,6 +181,59 @@ impl InstructionSimple {
 pub struct BlockSimple {
     pub address: String,
     pub instructions: Vec<InstructionSimple>,
+}
+
+impl BlockSimple {
+    fn into_ir_blk(&self) -> HashSet<u64> {
+        // Collecting jump targets for splitting up blocks
+        let mut jump_targets = HashSet::new();
+        for instr in &self.instructions {
+            // create a set of all jump targets
+            for op in &instr.pcode_ops {
+                match op.get_jump_target() {
+                    Some(JmpTarget::Absolut(target_addr)) => {
+                        jump_targets.insert(target_addr);
+                    }
+                    Some(JmpTarget::Relative((start_index, target_index))) => {
+                        self.get_if_relative_jump_to_next_instruction(
+                            instr,
+                            start_index as usize,
+                            target_index as usize,
+                        )
+                        .map(|addr| jump_targets.insert(addr));
+                    }
+
+                    _ => (),
+                };
+            }
+        }
+        jump_targets
+    }
+
+    /// Returns the following instruction of the block, if a pcode relative jump exceeds the amount of the instructions's pcode operations.
+    ///
+    /// If the pcode relative jump's target is within the array of the instruction's pcode operations,
+    /// `None` is returned.
+    fn get_if_relative_jump_to_next_instruction(
+        &self,
+        jump_site: &InstructionSimple,
+        start_index: usize,
+        target_index: usize,
+    ) -> Option<u64> {
+        let mut instruction_sequence = self.instructions.iter().peekable();
+        while let Some(instr) = instruction_sequence.next() {
+            if instr == jump_site && instr.pcode_ops.capacity() < (start_index + target_index) {
+                if let Some(target_instr) = instruction_sequence.peek() {
+                    return Some(
+                        u64::from_str_radix(&target_instr.address.trim_start_matches("0x"), 16)
+                            .expect("Cannot parse address"),
+                    );
+                }
+            }
+        }
+
+        None
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]

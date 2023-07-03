@@ -1,6 +1,7 @@
 use super::*;
 use serde::{Deserialize, Serialize};
 mod jumps;
+pub use jumps::*;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct PcodeOpSimple {
@@ -83,7 +84,7 @@ impl PcodeOpSimple {
     /// Translates a single pcode operation into at leas one `Def`.
     ///
     /// Adds additional `Def::Load`, if the pcode operation performs implicit loads from ram
-    pub fn into_ir_def(mut self, address: &String) -> Vec<Term<Def>> {
+    pub fn into_ir_def(&mut self, address: &String) -> Vec<Term<Def>> {
         let mut defs = vec![];
         // if the pcode operation contains implicit load operations, prepend them.
         if self.has_implicit_load() {
