@@ -208,6 +208,22 @@ impl Expression {
             }
         }
     }
+
+    /// Compute a recursion depth for the expression.
+    ///
+    /// Because of the recursive nature of the [Expression] type,
+    /// overly complex expressions are very costly to clone, which in turn can negatively affect some analyses.
+    /// The recursion depth measure can be used to detect and handle such cases.
+    pub fn recursion_depth(&self) -> u64 {
+        use Expression::*;
+        match self {
+            Const(_) | Unknown { .. } | Var(_) => 0,
+            Subpiece { arg, .. } | Cast { arg, .. } | UnOp { arg, .. } => arg.recursion_depth() + 1,
+            BinOp { lhs, rhs, .. } => {
+                std::cmp::max(lhs.recursion_depth(), rhs.recursion_depth()) + 1
+            }
+        }
+    }
 }
 
 impl fmt::Display for Expression {

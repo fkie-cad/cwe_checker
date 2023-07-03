@@ -168,7 +168,7 @@ pub fn compute_function_signatures<'a>(
         }
     }
     // Propagate globals in bottom-up direction in the call graph
-    propagate_globals(project, &mut fn_sig_map);
+    propagate_globals(project, &mut fn_sig_map, &mut logs);
 
     (fn_sig_map, logs)
 }
