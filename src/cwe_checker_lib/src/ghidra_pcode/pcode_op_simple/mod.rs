@@ -5,6 +5,8 @@ pub use jumps::*;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct PcodeOpSimple {
+    /// Index of the operation within the pcode operation sequence.
+    /// Starts at 0.
     pub pcode_index: u64,
     pub pcode_mnemonic: PcodeOperation,
     pub input0: VarnodeSimple,

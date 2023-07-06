@@ -38,10 +38,10 @@ pub struct ProjectSimple {
 
 impl ProjectSimple {
     pub fn into_ir_project(self) -> Project {
+        let mut targets: HashSet<u64> = HashSet::new();
         for func in self.functions {
-            let mut targets: HashSet<u64> = HashSet::new();
             for blk in func.blocks {
-                let t = &blk.into_ir_blk();
+                let t = &blk.collect_jmp_targets();
                 targets.extend(t.iter());
                 for inst in blk.instructions {
                     for mut op in inst.pcode_ops {
@@ -184,7 +184,7 @@ pub struct BlockSimple {
 }
 
 impl BlockSimple {
-    fn into_ir_blk(&self) -> HashSet<u64> {
+    fn collect_jmp_targets(&self) -> HashSet<u64> {
         // Collecting jump targets for splitting up blocks
         let mut jump_targets = HashSet::new();
         for instr in &self.instructions {
@@ -218,16 +218,19 @@ impl BlockSimple {
         &self,
         jump_site: &InstructionSimple,
         start_index: usize,
-        target_index: usize,
+        offset_to_target: usize,
     ) -> Option<u64> {
         let mut instruction_sequence = self.instructions.iter().peekable();
         while let Some(instr) = instruction_sequence.next() {
-            if instr == jump_site && instr.pcode_ops.capacity() < (start_index + target_index) {
+            if instr == jump_site && instr.pcode_ops.capacity() < (start_index + offset_to_target) {
                 if let Some(target_instr) = instruction_sequence.peek() {
+                    dbg!(&jump_site.pcode_ops[start_index]);
                     return Some(
                         u64::from_str_radix(&target_instr.address.trim_start_matches("0x"), 16)
                             .expect("Cannot parse address"),
                     );
+                } else {
+                    panic!("Pcode relative jump to next instruction, but block does not have instructions left")
                 }
             }
         }
