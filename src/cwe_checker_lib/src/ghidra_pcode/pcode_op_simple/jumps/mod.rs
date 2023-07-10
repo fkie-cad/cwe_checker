@@ -43,7 +43,7 @@ impl PcodeOpSimple {
         None
     }
 
-    pub fn create_jump(&self, address: &String) -> Term<Jmp> {
+    pub fn into_ir_jump(&self, address: &String) -> Term<Jmp> {
         if let PcodeOperation::JmpType(a) = self.pcode_mnemonic {
             match a {
                 JmpType::BRANCH => self.create_branch(address),

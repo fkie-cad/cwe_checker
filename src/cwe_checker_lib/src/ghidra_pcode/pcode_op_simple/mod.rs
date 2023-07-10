@@ -96,7 +96,7 @@ impl PcodeOpSimple {
 
         let def = match self.pcode_mnemonic {
             PcodeOperation::ExpressionType(expr_type) => self.create_def(address, expr_type),
-            PcodeOperation::JmpType(jmp_type) => todo!(),
+            PcodeOperation::JmpType(_) => panic!("Jump operation cannot be translated into Def"),
         };
 
         defs.push(def);
