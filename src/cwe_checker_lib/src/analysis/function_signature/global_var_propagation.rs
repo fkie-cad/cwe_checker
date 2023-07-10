@@ -10,6 +10,7 @@ use crate::analysis::callgraph::get_program_callgraph;
 use crate::analysis::callgraph::CallGraph;
 use crate::analysis::fixpoint::{Computation, Context};
 use crate::intermediate_representation::*;
+use crate::utils::log::LogMessage;
 use std::collections::BTreeMap;
 use std::collections::HashSet;
 
@@ -162,6 +163,7 @@ fn propagate_globals_bottom_up(
     project: &Project,
     known_globals: &BTreeMap<Tid, HashSet<u64>>,
     fn_sigs: &mut BTreeMap<Tid, FunctionSignature>,
+    logs: &mut Vec<LogMessage>,
 ) {
     // To propagate bottom-up, we have to reverse the edges in the callgraph
     let mut graph = get_program_callgraph(&project.program);
@@ -183,7 +185,11 @@ fn propagate_globals_bottom_up(
     // Compute the fixpoint
     computation.compute_with_max_steps(100);
     if !computation.has_stabilized() {
-        panic!("Global parameter propagation algorithm did not stabilize.")
+        let error_msg = format!(
+            "Global parameter propagation algorithm did not stabilize. Remaining worklist size: {}",
+            computation.get_worklist().len()
+        );
+        logs.push(LogMessage::new_error(error_msg).source("Function Signature Analysis"));
     }
     // Add the propagated globals to the function signatures
     for node in graph.node_indices() {
@@ -217,9 +223,13 @@ fn propagate_globals_bottom_up(
 ///   But if the function itself (or any of its callers) do not access the global variable,
 ///   then there is no benefit in tracking its value for the function itself.
 ///   Thus, the global variable should not be propagated to the function in such a case.
-pub fn propagate_globals(project: &Project, fn_sigs: &mut BTreeMap<Tid, FunctionSignature>) {
+pub fn propagate_globals(
+    project: &Project,
+    fn_sigs: &mut BTreeMap<Tid, FunctionSignature>,
+    logs: &mut Vec<LogMessage>,
+) {
     let known_globals = propagate_known_globals_top_down(project, fn_sigs);
-    propagate_globals_bottom_up(project, &known_globals, fn_sigs);
+    propagate_globals_bottom_up(project, &known_globals, fn_sigs, logs);
 }
 
 #[cfg(test)]
@@ -271,7 +281,7 @@ pub mod tests {
         ]);
 
         // Propagate globals
-        propagate_globals(&project, &mut fn_sigs);
+        propagate_globals(&project, &mut fn_sigs, &mut Vec::new());
         // Check propagation results
         assert_eq!(
             &fn_sigs[&Tid::new("main")].global_parameters,

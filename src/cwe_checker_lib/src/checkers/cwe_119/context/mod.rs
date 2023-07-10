@@ -34,7 +34,7 @@ pub struct Context<'a> {
     /// A map that maps abstract identifiers representing the values of parameters at callsites
     /// to the corresponding value (in the context of the caller) according to the pointer inference analysis.
     pub param_replacement_map: HashMap<AbstractIdentifier, Data>,
-    /// A map that maps the TIDs of calls to allocatingfunctions (like malloc, realloc and calloc)
+    /// A map that maps the TIDs of calls to allocating functions (like malloc, realloc and calloc)
     /// to the value representing the size of the allocated memory object according to the pointer inference analysis.
     pub malloc_tid_to_object_size_map: HashMap<Tid, Data>,
     /// A map that maps the TIDs of jump instructions to the function TID of the caller.
@@ -238,14 +238,14 @@ fn compute_size_values_of_malloc_calls(analysis_results: &AnalysisResults) -> Ha
 /// Compute the size value of a call to a malloc-like function according to the pointer inference and return it.
 /// Returns `None` if the called symbol is not an allocating function or the size computation for the symbol is not yet implemented.
 ///
-/// Currently this function computes the size values for the symbols `malloc`, `realloc` and `calloc`.
+/// Currently this function computes the size values for the symbols `malloc`, `realloc`, `reallocarray`, `calloc` and the C++-`new` operator.
 fn compute_size_value_of_malloc_like_call(
     jmp_tid: &Tid,
     called_symbol: &ExternSymbol,
     pointer_inference: &PointerInference,
 ) -> Option<Data> {
     match called_symbol.name.as_str() {
-        "malloc" => {
+        "malloc" | "operator.new" | "operator.new[]" => {
             let size_param = &called_symbol.parameters[0];
             match pointer_inference.eval_parameter_arg_at_call(jmp_tid, size_param) {
                 Some(size_value) => Some(size_value),
@@ -257,6 +257,19 @@ fn compute_size_value_of_malloc_like_call(
             match pointer_inference.eval_parameter_arg_at_call(jmp_tid, size_param) {
                 Some(size_value) => Some(size_value),
                 None => Some(Data::new_top(size_param.bytesize())),
+            }
+        }
+        "reallocarray" => {
+            let count_param = &called_symbol.parameters[1];
+            let size_param = &called_symbol.parameters[2];
+            match (
+                pointer_inference.eval_parameter_arg_at_call(jmp_tid, count_param),
+                pointer_inference.eval_parameter_arg_at_call(jmp_tid, size_param),
+            ) {
+                (Some(count_value), Some(size_value)) => {
+                    Some(count_value.bin_op(BinOpType::IntMult, &size_value))
+                }
+                _ => Some(Data::new_top(size_param.bytesize())),
             }
         }
         "calloc" => {

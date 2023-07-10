@@ -1,6 +1,3 @@
-***Important note:*** We recently decided to migrate from Dockerhub to the Github container registry.
-If you are using our prebuilt Docker images, please remember to change the cwe_checker-image names from `fkiecad/cwe_checker` to `ghcr.io/fkie-cad/cwe_checker` in your scripts!
-
 <p align="center">
     <img src="doc/images/cwe_checker_logo.png" alt="cwe_checker logo" width="50%" height="50%"/>
 </p>
@@ -21,13 +18,13 @@ Its main focus are ELF binaries that are commonly found on Linux and Unix operat
 The cwe_checker uses [Ghidra](https://ghidra-sre.org/) to disassemble binaries into one common intermediate representation
 and implements its own analyses on this IR.
 Hence, the analyses can be run on most CPU architectures that Ghidra can disassemble,
-which makes the *cwe_checker* a valuable tool for firmware analysis.
+which makes the cwe_checker a valuable tool for firmware analysis.
 
 The following arguments should convince you to give *cwe_checker* a try:
 -  it is very easy to set up, just build the Docker container!
 -  it analyzes ELF binaries of several CPU architectures including x86, ARM, MIPS, and PPC
 -  it is extensible due to its plugin-based architecture
--  it is configureable, e.g. apply analyses to new APIs
+-  it is configurable, e.g. apply analyses to new APIs
 -  view results annotated in Ghidra
 -  cwe_checker can be integrated as a plugin into [FACT](https://github.com/fkie-cad/FACT_core)
 
@@ -42,7 +39,7 @@ The following arguments should convince you to give *cwe_checker* a try:
 The simplest way is to pull the latest Docker image from the [Github container registry](https://github.com/fkie-cad/cwe_checker/pkgs/container/cwe_checker):
 -   `docker pull ghcr.io/fkie-cad/cwe_checker:latest` yields an image based on the current master branch.
 -   `docker pull ghcr.io/fkie-cad/cwe_checker:stable` yields an image based on the latest stable release version.
--   `docker pull ghcr.io/fkie-cad/cwe_checker:v0.6` yields an image based on the v0.6 stable release version.
+-   `docker pull ghcr.io/fkie-cad/cwe_checker:v0.7` yields an image based on the v0.7 stable release version.
 However, it is recommended to switch to newer stable releases as soon as they get published, since improvements between stable versions can be quite significant.
 
 If you want to build the docker image yourself, just run
@@ -56,7 +53,7 @@ The prebuilt Docker images are currently only x86-based.
 
 The following dependencies must be installed in order to build and install the *cwe_checker* locally:
 -   [Rust](https://www.rust-lang.org) >= 1.69
--   [Ghidra](https://ghidra-sre.org/) >= 10.2 (**Warning:** This applies to the master branch, the v0.6 stable release needs Ghidra 10.1.5)
+-   [Ghidra](https://ghidra-sre.org/) >= 10.2
 
 Run `make all GHIDRA_PATH=/path/to/ghidra_folder` (with the correct path to the local Ghidra installation inserted) to compile and install the cwe_checker.
 If you omit the `GHIDRA_PATH` argument the installer will search your file system for a local installation of Ghidra.
