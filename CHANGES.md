@@ -1,5 +1,20 @@
-0.7-dev
+0.7 (2023-06)
 ====
+
+-   Improve handling of conditional assignment assembly instructions (PR #337)
+-   Improved exactness of CWE-190 check (PR #336)
+-   Improved exactness of CWE-119 check (PRs #339, #399)
+-   Added stubs for common libC-functions to several analyses (PRs #342, #348)
+-   Added a check for CWE-789: Memory Allocation with Excessive Size Value (PR #347)
+-   Improved implementation of the expression propagation algorithm (PR #356)
+-   Implement tracking of variables in global memory for several analyses (PRs #358, #361)
+-   Generate call trace information in the JSON output of CWE-119-check results (PRs #365, #388)
+-   Add macros for simpler unit test generation, refactored unit tests (PRs #380, #386)
+-   Function signature analysis output now gets properly sanitized (PR #389)
+-   Migrate the official Docker images from Dockerhub to ghcr.io (PR #401)
+-   Improved support for MIPS (PR #404)
+-   Generate call trace information in the JSON output of CWE-416-check results (PR #408)
+-   Support more allocation/deallocation functions in the checks, e.g C++-new/delete (PR #414)
 
 0.6 (2022-06)
 ====

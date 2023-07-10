@@ -11,7 +11,7 @@ Currently its main focus are ELF binaries that are commonly found on Linux and U
 The cwe_checker uses [Ghidra](https://ghidra-sre.org/) to disassemble binaries into one common intermediate representation
 and implements its own analyses on this IR.
 Hence, the analyses can be run on most CPU architectures that Ghidra can disassemble,
-which makes the *cwe_checker* a valuable tool for firmware analysis.
+which makes the cwe_checker a valuable tool for firmware analysis.
 
 # Usage
 
