@@ -65,11 +65,7 @@ fn generate_fixpoint_computation<'a>(
                     // The node of a function entry point
                     let calling_convention = project
                         .get_specific_calling_convention(&sub.term.calling_convention)
-                        .unwrap_or_else(|| {
-                            project
-                                .get_standard_calling_convention()
-                                .expect("No standard calling convention found.")
-                        });
+                        .expect("No standard calling convention found.");
                     let mut fn_start_state = State::new(
                         &sub.tid,
                         &project.stack_pointer_register,
