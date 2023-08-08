@@ -206,7 +206,7 @@ dependencies = [
 
 [[package]]
 name = "cwe_checker"
-version = "0.7.0"
+version = "0.8.0-dev"
 dependencies = [
  "anyhow",
  "clap",
@@ -229,7 +229,7 @@ dependencies = [
 
 [[package]]
 name = "cwe_checker_lib"
-version = "0.7.0"
+version = "0.8.0-dev"
 dependencies = [
  "anyhow",
  "apint",
