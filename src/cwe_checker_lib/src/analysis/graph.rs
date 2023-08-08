@@ -477,8 +477,7 @@ impl<'a> GraphBuilder<'a> {
 
     /// Add all non-return-instruction-related jump edges to the graph.
     fn add_jump_and_call_edges(&mut self) {
-        while !self.block_worklist.is_empty() {
-            let node = self.block_worklist.pop().unwrap();
+        while let Some(node) = self.block_worklist.pop() {
             match self.graph[node] {
                 Node::BlkEnd(block, _) => self.add_outgoing_edges(node, block),
                 _ => panic!(),
