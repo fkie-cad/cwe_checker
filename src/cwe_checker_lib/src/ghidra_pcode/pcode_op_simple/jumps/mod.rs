@@ -9,8 +9,9 @@ use super::PcodeOpSimple;
 /// A jump target is either a pcode operation (pcode relative jump), or another
 /// machine code instruction (absolute jump).
 pub enum JmpTarget {
-    /// Pcode relative jump `(start, n)` from `start` pcode operation index to
-    /// to the `n`-th pcode operation index.
+    /// Pcode relative jump `(jmp_index, target_index)` from `jmp_index` pcode operation index to
+    /// to the `target_index` pcode operation index.
+    /// Note that both are indices and **not** offsets.
     Relative((u64, u64)),
     /// Machine code instruction jump target with absolute address.
     Absolut(u64),
@@ -36,7 +37,7 @@ impl PcodeOpSimple {
             } else if let Expression::Const(jmp_offset) = self.input0.into_ir_expr().unwrap() {
                 return Some(JmpTarget::Relative((
                     self.pcode_index,
-                    jmp_offset.try_to_u64().unwrap(),
+                    self.pcode_index + jmp_offset.try_to_u64().unwrap(),
                 )));
             }
         }
@@ -59,13 +60,18 @@ impl PcodeOpSimple {
         }
     }
 
+    /// Determines the target
     fn extract_target(&self, address: &String) -> Tid {
         // TODO: target Tid.id name convention
-        let target = self
-            .input0
-            .get_ram_address()
-            .unwrap()
-            .as_string_with_radix(16);
+        let target = match self.get_jump_target() {
+            Some(JmpTarget::Absolut(a)) => self
+                .input0
+                .get_ram_address()
+                .unwrap()
+                .as_string_with_radix(16),
+            Some(JmpTarget::Relative((_, pcode_index))) => format!("{}_{}", address, pcode_index),
+            None => panic!("Not a jump operation"),
+        };
         Tid {
             id: format!("jmp_from_{}_to_{}", address, target),
             address: target,

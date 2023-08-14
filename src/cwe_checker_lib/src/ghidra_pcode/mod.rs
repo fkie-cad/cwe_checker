@@ -5,8 +5,8 @@
 
 use crate::intermediate_representation::*;
 use crate::pcode::ExpressionType;
+use crate::pcode::JmpType::*;
 use anyhow::{anyhow, Result};
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 mod pcode_operations;
@@ -245,7 +245,7 @@ impl BlockSimple {
 
     /// Translates a Ghidra pcode block into one or more IR blocks.
     ///
-    /// This functions covers the splitting of a pcode block, if:
+    /// This functions covers the splitting of a Ghidra's pcode block, if:
     /// * it contains a jump target
     /// * it contains pcode relative jumps
     ///
@@ -273,76 +273,33 @@ impl BlockSimple {
 
         while let Some(instr) = instruction_iterator.next() {
             let mut pcode_op_iterator = instr.pcode_ops.iter().peekable();
+
+            // if the instruction contains pcode relative jumps, process it separately.
+            if instr.pcode_ops.iter().any(|x| x.is_pcode_relative_jump()) {
+                blocks.append(&mut process_pcode_relative_jump(
+                    &mut tid,
+                    &mut blk,
+                    instr.clone(),
+                    instruction_iterator.peek().map(|x| x.address.clone()),
+                ));
+                continue;
+            }
+
             while let Some(op) = pcode_op_iterator.next() {
-                match op.pcode_mnemonic {
-                    // Add Def to current block.
-                    PcodeOperation::ExpressionType(_) => {
-                        blk.defs.append(&mut op.clone().into_ir_def(&instr.address))
-                    }
-
-                    PcodeOperation::JmpType(_) if op.is_pcode_relative_jump() => todo!(),
-
-                    PcodeOperation::JmpType(crate::pcode::JmpType::CBRANCH) => {
-                        // Add conditional (not pcode relative) branch to block
-                        blk.jmps.push(op.into_ir_jump(&instr.address));
-                        // Add implicit branch to following instruction
-                        if let Some(next_instr) = instruction_iterator.peek() {
-                            let (finalized_blk, new_blk, new_tid) =
-                                finalize_blk_with_branch_and_setup_new_blk(
-                                    tid,
-                                    &mut blk,
-                                    instr.address.clone(),
-                                    next_instr.address.clone(),
-                                );
-                            // add finalized block to block list.
-                            blocks.push(finalized_blk);
-                            // set new block and tid.
-                            blk = new_blk;
-                            tid = new_tid;
-                        } else {
-                            // MIPS: Delay slots for C-Jumps. Ghidra verlegt Delay ggf vor, sodas fallthrough ggf. falsch? (alter code lookup)
-                            panic!("Jump target to consecutive instruction is not within block's instructions.")
-                        }
-                    }
-                    PcodeOperation::JmpType(jmp) => {
-                        // Add potential targets
-                        if matches!(
-                            jmp,
-                            crate::pcode::JmpType::CALLIND | crate::pcode::JmpType::BRANCHIND
-                        ) {
-                            if let Some(potential_targets) = &instr.potential_targets {
-                                blk.indirect_jmp_targets.append(
-                                    &mut potential_targets
-                                        .iter()
-                                        .map(|x| Tid {
-                                            id: format!("potential_target_{}", x),
-                                            address: x.to_string(),
-                                        })
-                                        .collect(),
-                                );
-                            }
-                        }
-                        blk.jmps.push(op.into_ir_jump(&instr.address));
-                        // TODO: Derive next instruction properly
-                        let (finalized_blk, new_blk, new_tid) = finalize_blk_and_setup_new_blk(
-                            tid,
-                            &mut blk,
-                            instruction_iterator
-                                .peek()
-                                .map_or(instr.address.clone() + "++", |x| x.address.clone()),
-                        );
-                        blocks.push(finalized_blk);
-                        blk = new_blk;
-                        tid = new_tid;
-                    }
-                }
+                add_operation_to_blk(
+                    op,
+                    instr,
+                    &mut blk,
+                    &mut tid,
+                    instruction_iterator.peek().map(|x| x.address.clone()),
+                );
                 // If **next** instruction is a target, add branch and set up next block.
                 if let Some(next_instr) = instruction_iterator.peek() {
                     if jump_targets.contains(&next_instr.get_u64_address()) && !blk.defs.is_empty()
                     {
                         let (finalized_blk, new_blk, new_tid) =
                             finalize_blk_with_branch_and_setup_new_blk(
-                                tid,
+                                &mut tid,
                                 &mut blk,
                                 instr.address.clone(),
                                 next_instr.address.clone(),
@@ -375,9 +332,82 @@ impl BlockSimple {
     }
 }
 
+/// Translates a pcode operation and adds it to the basic block.
+///
+/// `blk` is changed by adding the corresponding operation.
+/// `tid` is changed if the pcode operation is a jump.
+/// If the operation is a jump, the block is wrapped into the tid and returned.
+/// This function returns `None`, if the operation is not a jump.
+fn add_operation_to_blk(
+    op: &PcodeOpSimple,
+    instr: &InstructionSimple,
+    mut blk: &mut Blk,
+    mut tid: &mut Tid,
+    next_instruction_address: Option<String>,
+) -> Option<Term<Blk>> {
+    match op.pcode_mnemonic {
+        // Add Def to current block.
+        PcodeOperation::ExpressionType(_) => {
+            blk.defs.append(&mut op.clone().into_ir_def(&instr.address));
+            return None;
+        }
+        PcodeOperation::JmpType(crate::pcode::JmpType::CBRANCH) => {
+            // Add conditional (not pcode relative) branch to block
+            blk.jmps.push(op.into_ir_jump(&instr.address));
+            // Add implicit branch to following instruction
+            if let Some(next_instr_address) = next_instruction_address {
+                let (finalized_blk, new_blk, new_tid) = finalize_blk_with_branch_and_setup_new_blk(
+                    &mut tid,
+                    &mut blk,
+                    instr.address.clone(),
+                    next_instr_address,
+                );
+                // set new block and tid.
+                *blk = new_blk;
+                *tid = new_tid;
+
+                return Some(finalized_blk);
+            } else {
+                // MIPS: Delay slots for C-Jumps. Ghidra verlegt Delay ggf vor, sodas fallthrough ggf. falsch? (alter code lookup)
+                panic!("Jump target address to consecutive instruction is not provided.")
+            }
+        }
+        PcodeOperation::JmpType(jmp) => {
+            // Add potential targets
+            if matches!(
+                jmp,
+                crate::pcode::JmpType::CALLIND | crate::pcode::JmpType::BRANCHIND
+            ) {
+                if let Some(potential_targets) = &instr.potential_targets {
+                    blk.indirect_jmp_targets.append(
+                        &mut potential_targets
+                            .iter()
+                            .map(|x| Tid {
+                                id: format!("potential_target_{}", x),
+                                address: x.to_string(),
+                            })
+                            .collect(),
+                    );
+                }
+            }
+            blk.jmps.push(op.into_ir_jump(&instr.address));
+            // TODO: Derive next instruction properly
+            let (finalized_blk, new_blk, new_tid) = finalize_blk_and_setup_new_blk(
+                &mut tid,
+                &mut blk,
+                next_instruction_address.unwrap_or(instr.address.clone() + "++"),
+            );
+
+            *blk = new_blk;
+            *tid = new_tid;
+
+            return Some(finalized_blk);
+        }
+    }
+}
 /// Helper function for wrapping a block within a tid and prepare new empty block with corresponding tid.
 fn finalize_blk_and_setup_new_blk(
-    blk_tid: Tid,
+    blk_tid: &mut Tid,
     blk: &mut Blk,
     next_instruction_address: String,
 ) -> (Term<Blk>, Blk, Tid) {
@@ -392,7 +422,7 @@ fn finalize_blk_and_setup_new_blk(
     };
 
     let finalized_blk = Term {
-        tid: blk_tid,
+        tid: blk_tid.clone(),
         term: blk.clone(),
     };
     (finalized_blk, new_blk, new_tid)
@@ -400,13 +430,13 @@ fn finalize_blk_and_setup_new_blk(
 
 /// Adds a `Jmp::Branch` to the block, wrap block in `Term` and returns it with the new and empty target block with its `Tid`.
 fn finalize_blk_with_branch_and_setup_new_blk(
-    blk_tid: Tid,
+    blk_tid: &mut Tid,
     blk: &mut Blk,
     jump_instruction_address: String,
-    next_instruction_address: String,
+    target_address: String,
 ) -> (Term<Blk>, Blk, Tid) {
     let (mut blk_to_branch_from, new_blk, new_tid) =
-        finalize_blk_and_setup_new_blk(blk_tid, blk, next_instruction_address);
+        finalize_blk_and_setup_new_blk(blk_tid, blk, target_address);
 
     let branch = Term {
         tid: Tid {
@@ -420,90 +450,60 @@ fn finalize_blk_with_branch_and_setup_new_blk(
     (blk_to_branch_from, new_blk, new_tid)
 }
 
-fn finalize_blk_and_setup_new_blk_for_pcode_jmp(
-    instruction: &InstructionSimple,
-    pcode_op: &PcodeOpSimple,
-    current_instruction_address: &String,
-) {
-    if let Some(JmpTarget::Relative((jmp_index, target_index))) = pcode_op.get_jump_target() {
-        // Check if target is in instruction's pcode operations
-        if target_index < instruction.pcode_ops.len().try_into().unwrap() {
-            if let PcodeOperation::JmpType(jmp_type) = pcode_op.pcode_mnemonic {
-                use crate::pcode::JmpType::*;
-
-                let new_tid = Tid {
-                    id: format!(
-                        "artificial_blk_{}_{}",
-                        current_instruction_address, target_index
-                    ),
-                    address: current_instruction_address.to_string(),
-                };
-                let new_blk = Blk {
-                    defs: vec![],
-                    jmps: vec![],
-                    indirect_jmp_targets: vec![],
-                };
-                let a = match jmp_type {
-                    BRANCH => vec![Term {
-                        tid: Tid {
-                            id: format!(
-                                "pcode_relative_branch_{}_{}",
-                                current_instruction_address, jmp_index
-                            ),
-                            address: current_instruction_address.to_string(),
-                        },
-                        term: Jmp::Branch(new_tid.clone()),
-                    }],
-                    CALL => vec![Term {
-                        tid: Tid {
-                            id: format!(
-                                "pcode_relative_call_{}_{}",
-                                current_instruction_address, pcode_op.pcode_index
-                            ),
-                            address: current_instruction_address.to_string(),
-                        },
-                        term: Jmp::Call {
-                            target: new_tid.clone(),
-                            return_: None,
-                        }, // None as return correct?
-                    }],
-                    CBRANCH => vec![
-                        Term {
-                            tid: Tid {
-                                id: format!(
-                                    "pcode_relative_cbranch_{}_{}",
-                                    current_instruction_address, pcode_op.pcode_index
-                                ),
-                                address: current_instruction_address.to_string(),
-                            },
-                            term: Jmp::CBranch {
-                                target: new_tid.clone(),
-                                condition: pcode_op
-                                    .input2
-                                    .as_ref()
-                                    .unwrap()
-                                    .into_ir_expr()
-                                    .unwrap(),
-                            },
-                        },
-                        Term {
-                            tid: Tid {
-                                id: format!(
-                                    "pcode_relative_cbranch_falltrough_{}_{}",
-                                    current_instruction_address, pcode_op.pcode_index
-                                ),
-                                address: current_instruction_address.to_string(),
-                            },
-                            term: Jmp::Branch(todo!()),
-                        },
-                    ],
-                    _ => todo!(),
-                };
+/// Translates instruction with one or more pcode relative jumps into one or more blocks.
+/// Not pcode relative jumps are added as well.
+fn process_pcode_relative_jump(
+    blk_tid: &mut Tid,
+    blk: &mut Blk,
+    instruction: InstructionSimple,
+    next_instruction_address: Option<String>,
+) -> Vec<Term<Blk>> {
+    // collect all target indices for identifying backward branching
+    let mut relative_target_indices = HashMap::new();
+    let mut finalized_blocks = vec![];
+    for op in &instruction.pcode_ops {
+        if op.is_pcode_relative_jump() {
+            if let Some(JmpTarget::Relative((branch_side, target_side))) = op.get_jump_target() {
+                relative_target_indices.insert(branch_side, target_side);
             }
-        } else {
-            todo!()
         }
     }
+
+    for op in &instruction.pcode_ops {
+        // if current op is a jump target, add implicit branch and finalize block.
+        if let Some(target_side) = relative_target_indices.get(&op.pcode_index) {
+            let mut target_address = format!("{}_{}", instruction.address.clone(), target_side);
+
+            // Special case of jump target is not within the instructions pcode operation sequence
+            // We consider the next instruction as jump target.
+            if target_side >= &(instruction.pcode_ops.len() as u64) {
+                target_address = next_instruction_address
+                    .clone()
+                    .expect("Consecutive instruction is not available.")
+            }
+            let (finalized_blk, new_blk, new_tid) = finalize_blk_with_branch_and_setup_new_blk(
+                blk_tid,
+                blk,
+                format!("{}_{}", instruction.address, op.pcode_index),
+                target_address,
+            );
+            finalized_blocks.push(finalized_blk);
+            *blk = new_blk;
+            *blk_tid = new_tid;
+        } else {
+            if let Some(finalized_blk) = add_operation_to_blk(
+                &op,
+                &instruction,
+                blk,
+                blk_tid,
+                next_instruction_address.clone(),
+            ) {
+                finalized_blocks.push(finalized_blk)
+            }
+        }
+    }
+
+    finalized_blocks
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
