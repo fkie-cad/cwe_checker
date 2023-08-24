@@ -344,7 +344,7 @@ fn add_operation_to_blk(
                 let (finalized_blk, new_blk, new_tid) = finalize_blk_with_branch_and_setup_new_blk(
                     &mut tid,
                     &mut blk,
-                    instr.address.clone(),
+                    format!("{}_{}", instr.address.clone(), op.pcode_index),
                     next_instr_address,
                 );
                 // set new block and tid.
@@ -478,24 +478,10 @@ fn process_pcode_relative_jump(
             }
         }
     }
+    dbg!(&relative_target_indices);
 
     let mut pcode_op_iterator = instruction.pcode_ops.iter().peekable();
     while let Some(op) = pcode_op_iterator.next() {
-        // if current op is a jump target, add implicit branch and finalize block.
-
-        // TODO: not necessary if block empty!
-        if relative_target_indices.values().contains(&op.pcode_index) {
-            let (finalized_blk, new_blk, new_tid) = finalize_blk_with_branch_and_setup_new_blk(
-                blk_tid,
-                blk,
-                format!("{}_{}", instruction.address, op.pcode_index),
-                format!("{}_{}", instruction.address, op.pcode_index),
-            );
-            finalized_blocks.push(finalized_blk);
-            *blk = new_blk;
-            *blk_tid = new_tid;
-        }
-
         // Set next instruction address
         // Usually the following pcode operation, but if the last operation is processed, the following instruction is used.
         let fallthrough_addr = match pcode_op_iterator.peek() {
@@ -540,6 +526,26 @@ fn process_pcode_relative_jump(
                 };
             }
             finalized_blocks.push(finalized_blk)
+        } else {
+            // if next op is a jump target, add implicit branch and finalize block.
+            // TODO: not necessary if block empty!
+            if let Some(next_op) = pcode_op_iterator.peek() {
+                if relative_target_indices
+                    .values()
+                    .contains(&next_op.pcode_index)
+                {
+                    let (finalized_blk, new_blk, new_tid) =
+                        finalize_blk_with_branch_and_setup_new_blk(
+                            blk_tid,
+                            blk,
+                            format!("{}_{}", instruction.address, op.pcode_index),
+                            format!("{}_{}", instruction.address, next_op.pcode_index),
+                        );
+                    finalized_blocks.push(finalized_blk);
+                    *blk = new_blk;
+                    *blk_tid = new_tid;
+                }
+            }
         }
     }
 

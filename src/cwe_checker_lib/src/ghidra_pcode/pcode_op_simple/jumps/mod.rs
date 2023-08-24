@@ -66,19 +66,26 @@ impl PcodeOpSimple {
         }
     }
 
-    /// Determines the target
+    /// Determines the target ad returns corresponding `Tid`.
+    ///
+    /// Pcode relative targets are prefixed with `artificial`, e.g. artificial_blk_0x100_4.
+    /// Absolute targets (RAM located) are not prefixed, e.g. blk_0x0200
     fn extract_target(&self, address: &String) -> Tid {
-        let target = match self.get_jump_target() {
-            Some(JmpTarget::Absolute(a)) => self
-                .input0
-                .get_ram_address()
-                .unwrap()
-                .as_string_with_radix(16), // TODO: use a?
-            Some(JmpTarget::Relative((_, pcode_index))) => format!("{}_{}", address, pcode_index),
+        let target_id = match self.get_jump_target() {
+            Some(JmpTarget::Absolute(_)) => format!(
+                "blk_{}",
+                self.input0
+                    .get_ram_address()
+                    .unwrap()
+                    .as_string_with_radix(16)
+            ),
+            Some(JmpTarget::Relative((_, target_index))) => {
+                format!("artificial_blk_{}_{}", address, target_index)
+            }
             None => panic!("Not a jump operation"),
         };
         Tid {
-            id: format!("blk_{}", target),
+            id: target_id,
             address: address.to_string(),
         }
     }
