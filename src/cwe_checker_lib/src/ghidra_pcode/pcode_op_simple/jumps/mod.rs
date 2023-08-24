@@ -8,13 +8,14 @@ use super::PcodeOpSimple;
 
 /// A jump target is either a pcode operation (pcode relative jump), or another
 /// machine code instruction (absolute jump).
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum JmpTarget {
     /// Pcode relative jump `(jmp_index, target_index)` from `jmp_index` pcode operation index to
     /// to the `target_index` pcode operation index.
     /// Note that both are indices and **not** offsets.
     Relative((u64, u64)),
     /// Machine code instruction jump target with absolute address.
-    Absolut(u64),
+    Absolute(u64),
 }
 
 impl PcodeOpSimple {
@@ -33,12 +34,17 @@ impl PcodeOpSimple {
                 BRANCHIND | CALLIND | CALLOTHER | RETURN => (), // case `offset`
             }
             if let Some(target) = self.input0.get_ram_address() {
-                return Some(JmpTarget::Absolut(target.try_to_u64().unwrap()));
+                return Some(JmpTarget::Absolute(target.try_to_u64().unwrap()));
             } else if let Expression::Const(jmp_offset) = self.input0.into_ir_expr().unwrap() {
-                return Some(JmpTarget::Relative((
-                    self.pcode_index,
-                    self.pcode_index + jmp_offset.try_to_u64().unwrap(),
-                )));
+                if let Some(target_index) = self
+                    .pcode_index
+                    .checked_add_signed(jmp_offset.try_to_i64().unwrap())
+                {
+                    return Some(JmpTarget::Relative((self.pcode_index, target_index)));
+                } else {
+                    // TODO: Negative target index, trigger log message here
+                    return Some(JmpTarget::Relative((self.pcode_index, 0)));
+                }
             }
         }
         None
@@ -64,7 +70,7 @@ impl PcodeOpSimple {
     fn extract_target(&self, address: &String) -> Tid {
         // TODO: target Tid.id name convention
         let target = match self.get_jump_target() {
-            Some(JmpTarget::Absolut(a)) => self
+            Some(JmpTarget::Absolute(a)) => self
                 .input0
                 .get_ram_address()
                 .unwrap()
