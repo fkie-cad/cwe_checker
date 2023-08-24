@@ -71,23 +71,17 @@ impl PcodeOpSimple {
     /// Pcode relative targets are prefixed with `artificial`, e.g. artificial_blk_0x100_4.
     /// Absolute targets (RAM located) are not prefixed, e.g. blk_0x0200
     fn extract_target(&self, address: &String) -> Tid {
-        let target_id = match self.get_jump_target() {
-            Some(JmpTarget::Absolute(_)) => format!(
-                "blk_{}",
-                self.input0
-                    .get_ram_address()
-                    .unwrap()
-                    .as_string_with_radix(16)
-            ),
-            Some(JmpTarget::Relative((_, target_index))) => {
-                format!("artificial_blk_{}_{}", address, target_index)
+        let (id, address) = match self.get_jump_target() {
+            Some(JmpTarget::Absolute(_)) => {
+                (format!("blk_{}", self.input0.id), self.input0.id.clone())
             }
+            Some(JmpTarget::Relative((_, target_index))) => (
+                format!("artificial_blk_{}_{}", address, target_index),
+                address.clone(),
+            ),
             None => panic!("Not a jump operation"),
         };
-        Tid {
-            id: target_id,
-            address: address.to_string(),
-        }
+        Tid { id, address }
     }
 
     fn wrap_in_tid(&self, address: &String, jmp: Jmp) -> Term<Jmp> {

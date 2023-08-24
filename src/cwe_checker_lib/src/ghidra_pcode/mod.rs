@@ -478,7 +478,6 @@ fn process_pcode_relative_jump(
             }
         }
     }
-    dbg!(&relative_target_indices);
 
     let mut pcode_op_iterator = instruction.pcode_ops.iter().peekable();
     while let Some(op) = pcode_op_iterator.next() {
@@ -488,7 +487,6 @@ fn process_pcode_relative_jump(
             Some(next_op) => Some(format!("{}_{}", instruction.address, next_op.pcode_index)),
             None => next_instruction_address.clone(),
         };
-        dbg!(&fallthrough_addr);
 
         if let Some(mut finalized_blk) =
             add_operation_to_blk(&op, &instruction, blk, blk_tid, fallthrough_addr)
@@ -514,7 +512,7 @@ fn process_pcode_relative_jump(
                     .clone()
                     .expect("Next instruction address not available");
                 let next_instr_tid = Tid {
-                    id: format!("instr_{}", address_next_instr),
+                    id: format!("artificial_blk_{}", address_next_instr),
                     address: address_next_instr,
                 };
                 jump_to_next_instr.term = match &jump_to_next_instr.term{

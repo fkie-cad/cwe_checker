@@ -346,6 +346,21 @@ fn test_process_pcode_relative_jump_forward_jump() {
 
 #[test]
 fn test_process_pcode_relative_jump_backward_jump() {
+    /*
+                          ┌───┐
+       Instruction:       │   ▼    Blocks:
+                          │ ┌──────┐
+       ADD1  ◄─┐          │ │ADD1  │
+       ADD2    │   ==>    │ │BRANCH├─┐
+       CBRANCH─┘          │ └──────┘ │
+                          │          │
+                          │          ▼
+                          │ ┌────────┐    Block with following Instruction
+                          │ │ADD2    │   ┌───────┐
+                          └─┤CBRANCH │   │       │
+                            │BRANCH  ├─► │       │
+                            └────────┘   └───────┘
+    */
     let mut blk = Blk {
         defs: vec![],
         jmps: vec![],
@@ -454,4 +469,117 @@ fn test_process_pcode_relative_jump_backward_jump() {
         address: "0x0207".into(),
     };
     assert_eq!(tid, expected_tid_returned_block);
+}
+
+#[test]
+fn test_process_pcode_relative_jump_to_next_instruction() {
+    let mut blk = Blk {
+        defs: vec![],
+        jmps: vec![],
+        indirect_jmp_targets: vec![],
+    };
+    let mut tid = Tid::new("blk_tid");
+    let op_branch_to_next_instr =
+        mock_pcode_op_branch(0, mock_varnode("const".into(), "0x1".into(), 4));
+    let pcode_ops = vec![op_branch_to_next_instr];
+    let instr = mock_instruction("0x1111".into(), pcode_ops);
+
+    let result = process_pcode_relative_jump(&mut tid, &mut blk, instr, Some("0x1112".into()));
+
+    assert_eq!(result.len(), 1);
+
+    let expected_finalized_blk = Blk {
+        defs: vec![],
+        jmps: vec![Term {
+            tid: Tid {
+                id: "instr_0x1111_0".into(),
+                address: "0x1111".into(),
+            },
+            term: Jmp::Branch(Tid {
+                id: "artificial_blk_0x1112".into(),
+                address: "0x1112".into(),
+            }),
+        }],
+        indirect_jmp_targets: vec![],
+    };
+    assert_eq!(result.get(0).unwrap().term, expected_finalized_blk);
+
+    let expected_returned_tid = Tid {
+        id: "artificial_blk_0x1112".into(),
+        address: "0x1112".into(),
+    };
+    assert_eq!(tid, expected_returned_tid);
+    assert_eq!(
+        blk,
+        Blk {
+            defs: vec![],
+            jmps: vec![],
+            indirect_jmp_targets: vec![]
+        }
+    )
+}
+
+#[test]
+fn test_implicit_process_pcode_relative_jump_to_next_instruction() {
+    let mut blk = Blk {
+        defs: vec![],
+        jmps: vec![],
+        indirect_jmp_targets: vec![],
+    };
+    let mut tid = Tid::new("blk_tid");
+    let op_cbranch_fallthrough_to_next_instr = mock_pcode_op_cbranch(
+        0,
+        mock_varnode("ram".into(), "0xFFFF1111".into(), 4),
+        mock_varnode("register", "ZF", 1),
+    );
+    let pcode_ops = vec![op_cbranch_fallthrough_to_next_instr];
+    let instr = mock_instruction("0x1111".into(), pcode_ops);
+
+    let result = process_pcode_relative_jump(&mut tid, &mut blk, instr, Some("0x1112".into()));
+
+    assert_eq!(result.len(), 1);
+
+    let first_expected_jmp = Term {
+        tid: Tid {
+            id: "instr_0x1111_0".into(),
+            address: "0x1111".into(),
+        },
+        term: Jmp::CBranch {
+            target: Tid {
+                id: "blk_0xFFFF1111".into(),
+                address: "0xFFFF1111".into(),
+            },
+            condition: expr!("ZF:1"),
+        },
+    };
+    let second_expected_jmp = Term {
+        tid: Tid {
+            id: "artificial_jmp_0x1111_0".into(),
+            address: "0x1111".into(),
+        },
+        term: Jmp::Branch(Tid {
+            id: "artificial_blk_0x1112".into(),
+            address: "0x1112".into(),
+        }),
+    };
+    let expected_finalized_blk = Blk {
+        defs: vec![],
+        jmps: vec![first_expected_jmp, second_expected_jmp],
+        indirect_jmp_targets: vec![],
+    };
+    assert_eq!(result.get(0).unwrap().term, expected_finalized_blk);
+
+    let expected_returned_tid = Tid {
+        id: "artificial_blk_0x1112".into(),
+        address: "0x1112".into(),
+    };
+    assert_eq!(tid, expected_returned_tid);
+    assert_eq!(
+        blk,
+        Blk {
+            defs: vec![],
+            jmps: vec![],
+            indirect_jmp_targets: vec![]
+        }
+    )
 }
