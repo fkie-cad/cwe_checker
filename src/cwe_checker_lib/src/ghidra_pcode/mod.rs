@@ -7,6 +7,7 @@ use crate::intermediate_representation::*;
 use crate::pcode::ExpressionType;
 use crate::pcode::JmpType::*;
 use anyhow::{anyhow, Result};
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 mod pcode_operations;
@@ -39,18 +40,12 @@ pub struct ProjectSimple {
 
 impl ProjectSimple {
     pub fn into_ir_project(self) -> Project {
-        let mut targets: HashSet<u64> = HashSet::new();
+        let mut jump_targets: HashSet<u64> = HashSet::new();
         for func in self.functions {
             for blk in func.blocks {
                 let t = &blk.collect_jmp_targets();
-                targets.extend(t.iter());
-                for inst in blk.instructions {
-                    for mut op in inst.pcode_ops {
-                        if matches!(op.pcode_mnemonic, PcodeOperation::ExpressionType(_)) {
-                            op.into_ir_def(&inst.address);
-                        }
-                    }
-                }
+                jump_targets.extend(t.iter());
+                blk.into_ir_blk(&jump_targets);
             }
             //dbg!(&targets);
         }
@@ -177,8 +172,27 @@ impl InstructionSimple {
         }
     }
 
+    /// Returns the instruction field as `u64`.
     pub fn get_u64_address(&self) -> u64 {
         u64::from_str_radix(self.address.trim_start_matches("0x"), 16).unwrap()
+    }
+
+    /// Determines if a pcode relative jump exceeds the amount of the instructions's pcode operations.
+    ///
+    /// If the pcode relative jump's target is within the array of the instruction's pcode operations,
+    /// `false` is returned. If the jump exceeds te amount of pcode operations, `true` is returned,
+    fn contains_relative_jump_to_next_instruction(&self) -> bool {
+        for op in &self.pcode_ops {
+            if op.is_pcode_relative_jump() {
+                if let Some(JmpTarget::Relative((_, target_index))) = op.get_jump_target() {
+                    if target_index >= self.pcode_ops.len() as u64 {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        false
     }
 }
 
@@ -189,23 +203,22 @@ pub struct BlockSimple {
 }
 
 impl BlockSimple {
+    /// Collects all jumps targets of instructions within the block.
     fn collect_jmp_targets(&self) -> HashSet<u64> {
         // Collecting jump targets for splitting up blocks
         let mut jump_targets = HashSet::new();
-        for instr in &self.instructions {
+        let mut instructions = self.instructions.iter().peekable();
+        while let Some(instr) = instructions.next() {
             // create a set of all jump targets
             for op in &instr.pcode_ops {
                 match op.get_jump_target() {
-                    Some(JmpTarget::Absolut(target_addr)) => {
+                    Some(JmpTarget::Absolute(target_addr)) => {
                         jump_targets.insert(target_addr);
                     }
-                    Some(JmpTarget::Relative((start_index, target_index))) => {
-                        self.get_if_relative_jump_to_next_instruction(
-                            instr,
-                            start_index as usize,
-                            target_index as usize,
-                        )
-                        .map(|addr| jump_targets.insert(addr));
+                    Some(JmpTarget::Relative(_)) => {
+                        if instr.contains_relative_jump_to_next_instruction() {
+                            jump_targets.insert(instructions.peek().expect("Relative jump to next instruction, but block as no next instruction.").get_u64_address());
+                        }
                     }
 
                     _ => (),
@@ -213,34 +226,6 @@ impl BlockSimple {
             }
         }
         jump_targets
-    }
-
-    /// Returns the following instruction of the block, if a pcode relative jump exceeds the amount of the instructions's pcode operations.
-    ///
-    /// If the pcode relative jump's target is within the array of the instruction's pcode operations,
-    /// `None` is returned.
-    fn get_if_relative_jump_to_next_instruction(
-        &self,
-        jump_site: &InstructionSimple,
-        start_index: usize,
-        offset_to_target: usize,
-    ) -> Option<u64> {
-        let mut instruction_sequence = self.instructions.iter().peekable();
-        while let Some(instr) = instruction_sequence.next() {
-            if instr == jump_site && instr.pcode_ops.capacity() < (start_index + offset_to_target) {
-                if let Some(target_instr) = instruction_sequence.peek() {
-                    dbg!(&jump_site.pcode_ops[start_index]);
-                    return Some(
-                        u64::from_str_radix(&target_instr.address.trim_start_matches("0x"), 16)
-                            .expect("Cannot parse address"),
-                    );
-                } else {
-                    panic!("Pcode relative jump to next instruction, but block does not have instructions left")
-                }
-            }
-        }
-
-        None
     }
 
     /// Translates a Ghidra pcode block into one or more IR blocks.
@@ -405,7 +390,10 @@ fn add_operation_to_blk(
         }
     }
 }
+
 /// Helper function for wrapping a block within a tid and prepare new empty block with corresponding tid.
+///
+/// The new tid id is `artificial_blk_` followed by `next_instruction_address`.
 fn finalize_blk_and_setup_new_blk(
     blk_tid: &mut Tid,
     blk: &mut Blk,
@@ -413,7 +401,11 @@ fn finalize_blk_and_setup_new_blk(
 ) -> (Term<Blk>, Blk, Tid) {
     let new_tid = Tid {
         id: format!("artificial_blk_{}", next_instruction_address),
-        address: next_instruction_address,
+        address: next_instruction_address
+            .split("_")
+            .next()
+            .expect("Address extraction failed")
+            .to_string(),
     };
     let new_blk = Blk {
         defs: vec![],
@@ -429,21 +421,37 @@ fn finalize_blk_and_setup_new_blk(
 }
 
 /// Adds a `Jmp::Branch` to the block, wrap block in `Term` and returns it with the new and empty target block with its `Tid`.
+///
+/// This tid id is `artificial_blk` suffixed by `target_address`. The added `Branch`'s Tid `id` is `artificial_jmp_` suffixed by `jump_instruction_address`.
 fn finalize_blk_with_branch_and_setup_new_blk(
     blk_tid: &mut Tid,
     blk: &mut Blk,
     jump_instruction_address: String,
     target_address: String,
 ) -> (Term<Blk>, Blk, Tid) {
+    //TODO: Sprünge zu sich selbst -> new setup wrong?
+
     let (mut blk_to_branch_from, new_blk, new_tid) =
         finalize_blk_and_setup_new_blk(blk_tid, blk, target_address);
 
     let branch = Term {
         tid: Tid {
-            id: format!("artificial_jmp"),
-            address: jump_instruction_address,
+            id: format!("artificial_jmp_{}", jump_instruction_address),
+            address: jump_instruction_address
+                .split("_")
+                .next()
+                .expect("Address extraction failed")
+                .to_string(),
         },
-        term: Jmp::Branch(new_tid.clone()),
+        term: Jmp::Branch(Tid {
+            id: new_tid.id.clone(),
+            address: new_tid
+                .address
+                .split("_")
+                .next()
+                .expect("Address extraction failed")
+                .to_string(),
+        }),
     };
     blk_to_branch_from.term.jmps.push(branch);
 
@@ -452,6 +460,8 @@ fn finalize_blk_with_branch_and_setup_new_blk(
 
 /// Translates instruction with one or more pcode relative jumps into one or more blocks.
 /// Not pcode relative jumps are added as well.
+///
+/// Artificially added block's tid uses an artificial address using `_`.
 fn process_pcode_relative_jump(
     blk_tid: &mut Tid,
     blk: &mut Blk,
@@ -469,37 +479,67 @@ fn process_pcode_relative_jump(
         }
     }
 
-    for op in &instruction.pcode_ops {
+    let mut pcode_op_iterator = instruction.pcode_ops.iter().peekable();
+    while let Some(op) = pcode_op_iterator.next() {
         // if current op is a jump target, add implicit branch and finalize block.
-        if let Some(target_side) = relative_target_indices.get(&op.pcode_index) {
-            let mut target_address = format!("{}_{}", instruction.address.clone(), target_side);
 
-            // Special case of jump target is not within the instructions pcode operation sequence
-            // We consider the next instruction as jump target.
-            if target_side >= &(instruction.pcode_ops.len() as u64) {
-                target_address = next_instruction_address
-                    .clone()
-                    .expect("Consecutive instruction is not available.")
-            }
+        // TODO: not necessary if block empty!
+        if relative_target_indices.values().contains(&op.pcode_index) {
             let (finalized_blk, new_blk, new_tid) = finalize_blk_with_branch_and_setup_new_blk(
                 blk_tid,
                 blk,
                 format!("{}_{}", instruction.address, op.pcode_index),
-                target_address,
+                format!("{}_{}", instruction.address, op.pcode_index),
             );
             finalized_blocks.push(finalized_blk);
             *blk = new_blk;
             *blk_tid = new_tid;
-        } else {
-            if let Some(finalized_blk) = add_operation_to_blk(
-                &op,
-                &instruction,
-                blk,
-                blk_tid,
-                next_instruction_address.clone(),
-            ) {
-                finalized_blocks.push(finalized_blk)
+        }
+
+        // Set next instruction address
+        // Usually the following pcode operation, but if the last operation is processed, the following instruction is used.
+        let fallthrough_addr = match pcode_op_iterator.peek() {
+            Some(next_op) => Some(format!("{}_{}", instruction.address, next_op.pcode_index)),
+            None => next_instruction_address.clone(),
+        };
+        dbg!(&fallthrough_addr);
+
+        if let Some(mut finalized_blk) =
+            add_operation_to_blk(&op, &instruction, blk, blk_tid, fallthrough_addr)
+        {
+            // Special case of jump target is not within the instructions pcode operation sequence
+            // We consider the next instruction as jump target.
+            if relative_target_indices.get(&op.pcode_index)
+                >= Some(&(instruction.pcode_ops.len() as u64))
+            {
+                let block_jump_amount = finalized_blk.term.jmps.len();
+                let jump_to_next_instr = match op.pcode_mnemonic {
+                    PcodeOperation::ExpressionType(_) => panic!("Jump side is not a JmpType"),
+                    PcodeOperation::JmpType(jmp) if matches!(jmp, CBRANCH) => {
+                        finalized_blk.term.jmps.get_mut(block_jump_amount - 2)
+                    }
+                    PcodeOperation::JmpType(_) => {
+                        finalized_blk.term.jmps.get_mut(block_jump_amount - 1)
+                    }
+                }
+                .expect("Finalized block does not have expected jump");
+
+                let address_next_instr = next_instruction_address
+                    .clone()
+                    .expect("Next instruction address not available");
+                let next_instr_tid = Tid {
+                    id: format!("instr_{}", address_next_instr),
+                    address: address_next_instr,
+                };
+                jump_to_next_instr.term = match &jump_to_next_instr.term{
+                    Jmp::Branch(_) => Jmp::Branch(next_instr_tid),
+                    Jmp::CBranch { target: _, condition } => Jmp::CBranch { target: next_instr_tid, condition: condition.clone() },
+                    Jmp::Call { target: _, return_ } => Jmp::Call { target: next_instr_tid, return_: return_.clone() },
+                    // All other variants should not be in collected jump targets anyway.
+                    _ => panic!("Return, BranchInd, CallInd or CallOther are not affected by pcode relative jumps"),
+                };
             }
+            finalized_blocks.push(finalized_blk)
         }
     }
 

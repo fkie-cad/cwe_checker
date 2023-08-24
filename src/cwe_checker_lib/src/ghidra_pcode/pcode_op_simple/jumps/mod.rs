@@ -68,19 +68,18 @@ impl PcodeOpSimple {
 
     /// Determines the target
     fn extract_target(&self, address: &String) -> Tid {
-        // TODO: target Tid.id name convention
         let target = match self.get_jump_target() {
             Some(JmpTarget::Absolute(a)) => self
                 .input0
                 .get_ram_address()
                 .unwrap()
-                .as_string_with_radix(16),
+                .as_string_with_radix(16), // TODO: use a?
             Some(JmpTarget::Relative((_, pcode_index))) => format!("{}_{}", address, pcode_index),
             None => panic!("Not a jump operation"),
         };
         Tid {
-            id: format!("jmp_from_{}_to_{}", address, target),
-            address: target,
+            id: format!("blk_{}", target),
+            address: address.to_string(),
         }
     }
 
