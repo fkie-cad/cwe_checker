@@ -282,7 +282,14 @@ fn get_full_path_to_source_of_free<'a>(
             if caller_data.get_relative_values().contains_key(object_id) {
                 // A corresponding object ID was already flagged in a callee,
                 // so we want to suppress this CWE warning as a duplicate of the already flagged CWE in the callee.
-                return Err(());
+                if object_id.get_tid() != &return_state.current_fn_tid {
+                    return Err(());
+                } else {
+                    // This is a recursive call and the object is a parameter to this call.
+                    // We treat the call as the root cause
+                    // to avoid erroneously suppressing some CWE warnings based on recursive calls.
+                    return Ok((free_id.clone(), collected_callgraph_ids));
+                }
             }
         }
     }
