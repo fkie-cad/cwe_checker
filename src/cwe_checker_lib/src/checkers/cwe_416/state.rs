@@ -69,6 +69,30 @@ impl State {
         }
     }
 
+    /// Return a list of abstract identifiers that are marked as "flagged" in the current state,
+    /// i.e. they already triggered the generation of a CWE warning.
+    pub fn get_already_flagged_objects(&self) -> Vec<AbstractIdentifier> {
+        self.dangling_objects
+            .iter()
+            .filter_map(|(id, object_state)| match object_state {
+                ObjectState::AlreadyFlagged => Some(id.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Return a list of abstract identifiers that are marked as "dangling" in the current state
+    /// together with the TIDs of the corresponding `free` instruction.
+    pub fn get_dangling_objects(&self) -> Vec<(AbstractIdentifier, Tid)> {
+        self.dangling_objects
+            .iter()
+            .filter_map(|(id, object_state)| match object_state {
+                ObjectState::AlreadyFlagged => None,
+                ObjectState::Dangling(free_id) => Some((id.clone(), free_id.clone())),
+            })
+            .collect()
+    }
+
     /// Check the given address on whether it may point to already freed memory.
     /// For each possible dangling pointer target the abstract ID of the object
     /// and the TID of the corresponding site where the object was freed is returned.

@@ -275,14 +275,17 @@ impl State {
     }
 
     /// Check whether a generic function call may contain tainted values in its parameters.
-    /// Since we don't know the actual calling convention of the call,
-    /// we approximate the parameters with all parameter registers of the standard calling convention of the project.
+    /// Since we don't know the actual parameters of the call,
+    /// we approximate the parameters with all parameter registers of the calling convention of the function
+    /// or of the standard calling convention of the project.
     pub fn check_generic_function_params_for_taint(
         &self,
         project: &Project,
         pi_state_option: Option<&PointerInferenceState>,
+        calling_convention_hint: &Option<String>,
     ) -> bool {
-        if let Some(calling_conv) = project.get_standard_calling_convention() {
+        if let Some(calling_conv) = project.get_specific_calling_convention(calling_convention_hint)
+        {
             let mut all_parameters = calling_conv.integer_parameter_register.clone();
             for float_param in calling_conv.float_parameter_register.iter() {
                 for var in float_param.input_vars() {
@@ -298,13 +301,16 @@ impl State {
 
     /// Check whether the return registers may contain tainted values or point to objects containing tainted values.
     /// Since we don't know the actual return registers,
-    /// we approximate them by all return registers of the standard calling convention of the project.
+    /// we approximate them by all return registers of the calling convention of the function
+    /// or of the standard calling convention of the project.
     pub fn check_return_values_for_taint(
         &self,
         project: &Project,
         pi_state_option: Option<&PointerInferenceState>,
+        calling_convention_hint: &Option<String>,
     ) -> bool {
-        if let Some(calling_conv) = project.get_standard_calling_convention() {
+        if let Some(calling_conv) = project.get_specific_calling_convention(calling_convention_hint)
+        {
             self.check_register_list_for_taint(
                 &calling_conv.integer_return_register[..],
                 pi_state_option,

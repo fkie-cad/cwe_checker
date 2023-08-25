@@ -215,14 +215,26 @@ impl<'a> Context<'a> {
     /// If a possible  parameter register of the call contains taint,
     /// generate a CWE warning and return `None`.
     /// Else remove all taint contained in non-callee-saved registers.
-    fn handle_generic_call(&self, state: &State, call_tid: &Tid) -> Option<State> {
+    fn handle_generic_call(
+        &self,
+        state: &State,
+        call_tid: &Tid,
+        calling_convention_hint: &Option<String>,
+    ) -> Option<State> {
         let pi_state_option = self.get_current_pointer_inference_state(state, call_tid);
-        if state.check_generic_function_params_for_taint(self.project, pi_state_option.as_ref()) {
+        if state.check_generic_function_params_for_taint(
+            self.project,
+            pi_state_option.as_ref(),
+            calling_convention_hint,
+        ) {
             self.generate_cwe_warning(call_tid);
             return None;
         }
         let mut new_state = state.clone();
-        if let Some(calling_conv) = self.project.get_standard_calling_convention() {
+        if let Some(calling_conv) = self
+            .project
+            .get_specific_calling_convention(calling_convention_hint)
+        {
             new_state.remove_non_callee_saved_taint(calling_conv);
         }
         Some(new_state)
@@ -260,10 +272,14 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
         state: &State,
         call: &Term<Jmp>,
         _target: &Node,
-        _calling_convention: &Option<String>,
+        calling_convention: &Option<String>,
     ) -> Option<Self::Value> {
         let pi_state_option = self.get_current_pointer_inference_state(state, &call.tid);
-        if state.check_generic_function_params_for_taint(self.project, pi_state_option.as_ref()) {
+        if state.check_generic_function_params_for_taint(
+            self.project,
+            pi_state_option.as_ref(),
+            calling_convention,
+        ) {
             self.generate_cwe_warning(&call.tid);
         }
         None
@@ -295,7 +311,7 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
                     panic!("Extern symbol not found.");
                 }
             }
-            Jmp::CallInd { .. } => self.handle_generic_call(state, &call.tid),
+            Jmp::CallInd { .. } => self.handle_generic_call(state, &call.tid, &None),
             _ => panic!("Malformed control flow graph encountered."),
         }
     }
@@ -391,18 +407,22 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
         state_before_call: Option<&State>,
         call_term: &Term<Jmp>,
         return_term: &Term<Jmp>,
-        _calling_convention: &Option<String>,
+        calling_convention: &Option<String>,
     ) -> Option<State> {
         if let Some(state) = state_before_return {
             // If taint is returned, generate a CWE warning
             let pi_state_option = self.get_current_pointer_inference_state(state, &return_term.tid);
-            if state.check_return_values_for_taint(self.project, pi_state_option.as_ref()) {
+            if state.check_return_values_for_taint(
+                self.project,
+                pi_state_option.as_ref(),
+                calling_convention,
+            ) {
                 self.generate_cwe_warning(&return_term.tid);
             }
             // Do not return early in case `state_before_call` is also set (possible for recursive functions).
         }
         if let Some(state) = state_before_call {
-            self.handle_generic_call(state, &call_term.tid)
+            self.handle_generic_call(state, &call_term.tid, calling_convention)
         } else {
             None
         }
@@ -471,12 +491,12 @@ mod tests {
         let mut state = State::mock();
 
         assert!(context
-            .handle_generic_call(&state, &Tid::new("call_tid"))
+            .handle_generic_call(&state, &Tid::new("call_tid"), &None)
             .is_some());
 
         state.set_register_taint(&variable!("RDX:8"), Taint::Tainted(ByteSize::new(8)));
         assert!(context
-            .handle_generic_call(&state, &Tid::new("call_tid"))
+            .handle_generic_call(&state, &Tid::new("call_tid"), &None)
             .is_none());
     }
 
