@@ -461,7 +461,7 @@ fn finalize_blk_with_branch_and_setup_new_blk(
 /// Translates instruction with one or more pcode relative jumps into one or more blocks.
 /// Not pcode relative jumps are added as well.
 ///
-/// Artificially added block's tid uses an artificial address using `_`.
+/// Artificially added block's tid uses not artificial addresses.
 fn process_pcode_relative_jump(
     blk_tid: &mut Tid,
     blk: &mut Blk,
@@ -479,9 +479,35 @@ fn process_pcode_relative_jump(
         }
     }
 
+    // Used for optimazion of jump redirection
+    let mut empty_first_blk_tid = match blk.defs.is_empty() {
+        true => Some(blk_tid.clone()),
+        false => None,
+    };
+
     let mut pcode_op_iterator = instruction.pcode_ops.iter().peekable();
+
+    // If first operation is a target and the block is not empty, finalize block and set up new one.
+    if relative_target_indices.values().contains(&0) && !blk.defs.is_empty() {
+        // finalize block and set up new one
+        let first_op = pcode_op_iterator.peek().expect("No pcode operations");
+
+        let (finalized_blk, new_blk, new_tid) = finalize_blk_with_branch_and_setup_new_blk(
+            blk_tid,
+            blk,
+            format!("{}_--", instruction.address),
+            format!("{}_{}", instruction.address, first_op.pcode_index),
+        );
+        finalized_blocks.push(finalized_blk);
+        *blk = new_blk;
+        *blk_tid = new_tid;
+
+        empty_first_blk_tid = Some(blk_tid.clone());
+    }
+
     while let Some(op) = pcode_op_iterator.next() {
-        // Set next instruction address
+        
+        // Set next following instruction address:
         // Usually the following pcode operation, but if the last operation is processed, the following instruction is used.
         let fallthrough_addr = match pcode_op_iterator.peek() {
             Some(next_op) => Some(format!("{}_{}", instruction.address, next_op.pcode_index)),
@@ -522,6 +548,32 @@ fn process_pcode_relative_jump(
                     // All other variants should not be in collected jump targets anyway.
                     _ => panic!("Return, BranchInd, CallInd or CallOther are not affected by pcode relative jumps"),
                 };
+            } else if relative_target_indices.get(&op.pcode_index) == Some(&0) {
+                // Special case of jump to the first operation, which is the first def the corresponding block.
+                // Redirect the jump to the block.
+                if let Some(first_blk_tid) = &empty_first_blk_tid {
+                    dbg!(&first_blk_tid);
+                    let block_jump_amount = finalized_blk.term.jmps.len();
+                    let jump_to_first_blk = match op.pcode_mnemonic {
+                        PcodeOperation::ExpressionType(_) => panic!("Jump side is not a JmpType"),
+                        PcodeOperation::JmpType(jmp) if matches!(jmp, CBRANCH) => {
+                            finalized_blk.term.jmps.get_mut(block_jump_amount - 2)
+                        }
+                        PcodeOperation::JmpType(_) => {
+                            finalized_blk.term.jmps.get_mut(block_jump_amount - 1)
+                        }
+                    }
+                    .expect("Finalized block does not have expected jump");
+
+                    jump_to_first_blk.term = match &jump_to_first_blk.term{
+                        Jmp::Branch(_) => Jmp::Branch(first_blk_tid.clone()),
+                        Jmp::CBranch { target: _, condition } => Jmp::CBranch { target: first_blk_tid.clone(), condition: condition.clone() },
+                        Jmp::Call { target: _, return_ } => Jmp::Call { target: first_blk_tid.clone(), return_: return_.clone() },
+                        // All other variants should not be in collected jump targets anyway.
+                        _ => panic!("Return, BranchInd, CallInd or CallOther are not affected by pcode relative jumps"),
+                    };
+                    dbg!(&jump_to_first_blk);
+                }
             }
             finalized_blocks.push(finalized_blk)
         } else {

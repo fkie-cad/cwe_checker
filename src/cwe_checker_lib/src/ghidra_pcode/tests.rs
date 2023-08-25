@@ -3,7 +3,7 @@ use super::{
     *,
 };
 use crate::{
-    bitvec, def, expr, ghidra_pcode::pcode_op_simple::tests::mock_pcode_op_cbranch, variable,
+    bitvec, def, defs, expr, ghidra_pcode::pcode_op_simple::tests::mock_pcode_op_cbranch, variable,
 };
 use pcode_operations::PcodeOperation::JmpType;
 
@@ -347,19 +347,7 @@ fn test_process_pcode_relative_jump_forward_jump() {
 #[test]
 fn test_process_pcode_relative_jump_backward_jump() {
     /*
-                          ┌───┐
-       Instruction:       │   ▼    Blocks:
-                          │ ┌──────┐
-       ADD1  ◄─┐          │ │ADD1  │
-       ADD2    │   ==>    │ │BRANCH├─┐
-       CBRANCH─┘          │ └──────┘ │
-                          │          │
-                          │          ▼
-                          │ ┌────────┐    Block with following Instruction
-                          │ │ADD2    │   ┌───────┐
-                          └─┤CBRANCH │   │       │
-                            │BRANCH  ├─► │       │
-                            └────────┘   └───────┘
+      TODO
     */
     let mut blk = Blk {
         defs: vec![],
@@ -520,7 +508,7 @@ fn test_process_pcode_relative_jump_to_next_instruction() {
 }
 
 #[test]
-fn test_implicit_process_pcode_relative_jump_to_next_instruction() {
+fn test_process_pcode_relative_jump_implicitly_to_next_instruction() {
     let mut blk = Blk {
         defs: vec![],
         jmps: vec![],
@@ -582,4 +570,300 @@ fn test_implicit_process_pcode_relative_jump_to_next_instruction() {
             indirect_jmp_targets: vec![]
         }
     )
+}
+
+#[test]
+fn test_process_pcode_relative_jump_redirect_branch_to_block() {
+    let mut blk = Blk {
+        defs: vec![],
+        jmps: vec![],
+        indirect_jmp_targets: vec![],
+    };
+    let mut blk_tid = Tid::new("blk_tid");
+    let varnode = mock_varnode("register".into(), "EAX".into(), 4);
+    let op_add =
+        mock_pcode_op_add(varnode.clone(), Some(varnode.clone()), Some(varnode)).with_index(0);
+    let op_branch_to_first_op =
+        mock_pcode_op_branch(1, mock_varnode("const".into(), "0xFFFFFFFF".into(), 4));
+    let pcode_ops = vec![op_add, op_branch_to_first_op];
+    let instr = mock_instruction("0x1111".into(), pcode_ops);
+
+    let result = process_pcode_relative_jump(&mut blk_tid, &mut blk, instr, Some("0xFFFF".into()));
+
+    assert_eq!(result.len(), 1);
+
+    let expected_jmp = Term {
+        tid: Tid {
+            id: "instr_0x1111_1".into(),
+            address: "0x1111".into(),
+        },
+        term: Jmp::Branch(Tid::new("blk_tid").clone()),
+    };
+    let expected_blk = Blk {
+        defs: vec![Term {
+            tid: Tid {
+                id: "instr_0x1111_0".into(),
+                address: "0x1111".into(),
+            },
+            term: def!["EAX:4 = EAX:4 + EAX:4"].term,
+        }],
+        jmps: vec![expected_jmp],
+        indirect_jmp_targets: vec![],
+    };
+
+    assert_eq!(result.get(0).unwrap().term, expected_blk);
+    assert_eq!(result.get(0).unwrap().tid, Tid::new("blk_tid"));
+
+    let expected_returned_blk = Blk {
+        defs: vec![],
+        jmps: vec![],
+        indirect_jmp_targets: vec![],
+    };
+    let expected_returned_tid = Tid {
+        id: "artificial_blk_0xFFFF".into(),
+        address: "0xFFFF".into(),
+    };
+    assert_eq!(blk, expected_returned_blk);
+    assert_eq!(blk_tid, expected_returned_tid)
+}
+
+#[test]
+fn test_process_pcode_relative_jump_redirect_cbranch_to_block() {
+    let mut blk = Blk {
+        defs: vec![],
+        jmps: vec![],
+        indirect_jmp_targets: vec![],
+    };
+    let mut blk_tid = Tid::new("blk_tid");
+    let varnode = mock_varnode("register".into(), "EAX".into(), 4);
+    let op_add =
+        mock_pcode_op_add(varnode.clone(), Some(varnode.clone()), Some(varnode)).with_index(0);
+    let op_cbranch_to_first_op = mock_pcode_op_cbranch(
+        1,
+        mock_varnode("const".into(), "0xFFFFFFFF".into(), 4),
+        mock_varnode("register", "ZF", 1),
+    );
+    let pcode_ops = vec![op_add, op_cbranch_to_first_op];
+    let instr = mock_instruction("0x1111".into(), pcode_ops);
+
+    let result = process_pcode_relative_jump(&mut blk_tid, &mut blk, instr, Some("0x0000".into()));
+
+    assert_eq!(result.len(), 1);
+
+    let first_expected_jmp = Term {
+        tid: Tid {
+            id: "instr_0x1111_1".into(),
+            address: "0x1111".into(),
+        },
+        term: Jmp::CBranch {
+            target: Tid::new("blk_tid"),
+            condition: expr!("ZF:1"),
+        },
+    };
+    let second_expected_jmp = Term {
+        tid: Tid {
+            id: "artificial_jmp_0x1111_1".into(),
+            address: "0x1111".into(),
+        },
+        term: Jmp::Branch(Tid {
+            id: "artificial_blk_0x0000".into(),
+            address: "0x0000".into(),
+        }),
+    };
+    let expected_blk = Blk {
+        defs: vec![Term {
+            tid: Tid {
+                id: "instr_0x1111_0".into(),
+                address: "0x1111".into(),
+            },
+            term: def!["EAX:4 = EAX:4 + EAX:4"].term,
+        }],
+        jmps: vec![first_expected_jmp, second_expected_jmp],
+        indirect_jmp_targets: vec![],
+    };
+
+    assert_eq!(result.get(0).unwrap().term, expected_blk);
+    assert_eq!(result.get(0).unwrap().tid, Tid::new("blk_tid"));
+
+    let expected_returned_blk = Blk {
+        defs: vec![],
+        jmps: vec![],
+        indirect_jmp_targets: vec![],
+    };
+    let expected_returned_tid = Tid {
+        id: "artificial_blk_0x0000".into(),
+        address: "0x0000".into(),
+    };
+    assert_eq!(blk, expected_returned_blk);
+    assert_eq!(blk_tid, expected_returned_tid)
+}
+
+#[test]
+fn test_process_pcode_relative_jump_block_not_empty() {
+    let mut defs = defs!["RSP:8 = RSP:8 + 8:8", "RBP:8 = RSP:8"];
+    let mut blk = Blk {
+        defs: defs.clone(),
+        jmps: vec![],
+        indirect_jmp_targets: vec![],
+    };
+    let mut blk_tid = Tid::new("blk_tid");
+    let varnode = mock_varnode("register".into(), "EAX".into(), 4);
+    let op_add = mock_pcode_op_add(varnode.clone(), Some(varnode.clone()), Some(varnode));
+    let op_branch_to_next_op =
+        mock_pcode_op_branch(1, mock_varnode("const".into(), "0x1".into(), 4));
+    let pcode_ops = vec![
+        op_add.clone().with_index(0),
+        op_branch_to_next_op,
+        op_add.with_index(2),
+    ];
+    let instr = mock_instruction("0x0000".into(), pcode_ops);
+
+    let result = process_pcode_relative_jump(&mut blk_tid, &mut blk, instr, Some("0x0000".into()));
+    assert_eq!(result.len(), 1);
+
+    let expected_jmp = Term {
+        tid: Tid {
+            id: "instr_0x0000_1".into(),
+            address: "0x0000".into(),
+        },
+        term: Jmp::Branch(Tid {
+            id: "artificial_blk_0x0000_2".into(),
+            address: "0x0000".into(),
+        }),
+    };
+    let expected_added_def = Term {
+        tid: Tid {
+            id: "instr_0x0000_0".into(),
+            address: "0x0000".into(),
+        },
+        term: def!["EAX:4 = EAX:4 + EAX:4"].term,
+    };
+    defs.push(expected_added_def);
+    let expected_blk = Blk {
+        defs,
+        jmps: vec![expected_jmp],
+        indirect_jmp_targets: vec![],
+    };
+    assert_eq!(result.get(0).unwrap().term, expected_blk);
+    assert_eq!(result.get(0).unwrap().tid, Tid::new("blk_tid"));
+
+    let expected_added_def = Term {
+        tid: Tid {
+            id: "instr_0x0000_2".into(),
+            address: "0x0000".into(),
+        },
+        term: def!["EAX:4 = EAX:4 + EAX:4"].term,
+    };
+    let expected_returned_blk = Blk {
+        defs: vec![expected_added_def],
+        jmps: vec![],
+        indirect_jmp_targets: vec![],
+    };
+    assert_eq!(blk, expected_returned_blk);
+
+    let expected_returned_tid = Tid {
+        id: "artificial_blk_0x0000_2".into(),
+        address: "0x0000".into(),
+    };
+    assert_eq!(blk_tid, expected_returned_tid)
+}
+
+#[test]
+fn test_process_pcode_relative_jump_block_not_empty_with_jump_to_first_operation() {
+    let defs = defs!["RSP:8 = RSP:8 + 8:8", "RBP:8 = RSP:8"];
+    let mut blk = Blk {
+        defs: defs.clone(),
+        jmps: vec![],
+        indirect_jmp_targets: vec![],
+    };
+    let mut blk_tid = Tid::new("blk_tid");
+    let varnode = mock_varnode("register".into(), "EAX".into(), 4);
+    let op_add = mock_pcode_op_add(varnode.clone(), Some(varnode.clone()), Some(varnode));
+    let op_branch_to_next_op = mock_pcode_op_cbranch(
+        1,
+        mock_varnode("const".into(), "0xFFFFFFFF".into(), 4),
+        mock_varnode("register", "ZF", 1),
+    );
+    let pcode_ops = vec![
+        op_add.clone().with_index(0),
+        op_branch_to_next_op,
+        op_add.with_index(2),
+    ];
+    let instr = mock_instruction("0x0000".into(), pcode_ops);
+
+    let result = process_pcode_relative_jump(&mut blk_tid, &mut blk, instr, Some("0x0000".into()));
+    assert_eq!(result.len(), 2);
+
+    // check first finalized block
+    let expected_jmp = Term {
+        tid: Tid {
+            id: "artificial_jmp_0x0000_--".into(),
+            address: "0x0000".into(),
+        },
+        term: Jmp::Branch(Tid {
+            id: "artificial_blk_0x0000_0".into(),
+            address: "0x0000".into(),
+        }),
+    };
+    let expected_first_finalized_blk = Blk {
+        defs,
+        jmps: vec![expected_jmp],
+        indirect_jmp_targets: vec![],
+    };
+    assert_eq!(result.get(0).unwrap().term, expected_first_finalized_blk);
+    assert_eq!(result.get(0).unwrap().tid, Tid::new("blk_tid"));
+
+    // check second finalized block
+    let expected_added_def = Term {
+        tid: Tid {
+            id: "instr_0x0000_0".into(),
+            address: "0x0000".into(),
+        },
+        term: def!["EAX:4 = EAX:4 + EAX:4"].term,
+    };
+    let expected_first_jmp = Term {
+        tid: Tid {
+            id: "instr_0x0000_1".into(),
+            address: "0x0000".into(),
+        },
+        term: Jmp::CBranch {
+            target: Tid {
+                id: "artificial_blk_0x0000_0".into(),
+                address: "0x0000".into(),
+            },
+            condition: expr!("ZF:1"),
+        },
+    };
+    let expected_second_jmp = Term {
+        tid: Tid {
+            id: "artificial_jmp_0x0000_1".into(),
+            address: "0x0000".into(),
+        },
+        term: Jmp::Branch(Tid {
+            id: "artificial_blk_0x0000_2".into(),
+            address: "0x0000".into(),
+        }),
+    };
+    let expected_second_finalized_blk = Blk {
+        defs: vec![expected_added_def],
+        jmps: vec![expected_first_jmp, expected_second_jmp],
+        indirect_jmp_targets: vec![],
+    };
+    assert_eq!(result.get(1).unwrap().term, expected_second_finalized_blk);
+    
+    let expected_second_finalized_blk_tid = Tid{ id: "artificial_blk_0x0000_0".into(), address: "0x0000".into() };
+    assert_eq!(result.get(1).unwrap().tid, expected_second_finalized_blk_tid);
+
+    // check returned block
+    let expected_added_def = Term {
+        tid: Tid {
+            id: "instr_0x0000_2".into(),
+            address: "0x0000".into(),
+        },
+        term: def!["EAX:4 = EAX:4 + EAX:4"].term,
+    };
+    let expected_returned_blk = Blk{ defs: vec![expected_added_def], jmps: vec![], indirect_jmp_targets: vec![] };
+    assert_eq!(blk, expected_returned_blk);
+    let expected_returned_tid = Tid{ id: "artificial_blk_0x0000_2".into(), address: "0x0000".into()};
+    assert_eq!(blk_tid, expected_returned_tid)
 }
