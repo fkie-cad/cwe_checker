@@ -162,18 +162,15 @@ fn test_collect_jmp_targets() {
 }
 
 #[test]
-fn test_blk_into_ir() {}
-
-#[test]
 fn test_finalize_blk_and_setup_new_blk() {
-    let mut blk = Blk {
+    let blk = Blk {
         defs: vec![],
         jmps: vec![],
         indirect_jmp_targets: vec![],
     };
     let mut tid = Tid::new("tid_id");
     let (finalized, new_blk, new_tid) =
-        finalize_blk_and_setup_new_blk(&mut tid, &mut blk, "0x123_4_5".into());
+        finalize_blk_and_setup_new_blk(&mut tid, &mut blk.clone(), "0x123_4_5".into());
 
     assert_eq!(
         new_tid,
@@ -182,7 +179,7 @@ fn test_finalize_blk_and_setup_new_blk() {
             address: "0x123".into()
         }
     );
-    assert_eq!(blk, new_blk); // should be an "empty" block anyway
+    assert_eq!(blk, new_blk);
     assert_eq!(Term { tid, term: blk }, finalized);
 }
 
@@ -193,10 +190,10 @@ fn test_finalize_blk_with_branch_and_setup_new_blk() {
         jmps: vec![],
         indirect_jmp_targets: vec![],
     };
-    let mut tid = Tid::new("blk_tid");
+    let tid: Tid = Tid::new("blk_tid");
     let (finalized, new_blk, new_tid) = finalize_blk_with_branch_and_setup_new_blk(
-        &mut tid,
-        &mut blk,
+        &mut tid.clone(),
+        &mut blk.clone(),
         "0xACB_D_E".into(),
         "0x123_4_5".into(),
     );
@@ -260,7 +257,7 @@ fn test_process_pcode_relative_jump_forward_jump() {
     //We expect two finalized blocks
     assert_eq!(result.len(), 2);
 
-    let first_finalized_blk = result.get(0).unwrap();
+    // Check first finalized block
     let first_expected_jmp = Term {
         tid: Tid {
             id: "instr_0x0100_0".into(),
@@ -289,9 +286,10 @@ fn test_process_pcode_relative_jump_forward_jump() {
         jmps: vec![first_expected_jmp, second_expected_jmp],
         indirect_jmp_targets: vec![],
     };
-    assert_eq!(first_finalized_blk.term, first_expected_blk);
+    assert_eq!(result.get(0).unwrap().term, first_expected_blk);
+    assert_eq!(result.get(0).unwrap().tid, Tid::new("blk_tid"));
 
-    let second_finalized_blk = result.get(1).unwrap();
+    // Check second finalized block
     let expected_def = Term {
         tid: Tid {
             id: "instr_0x0100_1".into(),
@@ -314,8 +312,14 @@ fn test_process_pcode_relative_jump_forward_jump() {
         jmps: vec![expected_jmp],
         indirect_jmp_targets: vec![],
     };
-    assert_eq!(second_finalized_blk.term, second_expected_blk);
+    assert_eq!(result.get(1).unwrap().term, second_expected_blk);
+    let expected_tid_second_block = Tid {
+        id: "artificial_blk_0x0100_1".into(),
+        address: "0x0100".into(),
+    };
+    assert_eq!(result.get(1).unwrap().tid, expected_tid_second_block);
 
+    // Check returned block
     let expected_def_of_returned_blk = Term {
         tid: Tid {
             id: "instr_0x0100_2".into(),
@@ -329,14 +333,6 @@ fn test_process_pcode_relative_jump_forward_jump() {
         indirect_jmp_targets: vec![],
     };
     assert_eq!(blk, expected_returned_blk);
-
-    // Checking TIDs of blocks. Skipping first block, since TID is provided.
-    let expected_tid_second_block = Tid {
-        id: "artificial_blk_0x0100_1".into(),
-        address: "0x0100".into(),
-    };
-    assert_eq!(second_finalized_blk.tid, expected_tid_second_block);
-
     let expected_tid_returned_block = Tid {
         id: "artificial_blk_0x0100_2".into(),
         address: "0x0100".into(),
@@ -347,8 +343,20 @@ fn test_process_pcode_relative_jump_forward_jump() {
 #[test]
 fn test_process_pcode_relative_jump_backward_jump() {
     /*
-      TODO
-    */
+    Instruction:          Blocks:
+                     ┌──────┐
+    ADD1             │ADD1  │
+    ADD2 ◄──┐   ==>  │BRANCH├─┐
+    CBRANCH ┘        └──────┘ │
+                              │
+                    ┌────┐    │
+                    │    ▼    ▼
+                    │   ┌────────┐
+                    │   │ADD2    │   ┌───────┐
+                    └───┤CBRANCH │   │       │
+                        │BRANCH  ├─► │       │
+                        └────────┘   └───────┘
+     */
     let mut blk = Blk {
         defs: vec![],
         jmps: vec![],
@@ -373,7 +381,7 @@ fn test_process_pcode_relative_jump_backward_jump() {
     // We expect two finalized blocks
     assert_eq!(result.len(), 2);
 
-    let first_finalized_blk = result.get(0).unwrap();
+    // Check first finalized block
     let expected_def = Term {
         tid: Tid {
             id: "instr_0x0200_0".into(),
@@ -396,8 +404,10 @@ fn test_process_pcode_relative_jump_backward_jump() {
         jmps: vec![expected_jmp],
         indirect_jmp_targets: vec![],
     };
-    assert_eq!(first_finalized_blk.term, first_expected_blk);
+    assert_eq!(result.get(0).unwrap().term, first_expected_blk);
+    assert_eq!(result.get(0).unwrap().tid, Tid::new("blk_tid"));
 
+    // Check second finalized block
     let second_finalized_blk = result.get(1).unwrap();
     let expected_def = Term {
         tid: Tid {
@@ -435,7 +445,13 @@ fn test_process_pcode_relative_jump_backward_jump() {
         indirect_jmp_targets: vec![],
     };
     assert_eq!(second_finalized_blk.term, second_expected_blk);
+    let expected_tid_second_block = Tid {
+        id: "artificial_blk_0x0200_1".into(),
+        address: "0x0200".into(),
+    };
+    assert_eq!(second_finalized_blk.tid, expected_tid_second_block);
 
+    // Check returned block
     assert_eq!(
         blk,
         Blk {
@@ -444,14 +460,6 @@ fn test_process_pcode_relative_jump_backward_jump() {
             indirect_jmp_targets: vec![]
         }
     );
-
-    // Checking TIDs of blocks. Skipping first block, since TID is provided.
-    let expected_tid_second_block = Tid {
-        id: "artificial_blk_0x0200_1".into(),
-        address: "0x0200".into(),
-    };
-    assert_eq!(second_finalized_blk.tid, expected_tid_second_block);
-
     let expected_tid_returned_block = Tid {
         id: "artificial_blk_0x0207".into(),
         address: "0x0207".into(),
@@ -491,7 +499,9 @@ fn test_process_pcode_relative_jump_to_next_instruction() {
         indirect_jmp_targets: vec![],
     };
     assert_eq!(result.get(0).unwrap().term, expected_finalized_blk);
+    assert_eq!(result.get(0).unwrap().tid, Tid::new("blk_tid"));
 
+    // Check returned block
     let expected_returned_tid = Tid {
         id: "artificial_blk_0x1112".into(),
         address: "0x1112".into(),
@@ -527,6 +537,7 @@ fn test_process_pcode_relative_jump_implicitly_to_next_instruction() {
 
     assert_eq!(result.len(), 1);
 
+    // Check first expected block
     let first_expected_jmp = Term {
         tid: Tid {
             id: "instr_0x1111_0".into(),
@@ -556,7 +567,9 @@ fn test_process_pcode_relative_jump_implicitly_to_next_instruction() {
         indirect_jmp_targets: vec![],
     };
     assert_eq!(result.get(0).unwrap().term, expected_finalized_blk);
+    assert_eq!(result.get(0).unwrap().tid, Tid::new("blk_tid"));
 
+    // Check returned block
     let expected_returned_tid = Tid {
         id: "artificial_blk_0x1112".into(),
         address: "0x1112".into(),
@@ -592,6 +605,7 @@ fn test_process_pcode_relative_jump_redirect_branch_to_block() {
 
     assert_eq!(result.len(), 1);
 
+    // Check finalized block
     let expected_jmp = Term {
         tid: Tid {
             id: "instr_0x1111_1".into(),
@@ -614,6 +628,7 @@ fn test_process_pcode_relative_jump_redirect_branch_to_block() {
     assert_eq!(result.get(0).unwrap().term, expected_blk);
     assert_eq!(result.get(0).unwrap().tid, Tid::new("blk_tid"));
 
+    // Check returned block
     let expected_returned_blk = Blk {
         defs: vec![],
         jmps: vec![],
@@ -650,6 +665,7 @@ fn test_process_pcode_relative_jump_redirect_cbranch_to_block() {
 
     assert_eq!(result.len(), 1);
 
+    // Check finalized block
     let first_expected_jmp = Term {
         tid: Tid {
             id: "instr_0x1111_1".into(),
@@ -681,10 +697,10 @@ fn test_process_pcode_relative_jump_redirect_cbranch_to_block() {
         jmps: vec![first_expected_jmp, second_expected_jmp],
         indirect_jmp_targets: vec![],
     };
-
     assert_eq!(result.get(0).unwrap().term, expected_blk);
     assert_eq!(result.get(0).unwrap().tid, Tid::new("blk_tid"));
 
+    // Check returned block
     let expected_returned_blk = Blk {
         defs: vec![],
         jmps: vec![],
@@ -699,7 +715,7 @@ fn test_process_pcode_relative_jump_redirect_cbranch_to_block() {
 }
 
 #[test]
-fn test_process_pcode_relative_jump_block_not_empty() {
+fn test_process_pcode_relative_jump_with_block_not_empty() {
     let mut defs = defs!["RSP:8 = RSP:8 + 8:8", "RBP:8 = RSP:8"];
     let mut blk = Blk {
         defs: defs.clone(),
@@ -721,6 +737,7 @@ fn test_process_pcode_relative_jump_block_not_empty() {
     let result = process_pcode_relative_jump(&mut blk_tid, &mut blk, instr, Some("0x0000".into()));
     assert_eq!(result.len(), 1);
 
+    // Check finalized block
     let expected_jmp = Term {
         tid: Tid {
             id: "instr_0x0000_1".into(),
@@ -747,6 +764,7 @@ fn test_process_pcode_relative_jump_block_not_empty() {
     assert_eq!(result.get(0).unwrap().term, expected_blk);
     assert_eq!(result.get(0).unwrap().tid, Tid::new("blk_tid"));
 
+    // Check returned block
     let expected_added_def = Term {
         tid: Tid {
             id: "instr_0x0000_2".into(),
@@ -850,11 +868,17 @@ fn test_process_pcode_relative_jump_block_not_empty_with_jump_to_first_operation
         indirect_jmp_targets: vec![],
     };
     assert_eq!(result.get(1).unwrap().term, expected_second_finalized_blk);
-    
-    let expected_second_finalized_blk_tid = Tid{ id: "artificial_blk_0x0000_0".into(), address: "0x0000".into() };
-    assert_eq!(result.get(1).unwrap().tid, expected_second_finalized_blk_tid);
 
-    // check returned block
+    let expected_second_finalized_blk_tid = Tid {
+        id: "artificial_blk_0x0000_0".into(),
+        address: "0x0000".into(),
+    };
+    assert_eq!(
+        result.get(1).unwrap().tid,
+        expected_second_finalized_blk_tid
+    );
+
+    // Check returned block
     let expected_added_def = Term {
         tid: Tid {
             id: "instr_0x0000_2".into(),
@@ -862,8 +886,15 @@ fn test_process_pcode_relative_jump_block_not_empty_with_jump_to_first_operation
         },
         term: def!["EAX:4 = EAX:4 + EAX:4"].term,
     };
-    let expected_returned_blk = Blk{ defs: vec![expected_added_def], jmps: vec![], indirect_jmp_targets: vec![] };
+    let expected_returned_blk = Blk {
+        defs: vec![expected_added_def],
+        jmps: vec![],
+        indirect_jmp_targets: vec![],
+    };
     assert_eq!(blk, expected_returned_blk);
-    let expected_returned_tid = Tid{ id: "artificial_blk_0x0000_2".into(), address: "0x0000".into()};
+    let expected_returned_tid = Tid {
+        id: "artificial_blk_0x0000_2".into(),
+        address: "0x0000".into(),
+    };
     assert_eq!(blk_tid, expected_returned_tid)
 }

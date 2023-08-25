@@ -47,7 +47,6 @@ impl ProjectSimple {
                 jump_targets.extend(t.iter());
                 blk.into_ir_blk(&jump_targets);
             }
-            //dbg!(&targets);
         }
 
         Project {
@@ -461,7 +460,7 @@ fn finalize_blk_with_branch_and_setup_new_blk(
 /// Translates instruction with one or more pcode relative jumps into one or more blocks.
 /// Not pcode relative jumps are added as well.
 ///
-/// Artificially added block's tid uses not artificial addresses.
+/// Artificially added block's tid use not artificial addresses.
 fn process_pcode_relative_jump(
     blk_tid: &mut Tid,
     blk: &mut Blk,
@@ -506,7 +505,6 @@ fn process_pcode_relative_jump(
     }
 
     while let Some(op) = pcode_op_iterator.next() {
-        
         // Set next following instruction address:
         // Usually the following pcode operation, but if the last operation is processed, the following instruction is used.
         let fallthrough_addr = match pcode_op_iterator.peek() {
@@ -552,7 +550,6 @@ fn process_pcode_relative_jump(
                 // Special case of jump to the first operation, which is the first def the corresponding block.
                 // Redirect the jump to the block.
                 if let Some(first_blk_tid) = &empty_first_blk_tid {
-                    dbg!(&first_blk_tid);
                     let block_jump_amount = finalized_blk.term.jmps.len();
                     let jump_to_first_blk = match op.pcode_mnemonic {
                         PcodeOperation::ExpressionType(_) => panic!("Jump side is not a JmpType"),
@@ -572,13 +569,11 @@ fn process_pcode_relative_jump(
                         // All other variants should not be in collected jump targets anyway.
                         _ => panic!("Return, BranchInd, CallInd or CallOther are not affected by pcode relative jumps"),
                     };
-                    dbg!(&jump_to_first_blk);
                 }
             }
             finalized_blocks.push(finalized_blk)
         } else {
             // if next op is a jump target, add implicit branch and finalize block.
-            // TODO: not necessary if block empty!
             if let Some(next_op) = pcode_op_iterator.peek() {
                 if relative_target_indices
                     .values()

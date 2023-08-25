@@ -117,7 +117,6 @@ impl PcodeOpSimple {
     }
 
     fn create_branch_indirect(&self, address: &String) -> Term<Jmp> {
-        // Frage offset anders behalden als location?
         let branch_ind = Jmp::BranchInd(self.input0.into_ir_expr().unwrap());
         self.wrap_in_tid(address, branch_ind)
     }
