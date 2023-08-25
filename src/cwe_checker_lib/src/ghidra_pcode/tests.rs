@@ -23,7 +23,6 @@ fn mock_instruction(address: String, pcode_ops: Vec<PcodeOpSimple>) -> Instructi
         potential_targets: None,
     }
 }
-
 #[test]
 fn test_varnode_into_const() {
     if let Expression::Const(c) = mock_varnode("const", "0x0", 8).into_ir_expr().unwrap() {
