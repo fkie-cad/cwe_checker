@@ -450,12 +450,15 @@ impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
         state_before_call: Option<&State>,
         call_term: &Term<Jmp>,
         _return_term: &Term<Jmp>,
-        _calling_convention: &Option<String>,
+        calling_convention_opt: &Option<String>,
     ) -> Option<State> {
         if state.is_none() || state_before_call.is_none() {
             return None;
         }
-        let calling_convention = match self.project.get_standard_calling_convention() {
+        let calling_convention = match self
+            .project
+            .get_specific_calling_convention(calling_convention_opt)
+        {
             Some(cconv) => cconv,
             None => return None,
         };

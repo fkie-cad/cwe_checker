@@ -47,16 +47,20 @@ impl Project {
     }
 
     /// Try to find a specific calling convention in the list of calling conventions in the project.
-    /// If not given a calling convention (i.e. given `None`) then falls back to `get_standard_calling_convention`
+    /// If not given a calling convention (i.e. given `None`) or the given calling convention name was not found
+    /// then falls back to `get_standard_calling_convention`.
     pub fn get_specific_calling_convention(
         &self,
         cconv_name_opt: &Option<String>,
     ) -> Option<&CallingConvention> {
-        if let Some(cconv_name) = cconv_name_opt {
-            self.calling_conventions.get(cconv_name)
-        } else {
-            self.get_standard_calling_convention()
-        }
+        // FIXME: On x86 Windows binaries we can get a strange edge case:
+        // For some reason we get cases where Ghidra annotates a function with `__cdecl` as calling convention,
+        // but the general calling convention list only contains `__fastcall` and `__thiscall`.
+        // We should investigate this, so that we do not have to fall back to the standard calling convention.
+        cconv_name_opt
+            .as_ref()
+            .and_then(|cconv_name| self.calling_conventions.get(cconv_name))
+            .or_else(|| self.get_standard_calling_convention())
     }
 
     /// Return the calling convention associated to the given extern symbol.
