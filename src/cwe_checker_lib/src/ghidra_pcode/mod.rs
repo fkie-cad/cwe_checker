@@ -161,6 +161,7 @@ pub struct InstructionSimple {
     pub address: String,
     pub pcode_ops: Vec<PcodeOpSimple>,
     pub potential_targets: Option<Vec<String>>,
+    pub fall_through: Option<String>,
 }
 
 impl InstructionSimple {
