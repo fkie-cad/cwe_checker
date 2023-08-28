@@ -261,7 +261,7 @@ fn collect_tids_for_cwe_warning(
             &caller_tid,
             state.stack_id.get_tid(),
         );
-        tids.extend(call_sequence_tids.into_iter());
+        tids.extend(call_sequence_tids);
     }
     // Build a string out of the TID list
     tids.iter()
