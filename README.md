@@ -3,8 +3,8 @@
 </p>
 
 # cwe_checker #
-![Acceptance tests](https://github.com/fkie-cad/cwe_checker/actions/workflows/acceptance-tests.yml/badge.svg)
-![Unit tests](https://github.com/fkie-cad/cwe_checker/actions/workflows/unit-tests.yml/badge.svg)
+![Acceptance tests](https://github.com/fkie-cad/cwe_checker/actions/workflows/acceptance-tests.yml/badge.svg?branch=master)
+![Unit tests](https://github.com/fkie-cad/cwe_checker/actions/workflows/unit-tests.yml/badge.svg?branch=master)
 ![Docker-Pulls](https://img.shields.io/docker/pulls/fkiecad/cwe_checker.svg)
 [![Documentation](https://img.shields.io/badge/doc-stable-green.svg)](https://fkie-cad.github.io/cwe_checker/index.html)
 
