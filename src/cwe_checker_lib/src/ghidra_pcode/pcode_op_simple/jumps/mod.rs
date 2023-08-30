@@ -150,3 +150,6 @@ impl PcodeOpSimple {
         self.wrap_in_tid(address, _return)
     }
 }
+
+#[cfg(test)]
+mod tests;

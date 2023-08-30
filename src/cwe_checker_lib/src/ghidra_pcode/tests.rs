@@ -21,6 +21,7 @@ fn mock_instruction(address: String, pcode_ops: Vec<PcodeOpSimple>) -> Instructi
         address: address,
         pcode_ops: pcode_ops,
         potential_targets: None,
+        fall_through: None,
     }
 }
 
@@ -99,6 +100,7 @@ fn test_instruction_get_u64_address() {
         address: "0x00123ABFF".into(),
         pcode_ops: vec![],
         potential_targets: None,
+        fall_through: None,
     };
     assert_eq!(instr.get_u64_address(), 0x123ABFF);
     instr.address = "0x123ABFF".into();
