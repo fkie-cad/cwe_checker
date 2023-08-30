@@ -318,8 +318,6 @@ impl BlockSimple {
                     }
                 }
             }
-
-            // TODO: jump targets die nicht existieren (s. IR.normalize()), leere Blöcke übernehmen.
         }
 
         // Special case: Block ends without jump.
