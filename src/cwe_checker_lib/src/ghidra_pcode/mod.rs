@@ -159,6 +159,7 @@ impl VarnodeSimple {
 pub struct InstructionSimple {
     pub mnemonic: String,
     pub address: String,
+    pub size: u64,
     pub pcode_ops: Vec<PcodeOpSimple>,
     pub potential_targets: Option<Vec<String>>,
     pub fall_through: Option<String>,
@@ -175,6 +176,15 @@ impl InstructionSimple {
     /// Returns the instruction field as `u64`.
     pub fn get_u64_address(&self) -> u64 {
         u64::from_str_radix(self.address.trim_start_matches("0x"), 16).unwrap()
+    }
+
+    pub fn get_u64_falltrough_address(&self) -> Option<u64> {
+        match &self.fall_through {
+            Some(fallthrough) => {
+                Some(u64::from_str_radix(&fallthrough.trim_start_matches("0x"), 16).unwrap())
+            }
+            None => None,
+        }
     }
 
     /// Determines if a pcode relative jump exceeds the amount of the instructions's pcode operations.
@@ -217,7 +227,10 @@ impl BlockSimple {
                     }
                     Some(JmpTarget::Relative(_)) => {
                         if instr.contains_relative_jump_to_next_instruction() {
-                            jump_targets.insert(instructions.peek().expect("Relative jump to next instruction, but block as no next instruction.").get_u64_address());
+                            match instr.get_u64_falltrough_address() {
+                                Some(next_instr_addr) => jump_targets.insert(next_instr_addr),
+                                None => jump_targets.insert(instr.get_u64_address() + instr.size),
+                            };
                         }
                     }
 

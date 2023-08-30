@@ -15,6 +15,7 @@ import java.util.ArrayList;
 public class InstructionSimple {
     private String mnemonic;
     private String address;
+    private int size;
     private ArrayList<PcodeOpSimple> pcode_ops = new ArrayList();
     private ArrayList<String> potential_targets;
     private String fall_through = null;
@@ -23,6 +24,7 @@ public class InstructionSimple {
     public InstructionSimple(Instruction instruction, VarnodeContext context) {
         this.mnemonic = instruction.toString();
         this.address = "0x" + instruction.getAddressString(false, false);
+        this.size = instruction.getLength();
         
         if (instruction.getFallThrough() != null){
             this.fall_through = instruction.getFallThrough().toString(false, false);

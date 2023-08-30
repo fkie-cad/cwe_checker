@@ -19,6 +19,7 @@ fn mock_instruction(address: String, pcode_ops: Vec<PcodeOpSimple>) -> Instructi
     InstructionSimple {
         mnemonic: "mock".into(),
         address: address,
+        size: 1,
         pcode_ops: pcode_ops,
         potential_targets: None,
         fall_through: None,
@@ -98,6 +99,7 @@ fn test_instruction_get_u64_address() {
     let mut instr = InstructionSimple {
         mnemonic: "nop".into(),
         address: "0x00123ABFF".into(),
+        size: 2,
         pcode_ops: vec![],
         potential_targets: None,
         fall_through: None,
