@@ -228,8 +228,14 @@ impl BlockSimple {
                     Some(JmpTarget::Relative(_)) => {
                         if instr.contains_relative_jump_to_next_instruction() {
                             match instr.get_u64_falltrough_address() {
-                                Some(next_instr_addr) => jump_targets.insert(next_instr_addr),
-                                None => jump_targets.insert(instr.get_u64_address() + instr.size),
+                                Some(fallthrough_instr_addr) => jump_targets.insert(fallthrough_instr_addr),
+                                // If no fallthrough information available, first try following instruction in block
+                                // else compute next instruction
+                                None => {if let Some(consecutive_instr) = instructions.peek(){
+                                    jump_targets.insert(consecutive_instr.get_u64_address())
+                                } else {
+                                    jump_targets.insert(instr.get_u64_address() + instr.size)
+                                }},
                             };
                         }
                     }
