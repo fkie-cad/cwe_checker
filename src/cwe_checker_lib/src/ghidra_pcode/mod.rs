@@ -340,6 +340,10 @@ impl BlockSimple {
 /// `tid` is changed if the pcode operation is a jump.
 /// If the operation is a jump, the block is wrapped into the tid and returned.
 /// This function returns `None`, if the operation is not a jump.
+/// 
+/// # Note
+/// In the case of `JmpType::BRANCHIND`, the block's potential targets are set accordingly.
+/// This might introduce Tids to blocks, that are not existing.
 fn add_operation_to_blk(
     op: &PcodeOpSimple,
     instr: &InstructionSimple,
@@ -385,7 +389,7 @@ fn add_operation_to_blk(
                         &mut potential_targets
                             .iter()
                             .map(|x| Tid {
-                                id: format!("potential_target_{}", x),
+                                id: format!("blk_{}", x),
                                 address: x.to_string(),
                             })
                             .collect(),
