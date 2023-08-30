@@ -81,9 +81,9 @@ fn test_is_pcode_relative_jump() {
     let op = mock_pcode_op_branch(0, var);
     assert_eq!(op.is_pcode_relative_jump(), false);
 
-    let var = mock_varnode("const".into(), "0x1".into(), 4);
+    let var = mock_varnode("const".into(), "0xFFFFFFFF".into(), 4);
     let op = mock_pcode_op_add(var, None, None);
-    assert_eq!(op.is_pcode_relative_jump(), false)
+    assert_eq!(op.is_pcode_relative_jump(), true)
 }
 
 #[test]
