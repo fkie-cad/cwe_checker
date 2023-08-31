@@ -270,11 +270,19 @@ impl BlockSimple {
                                 }
                             };
                         } else {
-                            let tid = Tid {
-                                id: format!("blk_{}_{}", instr.address, target_index),
-                                address: instr.address.clone(),
-                            };
-                            jump_targets.insert(tid);
+                            if target_index != 0 {
+                                let tid = Tid {
+                                    id: format!("blk_{}_{}", instr.address, target_index),
+                                    address: instr.address.clone(),
+                                };
+                                jump_targets.insert(tid);
+                            } else {
+                                let tid = Tid {
+                                    id: format!("blk_{}", instr.address),
+                                    address: instr.address.clone(),
+                                };
+                                jump_targets.insert(tid);
+                            }
                         }
                     }
 
