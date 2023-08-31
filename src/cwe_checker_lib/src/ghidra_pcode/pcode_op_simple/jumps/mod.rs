@@ -22,6 +22,7 @@ impl PcodeOpSimple {
     /// Returns the jump target, if the `PcodeOperation` is a `JmpType` variant.
     ///
     /// The target is either a pcode operation relative target, or an absolute machine instruction target.
+    /// Relative jumps to indices below 0, are interpreted as jumps to the index 0.
     pub fn get_jump_target(&self) -> Option<JmpTarget> {
         use crate::pcode::JmpType::*;
         if let PcodeOperation::JmpType(jmp_type) = &self.pcode_mnemonic {

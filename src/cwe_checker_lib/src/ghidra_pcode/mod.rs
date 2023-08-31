@@ -40,12 +40,11 @@ pub struct ProjectSimple {
 
 impl ProjectSimple {
     pub fn into_ir_project(self) -> Project {
-        let mut jump_targets: HashSet<u64> = HashSet::new();
+        let mut jump_targets: HashSet<Tid> = HashSet::new();
         for func in self.functions {
             for blk in func.blocks {
-                let t = &blk.collect_jmp_targets();
-                jump_targets.extend(t.iter());
-                blk.into_ir_blk(&jump_targets);
+                let t = blk.collect_jmp_targets();
+                jump_targets.extend(t.into_iter());
             }
         }
 
@@ -214,29 +213,68 @@ pub struct BlockSimple {
 
 impl BlockSimple {
     /// Collects all jumps targets of instructions within the block.
-    fn collect_jmp_targets(&self) -> HashSet<u64> {
+    ///
+    /// A block `Tid`is created for every target using the id scheme `blk_<addr>_<index>`, with
+    /// `<index>` denoting the pcode operation index for intra instruction jumps. `<addr>` denotes the address
+    /// of the target block, that might be created additionally to Ghidras basic blocks.
+    /// If a pcode relative jump implies a jump to the next instruction, the instruction's address is derived in the following order:
+    /// 1. use instructions's falltrough address
+    /// 2. use the block's consecutive instruction
+    /// 3. compute the address
+    fn collect_jmp_targets(&self) -> HashSet<Tid> {
         // Collecting jump targets for splitting up blocks
         let mut jump_targets = HashSet::new();
         let mut instructions = self.instructions.iter().peekable();
         while let Some(instr) = instructions.next() {
-            // create a set of all jump targets
             for op in &instr.pcode_ops {
                 match op.get_jump_target() {
                     Some(JmpTarget::Absolute(target_addr)) => {
-                        jump_targets.insert(target_addr);
+                        let tid = Tid {
+                            id: format!("blk_{}", op.input0.id.clone()),
+                            address: op.input0.id.clone(),
+                        };
+                        jump_targets.insert(tid);
                     }
-                    Some(JmpTarget::Relative(_)) => {
+                    Some(JmpTarget::Relative((_, target_index))) => {
                         if instr.contains_relative_jump_to_next_instruction() {
-                            match instr.get_u64_falltrough_address() {
-                                Some(fallthrough_instr_addr) => jump_targets.insert(fallthrough_instr_addr),
+                            match &instr.fall_through {
+                                Some(fallthrough_instr_addr) => {
+                                    let tid = Tid {
+                                        id: format!("blk_{}", fallthrough_instr_addr),
+                                        address: fallthrough_instr_addr.clone(),
+                                    };
+                                    jump_targets.insert(tid);
+                                }
                                 // If no fallthrough information available, first try following instruction in block
                                 // else compute next instruction
-                                None => {if let Some(consecutive_instr) = instructions.peek(){
-                                    jump_targets.insert(consecutive_instr.get_u64_address())
-                                } else {
-                                    jump_targets.insert(instr.get_u64_address() + instr.size)
-                                }},
+                                None => {
+                                    if let Some(consecutive_instr) = instructions.peek() {
+                                        let tid = Tid {
+                                            id: format!("blk_{}", consecutive_instr.address),
+                                            address: consecutive_instr.address.clone(),
+                                        };
+                                        jump_targets.insert(tid);
+                                    } else {
+                                        let tid = Tid {
+                                            id: format!(
+                                                "blk_{:x}",
+                                                instr.get_u64_address() + instr.size
+                                            ),
+                                            address: format!(
+                                                "{:x}",
+                                                instr.get_u64_address() + instr.size
+                                            ),
+                                        };
+                                        jump_targets.insert(tid);
+                                    }
+                                }
                             };
+                        } else {
+                            let tid = Tid {
+                                id: format!("blk_{}_{}", instr.address, target_index),
+                                address: instr.address.clone(),
+                            };
+                            jump_targets.insert(tid);
                         }
                     }
 
@@ -254,7 +292,7 @@ impl BlockSimple {
     /// * it contains pcode relative jumps
     ///
     /// In each case, a new, artificial block is added and the corresponding jump is generated.
-    fn into_ir_blk(self, jump_targets: &HashSet<u64>) -> Vec<Term<Blk>> {
+    fn into_ir_blk(self, jump_targets: &HashSet<Tid>) -> Vec<Term<Blk>> {
         let mut blocks: Vec<Term<Blk>> = vec![];
         // Create first block and its tid
         let mut blk = Blk {
@@ -340,7 +378,7 @@ impl BlockSimple {
 /// `tid` is changed if the pcode operation is a jump.
 /// If the operation is a jump, the block is wrapped into the tid and returned.
 /// This function returns `None`, if the operation is not a jump.
-/// 
+///
 /// # Note
 /// In the case of `JmpType::BRANCHIND`, the block's potential targets are set accordingly.
 /// This might introduce Tids to blocks, that are not existing.
