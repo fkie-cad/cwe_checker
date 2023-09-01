@@ -142,11 +142,7 @@ fn inter_block_propagation() {
                 variable!("X:8"),
                 expr!("-(42:4)").un_op(UnOpType::BoolNegate),
             ),
-            Def::assign(
-                "entry_jmp_def_2",
-                variable!("Z:8"),
-                expr!("-(42:4)").un_op(UnOpType::IntNegate),
-            )
+            Def::assign("entry_jmp_def_2", variable!("Z:8"), expr!("42:4"),)
         ]
     )
 }
@@ -290,11 +286,7 @@ fn expressions_inserted() {
                 variable!("X:8"),
                 expr!("-(42:4)").un_op(UnOpType::BoolNegate),
             ),
-            Def::assign(
-                "entry_jmp_def_2",
-                variable!("Z:8"),
-                expr!("-(42:4)").un_op(UnOpType::IntNegate)
-            )
+            Def::assign("entry_jmp_def_2", variable!("Z:8"), expr!("42:4"))
         ]
     );
     assert_eq!(
