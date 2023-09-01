@@ -165,7 +165,7 @@ public class ParseCspecContent {
         String languageId = program.getLanguageID().toString();
 
         if (processorDef.startsWith("AARCH64") && languageId.endsWith("AppleSilicon")) {
-            processorDef = "AppleSilicon.ldef";
+            processorDef = "AppleSilicon.ldefs";
         }
         if(processorDef.startsWith("MIPS") || processorDef.startsWith("AVR")) {
             processorDef = processorDef.toLowerCase();
