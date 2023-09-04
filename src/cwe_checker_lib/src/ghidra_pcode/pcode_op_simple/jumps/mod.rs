@@ -51,48 +51,40 @@ impl PcodeOpSimple {
         None
     }
 
-    pub fn into_ir_jump(&self, address: &String) -> Term<Jmp> {
-        if let PcodeOperation::JmpType(a) = self.pcode_mnemonic {
-            match a {
-                JmpType::BRANCH => self.create_branch(address),
-                JmpType::CBRANCH => self.create_cbranch(address),
-                JmpType::BRANCHIND => self.create_branch_indirect(address),
-                JmpType::CALL => self.create_call(address),
-                JmpType::CALLIND => self.create_call_indirect(address),
-                JmpType::CALLOTHER => self.create_call_other(address),
-                JmpType::RETURN => self.create_return(address),
+    pub fn into_ir_jump(&self, address: &String, target: Tid) -> Term<Jmp> {
+        if let PcodeOperation::JmpType(jmp) = self.pcode_mnemonic {
+            match jmp {
+                JmpType::BRANCH => self.create_branch(address, target),
+                JmpType::CBRANCH => self.create_cbranch(address, target),
+                JmpType::BRANCHIND => todo!(),
+                JmpType::CALL => todo!(),
+                JmpType::CALLIND => todo!(),
+                JmpType::CALLOTHER => todo!(),
+                JmpType::RETURN => todo!(),
             }
         } else {
             panic!("Not a jump operation")
         }
     }
 
-    /// Determines the target ad returns corresponding `Tid`.
+    /// Determines the target and returns corresponding `Tid`.
     ///
-    /// Pcode relative targets are prefixed with `artificial`, e.g. artificial_blk_0x100_4.
-    /// Absolute targets (RAM located) are not prefixed, e.g. blk_0x0200
+    /// `Tid`s follow the `blk_<addr>_<pcode_index> scheme`.
+    /// Relative jumps to index `0` return the Tid `blk_<addr>`, without the `<pcode_index>` suffix.
     fn extract_target(&self, address: &String) -> Tid {
         let (id, address) = match self.get_jump_target() {
             Some(JmpTarget::Absolute(_)) => {
                 (format!("blk_{}", self.input0.id), self.input0.id.clone())
             }
-            Some(JmpTarget::Relative((_, target_index))) => (
-                format!("artificial_blk_{}_{}", address, target_index),
-                address.clone(),
-            ),
+            Some(JmpTarget::Relative((_, target_index))) if target_index != 0 => {
+                (format!("blk_{}", address), address.clone())
+            }
+            Some(JmpTarget::Relative((_, target_index))) => {
+                (format!("blk_{}_{}", address, target_index), address.clone())
+            }
             None => panic!("Not a jump operation"),
         };
         Tid { id, address }
-    }
-
-    fn wrap_in_tid(&self, address: &String, jmp: Jmp) -> Term<Jmp> {
-        Term {
-            tid: Tid {
-                id: format!("instr_{}_{}", address, self.pcode_index),
-                address: address.to_string(),
-            },
-            term: jmp,
-        }
     }
 
     /// Determines, if the jump target is relative to the pcode index of the jump instruction.
@@ -105,21 +97,21 @@ impl PcodeOpSimple {
         }
     }
 
-    fn create_branch(&self, address: &String) -> Term<Jmp> {
-        self.wrap_in_tid(address, Jmp::Branch(self.extract_target(address)))
+    fn create_branch(&self, address: &String, target: Tid) -> Term<Jmp> {
+        wrap_in_tid(address, self.pcode_index, Jmp::Branch(target))
     }
 
-    fn create_cbranch(&self, address: &String) -> Term<Jmp> {
+    fn create_cbranch(&self, address: &String, target: Tid) -> Term<Jmp> {
         let cbranch = Jmp::CBranch {
-            target: self.extract_target(address),
+            target: target,
             condition: self.input1.as_ref().unwrap().into_ir_expr().unwrap(),
         };
-        self.wrap_in_tid(address, cbranch)
+        wrap_in_tid(address, self.pcode_index, cbranch)
     }
 
     fn create_branch_indirect(&self, address: &String) -> Term<Jmp> {
         let branch_ind = Jmp::BranchInd(self.input0.into_ir_expr().unwrap());
-        self.wrap_in_tid(address, branch_ind)
+        wrap_in_tid(address, self.pcode_index, branch_ind)
     }
 
     fn create_call(&self, address: &String) -> Term<Jmp> {
@@ -127,7 +119,7 @@ impl PcodeOpSimple {
             target: self.extract_target(address),
             return_: Some(todo!()),
         };
-        self.wrap_in_tid(address, branch_ind)
+        wrap_in_tid(address, self.pcode_index, branch_ind)
     }
 
     fn create_call_indirect(&self, address: &String) -> Term<Jmp> {
@@ -135,7 +127,7 @@ impl PcodeOpSimple {
             target: todo!(),
             return_: todo!(),
         };
-        self.wrap_in_tid(address, branch_ind)
+        wrap_in_tid(address, self.pcode_index, branch_ind)
     }
 
     fn create_call_other(&self, address: &String) -> Term<Jmp> {
@@ -143,12 +135,23 @@ impl PcodeOpSimple {
             description: todo!(),
             return_: todo!(),
         };
-        self.wrap_in_tid(address, call_other)
+        wrap_in_tid(address, self.pcode_index, call_other)
     }
 
     fn create_return(&self, address: &String) -> Term<Jmp> {
         let _return = Jmp::Return(todo!());
-        self.wrap_in_tid(address, _return)
+        wrap_in_tid(address, self.pcode_index, _return)
+    }
+}
+
+/// Helper function to wrap a `Jmp` in a `Tid` with id `instr_<addr>_<pcode_index>`
+fn wrap_in_tid(address: &String, pcode_index: u64, jmp: Jmp) -> Term<Jmp> {
+    Term {
+        tid: Tid {
+            id: format!("instr_{}_{}", address, pcode_index),
+            address: address.to_string(),
+        },
+        term: jmp,
     }
 }
 

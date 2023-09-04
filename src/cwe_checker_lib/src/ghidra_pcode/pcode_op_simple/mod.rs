@@ -16,6 +16,63 @@ pub struct PcodeOpSimple {
 }
 
 impl PcodeOpSimple {
+    /// Returns block `Tid` of jump target.
+    /// In case of a conditional branch the fallthrough block `Tid` is provided as well,
+    /// describing an implicit branch if the conditional jump is not taken.
+    /// The provided `fallthrough` is used, if:
+    /// * a pcode relative jump exceeds the pcode operation sequence
+    /// * No following pcode operation left, if a conditional branch is not taken
+    pub fn collect_jmp_targets(
+        &self,
+        instruction_address: String,
+        pcode_sequence_length: u64,
+        fall_through_address: String,
+    ) -> Vec<Tid> {
+        let mut jump_targets = vec![];
+
+        if let Some(JmpTarget::Absolute(_)) = self.get_jump_target() {
+            jump_targets.push(Tid {
+                id: format!("blk_{}", self.input0.id.clone()),
+                address: self.input0.id.clone(),
+            });
+        }
+
+        if let Some(JmpTarget::Relative((_, target_index))) = self.get_jump_target() {
+            let target = match target_index {
+                0 => Tid {
+                    id: format!("blk_{}", instruction_address),
+                    address: instruction_address.clone(),
+                },
+                // jump behind pcode sequence
+                target_index if target_index >= pcode_sequence_length => Tid {
+                    id: format!("blk_{}", fall_through_address),
+                    address: instruction_address.clone(),
+                },
+                _ => Tid {
+                    id: format!("blk_{}_{}", instruction_address, target_index),
+                    address: instruction_address.clone(),
+                },
+            };
+            jump_targets.push(target)
+        }
+
+        // Add implicit branch target, if conditional branch is not taken
+        if matches!(self.pcode_mnemonic, PcodeOperation::JmpType(CBRANCH)) {
+            if self.pcode_index + 1 < pcode_sequence_length {
+                jump_targets.push(Tid {
+                    id: format!("blk_{}_{}", instruction_address, self.pcode_index + 1),
+                    address: instruction_address.clone(),
+                })
+            } else {
+                jump_targets.push(Tid {
+                    id: format!("blk_{}", fall_through_address),
+                    address: instruction_address.clone(),
+                })
+            }
+        }
+        return jump_targets;
+    }
+
     /// Returns `true` if at least one input is ram located.
     pub fn has_implicit_load(&self) -> bool {
         if self.input0.address_space == "ram" {

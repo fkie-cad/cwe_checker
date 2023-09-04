@@ -7,7 +7,6 @@ use crate::intermediate_representation::*;
 use crate::pcode::ExpressionType;
 use crate::pcode::JmpType::*;
 use anyhow::{anyhow, Result};
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 mod pcode_operations;
@@ -41,10 +40,16 @@ pub struct ProjectSimple {
 impl ProjectSimple {
     pub fn into_ir_project(self) -> Project {
         let mut jump_targets: HashSet<Tid> = HashSet::new();
+        for func in &self.functions {
+            for blk in &func.blocks {
+                let targets = blk.collect_jmp_targets();
+                jump_targets.extend(targets.into_iter());
+            }
+        }
+
         for func in self.functions {
             for blk in func.blocks {
-                let t = blk.collect_jmp_targets();
-                jump_targets.extend(t.into_iter());
+                blk.into_ir_blk(&jump_targets);
             }
         }
 
@@ -203,6 +208,52 @@ impl InstructionSimple {
 
         false
     }
+
+    /// Returns the fallthrough address of the instruction using the following order:
+    /// 1) `instructions.fall_through` if `Some`
+    /// 2) provided consecutive instruction's address
+    /// 3) compute instructuins address + instruction size
+    pub fn get_best_guess_fallthrough_addr(
+        &self,
+        consecutive_instr: Option<&InstructionSimple>,
+    ) -> String {
+        match &self.fall_through {
+            Some(fallthrough_instr_addr) => fallthrough_instr_addr.clone(),
+            // If no fallthrough information available, first try following instruction in block
+            // else compute next instruction
+            None => {
+                if let Some(next_instr) = consecutive_instr {
+                    next_instr.address.clone()
+                } else {
+                    format!("{:x}", self.get_u64_address() + self.size)
+                }
+            }
+        }
+    }
+
+    /// Collects all jump targets of an instruction and returns their `Tid`.
+    /// The id follows the naming convention `blk_<address>`. If the target is within
+    /// a pcode sequence adn the index is larger 0, `_<pcode_index>` is suffixed.
+    pub fn collect_jmp_targets(
+        &self,
+        consecutive_instr: Option<&InstructionSimple>,
+    ) -> HashSet<Tid> {
+        let mut jump_targets = HashSet::new();
+        for op in &self.pcode_ops {
+            if matches!(op.pcode_mnemonic, PcodeOperation::JmpType(_)) {
+                let best_guess_fallthrough_address =
+                    self.get_best_guess_fallthrough_addr(consecutive_instr);
+
+                let targets = op.collect_jmp_targets(
+                    self.address.clone(),
+                    self.pcode_ops.len() as u64,
+                    best_guess_fallthrough_address,
+                );
+                jump_targets.extend(targets)
+            }
+        }
+        jump_targets
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
@@ -225,70 +276,9 @@ impl BlockSimple {
         // Collecting jump targets for splitting up blocks
         let mut jump_targets = HashSet::new();
         let mut instructions = self.instructions.iter().peekable();
-        while let Some(instr) = instructions.next() {
-            for op in &instr.pcode_ops {
-                match op.get_jump_target() {
-                    Some(JmpTarget::Absolute(target_addr)) => {
-                        let tid = Tid {
-                            id: format!("blk_{}", op.input0.id.clone()),
-                            address: op.input0.id.clone(),
-                        };
-                        jump_targets.insert(tid);
-                    }
-                    Some(JmpTarget::Relative((_, target_index))) => {
-                        if instr.contains_relative_jump_to_next_instruction() {
-                            match &instr.fall_through {
-                                Some(fallthrough_instr_addr) => {
-                                    let tid = Tid {
-                                        id: format!("blk_{}", fallthrough_instr_addr),
-                                        address: fallthrough_instr_addr.clone(),
-                                    };
-                                    jump_targets.insert(tid);
-                                }
-                                // If no fallthrough information available, first try following instruction in block
-                                // else compute next instruction
-                                None => {
-                                    if let Some(consecutive_instr) = instructions.peek() {
-                                        let tid = Tid {
-                                            id: format!("blk_{}", consecutive_instr.address),
-                                            address: consecutive_instr.address.clone(),
-                                        };
-                                        jump_targets.insert(tid);
-                                    } else {
-                                        let tid = Tid {
-                                            id: format!(
-                                                "blk_{:x}",
-                                                instr.get_u64_address() + instr.size
-                                            ),
-                                            address: format!(
-                                                "{:x}",
-                                                instr.get_u64_address() + instr.size
-                                            ),
-                                        };
-                                        jump_targets.insert(tid);
-                                    }
-                                }
-                            };
-                        } else {
-                            if target_index != 0 {
-                                let tid = Tid {
-                                    id: format!("blk_{}_{}", instr.address, target_index),
-                                    address: instr.address.clone(),
-                                };
-                                jump_targets.insert(tid);
-                            } else {
-                                let tid = Tid {
-                                    id: format!("blk_{}", instr.address),
-                                    address: instr.address.clone(),
-                                };
-                                jump_targets.insert(tid);
-                            }
-                        }
-                    }
 
-                    _ => (),
-                };
-            }
+        while let Some(instr) = instructions.next() {
+            jump_targets.extend(instr.collect_jmp_targets(instructions.peek().copied()))
         }
         jump_targets
     }
@@ -324,43 +314,66 @@ impl BlockSimple {
         while let Some(instr) = instruction_iterator.next() {
             let mut pcode_op_iterator = instr.pcode_ops.iter().peekable();
 
-            // if the instruction contains pcode relative jumps, process it separately.
-            if instr.pcode_ops.iter().any(|x| x.is_pcode_relative_jump()) {
-                blocks.append(&mut process_pcode_relative_jump(
-                    &mut tid,
-                    &mut blk,
-                    instr.clone(),
-                    instruction_iterator.peek().map(|x| x.address.clone()),
-                ));
-                continue;
-            }
-
             while let Some(op) = pcode_op_iterator.next() {
-                add_operation_to_blk(
-                    op,
-                    instr,
-                    &mut blk,
-                    &mut tid,
-                    instruction_iterator.peek().map(|x| x.address.clone()),
-                );
-                // If **next** instruction is a target, add branch and set up next block.
-                if let Some(next_instr) = instruction_iterator.peek() {
-                    if jump_targets.contains(&next_instr.get_u64_address()) && !blk.defs.is_empty()
-                    {
-                        let (finalized_blk, new_blk, new_tid) =
-                            finalize_blk_with_branch_and_setup_new_blk(
-                                &mut tid,
-                                &mut blk,
-                                instr.address.clone(),
-                                next_instr.address.clone(),
-                            );
+                let fallthrough_address =
+                    instr.get_best_guess_fallthrough_addr(instruction_iterator.peek().copied());
+                if let Some(finalized_blk) =
+                    add_operation_to_blk(op, instr, &mut blk, &mut tid, fallthrough_address)
+                {
+                    blocks.push(finalized_blk);
+                }
 
-                        // add finalized block to block list.
+                // If next **operation** is a target, finalize current block and set up new block.
+                if let Some(consecutive_operation) = pcode_op_iterator.peek() {
+                    let target_tid = Tid {
+                        id: format!(
+                            "blk_{}_{}",
+                            instr.address, consecutive_operation.pcode_index
+                        ),
+                        address: instr.address.clone(),
+                    };
+                    if jump_targets.contains(&target_tid) {
+                        let finalized_blk = finalize_blk_with_branch(
+                            tid,
+                            blk,
+                            instr.address.clone(),
+                            op.pcode_index,
+                            target_tid.clone(),
+                        );
                         blocks.push(finalized_blk);
 
-                        // set new block and tid
-                        tid = new_tid;
-                        blk = new_blk;
+                        // setup new tid and block
+                        tid = target_tid;
+                        blk = Blk {
+                            defs: vec![],
+                            jmps: vec![],
+                            indirect_jmp_targets: vec![],
+                        }
+                    }
+                }
+                // If no operations are left and the next **instruction** is a target
+                else if let Some(consecutive_instr) = instruction_iterator.peek() {
+                    let target_tid = Tid {
+                        id: format!("blk_{}", consecutive_instr.address),
+                        address: instr.address.clone(),
+                    };
+                    if jump_targets.contains(&target_tid) {
+                        let finalized_blk = finalize_blk_with_branch(
+                            tid,
+                            blk,
+                            instr.address.clone(),
+                            op.pcode_index,
+                            target_tid.clone(),
+                        );
+                        blocks.push(finalized_blk);
+
+                        // setup new tid and block
+                        tid = target_tid;
+                        blk = Blk {
+                            defs: vec![],
+                            jmps: vec![],
+                            indirect_jmp_targets: vec![],
+                        }
                     }
                 }
             }
@@ -368,8 +381,8 @@ impl BlockSimple {
 
         // Special case: Block ends without jump.
         // If all instructions are processed and current block is not new, add to blocks.
-        // TODO: Add branch here?
         if !blk.defs.is_empty() && !blk.jmps.is_empty() {
+            // TODO: Add branch here?
             blocks.push(Term {
                 tid: tid,
                 term: blk,
@@ -383,8 +396,7 @@ impl BlockSimple {
 /// Translates a pcode operation and adds it to the basic block.
 ///
 /// `blk` is changed by adding the corresponding operation.
-/// `tid` is changed if the pcode operation is a jump.
-/// If the operation is a jump, the block is wrapped into the tid and returned.
+/// If the operation is a jump, the block is wrapped into `Term` together with the tid and returned.
 /// This function returns `None`, if the operation is not a jump.
 ///
 /// # Note
@@ -393,9 +405,9 @@ impl BlockSimple {
 fn add_operation_to_blk(
     op: &PcodeOpSimple,
     instr: &InstructionSimple,
-    mut blk: &mut Blk,
-    mut tid: &mut Tid,
-    next_instruction_address: Option<String>,
+    blk: &mut Blk,
+    tid: &Tid,
+    fallthrough_address: String,
 ) -> Option<Term<Blk>> {
     match op.pcode_mnemonic {
         // Add Def to current block.
@@ -403,267 +415,198 @@ fn add_operation_to_blk(
             blk.defs.append(&mut op.clone().into_ir_def(&instr.address));
             return None;
         }
+        // Add conditional branch and then implicit branch
         PcodeOperation::JmpType(crate::pcode::JmpType::CBRANCH) => {
-            // Add conditional (not pcode relative) branch to block
-            blk.jmps.push(op.into_ir_jump(&instr.address));
-            // Add implicit branch to following instruction
-            if let Some(next_instr_address) = next_instruction_address {
-                let (finalized_blk, new_blk, new_tid) = finalize_blk_with_branch_and_setup_new_blk(
-                    &mut tid,
-                    &mut blk,
-                    format!("{}_{}", instr.address.clone(), op.pcode_index),
-                    next_instr_address,
-                );
-                // set new block and tid.
-                *blk = new_blk;
-                *tid = new_tid;
-
-                return Some(finalized_blk);
-            } else {
-                // MIPS: Delay slots for C-Jumps. Ghidra verlegt Delay ggf vor, sodas fallthrough ggf. falsch? (alter code lookup)
-                panic!("Jump target address to consecutive instruction is not provided.")
-            }
-        }
-        PcodeOperation::JmpType(jmp) => {
-            // Add potential targets
-            if matches!(
-                jmp,
-                crate::pcode::JmpType::CALLIND | crate::pcode::JmpType::BRANCHIND
-            ) {
-                if let Some(potential_targets) = &instr.potential_targets {
-                    blk.indirect_jmp_targets.append(
-                        &mut potential_targets
-                            .iter()
-                            .map(|x| Tid {
-                                id: format!("blk_{}", x),
-                                address: x.to_string(),
-                            })
-                            .collect(),
-                    );
-                }
-            }
-            blk.jmps.push(op.into_ir_jump(&instr.address));
-            // TODO: Derive next instruction properly
-            let (finalized_blk, new_blk, new_tid) = finalize_blk_and_setup_new_blk(
-                &mut tid,
-                &mut blk,
-                next_instruction_address.unwrap_or(instr.address.clone() + "++"),
+            let targets = op.collect_jmp_targets(
+                instr.address.clone(),
+                instr.pcode_ops.len() as u64,
+                fallthrough_address,
             );
-
-            *blk = new_blk;
-            *tid = new_tid;
-
-            return Some(finalized_blk);
+            let cbranch = op.into_ir_jump(&instr.address, targets[0].clone());
+            let implicit_branch = Term {
+                tid: Tid {
+                    id: format!("instr_{}_{}_implicit_branch", instr.address, op.pcode_index),
+                    address: instr.address.clone(),
+                },
+                term: Jmp::Branch(targets[1].clone()),
+            };
+            blk.jmps.push(cbranch);
+            blk.jmps.push(implicit_branch);
+            let finalized_block = Term {
+                tid: tid.clone(),
+                term: blk.clone(),
+            };
+            return Some(finalized_block);
         }
+        PcodeOperation::JmpType(jmp) => todo!(),
     }
 }
 
-/// Helper function for wrapping a block within a tid and prepare new empty block with corresponding tid.
-///
-/// The new tid id is `artificial_blk_` followed by `next_instruction_address`.
-fn finalize_blk_and_setup_new_blk(
-    blk_tid: &mut Tid,
-    blk: &mut Blk,
-    next_instruction_address: String,
-) -> (Term<Blk>, Blk, Tid) {
-    let new_tid = Tid {
-        id: format!("artificial_blk_{}", next_instruction_address),
-        address: next_instruction_address
-            .split("_")
-            .next()
-            .expect("Address extraction failed")
-            .to_string(),
-    };
-    let new_blk = Blk {
-        defs: vec![],
-        jmps: vec![],
-        indirect_jmp_targets: vec![],
-    };
-
-    let finalized_blk = Term {
-        tid: blk_tid.clone(),
-        term: blk.clone(),
-    };
-    (finalized_blk, new_blk, new_tid)
-}
-
-/// Adds a `Jmp::Branch` to the block, wrap block in `Term` and returns it with the new and empty target block with its `Tid`.
-///
-/// This tid id is `artificial_blk` suffixed by `target_address`. The added `Branch`'s Tid `id` is `artificial_jmp_` suffixed by `jump_instruction_address`.
-fn finalize_blk_with_branch_and_setup_new_blk(
-    blk_tid: &mut Tid,
-    blk: &mut Blk,
+/// Adds a `Jmp::Branch` with provided target to the block, then wraps block with tid in `Term` and returns it.
+fn finalize_blk_with_branch(
+    blk_tid: Tid,
+    mut blk: Blk,
     jump_instruction_address: String,
-    target_address: String,
-) -> (Term<Blk>, Blk, Tid) {
-    //TODO: Sprünge zu sich selbst -> new setup wrong?
-
-    let (mut blk_to_branch_from, new_blk, new_tid) =
-        finalize_blk_and_setup_new_blk(blk_tid, blk, target_address);
-
+    pcode_index_branch_side: u64,
+    target_tid: Tid,
+) -> Term<Blk> {
     let branch = Term {
         tid: Tid {
-            id: format!("artificial_jmp_{}", jump_instruction_address),
-            address: jump_instruction_address
-                .split("_")
-                .next()
-                .expect("Address extraction failed")
-                .to_string(),
+            id: format!(
+                "instr_{}_{}_implicit_jmp",
+                jump_instruction_address, pcode_index_branch_side
+            ),
+            address: jump_instruction_address,
         },
-        term: Jmp::Branch(Tid {
-            id: new_tid.id.clone(),
-            address: new_tid
-                .address
-                .split("_")
-                .next()
-                .expect("Address extraction failed")
-                .to_string(),
-        }),
+        term: Jmp::Branch(target_tid),
     };
-    blk_to_branch_from.term.jmps.push(branch);
+    blk.jmps.push(branch);
 
-    (blk_to_branch_from, new_blk, new_tid)
+    Term {
+        tid: blk_tid.clone(),
+        term: blk.clone(),
+    }
 }
 
 /// Translates instruction with one or more pcode relative jumps into one or more blocks.
 /// Not pcode relative jumps are added as well.
 ///
 /// Artificially added block's tid use not artificial addresses.
-fn process_pcode_relative_jump(
-    blk_tid: &mut Tid,
-    blk: &mut Blk,
-    instruction: InstructionSimple,
-    next_instruction_address: Option<String>,
-) -> Vec<Term<Blk>> {
-    // collect all target indices for identifying backward branching
-    let mut relative_target_indices = HashMap::new();
-    let mut finalized_blocks = vec![];
-    for op in &instruction.pcode_ops {
-        if op.is_pcode_relative_jump() {
-            if let Some(JmpTarget::Relative((branch_side, target_side))) = op.get_jump_target() {
-                relative_target_indices.insert(branch_side, target_side);
-            }
-        }
-    }
+// fn process_pcode_relative_jump(
+//     blk_tid: &mut Tid,
+//     blk: &mut Blk,
+//     instruction: InstructionSimple,
+//     next_instruction_address: Option<String>,
+// ) -> Vec<Term<Blk>> {
+//     // collect all target indices for identifying backward branching
+//     let mut relative_target_indices = HashMap::new();
+//     let mut finalized_blocks = vec![];
+//     for op in &instruction.pcode_ops {
+//         if op.is_pcode_relative_jump() {
+//             if let Some(JmpTarget::Relative((branch_side, target_side))) = op.get_jump_target() {
+//                 relative_target_indices.insert(branch_side, target_side);
+//             }
+//         }
+//     }
 
-    // Used for optimazion of jump redirection
-    let mut empty_first_blk_tid = match blk.defs.is_empty() {
-        true => Some(blk_tid.clone()),
-        false => None,
-    };
+//     // Used for optimazion of jump redirection
+//     let mut empty_first_blk_tid = match blk.defs.is_empty() {
+//         true => Some(blk_tid.clone()),
+//         false => None,
+//     };
 
-    let mut pcode_op_iterator = instruction.pcode_ops.iter().peekable();
+//     let mut pcode_op_iterator = instruction.pcode_ops.iter().peekable();
 
-    // If first operation is a target and the block is not empty, finalize block and set up new one.
-    if relative_target_indices.values().contains(&0) && !blk.defs.is_empty() {
-        // finalize block and set up new one
-        let first_op = pcode_op_iterator.peek().expect("No pcode operations");
+//     // If first operation is a target and the block is not empty, finalize block and set up new one.
+//     if relative_target_indices.values().contains(&0) && !blk.defs.is_empty() {
+//         // finalize block and set up new one
+//         let first_op = pcode_op_iterator.peek().expect("No pcode operations");
 
-        let (finalized_blk, new_blk, new_tid) = finalize_blk_with_branch_and_setup_new_blk(
-            blk_tid,
-            blk,
-            format!("{}_--", instruction.address),
-            format!("{}_{}", instruction.address, first_op.pcode_index),
-        );
-        finalized_blocks.push(finalized_blk);
-        *blk = new_blk;
-        *blk_tid = new_tid;
+//         let (finalized_blk, new_blk, new_tid) = finalize_blk_with_branch_and_setup_new_blk(
+//             blk_tid,
+//             blk,
+//             format!("{}_--", instruction.address),
+//             format!("{}_{}", instruction.address, first_op.pcode_index),
+//         );
+//         finalized_blocks.push(finalized_blk);
+//         *blk = new_blk;
+//         *blk_tid = new_tid;
 
-        empty_first_blk_tid = Some(blk_tid.clone());
-    }
+//         empty_first_blk_tid = Some(blk_tid.clone());
+//     }
 
-    while let Some(op) = pcode_op_iterator.next() {
-        // Set next following instruction address:
-        // Usually the following pcode operation, but if the last operation is processed, the following instruction is used.
-        let fallthrough_addr = match pcode_op_iterator.peek() {
-            Some(next_op) => Some(format!("{}_{}", instruction.address, next_op.pcode_index)),
-            None => next_instruction_address.clone(),
-        };
+//     while let Some(op) = pcode_op_iterator.next() {
+//         // Set next following instruction address:
+//         // Usually the following pcode operation, but if the last operation is processed, the following instruction is used.
+//         let fallthrough_addr = match pcode_op_iterator.peek() {
+//             Some(next_op) => Some(format!("{}_{}", instruction.address, next_op.pcode_index)),
+//             None => next_instruction_address.clone(),
+//         };
 
-        if let Some(mut finalized_blk) =
-            add_operation_to_blk(&op, &instruction, blk, blk_tid, fallthrough_addr)
-        {
-            // Special case of jump target is not within the instructions pcode operation sequence
-            // We consider the next instruction as jump target.
-            if relative_target_indices.get(&op.pcode_index)
-                >= Some(&(instruction.pcode_ops.len() as u64))
-            {
-                let block_jump_amount = finalized_blk.term.jmps.len();
-                let jump_to_next_instr = match op.pcode_mnemonic {
-                    PcodeOperation::ExpressionType(_) => panic!("Jump side is not a JmpType"),
-                    PcodeOperation::JmpType(jmp) if matches!(jmp, CBRANCH) => {
-                        finalized_blk.term.jmps.get_mut(block_jump_amount - 2)
-                    }
-                    PcodeOperation::JmpType(_) => {
-                        finalized_blk.term.jmps.get_mut(block_jump_amount - 1)
-                    }
-                }
-                .expect("Finalized block does not have expected jump");
+//         if let Some(mut finalized_blk) =
+//             add_operation_to_blk(&op, &instruction, blk, blk_tid, fallthrough_addr)
+//         {
+//             // Special case of jump target is not within the instructions pcode operation sequence
+//             // We consider the next instruction as jump target.
+//             if relative_target_indices.get(&op.pcode_index)
+//                 >= Some(&(instruction.pcode_ops.len() as u64))
+//             {
+//                 let block_jump_amount = finalized_blk.term.jmps.len();
+//                 let jump_to_next_instr = match op.pcode_mnemonic {
+//                     PcodeOperation::ExpressionType(_) => panic!("Jump side is not a JmpType"),
+//                     PcodeOperation::JmpType(jmp) if matches!(jmp, CBRANCH) => {
+//                         finalized_blk.term.jmps.get_mut(block_jump_amount - 2)
+//                     }
+//                     PcodeOperation::JmpType(_) => {
+//                         finalized_blk.term.jmps.get_mut(block_jump_amount - 1)
+//                     }
+//                 }
+//                 .expect("Finalized block does not have expected jump");
 
-                let address_next_instr = next_instruction_address
-                    .clone()
-                    .expect("Next instruction address not available");
-                let next_instr_tid = Tid {
-                    id: format!("artificial_blk_{}", address_next_instr),
-                    address: address_next_instr,
-                };
-                jump_to_next_instr.term = match &jump_to_next_instr.term{
-                    Jmp::Branch(_) => Jmp::Branch(next_instr_tid),
-                    Jmp::CBranch { target: _, condition } => Jmp::CBranch { target: next_instr_tid, condition: condition.clone() },
-                    Jmp::Call { target: _, return_ } => Jmp::Call { target: next_instr_tid, return_: return_.clone() },
-                    // All other variants should not be in collected jump targets anyway.
-                    _ => panic!("Return, BranchInd, CallInd or CallOther are not affected by pcode relative jumps"),
-                };
-            } else if relative_target_indices.get(&op.pcode_index) == Some(&0) {
-                // Special case of jump to the first operation, which is the first def the corresponding block.
-                // Redirect the jump to the block.
-                if let Some(first_blk_tid) = &empty_first_blk_tid {
-                    let block_jump_amount = finalized_blk.term.jmps.len();
-                    let jump_to_first_blk = match op.pcode_mnemonic {
-                        PcodeOperation::ExpressionType(_) => panic!("Jump side is not a JmpType"),
-                        PcodeOperation::JmpType(jmp) if matches!(jmp, CBRANCH) => {
-                            finalized_blk.term.jmps.get_mut(block_jump_amount - 2)
-                        }
-                        PcodeOperation::JmpType(_) => {
-                            finalized_blk.term.jmps.get_mut(block_jump_amount - 1)
-                        }
-                    }
-                    .expect("Finalized block does not have expected jump");
+//                 let address_next_instr = next_instruction_address
+//                     .clone()
+//                     .expect("Next instruction address not available");
+//                 let next_instr_tid = Tid {
+//                     id: format!("artificial_blk_{}", address_next_instr),
+//                     address: address_next_instr,
+//                 };
+//                 jump_to_next_instr.term = match &jump_to_next_instr.term{
+//                     Jmp::Branch(_) => Jmp::Branch(next_instr_tid),
+//                     Jmp::CBranch { target: _, condition } => Jmp::CBranch { target: next_instr_tid, condition: condition.clone() },
+//                     Jmp::Call { target: _, return_ } => Jmp::Call { target: next_instr_tid, return_: return_.clone() },
+//                     // All other variants should not be in collected jump targets anyway.
+//                     _ => panic!("Return, BranchInd, CallInd or CallOther are not affected by pcode relative jumps"),
+//                 };
+//             } else if relative_target_indices.get(&op.pcode_index) == Some(&0) {
+//                 // Special case of jump to the first operation, which is the first def the corresponding block.
+//                 // Redirect the jump to the block.
+//                 if let Some(first_blk_tid) = &empty_first_blk_tid {
+//                     let block_jump_amount = finalized_blk.term.jmps.len();
+//                     let jump_to_first_blk = match op.pcode_mnemonic {
+//                         PcodeOperation::ExpressionType(_) => panic!("Jump side is not a JmpType"),
+//                         PcodeOperation::JmpType(jmp) if matches!(jmp, CBRANCH) => {
+//                             finalized_blk.term.jmps.get_mut(block_jump_amount - 2)
+//                         }
+//                         PcodeOperation::JmpType(_) => {
+//                             finalized_blk.term.jmps.get_mut(block_jump_amount - 1)
+//                         }
+//                     }
+//                     .expect("Finalized block does not have expected jump");
 
-                    jump_to_first_blk.term = match &jump_to_first_blk.term{
-                        Jmp::Branch(_) => Jmp::Branch(first_blk_tid.clone()),
-                        Jmp::CBranch { target: _, condition } => Jmp::CBranch { target: first_blk_tid.clone(), condition: condition.clone() },
-                        Jmp::Call { target: _, return_ } => Jmp::Call { target: first_blk_tid.clone(), return_: return_.clone() },
-                        // All other variants should not be in collected jump targets anyway.
-                        _ => panic!("Return, BranchInd, CallInd or CallOther are not affected by pcode relative jumps"),
-                    };
-                }
-            }
-            finalized_blocks.push(finalized_blk)
-        } else {
-            // if next op is a jump target, add implicit branch and finalize block.
-            if let Some(next_op) = pcode_op_iterator.peek() {
-                if relative_target_indices
-                    .values()
-                    .contains(&next_op.pcode_index)
-                {
-                    let (finalized_blk, new_blk, new_tid) =
-                        finalize_blk_with_branch_and_setup_new_blk(
-                            blk_tid,
-                            blk,
-                            format!("{}_{}", instruction.address, op.pcode_index),
-                            format!("{}_{}", instruction.address, next_op.pcode_index),
-                        );
-                    finalized_blocks.push(finalized_blk);
-                    *blk = new_blk;
-                    *blk_tid = new_tid;
-                }
-            }
-        }
-    }
+//                     jump_to_first_blk.term = match &jump_to_first_blk.term{
+//                         Jmp::Branch(_) => Jmp::Branch(first_blk_tid.clone()),
+//                         Jmp::CBranch { target: _, condition } => Jmp::CBranch { target: first_blk_tid.clone(), condition: condition.clone() },
+//                         Jmp::Call { target: _, return_ } => Jmp::Call { target: first_blk_tid.clone(), return_: return_.clone() },
+//                         // All other variants should not be in collected jump targets anyway.
+//                         _ => panic!("Return, BranchInd, CallInd or CallOther are not affected by pcode relative jumps"),
+//                     };
+//                 }
+//             }
+//             finalized_blocks.push(finalized_blk)
+//         } else {
+//             // if next op is a jump target, add implicit branch and finalize block.
+//             if let Some(next_op) = pcode_op_iterator.peek() {
+//                 if relative_target_indices
+//                     .values()
+//                     .contains(&next_op.pcode_index)
+//                 {
+//                     let (finalized_blk, new_blk, new_tid) =
+//                         finalize_blk_with_branch_and_setup_new_blk(
+//                             blk_tid,
+//                             blk,
+//                             format!("{}_{}", instruction.address, op.pcode_index),
+//                             format!("{}_{}", instruction.address, next_op.pcode_index),
+//                         );
+//                     finalized_blocks.push(finalized_blk);
+//                     *blk = new_blk;
+//                     *blk_tid = new_tid;
+//                 }
+//             }
+//         }
+//     }
 
-    finalized_blocks
-}
+//     finalized_blocks
+// }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct FunctionSimple {
