@@ -76,7 +76,7 @@ impl<'a> Context<'a> {
         state: &mut State,
         call_tid: &Tid,
         call_params: impl IntoIterator<Item = &'b Arg>,
-    ) -> Option<Vec<(AbstractIdentifier, Tid)>> {
+    ) -> Option<Vec<(AbstractIdentifier, Vec<Tid>)>> {
         let mut warnings = Vec::new();
         for arg in call_params {
             if let Some(arg_value) = self
@@ -174,7 +174,7 @@ impl<'a> Context<'a> {
         name: &str,
         description: String,
         location: &Tid,
-        warning_causes: Vec<(AbstractIdentifier, Tid)>,
+        warning_causes: Vec<(AbstractIdentifier, Vec<Tid>)>,
         root_function: &Tid,
     ) {
         let cwe_warning = CweWarning {

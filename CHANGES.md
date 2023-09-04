@@ -1,6 +1,8 @@
 0.8-dev
 ===
 
+-   Improve logic and context information generation of CWE-416 (use-after-free) check (PRs #423, #429)
+
 0.7 (2023-06)
 ====
 
