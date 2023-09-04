@@ -233,10 +233,20 @@ pub fn propagate_input_expressions(
                 var,
                 value: expression,
             } => {
-                // insert known input expressions
-                for (input_var, input_expr) in insertable_expressions.iter() {
-                    expression.substitute_input_var(input_var, input_expr);
+                // Extend the considered expression with already known expressions.
+                let mut extended_expression = expression.clone();
+                for input_var in expression.input_vars().into_iter() {
+                    if let Some(expr) = insertable_expressions.get(input_var) {
+                        // We limit the complexity of expressions to insert.
+                        // This prevents extremely large expressions that can lead to extremely high RAM usage.
+                        // FIXME: Right now this limit is quite arbitrary. Maybe there is a better way to achieve the same result?
+                        if expr.recursion_depth() < 10 {
+                            extended_expression.substitute_input_var(input_var, expr)
+                        }
+                    }
                 }
+                extended_expression.substitute_trivial_operations();
+                *expression = extended_expression;
                 // expressions dependent on the assigned variable are no longer insertable
                 insertable_expressions.retain(|input_var, input_expr| {
                     input_var != var && !input_expr.input_vars().into_iter().any(|x| x == var)
