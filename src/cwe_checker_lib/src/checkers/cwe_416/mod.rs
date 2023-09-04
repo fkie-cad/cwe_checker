@@ -48,21 +48,13 @@
 //! may lead to missed CWEs in this check.
 //! - Pointers freed by other operations than calls to the deallocation symbols contained in the config.json will be missed by the analysis.
 
-use std::collections::BTreeSet;
-use std::collections::HashMap;
-use std::collections::HashSet;
-
-use crate::abstract_domain::AbstractDomain;
 use crate::abstract_domain::AbstractIdentifier;
-use crate::analysis::fixpoint::Computation;
-use crate::analysis::forward_interprocedural_fixpoint::GeneralizedContext;
-use crate::analysis::graph::Node;
-use crate::analysis::interprocedural_fixpoint_generic::NodeValue;
-use crate::analysis::pointer_inference::PointerInference;
 use crate::prelude::*;
 use crate::utils::log::CweWarning;
 use crate::utils::log::LogMessage;
 use crate::CweModule;
+use std::collections::BTreeSet;
+use std::collections::HashSet;
 
 /// The module name and version
 pub static CWE_MODULE: CweModule = CweModule {
@@ -123,16 +115,13 @@ pub fn check_cwe(
 
     fixpoint_computation.compute_with_max_steps(100);
 
-    let mut warnings = HashSet::new();
+    let mut warnings = BTreeSet::new();
     while let Ok(warning) = cwe_warning_receiver.try_recv() {
         warnings.insert(warning);
     }
-    let return_site_states = collect_return_site_states(&fixpoint_computation);
     let cwes = generate_context_information_for_warnings(
-        return_site_states,
         warnings,
         config.always_include_full_path_to_free_site,
-        analysis_results.pointer_inference.unwrap(),
     );
 
     let mut logs = BTreeSet::new();
@@ -151,18 +140,15 @@ pub struct WarningContext {
     cwe: CweWarning,
     /// The TID of the function in which the CWE warning was generated.
     root_function: Tid,
-    /// Pairs of object IDs and the sites where the object was freed.
-    /// If the free-site is the same function call from which the object ID originates
-    /// then the CWE needs to be post-processed to give more exact information about the
-    /// free-site inside the function call.
-    object_and_free_ids: Vec<(AbstractIdentifier, Tid)>,
+    /// Pairs of object IDs and the paths to the actual free sites.
+    object_and_free_ids: Vec<(AbstractIdentifier, Vec<Tid>)>,
 }
 
 impl WarningContext {
     /// Generate a new warning context object.
     pub fn new(
         cwe: CweWarning,
-        object_and_free_ids: Vec<(AbstractIdentifier, Tid)>,
+        object_and_free_ids: Vec<(AbstractIdentifier, Vec<Tid>)>,
         root_function: Tid,
     ) -> Self {
         WarningContext {
@@ -173,202 +159,94 @@ impl WarningContext {
     }
 }
 
-/// For each function call TID collect the state of the callee just before returning to the caller.
-fn collect_return_site_states<'a>(
-    fixpoint: &Computation<GeneralizedContext<'a, Context<'a>>>,
-) -> HashMap<Tid, State> {
-    let mut call_tid_to_return_state_map: HashMap<Tid, State> = HashMap::new();
-    let graph = fixpoint.get_graph();
-    for node in graph.node_indices() {
-        let call_tid = match graph[node] {
-            Node::CallReturn { call, return_: _ } => call.0.term.jmps[0].tid.clone(),
-            _ => continue,
-        };
-        let node_value = match fixpoint.get_node_value(node) {
-            Some(value) => value,
-            None => continue,
-        };
-        let return_state = match node_value {
-            NodeValue::CallFlowCombinator {
-                call_stub: _,
-                interprocedural_flow,
-            } => {
-                if let Some(state) = interprocedural_flow {
-                    state.clone()
-                } else {
-                    continue;
-                }
-            }
-            _ => panic!("Unexpexted NodeValue type encountered."),
-        };
-        // There exists one CallReturn node for each return instruction in the callee,
-        // so we have to merge the corresponding states here.
-        call_tid_to_return_state_map
-            .entry(call_tid)
-            .and_modify(|saved_return_state| {
-                *saved_return_state = saved_return_state.merge(&return_state)
-            })
-            .or_insert(return_state);
-    }
-    call_tid_to_return_state_map
-}
-
-/// If the ID of the "free"-site is the same call from which the object ID originates from
-/// then (recursively) identify the real "free"-site inside the call.
-/// Also return a list of call TIDs that lead to the real "free"-site.
-///
-/// The function returns an error if the source object was already flagged in some of the callees.
-/// In such a case the corresponding CWE warning should be removed,
-/// since there already exists another CWE warning with the same root cause.
+/// Shorten the path to the "free"-site so that it ends in the first call
+/// that is not contained in the path to the object origin.
 fn get_shortended_path_to_source_of_free(
     object_id: &AbstractIdentifier,
-    free_id: &Tid,
-    return_site_states: &HashMap<Tid, State>,
-) -> Result<(Tid, Vec<Tid>), ()> {
-    if let (inner_object, Some(path_hint_id)) = object_id.without_last_path_hint() {
-        if path_hint_id == *free_id {
-            if let Some(return_state) = return_site_states.get(free_id) {
-                if return_state.is_id_already_flagged(&inner_object) {
-                    return Err(());
-                }
-                if let Some(inner_free) = return_state.get_free_tid_if_dangling(&inner_object) {
-                    let (root_free, mut callgraph_ids) = get_shortended_path_to_source_of_free(
-                        &inner_object,
-                        inner_free,
-                        return_site_states,
-                    )?;
-                    callgraph_ids.push(path_hint_id);
-                    return Ok((root_free, callgraph_ids));
-                }
-            }
+    free_path: &[Tid],
+) -> Vec<Tid> {
+    let mut object_id = object_id.clone();
+    let mut shortened_free_path = free_path.to_vec();
+    while let (shortened_id, Some(last_path_hint)) = object_id.without_last_path_hint() {
+        if Some(&last_path_hint) == shortened_free_path.last() {
+            object_id = shortened_id;
+            shortened_free_path.pop();
+        } else {
+            break;
         }
     }
-    // No inner source apart from the given free_id could be identified
-    Ok((free_id.clone(), Vec::new()))
+    // Return the free path without the shortened free path
+    if shortened_free_path.is_empty() {
+        free_path.to_vec()
+    } else {
+        free_path[(shortened_free_path.len() - 1)..].to_vec()
+    }
 }
 
-/// Get the full path in the call-graph connecting the `object_id` to the site where it gets freed.
-/// Note that there may be several paths to "free" sites in the call-graph.
-/// This function returns just one (random) path to such a "free" site.
-///
-/// When calling this function non-recursively, the `collectect_callgraph_ids` should be empty.
-///
-/// The function returns an error if the source object was already flagged in some of the callees.
-/// In such a case the corresponding CWE warning should be removed,
-/// since there already exists another CWE warning with the same root cause.
-fn get_full_path_to_source_of_free<'a>(
+/// Get the part of the path to the "free"-site that is not shared with the path to the object origin site.
+fn get_root_cause_for_returned_dangling_pointers(
     object_id: &AbstractIdentifier,
-    free_id: &Tid,
-    return_site_states: &HashMap<Tid, State>,
-    pointer_inference: &'a PointerInference<'a>,
-    mut collected_callgraph_ids: Vec<Tid>,
-) -> Result<(Tid, Vec<Tid>), ()> {
-    if collected_callgraph_ids.contains(free_id) {
-        // This path is recursive and thus not a (shortest) path to an actual `free`-site.
-        return Err(());
-    }
-    // Get callee information. If unsuccessful, then the `free_id` should already be the source site.
-    let id_replacement_map = match pointer_inference.get_id_renaming_map_at_call_tid(free_id) {
-        Some(map) => map,
-        None => return Ok((free_id.clone(), collected_callgraph_ids)),
-    };
-    let return_state = match return_site_states.get(free_id) {
-        Some(state) => state,
-        None => return Ok((free_id.clone(), collected_callgraph_ids)),
-    };
-    // Check whether the free site in the callee is already flagged.
-    for flagged_id in return_state.get_already_flagged_objects() {
-        if let Some(caller_data) = id_replacement_map.get(&flagged_id) {
-            if caller_data.get_relative_values().contains_key(object_id) {
-                // A corresponding object ID was already flagged in a callee,
-                // so we want to suppress this CWE warning as a duplicate of the already flagged CWE in the callee.
-                if object_id.get_tid() != &return_state.current_fn_tid {
-                    return Err(());
-                } else {
-                    // This is a recursive call and the object is a parameter to this call.
-                    // We treat the call as the root cause
-                    // to avoid erroneously suppressing some CWE warnings based on recursive calls.
-                    return Ok((free_id.clone(), collected_callgraph_ids));
-                }
-            }
+    free_path: &[Tid],
+) -> Vec<Tid> {
+    let mut object_id = object_id.clone();
+    let mut shortened_free_path = free_path.to_vec();
+    while let (shortened_id, Some(last_path_hint)) = object_id.without_last_path_hint() {
+        if Some(&last_path_hint) == shortened_free_path.last() {
+            object_id = shortened_id;
+            shortened_free_path.pop();
+        } else {
+            break;
         }
     }
-    // If the object is a parameter to the callee then recursively find the real free site inside the callee
-    for (callee_id, free_site_in_callee) in return_state.get_dangling_objects() {
-        if collected_callgraph_ids.contains(&free_site_in_callee) {
-            // we skip potentially recursive paths
-            continue;
-        }
-        if let Some(caller_data) = id_replacement_map.get(&callee_id) {
-            if caller_data.get_relative_values().contains_key(object_id) {
-                collected_callgraph_ids.push(free_id.clone());
-                return get_full_path_to_source_of_free(
-                    &callee_id,
-                    &free_site_in_callee,
-                    return_site_states,
-                    pointer_inference,
-                    collected_callgraph_ids,
-                );
-            }
-        }
+    if shortened_free_path.is_empty() {
+        vec![free_path[0].clone()]
+    } else {
+        shortened_free_path
     }
-    // If the object originates from the same call that also frees the object,
-    // then use the path hints of the object ID to find the `free` site inside the callee.
-    if let (inner_object, Some(path_hint_id)) = object_id.without_last_path_hint() {
-        if path_hint_id == *free_id {
-            if let Some(return_state) = return_site_states.get(free_id) {
-                if return_state.is_id_already_flagged(&inner_object) {
-                    return Err(());
-                }
-                if let Some(inner_free) = return_state.get_free_tid_if_dangling(&inner_object) {
-                    collected_callgraph_ids.push(free_id.clone());
-                    return get_full_path_to_source_of_free(
-                        &inner_object,
-                        inner_free,
-                        return_site_states,
-                        pointer_inference,
-                        collected_callgraph_ids,
-                    );
-                }
-            }
-        }
-    }
-    // The `free_id` is an internal call, but no `free` site was found inside the callee.
-    // In theory, this case should never happen.
-    // We treat it like the `free_id` is the source `free` to at least return some useful information if it happens anyway.
-    Ok((free_id.clone(), collected_callgraph_ids))
+}
+
+/// Return `true` if the object originates in the same call as the "free"-site.
+fn is_case_of_returned_dangling_pointer(object_id: &AbstractIdentifier, free_path: &[Tid]) -> bool {
+    // This implicitly uses that the `free_path` is never empty.
+    object_id.get_path_hints().last() == free_path.last()
 }
 
 /// Generate context information for CWE warnings.
 /// E.g. relevant callgraph addresses are added to each CWE here.
-fn generate_context_information_for_warnings<'a>(
-    return_site_states: HashMap<Tid, State>,
-    warnings: HashSet<WarningContext>,
+fn generate_context_information_for_warnings(
+    warnings: BTreeSet<WarningContext>,
     generate_full_paths_to_free_site: bool,
-    pointer_inference: &'a PointerInference<'a>,
 ) -> BTreeSet<CweWarning> {
     let mut processed_warnings = BTreeSet::new();
+    let mut root_causes_for_returned_dangling_pointers = HashSet::new();
+
     for mut warning in warnings {
         let mut context_infos = Vec::new();
-        let mut relevant_callgraph_tids = Vec::new();
-        for (object_id, free_id) in warning.object_and_free_ids.iter() {
-            let source_free_site_info = if generate_full_paths_to_free_site {
-                get_full_path_to_source_of_free(
-                    object_id,
-                    free_id,
-                    &return_site_states,
-                    pointer_inference,
-                    Vec::new(),
-                )
-            } else {
-                get_shortended_path_to_source_of_free(object_id, free_id, &return_site_states)
-            };
-            if let Ok((root_free_id, mut callgraph_ids_to_free)) = source_free_site_info {
-                relevant_callgraph_tids.append(&mut callgraph_ids_to_free);
-                context_infos.push(format!(
-                    "Accessed ID {object_id} may have been freed before at {root_free_id}."
-                ));
+        let mut relevant_callgraph_tids = BTreeSet::new();
+        for (object_id, mut free_path) in warning.object_and_free_ids.into_iter() {
+            if is_case_of_returned_dangling_pointer(&object_id, &free_path) {
+                let root_cause =
+                    get_root_cause_for_returned_dangling_pointers(&object_id, &free_path);
+                if root_causes_for_returned_dangling_pointers.contains(&root_cause) {
+                    // Skip this warning root cause, since another warning with the same root cause was already generated.
+                    // FIXME: This is a coarse heuristic to reduce false positives.
+                    // However, it is still possible that some but not all of these cases are real bugs
+                    // and that this heuristic chooses the wrong representative.
+                    continue;
+                } else {
+                    root_causes_for_returned_dangling_pointers.insert(root_cause);
+                }
             }
+            if !generate_full_paths_to_free_site {
+                free_path = get_shortended_path_to_source_of_free(&object_id, &free_path);
+            }
+            for id in &free_path[1..] {
+                relevant_callgraph_tids.insert(id.clone());
+            }
+            context_infos.push(format!(
+                "Accessed ID {object_id} may have been freed before at {}.",
+                free_path[0]
+            ));
         }
         if context_infos.is_empty() {
             // Skip (delete) this CWE warning,
@@ -402,33 +280,23 @@ pub mod tests {
 
     #[test]
     fn test_warning_context_generation() {
-        let project = Project::mock_x64();
-        let pointer_inference = PointerInference::mock(&project);
         let id = AbstractIdentifier::new(
             Tid::new("object_origin_tid"),
             AbstractLocation::Register(variable!("RAX:8")),
         );
-        let path_id = id.with_path_hint(Tid::new("call_tid")).unwrap();
-        let object_and_free_ids = vec![(path_id, Tid::new("call_tid"))];
+        let object_id = id.with_path_hint(Tid::new("call_tid")).unwrap();
+        let object_and_free_ids = vec![(
+            object_id.clone(),
+            vec![Tid::new("free_tid"), Tid::new("call_tid")],
+        )];
 
         let cwe = CweWarning::new("CWE416", "test", "mock_cwe");
         let warning_context =
             WarningContext::new(cwe, object_and_free_ids, Tid::new("root_func_tid"));
-        let warnings = HashSet::from([warning_context]);
+        let warnings = BTreeSet::from([warning_context.clone()]);
 
         // Test warning context generation
-        let return_state = State::mock(
-            Tid::new("callee_tid"),
-            &[(id.clone(), Tid::new("free_tid"))],
-            &[],
-        );
-        let return_site_states = HashMap::from([(Tid::new("call_tid"), return_state)]);
-        let processed_warnings = generate_context_information_for_warnings(
-            return_site_states,
-            warnings.clone(),
-            false,
-            &pointer_inference,
-        );
+        let processed_warnings = generate_context_information_for_warnings(warnings.clone(), false);
         assert_eq!(processed_warnings.len(), 1);
         let processed_cwe = processed_warnings.iter().next().unwrap();
         assert_eq!(&processed_cwe.other[0], &[
@@ -437,14 +305,21 @@ pub mod tests {
         ]);
 
         // Test warning filtering
-        let return_state = State::mock(Tid::new("callee_tid"), &[], &[id.clone()]);
-        let return_site_states = HashMap::from([(Tid::new("call_tid"), return_state)]);
-        let processed_warnings = generate_context_information_for_warnings(
-            return_site_states,
-            warnings,
-            false,
-            &pointer_inference,
-        );
-        assert_eq!(processed_warnings.len(), 0)
+        let object_and_free_ids_2 = vec![(
+            object_id
+                .with_path_hint(Tid::new("outer_call_tid"))
+                .unwrap(),
+            vec![
+                Tid::new("free_tid"),
+                Tid::new("call_tid"),
+                Tid::new("outer_call_tid"),
+            ],
+        )];
+        let cwe_2 = CweWarning::new("CWE416", "test", "mock_cwe_2");
+        let warning_context_2 =
+            WarningContext::new(cwe_2, object_and_free_ids_2, Tid::new("root_func_tid_2"));
+        let warnings = BTreeSet::from([warning_context, warning_context_2]);
+        let processed_warnings = generate_context_information_for_warnings(warnings, false);
+        assert_eq!(processed_warnings.len(), 1)
     }
 }
