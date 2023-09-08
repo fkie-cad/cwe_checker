@@ -1,2 +1,3 @@
 [workspace]
 members = ["src/cwe_checker_lib", "src/caller", "test", "src/installer"]
+resolver = "2"

@@ -64,7 +64,7 @@ pub fn parse_format_string_parameters(
     // - `[\.]?\d*` matches the precision parameter (for printf-like functions)
     // - `[cCdiouxXeEfFgGaAnpsS]` matches a format specifier without length parameter.
     // - `hi|hd|hu|li|ld|lu|lli|lld|llu|lf|lg|le|la|lF|lG|lE|lA|Lf|Lg|Le|La|LF|LG|LE|LA` matches format specifiers with length parameter.
-    let re = Regex::new(r#"%[+\-#0]{0,1}\d*[\.]?\d*([cCdiouxXeEfFgGaAnpsS]|hi|hd|hu|li|ld|lu|lli|lld|llu|lf|lg|le|la|lF|lG|lE|lA|Lf|Lg|Le|La|LF|LG|LE|LA)"#)
+    let re = Regex::new(r"%[+\-#0]{0,1}\d*[\.]?\d*([cCdiouxXeEfFgGaAnpsS]|hi|hd|hu|li|ld|lu|lli|lld|llu|lf|lg|le|la|lF|lG|lE|lA|Lf|Lg|Le|La|LF|LG|LE|LA)")
         .expect("No valid regex!");
 
     let datatype_map: Vec<(Datatype, ByteSize)> = re
