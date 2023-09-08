@@ -46,7 +46,7 @@ impl PcodeOpSimple {
                 // jump behind pcode sequence
                 target_index if target_index >= pcode_sequence_length => Tid {
                     id: format!("blk_{}", fall_through_address),
-                    address: instruction_address.clone(),
+                    address: fall_through_address.clone(),
                 },
                 _ => Tid {
                     id: format!("blk_{}_{}", instruction_address, target_index),

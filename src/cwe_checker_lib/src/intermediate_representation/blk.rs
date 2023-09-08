@@ -38,6 +38,17 @@ pub struct Blk {
     pub indirect_jmp_targets: Vec<Tid>,
 }
 
+impl Blk {
+    /// Returns an empty block
+    pub fn new() -> Blk {
+        Blk {
+            defs: vec![],
+            jmps: vec![],
+            indirect_jmp_targets: vec![],
+        }
+    }
+}
+
 impl Term<Blk> {
     /// Remove indirect jump target addresses for which no corresponding target block exists.
     /// Return an error message for each removed address.

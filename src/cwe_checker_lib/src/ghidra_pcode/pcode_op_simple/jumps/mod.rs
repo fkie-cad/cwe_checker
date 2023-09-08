@@ -67,36 +67,6 @@ impl PcodeOpSimple {
         }
     }
 
-    /// Determines the target and returns corresponding `Tid`.
-    ///
-    /// `Tid`s follow the `blk_<addr>_<pcode_index> scheme`.
-    /// Relative jumps to index `0` return the Tid `blk_<addr>`, without the `<pcode_index>` suffix.
-    fn extract_target(&self, address: &String) -> Tid {
-        let (id, address) = match self.get_jump_target() {
-            Some(JmpTarget::Absolute(_)) => {
-                (format!("blk_{}", self.input0.id), self.input0.id.clone())
-            }
-            Some(JmpTarget::Relative((_, target_index))) if target_index != 0 => {
-                (format!("blk_{}", address), address.clone())
-            }
-            Some(JmpTarget::Relative((_, target_index))) => {
-                (format!("blk_{}_{}", address, target_index), address.clone())
-            }
-            None => panic!("Not a jump operation"),
-        };
-        Tid { id, address }
-    }
-
-    /// Determines, if the jump target is relative to the pcode index of the jump instruction.
-    ///
-    /// Note: $(GHIDRA_PATH)/docs/languages/html/pcodedescription.html#cpui_branch
-    pub fn is_pcode_relative_jump(&self) -> bool {
-        match self.input0.address_space.as_str() {
-            "const" => true,
-            _ => false,
-        }
-    }
-
     fn create_branch(&self, address: &String, target: Tid) -> Term<Jmp> {
         wrap_in_tid(address, self.pcode_index, Jmp::Branch(target))
     }
@@ -116,7 +86,7 @@ impl PcodeOpSimple {
 
     fn create_call(&self, address: &String) -> Term<Jmp> {
         let branch_ind = Jmp::Call {
-            target: self.extract_target(address),
+            target: todo!(),
             return_: Some(todo!()),
         };
         wrap_in_tid(address, self.pcode_index, branch_ind)

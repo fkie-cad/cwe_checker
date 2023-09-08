@@ -655,3 +655,18 @@ fn test_get_jump_target_absolute() {
     let op = mock_pcode_op_branch(0, var);
     assert_eq!(op.get_jump_target(), Some(JmpTarget::Absolute(0xFFFFFFFF)));
 }
+
+#[test]
+fn collect_collect_jmp_targets() {
+    todo!()
+}
+
+#[test]
+fn collect_into_ir_def() {
+    todo!()
+}
+
+#[test]
+fn collect_create_def() {
+    todo!()
+}
