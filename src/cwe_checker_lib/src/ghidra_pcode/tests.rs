@@ -307,7 +307,7 @@ fn test_pcode_relative_jump_forward_jump() {
     };
     assert_eq!(result.get(2).unwrap().term, expected_returned_blk);
     let expected_tid_returned_block = Tid {
-        id: "artificial_blk_0x0100_2".into(),
+        id: "blk_0x0100_2".into(),
         address: "0x0100".into(),
     };
     assert_eq!(tid, expected_tid_returned_block);
@@ -369,11 +369,11 @@ fn test_process_pcode_relative_jump_backward_jump() {
     };
     let expected_jmp = Term {
         tid: Tid {
-            id: "artificial_jmp_0x0200_0".into(),
+            id: "implicit_jmp_0x0200_0".into(),
             address: "0x0200".into(),
         },
         term: Jmp::Branch(Tid {
-            id: "artificial_blk_0x0200_1".into(),
+            id: "blk_0x0200_1".into(),
             address: "0x0200".into(),
         }),
     };
@@ -401,7 +401,7 @@ fn test_process_pcode_relative_jump_backward_jump() {
         },
         term: Jmp::CBranch {
             target: Tid {
-                id: "artificial_blk_0x0200_1".into(),
+                id: "blk_0x0200_1".into(),
                 address: "0x0200".into(),
             },
             condition: expr!("ZF:4"),
@@ -409,11 +409,11 @@ fn test_process_pcode_relative_jump_backward_jump() {
     };
     let second_expected_jmp = Term {
         tid: Tid {
-            id: "artificial_jmp_0x0200_2".into(),
+            id: "implicit_jmp_0x0200_2".into(),
             address: "0x0200".into(),
         },
         term: Jmp::Branch(Tid {
-            id: "artificial_blk_0x0207".into(),
+            id: "blk_0x0207".into(),
             address: "0x0207".into(),
         }),
     };
@@ -424,7 +424,7 @@ fn test_process_pcode_relative_jump_backward_jump() {
     };
     assert_eq!(second_finalized_blk.term, second_expected_blk);
     let expected_tid_second_block = Tid {
-        id: "artificial_blk_0x0200_1".into(),
+        id: "blk_0x0200_1".into(),
         address: "0x0200".into(),
     };
     assert_eq!(second_finalized_blk.tid, expected_tid_second_block);
@@ -439,7 +439,7 @@ fn test_process_pcode_relative_jump_backward_jump() {
         }
     );
     let expected_tid_returned_block = Tid {
-        id: "artificial_blk_0x0207".into(),
+        id: "blk_0x0207".into(),
         address: "0x0207".into(),
     };
     assert_eq!(tid, expected_tid_returned_block);

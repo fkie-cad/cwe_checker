@@ -377,6 +377,7 @@ fn add_defs_to_block(mut blk: Blk, iterator: &mut OpIterator, jump_targets: &Has
                 .into_ir_def(&iterator.get_current_instr().unwrap().address),
         );
     }
+    // What to do if the sequence ends without a jump?
     blk
 }
 

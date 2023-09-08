@@ -51,6 +51,9 @@ impl PcodeOpSimple {
         None
     }
 
+    /// Returns the translated jump to the provided location.
+    /// 
+    /// Note: Currently, it supports `BRANCH` and `CBRANCH` only.
     pub fn into_ir_jump(&self, address: &String, target: Tid) -> Term<Jmp> {
         if let PcodeOperation::JmpType(jmp) = self.pcode_mnemonic {
             match jmp {
