@@ -111,7 +111,13 @@
     ]
   },
   "CWE457": {
-    "symbols": []
+    "allocation_symbols": [
+      "malloc",
+      "xmalloc"
+    ],
+    "extern_symbol_whitelist": [
+      ""
+    ]
   },
   "CWE467": {
     "_comment": "any function that takes something of type size_t could be a possible candidate.",
