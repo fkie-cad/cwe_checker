@@ -94,17 +94,4 @@ impl State {
         }
         false
     }
-
-    pub fn to_string(&self) -> String {
-        let mut out = String::new();
-        for id in self.tracked_objects.keys() {
-            out.push_str(&format!("{}\n", id));
-            if let Some(mem_region) = self.tracked_objects.get(id) {
-                for (offset, status) in mem_region.entry_map() {
-                    out.push_str(&format!("\t{}\t : \t {:?}\n", offset, status));
-                }
-            }
-        }
-        out
-    }
 }

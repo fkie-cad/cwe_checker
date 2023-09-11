@@ -160,7 +160,7 @@ impl MemRegion<InitializationStatus> {
         let mut maybe_init = HashMap::new();
 
         if let Ok((lower_bound, upper_bound)) = interval.try_to_offset_interval().as_mut() {
-            if upper_bound.clone() - lower_bound.clone() < 256 {
+            if *upper_bound - *lower_bound < 256 {
                 if ignore_non_neg_offsets {
                     if *lower_bound > 0 {
                         *lower_bound = 0;
@@ -223,7 +223,7 @@ impl MemRegion<InitializationStatus> {
             self.merge_at_byte_index(*offset, status);
         }
         // cover all offsets in self, that are uninit in other
-        for (offset, _status) in self.clone().entry_map() {
+        for offset in self.clone().entry_map().keys() {
             if let InitializationStatus::Uninit = other.get_init_status_at_byte_index(*offset) {
                 self.merge_at_byte_index(*offset, &InitializationStatus::Uninit);
             }

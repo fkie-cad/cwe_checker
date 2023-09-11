@@ -457,6 +457,12 @@ fn extract_results<'a>(
     cwe_warnings
 }
 
+/// Run the check for CWE-457: Use of Uninitialized Variable.
+///
+/// This function prepares the fixpoint computation
+/// by initializing the state at nodes, that introduce new memory objects
+/// and then executing the fixpoint algorithm.
+/// Returns collected log messages and CWE warnings.
 pub fn check_cwe(
     analysis_results: &AnalysisResults,
     cwe_params: &serde_json::Value,
