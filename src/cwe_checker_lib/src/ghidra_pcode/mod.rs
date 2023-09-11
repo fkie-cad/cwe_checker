@@ -9,6 +9,7 @@ use crate::pcode::JmpType::*;
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use std::iter::Peekable;
 mod pcode_operations;
 use pcode_operations::*;
 mod pcode_op_simple;
@@ -49,7 +50,8 @@ impl ProjectSimple {
 
         for func in self.functions {
             for blk in func.blocks {
-                blk.into_ir_blk(&jump_targets);
+                let blocks = blk.into_ir_blk(&jump_targets);
+                todo!()
             }
         }
 
@@ -130,7 +132,7 @@ impl VarnodeSimple {
         &mut self,
         var_name: String,
         tid_suffix: String,
-        address: &String,
+        address: &str,
         pcode_index: u64,
     ) -> Term<Def> {
         let load = Def::Load {
@@ -222,48 +224,153 @@ impl InstructionSimple {
     }
 }
 
-/// Iterator for processing a block's sequence of instructions and their pcode operations.
-/// For creating Tids of implicit branches, we need to be able to have a look at the previous operation.
-/// For creating jumps to consecutive blocks, wee need to be able to have a look at the next operation.
-/// For all cases we need to know the corresponding Instruction-Pcode-Pair for deriving the correct address and Tid.
-struct OpIterator {
-    instructions: Vec<InstructionSimple>,
-    operations: Vec<PcodeOpSimple>,
-    current_instr_index: Option<u64>,
-    current_op_index: Option<u64>,
+/// Iterator-like struct for iterating over the P-Code operations contained in a slice of [`InstructionSimple`] objects.
+struct OpIterator<'a> {
+    /// The iterator over the assembly instructions
+    instr_iter: Peekable<std::slice::Iter<'a, InstructionSimple>>,
+    /// The iterator over the P-Code instructions contained in the current assembly instruction
+    op_iter: Option<Peekable<std::slice::Iter<'a, PcodeOpSimple>>>,
+    /// The current assembly instruction
+    current_instr: Option<&'a InstructionSimple>,
+    /// The list of known jump targets.
+    jump_targets: &'a HashSet<Tid>,
 }
 
-impl OpIterator {
-    fn get_current_instr(&self) -> Option<InstructionSimple> {
-        todo!()
+impl<'a> OpIterator<'a> {
+    /// Create a new iterator out of a slice and the list of known jump targets.
+    pub fn new(instructions: &'a [InstructionSimple], jump_targets: &'a HashSet<Tid>) -> Self {
+        Self {
+            instr_iter: instructions.iter().peekable(),
+            op_iter: None,
+            current_instr: None,
+            jump_targets,
+        }
     }
 
-    fn get_current_op(&self) -> Option<PcodeOpSimple> {
-        todo!()
+    /// Get the next instruction.
+    /// Reset the P-code operation iterator accordingly.
+    fn next_instr(&mut self) -> Option<&'a InstructionSimple> {
+        if let Some(instr) = self.instr_iter.next() {
+            self.op_iter = Some(instr.pcode_ops.iter().peekable());
+            self.current_instr = Some(instr);
+            Some(instr)
+        } else {
+            self.op_iter = None;
+            self.current_instr = None;
+            None
+        }
     }
 
-    fn get_current_pair(&self) -> Option<(InstructionSimple, PcodeOpSimple)> {
-        todo!()
+    /// Peek the next assembly instruction without advancing the iterator.
+    fn peek_next_instr(&mut self) -> Option<&'a InstructionSimple> {
+        self.instr_iter.peek().copied()
     }
 
-    fn next(&self) -> Option<(InstructionSimple, PcodeOpSimple)> {
-        todo!()
+    /// If the next instruction (either P-Code or assembly instruction) is a jump target,
+    /// then return the corresponding block TID
+    fn peek_for_jmp_target(&mut self) -> Option<Tid> {
+        if let Some(op_iter) = self.op_iter.as_mut() {
+            if let Some(op) = op_iter.peek() {
+                let address = self.current_instr.unwrap().address.clone();
+                let blk_tid_name = match op.pcode_index {
+                    0 => format!("blk_{}", address),
+                    pcode_index => format!("blk_{}_{}", address, pcode_index),
+                };
+                let blk_tid = Tid {
+                    id: blk_tid_name,
+                    address,
+                };
+                if self.jump_targets.contains(&blk_tid) {
+                    return Some(blk_tid);
+                }
+            }
+        }
+        if let Some(instr) = self.instr_iter.peek() {
+            let blk_tid = Tid {
+                id: format!("blk_{}", instr.address),
+                address: instr.address.clone(),
+            };
+            if self.jump_targets.contains(&blk_tid) {
+                return Some(blk_tid);
+            }
+        }
+        None
     }
 
-    fn get_next_instr(&self) -> Option<InstructionSimple> {
-        todo!()
+    /// Return `true` if the next P-Code instruction is a jump.
+    fn peek_for_jmp_op(&mut self) -> bool {
+        if let Some(op_iter) = self.op_iter.as_mut() {
+            if let Some(op) = op_iter.peek() {
+                match op.pcode_mnemonic {
+                    PcodeOperation::JmpType(_) => return true,
+                    PcodeOperation::ExpressionType(_) => return false,
+                }
+            }
+        }
+        if let Some(instr) = self.instr_iter.peek() {
+            if let Some(op) = instr.pcode_ops.first() {
+                match op.pcode_mnemonic {
+                    PcodeOperation::JmpType(_) => return true,
+                    PcodeOperation::ExpressionType(_) => return false,
+                }
+            }
+        }
+        false
     }
 
-    fn get_next_op(&self) -> Option<PcodeOpSimple> {
-        todo!()
+    /// Peek the address (as a string) and the P-Code-Index of the next instruction (either P-Code or assembly).
+    pub fn peek_next_tid(&mut self) -> Option<(&'a str, u64)> {
+        if let Some(op_iter) = self.op_iter.as_mut() {
+            if let Some(op) = op_iter.peek() {
+                return Some((&self.current_instr.unwrap().address, op.pcode_index));
+            }
+        }
+        if let Some(instr) = self.instr_iter.peek() {
+            Some((&instr.address, 0))
+        } else {
+            None
+        }
     }
 
-    fn get_blk_tid_of_current_operation(&self) -> Tid {
-        todo!()
+    /// Advance the iterator until one of the following occurs:
+    /// - The peeked next instruction would be a jump target not equal to the given block TID. Return None.
+    ///   The comparison with the given block TID ensures that Defs are added to blocks starting with a jump target.
+    /// - The peeked next instruction is a jump. Return None.
+    /// - A P-Code operation corresponding to a `Def` is reached.
+    ///   Yield the operation and the address of the corresponding assembly instruction.
+    pub fn next_def(&mut self, block_tid: &Tid) -> Option<(&'a PcodeOpSimple, &'a str)> {
+        loop {
+            if self.peek_for_jmp_target().as_ref() != Some(block_tid) || self.peek_for_jmp_op() {
+                return None;
+            }
+            if let Some(op_iter) = self.op_iter.as_mut() {
+                if let Some(op) = op_iter.next() {
+                    return Some((op, &self.current_instr.unwrap().address));
+                }
+            }
+            // Forward to next instruction and repeat the loop
+            if self.next_instr().is_none() {
+                // We reached the end of the iterator.
+                return None;
+            }
+        }
     }
 
-    fn get_last_operation_pair(&self) -> Option<(InstructionSimple, PcodeOpSimple)> {
-        todo!()
+    /// If the next operation is a jump, yield it together with the address of the corresponding assembly instruction.
+    /// Panics if the next operation is not a jump.
+    pub fn next_jmp(&mut self) -> Option<(&'a PcodeOpSimple, &'a str)> {
+        let op_iter = if let Some(op_iter) = self.op_iter.as_mut() {
+            op_iter
+        } else {
+            self.next_instr().unwrap();
+            self.op_iter.as_mut().unwrap()
+        };
+        let jmp_op = op_iter.next().unwrap();
+        if let PcodeOperation::JmpType(_) = &jmp_op.pcode_mnemonic {
+            Some((jmp_op, &self.current_instr.unwrap().address))
+        } else {
+            panic!("Expected jump operation.")
+        }
     }
 }
 
@@ -274,10 +381,6 @@ pub struct BlockSimple {
 }
 
 impl BlockSimple {
-    fn get_op_iterator(&self) -> OpIterator {
-        todo!()
-    }
-
     /// Collects all jumps targets of instructions within the block.
     ///
     /// A block `Tid`is created for every target using the id scheme `blk_<addr>_<index>`, with
@@ -303,26 +406,18 @@ impl BlockSimple {
         let mut finalized_blocks = vec![];
 
         // The iterator provides the currently pcode operation together with its instruction.
-        let mut iterator = self.get_op_iterator();
+        let mut iterator = OpIterator::new(&self.instructions[..], jump_targets);
 
         // While a current operation is present, translate it and add it to a block...
-        while let Some((instr, op)) = iterator.get_current_pair() {
-            let tid = generate_new_tid(instr.address.clone(), op.pcode_index);
-
-            // add_defs_to_block() processes the current operation and following, until:
-            // A) a jump target is reached
-            // B) the current operation is a jump operation
-            //  This function might change the current operation.
-            let blk = add_defs_to_block(Blk::new(), &mut iterator, jump_targets);
-            // At this point, the current operation is either a target or a jump instruction.
-
-            // This is used to finish a block.
-            let finished_blk = finish_blk(blk, &mut iterator, jump_targets);
-            let finalized_blk = Term {
+        while let Some((instr_addr, pcode_index)) = iterator.peek_next_tid() {
+            let tid = generate_new_tid(instr_addr.to_string(), pcode_index);
+            let block = Term {
                 tid,
-                term: finished_blk,
+                term: Blk::new(),
             };
-            finalized_blocks.push(finalized_blk);
+            let block = add_defs_to_block(block, &mut iterator);
+            let block = add_jump_to_block(block, &mut iterator);
+            finalized_blocks.push(block);
         }
         finalized_blocks
     }
@@ -339,77 +434,61 @@ fn generate_new_tid(address: String, pcode_index: u64) -> Tid {
 
 /// Uses the iterator to translate current operation and following into Defs and adds them to the block.
 /// Returns if current operation is a jump target, or a jump operation.
-fn add_defs_to_block(mut blk: Blk, iterator: &mut OpIterator, jump_targets: &HashSet<Tid>) -> Blk {
-    if jump_targets.contains(&iterator.get_blk_tid_of_current_operation()) {
-        return blk;
+fn add_defs_to_block(mut block: Term<Blk>, iterator: &mut OpIterator) -> Term<Blk> {
+    while let Some((def_op, address)) = iterator.next_def(&block.tid) {
+        block
+            .term
+            .defs
+            .append(&mut def_op.clone().into_ir_def(address));
     }
-    if matches!(
-        iterator.get_current_op().unwrap().pcode_mnemonic,
-        PcodeOperation::JmpType(_)
-    ) {
-        return blk;
-    }
-    // Add current operation to block
-    blk.defs.append(
-        &mut iterator
-            .get_current_op()
-            .unwrap()
-            .clone()
-            .into_ir_def(&iterator.get_current_instr().unwrap().address),
-    );
-
-    // Add all following operations, that are not a target nor a jump to the block
-    while let Some((instr, op)) = iterator.next() {
-        if jump_targets.contains(&iterator.get_blk_tid_of_current_operation()) {
-            return blk;
-        }
-        if matches!(
-            iterator.get_current_op().unwrap().pcode_mnemonic,
-            PcodeOperation::JmpType(_)
-        ) {
-            return blk;
-        }
-        blk.defs.append(
-            &mut iterator
-                .get_current_op()
-                .unwrap()
-                .clone()
-                .into_ir_def(&iterator.get_current_instr().unwrap().address),
-        );
-    }
-    // What to do if the sequence ends without a jump?
-    blk
+    block
 }
 
-fn finish_blk(mut blk: Blk, iterator: &mut OpIterator, jump_targets: &HashSet<Tid>) -> Blk {
-    // If current operation is a target, add implicit branch to next block
-    if jump_targets.contains(&iterator.get_blk_tid_of_current_operation()) {
-        let (last_instr, last_op) = iterator.get_last_operation_pair().unwrap();
-        blk = add_branch_to_blk(
-            blk,
-            last_instr.address.clone(),
-            last_op.pcode_index,
-            iterator.get_blk_tid_of_current_operation(),
-        );
-        // Here the current operation is not changed, since the operation is not translated and add to block yet.
-        return blk;
+/// Create the TID of an implicit jump instruction that gets added to a block
+/// when it does not end in a jump in Ghidra but falls through to the next instruction.
+fn create_implicit_jmp_tid(block: &Term<Blk>, iterator: &mut OpIterator) -> Tid {
+    if let Some(last_def) = block.term.defs.last() {
+        last_def.tid.clone().with_id_suffix("_implicit_jump")
+    } else {
+        // FIXME: This generates instructions with a "blk" prefix.
+        // Usually, we want to avoid that.
+        block.tid.clone().with_id_suffix("_implicit_jump")
     }
+}
 
-    if matches!(
-        iterator.get_current_op().unwrap().pcode_mnemonic,
-        PcodeOperation::JmpType(_)
-    ) {
-        blk = add_jmp_to_blk(
-            blk,
-            iterator.get_current_instr().unwrap(),
-            iterator.get_current_op().unwrap(),
-            iterator.get_next_instr().as_ref(),
+/// Add jumps to the block depending on the situation:
+/// - If the next instruction in the iterator is a jump target, then add a fallthrough jump to that instruction to the block.
+/// - Else if the next instruction is a jump, create the corresponding IR-jumps and add them to the block.
+/// - Else try to add a fallthrough jump to the next block on a best-effort basis.
+fn add_jump_to_block(mut block: Term<Blk>, iterator: &mut OpIterator) -> Term<Blk> {
+    if let Some(target_tid) = iterator.peek_for_jmp_target() {
+        let jmp_tid = create_implicit_jmp_tid(&block, iterator);
+        let jmp = Term {
+            tid: jmp_tid,
+            term: Jmp::Branch(target_tid),
+        };
+        block.term.jmps.push(jmp);
+    } else if let Some((jmp_op, _)) = iterator.next_jmp() {
+        block.term = add_jmp_to_blk(
+            block.term,
+            iterator.current_instr.unwrap().clone(),
+            jmp_op.clone(),
+            iterator.peek_next_instr(),
         );
-        // The current operation is translated. We can move to the next operation.
-        iterator.next();
-        return blk;
-    }
-    return blk;
+    } else if let Some(instr) = iterator.current_instr {
+        let jmp_tid = create_implicit_jmp_tid(&block, iterator);
+        let fallthrough_address = instr.get_best_guess_fallthrough_addr(None);
+        let target_tid = Tid {
+            id: format!("blk_{}", fallthrough_address),
+            address: fallthrough_address,
+        };
+        let jmp = Term {
+            tid: jmp_tid,
+            term: Jmp::Branch(target_tid),
+        };
+        block.term.jmps.push(jmp);
+    } // Else we cannot guess a fallthrough address without any instruction and the block ends without a jump.
+    block
 }
 
 fn add_jmp_to_blk(
