@@ -1,7 +1,7 @@
 use super::*;
-use crate::ghidra_pcode::VarnodeSimple;
-use crate::ghidra_pcode::PcodeOperation::JmpType;
 use crate::ghidra_pcode::pcode_op_simple::tests::*;
+use crate::ghidra_pcode::PcodeOperation::JmpType;
+use crate::ghidra_pcode::VarnodeSimple;
 use crate::{def, expr};
 
 #[test]

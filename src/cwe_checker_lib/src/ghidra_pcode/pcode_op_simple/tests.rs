@@ -261,7 +261,8 @@ fn test_create_load() {
 #[test]
 #[should_panic]
 fn test_create_load_not_load() {
-    mock_pcode_op_add(VarnodeSimple::mock("space", "id", 8), None, None).create_load(&"0x123".to_string());
+    mock_pcode_op_add(VarnodeSimple::mock("space", "id", 8), None, None)
+        .create_load(&"0x123".to_string());
 }
 
 #[test]
