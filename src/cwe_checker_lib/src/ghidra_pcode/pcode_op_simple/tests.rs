@@ -3,13 +3,12 @@ use crate::ghidra_pcode::tests::*;
 use crate::ghidra_pcode::ExpressionType::*;
 use crate::ghidra_pcode::PcodeOperation::ExpressionType;
 use crate::ghidra_pcode::PcodeOperation::JmpType;
-use crate::pcode::JmpType::*;
 use crate::variable;
 use crate::{def, expr};
 
 /// Simplified construction of pcode operation with `pcode_index: 1` and
 /// pcode_mnemonic: ExpressionType(INT_ADD).
-fn mock_pcode_op_add(
+pub fn mock_pcode_op_add(
     input0: VarnodeSimple,
     input1: Option<VarnodeSimple>,
     output: Option<VarnodeSimple>,
@@ -24,8 +23,34 @@ fn mock_pcode_op_add(
     }
 }
 
+pub fn mock_pcode_op_branch(pcode_index: u64, input0: VarnodeSimple) -> PcodeOpSimple {
+    PcodeOpSimple {
+        pcode_index,
+        pcode_mnemonic: JmpType(BRANCH),
+        input0,
+        input1: None,
+        input2: None,
+        output: None,
+    }
+}
+
+pub fn mock_pcode_op_cbranch(
+    pcode_index: u64,
+    input0: VarnodeSimple,
+    input1: VarnodeSimple,
+) -> PcodeOpSimple {
+    PcodeOpSimple {
+        pcode_index,
+        pcode_mnemonic: JmpType(CBRANCH),
+        input0,
+        input1: Some(input1),
+        input2: None,
+        output: None,
+    }
+}
+
 impl PcodeOpSimple {
-    fn with_mnemonic(&self, mnemonic: PcodeOperation) -> PcodeOpSimple {
+    pub fn with_mnemonic(&self, mnemonic: PcodeOperation) -> PcodeOpSimple {
         PcodeOpSimple {
             pcode_index: self.pcode_index,
             pcode_mnemonic: mnemonic,
@@ -47,6 +72,11 @@ impl PcodeOpSimple {
         self.input1 = input1;
         self.input2 = input2;
         self.output = output;
+        self
+    }
+
+    pub fn with_index(mut self, index: u64) -> PcodeOpSimple {
+        self.pcode_index = index;
         self
     }
 }
@@ -604,4 +634,39 @@ fn test_wrap_in_assign_or_store_output_not_variable_nor_implicit_store() {
         Some(mock_varnode("const", "0xFFFF", 4)),
     )
     .wrap_in_assign_or_store(&"0x1234".to_string(), expr!("0x1111:4"));
+}
+
+#[test]
+fn test_get_jump_target_relative() {
+    // backwards jump is lower bounded to 0
+    let var = mock_varnode("const".into(), "0xFFFFFFFF".into(), 4);
+    let op = mock_pcode_op_branch(0, var);
+    assert_eq!(op.get_jump_target(), Some(JmpTarget::Relative((0, 0))));
+
+    let var = mock_varnode("const".into(), "0x1".into(), 4);
+    let op = mock_pcode_op_branch(7, var);
+    assert_eq!(op.get_jump_target(), Some(JmpTarget::Relative((7, 8))));
+}
+
+#[test]
+fn test_get_jump_target_absolute() {
+    // backwards jump is lower bounded to 0
+    let var = mock_varnode("ram".into(), "0xFFFFFFFF".into(), 4);
+    let op = mock_pcode_op_branch(0, var);
+    assert_eq!(op.get_jump_target(), Some(JmpTarget::Absolute(0xFFFFFFFF)));
+}
+
+#[test]
+fn collect_collect_jmp_targets() {
+    todo!()
+}
+
+#[test]
+fn collect_into_ir_def() {
+    todo!()
+}
+
+#[test]
+fn collect_create_def() {
+    todo!()
 }

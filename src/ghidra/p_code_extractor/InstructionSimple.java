@@ -15,18 +15,27 @@ import java.util.ArrayList;
 public class InstructionSimple {
     private String mnemonic;
     private String address;
+    private int size;
     private ArrayList<PcodeOpSimple> pcode_ops = new ArrayList();
     private ArrayList<String> potential_targets;
+    private String fall_through = null;
 
 
     public InstructionSimple(Instruction instruction, VarnodeContext context) {
         this.mnemonic = instruction.toString();
         this.address = "0x" + instruction.getAddressString(false, false);
+        this.size = instruction.getLength();
+        
+        if (instruction.getFallThrough() != null){
+            this.fall_through = instruction.getFallThrough().toString(false, false);
+        }
+ 
+        
         PcodeOp[] pcodes = instruction.getPcode(true);
         for (int i = 0; i < pcodes.length; i++) {
             pcode_ops.add(new PcodeOpSimple(i, pcodes[i], context));
 
-            // add potential targets if instruction contains indiect call or branch.
+            // add potential targets if instruction contains indirect call or branch.
             // Note: All references are put together. Multiple CALLIND or BRANCHIND should not
             // occur within a single instruction, but if so, the potential targets are not
             // separable.

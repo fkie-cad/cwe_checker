@@ -1,9 +1,12 @@
 use super::*;
 use serde::{Deserialize, Serialize};
 mod jumps;
+pub use jumps::*;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct PcodeOpSimple {
+    /// Index of the operation within the pcode operation sequence.
+    /// Starts at 0.
     pub pcode_index: u64,
     pub pcode_mnemonic: PcodeOperation,
     pub input0: VarnodeSimple,
@@ -13,6 +16,63 @@ pub struct PcodeOpSimple {
 }
 
 impl PcodeOpSimple {
+    /// Returns block `Tid` of jump target.
+    /// In case of a conditional branch the fallthrough block `Tid` is provided as well,
+    /// describing an implicit branch if the conditional jump is not taken.
+    /// The provided `fallthrough` is used, if:
+    /// * a pcode relative jump exceeds the pcode operation sequence
+    /// * No following pcode operation left, if a conditional branch is not taken
+    pub fn collect_jmp_targets(
+        &self,
+        instruction_address: String,
+        pcode_sequence_length: u64,
+        fall_through_address: String,
+    ) -> Vec<Tid> {
+        let mut jump_targets = vec![];
+
+        if let Some(JmpTarget::Absolute(_)) = self.get_jump_target() {
+            jump_targets.push(Tid {
+                id: format!("blk_{}", self.input0.id.clone()),
+                address: self.input0.id.clone(),
+            });
+        }
+
+        if let Some(JmpTarget::Relative((_, target_index))) = self.get_jump_target() {
+            let target = match target_index {
+                0 => Tid {
+                    id: format!("blk_{}", instruction_address),
+                    address: instruction_address.clone(),
+                },
+                // jump behind pcode sequence
+                target_index if target_index >= pcode_sequence_length => Tid {
+                    id: format!("blk_{}", fall_through_address),
+                    address: fall_through_address.clone(),
+                },
+                _ => Tid {
+                    id: format!("blk_{}_{}", instruction_address, target_index),
+                    address: instruction_address.clone(),
+                },
+            };
+            jump_targets.push(target)
+        }
+
+        // Add implicit branch target, if conditional branch is not taken
+        if matches!(self.pcode_mnemonic, PcodeOperation::JmpType(CBRANCH)) {
+            if self.pcode_index + 1 < pcode_sequence_length {
+                jump_targets.push(Tid {
+                    id: format!("blk_{}_{}", instruction_address, self.pcode_index + 1),
+                    address: instruction_address.clone(),
+                })
+            } else {
+                jump_targets.push(Tid {
+                    id: format!("blk_{}", fall_through_address),
+                    address: fall_through_address.clone(),
+                })
+            }
+        }
+        return jump_targets;
+    }
+
     /// Returns `true` if at least one input is ram located.
     pub fn has_implicit_load(&self) -> bool {
         if self.input0.address_space == "ram" {
@@ -46,7 +106,7 @@ impl PcodeOpSimple {
     /// The created instructions use the virtual register `$load_tempX`, whereby `X` is
     /// either `0`, `1`or `2` representing which input is used.
     /// The created `Tid` is named `instr_<address>_<pcode index>_load<X>`.
-    pub fn create_implicit_loads(&mut self, address: &String) -> Vec<Term<Def>> {
+    pub fn create_implicit_loads(&mut self, address: &str) -> Vec<Term<Def>> {
         let mut explicit_loads = vec![];
         if self.input0.address_space == "ram" {
             explicit_loads.push(self.input0.into_explicit_load(
@@ -80,10 +140,10 @@ impl PcodeOpSimple {
         explicit_loads
     }
 
-    /// Translates a single pcode operation into at leas one `Def`.
+    /// Translates a single pcode operation into at least one `Def`.
     ///
     /// Adds additional `Def::Load`, if the pcode operation performs implicit loads from ram
-    pub fn into_ir_def(mut self, address: &String) -> Vec<Term<Def>> {
+    pub fn into_ir_def(&mut self, address: &str) -> Vec<Term<Def>> {
         let mut defs = vec![];
         // if the pcode operation contains implicit load operations, prepend them.
         if self.has_implicit_load() {
@@ -93,7 +153,7 @@ impl PcodeOpSimple {
 
         let def = match self.pcode_mnemonic {
             PcodeOperation::ExpressionType(expr_type) => self.create_def(address, expr_type),
-            PcodeOperation::JmpType(jmp_type) => todo!(),
+            PcodeOperation::JmpType(_) => panic!("Jump operation cannot be translated into Def"),
         };
 
         defs.push(def);
@@ -102,7 +162,7 @@ impl PcodeOpSimple {
 
     /// Creates `Def::Store`, `Def::Load` or `Def::Assign` according to the pcode operations'
     /// expression type.
-    fn create_def(&self, address: &String, expr_type: ExpressionType) -> Term<Def> {
+    fn create_def(&self, address: &str, expr_type: ExpressionType) -> Term<Def> {
         match expr_type {
             ExpressionType::LOAD => self.create_load(address),
             ExpressionType::STORE => self.create_store(address),
@@ -126,7 +186,7 @@ impl PcodeOpSimple {
     /// * load destination is not a variable
     /// * `input1` is `None`
     /// * `into_ir_expr()` returns `Err` on any varnode
-    pub fn create_load(&self, address: &String) -> Term<Def> {
+    pub fn create_load(&self, address: &str) -> Term<Def> {
         if !matches!(
             self.pcode_mnemonic,
             PcodeOperation::ExpressionType(ExpressionType::LOAD)
@@ -171,7 +231,7 @@ impl PcodeOpSimple {
     /// * `input1` is None
     /// * `input2` is None
     /// * `into_ir_expr()` returns `Err` on any varnode
-    fn create_store(&self, address: &String) -> Term<Def> {
+    fn create_store(&self, address: &str) -> Term<Def> {
         if !matches!(
             self.pcode_mnemonic,
             PcodeOperation::ExpressionType(ExpressionType::STORE)
@@ -215,7 +275,7 @@ impl PcodeOpSimple {
     /// * self.input1 is `None` or cannot be translated into `Expression:Const`
     /// * Amount of bytes to truncate cannot be translated into `u64`
     /// * `into_ir_expr()` returns `Err` `on self.input0`
-    fn create_subpiece(&self, address: &String) -> Term<Def> {
+    fn create_subpiece(&self, address: &str) -> Term<Def> {
         if let Expression::Const(truncate) = self
             .input1
             .as_ref()
@@ -250,7 +310,7 @@ impl PcodeOpSimple {
     /// * `self.pcode_mnemonic` is not `PcodeOperation::ExpressionType`
     /// * `self.output` is `None` or `into_it_expr()` returns not an `Expression::Var`
     /// * `into_ir_expr()` returns `Err` on `self.output` or `self.input0`
-    fn create_unop(&self, address: &String) -> Term<Def> {
+    fn create_unop(&self, address: &str) -> Term<Def> {
         if let PcodeOperation::ExpressionType(expr_type) = self.pcode_mnemonic {
             let expr = Expression::UnOp {
                 op: expr_type
@@ -271,7 +331,7 @@ impl PcodeOpSimple {
     /// * `self.pcode_mnemonic` is not `PcodeOperation::ExpressionType`
     /// * `self.output` is `None` or `into_it_expr()` returns not an `Expression::Var`
     /// * `into_ir_expr()` returns `Err` on `self.output`, `self.input0` or `self.input1`
-    pub fn create_biop(&self, address: &String) -> Term<Def> {
+    pub fn create_biop(&self, address: &str) -> Term<Def> {
         if let PcodeOperation::ExpressionType(expr_type) = self.pcode_mnemonic {
             let expr = Expression::BinOp {
                 op: expr_type
@@ -299,7 +359,7 @@ impl PcodeOpSimple {
     /// * `self.pcode_mnemonic` is not `PcodeOperation::ExpressionType`
     /// * `self.output` is `None` or `into_it_expr()` returns not an `Expression::Var`
     /// * `into_ir_expr()` returns `Err` on `self.output` or `self.input0`
-    pub fn create_castop(&self, address: &String) -> Term<Def> {
+    pub fn create_castop(&self, address: &str) -> Term<Def> {
         if let PcodeOperation::ExpressionType(expr_type) = self.pcode_mnemonic {
             let expr = Expression::Cast {
                 op: expr_type
@@ -320,7 +380,7 @@ impl PcodeOpSimple {
     }
 
     /// Translates `PcodeOperation::COPY` into `Term` containing `Def::Assign`.
-    pub fn create_assign(&self, address: &String) -> Term<Def> {
+    pub fn create_assign(&self, address: &str) -> Term<Def> {
         if let PcodeOperation::ExpressionType(ExpressionType::COPY) = self.pcode_mnemonic {
             let expr = self.input0.into_ir_expr().unwrap();
             self.wrap_in_assign_or_store(address, expr)
@@ -336,7 +396,7 @@ impl PcodeOpSimple {
     /// * for Assign case: self.output is `None` or `into_ir_expr()` returns `Err`
     /// * for Assign case: self.output is not `Expression::Var`
     /// * for Store case: self.output is `None` or `get_ram_address()` returns `None`
-    pub fn wrap_in_assign_or_store(&self, address: &String, expr: Expression) -> Term<Def> {
+    pub fn wrap_in_assign_or_store(&self, address: &str, expr: Expression) -> Term<Def> {
         let tid = Tid {
             id: format!("instr_{}_{}", address, self.pcode_index),
             address: address.to_string(),
@@ -375,4 +435,4 @@ impl PcodeOpSimple {
 }
 
 #[cfg(test)]
-mod tests;
+pub mod tests;
