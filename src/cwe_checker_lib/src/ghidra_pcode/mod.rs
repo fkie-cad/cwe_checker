@@ -194,8 +194,13 @@ impl InstructionSimple {
                     next_instr.address.clone()
                 } else {
                     // We have to ensure the same address format as used by Ghidra, even in the case of an integer overflow.
-                    let formatted_address = format!("{:0width$x}", self.get_u64_address() + self.size, width = self.address.len() - 2);
-                    let formatted_address = &formatted_address[(formatted_address.len() + 2 - self.address.len())..];
+                    let formatted_address = format!(
+                        "{:0width$x}",
+                        self.get_u64_address() + self.size,
+                        width = self.address.len() - 2
+                    );
+                    let formatted_address =
+                        &formatted_address[(formatted_address.len() + 2 - self.address.len())..];
                     format!("0x{}", formatted_address)
                 }
             }
@@ -509,6 +514,7 @@ fn add_jump_to_block(mut block: Term<Blk>, iterator: &mut OpIterator) -> Term<Bl
     block
 }
 
+/// Add the given jump operation to the block and, if necessary, a second fallthrough jump instruction.
 fn add_jmp_to_blk(
     mut blk: Blk,
     instr: InstructionSimple,
@@ -547,29 +553,9 @@ fn add_jmp_to_blk(
             blk.jmps.push(cbranch);
             blk.jmps.push(implicit_branch);
         }
-        PcodeOperation::JmpType(jmp) => todo!(),
+        PcodeOperation::JmpType(jmp) => todo!(), // TODO
     }
     return blk;
-}
-
-fn add_branch_to_blk(
-    mut blk: Blk,
-    jump_instruction_address: String,
-    pcode_index_branch_side: u64,
-    target_tid: Tid,
-) -> Blk {
-    let branch = Term {
-        tid: Tid {
-            id: format!(
-                "instr_{}_{}_implicit_jmp",
-                jump_instruction_address, pcode_index_branch_side
-            ),
-            address: jump_instruction_address,
-        },
-        term: Jmp::Branch(target_tid),
-    };
-    blk.jmps.push(branch);
-    blk
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
