@@ -66,7 +66,7 @@ impl PcodeOpSimple {
             } else {
                 jump_targets.push(Tid {
                     id: format!("blk_{}", fall_through_address),
-                    address: instruction_address.clone(),
+                    address: fall_through_address.clone(),
                 })
             }
         }

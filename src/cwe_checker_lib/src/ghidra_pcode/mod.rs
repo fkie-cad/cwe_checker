@@ -193,7 +193,10 @@ impl InstructionSimple {
                 if let Some(next_instr) = consecutive_instr {
                     next_instr.address.clone()
                 } else {
-                    format!("{:x}", self.get_u64_address() + self.size)
+                    // We have to ensure the same address format as used by Ghidra, even in the case of an integer overflow.
+                    let formatted_address = format!("{:0width$x}", self.get_u64_address() + self.size, width = self.address.len() - 2);
+                    let formatted_address = &formatted_address[(formatted_address.len() + 2 - self.address.len())..];
+                    format!("0x{}", formatted_address)
                 }
             }
         }
@@ -340,7 +343,12 @@ impl<'a> OpIterator<'a> {
     ///   Yield the operation and the address of the corresponding assembly instruction.
     pub fn next_def(&mut self, block_tid: &Tid) -> Option<(&'a PcodeOpSimple, &'a str)> {
         loop {
-            if self.peek_for_jmp_target().as_ref() != Some(block_tid) || self.peek_for_jmp_op() {
+            if let Some(jmp_target) = self.peek_for_jmp_target().as_ref() {
+                if jmp_target != block_tid {
+                    return None;
+                }
+            }
+            if self.peek_for_jmp_op() {
                 return None;
             }
             if let Some(op_iter) = self.op_iter.as_mut() {
@@ -349,28 +357,28 @@ impl<'a> OpIterator<'a> {
                 }
             }
             // Forward to next instruction and repeat the loop
-            if self.next_instr().is_none() {
+            if self.peek_next_instr().is_none() {
                 // We reached the end of the iterator.
                 return None;
             }
+            self.next_instr();
         }
     }
 
     /// If the next operation is a jump, yield it together with the address of the corresponding assembly instruction.
-    /// Panics if the next operation is not a jump.
     pub fn next_jmp(&mut self) -> Option<(&'a PcodeOpSimple, &'a str)> {
-        let op_iter = if let Some(op_iter) = self.op_iter.as_mut() {
-            op_iter
-        } else {
-            self.next_instr().unwrap();
-            self.op_iter.as_mut().unwrap()
-        };
-        let jmp_op = op_iter.next().unwrap();
-        if let PcodeOperation::JmpType(_) = &jmp_op.pcode_mnemonic {
-            Some((jmp_op, &self.current_instr.unwrap().address))
-        } else {
-            panic!("Expected jump operation.")
+        if !self.peek_for_jmp_op() {
+            return None;
         }
+        if let Some(op_iter) = self.op_iter.as_mut() {
+            if let Some(jmp_op) = op_iter.next() {
+                return Some((jmp_op, &self.current_instr.unwrap().address));
+            }
+        }
+        self.next_instr().unwrap();
+        let op_iter = self.op_iter.as_mut().unwrap();
+        let jmp_op = op_iter.next().unwrap();
+        Some((jmp_op, &self.current_instr.unwrap().address))
     }
 }
 
@@ -462,22 +470,30 @@ fn create_implicit_jmp_tid(block: &Term<Blk>, iterator: &mut OpIterator) -> Tid 
 /// - Else try to add a fallthrough jump to the next block on a best-effort basis.
 fn add_jump_to_block(mut block: Term<Blk>, iterator: &mut OpIterator) -> Term<Blk> {
     if let Some(target_tid) = iterator.peek_for_jmp_target() {
-        let jmp_tid = create_implicit_jmp_tid(&block, iterator);
-        let jmp = Term {
-            tid: jmp_tid,
-            term: Jmp::Branch(target_tid),
-        };
-        block.term.jmps.push(jmp);
-    } else if let Some((jmp_op, _)) = iterator.next_jmp() {
+        if target_tid != block.tid {
+            // The target is not the very first instruction of the block
+            let jmp_tid = create_implicit_jmp_tid(&block, iterator);
+            let jmp = Term {
+                tid: jmp_tid,
+                term: Jmp::Branch(target_tid),
+            };
+            block.term.jmps.push(jmp);
+            return block;
+        }
+    }
+    if let Some((jmp_op, _)) = iterator.next_jmp() {
         block.term = add_jmp_to_blk(
             block.term,
             iterator.current_instr.unwrap().clone(),
             jmp_op.clone(),
             iterator.peek_next_instr(),
         );
-    } else if let Some(instr) = iterator.current_instr {
+        return block;
+    }
+    if let Some(instr) = iterator.current_instr {
         let jmp_tid = create_implicit_jmp_tid(&block, iterator);
         let fallthrough_address = instr.get_best_guess_fallthrough_addr(None);
+        // TODO: The generation of the TID should not be made by hand here but refactored to somewhere else.
         let target_tid = Tid {
             id: format!("blk_{}", fallthrough_address),
             address: fallthrough_address,
@@ -487,7 +503,9 @@ fn add_jump_to_block(mut block: Term<Blk>, iterator: &mut OpIterator) -> Term<Bl
             term: Jmp::Branch(target_tid),
         };
         block.term.jmps.push(jmp);
-    } // Else we cannot guess a fallthrough address without any instruction and the block ends without a jump.
+        return block;
+    }
+    // Else we cannot guess a fallthrough address without any instruction and the block ends without a jump.
     block
 }
 
@@ -521,7 +539,7 @@ fn add_jmp_to_blk(
             let cbranch = op.into_ir_jump(&instr.address, targets[0].clone());
             let implicit_branch = Term {
                 tid: Tid {
-                    id: format!("instr_{}_{}_implicit_branch", instr.address, op.pcode_index),
+                    id: format!("instr_{}_{}_implicit_jump", instr.address, op.pcode_index),
                     address: instr.address.clone(),
                 },
                 term: Jmp::Branch(targets[1].clone()),
