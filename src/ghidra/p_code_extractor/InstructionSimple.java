@@ -39,12 +39,27 @@ public class InstructionSimple {
             // Note: All references are put together. Multiple CALLIND or BRANCHIND should not
             // occur within a single instruction, but if so, the potential targets are not
             // separable.
-            if ((pcodes[i].getMnemonic() == "CALLIND") || (pcodes[i].getMnemonic() == "BRANCHIND")){
+            if ((pcodes[i].getMnemonic() == "CALLIND") || (pcodes[i].getMnemonic() == "BRANCHIND")) {
                 if (potential_targets == null){
                     potential_targets = new ArrayList<String>();
                 }
-                for (Reference ref : instruction.getReferencesFrom()){
-                    potential_targets.add("0x" + ref.getToAddress().toString(false, false));
+                for (Reference ref : instruction.getReferencesFrom()) {
+                    switch(ref.getReferenceType().toString()) {
+                        case "COMPUTED_JUMP":
+                        case "CONDITIONAL_COMPUTED_JUMP":
+                            if (pcodes[i].getMnemonic() == "BRANCHIND") {
+                                potential_targets.add("0x" + ref.getToAddress().toString(false, false));
+                            }
+                            break;
+                        case "COMPUTED_CALL":
+                        case "CONDITIONAL_COMPUTED_CALL":
+                            if (pcodes[i].getMnemonic() == "CALLIND") {
+                                potential_targets.add("0x" + ref.getToAddress().toString(false, false));
+                            }
+                            break;
+                        default:
+                            break;
+                    }
                 }                    
             }
         }

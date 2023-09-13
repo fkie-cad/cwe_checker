@@ -1,5 +1,5 @@
 use crate::{
-    ghidra_pcode::pcode_operations::PcodeOperation,
+    ghidra_pcode::{pcode_operations::PcodeOperation, instruction::InstructionSimple, block::generate_block_tid},
     intermediate_representation::{Expression, Jmp, Term, Tid},
     pcode::JmpType,
 };
@@ -26,17 +26,15 @@ impl PcodeOpSimple {
     pub fn get_jump_target(&self) -> Option<JmpTarget> {
         use crate::pcode::JmpType::*;
         if let PcodeOperation::JmpType(jmp_type) = &self.pcode_mnemonic {
-            // Pcode definition distinguishes between `location` and `offset`.
-            // Note: $(GHIDRA_PATH)/docs/languages/html/pcodedescription.html#cpui_branch
-            // Currently, the IR does not distinguishes these cases.
-            // We do nothing here.
             match jmp_type {
-                BRANCH | CBRANCH | CALL => (),                  // case `location`
-                BRANCHIND | CALLIND | CALLOTHER | RETURN => (), // case `offset`
+                BRANCH | CBRANCH | CALL => (),
+                BRANCHIND | CALLIND | CALLOTHER | RETURN => return None,
             }
             if let Some(target) = self.input0.get_ram_address() {
                 return Some(JmpTarget::Absolute(target.try_to_u64().unwrap()));
             } else if let Expression::Const(jmp_offset) = self.input0.into_ir_expr().unwrap() {
+                // TODO: The computation for negative target indices does not work for 32-bit-systems,
+                // as addition causes no overflow when using u64 for the computation!
                 if let Some(target_index) = self
                     .pcode_index
                     .checked_add_signed(jmp_offset.try_to_i64().unwrap())
@@ -48,33 +46,37 @@ impl PcodeOpSimple {
                 }
             }
         }
-        None
+        panic!("operation is not a jump")
     }
 
     /// Returns the translated jump to the provided location.
-    ///
-    /// Note: Currently, it supports `BRANCH` and `CBRANCH` only.
-    pub fn into_ir_jump(&self, address: &String, target: Tid) -> Term<Jmp> {
+    pub fn into_ir_jump(&self, instr: &InstructionSimple) -> Term<Jmp> {
+        let address = &instr.address;
+        let targets = self.collect_jmp_targets(
+            instr.address.clone(),
+            instr.pcode_ops.len() as u64,
+            instr.fall_through.as_deref(),
+        );
         if let PcodeOperation::JmpType(jmp) = self.pcode_mnemonic {
             match jmp {
-                JmpType::BRANCH => self.create_branch(address, target),
-                JmpType::CBRANCH => self.create_cbranch(address, target),
-                JmpType::BRANCHIND => todo!(),
+                JmpType::BRANCH => self.create_branch(address, targets[0].clone()),
+                JmpType::CBRANCH => self.create_cbranch(address, targets[0].clone()),
+                JmpType::BRANCHIND => self.create_branch_indirect(address),
                 JmpType::CALL => todo!(),
-                JmpType::CALLIND => todo!(),
+                JmpType::CALLIND => self.create_call_indirect(address, instr.fall_through.as_deref()),
                 JmpType::CALLOTHER => todo!(),
-                JmpType::RETURN => todo!(),
+                JmpType::RETURN => self.create_return(address),
             }
         } else {
             panic!("Not a jump operation")
         }
     }
 
-    fn create_branch(&self, address: &String, target: Tid) -> Term<Jmp> {
+    fn create_branch(&self, address: &str, target: Tid) -> Term<Jmp> {
         wrap_in_tid(address, self.pcode_index, Jmp::Branch(target))
     }
 
-    fn create_cbranch(&self, address: &String, target: Tid) -> Term<Jmp> {
+    fn create_cbranch(&self, address: &str, target: Tid) -> Term<Jmp> {
         let cbranch = Jmp::CBranch {
             target: target,
             condition: self.input1.as_ref().unwrap().into_ir_expr().unwrap(),
@@ -82,12 +84,12 @@ impl PcodeOpSimple {
         wrap_in_tid(address, self.pcode_index, cbranch)
     }
 
-    fn create_branch_indirect(&self, address: &String) -> Term<Jmp> {
+    fn create_branch_indirect(&self, address: &str) -> Term<Jmp> {
         let branch_ind = Jmp::BranchInd(self.input0.into_ir_expr().unwrap());
         wrap_in_tid(address, self.pcode_index, branch_ind)
     }
 
-    fn create_call(&self, address: &String) -> Term<Jmp> {
+    fn create_call(&self, address: &str) -> Term<Jmp> {
         let branch_ind = Jmp::Call {
             target: todo!(),
             return_: Some(todo!()),
@@ -95,15 +97,18 @@ impl PcodeOpSimple {
         wrap_in_tid(address, self.pcode_index, branch_ind)
     }
 
-    fn create_call_indirect(&self, address: &String) -> Term<Jmp> {
-        let branch_ind = Jmp::CallInd {
-            target: todo!(),
-            return_: todo!(),
+    fn create_call_indirect(&self, address: &str, return_addr: Option<&str>) -> Term<Jmp> {
+        let return_ = return_addr.map(|address| {
+            generate_block_tid(address.to_string(), 0)
+        });
+        let call_ind = Jmp::CallInd {
+            target: self.input0.into_ir_expr().unwrap(),
+            return_,
         };
-        wrap_in_tid(address, self.pcode_index, branch_ind)
+        wrap_in_tid(address, self.pcode_index, call_ind)
     }
 
-    fn create_call_other(&self, address: &String) -> Term<Jmp> {
+    fn create_call_other(&self, address: &str) -> Term<Jmp> {
         let call_other = Jmp::CallOther {
             description: todo!(),
             return_: todo!(),
@@ -111,14 +116,14 @@ impl PcodeOpSimple {
         wrap_in_tid(address, self.pcode_index, call_other)
     }
 
-    fn create_return(&self, address: &String) -> Term<Jmp> {
-        let _return = Jmp::Return(todo!());
+    fn create_return(&self, address: &str) -> Term<Jmp> {
+        let _return = Jmp::Return(self.input0.into_ir_expr().unwrap());
         wrap_in_tid(address, self.pcode_index, _return)
     }
 }
 
 /// Helper function to wrap a `Jmp` in a `Tid` with id `instr_<addr>_<pcode_index>`
-fn wrap_in_tid(address: &String, pcode_index: u64, jmp: Jmp) -> Term<Jmp> {
+fn wrap_in_tid(address: &str, pcode_index: u64, jmp: Jmp) -> Term<Jmp> {
     Term {
         tid: Tid {
             id: format!("instr_{}_{}", address, pcode_index),

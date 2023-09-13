@@ -38,7 +38,7 @@ fn test_create_branch() {
         },
         term: Jmp::Branch(target.clone()),
     };
-    assert_eq!(op.create_branch(&"0x1111".into(), target), expected)
+    assert_eq!(op.create_branch("0x1111", target), expected)
 }
 
 #[test]
@@ -60,7 +60,7 @@ fn test_create_cbranch() {
             condition: expr!("ZF:1"),
         },
     };
-    assert_eq!(op.create_cbranch(&"0x1111".into(), target), expected)
+    assert_eq!(op.create_cbranch("0x1111", target), expected)
 }
 
 #[test]

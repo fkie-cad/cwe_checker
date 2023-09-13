@@ -55,24 +55,14 @@ impl<'a> OpIterator<'a> {
         if let Some(op_iter) = self.op_iter.as_mut() {
             if let Some(op) = op_iter.peek() {
                 let address = self.current_instr.unwrap().address.clone();
-                let blk_tid_name = match op.pcode_index {
-                    0 => format!("blk_{}", address),
-                    pcode_index => format!("blk_{}_{}", address, pcode_index),
-                };
-                let blk_tid = Tid {
-                    id: blk_tid_name,
-                    address,
-                };
+                let blk_tid = generate_block_tid(address, op.pcode_index);
                 if self.jump_targets.contains(&blk_tid) {
                     return Some(blk_tid);
                 }
             }
         }
         if let Some(instr) = self.instr_iter.peek() {
-            let blk_tid = Tid {
-                id: format!("blk_{}", instr.address),
-                address: instr.address.clone(),
-            };
+            let blk_tid = generate_block_tid(instr.address.clone(), 0);
             if self.jump_targets.contains(&blk_tid) {
                 return Some(blk_tid);
             }
@@ -198,7 +188,7 @@ impl BlockSimple {
 
         // While a current operation is present, translate it and add it to a block...
         while let Some((instr_addr, pcode_index)) = iterator.peek_next_tid() {
-            let tid = generate_new_tid(instr_addr.to_string(), pcode_index);
+            let tid = generate_block_tid(instr_addr.to_string(), pcode_index);
             let block = Term {
                 tid,
                 term: Blk::new(),
@@ -212,7 +202,7 @@ impl BlockSimple {
 }
 
 /// Generates a block tid using the naming convention.
-fn generate_new_tid(address: String, pcode_index: u64) -> Tid {
+pub fn generate_block_tid(address: String, pcode_index: u64) -> Tid {
     let id = match pcode_index {
         0 => format!("blk_{}", address),
         _ => format!("blk_{}_{}", address, pcode_index),
@@ -272,12 +262,11 @@ fn add_jump_to_block(mut block: Term<Blk>, iterator: &mut OpIterator) -> Term<Bl
     }
     if let Some(instr) = iterator.current_instr {
         let jmp_tid = create_implicit_jmp_tid(&block);
-        let fallthrough_address = instr.get_best_guess_fallthrough_addr(None);
-        // TODO: The generation of the TID should not be made by hand here but refactored to somewhere else.
-        let target_tid = Tid {
-            id: format!("blk_{}", fallthrough_address),
-            address: fallthrough_address,
-        };
+        let fallthrough_address = instr
+            .fall_through
+            .as_ref()
+            .expect("Instruction should have a fall trough address.");
+        let target_tid = generate_block_tid(fallthrough_address.clone(), 0);
         let jmp = Term {
             tid: jmp_tid,
             term: Jmp::Branch(target_tid),
@@ -296,28 +285,56 @@ fn add_jmp_to_blk(
     op: PcodeOpSimple,
     next_instr: Option<&InstructionSimple>,
 ) -> Blk {
-    let fallthrough_address = instr.get_best_guess_fallthrough_addr(next_instr);
     let targets = op.collect_jmp_targets(
         instr.address.clone(),
         instr.pcode_ops.len() as u64,
-        fallthrough_address.clone(),
+        instr.fall_through.as_deref(),
     );
     match op.pcode_mnemonic {
         PcodeOperation::ExpressionType(_) => {
             panic!("current op is not a jump.")
         }
         PcodeOperation::JmpType(BRANCH) => {
-            let branch = op.into_ir_jump(&instr.address, targets[0].clone());
+            let branch = op.into_ir_jump(&instr);
+            blk.jmps.push(branch);
+        }
+        PcodeOperation::JmpType(BRANCHIND) => {
+            let branch = op.into_ir_jump(&instr);
+            dbg!(&branch); // TODO: Remove after writing tests for BRANCHIND
+            blk.jmps.push(branch);
+            if let Some(targets) = &instr.potential_targets {
+                for target in targets {
+                    let target_tid = generate_block_tid(target.clone(), 0);
+                    blk.indirect_jmp_targets.push(target_tid);
+                }
+            }
+            dbg!(&blk.indirect_jmp_targets); // TODO: Remove after writing tests for BRANCHIND
+        }
+        PcodeOperation::JmpType(CALLIND) => {
+            let branch = op.into_ir_jump(&instr);
+            dbg!(&branch); // TODO: Remvoe after writing tests for CALLIND
+            blk.jmps.push(branch);
+            if let Some(targets) = &instr.potential_targets {
+                for target in targets {
+                    let target_tid = Tid {
+                        id: format!("FUN_{}", target),
+                        address: target.clone(),
+                    };
+                    dbg!(&target_tid); // TODO: Remove after writing tests for CALLIND
+                                       // TODO: In cases with exactly one call target that call can be replaced by a direct call.
+                                       // But the test, whether there is only one target possible should probably made later in the analysis.
+                    blk.indirect_jmp_targets.push(target_tid);
+                }
+            }
+        }
+        PcodeOperation::JmpType(RETURN) => {
+            let branch = op.into_ir_jump(&instr);
+            dbg!(&branch); // TODO: Remove after writing tests for RETURN
             blk.jmps.push(branch);
         }
         // Add conditional branch and then implicit branch
         PcodeOperation::JmpType(CBRANCH) => {
-            let targets = op.collect_jmp_targets(
-                instr.address.clone(),
-                instr.pcode_ops.len() as u64,
-                fallthrough_address.clone(),
-            );
-            let cbranch = op.into_ir_jump(&instr.address, targets[0].clone());
+            let cbranch = op.into_ir_jump(&instr);
             let implicit_branch = Term {
                 tid: Tid {
                     id: format!("instr_{}_{}_implicit_jump", instr.address, op.pcode_index),
@@ -328,7 +345,15 @@ fn add_jmp_to_blk(
             blk.jmps.push(cbranch);
             blk.jmps.push(implicit_branch);
         }
-        PcodeOperation::JmpType(jmp) => todo!(), // TODO
+        _ => {
+            // TODO: Remove debug prints!
+            dbg!(&instr);
+            dbg!(&op);
+            todo!()
+        }
+        PcodeOperation::JmpType(CALL) => todo!(),
+        PcodeOperation::JmpType(CALLIND) => todo!(),
+        PcodeOperation::JmpType(CALLOTHER) => todo!(),
     }
     return blk;
 }

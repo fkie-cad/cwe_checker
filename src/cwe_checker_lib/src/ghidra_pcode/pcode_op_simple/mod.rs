@@ -26,32 +26,23 @@ impl PcodeOpSimple {
         &self,
         instruction_address: String,
         pcode_sequence_length: u64,
-        fall_through_address: String,
+        fall_through_address: Option<&str>,
     ) -> Vec<Tid> {
         let mut jump_targets = vec![];
 
         if let Some(JmpTarget::Absolute(_)) = self.get_jump_target() {
-            jump_targets.push(Tid {
-                id: format!("blk_{}", self.input0.id.clone()),
-                address: self.input0.id.clone(),
-            });
+            jump_targets.push(generate_block_tid(self.input0.id.clone(), 0));
         }
 
         if let Some(JmpTarget::Relative((_, target_index))) = self.get_jump_target() {
             let target = match target_index {
-                0 => Tid {
-                    id: format!("blk_{}", instruction_address),
-                    address: instruction_address.clone(),
-                },
                 // jump behind pcode sequence
-                target_index if target_index >= pcode_sequence_length => Tid {
-                    id: format!("blk_{}", fall_through_address),
-                    address: fall_through_address.clone(),
-                },
-                _ => Tid {
-                    id: format!("blk_{}_{}", instruction_address, target_index),
-                    address: instruction_address.clone(),
-                },
+                target_index if target_index >= pcode_sequence_length => {
+                    let fall_through_address = fall_through_address
+                        .expect("Missing fall through address for P-Code-relative jump.");
+                    generate_block_tid(fall_through_address.to_string(), 0)
+                }
+                _ => generate_block_tid(instruction_address.clone(), target_index),
             };
             jump_targets.push(target)
         }
@@ -59,15 +50,14 @@ impl PcodeOpSimple {
         // Add implicit branch target, if conditional branch is not taken
         if matches!(self.pcode_mnemonic, PcodeOperation::JmpType(CBRANCH)) {
             if self.pcode_index + 1 < pcode_sequence_length {
-                jump_targets.push(Tid {
-                    id: format!("blk_{}_{}", instruction_address, self.pcode_index + 1),
-                    address: instruction_address.clone(),
-                })
+                jump_targets.push(generate_block_tid(
+                    instruction_address,
+                    self.pcode_index + 1,
+                ))
             } else {
-                jump_targets.push(Tid {
-                    id: format!("blk_{}", fall_through_address),
-                    address: fall_through_address.clone(),
-                })
+                let fall_through_address = fall_through_address
+                    .expect("Missing fall through address for conditional branch.");
+                jump_targets.push(generate_block_tid(fall_through_address.to_string(), 0))
             }
         }
         return jump_targets;
