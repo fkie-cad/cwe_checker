@@ -1,5 +1,8 @@
 use crate::{
-    ghidra_pcode::{pcode_operations::PcodeOperation, instruction::InstructionSimple, block::generate_block_tid},
+    ghidra_pcode::{
+        block::generate_block_tid, function::generate_placeholder_function_tid,
+        instruction::InstructionSimple, pcode_operations::PcodeOperation,
+    },
     intermediate_representation::{Expression, Jmp, Term, Tid},
     pcode::JmpType,
 };
@@ -62,8 +65,10 @@ impl PcodeOpSimple {
                 JmpType::BRANCH => self.create_branch(address, targets[0].clone()),
                 JmpType::CBRANCH => self.create_cbranch(address, targets[0].clone()),
                 JmpType::BRANCHIND => self.create_branch_indirect(address),
-                JmpType::CALL => todo!(),
-                JmpType::CALLIND => self.create_call_indirect(address, instr.fall_through.as_deref()),
+                JmpType::CALL => self.create_call(address, instr.fall_through.as_deref()),
+                JmpType::CALLIND => {
+                    self.create_call_indirect(address, instr.fall_through.as_deref())
+                }
                 JmpType::CALLOTHER => todo!(),
                 JmpType::RETURN => self.create_return(address),
             }
@@ -89,18 +94,19 @@ impl PcodeOpSimple {
         wrap_in_tid(address, self.pcode_index, branch_ind)
     }
 
-    fn create_call(&self, address: &str) -> Term<Jmp> {
-        let branch_ind = Jmp::Call {
-            target: todo!(),
-            return_: Some(todo!()),
+    fn create_call(&self, address: &str, return_addr: Option<&str>) -> Term<Jmp> {
+        let return_ = return_addr.map(|address| generate_block_tid(address.to_string(), 0));
+        let call = Jmp::Call {
+            target: generate_placeholder_function_tid(
+                self.input0.get_ram_address_as_string().unwrap(),
+            ),
+            return_,
         };
-        wrap_in_tid(address, self.pcode_index, branch_ind)
+        wrap_in_tid(address, self.pcode_index, call)
     }
 
     fn create_call_indirect(&self, address: &str, return_addr: Option<&str>) -> Term<Jmp> {
-        let return_ = return_addr.map(|address| {
-            generate_block_tid(address.to_string(), 0)
-        });
+        let return_ = return_addr.map(|address| generate_block_tid(address.to_string(), 0));
         let call_ind = Jmp::CallInd {
             target: self.input0.into_ir_expr().unwrap(),
             return_,

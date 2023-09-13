@@ -46,7 +46,6 @@ impl VarnodeSimple {
 
     /// Returns `Bitvector` representing a constant address in ram, if
     /// the varnode represents such address.
-    /// Panics if the address cannot be parsed.
     pub fn get_ram_address(&self) -> Option<Bitvector> {
         if self.address_space.as_str() == "ram" {
             let offset = Bitvector::from_u64(
@@ -56,6 +55,16 @@ impl VarnodeSimple {
             return Some(offset.into_resize_unsigned(self.size.into()));
         }
         None
+    }
+
+    /// Return the string representing a constant address in RAM
+    /// if the varnode represents such an address.
+    pub fn get_ram_address_as_string(&self) -> Option<&str> {
+        if self.address_space.as_str() == "ram" {
+            Some(&self.id)
+        } else {
+            None
+        }
     }
 
     /// Returns `Term<Def::Load>`, if the varnode describes an implicit load operation.

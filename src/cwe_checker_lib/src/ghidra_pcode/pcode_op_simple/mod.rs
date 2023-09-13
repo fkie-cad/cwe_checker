@@ -31,7 +31,10 @@ impl PcodeOpSimple {
         let mut jump_targets = vec![];
 
         if let Some(JmpTarget::Absolute(_)) = self.get_jump_target() {
-            jump_targets.push(generate_block_tid(self.input0.id.clone(), 0));
+            jump_targets.push(generate_block_tid(
+                self.input0.get_ram_address_as_string().unwrap().to_string(),
+                0,
+            ));
         }
 
         if let Some(JmpTarget::Relative((_, target_index))) = self.get_jump_target() {

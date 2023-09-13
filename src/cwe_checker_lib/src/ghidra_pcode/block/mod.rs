@@ -327,9 +327,9 @@ fn add_jmp_to_blk(
                 }
             }
         }
-        PcodeOperation::JmpType(RETURN) => {
+        PcodeOperation::JmpType(RETURN) | PcodeOperation::JmpType(CALL) => {
             let branch = op.into_ir_jump(&instr);
-            dbg!(&branch); // TODO: Remove after writing tests for RETURN
+            dbg!(&branch); // TODO: Remove after writing tests for RETURN and CALL
             blk.jmps.push(branch);
         }
         // Add conditional branch and then implicit branch
@@ -351,8 +351,6 @@ fn add_jmp_to_blk(
             dbg!(&op);
             todo!()
         }
-        PcodeOperation::JmpType(CALL) => todo!(),
-        PcodeOperation::JmpType(CALLIND) => todo!(),
         PcodeOperation::JmpType(CALLOTHER) => todo!(),
     }
     return blk;
