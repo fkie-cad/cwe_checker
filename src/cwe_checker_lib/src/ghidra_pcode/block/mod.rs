@@ -58,6 +58,8 @@ impl<'a> OpIterator<'a> {
                 let blk_tid = generate_block_tid(address, op.pcode_index);
                 if self.jump_targets.contains(&blk_tid) {
                     return Some(blk_tid);
+                } else {
+                    return None;
                 }
             }
         }
