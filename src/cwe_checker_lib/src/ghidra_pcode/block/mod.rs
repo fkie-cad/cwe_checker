@@ -287,7 +287,8 @@ fn add_jmp_to_blk(
     mut op: PcodeOpSimple,
     next_instr: Option<&InstructionSimple>,
 ) -> Blk {
-    blk.defs.append(&mut op.create_implicit_loads_for_jump(&instr.address));
+    blk.defs
+        .append(&mut op.create_implicit_loads_for_jump(&instr.address));
 
     let targets = op.collect_jmp_targets(
         instr.address.clone(),
@@ -298,7 +299,10 @@ fn add_jmp_to_blk(
         PcodeOperation::ExpressionType(_) => {
             panic!("current op is not a jump.")
         }
-        PcodeOperation::JmpType(BRANCH) => {
+        PcodeOperation::JmpType(BRANCH)
+        | PcodeOperation::JmpType(RETURN)
+        | PcodeOperation::JmpType(CALL)
+        | PcodeOperation::JmpType(CALLOTHER) => {
             let branch = op.into_ir_jump(&instr);
             blk.jmps.push(branch);
         }
@@ -331,11 +335,6 @@ fn add_jmp_to_blk(
                 }
             }
         }
-        PcodeOperation::JmpType(RETURN) | PcodeOperation::JmpType(CALL) => {
-            let branch = op.into_ir_jump(&instr);
-            dbg!(&branch); // TODO: Remove after writing tests for RETURN and CALL
-            blk.jmps.push(branch);
-        }
         // Add conditional branch and then implicit branch
         PcodeOperation::JmpType(CBRANCH) => {
             let cbranch = op.into_ir_jump(&instr);
@@ -349,13 +348,6 @@ fn add_jmp_to_blk(
             blk.jmps.push(cbranch);
             blk.jmps.push(implicit_branch);
         }
-        _ => {
-            // TODO: Remove debug prints!
-            dbg!(&instr);
-            dbg!(&op);
-            todo!()
-        }
-        PcodeOperation::JmpType(CALLOTHER) => todo!(),
     }
     return blk;
 }

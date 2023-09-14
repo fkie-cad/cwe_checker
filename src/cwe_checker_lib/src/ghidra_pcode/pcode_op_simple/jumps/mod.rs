@@ -69,7 +69,9 @@ impl PcodeOpSimple {
                 JmpType::CALLIND => {
                     self.create_call_indirect(address, instr.fall_through.as_deref())
                 }
-                JmpType::CALLOTHER => todo!(),
+                JmpType::CALLOTHER => {
+                    self.create_call_other(address, &instr.mnemonic, instr.fall_through.as_deref())
+                }
                 JmpType::RETURN => self.create_return(address),
             }
         } else {
@@ -114,10 +116,16 @@ impl PcodeOpSimple {
         wrap_in_tid(address, self.pcode_index, call_ind)
     }
 
-    fn create_call_other(&self, address: &str) -> Term<Jmp> {
+    fn create_call_other(
+        &self,
+        address: &str,
+        mnemonic: &str,
+        return_addr: Option<&str>,
+    ) -> Term<Jmp> {
+        let return_ = return_addr.map(|address| generate_block_tid(address.to_string(), 0));
         let call_other = Jmp::CallOther {
-            description: todo!(),
-            return_: todo!(),
+            description: mnemonic.to_string(),
+            return_,
         };
         wrap_in_tid(address, self.pcode_index, call_other)
     }
