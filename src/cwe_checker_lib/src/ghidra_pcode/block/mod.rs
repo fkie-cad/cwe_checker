@@ -284,9 +284,11 @@ fn add_jump_to_block(mut block: Term<Blk>, iterator: &mut OpIterator) -> Term<Bl
 fn add_jmp_to_blk(
     mut blk: Blk,
     instr: InstructionSimple,
-    op: PcodeOpSimple,
+    mut op: PcodeOpSimple,
     next_instr: Option<&InstructionSimple>,
 ) -> Blk {
+    blk.defs.append(&mut op.create_implicit_loads_for_jump(&instr.address));
+
     let targets = op.collect_jmp_targets(
         instr.address.clone(),
         instr.pcode_ops.len() as u64,

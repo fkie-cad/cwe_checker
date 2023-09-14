@@ -92,7 +92,7 @@ impl PcodeOpSimple {
         }
         false
     }
-    /// Returns artificial `Def::Load` instructions, if the operants are ram located.
+    /// Returns artificial `Def::Load` instructions, if the operands are ram located.
     /// Otherwise returns empty `Vec`. Changes ram varnodes into virtual register varnodes
     /// using the explicitly loaded value.
     ///
@@ -129,7 +129,41 @@ impl PcodeOpSimple {
                 ));
             }
         }
+        explicit_loads
+    }
 
+    /// Returns artificial `Def::Load` instructions,
+    /// if an expression-valued operand of a jump-instruction is ram located.
+    /// Otherwise returns empty `Vec`.
+    /// Changes corresponding ram varnodes into virtual register varnodes using the explicitly loaded value.
+    pub fn create_implicit_loads_for_jump(&mut self, address: &str) -> Vec<Term<Def>> {
+        let mut explicit_loads = Vec::new();
+        match self.pcode_mnemonic {
+            PcodeOperation::JmpType(BRANCHIND)
+            | PcodeOperation::JmpType(CALLIND)
+            | PcodeOperation::JmpType(RETURN) => {
+                if self.input0.address_space == "ram" {
+                    explicit_loads.push(self.input0.into_explicit_load(
+                        "$load_temp0".to_string(),
+                        "load0".to_string(),
+                        address,
+                        self.pcode_index,
+                    ));
+                }
+            }
+            PcodeOperation::JmpType(CBRANCH) => {
+                let varnode = self.input1.as_mut().unwrap();
+                if varnode.address_space == "ram" {
+                    explicit_loads.push(varnode.into_explicit_load(
+                        "$load_temp1".to_string(),
+                        "load1".to_string(),
+                        address,
+                        self.pcode_index,
+                    ));
+                }
+            }
+            _ => (),
+        }
         explicit_loads
     }
 

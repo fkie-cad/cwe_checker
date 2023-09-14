@@ -83,7 +83,7 @@ impl PcodeOpSimple {
 
     fn create_cbranch(&self, address: &str, target: Tid) -> Term<Jmp> {
         let cbranch = Jmp::CBranch {
-            target: target,
+            target,
             condition: self.input1.as_ref().unwrap().into_ir_expr().unwrap(),
         };
         wrap_in_tid(address, self.pcode_index, cbranch)
