@@ -1,3 +1,4 @@
+use super::PcodeOpSimple;
 use crate::{
     ghidra_pcode::{
         block::generate_block_tid, function::generate_placeholder_function_tid,
@@ -6,8 +7,6 @@ use crate::{
     intermediate_representation::{Expression, Jmp, Term, Tid},
     pcode::JmpType,
 };
-
-use super::PcodeOpSimple;
 
 /// A jump target is either a pcode operation (pcode relative jump), or another
 /// machine code instruction (absolute jump).
@@ -36,15 +35,12 @@ impl PcodeOpSimple {
             if let Some(target) = self.input0.get_ram_address() {
                 return Some(JmpTarget::Absolute(target.try_to_u64().unwrap()));
             } else if let Expression::Const(jmp_offset) = self.input0.into_ir_expr().unwrap() {
-                // TODO: The computation for negative target indices does not work for 32-bit-systems,
-                // as addition causes no overflow when using u64 for the computation!
                 if let Some(target_index) = self
                     .pcode_index
                     .checked_add_signed(jmp_offset.try_to_i64().unwrap())
                 {
                     return Some(JmpTarget::Relative((self.pcode_index, target_index)));
                 } else {
-                    // TODO: Negative target index, trigger log message here
                     return Some(JmpTarget::Relative((self.pcode_index, 0)));
                 }
             }
@@ -60,79 +56,86 @@ impl PcodeOpSimple {
             instr.pcode_ops.len() as u64,
             instr.fall_through.as_deref(),
         );
-        if let PcodeOperation::JmpType(jmp) = self.pcode_mnemonic {
+        let jump = if let PcodeOperation::JmpType(jmp) = self.pcode_mnemonic {
             match jmp {
-                JmpType::BRANCH => self.create_branch(address, targets[0].clone()),
-                JmpType::CBRANCH => self.create_cbranch(address, targets[0].clone()),
-                JmpType::BRANCHIND => self.create_branch_indirect(address),
-                JmpType::CALL => self.create_call(address, instr.fall_through.as_deref()),
-                JmpType::CALLIND => {
-                    self.create_call_indirect(address, instr.fall_through.as_deref())
-                }
-                JmpType::CALLOTHER => {
-                    self.create_call_other(address, &instr.mnemonic, instr.fall_through.as_deref())
-                }
-                JmpType::RETURN => self.create_return(address),
+                JmpType::BRANCH => self.create_branch(targets[0].clone()),
+                JmpType::CBRANCH => self.create_cbranch(targets[0].clone()),
+                JmpType::BRANCHIND => self.create_branch_indirect(),
+                JmpType::CALL => self.create_call(instr.fall_through.as_deref()),
+                JmpType::CALLIND => self.create_call_indirect(instr.fall_through.as_deref()),
+                JmpType::CALLOTHER => self.create_call_other(instr),
+                JmpType::RETURN => self.create_return(),
             }
         } else {
             panic!("Not a jump operation")
+        };
+        wrap_in_tid(address, self.pcode_index, jump)
+    }
+
+    /// Create a branch instruction.
+    fn create_branch(&self, target: Tid) -> Jmp {
+        Jmp::Branch(target)
+    }
+
+    // Create a conditional branch.
+    fn create_cbranch(&self, target: Tid) -> Jmp {
+        Jmp::CBranch {
+            target,
+            condition: self.input1.as_ref().unwrap().into_ir_expr().unwrap(),
         }
     }
 
-    fn create_branch(&self, address: &str, target: Tid) -> Term<Jmp> {
-        wrap_in_tid(address, self.pcode_index, Jmp::Branch(target))
+    /// Create an indirect branch.
+    fn create_branch_indirect(&self) -> Jmp {
+        Jmp::BranchInd(self.input0.into_ir_expr().unwrap())
     }
 
-    fn create_cbranch(&self, address: &str, target: Tid) -> Term<Jmp> {
-        let cbranch = Jmp::CBranch {
-            target,
-            condition: self.input1.as_ref().unwrap().into_ir_expr().unwrap(),
-        };
-        wrap_in_tid(address, self.pcode_index, cbranch)
-    }
-
-    fn create_branch_indirect(&self, address: &str) -> Term<Jmp> {
-        let branch_ind = Jmp::BranchInd(self.input0.into_ir_expr().unwrap());
-        wrap_in_tid(address, self.pcode_index, branch_ind)
-    }
-
-    fn create_call(&self, address: &str, return_addr: Option<&str>) -> Term<Jmp> {
+    /// Create a call.
+    fn create_call(&self, return_addr: Option<&str>) -> Jmp {
         let return_ = return_addr.map(|address| generate_block_tid(address.to_string(), 0));
-        let call = Jmp::Call {
+        Jmp::Call {
             target: generate_placeholder_function_tid(
                 self.input0.get_ram_address_as_string().unwrap(),
             ),
             return_,
-        };
-        wrap_in_tid(address, self.pcode_index, call)
+        }
     }
 
-    fn create_call_indirect(&self, address: &str, return_addr: Option<&str>) -> Term<Jmp> {
+    /// Create an indirect call.
+    fn create_call_indirect(&self, return_addr: Option<&str>) -> Jmp {
         let return_ = return_addr.map(|address| generate_block_tid(address.to_string(), 0));
-        let call_ind = Jmp::CallInd {
+        Jmp::CallInd {
             target: self.input0.into_ir_expr().unwrap(),
             return_,
-        };
-        wrap_in_tid(address, self.pcode_index, call_ind)
+        }
     }
 
-    fn create_call_other(
-        &self,
-        address: &str,
-        mnemonic: &str,
-        return_addr: Option<&str>,
-    ) -> Term<Jmp> {
-        let return_ = return_addr.map(|address| generate_block_tid(address.to_string(), 0));
-        let call_other = Jmp::CallOther {
-            description: mnemonic.to_string(),
+    /// Create a `CallOther` instruction.
+    /// The description is given by the mnemonic of the corresponding assembly instruction
+    fn create_call_other(&self, instr: &InstructionSimple) -> Jmp {
+        // FIXME: The description shown by Ghidra is actually not the mnemonic!
+        // But it is unclear how one can access the description through Ghidras API.
+        // Furthermore, we do not encode the optional input varnodes that Ghidra allows for CALLOTHER operations.
+        let return_ = if (self.pcode_index as usize) < instr.pcode_ops.len() - 1 {
+            Some(generate_block_tid(
+                instr.address.clone(),
+                self.pcode_index + 1,
+            ))
+        } else {
+            instr
+                .fall_through
+                .as_deref()
+                .map(|address| generate_block_tid(address.to_string(), 0))
+        };
+        Jmp::CallOther {
+            description: instr.mnemonic.clone(),
             return_,
-        };
-        wrap_in_tid(address, self.pcode_index, call_other)
+        }
     }
 
-    fn create_return(&self, address: &str) -> Term<Jmp> {
-        let _return = Jmp::Return(self.input0.into_ir_expr().unwrap());
-        wrap_in_tid(address, self.pcode_index, _return)
+    /// Create a return instruction.
+    fn create_return(&self) -> Jmp {
+        Jmp::Return(self.input0.into_ir_expr().unwrap())
     }
 }
 

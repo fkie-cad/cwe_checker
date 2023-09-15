@@ -48,12 +48,20 @@ pub mod tests {
 
     impl InstructionSimple {
         /// Returns `InstructionSimple`, with mnemonic `mock`, size `1`, `potential_targets` and `fall_through` set to `None`.
-        pub fn mock(address: String, pcode_ops: Vec<PcodeOpSimple>) -> Self {
+        pub fn mock<'a, T>(address: &'a str, pcode_ops: T) -> Self
+        where
+            T: IntoIterator,
+            T::Item: Into<&'a str>,
+        {
+            let mut ops = Vec::new();
+            for (index, op) in pcode_ops.into_iter().enumerate() {
+                ops.push(PcodeOpSimple::mock(op.into()).with_index(index as u64));
+            }
             InstructionSimple {
                 mnemonic: "mock".into(),
-                address: address,
+                address: address.to_string(),
                 size: 1,
-                pcode_ops: pcode_ops,
+                pcode_ops: ops,
                 potential_targets: None,
                 fall_through: None,
             }
@@ -78,6 +86,6 @@ pub mod tests {
     #[test]
     #[should_panic]
     fn test_instruction_get_u64_address_not_hex() {
-        InstructionSimple::mock("0xABG".into(), vec![]).get_u64_address();
+        InstructionSimple::mock("0xABG".into(), Vec::<&str>::new()).get_u64_address();
     }
 }

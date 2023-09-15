@@ -1,94 +1,134 @@
-use crate::{
-    expr,
-    ghidra_pcode::pcode_op_simple::{tests::*, *},
-};
+use crate::{expr, ghidra_pcode::pcode_op_simple::*};
 
 #[test]
 fn test_get_jump_target_relative() {
+    let op = PcodeOpSimple::mock("BRANCH const_0x1_4").with_index(4);
+    assert_eq!(op.get_jump_target(), Some(JmpTarget::Relative((4, 5))));
+    let op = PcodeOpSimple::mock("BRANCH const_0xFFFFFFFD_4").with_index(4);
+    assert_eq!(op.get_jump_target(), Some(JmpTarget::Relative((4, 1))));
     // backwards jump is lower bounded to 0
-    let var = VarnodeSimple::mock("const_0xFFFFFFFF_4");
-    let op = mock_pcode_op_branch(0, var);
-    assert_eq!(op.get_jump_target(), Some(JmpTarget::Relative((0, 0))));
-
-    let var = VarnodeSimple::mock("const_0x1_4");
-    let op = mock_pcode_op_branch(7, var);
-    assert_eq!(op.get_jump_target(), Some(JmpTarget::Relative((7, 8))));
+    let op = PcodeOpSimple::mock("BRANCH const_0xFFFFFFFD_4").with_index(1);
+    assert_eq!(op.get_jump_target(), Some(JmpTarget::Relative((1, 0))));
 }
 
 #[test]
 fn test_get_jump_target_absolute() {
-    // backwards jump is lower bounded to index 0
-    let var = VarnodeSimple::mock("ram_0xFFFFFFFF_4");
-    let op = mock_pcode_op_branch(0, var);
-    assert_eq!(op.get_jump_target(), Some(JmpTarget::Absolute(0xFFFFFFFF)));
+    let op = PcodeOpSimple::mock("BRANCH ram_0xABCD_4");
+    assert_eq!(op.get_jump_target(), Some(JmpTarget::Absolute(0xABCD)));
 }
 
 #[test]
 fn test_create_branch() {
-    let var = VarnodeSimple::mock("const_0x002_4");
-    let op = mock_pcode_op_branch(4, var);
-    let target = Tid {
-        id: "blk_0x1111_6".into(),
-        address: "0x1111".into(),
-    };
-    let expected = Term {
-        tid: Tid {
-            id: "instr_0x1111_4".into(),
-            address: "0x1111".into(),
-        },
-        term: Jmp::Branch(target.clone()),
-    };
-    assert_eq!(op.create_branch("0x1111", target), expected)
+    let instr = InstructionSimple::mock("0x1000", ["BRANCH ram_0x1234_4"]);
+    assert_eq!(
+        instr.pcode_ops[0].into_ir_jump(&instr),
+        Term {
+            tid: Tid::mock("instr_0x1000_0"),
+            term: Jmp::Branch(Tid::mock("blk_0x1234"))
+        }
+    );
+    let mut instr = InstructionSimple::mock("0x1000", ["BRANCH const_0x2_4"]);
+    instr.fall_through = Some("0x1001".into());
+    assert_eq!(
+        instr.pcode_ops[0].into_ir_jump(&instr),
+        Term {
+            tid: Tid::mock("instr_0x1000_0"),
+            term: Jmp::Branch(Tid::mock("blk_0x1001"))
+        }
+    );
 }
 
 #[test]
 fn test_create_cbranch() {
-    let var_target = VarnodeSimple::mock("ram_0x2222_4");
-    let var_condition = VarnodeSimple::mock("register_ZF_1");
-    let op = mock_pcode_op_cbranch(1, var_target, var_condition);
-    let target = Tid {
-        id: "blk_0x2222".into(),
-        address: "0x2222".into(),
-    };
-    let expected = Term {
-        tid: Tid {
-            id: "instr_0x1111_1".into(),
-            address: "0x1111".into(),
-        },
-        term: Jmp::CBranch {
-            target: target.clone(),
-            condition: expr!("ZF:1"),
-        },
-    };
-    assert_eq!(op.create_cbranch("0x1111", target), expected)
+    let instr = InstructionSimple::mock(
+        "0x1000",
+        [
+            "CBRANCH const_0x2_4 register_ZF_1",
+            "register_RAX_8 INT_ADD register_RAX_8 register_RAX_8",
+            "register_RAX_8 INT_ADD register_RAX_8 register_RAX_8",
+        ],
+    );
+    assert_eq!(
+        instr.pcode_ops[0].into_ir_jump(&instr),
+        Term {
+            tid: Tid::mock("instr_0x1000_0"),
+            term: Jmp::CBranch {
+                target: Tid::mock("blk_0x1000_2"),
+                condition: expr!("ZF:1")
+            }
+        }
+    );
 }
 
 #[test]
 fn test_create_branch_indirect() {
-    todo!()
-}
-
-#[test]
-fn test_create_return() {
-    todo!()
+    let instr = InstructionSimple::mock("0x1000", ["BRANCHIND register_pc_4"]);
+    assert_eq!(
+        instr.pcode_ops[0].into_ir_jump(&instr),
+        Term {
+            tid: Tid::mock("instr_0x1000_0"),
+            term: Jmp::BranchInd(expr!("pc:4"))
+        }
+    );
 }
 
 #[test]
 fn test_create_call() {
-    todo!()
+    let mut instr = InstructionSimple::mock("0x1000", ["CALL ram_0x1234_4"]);
+    instr.fall_through = Some("0x1001".into());
+    assert_eq!(
+        instr.pcode_ops[0].into_ir_jump(&instr),
+        Term {
+            tid: Tid::mock("instr_0x1000_0"),
+            term: Jmp::Call {
+                target: Tid::mock("FUN_0x1234"),
+                return_: Some(Tid::mock("blk_0x1001"))
+            }
+        }
+    );
 }
 
 #[test]
 fn test_create_call_indirect() {
-    todo!()
+    let mut instr = InstructionSimple::mock("0x1000", ["CALLIND register_EAX_4"]);
+    instr.fall_through = Some("0x1001".into());
+    assert_eq!(
+        instr.pcode_ops[0].into_ir_jump(&instr),
+        Term {
+            tid: Tid::mock("instr_0x1000_0"),
+            term: Jmp::CallInd {
+                target: expr!("EAX:4"),
+                return_: Some(Tid::mock("blk_0x1001"))
+            }
+        }
+    );
+}
+
+#[test]
+fn test_create_return() {
+    let mut instr = InstructionSimple::mock("0x1000", ["RETURN register_EAX_4"]);
+    instr.fall_through = Some("0x1001".into());
+    assert_eq!(
+        instr.pcode_ops[0].into_ir_jump(&instr),
+        Term {
+            tid: Tid::mock("instr_0x1000_0"),
+            term: Jmp::Return(expr!("EAX:4"))
+        }
+    );
 }
 
 #[test]
 fn test_create_call_other() {
-    todo!()
-}
-
-#[test]
-fn test_into_ir_jump() {
-    todo!()
+    let mut instr = InstructionSimple::mock("0x1000", ["CALLOTHER register_EAX_4"]);
+    instr.fall_through = Some("0x1001".into());
+    assert_eq!(
+        instr.pcode_ops[0].into_ir_jump(&instr),
+        Term {
+            tid: Tid::mock("instr_0x1000_0"),
+            term: Jmp::CallOther {
+                description: "mock".into(),
+                return_: Some(Tid::mock("blk_0x1001"))
+            }
+        }
+    );
 }
