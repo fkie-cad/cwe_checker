@@ -58,3 +58,20 @@ pub struct Term<T> {
     /// The object
     pub term: T,
 }
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+
+    impl Tid {
+        /// Mock a TID with the given name and the address parsed from the name.
+        /// The name must have the form `prefix_address[_suffix]`, e.g. `instr_0x00001234_5`.
+        pub fn mock(tid: &str) -> Tid {
+            let components: Vec<_> = tid.split("_").collect();
+            Tid {
+                id: tid.to_string(),
+                address: components[1].to_string()
+            }
+        }
+    }
+}

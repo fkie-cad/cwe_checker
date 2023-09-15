@@ -5,6 +5,62 @@ use crate::ghidra_pcode::PcodeOperation::JmpType;
 use crate::variable;
 use crate::{def, expr};
 
+impl PcodeOpSimple {
+    /// Mock a P-Code-operation from a string of the form `[output_varnode] mnemonic input0 [input_1] [input2]`.
+    /// The `pcode_index` will be set to 0.
+    /// Examples:
+    /// - `register_RAX_8 INT_ADD register_RBX_8 register_RCX_8`
+    /// - `BRANCH const_0x1234_8`
+    pub fn mock(pcode_op: &str) -> PcodeOpSimple {
+        let mut components = pcode_op.split_whitespace();
+        let first_elem = components.next().unwrap();
+        let (output, pcode_mnemonic) = if let Ok(mnemonic) =
+            serde_json::from_value(serde_json::Value::String(first_elem.into()))
+        {
+            (None, mnemonic)
+        } else {
+            (
+                Some(VarnodeSimple::mock(first_elem)),
+                serde_json::from_value(serde_json::Value::String(
+                    components.next().unwrap().to_string(),
+                ))
+                .unwrap(),
+            )
+        };
+        let input0 = VarnodeSimple::mock(components.next().unwrap());
+        let input1 = components
+            .next()
+            .map(|varnode| VarnodeSimple::mock(varnode));
+        let input2 = components
+            .next()
+            .map(|varnode| VarnodeSimple::mock(varnode));
+        assert!(components.next().is_none());
+        PcodeOpSimple {
+            pcode_index: 0,
+            pcode_mnemonic,
+            input0,
+            input1,
+            input2,
+            output,
+        }
+    }
+}
+
+#[test]
+fn test_pcode_op_simple_mock() {
+    assert_eq!(
+        PcodeOpSimple::mock("register_RAX_8 INT_ADD register_RBX_8 register_RCX_8"),
+        PcodeOpSimple {
+            pcode_index: 0,
+            pcode_mnemonic: PcodeOperation::ExpressionType(INT_ADD),
+            input0: VarnodeSimple::mock("register_RBX_8"),
+            input1: Some(VarnodeSimple::mock("register_RCX_8")),
+            input2: None,
+            output: Some(VarnodeSimple::mock("register_RAX_8"))
+        }
+    )
+}
+
 /// Simplified construction of pcode operation with `pcode_index: 1` and
 /// pcode_mnemonic: ExpressionType(INT_ADD).
 pub fn mock_pcode_op_add(
@@ -60,20 +116,6 @@ impl PcodeOpSimple {
         }
     }
 
-    fn with_varnodes(
-        mut self,
-        input0: VarnodeSimple,
-        input1: Option<VarnodeSimple>,
-        input2: Option<VarnodeSimple>,
-        output: Option<VarnodeSimple>,
-    ) -> PcodeOpSimple {
-        self.input0 = input0;
-        self.input1 = input1;
-        self.input2 = input2;
-        self.output = output;
-        self
-    }
-
     pub fn with_index(mut self, index: u64) -> PcodeOpSimple {
         self.pcode_index = index;
         self
@@ -82,59 +124,25 @@ impl PcodeOpSimple {
 
 #[test]
 fn test_pcode_op_has_implicit_load() {
-    let ram_varnode = VarnodeSimple::mock("ram_0x42_8");
-    let varnode = VarnodeSimple::mock("register_RAX_8");
-    let pcode_op = PcodeOpSimple {
-        pcode_index: 1,
-        pcode_mnemonic: ExpressionType(STORE),
-        input0: ram_varnode.clone(),
-        input1: None,
-        input2: None,
-        output: None,
-    };
+    let pcode_op = PcodeOpSimple::mock("register_RAX_8 INT_ADD ram_0x42_8 register_RAX_8");
     assert!(pcode_op.has_implicit_load());
-    assert!(pcode_op
-        .clone()
-        .with_varnodes(varnode.clone(), Some(ram_varnode.clone()), None, None)
-        .has_implicit_load());
-    assert!(pcode_op
-        .clone()
-        .with_varnodes(varnode.clone(), None, Some(ram_varnode.clone()), None)
-        .has_implicit_load());
-    assert_eq!(
-        pcode_op
-            .clone()
-            .with_varnodes(varnode.clone(), None, None, None)
-            .has_implicit_load(),
-        false
-    );
-    assert_eq!(
-        pcode_op
-            .clone()
-            .with_varnodes(varnode.clone(), Some(varnode.clone()), None, None)
-            .has_implicit_load(),
-        false
-    );
-    assert_eq!(
-        pcode_op
-            .with_varnodes(varnode.clone(), None, Some(varnode.clone()), None)
-            .has_implicit_load(),
-        false
-    );
+    let pcode_op = PcodeOpSimple::mock("STORE const_0x1b1_8 ram_0x42_8 register_RAX_8");
+    assert!(pcode_op.has_implicit_load());
+    let pcode_op = PcodeOpSimple::mock("STORE const_0x1b1_8 register_RAX_8 ram_0x42_8");
+    assert!(pcode_op.has_implicit_load());
+    // No implicit loads
+    let pcode_op = PcodeOpSimple::mock("STORE const_0x1b1_8 register_RAX_8 register_RAX_8");
+    assert!(!pcode_op.has_implicit_load());
+    let pcode_op = PcodeOpSimple::mock("ram_0x42_8 INT_ADD register_RAX_8 register_RAX_8");
+    assert!(!pcode_op.has_implicit_load());
 }
 
 #[test]
 fn test_pcode_op_has_implicit_store() {
-    let ram_varnode = VarnodeSimple::mock("ram_0x42_8");
-    let varnode = VarnodeSimple::mock("register_RAX_8");
-    assert_eq!(
-        mock_pcode_op_add(varnode.clone(), None, Some(ram_varnode)).has_implicit_store(),
-        true
-    );
-    assert_eq!(
-        mock_pcode_op_add(varnode.clone(), None, Some(varnode)).has_implicit_store(),
-        false
-    );
+    let pcode_op = PcodeOpSimple::mock("ram_0x42_8 INT_ADD register_RAX_8 register_RAX_8");
+    assert!(pcode_op.has_implicit_store());
+    let pcode_op = PcodeOpSimple::mock("register_RAX_8 INT_ADD ram_0x42_8 register_RAX_8");
+    assert!(!pcode_op.has_implicit_store());
 }
 
 #[test]
@@ -243,10 +251,7 @@ fn test_create_load() {
     assert_eq!(
         pcode_op.create_load(&"0xFFFFFF".to_string()),
         Term {
-            tid: Tid {
-                id: "instr_0xFFFFFF_1".into(),
-                address: "0xFFFFFF".into()
-            },
+            tid: Tid::mock("instr_0xFFFFFF_1"),
             term: def!["RAX:8 := Load from 0x0012345:8"].term
         }
     );
