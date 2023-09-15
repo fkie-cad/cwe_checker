@@ -6,9 +6,9 @@ use crate::{def, expr};
 
 #[test]
 fn test_block_collect_jmp_targets() {
-    let target_a = VarnodeSimple::mock("ram".into(), "0x1234".into(), 8);
-    let target_b = VarnodeSimple::mock("ram".into(), "0xFFFFFFFF".into(), 8);
-    let target_relative_next_op = VarnodeSimple::mock("const".into(), "0x1".into(), 8);
+    let target_a = VarnodeSimple::mock("ram_0x1234_8");
+    let target_b = VarnodeSimple::mock("ram_0xFFFFFFFF_8");
+    let target_relative_next_op = VarnodeSimple::mock("const_0x1_8");
 
     let instr = InstructionSimple::mock(
         "0x01000".into(),
@@ -68,12 +68,12 @@ fn test_pcode_relative_jump_forward_jump() {
                            └───────┘
     */
     let tid = Tid::new("blk_tid");
-    let varnode = VarnodeSimple::mock("register".into(), "EAX".into(), 4);
+    let varnode = VarnodeSimple::mock("register_EAX_4");
     let op_add = mock_pcode_op_add(varnode.clone(), Some(varnode.clone()), Some(varnode));
     let op_cbranch_forward = mock_pcode_op_cbranch(
         0,
-        VarnodeSimple::mock("const", "0x2", 4),
-        VarnodeSimple::mock("register".into(), "ZF".into(), 4),
+        VarnodeSimple::mock("const_0x2_4"),
+        VarnodeSimple::mock("register_ZF_1"),
     );
     let pcode_ops = vec![
         op_cbranch_forward,
@@ -207,12 +207,12 @@ fn test_process_pcode_relative_jump_backward_jump() {
                         │BRANCH  |
                         └────────┘
      */
-    let varnode = VarnodeSimple::mock("register".into(), "EAX".into(), 4);
+    let varnode = VarnodeSimple::mock("register_EAX_4");
     let op_add = mock_pcode_op_add(varnode.clone(), Some(varnode.clone()), Some(varnode));
     let op_cbranch_backward = mock_pcode_op_cbranch(
         2,
-        VarnodeSimple::mock("const", "0xFFFFFFFF", 4),
-        VarnodeSimple::mock("register".into(), "ZF".into(), 4),
+        VarnodeSimple::mock("const_0xFFFFFFFF_4"),
+        VarnodeSimple::mock("register_ZF_1"),
     );
     let pcode_ops = vec![
         op_add.clone().with_index(0),
