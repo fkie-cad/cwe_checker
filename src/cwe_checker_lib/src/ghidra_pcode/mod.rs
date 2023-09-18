@@ -64,6 +64,8 @@ impl ProjectSimple {
 
         todo!(); // TODO: Normalization-Pass that replaces pseudo-call-target-TIDs with the correct target-TID
                  // of the corresponding function.
+        todo!(); // TODO: Check that we somewhere replace indirect calls with a constant target
+                 // with a direct call. Maybe do the same for indirect branches?
 
         Project {
             program: todo!(),

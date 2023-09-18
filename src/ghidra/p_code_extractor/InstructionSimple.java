@@ -27,7 +27,7 @@ public class InstructionSimple {
         this.size = instruction.getLength();
         
         if (instruction.getFallThrough() != null){
-            this.fall_through = instruction.getFallThrough().toString(false, false);
+            this.fall_through = "0x" + instruction.getFallThrough().toString(false, false);
         }
  
         
