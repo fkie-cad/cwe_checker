@@ -46,7 +46,6 @@ impl VarnodeSimple {
 
     /// Returns `Bitvector` representing a constant address in ram, if
     /// the varnode represents such address.
-    /// Panics if the address cannot be parsed.
     pub fn get_ram_address(&self) -> Option<Bitvector> {
         if self.address_space.as_str() == "ram" {
             let offset = Bitvector::from_u64(
@@ -56,6 +55,16 @@ impl VarnodeSimple {
             return Some(offset.into_resize_unsigned(self.size.into()));
         }
         None
+    }
+
+    /// Return the string representing a constant address in RAM
+    /// if the varnode represents such an address.
+    pub fn get_ram_address_as_string(&self) -> Option<&str> {
+        if self.address_space.as_str() == "ram" {
+            Some(&self.id)
+        } else {
+            None
+        }
     }
 
     /// Returns `Term<Def::Load>`, if the varnode describes an implicit load operation.
@@ -102,77 +111,79 @@ pub mod tests {
     use crate::{bitvec, variable};
 
     impl VarnodeSimple {
-        pub fn mock(addr_space: &str, id: &str, size: u64) -> Self {
+        /// Mock a varnode via a string on the form `AddressSpace_Id_Size`. Examples:
+        /// - `register_RSP_8` for the `RAX` register.
+        /// - `const_0x1_4` for a 4-byte-constant with value 1.
+        pub fn mock(varnode: &str) -> Self {
+            let components: Vec<_> = varnode.trim().split("_").collect();
+            assert_eq!(components.len(), 3);
+            for elem in &components {
+                assert_eq!(*elem, elem.trim());
+            }
             VarnodeSimple {
-                address_space: addr_space.to_string(),
-                id: id.to_string(),
-                size,
+                address_space: components[0].to_string(),
+                id: components[1].to_string(),
+                size: u64::from_str_radix(components[2], 10).unwrap(),
             }
         }
     }
 
     #[test]
+    fn test_varnode_mock() {
+        let mock = VarnodeSimple::mock("const_0x1_16");
+        let expected_varnode = VarnodeSimple {
+            address_space: "const".to_string(),
+            id: "0x1".to_string(),
+            size: 16,
+        };
+        assert_eq!(mock, expected_varnode);
+    }
+
+    #[test]
     fn test_varnode_into_const() {
-        if let Expression::Const(c) = VarnodeSimple::mock("const", "0x0", 8)
-            .into_ir_expr()
-            .unwrap()
-        {
-            assert_eq!(c, bitvec!("0x0:8"));
-        } else {
-            panic!("not an IR constant")
-        }
-        if let Expression::Const(c) = VarnodeSimple::mock("const", "0x42", 4)
-            .into_ir_expr()
-            .unwrap()
-        {
-            assert_eq!(c, bitvec!("0x42:4"));
-        } else {
-            panic!("not an IR constant")
-        }
-        if let Expression::Const(c) = VarnodeSimple::mock("const", "0xFFFFFFFF", 4)
-            .into_ir_expr()
-            .unwrap()
-        {
-            assert_eq!(c, bitvec!("0x-1:4"));
-        } else {
-            panic!("not an IR constant")
-        }
+        assert_eq!(
+            VarnodeSimple::mock("const_0x0_8").into_ir_expr().unwrap(),
+            Expression::Const(bitvec!("0x0:8"))
+        );
+        assert_eq!(
+            VarnodeSimple::mock("const_0x42_4").into_ir_expr().unwrap(),
+            Expression::Const(bitvec!("0x42:4"))
+        );
+        assert_eq!(
+            VarnodeSimple::mock("const_0xFFFFFFFF_4")
+                .into_ir_expr()
+                .unwrap(),
+            Expression::Const(bitvec!("0x-1:4"))
+        );
     }
 
     #[test]
     fn test_varnode_into_var() {
-        if let Expression::Var(v) = VarnodeSimple::mock("register", "RSP", 8)
-            .into_ir_expr()
-            .unwrap()
-        {
-            assert_eq!(v, variable!("RSP:8"));
-        } else {
-            panic!("not an IR variable")
-        }
+        assert_eq!(
+            VarnodeSimple::mock("register_RSP_8")
+                .into_ir_expr()
+                .unwrap(),
+            Expression::Var(variable!("RSP:8"))
+        );
     }
 
     #[test]
     fn test_varnode_into_temp_var() {
-        if let Expression::Var(v) = VarnodeSimple::mock("unique", "virtual", 8)
-            .into_ir_expr()
-            .unwrap()
-        {
-            assert_eq!(
-                v,
-                Variable {
-                    name: "$U_virtual".into(),
-                    size: 8.into(),
-                    is_temp: true
-                }
-            );
-        } else {
-            panic!("not an IR virtual variable")
-        }
+        assert_eq!(
+            VarnodeSimple::mock("unique_virtual_8")
+                .into_ir_expr()
+                .unwrap(),
+            Expression::Var(Variable {
+                name: "$U_virtual".into(),
+                size: 8.into(),
+                is_temp: true
+            })
+        );
     }
 
     #[test]
-    fn test_varnode_alternative_addressspace() {
-        assert!(VarnodeSimple::mock("something", "id", 8)
+    fn test_varnode_alternative_address_space() {
+        assert!(VarnodeSimple::mock("something_id_8")
             .into_ir_expr()
             .is_err());
     }
@@ -180,15 +191,11 @@ pub mod tests {
     #[test]
     fn test_varnode_into_ram_address() {
         assert_eq!(
-            VarnodeSimple::mock("ram", "0xFF11", 8).get_ram_address(),
+            VarnodeSimple::mock("ram_0xFF11_8").get_ram_address(),
             Some(bitvec!("0xFF11:8"))
         );
-    }
-
-    #[test]
-    fn test_alternative_varnode_into_ram_address() {
         assert_eq!(
-            VarnodeSimple::mock("something", "0xFF11", 8).get_ram_address(),
+            VarnodeSimple::mock("something_0xFF11_8").get_ram_address(),
             None
         );
     }

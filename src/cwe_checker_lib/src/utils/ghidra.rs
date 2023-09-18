@@ -81,7 +81,7 @@ fn parse_pcode_project_to_ir_project(
 
 /// Execute Ghidra with the P-Code plugin and return the parsed P-Code project.
 ///
-/// Note that this function will abort the program is the Ghidra execution does not succeed.
+/// Note that this function will abort the program if the Ghidra execution does not succeed.
 fn execute_ghidra(
     mut ghidra_command: Command,
     fifo_path: &PathBuf,

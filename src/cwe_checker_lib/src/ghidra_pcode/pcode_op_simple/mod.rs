@@ -16,63 +16,6 @@ pub struct PcodeOpSimple {
 }
 
 impl PcodeOpSimple {
-    /// Returns block `Tid` of jump target.
-    /// In case of a conditional branch the fallthrough block `Tid` is provided as well,
-    /// describing an implicit branch if the conditional jump is not taken.
-    /// The provided `fallthrough` is used, if:
-    /// * a pcode relative jump exceeds the pcode operation sequence
-    /// * No following pcode operation left, if a conditional branch is not taken
-    pub fn collect_jmp_targets(
-        &self,
-        instruction_address: String,
-        pcode_sequence_length: u64,
-        fall_through_address: String,
-    ) -> Vec<Tid> {
-        let mut jump_targets = vec![];
-
-        if let Some(JmpTarget::Absolute(_)) = self.get_jump_target() {
-            jump_targets.push(Tid {
-                id: format!("blk_{}", self.input0.id.clone()),
-                address: self.input0.id.clone(),
-            });
-        }
-
-        if let Some(JmpTarget::Relative((_, target_index))) = self.get_jump_target() {
-            let target = match target_index {
-                0 => Tid {
-                    id: format!("blk_{}", instruction_address),
-                    address: instruction_address.clone(),
-                },
-                // jump behind pcode sequence
-                target_index if target_index >= pcode_sequence_length => Tid {
-                    id: format!("blk_{}", fall_through_address),
-                    address: fall_through_address.clone(),
-                },
-                _ => Tid {
-                    id: format!("blk_{}_{}", instruction_address, target_index),
-                    address: instruction_address.clone(),
-                },
-            };
-            jump_targets.push(target)
-        }
-
-        // Add implicit branch target, if conditional branch is not taken
-        if matches!(self.pcode_mnemonic, PcodeOperation::JmpType(CBRANCH)) {
-            if self.pcode_index + 1 < pcode_sequence_length {
-                jump_targets.push(Tid {
-                    id: format!("blk_{}_{}", instruction_address, self.pcode_index + 1),
-                    address: instruction_address.clone(),
-                })
-            } else {
-                jump_targets.push(Tid {
-                    id: format!("blk_{}", fall_through_address),
-                    address: fall_through_address.clone(),
-                })
-            }
-        }
-        return jump_targets;
-    }
-
     /// Returns `true` if at least one input is ram located.
     pub fn has_implicit_load(&self) -> bool {
         if self.input0.address_space == "ram" {
@@ -99,14 +42,14 @@ impl PcodeOpSimple {
         }
         false
     }
-    /// Returns artificial `Def::Load` instructions, if the operants are ram located.
+    /// Returns artificial `Def::Load` instructions, if the operands are ram located.
     /// Otherwise returns empty `Vec`. Changes ram varnodes into virtual register varnodes
     /// using the explicitly loaded value.
     ///
     /// The created instructions use the virtual register `$load_tempX`, whereby `X` is
     /// either `0`, `1`or `2` representing which input is used.
     /// The created `Tid` is named `instr_<address>_<pcode index>_load<X>`.
-    pub fn create_implicit_loads(&mut self, address: &str) -> Vec<Term<Def>> {
+    pub fn create_implicit_loads_for_def(&mut self, address: &str) -> Vec<Term<Def>> {
         let mut explicit_loads = vec![];
         if self.input0.address_space == "ram" {
             explicit_loads.push(self.input0.into_explicit_load(
@@ -136,7 +79,41 @@ impl PcodeOpSimple {
                 ));
             }
         }
+        explicit_loads
+    }
 
+    /// Returns artificial `Def::Load` instructions,
+    /// if an expression-valued operand of a jump-instruction is ram located.
+    /// Otherwise returns empty `Vec`.
+    /// Changes corresponding ram varnodes into virtual register varnodes using the explicitly loaded value.
+    pub fn create_implicit_loads_for_jump(&mut self, address: &str) -> Vec<Term<Def>> {
+        let mut explicit_loads = Vec::new();
+        match self.pcode_mnemonic {
+            PcodeOperation::JmpType(BRANCHIND)
+            | PcodeOperation::JmpType(CALLIND)
+            | PcodeOperation::JmpType(RETURN) => {
+                if self.input0.address_space == "ram" {
+                    explicit_loads.push(self.input0.into_explicit_load(
+                        "$load_temp0".to_string(),
+                        "load0".to_string(),
+                        address,
+                        self.pcode_index,
+                    ));
+                }
+            }
+            PcodeOperation::JmpType(CBRANCH) => {
+                let varnode = self.input1.as_mut().unwrap();
+                if varnode.address_space == "ram" {
+                    explicit_loads.push(varnode.into_explicit_load(
+                        "$load_temp1".to_string(),
+                        "load1".to_string(),
+                        address,
+                        self.pcode_index,
+                    ));
+                }
+            }
+            _ => (),
+        }
         explicit_loads
     }
 
@@ -147,7 +124,7 @@ impl PcodeOpSimple {
         let mut defs = vec![];
         // if the pcode operation contains implicit load operations, prepend them.
         if self.has_implicit_load() {
-            let mut explicit_loads = self.create_implicit_loads(address);
+            let mut explicit_loads = self.create_implicit_loads_for_def(address);
             defs.append(&mut explicit_loads);
         }
 

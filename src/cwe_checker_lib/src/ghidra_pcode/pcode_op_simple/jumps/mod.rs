@@ -1,124 +1,186 @@
+use super::PcodeOpSimple;
+use crate::pcode::JmpType::*;
 use crate::{
-    ghidra_pcode::pcode_operations::PcodeOperation,
+    ghidra_pcode::{
+        block::generate_block_tid, function::generate_placeholder_function_tid,
+        instruction::InstructionSimple, pcode_operations::PcodeOperation,
+    },
     intermediate_representation::{Expression, Jmp, Term, Tid},
     pcode::JmpType,
 };
 
-use super::PcodeOpSimple;
-
-/// A jump target is either a pcode operation (pcode relative jump), or another
-/// machine code instruction (absolute jump).
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub enum JmpTarget {
-    /// Pcode relative jump `(jmp_index, target_index)` from `jmp_index` pcode operation index to
-    /// to the `target_index` pcode operation index.
-    /// Note that both are indices and **not** offsets.
-    Relative((u64, u64)),
-    /// Machine code instruction jump target with absolute address.
-    Absolute(u64),
-}
-
 impl PcodeOpSimple {
-    /// Returns the jump target, if the `PcodeOperation` is a `JmpType` variant.
-    ///
-    /// The target is either a pcode operation relative target, or an absolute machine instruction target.
-    /// Relative jumps to indices below 0, are interpreted as jumps to the index 0.
-    pub fn get_jump_target(&self) -> Option<JmpTarget> {
-        use crate::pcode::JmpType::*;
+    /// Helper function to unwrap the jump type of a P-Code-operation.
+    /// Panics if `self` is not a jump.
+    fn unwrap_jmp_type(&self) -> &JmpType {
         if let PcodeOperation::JmpType(jmp_type) = &self.pcode_mnemonic {
-            // Pcode definition distinguishes between `location` and `offset`.
-            // Note: $(GHIDRA_PATH)/docs/languages/html/pcodedescription.html#cpui_branch
-            // Currently, the IR does not distinguishes these cases.
-            // We do nothing here.
-            match jmp_type {
-                BRANCH | CBRANCH | CALL => (),                  // case `location`
-                BRANCHIND | CALLIND | CALLOTHER | RETURN => (), // case `offset`
-            }
-            if let Some(target) = self.input0.get_ram_address() {
-                return Some(JmpTarget::Absolute(target.try_to_u64().unwrap()));
-            } else if let Expression::Const(jmp_offset) = self.input0.into_ir_expr().unwrap() {
-                if let Some(target_index) = self
-                    .pcode_index
-                    .checked_add_signed(jmp_offset.try_to_i64().unwrap())
-                {
-                    return Some(JmpTarget::Relative((self.pcode_index, target_index)));
+            jmp_type
+        } else {
+            panic!("Jump type expected.")
+        }
+    }
+
+    /// Get the direct jump target of a BRANCH/CBRANCH/CALL instruction as a block TID (even in the case of a CALL).
+    /// Panics for other jump types.
+    fn get_direct_jump_target(&self, instr: &InstructionSimple) -> Tid {
+        match self.unwrap_jmp_type() {
+            BRANCH | CBRANCH | CALL => (),
+            BRANCHIND | CALLIND | CALLOTHER | RETURN => panic!("Expected BRANCH/CBRANCH/CALL."),
+        }
+        if let Some(target) = self.input0.get_ram_address_as_string() {
+            generate_block_tid(target.to_string(), 0)
+        } else if let Expression::Const(jmp_offset) = self.input0.into_ir_expr().unwrap() {
+            if let Some(target_index) = self
+                .pcode_index
+                .checked_add_signed(jmp_offset.try_to_i64().unwrap())
+            {
+                if target_index >= (instr.pcode_ops.len() as u64) {
+                    generate_block_tid(
+                        instr
+                            .fall_through
+                            .as_deref()
+                            .expect("No target found for direct jump.")
+                            .to_string(),
+                        0,
+                    )
                 } else {
-                    // TODO: Negative target index, trigger log message here
-                    return Some(JmpTarget::Relative((self.pcode_index, 0)));
+                    generate_block_tid(instr.address.clone(), target_index)
+                }
+            } else {
+                generate_block_tid(instr.address.clone(), 0)
+            }
+        } else {
+            panic!("Could not parse direct jump target.")
+        }
+    }
+
+    /// Returns the block TIDs of jump targets, including target hints for indirect calls and branches.
+    /// Note that the generated TIDs are always block TIDs, even for call instructions.
+    pub fn collect_jmp_targets(&self, instr: &InstructionSimple) -> Vec<Tid> {
+        match self.unwrap_jmp_type() {
+            BRANCH | CBRANCH | CALL => vec![self.get_direct_jump_target(instr)],
+            BRANCHIND | CALLIND => {
+                let mut jump_targets = vec![];
+                for targets in instr.potential_targets.iter() {
+                    for target in targets.iter() {
+                        jump_targets.push(generate_block_tid(target.clone(), 0));
+                    }
+                }
+                jump_targets
+            }
+            CALLOTHER | RETURN => Vec::new(),
+        }
+    }
+
+    /// Get the fall-through address of the jump instruction, if it has one.
+    pub fn get_fall_through_target(&self, instr: &InstructionSimple) -> Option<Tid> {
+        let jmp_type = self.unwrap_jmp_type();
+        match jmp_type {
+            BRANCH | BRANCHIND | RETURN => None,
+            CALL | CALLIND => {
+                if self.pcode_index + 1 < (instr.pcode_ops.len() as u64) {
+                    match instr.pcode_ops[(self.pcode_index + 1) as usize].pcode_mnemonic {
+                        PcodeOperation::JmpType(RETURN) => Some(generate_block_tid(
+                            instr.address.clone(),
+                            self.pcode_index + 1,
+                        )),
+                        _ => panic!("Call was not last P-Code-operation of assembly instruction."),
+                    }
+                } else {
+                    instr.fall_through.as_deref().map(|fall_through_addr| {
+                        generate_block_tid(fall_through_addr.to_string(), 0)
+                    })
+                }
+            }
+            CBRANCH | CALLOTHER => {
+                if self.pcode_index + 1 < (instr.pcode_ops.len() as u64) {
+                    Some(generate_block_tid(
+                        instr.address.clone(),
+                        self.pcode_index + 1,
+                    ))
+                } else {
+                    instr.fall_through.as_deref().map(|fall_through_addr| {
+                        generate_block_tid(fall_through_addr.to_string(), 0)
+                    })
                 }
             }
         }
-        None
     }
 
     /// Returns the translated jump to the provided location.
-    ///
-    /// Note: Currently, it supports `BRANCH` and `CBRANCH` only.
-    pub fn into_ir_jump(&self, address: &String, target: Tid) -> Term<Jmp> {
-        if let PcodeOperation::JmpType(jmp) = self.pcode_mnemonic {
+    pub fn into_ir_jump(&self, instr: &InstructionSimple) -> Term<Jmp> {
+        let jump = if let PcodeOperation::JmpType(jmp) = self.pcode_mnemonic {
             match jmp {
-                JmpType::BRANCH => self.create_branch(address, target),
-                JmpType::CBRANCH => self.create_cbranch(address, target),
-                JmpType::BRANCHIND => todo!(),
-                JmpType::CALL => todo!(),
-                JmpType::CALLIND => todo!(),
-                JmpType::CALLOTHER => todo!(),
-                JmpType::RETURN => todo!(),
+                JmpType::BRANCH => self.create_branch(self.get_direct_jump_target(instr)),
+                JmpType::CBRANCH => self.create_cbranch(self.get_direct_jump_target(instr)),
+                JmpType::BRANCHIND => self.create_branch_indirect(),
+                JmpType::CALL => self.create_call(instr),
+                JmpType::CALLIND => self.create_call_indirect(instr),
+                JmpType::CALLOTHER => self.create_call_other(instr),
+                JmpType::RETURN => self.create_return(),
             }
         } else {
             panic!("Not a jump operation")
+        };
+        wrap_in_tid(&instr.address, self.pcode_index, jump)
+    }
+
+    /// Create a branch instruction.
+    fn create_branch(&self, target: Tid) -> Jmp {
+        Jmp::Branch(target)
+    }
+
+    // Create a conditional branch.
+    fn create_cbranch(&self, target: Tid) -> Jmp {
+        Jmp::CBranch {
+            target,
+            condition: self.input1.as_ref().unwrap().into_ir_expr().unwrap(),
         }
     }
 
-    fn create_branch(&self, address: &String, target: Tid) -> Term<Jmp> {
-        wrap_in_tid(address, self.pcode_index, Jmp::Branch(target))
+    /// Create an indirect branch.
+    fn create_branch_indirect(&self) -> Jmp {
+        Jmp::BranchInd(self.input0.into_ir_expr().unwrap())
     }
 
-    fn create_cbranch(&self, address: &String, target: Tid) -> Term<Jmp> {
-        let cbranch = Jmp::CBranch {
-            target: target,
-            condition: self.input1.as_ref().unwrap().into_ir_expr().unwrap(),
-        };
-        wrap_in_tid(address, self.pcode_index, cbranch)
+    /// Create a call.
+    fn create_call(&self, instr: &InstructionSimple) -> Jmp {
+        Jmp::Call {
+            target: generate_placeholder_function_tid(
+                self.input0.get_ram_address_as_string().unwrap(),
+            ),
+            return_: self.get_fall_through_target(instr),
+        }
     }
 
-    fn create_branch_indirect(&self, address: &String) -> Term<Jmp> {
-        let branch_ind = Jmp::BranchInd(self.input0.into_ir_expr().unwrap());
-        wrap_in_tid(address, self.pcode_index, branch_ind)
+    /// Create an indirect call.
+    fn create_call_indirect(&self, instr: &InstructionSimple) -> Jmp {
+        Jmp::CallInd {
+            target: self.input0.into_ir_expr().unwrap(),
+            return_: self.get_fall_through_target(instr),
+        }
     }
 
-    fn create_call(&self, address: &String) -> Term<Jmp> {
-        let branch_ind = Jmp::Call {
-            target: todo!(),
-            return_: Some(todo!()),
-        };
-        wrap_in_tid(address, self.pcode_index, branch_ind)
+    /// Create a `CallOther` instruction.
+    /// The description is given by the mnemonic of the corresponding assembly instruction
+    fn create_call_other(&self, instr: &InstructionSimple) -> Jmp {
+        // FIXME: The description shown by Ghidra is actually not the mnemonic!
+        // But it is unclear how one can access the description through Ghidras API.
+        // Furthermore, we do not encode the optional input varnodes that Ghidra allows for CALLOTHER operations.
+        Jmp::CallOther {
+            description: instr.mnemonic.clone(),
+            return_: self.get_fall_through_target(instr),
+        }
     }
 
-    fn create_call_indirect(&self, address: &String) -> Term<Jmp> {
-        let branch_ind = Jmp::CallInd {
-            target: todo!(),
-            return_: todo!(),
-        };
-        wrap_in_tid(address, self.pcode_index, branch_ind)
-    }
-
-    fn create_call_other(&self, address: &String) -> Term<Jmp> {
-        let call_other = Jmp::CallOther {
-            description: todo!(),
-            return_: todo!(),
-        };
-        wrap_in_tid(address, self.pcode_index, call_other)
-    }
-
-    fn create_return(&self, address: &String) -> Term<Jmp> {
-        let _return = Jmp::Return(todo!());
-        wrap_in_tid(address, self.pcode_index, _return)
+    /// Create a return instruction.
+    fn create_return(&self) -> Jmp {
+        Jmp::Return(self.input0.into_ir_expr().unwrap())
     }
 }
 
 /// Helper function to wrap a `Jmp` in a `Tid` with id `instr_<addr>_<pcode_index>`
-fn wrap_in_tid(address: &String, pcode_index: u64, jmp: Jmp) -> Term<Jmp> {
+fn wrap_in_tid(address: &str, pcode_index: u64, jmp: Jmp) -> Term<Jmp> {
     Term {
         tid: Tid {
             id: format!("instr_{}_{}", address, pcode_index),

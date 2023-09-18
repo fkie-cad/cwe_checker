@@ -19,6 +19,8 @@ mod instruction;
 use instruction::*;
 mod block;
 use block::*;
+mod function;
+use function::*;
 
 /// The project struct for deserialization of the ghidra pcode extractor JSON.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
@@ -56,9 +58,14 @@ impl ProjectSimple {
         for func in self.functions {
             for blk in func.blocks {
                 let blocks = blk.into_ir_blk(&jump_targets);
-                todo!()
+                // TODO
             }
         }
+
+        todo!(); // TODO: Normalization-Pass that replaces pseudo-call-target-TIDs with the correct target-TID
+                 // of the corresponding function.
+        todo!(); // TODO: Check that we somewhere replace indirect calls with a constant target
+                 // with a direct call. Maybe do the same for indirect branches?
 
         Project {
             program: todo!(),
@@ -73,35 +80,11 @@ impl ProjectSimple {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
-pub struct FunctionSimple {
-    pub name: String,
-    pub address: String,
-    pub blocks: Vec<BlockSimple>,
-}
-
-impl FunctionSimple {
-    fn into_ir_sub(self, jump_targets: &HashSet<u64>) -> Term<Sub> {
-        todo!()
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct RegisterProperties {
     pub register_name: String,
     pub base_register: String,
     pub lsb: u64,
     pub size: u64,
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
-pub struct ExternFunctionSimple {
-    pub name: String,
-    pub calling_convention: String,
-    pub parameters: Vec<VarnodeSimple>,
-    pub return_location: Option<VarnodeSimple>,
-    pub thunks: Vec<String>,
-    pub has_no_return: bool,
-    pub has_var_args: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
