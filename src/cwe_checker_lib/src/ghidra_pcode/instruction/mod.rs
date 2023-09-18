@@ -23,19 +23,18 @@ impl InstructionSimple {
     /// Collects all jump targets of an instruction and returns their `Tid`.
     /// The id follows the naming convention `blk_<address>`. If the target is within
     /// a pcode sequence and the index is larger 0, `_<pcode_index>` is suffixed.
-    pub fn collect_jmp_targets(
+    pub fn collect_jmp_and_fall_through_targets(
         &self,
         consecutive_instr: Option<&InstructionSimple>,
     ) -> HashSet<Tid> {
         let mut jump_targets = HashSet::new();
         for op in &self.pcode_ops {
             if matches!(op.pcode_mnemonic, PcodeOperation::JmpType(_)) {
-                let targets = op.collect_jmp_targets(
-                    self.address.clone(),
-                    self.pcode_ops.len() as u64,
-                    self.fall_through.as_deref(),
-                );
-                jump_targets.extend(targets)
+                let targets = op.collect_jmp_targets(self);
+                jump_targets.extend(targets);
+                if let Some(fall_through) = op.get_fall_through_target(self) {
+                    jump_targets.insert(fall_through);
+                }
             }
         }
         jump_targets

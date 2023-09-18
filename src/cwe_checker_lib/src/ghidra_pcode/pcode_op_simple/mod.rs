@@ -16,56 +16,6 @@ pub struct PcodeOpSimple {
 }
 
 impl PcodeOpSimple {
-    /// Returns block `Tid` of jump target.
-    /// In case of a conditional branch the fallthrough block `Tid` is provided as well,
-    /// describing an implicit branch if the conditional jump is not taken.
-    /// The provided `fallthrough` is used, if:
-    /// * a pcode relative jump exceeds the pcode operation sequence
-    /// * No following pcode operation left, if a conditional branch is not taken
-    pub fn collect_jmp_targets(
-        &self,
-        instruction_address: String,
-        pcode_sequence_length: u64,
-        fall_through_address: Option<&str>,
-    ) -> Vec<Tid> {
-        let mut jump_targets = vec![];
-
-        if let Some(JmpTarget::Absolute(_)) = self.get_jump_target() {
-            jump_targets.push(generate_block_tid(
-                self.input0.get_ram_address_as_string().unwrap().to_string(),
-                0,
-            ));
-        }
-
-        if let Some(JmpTarget::Relative((_, target_index))) = self.get_jump_target() {
-            let target = match target_index {
-                // jump behind pcode sequence
-                target_index if target_index >= pcode_sequence_length => {
-                    let fall_through_address = fall_through_address
-                        .expect("Missing fall through address for P-Code-relative jump.");
-                    generate_block_tid(fall_through_address.to_string(), 0)
-                }
-                _ => generate_block_tid(instruction_address.clone(), target_index),
-            };
-            jump_targets.push(target)
-        }
-
-        // Add implicit branch target, if conditional branch is not taken
-        if matches!(self.pcode_mnemonic, PcodeOperation::JmpType(CBRANCH)) {
-            if self.pcode_index + 1 < pcode_sequence_length {
-                jump_targets.push(generate_block_tid(
-                    instruction_address,
-                    self.pcode_index + 1,
-                ))
-            } else {
-                let fall_through_address = fall_through_address
-                    .expect("Missing fall through address for conditional branch.");
-                jump_targets.push(generate_block_tid(fall_through_address.to_string(), 0))
-            }
-        }
-        return jump_targets;
-    }
-
     /// Returns `true` if at least one input is ram located.
     pub fn has_implicit_load(&self) -> bool {
         if self.input0.address_space == "ram" {
@@ -99,7 +49,7 @@ impl PcodeOpSimple {
     /// The created instructions use the virtual register `$load_tempX`, whereby `X` is
     /// either `0`, `1`or `2` representing which input is used.
     /// The created `Tid` is named `instr_<address>_<pcode index>_load<X>`.
-    pub fn create_implicit_loads(&mut self, address: &str) -> Vec<Term<Def>> {
+    pub fn create_implicit_loads_for_def(&mut self, address: &str) -> Vec<Term<Def>> {
         let mut explicit_loads = vec![];
         if self.input0.address_space == "ram" {
             explicit_loads.push(self.input0.into_explicit_load(
@@ -174,7 +124,7 @@ impl PcodeOpSimple {
         let mut defs = vec![];
         // if the pcode operation contains implicit load operations, prepend them.
         if self.has_implicit_load() {
-            let mut explicit_loads = self.create_implicit_loads(address);
+            let mut explicit_loads = self.create_implicit_loads_for_def(address);
             defs.append(&mut explicit_loads);
         }
 

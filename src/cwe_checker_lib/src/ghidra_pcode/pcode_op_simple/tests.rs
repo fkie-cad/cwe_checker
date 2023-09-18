@@ -182,13 +182,13 @@ fn test_implicit_load_translation() {
     };
     // No implicit load
     assert_eq!(
-        mock_pcode_op_add(varnode.clone(), None, None).create_implicit_loads(&"0x1234".to_string()),
+        mock_pcode_op_add(varnode.clone(), None, None).create_implicit_loads_for_def(&"0x1234".to_string()),
         vec![]
     );
     // input0 is implicit load
     assert_eq!(
         mock_pcode_op_add(ram_varnode.clone(), None, None)
-            .create_implicit_loads(&"0x1234".to_string()),
+            .create_implicit_loads_for_def(&"0x1234".to_string()),
         vec![expected_load0
             .clone()
             .with_tid_id("instr_0x1234_1_load0".into())]
@@ -196,7 +196,7 @@ fn test_implicit_load_translation() {
     // input1 is implicit load
     assert_eq!(
         mock_pcode_op_add(varnode.clone(), Some(ram_varnode.clone()), None)
-            .create_implicit_loads(&"0x1234".to_string()),
+            .create_implicit_loads_for_def(&"0x1234".to_string()),
         vec![expected_load1
             .clone()
             .with_tid_id("instr_0x1234_1_load1".into())]
@@ -211,7 +211,7 @@ fn test_implicit_load_translation() {
             input2: Some(ram_varnode.clone()),
             output: None
         }
-        .create_implicit_loads(&"0x1234".to_string()),
+        .create_implicit_loads_for_def(&"0x1234".to_string()),
         vec![expected_load2
             .clone()
             .with_tid_id("instr_0x1234_1_load2".into())]
@@ -226,7 +226,7 @@ fn test_implicit_load_translation() {
             input2: Some(ram_varnode.clone()),
             output: None
         }
-        .create_implicit_loads(&"0x1234".to_string()),
+        .create_implicit_loads_for_def(&"0x1234".to_string()),
         vec![
             expected_load0.with_tid_id("instr_0x1234_1_load0".into()),
             expected_load1.with_tid_id("instr_0x1234_1_load1".into()),
@@ -633,26 +633,6 @@ fn test_wrap_in_assign_or_store_output_not_variable_nor_implicit_store() {
         Some(VarnodeSimple::mock("const_0xFFFF_4")),
     )
     .wrap_in_assign_or_store(&"0x1234".to_string(), expr!("0x1111:4"));
-}
-
-#[test]
-fn test_get_jump_target_relative() {
-    // backwards jump is lower bounded to 0
-    let var = VarnodeSimple::mock("const_0xFFFFFFFF_4");
-    let op = mock_pcode_op_branch(0, var);
-    assert_eq!(op.get_jump_target(), Some(JmpTarget::Relative((0, 0))));
-
-    let var = VarnodeSimple::mock("const_0x1_4");
-    let op = mock_pcode_op_branch(7, var);
-    assert_eq!(op.get_jump_target(), Some(JmpTarget::Relative((7, 8))));
-}
-
-#[test]
-fn test_get_jump_target_absolute() {
-    // backwards jump is lower bounded to 0
-    let var = VarnodeSimple::mock("ram_0xFFFFFFFF_4");
-    let op = mock_pcode_op_branch(0, var);
-    assert_eq!(op.get_jump_target(), Some(JmpTarget::Absolute(0xFFFFFFFF)));
 }
 
 #[test]

@@ -176,7 +176,8 @@ impl BlockSimple {
         let mut instructions = self.instructions.iter().peekable();
 
         while let Some(instr) = instructions.next() {
-            jump_targets.extend(instr.collect_jmp_targets(instructions.peek().copied()))
+            jump_targets
+                .extend(instr.collect_jmp_and_fall_through_targets(instructions.peek().copied()))
         }
         jump_targets
     }
@@ -289,12 +290,6 @@ fn add_jmp_to_blk(
 ) -> Blk {
     blk.defs
         .append(&mut op.create_implicit_loads_for_jump(&instr.address));
-
-    let targets = op.collect_jmp_targets(
-        instr.address.clone(),
-        instr.pcode_ops.len() as u64,
-        instr.fall_through.as_deref(),
-    );
     match op.pcode_mnemonic {
         PcodeOperation::ExpressionType(_) => {
             panic!("current op is not a jump.")
@@ -338,12 +333,15 @@ fn add_jmp_to_blk(
         // Add conditional branch and then implicit branch
         PcodeOperation::JmpType(CBRANCH) => {
             let cbranch = op.into_ir_jump(&instr);
+            let fall_through = op
+                .get_fall_through_target(&instr)
+                .expect("Expected fall through for conditional branch.");
             let implicit_branch = Term {
                 tid: Tid {
                     id: format!("instr_{}_{}_implicit_jump", instr.address, op.pcode_index),
                     address: instr.address.clone(),
                 },
-                term: Jmp::Branch(targets[1].clone()),
+                term: Jmp::Branch(fall_through),
             };
             blk.jmps.push(cbranch);
             blk.jmps.push(implicit_branch);
