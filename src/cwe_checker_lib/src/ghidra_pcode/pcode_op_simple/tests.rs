@@ -182,7 +182,8 @@ fn test_implicit_load_translation() {
     };
     // No implicit load
     assert_eq!(
-        mock_pcode_op_add(varnode.clone(), None, None).create_implicit_loads_for_def(&"0x1234".to_string()),
+        mock_pcode_op_add(varnode.clone(), None, None)
+            .create_implicit_loads_for_def(&"0x1234".to_string()),
         vec![]
     );
     // input0 is implicit load

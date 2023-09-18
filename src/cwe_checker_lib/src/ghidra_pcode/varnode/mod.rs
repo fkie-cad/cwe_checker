@@ -134,7 +134,7 @@ pub mod tests {
         let expected_varnode = VarnodeSimple {
             address_space: "const".to_string(),
             id: "0x1".to_string(),
-            size: 16
+            size: 16,
         };
         assert_eq!(mock, expected_varnode);
     }

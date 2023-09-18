@@ -70,7 +70,7 @@ pub mod tests {
             let components: Vec<_> = tid.split("_").collect();
             Tid {
                 id: tid.to_string(),
-                address: components[1].to_string()
+                address: components[1].to_string(),
             }
         }
     }
