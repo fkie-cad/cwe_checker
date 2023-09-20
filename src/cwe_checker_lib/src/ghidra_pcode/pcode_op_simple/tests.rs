@@ -78,17 +78,6 @@ pub fn mock_pcode_op_add(
     }
 }
 
-pub fn mock_pcode_op_branch(pcode_index: u64, input0: VarnodeSimple) -> PcodeOpSimple {
-    PcodeOpSimple {
-        pcode_index,
-        pcode_mnemonic: JmpType(BRANCH),
-        input0,
-        input1: None,
-        input2: None,
-        output: None,
-    }
-}
-
 pub fn mock_pcode_op_cbranch(
     pcode_index: u64,
     input0: VarnodeSimple,
@@ -122,6 +111,16 @@ impl PcodeOpSimple {
     }
 }
 
+/// Mock a temporary variable
+fn mock_temp_var(var: &str) -> Variable {
+    let components: Vec<_> = var.split(":").collect();
+    Variable {
+        name: components[0].to_string(),
+        size: u64::from_str_radix(components[1], 10).unwrap().into(),
+        is_temp: true,
+    }
+}
+
 #[test]
 fn test_pcode_op_has_implicit_load() {
     let pcode_op = PcodeOpSimple::mock("register_RAX_8 INT_ADD ram_0x42_8 register_RAX_8");
@@ -147,112 +146,84 @@ fn test_pcode_op_has_implicit_store() {
 
 #[test]
 fn test_implicit_load_translation() {
-    let ram_varnode = VarnodeSimple::mock("ram_0x42_8");
-    let varnode = VarnodeSimple::mock("register_RAX_8");
-    let load0_target = Variable {
-        name: "$load_temp0".into(),
-        size: 8.into(),
-        is_temp: true,
-    };
+    // Implicit loads for input0 and input1
+    let mut instr = InstructionSimple::mock("0x1000", ["ram_0x10_8 INT_SUB ram_0x20_8 ram_0x30_8"]);
     let expected_load0 = Term {
-        tid: Tid {
-            id: "".into(),
-            address: "0x1234".into(),
-        },
+        tid: Tid::mock("instr_0x1000_0_load0"),
         term: Def::Load {
-            var: load0_target.clone(),
-            address: expr!("0x42:8"),
+            var: mock_temp_var("$load_temp0:8"),
+            address: expr!("0x20:8"),
         },
     };
-
-    let mut load1_target = load0_target.clone();
-    load1_target.name = "$load_temp1".into();
-    let mut expected_load1 = expected_load0.clone();
-    expected_load1.term = Def::Load {
-        var: load1_target.clone(),
-        address: expr!("0x42:8"),
+    let expected_load1 = Term {
+        tid: Tid::mock("instr_0x1000_0_load1"),
+        term: Def::Load {
+            var: mock_temp_var("$load_temp1:8"),
+            address: expr!("0x30:8"),
+        },
     };
-
-    let mut load2_target = load0_target.clone();
-    load2_target.name = "$load_temp2".into();
-    let mut expected_load2 = expected_load0.clone();
-    expected_load2.term = Def::Load {
-        var: load2_target.clone(),
-        address: expr!("0x42:8"),
+    assert_eq!(
+        instr.pcode_ops[0].create_implicit_loads_for_def("0x1000"),
+        vec![expected_load0, expected_load1]
+    );
+    assert_eq!(
+        &instr.pcode_ops[0].input0,
+        &VarnodeSimple {
+            address_space: "unique".to_string(),
+            id: "$load_temp0".to_string(),
+            size: 8
+        }
+    );
+    assert_eq!(
+        instr.pcode_ops[0].input1.as_ref().unwrap(),
+        &VarnodeSimple {
+            address_space: "unique".to_string(),
+            id: "$load_temp1".to_string(),
+            size: 8
+        }
+    );
+    // Implicit load for input2
+    let mut instr = InstructionSimple::mock(
+        "0x1000",
+        ["register_RAX_8 STORE const_0x10_8 register_RAX_8 ram_0x10_8"],
+    );
+    let expected_load = Term {
+        tid: Tid::mock("instr_0x1000_0_load2"),
+        term: Def::Load {
+            var: mock_temp_var("$load_temp2:8"),
+            address: expr!("0x10:8"),
+        },
     };
+    assert_eq!(
+        instr.pcode_ops[0].create_implicit_loads_for_def("0x1000"),
+        vec![expected_load]
+    );
+    assert_eq!(
+        instr.pcode_ops[0].input2.as_ref().unwrap(),
+        &VarnodeSimple {
+            address_space: "unique".to_string(),
+            id: "$load_temp2".to_string(),
+            size: 8
+        }
+    );
     // No implicit load
+    let mut instr = InstructionSimple::mock(
+        "0x1000",
+        ["register_RAX_8 STORE const_0x10_8 register_RAX_8 register_RAX_8"],
+    );
     assert_eq!(
-        mock_pcode_op_add(varnode.clone(), None, None)
-            .create_implicit_loads_for_def(&"0x1234".to_string()),
+        instr.pcode_ops[0].create_implicit_loads_for_def("0x1000"),
         vec![]
-    );
-    // input0 is implicit load
-    assert_eq!(
-        mock_pcode_op_add(ram_varnode.clone(), None, None)
-            .create_implicit_loads_for_def(&"0x1234".to_string()),
-        vec![expected_load0
-            .clone()
-            .with_tid_id("instr_0x1234_1_load0".into())]
-    );
-    // input1 is implicit load
-    assert_eq!(
-        mock_pcode_op_add(varnode.clone(), Some(ram_varnode.clone()), None)
-            .create_implicit_loads_for_def(&"0x1234".to_string()),
-        vec![expected_load1
-            .clone()
-            .with_tid_id("instr_0x1234_1_load1".into())]
-    );
-    // input2 is implicit load
-    assert_eq!(
-        PcodeOpSimple {
-            pcode_index: 1,
-            pcode_mnemonic: ExpressionType(STORE),
-            input0: varnode.clone(),
-            input1: None,
-            input2: Some(ram_varnode.clone()),
-            output: None
-        }
-        .create_implicit_loads_for_def(&"0x1234".to_string()),
-        vec![expected_load2
-            .clone()
-            .with_tid_id("instr_0x1234_1_load2".into())]
-    );
-    // input0, input1 and input2 are implicit loads
-    assert_eq!(
-        PcodeOpSimple {
-            pcode_index: 1,
-            pcode_mnemonic: ExpressionType(INT_ZEXT),
-            input0: ram_varnode.clone(),
-            input1: Some(ram_varnode.clone()),
-            input2: Some(ram_varnode.clone()),
-            output: None
-        }
-        .create_implicit_loads_for_def(&"0x1234".to_string()),
-        vec![
-            expected_load0.with_tid_id("instr_0x1234_1_load0".into()),
-            expected_load1.with_tid_id("instr_0x1234_1_load1".into()),
-            expected_load2.with_tid_id("instr_0x1234_1_load2".into()),
-        ]
     );
 }
 
 #[test]
 fn test_create_load() {
-    let load_target = VarnodeSimple::mock("register_RAX_8");
-    let source = VarnodeSimple::mock("const_0x0012345_8");
-    let pcode_op = PcodeOpSimple {
-        pcode_index: 1,
-        pcode_mnemonic: ExpressionType(LOAD),
-        input0: source.clone(),
-        input1: Some(source),
-        input2: None,
-        output: Some(load_target),
-    };
-
+    let pcode_op = PcodeOpSimple::mock("register_RAX_8 LOAD space_id_8 const_0x0012345_8");
     assert_eq!(
         pcode_op.create_load(&"0xFFFFFF".to_string()),
         Term {
-            tid: Tid::mock("instr_0xFFFFFF_1"),
+            tid: Tid::mock("instr_0xFFFFFF_0"),
             term: def!["RAX:8 := Load from 0x0012345:8"].term
         }
     );
@@ -260,73 +231,31 @@ fn test_create_load() {
 
 #[test]
 #[should_panic]
-fn test_create_load_not_load() {
-    mock_pcode_op_add(VarnodeSimple::mock("space_id_8"), None, None)
-        .create_load(&"0x123".to_string());
+fn test_create_load_no_source() {
+    PcodeOpSimple::mock("register_RAX_8 LOAD space_id_8").create_load(&"0x123".to_string());
 }
 
 #[test]
 #[should_panic]
 fn test_create_load_no_output() {
-    PcodeOpSimple {
-        pcode_index: 1,
-        pcode_mnemonic: ExpressionType(LOAD),
-        input0: VarnodeSimple::mock("space_id_8"),
-        input1: Some(VarnodeSimple::mock("const_0x200_8")),
-        input2: None,
-        output: None,
-    }
-    .create_load(&"0x123".to_string());
-}
-
-#[test]
-#[should_panic]
-fn test_create_load_no_source() {
-    PcodeOpSimple {
-        pcode_index: 1,
-        pcode_mnemonic: ExpressionType(LOAD),
-        input0: VarnodeSimple::mock("space_id_8"),
-        input1: None,
-        input2: None,
-        output: Some(VarnodeSimple::mock("register_RAX_8")),
-    }
-    .create_load(&"0x123".to_string());
+    PcodeOpSimple::mock("LOAD space_id_8 const_0x200_8").create_load(&"0x123".to_string());
 }
 
 #[test]
 #[should_panic]
 fn test_create_load_target_not_var() {
-    PcodeOpSimple {
-        pcode_index: 1,
-        pcode_mnemonic: ExpressionType(LOAD),
-        input0: VarnodeSimple::mock("space_id_8"),
-        input1: Some(VarnodeSimple::mock("const_0x200_8")),
-        input2: None,
-        output: Some(VarnodeSimple::mock("const_0x4321_8")),
-    }
-    .create_load(&"0x123".to_string());
+    PcodeOpSimple::mock("const_0x4321_8 LOAD space_id_8 const_0x200_8")
+        .create_load(&"0x123".to_string());
 }
 
 #[test]
 fn test_create_store() {
-    let data = VarnodeSimple::mock("const_0x0042_8");
-    let target = VarnodeSimple::mock("register_RAX_8");
-    let pcode_op = PcodeOpSimple {
-        pcode_index: 5,
-        pcode_mnemonic: ExpressionType(STORE),
-        input0: VarnodeSimple::mock("space_id_8"),
-        input1: Some(target),
-        input2: Some(data),
-        output: None,
-    };
+    let pcode_op = PcodeOpSimple::mock("STORE space_id_8 register_RAX_8 const_0x42_8");
     assert_eq!(
         pcode_op.create_store(&"0x00ABCDEF".to_string()),
         Term {
-            tid: Tid {
-                id: "instr_0x00ABCDEF_5".into(),
-                address: "0x00ABCDEF".into()
-            },
-            term: def!["Store at RAX:8 := 0x0042:8"].term
+            tid: Tid::mock("instr_0x00ABCDEF_0"),
+            term: def!["Store at RAX:8 := 0x42:8"].term
         }
     )
 }
@@ -334,58 +263,26 @@ fn test_create_store() {
 #[test]
 #[should_panic]
 fn test_create_store_not_store() {
-    mock_pcode_op_add(VarnodeSimple::mock("space_id_8"), None, None)
-        .create_store(&"0x123".to_string());
-}
-
-#[test]
-#[should_panic]
-fn test_create_store_no_target() {
-    PcodeOpSimple {
-        pcode_index: 1,
-        pcode_mnemonic: ExpressionType(STORE),
-        input0: VarnodeSimple::mock("space_id_8"),
-        input1: None,
-        input2: Some(VarnodeSimple::mock("const_0x4321_8")),
-        output: None,
-    }
-    .create_store(&"0x123".to_string());
+    PcodeOpSimple::mock("STORE space_id_8 register_RAX_8").create_store(&"0x123".to_string());
 }
 
 #[test]
 #[should_panic]
 fn test_create_store_from_ram() {
-    PcodeOpSimple {
-        pcode_index: 1,
-        pcode_mnemonic: ExpressionType(STORE),
-        input0: VarnodeSimple::mock("space_id_8"),
-        input1: Some(VarnodeSimple::mock("const_0x4321_8")),
-        input2: Some(VarnodeSimple::mock("ram_0xFFFF01_8")),
-        output: None,
-    }
-    .create_store(&"0x123".to_string());
+    PcodeOpSimple::mock("STORE space_id_8 const_4321_8 ram_0xFFFF01_8")
+        .create_store(&"0x123".to_string());
 }
 
 #[test]
-fn test_create_subpice() {
-    let op = PcodeOpSimple {
-        pcode_index: 1,
-        pcode_mnemonic: ExpressionType(SUBPIECE),
-        input0: VarnodeSimple::mock("const_0xAABBCCDD_8"),
-        input1: Some(VarnodeSimple::mock("const_0x3_1")),
-        input2: None,
-        output: Some(VarnodeSimple::mock("register_EAX_4")),
-    };
+fn test_create_subpiece() {
+    let op = PcodeOpSimple::mock("register_EAX_4 SUBPIECE const_0xAABBCCDD_8 const_0x3_1");
     let expected_expr = Expression::Subpiece {
         low_byte: 3.into(),
         size: 4.into(),
         arg: Box::new(Expression::Const(Bitvector::from_u64(0xAABBCCDD))),
     };
     let expected = Term {
-        tid: Tid {
-            id: "instr_0x1234_1".to_string(),
-            address: "0x1234".to_string(),
-        },
+        tid: Tid::mock("instr_0x1234_0"),
         term: Def::Assign {
             var: variable!("EAX:4"),
             value: expected_expr,
@@ -397,80 +294,35 @@ fn test_create_subpice() {
 #[test]
 #[should_panic]
 fn test_create_subpiece_with_non_constant() {
-    PcodeOpSimple {
-        pcode_index: 1,
-        pcode_mnemonic: ExpressionType(SUBPIECE),
-        input0: VarnodeSimple::mock("const_0xABCDEF_8"),
-        input1: Some(VarnodeSimple::mock("register_RAX_8")),
-        input2: None,
-        output: Some(VarnodeSimple::mock("register_EAX_4")),
-    }
-    .create_subpiece(&"0x1234".to_string());
+    PcodeOpSimple::mock("register_EAX_4 SUBPIECE const_0xABCDEF_8 register_RAX_8")
+        .create_subpiece(&"0x1234".to_string());
 }
 
 #[test]
 fn test_create_unop() {
-    let op = PcodeOpSimple {
-        pcode_index: 1,
-        pcode_mnemonic: ExpressionType(INT_NEGATE),
-        input0: VarnodeSimple::mock("register_RAX_8"),
-        input1: None,
-        input2: None,
-        output: Some(VarnodeSimple::mock("register_RAX_8")),
-    };
-    let mut expected = def!["instr_0x1234_1: RAX:8 = -(RAX:8)"];
+    let op = PcodeOpSimple::mock("register_RAX_8 INT_NEGATE register_RAX_8");
+    let mut expected = def!["instr_0x1234_0: RAX:8 = -(RAX:8)"];
     expected.tid.address = "0x1234".to_string();
     assert_eq!(op.create_unop(&"0x1234".to_string()), expected);
-
-    expected.term = def!["RAX:8 = ¬(RAX:8)"].term;
-    assert_eq!(
-        op.with_mnemonic(ExpressionType(BOOL_NEGATE))
-            .create_unop(&"0x1234".to_string()),
-        expected
-    )
 }
 
 #[test]
 #[should_panic]
 fn test_create_unop_not_expression_type() {
-    PcodeOpSimple {
-        pcode_index: 1,
-        pcode_mnemonic: JmpType(CALL),
-        input0: VarnodeSimple::mock("register_RAX_8"),
-        input1: None,
-        input2: None,
-        output: Some(VarnodeSimple::mock("register_RAX_8")),
-    }
-    .create_unop(&"0xFFFF".to_string());
+    PcodeOpSimple::mock("register_RAX_8 CALL register_RAX_8").create_unop(&"0xFFFF".to_string());
 }
 
 #[test]
 #[should_panic]
 fn test_create_unop_not_unop_type() {
-    PcodeOpSimple {
-        pcode_index: 1,
-        pcode_mnemonic: ExpressionType(INT_AND),
-        input0: VarnodeSimple::mock("register_RAX_8"),
-        input1: None,
-        input2: None,
-        output: Some(VarnodeSimple::mock("register_RAX_8")),
-    }
-    .create_unop(&"0xFFFF".to_string());
+    PcodeOpSimple::mock("register_RAX_8 INT_ADD register_RAX_8").create_unop(&"0xFFFF".to_string());
 }
 
 #[test]
 fn test_create_biop() {
-    let op = mock_pcode_op_add(
-        VarnodeSimple::mock("register_RAX_8"),
-        Some(VarnodeSimple::mock("const_0xCAFE_4")),
-        Some(VarnodeSimple::mock("register_RAX_8")),
-    );
-
+    let op = PcodeOpSimple::mock("register_RAX_8 INT_ADD register_RAX_8 const_0xCAFE_8");
     let expected = Term {
-        tid: Tid {
-            id: "instr_0x1234_1".into(),
-            address: "0x1234".into(),
-        },
+        tid: Tid::mock("instr_0x1234_0"),
         term: def!["RAX:8 = RAX:8 + 0xCAFE:4"].term,
     };
     assert_eq!(op.create_biop(&"0x1234".to_string()), expected)
@@ -478,52 +330,21 @@ fn test_create_biop() {
 
 #[test]
 #[should_panic]
-fn test_create_biop_not_expression_type() {
-    PcodeOpSimple {
-        pcode_index: 1,
-        pcode_mnemonic: JmpType(CALL),
-        input0: VarnodeSimple::mock("register_RAX_8"),
-        input1: Some(VarnodeSimple::mock("const_0xCAFE_4")),
-        input2: None,
-        output: Some(VarnodeSimple::mock("register_RAX_8")),
-    }
-    .create_biop(&"0x1234".to_string());
-}
-
-#[test]
-#[should_panic]
 fn test_create_biop_not_biop_type() {
-    PcodeOpSimple {
-        pcode_index: 1,
-        pcode_mnemonic: ExpressionType(COPY),
-        input0: VarnodeSimple::mock("register_RAX_8"),
-        input1: Some(VarnodeSimple::mock("const_0xCAFE_4")),
-        input2: None,
-        output: Some(VarnodeSimple::mock("register_RAX_8")),
-    }
-    .create_biop(&"0x1234".to_string());
+    PcodeOpSimple::mock("register_RAX_8 COPY register_RAX_8 const_0xCAFE_8")
+        .create_biop(&"0x1234".to_string());
 }
 
 #[test]
 fn test_create_cast_op() {
-    let op = PcodeOpSimple {
-        pcode_index: 9,
-        pcode_mnemonic: PcodeOperation::ExpressionType(INT_ZEXT),
-        input0: VarnodeSimple::mock("const_0x1_1"),
-        input1: None,
-        input2: None,
-        output: Some(VarnodeSimple::mock("register_RDI_8")),
-    };
+    let op = PcodeOpSimple::mock("register_RDI_8 INT_ZEXT const_0x1_1");
     let expected_expr = Expression::Cast {
         op: CastOpType::IntZExt,
         size: 8.into(),
         arg: Box::new(expr!("0x1:1")),
     };
     let expected = Term {
-        tid: Tid {
-            id: "instr_0x4321_9".into(),
-            address: "0x4321".into(),
-        },
+        tid: Tid::mock("instr_0x4321_0"),
         term: Def::Assign {
             var: variable!("RDI:8"),
             value: expected_expr,
@@ -534,48 +355,16 @@ fn test_create_cast_op() {
 
 #[test]
 #[should_panic]
-fn test_create_castop_not_expression_type() {
-    PcodeOpSimple {
-        pcode_index: 1,
-        pcode_mnemonic: JmpType(CALL),
-        input0: VarnodeSimple::mock("register_RAX_8"),
-        input1: Some(VarnodeSimple::mock("const_0xCAFE_4")),
-        input2: None,
-        output: Some(VarnodeSimple::mock("register_RAX_8")),
-    }
-    .create_castop(&"0x1234".to_string());
-}
-
-#[test]
-#[should_panic]
 fn test_create_castop_not_castop_type() {
-    PcodeOpSimple {
-        pcode_index: 1,
-        pcode_mnemonic: ExpressionType(COPY),
-        input0: VarnodeSimple::mock("register_RAX_8"),
-        input1: Some(VarnodeSimple::mock("const_0xCAFE_4")),
-        input2: None,
-        output: Some(VarnodeSimple::mock("register_RAX_8")),
-    }
-    .create_castop(&"0x1234".to_string());
+    PcodeOpSimple::mock("register_RAX_8 COPY const_0x1_1").create_castop(&"0x1234".to_string());
 }
 
 #[test]
 fn test_create_assign() {
-    let op = PcodeOpSimple {
-        pcode_index: 2,
-        pcode_mnemonic: ExpressionType(COPY),
-        input0: VarnodeSimple::mock("const_0x42_1"),
-        input1: None,
-        input2: None,
-        output: Some(VarnodeSimple::mock("register_ZF_1")),
-    };
+    let op = PcodeOpSimple::mock("register_ZF_1 COPY const_0x1_1");
     let expected = Term {
-        tid: Tid {
-            id: "instr_0x1111_2".to_string(),
-            address: "0x1111".to_string(),
-        },
-        term: def!["ZF:1 = 0x42:1"].term,
+        tid: Tid::mock("instr_0x1111_0"),
+        term: def!["ZF:1 = 0x1:1"].term,
     };
     assert_eq!(expected, op.create_assign(&"0x1111".to_string()))
 }
@@ -583,44 +372,28 @@ fn test_create_assign() {
 #[test]
 #[should_panic]
 fn test_create_assign_not_copy_type() {
-    PcodeOpSimple {
-        pcode_index: 1,
-        pcode_mnemonic: ExpressionType(BOOL_AND),
-        input0: VarnodeSimple::mock("register_RAX_8"),
-        input1: Some(VarnodeSimple::mock("const_0xCAFE_4")),
-        input2: None,
-        output: Some(VarnodeSimple::mock("register_RAX_8")),
-    }
-    .create_assign(&"0x1234".to_string());
+    PcodeOpSimple::mock("register_ZF_1 BOOL_AND register_RAX_8 const_0xCAFE_4")
+        .create_assign(&"0x1234".to_string());
 }
 
 #[test]
 fn test_wrap_in_assign_or_store() {
-    let mut op = mock_pcode_op_add(
-        VarnodeSimple::mock("register_EAX_4"),
-        Some(VarnodeSimple::mock("const_0xCAFE_4")),
-        Some(VarnodeSimple::mock("register_EAX_4")),
-    );
-
+    let op = PcodeOpSimple::mock("register_EAX_4 INT_ADD register_EAX_4 const_0xCAFE_4");
     let expr = expr!("EAX:4 + 0xCAFE:4");
     // test Assign
     let mut expected = Term {
-        tid: Tid {
-            id: "instr_0xAFFE_1".to_string(),
-            address: "0xAFFE".to_string(),
-        },
+        tid: Tid::mock("instr_0x1234_0"),
         term: def!["EAX:4 = EAX:4 + 0xCAFE:4"].term,
     };
     assert_eq!(
         expected,
-        op.wrap_in_assign_or_store(&"0xAFFE".to_string(), expr.clone())
+        op.wrap_in_assign_or_store(&"0x1234".to_string(), expr.clone())
     );
-
     // test Store
-    op.output = Some(VarnodeSimple::mock("ram_0x1234_4"));
-    expected.term = def!["Store at 0x1234:4 := EAX:4 + 0xCAFE:4"].term;
+    let op = PcodeOpSimple::mock("ram_0x1000_4 INT_ADD register_EAX_4 const_0xCAFE_4");
+    expected.term = def!["Store at 0x1000:4 := EAX:4 + 0xCAFE:4"].term;
     assert_eq!(
-        op.wrap_in_assign_or_store(&"0xAFFE".to_string(), expr),
+        op.wrap_in_assign_or_store(&"0x1234".to_string(), expr),
         expected
     )
 }
@@ -628,12 +401,8 @@ fn test_wrap_in_assign_or_store() {
 #[test]
 #[should_panic]
 fn test_wrap_in_assign_or_store_output_not_variable_nor_implicit_store() {
-    mock_pcode_op_add(
-        VarnodeSimple::mock("register_EAX_4"),
-        Some(VarnodeSimple::mock("const_0xCAFE_4")),
-        Some(VarnodeSimple::mock("const_0xFFFF_4")),
-    )
-    .wrap_in_assign_or_store(&"0x1234".to_string(), expr!("0x1111:4"));
+    PcodeOpSimple::mock("const_0xFFFF_4 INT_ADD register_EAX_4 const_0xCAFE_4")
+        .wrap_in_assign_or_store(&"0x1234".to_string(), expr!("0x1111:4"));
 }
 
 #[test]
