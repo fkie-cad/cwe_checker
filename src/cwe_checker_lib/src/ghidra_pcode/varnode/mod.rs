@@ -20,27 +20,39 @@ impl VarnodeSimple {
     /// Translates into `Expression::Const` for constants or `Expression::Var` for registers or
     /// virtual registers.
     ///
-    /// Returns `Err` if the addressspace is neither `"const"`, `"register"` nor `"unique"`.
+    /// Returns `Err` if the address space is neither `"const"`, `"register"` nor `"unique"`.
     pub fn into_ir_expr(&self) -> Result<Expression> {
         match self.address_space.as_str() {
-            "const" => {
-                let constant =
-                    Bitvector::from_u64(u64::from_str_radix(self.id.trim_start_matches("0x"), 16)?);
-                Ok(Expression::Const(
-                    constant.into_resize_unsigned(self.size.into()),
-                ))
-            }
-            "register" => Ok(Expression::Var(Variable {
+            "const" => Ok(Expression::Const(self.to_const())),
+            "register" | "unique" => Ok(Expression::Var(self.to_var())),
+            _ => Err(anyhow!("Varnode translation failed.")),
+        }
+    }
+
+    /// Translates a varnode with the "const" address space into the bitvector constant it represents.
+    fn to_const(&self) -> Bitvector {
+        assert_eq!(&self.address_space, "const");
+        // FIXME: Does Ghidra produce constants larger than 8 bytes?
+        // If yes, they could be parsed incorrectly by the current implementation.
+        let constant =
+            Bitvector::from_u64(u64::from_str_radix(self.id.trim_start_matches("0x"), 16).unwrap());
+        constant.into_resize_unsigned(self.size.into())
+    }
+
+    /// Translates a varnode with the "register" or "unique" address space into a (regular or temporary) variable.
+    fn to_var(&self) -> Variable {
+        match self.address_space.as_str() {
+            "register" => Variable {
                 name: self.id.clone(),
                 size: ByteSize::new(self.size),
                 is_temp: false,
-            })),
-            "unique" => Ok(Expression::Var(Variable {
+            },
+            "unique" => Variable {
                 name: format!("$U_{}", self.id),
                 size: ByteSize::new(self.size),
                 is_temp: true,
-            })),
-            _ => Err(anyhow!("Varnode translation failed.")),
+            },
+            _ => panic!("Expected register or unique varnode."),
         }
     }
 
@@ -79,22 +91,18 @@ impl VarnodeSimple {
         address: &str,
         pcode_index: u64,
     ) -> Term<Def> {
-        let load = Def::Load {
-            var: Variable {
-                name: var_name.clone(),
-                size: self.size.into(),
-                is_temp: true,
-            },
-            address: Expression::Const(
-                self.get_ram_address()
-                    .expect("varnode's addressspace is not ram"),
-            ),
-        };
-
+        let load_address = Expression::Const(
+            self.get_ram_address()
+                .expect("varnode's address space is not ram"),
+        );
         // Change varnode to newly introduced explicit variable
         self.id = var_name.into();
         self.address_space = "unique".into();
 
+        let load = Def::Load {
+            var: self.to_var(),
+            address: load_address,
+        };
         Term {
             tid: Tid {
                 id: format!("instr_{}_{}_{}", address, pcode_index, tid_suffix),

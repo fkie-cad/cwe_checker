@@ -151,14 +151,14 @@ fn test_implicit_load_translation() {
     let expected_load0 = Term {
         tid: Tid::mock("instr_0x1000_0_load0"),
         term: Def::Load {
-            var: mock_temp_var("$load_temp0:8"),
+            var: mock_temp_var("$U_load_temp0:8"),
             address: expr!("0x20:8"),
         },
     };
     let expected_load1 = Term {
         tid: Tid::mock("instr_0x1000_0_load1"),
         term: Def::Load {
-            var: mock_temp_var("$load_temp1:8"),
+            var: mock_temp_var("$U_load_temp1:8"),
             address: expr!("0x30:8"),
         },
     };
@@ -170,7 +170,7 @@ fn test_implicit_load_translation() {
         &instr.pcode_ops[0].input0,
         &VarnodeSimple {
             address_space: "unique".to_string(),
-            id: "$load_temp0".to_string(),
+            id: "load_temp0".to_string(),
             size: 8
         }
     );
@@ -178,7 +178,7 @@ fn test_implicit_load_translation() {
         instr.pcode_ops[0].input1.as_ref().unwrap(),
         &VarnodeSimple {
             address_space: "unique".to_string(),
-            id: "$load_temp1".to_string(),
+            id: "load_temp1".to_string(),
             size: 8
         }
     );
@@ -190,7 +190,7 @@ fn test_implicit_load_translation() {
     let expected_load = Term {
         tid: Tid::mock("instr_0x1000_0_load2"),
         term: Def::Load {
-            var: mock_temp_var("$load_temp2:8"),
+            var: mock_temp_var("$U_load_temp2:8"),
             address: expr!("0x10:8"),
         },
     };
@@ -202,7 +202,7 @@ fn test_implicit_load_translation() {
         instr.pcode_ops[0].input2.as_ref().unwrap(),
         &VarnodeSimple {
             address_space: "unique".to_string(),
-            id: "$load_temp2".to_string(),
+            id: "load_temp2".to_string(),
             size: 8
         }
     );
@@ -323,7 +323,7 @@ fn test_create_biop() {
     let op = PcodeOpSimple::mock("register_RAX_8 INT_ADD register_RAX_8 const_0xCAFE_8");
     let expected = Term {
         tid: Tid::mock("instr_0x1234_0"),
-        term: def!["RAX:8 = RAX:8 + 0xCAFE:4"].term,
+        term: def!["RAX:8 = RAX:8 + 0xCAFE:8"].term,
     };
     assert_eq!(op.create_biop(&"0x1234".to_string()), expected)
 }
@@ -406,16 +406,27 @@ fn test_wrap_in_assign_or_store_output_not_variable_nor_implicit_store() {
 }
 
 #[test]
-fn collect_collect_jmp_targets() {
-    todo!()
-}
+fn test_into_ir_def() {
+    let op = PcodeOpSimple::mock("ram_0x10_8 INT_ADD register_RAX_8 ram_0x20_8");
+    let defs = op.into_ir_def("0x1000");
 
-#[test]
-fn collect_into_ir_def() {
-    todo!()
-}
-
-#[test]
-fn collect_create_def() {
-    todo!()
+    let expected_load = Term {
+        tid: Tid::mock("instr_0x1000_0_load1"),
+        term: Def::Load {
+            var: mock_temp_var("$U_load_temp1:8"),
+            address: expr!("0x20:8"),
+        },
+    };
+    let expected_store = Term {
+        tid: Tid::mock("instr_0x1000_0"),
+        term: Def::Store {
+            address: expr!("0x10:8"),
+            value: Expression::BinOp {
+                op: BinOpType::IntAdd,
+                lhs: Box::new(expr!("RAX:8")),
+                rhs: Box::new(Expression::Var(mock_temp_var("$U_load_temp1:8"))),
+            },
+        },
+    };
+    assert_eq!(defs, vec![expected_load, expected_store]);
 }
