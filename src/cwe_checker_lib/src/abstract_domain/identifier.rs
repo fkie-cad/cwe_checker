@@ -237,6 +237,65 @@ impl AbstractLocation {
         AbstractLocation::GlobalAddress { address, size }
     }
 
+    /// Add an offset to the abstract location.
+    pub fn with_offset_addendum(self, addendum: i64) -> AbstractLocation {
+        match self {
+            Self::Register(_) => panic!("Cannot add an offset to a register abstract location"),
+            Self::GlobalAddress { address, size } => Self::GlobalAddress {
+                address: address + (addendum as u64),
+                size,
+            },
+            Self::Pointer(var, mut location) => {
+                location.add_offset(addendum);
+                Self::Pointer(var, location)
+            }
+            Self::GlobalPointer(address, mut location) => {
+                location.add_offset(addendum);
+                Self::GlobalPointer(address, location)
+            }
+        }
+    }
+
+    /// Return the abstract location that one gets when dereferencing the pointer that `self` is pointing to.
+    ///
+    /// Panics if `self` is not pointer-sized.
+    pub fn dereferenced(
+        self,
+        new_size: ByteSize,
+        generic_pointer_size: ByteSize,
+    ) -> AbstractLocation {
+        match self {
+            Self::Register(var) => Self::Pointer(
+                var,
+                AbstractMemoryLocation::Location {
+                    offset: 0,
+                    size: new_size,
+                },
+            ),
+            Self::GlobalAddress { address, size } => {
+                assert_eq!(
+                    size, generic_pointer_size,
+                    "Cannot dereference an abstract memory location that is not pointer-sized."
+                );
+                Self::GlobalPointer(
+                    address,
+                    AbstractMemoryLocation::Location {
+                        offset: 0,
+                        size: new_size,
+                    },
+                )
+            }
+            Self::GlobalPointer(address, mut location) => {
+                location.dereference(new_size, generic_pointer_size);
+                Self::GlobalPointer(address, location)
+            }
+            Self::Pointer(var, mut location) => {
+                location.dereference(new_size, generic_pointer_size);
+                Self::Pointer(var.clone(), location)
+            }
+        }
+    }
+
     /// Get the bytesize of the value represented by the abstract location.
     pub fn bytesize(&self) -> ByteSize {
         match self {
@@ -244,6 +303,18 @@ impl AbstractLocation {
             Self::GlobalAddress { size, .. } => *size,
             Self::Pointer(_, mem_location) | Self::GlobalPointer(_, mem_location) => {
                 mem_location.bytesize()
+            }
+        }
+    }
+
+    /// Get the recursion depth of the abstract location,
+    /// i.e. how many times one has to dereference a pointer until reaching the actual location.
+    pub fn recursion_depth(&self) -> u64 {
+        match self {
+            Self::Register(_) => 0,
+            Self::GlobalAddress { .. } => 1,
+            Self::Pointer(_, mem_location) | Self::GlobalPointer(_, mem_location) => {
+                1 + mem_location.recursion_depth()
             }
         }
     }
@@ -273,11 +344,50 @@ pub enum AbstractMemoryLocation {
 }
 
 impl AbstractMemoryLocation {
+    /// Add an offset to a memory location.
+    pub fn add_offset(&mut self, addendum: i64) {
+        match self {
+            Self::Location { offset, .. } => *offset += addendum,
+            Self::Pointer { target, .. } => target.add_offset(addendum),
+        }
+    }
+
+    /// Dereference the pointer that `self` is pointing to.
+    ///
+    /// Panics if the old value of `self` is not pointer-sized.
+    fn dereference(&mut self, new_size: ByteSize, generic_pointer_size: ByteSize) {
+        match self {
+            Self::Pointer { target, .. } => target.dereference(new_size, generic_pointer_size),
+            Self::Location { offset, size } => {
+                assert_eq!(
+                    *size, generic_pointer_size,
+                    "Cannot dereference an abstract memory location that is not pointer-sized."
+                );
+                *self = Self::Pointer {
+                    offset: *offset,
+                    target: Box::new(Self::Location {
+                        offset: 0,
+                        size: new_size,
+                    }),
+                }
+            }
+        };
+    }
+
     /// Get the bytesize of the value represented by the abstract memory location.
     pub fn bytesize(&self) -> ByteSize {
         match self {
             Self::Location { size, .. } => *size,
             Self::Pointer { target, .. } => target.bytesize(),
+        }
+    }
+
+    /// Get the recursion depth of the abstract memory location,
+    /// i.e. how many times one has to dereference a pointer until reaching the actual location.
+    pub fn recursion_depth(&self) -> u64 {
+        match self {
+            Self::Location { .. } => 0,
+            Self::Pointer { target, .. } => 1 + target.recursion_depth(),
         }
     }
 }
