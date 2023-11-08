@@ -35,11 +35,9 @@ impl<'a> Context<'a> {
     /// Compute the return values of a call and return them (without adding them to the caller state).
     ///
     /// The `callee_state` is the state of the callee at the return site.
-    /// The return values are expressed in the abstract IDs that are known to the caller.
-    /// If a return value may contain `Top` values,
-    /// i.e. values for which the origin is not known or not expressible in the abstract IDs known to the caller,
-    /// then a call- and register-specific abstract ID is added to the corresponding return value.
-    /// This ID is not added to the tracked IDs of the caller state.
+    /// Return values corresponding to callee parameters are expressed in the abstract IDs that are known to the caller.
+    /// Additionally, each return value also contains one abstract ID specific to the call instruction and return register.
+    /// This ID is used to track abstract location access patterns to the return value of the call in the caller.
     fn compute_return_values_of_call<'cconv>(
         &self,
         caller_state: &mut State,
@@ -86,20 +84,18 @@ impl<'a> Context<'a> {
         let callee_value = callee_state.get_register(return_register);
         let mut return_value: DataDomain<BitvectorDomain> =
             DataDomain::new_empty(return_register.size);
-        // For absolute or Top-values originating in the callee the Top-flag of the return value is set.
-        if callee_value.contains_top() || callee_value.get_absolute_value().is_some() {
-            return_value.set_contains_top_flag();
-        }
+
         // For every relative value in the callee we check whether it is relative a parameter to the callee.
         // If yes, we can compute it relative to the value of the parameter at the callsite and add the result to the return value.
-        // Else we just set the Top-flag of the return value to indicate some value originating in the callee.
-        for (callee_id, callee_offset) in callee_value.get_relative_values() {
-            if callee_id.get_tid() == callee_state.get_current_function_tid()
-                && matches!(
-                    callee_id.get_location(),
-                    AbstractLocation::GlobalAddress { .. }
-                )
-            {
+        for (callee_id, callee_offset) in callee_value
+            .get_relative_values()
+            .iter()
+            .filter(|(callee_id, _)| callee_id.get_tid() == callee_state.get_current_function_tid())
+        {
+            if matches!(
+                callee_id.get_location(),
+                AbstractLocation::GlobalAddress { .. } | AbstractLocation::GlobalPointer(_, _)
+            ) {
                 // Globals get the same ID as if the global pointer originated in the caller.
                 let caller_global_id = AbstractIdentifier::new(
                     caller_state.get_current_function_tid().clone(),
@@ -109,13 +105,13 @@ impl<'a> Context<'a> {
                 let caller_global =
                     DataDomain::from_target(caller_global_id, callee_offset.clone());
                 return_value = return_value.merge(&caller_global);
-            } else if let Some(param_arg) = callee_state.get_arg_corresponding_to_id(callee_id) {
-                let param_value = caller_state.eval_parameter_arg(&param_arg);
+            } else {
+                let param_value = caller_state.eval_param_location(
+                    callee_id.get_location(),
+                    &self.project.runtime_memory_image,
+                );
                 let param_value = caller_state
                     .substitute_global_mem_address(param_value, &self.project.runtime_memory_image);
-                if param_value.contains_top() || param_value.get_absolute_value().is_some() {
-                    return_value.set_contains_top_flag()
-                }
                 for (param_id, param_offset) in param_value.get_relative_values() {
                     let value = DataDomain::from_target(
                         param_id.clone(),
@@ -123,19 +119,14 @@ impl<'a> Context<'a> {
                     );
                     return_value = return_value.merge(&value);
                 }
-            } else {
-                return_value.set_contains_top_flag();
             }
         }
-        // If the Top-flag of the return value was set we replace it with an ID representing the return register
-        // to indicate where the unknown value originated from.
-        if return_value.contains_top() {
-            let id = AbstractIdentifier::from_var(call.tid.clone(), return_register);
-            let value =
-                DataDomain::from_target(id, Bitvector::zero(return_register.size.into()).into());
-            return_value = return_value.merge(&value);
-            return_value.unset_contains_top_flag();
-        }
+        // Also add an ID representing the return register (regardless of what was added before).
+        // This ID is used to track abstract location access patterns in relation to the return value.
+        let id = AbstractIdentifier::from_var(call.tid.clone(), return_register);
+        let value =
+            DataDomain::from_target(id, Bitvector::zero(return_register.size.into()).into());
+        return_value = return_value.merge(&value);
 
         return_value
     }
@@ -352,6 +343,7 @@ impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
                 );
                 let value = new_state
                     .substitute_global_mem_address(value, &self.project.runtime_memory_image);
+                new_state.track_contained_ids(&value);
                 new_state.set_register(var, value);
             }
             Def::Store { address, value } => {

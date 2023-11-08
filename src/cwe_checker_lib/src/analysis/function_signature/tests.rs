@@ -19,7 +19,7 @@ impl FunctionSignature {
         ]);
         FunctionSignature {
             parameters,
-            global_parameters: HashMap::from([
+            global_parameters: BTreeMap::from([
                 (0x2000, AccessPattern::new_unknown_access()),
                 (0x3000, AccessPattern::new().with_dereference_flag()),
             ]),

@@ -69,7 +69,7 @@ fn test_call_stub_handling() {
     assert_eq!(
         state.get_params_of_current_function(),
         vec![(
-            Arg::from_var(variable!("r0:4"), None),
+            &AbstractLocation::from_var(&variable!("r0:4")).unwrap(),
             AccessPattern::new().with_read_flag()
         )]
     );
@@ -97,14 +97,14 @@ fn test_call_stub_handling() {
     assert_eq!(
         params[0],
         (
-            Arg::from_var(variable!("r0:4"), None),
+            &AbstractLocation::from_var(&variable!("r0:4")).unwrap(),
             AccessPattern::new_unknown_access()
         )
     );
     assert_eq!(
         params[1],
         (
-            Arg::from_var(variable!("r2:4"), None),
+            &AbstractLocation::from_var(&variable!("r2:4")).unwrap(),
             AccessPattern::new()
                 .with_read_flag()
                 .with_dereference_flag()

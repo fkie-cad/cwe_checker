@@ -318,6 +318,22 @@ impl AbstractLocation {
             }
         }
     }
+
+    pub fn extend(&mut self, extension: AbstractMemoryLocation, generic_pointer_size: ByteSize) {
+        match self {
+            Self::Pointer(_, location) | Self::GlobalPointer(_, location) => {
+                location.extend(extension, generic_pointer_size);
+            }
+            Self::GlobalAddress { address, size } => {
+                assert_eq!(*size, generic_pointer_size);
+                *self = Self::GlobalPointer(*address, extension);
+            }
+            Self::Register(var) => {
+                assert_eq!(var.size, generic_pointer_size);
+                *self = Self::Pointer(*var, extension);
+            }
+        }
+    }
 }
 
 /// An abstract memory location is either an offset from the given location, where the actual value can be found,
@@ -372,6 +388,19 @@ impl AbstractMemoryLocation {
                 }
             }
         };
+    }
+
+    pub fn extend(&mut self, extension: AbstractMemoryLocation, generic_pointer_size: ByteSize) {
+        match self {
+            Self::Location { offset, size } => {
+                assert_eq!(*size, generic_pointer_size);
+                *self = Self::Pointer {
+                    offset: *offset,
+                    target: Box::new(extension),
+                };
+            }
+            Self::Pointer { target, .. } => target.extend(extension, generic_pointer_size),
+        }
     }
 
     /// Get the bytesize of the value represented by the abstract memory location.

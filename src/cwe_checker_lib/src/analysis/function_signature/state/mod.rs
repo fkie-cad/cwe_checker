@@ -8,6 +8,8 @@ use std::collections::BTreeSet;
 
 /// Methods of [`State`] related to handling call instructions.
 mod call_handling;
+/// Methods of [`State`] related to handling load and store instructions.
+mod memory_handling;
 
 /// The state tracks knowledge about known register values,
 /// known values on the stack, and access patterns of tracked variables.
@@ -112,143 +114,6 @@ impl State {
         self.stack_id.get_tid()
     }
 
-    /// Load the value at the given address.
-    ///
-    /// Only values on the stack and in registers are tracked directly.
-    /// For all other values abstract location strings are generated
-    /// that track how the pointer to the value is computed. 
-    ///
-    /// This function does not set any access flags for input IDs in the address value.
-    pub fn load_value(
-        &mut self,
-        address: DataDomain<BitvectorDomain>,
-        size: ByteSize,
-        global_memory: Option<&RuntimeMemoryImage>,
-    ) -> DataDomain<BitvectorDomain> {
-        let mut loaded_value = DataDomain::new_empty(size);
-        for (id, offset) in address.get_relative_values() {
-            if *id == self.stack_id {
-                // Try to load a value from the stack (which may generate a new stack parameter)
-                match offset.try_to_bitvec() {
-                    Ok(stack_offset) => {
-                        loaded_value =
-                            loaded_value.merge(&self.load_value_from_stack(stack_offset, size))
-                    }
-                    Err(_) => loaded_value.set_contains_top_flag(),
-                }
-            } else {
-                if let (true, Ok(constant_offset)) = (
-                    id.get_location().recursion_depth() < POINTER_RECURSION_DEPTH_LIMIT,
-                    offset.try_to_offset(),
-                ) {
-                    // Extend the abstract location string
-                    let new_id = AbstractIdentifier::new(
-                        id.get_tid().clone(),
-                        id.get_location()
-                            .clone()
-                            .with_offset_addendum(constant_offset)
-                            .dereferenced(size, self.stack_id.bytesize()),
-                    );
-                    loaded_value = loaded_value.merge(&DataDomain::from_target(
-                        new_id,
-                        Bitvector::zero(size.into()).into(),
-                    ));
-                } else {
-                    // The abstract location string cannot be extended
-                    loaded_value.set_contains_top_flag();
-                }
-            }
-        }
-        if let Some(global_address) = address.get_absolute_value() {
-            if let (Ok(offset), Some(global_mem)) = (global_address.try_to_bitvec(), global_memory)
-            {
-                match global_mem.read(&offset, size) {
-                    Ok(Some(value)) => {
-                        loaded_value = loaded_value.merge(&value.into());
-                    }
-                    Ok(None) => {
-                        let address = global_address.try_to_offset().unwrap() as u64;
-                        let global_mem_location = AbstractLocation::GlobalAddress { address, size };
-                        let global_mem_id = AbstractIdentifier::new(
-                            self.get_current_function_tid().clone(),
-                            global_mem_location,
-                        );
-                        loaded_value = loaded_value.merge(&DataDomain::from_target(
-                            global_mem_id,
-                            Bitvector::zero(size.into()).into(),
-                        ));
-                    }
-                    Err(_) => loaded_value.set_contains_top_flag(),
-                }
-            } else {
-                loaded_value.set_contains_top_flag();
-            }
-        }
-        if address.contains_top() {
-            loaded_value.set_contains_top_flag();
-        }
-        loaded_value
-    }
-
-    /// Load the value at the given stack offset.
-    /// If the offset is non-negative a corresponding stack parameter is generated if necessary.
-    fn load_value_from_stack(
-        &mut self,
-        stack_offset: Bitvector,
-        size: ByteSize,
-    ) -> DataDomain<BitvectorDomain> {
-        if !stack_offset.sign_bit().to_bool() {
-            // Stack offset is nonnegative, i.e. this is a stack parameter access.
-            self.get_stack_param(stack_offset, size)
-        } else {
-            self.stack.get(stack_offset, size)
-        }
-    }
-
-    /// Load a value of unknown bytesize at the given stack offset.
-    /// If the offset is non-negative, a corresponding stack parameter is generated if necessary.
-    ///
-    /// One must be careful to not rely on the correctness of the bytesize of the returned value!
-    /// If the size of the value cannot be guessed from the contents of the stack,
-    /// then a size of 1 byte is assumed, which will be wrong in general!
-    fn load_unsized_value_from_stack(&mut self, offset: Bitvector) -> DataDomain<BitvectorDomain> {
-        if !offset.sign_bit().to_bool() {
-            // This is a pointer to a stack parameter of the current function
-            self.stack
-                .get_unsized(offset.clone())
-                .unwrap_or_else(|| self.get_stack_param(offset, ByteSize::new(1)))
-        } else {
-            self.stack
-                .get_unsized(offset)
-                .unwrap_or_else(|| DataDomain::new_top(ByteSize::new(1)))
-        }
-    }
-
-    /// If `address` is a stack offset, then write `value` onto the stack.
-    ///
-    /// If address points to a stack parameter, whose ID does not yet exists,
-    /// then the ID is generated and added to the tracked IDs.
-    ///
-    /// This function does not set any access flags for input IDs of the given address or value.
-    pub fn write_value(
-        &mut self,
-        address: DataDomain<BitvectorDomain>,
-        value: DataDomain<BitvectorDomain>,
-    ) {
-        // TODO: We have to merge values on the stack if the address may (but not has to) be a stack address.
-        todo!();
-        
-        if let Some(stack_offset) = self.get_offset_if_exact_stack_pointer(&address) {
-            // We generate a new stack parameter object, but do not set any access flags,
-            // since the stack parameter is not accessed but overwritten.
-            if !stack_offset.sign_bit().to_bool() {
-                let _ = self
-                    .generate_stack_param_id_if_nonexistent(stack_offset.clone(), value.bytesize());
-            }
-            self.stack.add(value, stack_offset);
-        }
-    }
-
     /// If the stack parameter ID corresponding to the given stack offset does not exist
     /// then generate it, add it to the list of tracked IDs, and return it.
     fn generate_stack_param_id_if_nonexistent(
@@ -278,40 +143,6 @@ impl State {
         if self.tracked_ids.get(id).is_none() {
             self.tracked_ids.insert(id.clone(), AccessPattern::new());
         }
-    }
-
-    /// Get the value located at a positive stack offset.
-    ///
-    /// If no corresponding stack parameter ID exists for the value,
-    /// generate it and then return it as an unmodified stack parameter.
-    /// Otherwise just read the value at the given stack address.
-    fn get_stack_param(
-        &mut self,
-        address: Bitvector,
-        size: ByteSize,
-    ) -> DataDomain<BitvectorDomain> {
-        assert!(!address.sign_bit().to_bool());
-        if let Some(param_id) = self.generate_stack_param_id_if_nonexistent(address.clone(), size) {
-            let stack_param =
-                DataDomain::from_target(param_id, Bitvector::zero(size.into()).into());
-            self.stack.add(stack_param.clone(), address);
-            stack_param
-        } else {
-            self.stack.get(address, size)
-        }
-    }
-
-    /// If the address is an exactly known pointer to the stack with a constant offset, then return the offset.
-    pub fn get_offset_if_exact_stack_pointer(
-        &self,
-        address: &DataDomain<BitvectorDomain>,
-    ) -> Option<Bitvector> {
-        if let Some((target, offset)) = address.get_if_unique_target() {
-            if *target == self.stack_id {
-                return offset.try_to_bitvec().ok();
-            }
-        }
-        None
     }
 
     /// Merges the access pattern of the given abstract identifer in `self` with the provided access pattern.
@@ -364,6 +195,92 @@ impl State {
                 let address = self.eval(address);
                 self.load_value(address, *size, None)
             }
+        }
+    }
+
+    fn eval_mem_location_relative_value(
+        &mut self,
+        value: DataDomain<BitvectorDomain>,
+        mem_location: &AbstractMemoryLocation,
+    ) -> DataDomain<BitvectorDomain> {
+        let mut eval_result = DataDomain::new_empty(mem_location.bytesize());
+        for (id, offset) in value.get_relative_values() {
+            let mut location = id.get_location().clone();
+            location.extend(mem_location.clone(), self.stack_id.bytesize());
+            if location.recursion_depth() <= POINTER_RECURSION_DEPTH_LIMIT {
+                eval_result = eval_result.merge(&DataDomain::from_target(
+                    AbstractIdentifier::new(id.get_tid().clone(), location),
+                    Bitvector::zero(mem_location.bytesize().into()).into(),
+                ));
+            } else {
+                eval_result.set_contains_top_flag();
+            }
+        }
+        if value.contains_top() || value.get_absolute_value().is_some() {
+            eval_result.set_contains_top_flag();
+        }
+        eval_result
+    }
+
+    // TODO: Move to call handling!
+    pub fn eval_param_location(
+        &mut self,
+        param_location: &AbstractLocation,
+        global_memory: &RuntimeMemoryImage,
+    ) -> DataDomain<BitvectorDomain> {
+        match param_location {
+            AbstractLocation::GlobalAddress { .. } | AbstractLocation::GlobalPointer(_, _) => {
+                panic!("Globals are not valid parameter locations.")
+            }
+            AbstractLocation::Register(var) => {
+                let mut value = self.get_register(var);
+                self.substitute_global_mem_address(value, global_memory)
+            }
+            AbstractLocation::Pointer(var, mem_location) => {
+                if var == self.stack_id.unwrap_register() {
+                    match mem_location {
+                        AbstractMemoryLocation::Location { offset, size } => {
+                            if let Some(stack_offset) =
+                                self.get_offset_if_exact_stack_pointer(&self.get_register(var))
+                            {
+                                let stack_offset = stack_offset
+                                    + &Bitvector::from_i64(*offset)
+                                        .into_sign_resize(self.stack_id.bytesize());
+                                self.load_value_from_stack(stack_offset, *size)
+                            } else {
+                                DataDomain::new_top(*size)
+                            }
+                        }
+                        AbstractMemoryLocation::Pointer {
+                            offset,
+                            target: inner_mem_location,
+                        } => {
+                            if let Some(stack_offset) =
+                                self.get_offset_if_exact_stack_pointer(&self.get_register(var))
+                            {
+                                let stack_offset = stack_offset
+                                    + &Bitvector::from_i64(*offset)
+                                        .into_sign_resize(self.stack_id.bytesize());
+                                let value = self.load_value_from_stack(stack_offset, self.stack_id.bytesize());
+                                let value = self.substitute_global_mem_address(value, global_memory);
+                                self.eval_mem_location_relative_value(value, inner_mem_location)
+                            } else {
+                                DataDomain::new_top(inner_mem_location.bytesize())
+                            }
+                        }
+                    }
+                } else {
+                    let value = self.get_register(var);
+                    let value = self.substitute_global_mem_address(value, global_memory);
+                    self.eval_mem_location_relative_value(value, mem_location)
+                }
+            }
+        }
+    }
+
+    pub fn track_contained_ids(&mut self, data: &DataDomain<BitvectorDomain>) {
+        for id in data.referenced_ids() {
+            self.add_id_to_tracked_ids(id);
         }
     }
 
