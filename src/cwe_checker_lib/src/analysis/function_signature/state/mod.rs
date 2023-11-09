@@ -222,61 +222,7 @@ impl State {
         eval_result
     }
 
-    // TODO: Move to call handling!
-    pub fn eval_param_location(
-        &mut self,
-        param_location: &AbstractLocation,
-        global_memory: &RuntimeMemoryImage,
-    ) -> DataDomain<BitvectorDomain> {
-        match param_location {
-            AbstractLocation::GlobalAddress { .. } | AbstractLocation::GlobalPointer(_, _) => {
-                panic!("Globals are not valid parameter locations.")
-            }
-            AbstractLocation::Register(var) => {
-                let mut value = self.get_register(var);
-                self.substitute_global_mem_address(value, global_memory)
-            }
-            AbstractLocation::Pointer(var, mem_location) => {
-                if var == self.stack_id.unwrap_register() {
-                    match mem_location {
-                        AbstractMemoryLocation::Location { offset, size } => {
-                            if let Some(stack_offset) =
-                                self.get_offset_if_exact_stack_pointer(&self.get_register(var))
-                            {
-                                let stack_offset = stack_offset
-                                    + &Bitvector::from_i64(*offset)
-                                        .into_sign_resize(self.stack_id.bytesize());
-                                self.load_value_from_stack(stack_offset, *size)
-                            } else {
-                                DataDomain::new_top(*size)
-                            }
-                        }
-                        AbstractMemoryLocation::Pointer {
-                            offset,
-                            target: inner_mem_location,
-                        } => {
-                            if let Some(stack_offset) =
-                                self.get_offset_if_exact_stack_pointer(&self.get_register(var))
-                            {
-                                let stack_offset = stack_offset
-                                    + &Bitvector::from_i64(*offset)
-                                        .into_sign_resize(self.stack_id.bytesize());
-                                let value = self.load_value_from_stack(stack_offset, self.stack_id.bytesize());
-                                let value = self.substitute_global_mem_address(value, global_memory);
-                                self.eval_mem_location_relative_value(value, inner_mem_location)
-                            } else {
-                                DataDomain::new_top(inner_mem_location.bytesize())
-                            }
-                        }
-                    }
-                } else {
-                    let value = self.get_register(var);
-                    let value = self.substitute_global_mem_address(value, global_memory);
-                    self.eval_mem_location_relative_value(value, mem_location)
-                }
-            }
-        }
-    }
+
 
     pub fn track_contained_ids(&mut self, data: &DataDomain<BitvectorDomain>) {
         for id in data.referenced_ids() {

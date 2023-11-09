@@ -1,5 +1,14 @@
 use super::*;
-use crate::{expr, variable};
+use crate::variable;
+
+/// Mock the abstract location of a global parameter.
+fn mock_global(address: u64) -> AbstractLocation {
+    AbstractLocation::GlobalAddress {
+        address: address,
+        size: ByteSize::new(4),
+    }
+}
+
 impl FunctionSignature {
     /// Create a mock x64 function signature with 2 parameters, one of which is accessed mutably,
     /// one mutably accessed global variable at address 0x2000
@@ -7,40 +16,45 @@ impl FunctionSignature {
     pub fn mock_x64() -> FunctionSignature {
         let mut write_access_pattern = AccessPattern::new();
         write_access_pattern.set_unknown_access_flags();
-        let parameters = HashMap::from_iter([
+        let parameters = BTreeMap::from_iter([
             (
-                Arg::from_var(variable!("RDI:8"), None),
+                AbstractLocation::from_var(&variable!("RDI:8")).unwrap(),
                 AccessPattern::new(),
             ),
             (
-                Arg::from_var(variable!("RSI:8"), None),
+                AbstractLocation::from_var(&variable!("RSI:8")).unwrap(),
                 write_access_pattern,
             ),
         ]);
         FunctionSignature {
             parameters,
             global_parameters: BTreeMap::from([
-                (0x2000, AccessPattern::new_unknown_access()),
-                (0x3000, AccessPattern::new().with_dereference_flag()),
+                (mock_global(0x2000), AccessPattern::new_unknown_access()),
+                (
+                    mock_global(0x3000),
+                    AccessPattern::new().with_dereference_flag(),
+                ),
             ]),
         }
     }
 }
 
-fn mock_stack_arg(address: Expression, size: u64) -> Arg {
-    Arg::Stack {
-        address,
-        size: size.into(),
-        data_type: None,
-    }
+fn mock_stack_arg(offset: i64, size: u64) -> AbstractLocation {
+    AbstractLocation::Pointer(
+        variable!("RSP:8"),
+        AbstractMemoryLocation::Location {
+            offset: offset,
+            size: ByteSize::new(size),
+        },
+    )
 }
 
 #[test]
 fn test_two_parameter_overlapping_merging() {
     let proj = Project::mock_x64();
     let mut func_sig = FunctionSignature::mock_x64();
-    let stack_parm_1 = mock_stack_arg(expr!("RSP:8 + 0x1000:8"), 8);
-    let stack_parm_2 = mock_stack_arg(expr!("RSP:8 + 0x1004:8"), 8);
+    let stack_parm_1 = mock_stack_arg(0x1000, 8);
+    let stack_parm_2 = mock_stack_arg(0x1004, 8);
 
     func_sig
         .parameters
@@ -51,13 +65,10 @@ fn test_two_parameter_overlapping_merging() {
 
     assert_eq!(
         func_sig.sanitize(&proj),
-        (
-            vec!["Unexpected stack parameter size".to_string()],
-            vec!["Merged a stack parameter, that intersect another but is no subset".to_string()]
-        )
+        vec!["Unexpected stack parameter size".to_string()],
     );
     let mut expected_function_sig = FunctionSignature::mock_x64();
-    let expected_stack_arg = mock_stack_arg(expr!("RSP:8 + 0x1000:8"), 12);
+    let expected_stack_arg = mock_stack_arg(0x1000, 12);
 
     expected_function_sig
         .parameters
@@ -69,10 +80,10 @@ fn test_two_parameter_overlapping_merging() {
 fn test_merging_multiple_parameters() {
     let proj = Project::mock_x64();
     let mut func_sig = FunctionSignature::mock_x64();
-    let stack_parm_1 = mock_stack_arg(expr!("RSP:8 + 0x1000:8"), 8);
-    let stack_parm_2 = mock_stack_arg(expr!("RSP:8 + 0x1000:8"), 1);
-    let stack_parm_3 = mock_stack_arg(expr!("RSP:8 + 0x1007:8"), 1);
-    let stack_parm_4 = mock_stack_arg(expr!("RSP:8 + 0x1008:8"), 8);
+    let stack_parm_1 = mock_stack_arg(0x1000, 8);
+    let stack_parm_2 = mock_stack_arg(0x1000, 1);
+    let stack_parm_3 = mock_stack_arg(0x1007, 1);
+    let stack_parm_4 = mock_stack_arg(0x1008, 8);
 
     func_sig.parameters.extend([
         (stack_parm_1.clone(), AccessPattern::new()),
@@ -80,7 +91,7 @@ fn test_merging_multiple_parameters() {
         (stack_parm_3, AccessPattern::new()),
         (stack_parm_4.clone(), AccessPattern::new()),
     ]);
-    assert_eq!((vec![], vec![]), func_sig.sanitize(&proj));
+    assert_eq!(Vec::<String>::new(), func_sig.sanitize(&proj));
 
     let mut expected_function_sig = FunctionSignature::mock_x64();
     expected_function_sig.parameters.extend([
@@ -93,8 +104,8 @@ fn test_merging_multiple_parameters() {
 fn test_log_messages() {
     let proj = Project::mock_x64();
     let mut func_sig = FunctionSignature::mock_x64();
-    let stack_parm_1 = mock_stack_arg(expr!("RSP:8 + 0x1001:8"), 8);
-    let stack_parm_2 = mock_stack_arg(expr!("RSP:8 + 0x1007:8"), 4);
+    let stack_parm_1 = mock_stack_arg(0x1001, 8);
+    let stack_parm_2 = mock_stack_arg(0x1007, 4);
 
     func_sig.parameters.extend([
         (stack_parm_1.clone(), AccessPattern::new()),
@@ -103,13 +114,10 @@ fn test_log_messages() {
 
     let logs = func_sig.sanitize(&proj);
     assert_eq!(
-        (
-            vec![
-                "Unexpected stack parameter size".to_string(),
-                "Unexpected stack parameter alignment".to_string()
-            ],
-            vec!["Merged a stack parameter, that intersect another but is no subset".to_string()]
-        ),
+        vec![
+            "Unexpected stack parameter size".to_string(),
+            "Unexpected stack parameter alignment".to_string()
+        ],
         logs
     );
 }

@@ -4,6 +4,7 @@
 use super::AccessPattern;
 use super::FunctionSignature;
 use crate::abstract_domain::AbstractDomain;
+use crate::abstract_domain::AbstractLocation;
 use crate::abstract_domain::DomainMap;
 use crate::abstract_domain::UnionMergeStrategy;
 use crate::analysis::callgraph::get_program_callgraph;
@@ -12,7 +13,7 @@ use crate::analysis::fixpoint::{Computation, Context};
 use crate::intermediate_representation::*;
 use crate::utils::log::LogMessage;
 use std::collections::BTreeMap;
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 
 /// The context object for propagating known global variables top-down in the call graph.
 struct KnownGlobalsContext<'a> {
@@ -31,7 +32,7 @@ impl<'a> Context for KnownGlobalsContext<'a> {
     type EdgeLabel = &'a Term<Jmp>;
     type NodeLabel = Tid;
     /// The values at nodes are the sets of known addresses of global variables for that function.
-    type NodeValue = HashSet<u64>;
+    type NodeValue = BTreeSet<AbstractLocation>;
 
     /// Get the call graph corresponding to the context object.
     fn get_graph(&self) -> &CallGraph<'a> {
@@ -39,7 +40,11 @@ impl<'a> Context for KnownGlobalsContext<'a> {
     }
 
     /// The merge function returns the union of the two input sets of global addresses.
-    fn merge(&self, set1: &HashSet<u64>, set2: &HashSet<u64>) -> HashSet<u64> {
+    fn merge(
+        &self,
+        set1: &BTreeSet<AbstractLocation>,
+        set2: &BTreeSet<AbstractLocation>,
+    ) -> BTreeSet<AbstractLocation> {
         let mut result = set1.clone();
         for address in set2 {
             result.insert(*address);
@@ -50,9 +55,9 @@ impl<'a> Context for KnownGlobalsContext<'a> {
     /// We always propagate all known addresses of global variables along the edges of the call graph.
     fn update_edge(
         &self,
-        globals: &HashSet<u64>,
+        globals: &BTreeSet<AbstractLocation>,
         _edge: petgraph::stable_graph::EdgeIndex,
-    ) -> Option<HashSet<u64>> {
+    ) -> Option<BTreeSet<AbstractLocation>> {
         Some(globals.clone())
     }
 }
@@ -66,7 +71,7 @@ impl<'a> Context for KnownGlobalsContext<'a> {
 fn propagate_known_globals_top_down(
     project: &Project,
     fn_sigs: &BTreeMap<Tid, FunctionSignature>,
-) -> BTreeMap<Tid, HashSet<u64>> {
+) -> BTreeMap<Tid, BTreeSet<AbstractLocation>> {
     let graph = get_program_callgraph(&project.program);
     let context = KnownGlobalsContext::new(&graph);
     let mut computation = Computation::new(context, None);
@@ -96,12 +101,15 @@ struct GlobalsPropagationContext<'a> {
     /// The reversed (!) call graph of the program.
     graph: &'a CallGraph<'a>,
     /// A map from TIDs of functions to the set of known addresses of global variables for that function.
-    known_globals: &'a BTreeMap<Tid, HashSet<u64>>,
+    known_globals: &'a BTreeMap<Tid, BTreeSet<AbstractLocation>>,
 }
 
 impl<'a> GlobalsPropagationContext<'a> {
     /// Create a new [`GlobalsPropagationContext`] object.
-    fn new(graph: &'a CallGraph<'a>, known_globals: &'a BTreeMap<Tid, HashSet<u64>>) -> Self {
+    fn new(
+        graph: &'a CallGraph<'a>,
+        known_globals: &'a BTreeMap<Tid, BTreeSet<AbstractLocation>>,
+    ) -> Self {
         GlobalsPropagationContext {
             graph,
             known_globals,
@@ -113,9 +121,9 @@ impl<'a> Context for GlobalsPropagationContext<'a> {
     type EdgeLabel = &'a Term<Jmp>;
     type NodeLabel = Tid;
     /// The node values for the fixpoint comutation
-    /// are maps from addresses of global variables known to the function represented by the node
+    /// are maps from locations of (possibly nested) global variables known to the function represented by the node
     /// to the corresponding access pattern of the global variable.
-    type NodeValue = DomainMap<u64, AccessPattern, UnionMergeStrategy>;
+    type NodeValue = DomainMap<AbstractLocation, AccessPattern, UnionMergeStrategy>;
 
     /// Get the (reversed!) call graph corresponding to the program
     fn get_graph(&self) -> &CallGraph<'a> {
@@ -161,7 +169,7 @@ impl<'a> Context for GlobalsPropagationContext<'a> {
 /// that are known to the caller anyway (i.e. some function upwards in the call graph accesses the global variable).
 fn propagate_globals_bottom_up(
     project: &Project,
-    known_globals: &BTreeMap<Tid, HashSet<u64>>,
+    known_globals: &BTreeMap<Tid, BTreeSet<AbstractLocation>>,
     fn_sigs: &mut BTreeMap<Tid, FunctionSignature>,
     logs: &mut Vec<LogMessage>,
 ) {
@@ -234,9 +242,15 @@ pub fn propagate_globals(
 
 #[cfg(test)]
 pub mod tests {
-    use std::collections::HashMap;
-
     use super::*;
+
+    /// Mock the abstract location of a global parameter.
+    fn mock_global(address: u64) -> AbstractLocation {
+        AbstractLocation::GlobalAddress {
+            address: address,
+            size: ByteSize::new(4),
+        }
+    }
 
     #[test]
     fn test_globals_propagation() {
@@ -265,15 +279,16 @@ pub mod tests {
         let mut sig_main = FunctionSignature::new();
         sig_main
             .global_parameters
-            .insert(1000, AccessPattern::new().with_read_flag());
+            .insert(mock_global(1000), AccessPattern::new().with_read_flag());
         let mut sig_callee1 = FunctionSignature::new();
-        sig_callee1
-            .global_parameters
-            .insert(2000, AccessPattern::new().with_dereference_flag());
+        sig_callee1.global_parameters.insert(
+            mock_global(2000),
+            AccessPattern::new().with_dereference_flag(),
+        );
         let mut sig_callee2 = FunctionSignature::new();
         sig_callee2
             .global_parameters
-            .insert(1000, AccessPattern::new_unknown_access());
+            .insert(mock_global(1000), AccessPattern::new_unknown_access());
         let mut fn_sigs = BTreeMap::from([
             (Tid::new("main"), sig_main),
             (Tid::new("callee1"), sig_callee1),
@@ -285,18 +300,21 @@ pub mod tests {
         // Check propagation results
         assert_eq!(
             &fn_sigs[&Tid::new("main")].global_parameters,
-            &HashMap::from([(1000, AccessPattern::new_unknown_access())])
+            &BTreeMap::from([(mock_global(1000), AccessPattern::new_unknown_access())])
         );
         assert_eq!(
             &fn_sigs[&Tid::new("callee1")].global_parameters,
-            &HashMap::from([
-                (1000, AccessPattern::new_unknown_access()),
-                (2000, AccessPattern::new().with_dereference_flag())
+            &BTreeMap::from([
+                (mock_global(1000), AccessPattern::new_unknown_access()),
+                (
+                    mock_global(2000),
+                    AccessPattern::new().with_dereference_flag()
+                )
             ])
         );
         assert_eq!(
             &fn_sigs[&Tid::new("callee2")].global_parameters,
-            &HashMap::from([(1000, AccessPattern::new_unknown_access())])
+            &BTreeMap::from([(mock_global(1000), AccessPattern::new_unknown_access())])
         );
     }
 }

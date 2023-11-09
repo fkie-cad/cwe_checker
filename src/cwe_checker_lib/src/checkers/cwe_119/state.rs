@@ -37,7 +37,7 @@ impl State {
         };
         let stack_upper_bound = std::cmp::max(
             stack_upper_bound,
-            function_sig.get_stack_params_total_size(),
+            function_sig.get_stack_params_total_size(&project.stack_pointer_register),
         );
         let object_lower_bounds = BTreeMap::from([(
             stack_id.clone(),

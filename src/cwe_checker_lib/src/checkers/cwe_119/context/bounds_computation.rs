@@ -107,7 +107,7 @@ impl<'a> Context<'a> {
                     .function_signatures
                     .get(id.get_tid())
                     .unwrap()
-                    .get_stack_params_total_size();
+                    .get_stack_params_total_size(&self.project.stack_pointer_register);
                 replace_if_smaller_bound(
                     &mut upper_bound,
                     BoundsMetadata::from_source(
@@ -153,7 +153,7 @@ impl<'a> Context<'a> {
                 .function_signatures
                 .get(object_id.get_tid())
                 .unwrap()
-                .get_stack_params_total_size();
+                .get_stack_params_total_size(&self.project.stack_pointer_register);
             (None, Some(BoundsMetadata::new(stack_frame_upper_bound)))
         } else if object_id.get_tid() == current_stack_frame_id.get_tid()
             && object_id.get_path_hints().is_empty()

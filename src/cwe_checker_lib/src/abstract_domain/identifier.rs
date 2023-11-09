@@ -334,6 +334,47 @@ impl AbstractLocation {
             }
         }
     }
+
+    /// Get the abstract location representing the pointer pointing to the memory object
+    /// that contains the location represented by `self`
+    /// together with the offset that one has to add to the pointer to get the location of self.
+    /// 
+    /// Returns an error if the abstract location contains no dereference operation
+    /// (e.g. if `self` represents a register value).
+    pub fn get_parent_location(
+        &self,
+        generic_pointer_size: ByteSize,
+    ) -> Result<(AbstractLocation, i64), Error> {
+        match self {
+            AbstractLocation::GlobalAddress { .. } | AbstractLocation::Register(_) => {
+                Err(anyhow!("Root location without a parent."))
+            }
+            AbstractLocation::GlobalPointer(address, location) => {
+                match location.get_parent_location(generic_pointer_size) {
+                    Ok((inner_parent_location, innermost_offset)) => Ok((
+                        Self::GlobalPointer(*address, inner_parent_location),
+                        innermost_offset,
+                    )),
+                    Err(innermost_offset) => Ok((
+                        Self::GlobalAddress {
+                            address: *address,
+                            size: generic_pointer_size,
+                        },
+                        innermost_offset,
+                    )),
+                }
+            }
+            AbstractLocation::Pointer(var, location) => {
+                match location.get_parent_location(generic_pointer_size) {
+                    Ok((inner_parent_location, innermost_offset)) => Ok((
+                        Self::Pointer(var.clone(), inner_parent_location),
+                        innermost_offset,
+                    )),
+                    Err(innermost_offset) => Ok((Self::Register(var.clone()), innermost_offset)),
+                }
+            }
+        }
+    }
 }
 
 /// An abstract memory location is either an offset from the given location, where the actual value can be found,
@@ -360,6 +401,38 @@ pub enum AbstractMemoryLocation {
 }
 
 impl AbstractMemoryLocation {
+    /// Get the abstract memory location representing the pointer pointing to the memory object
+    /// that contains the location represented by `self`
+    /// together with the offset that one has to add to the pointer to get the location of self.
+    /// 
+    /// If `self` is a location (and not a pointer), return the offset in the location instead.
+    pub fn get_parent_location(
+        &self,
+        generic_pointer_size: ByteSize,
+    ) -> Result<(AbstractMemoryLocation, i64), i64> {
+        match self {
+            Self::Location { offset, size } => Err(*offset),
+            Self::Pointer { offset, target } => {
+                match target.get_parent_location(generic_pointer_size) {
+                    Ok((inner_parent, innermost_offset)) => Ok((
+                        Self::Pointer {
+                            offset: *offset,
+                            target: Box::new(inner_parent),
+                        },
+                        innermost_offset,
+                    )),
+                    Err(inner_offset) => Ok((
+                        Self::Location {
+                            offset: *offset,
+                            size: generic_pointer_size,
+                        },
+                        inner_offset,
+                    )),
+                }
+            }
+        }
+    }
+
     /// Add an offset to a memory location.
     pub fn add_offset(&mut self, addendum: i64) {
         match self {

@@ -157,12 +157,17 @@ impl State {
 
     /// Return a list of all potential global memory addresses
     /// for which any type of access has been tracked by the current state.
-    pub fn get_global_mem_params_of_current_function(&self) -> Vec<(&AbstractLocation, AccessPattern)> {
+    pub fn get_global_mem_params_of_current_function(
+        &self,
+    ) -> Vec<(&AbstractLocation, AccessPattern)> {
         let mut global_params = Vec::new();
         for (id, access_pattern) in self.tracked_ids.iter() {
             if id.get_tid() == self.get_current_function_tid() {
                 let location = id.get_location();
-                if matches!(location, AbstractLocation::GlobalAddress { .. } | AbstractLocation::GlobalPointer(_, _)) {
+                if matches!(
+                    location,
+                    AbstractLocation::GlobalAddress { .. } | AbstractLocation::GlobalPointer(_, _)
+                ) {
                     global_params.push((location, *access_pattern));
                 }
             }
@@ -209,6 +214,66 @@ impl State {
                         self.stack
                             .mark_interval_values_as_top(offset, offset, ByteSize::new(1));
                     }
+                }
+            }
+        }
+    }
+
+    /// Evaluate the value of a parameter location from a call on the current state.
+    /// 
+    /// This function panics for global parameters.
+    pub fn eval_param_location(
+        &mut self,
+        param_location: &AbstractLocation,
+        global_memory: &RuntimeMemoryImage,
+    ) -> DataDomain<BitvectorDomain> {
+        match param_location {
+            AbstractLocation::GlobalAddress { .. } | AbstractLocation::GlobalPointer(_, _) => {
+                panic!("Globals are not valid parameter locations.")
+            }
+            AbstractLocation::Register(var) => {
+                let mut value = self.get_register(var);
+                self.substitute_global_mem_address(value, global_memory)
+            }
+            AbstractLocation::Pointer(var, mem_location) => {
+                if var == self.stack_id.unwrap_register() {
+                    match mem_location {
+                        AbstractMemoryLocation::Location { offset, size } => {
+                            if let Some(stack_offset) =
+                                self.get_offset_if_exact_stack_pointer(&self.get_register(var))
+                            {
+                                let stack_offset = stack_offset
+                                    + &Bitvector::from_i64(*offset)
+                                        .into_sign_resize(self.stack_id.bytesize());
+                                self.load_value_from_stack(stack_offset, *size)
+                            } else {
+                                DataDomain::new_top(*size)
+                            }
+                        }
+                        AbstractMemoryLocation::Pointer {
+                            offset,
+                            target: inner_mem_location,
+                        } => {
+                            if let Some(stack_offset) =
+                                self.get_offset_if_exact_stack_pointer(&self.get_register(var))
+                            {
+                                let stack_offset = stack_offset
+                                    + &Bitvector::from_i64(*offset)
+                                        .into_sign_resize(self.stack_id.bytesize());
+                                let value = self
+                                    .load_value_from_stack(stack_offset, self.stack_id.bytesize());
+                                let value =
+                                    self.substitute_global_mem_address(value, global_memory);
+                                self.eval_mem_location_relative_value(value, inner_mem_location)
+                            } else {
+                                DataDomain::new_top(inner_mem_location.bytesize())
+                            }
+                        }
+                    }
+                } else {
+                    let value = self.get_register(var);
+                    let value = self.substitute_global_mem_address(value, global_memory);
+                    self.eval_mem_location_relative_value(value, mem_location)
                 }
             }
         }
