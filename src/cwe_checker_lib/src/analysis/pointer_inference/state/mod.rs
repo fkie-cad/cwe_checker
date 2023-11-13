@@ -5,6 +5,7 @@ use crate::analysis::function_signature::AccessPattern;
 use crate::analysis::function_signature::FunctionSignature;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
+use std::collections::HashSet;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
@@ -98,7 +99,7 @@ impl State {
     /// Add the given parameter to the function start state represented by `self`:
     /// For the given parameter location, add a parameter object if it was dereferenced (according to the access pattern)
     /// and write the pointer to the parameter object to the corresponding existing memory object of `self`.
-    /// 
+    ///
     /// This function assumes that the parent memory object of `param` already exists if `param` is a nested parameter.
     fn add_param(
         &mut self,
@@ -197,6 +198,70 @@ impl State {
             .into_resize_unsigned(generic_pointer_size);
         self.set_register(&link_register, address.into());
         Ok(())
+    }
+
+    /// Remove all objects and registers from the state whose contents will not be used after returning to a caller.
+    /// 
+    /// All remaining memory objects after the minimization are reachable in the caller
+    /// either via a parameter object that may have been mutated in the call
+    /// or via a return register.
+    pub fn minimize_before_return_instruction(
+        &mut self,
+        fn_sig: &FunctionSignature,
+        cconv: &CallingConvention,
+    ) {
+        self.clear_non_return_register(cconv);
+        self.remove_immutable_parameter_objects(fn_sig);
+        self.memory.remove(&self.stack_id);
+        self.remove_unreferenced_objects();
+    }
+
+    /// Remove all parameter objects (including global parameter objects) that are not marked as mutably accessed.
+    /// Used to minimize state before a return instruction.
+    fn remove_immutable_parameter_objects(&mut self, fn_sig: &FunctionSignature) {
+        self.memory.retain(|object_id, _object| {
+            if object_id.get_tid() == self.get_fn_tid() {
+                if let Some(access_pattern) = fn_sig.parameters.get(object_id.get_location()) {
+                    if !access_pattern.is_mutably_dereferenced() {
+                        return false;
+                    }
+                }
+                if let Some(access_pattern) = fn_sig.global_parameters.get(object_id.get_location()) {
+                    if !access_pattern.is_mutably_dereferenced() {
+                        return false;
+                    }
+                }
+            }
+            true
+        });
+    }
+
+    /// Clear all non-return registers from the state, including all virtual registers.
+    /// This function is used to minimize the state before a return instruction.
+    fn clear_non_return_register(&mut self, cconv: &CallingConvention) {
+        let return_register: HashSet<Variable> = cconv
+            .get_all_return_register()
+            .into_iter()
+            .cloned()
+            .collect();
+        self.register
+            .retain(|var, _value| return_register.contains(var));
+    }
+
+    pub fn merge_mem_objects_with_unique_abstract_location(&mut self) {
+        // TODO: Write doc-string for this function!
+        todo!(); // Generate a map from all abstract locations to the corresponding pointer value.
+        todo!(); // Throw out non-unique locations: A location is non-unique
+                 // if it shares at least one mem-object with another location.
+                 // Only callee-originating mem-objects count here.
+        todo!(); // Merge mem-objects corresponding to unique abstract locations.
+        todo!(); // Replace callee-originating IDs with an ID generated from the abstract location
+                 // if the location is unique.
+                 // Implementation probably differs between locations based on param objects and based on return registers.
+        todo!(); // Decide whether the propagation of other non-unique callee-originating mem-objects should be limited.
+                 // For example, one could limit the path length of corresponding IDs.
+
+        todo!()
     }
 
     /// Clear all non-callee-saved registers from the state.

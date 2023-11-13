@@ -97,6 +97,18 @@ impl<'a> Context<'a> {
         }
     }
 
+    /// If `result` is an `Err`, log the error message as an error message through the `log_collector` channel.
+    pub fn log_error(&self, result: Result<(), Error>, location: Option<&Tid>) {
+        if let Err(err) = result {
+            let mut log_message =
+                LogMessage::new_error(format!("{err}")).source("Pointer Inference");
+            if let Some(loc) = location {
+                log_message = log_message.location(loc.clone());
+            };
+            let _ = self.log_collector.send(LogThreadMsg::Log(log_message));
+        }
+    }
+
     /// Detect and log if the stack pointer is not as expected when returning from a function.
     fn detect_stack_pointer_information_loss_on_return(
         &self,

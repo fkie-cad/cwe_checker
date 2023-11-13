@@ -89,4 +89,33 @@ impl State {
         }
         Ok(())
     }
+
+    pub fn map_abstract_locations_to_pointer_data(&self) -> BTreeMap<AbstractLocation, Data> {
+        // TODO: Write doc-string for this function!
+        let mut root_locations = BTreeMap::new();
+        for (var, value) in self.register.iter() {
+            if !var.is_temp && self.contains_non_param_pointer(value) {
+                let location = AbstractLocation::from_var(var).unwrap();
+                root_locations.insert(location, value.clone());
+            }
+        }
+        todo!(); // Add roots from parameter objects to the root locations.
+                 // Needs to be done in its own map to prevent collisions with the return-register based locations
+                 // (in case of ARM, where parameter and return register are the same).
+        todo!(); // For all memory objects contained in the data of the root locations generate derived locations
+                 // and compute the corresponding data values.
+        todo!(); // Iterate until a nested pointer limit is reached.
+        todo!()
+    }
+
+    /// Returns `true` if the value contains at least one reference to a non-parameter
+    /// (and non-stack) memory object tracked by the current state.
+    fn contains_non_param_pointer(&self, value: &Data) -> bool {
+        for id in value.referenced_ids() {
+            if id.get_tid() != self.get_fn_tid() && self.memory.contains(id) {
+                return true;
+            }
+        }
+        false
+    }
 }

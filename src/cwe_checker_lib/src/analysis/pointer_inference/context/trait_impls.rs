@@ -124,6 +124,20 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
                 return None;
             }
         };
+        let callee_fn_sig = match self.fn_signatures.get(state_before_return.get_fn_tid()) {
+            Some(fn_sig) => fn_sig,
+            None => {
+                let location = state_before_return.get_fn_tid();
+                self.log_error(
+                    Err(anyhow!(
+                        "Internal function {} has no function signature.",
+                        location
+                    )),
+                    Some(location),
+                );
+                return None;
+            }
+        };
 
         // Detect possible information loss on the stack pointer and report it.
         if let Err(err) = self.detect_stack_pointer_information_loss_on_return(state_before_return)
@@ -133,15 +147,25 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
             // or a call to a non-returning extern function that was not marked as non-returning.
             return None;
         }
+        // Minimize the callee state and replace callee-originating object IDs whenever possible.
+        let mut state_before_return = state_before_return.clone();
+        state_before_return.minimize_before_return_instruction(callee_fn_sig, cconv);
+        // TODO: Implement rest of the new handling scheme for update_return!
+        todo!(); // TODO: In the callee-state:
+                 //       Unify callee-originating memory objects that can only be accessed by a unique abstract location strings.
+        todo!(); // TODO: Create a callee-ID to caller-value map as usual (with the modified callee state).
+        todo!(); // TODO: Insert callee objects and callee values into the caller state as usual.
+        todo!(); // TODO: The callee-ID to caller-value map used by other analyses needs to be refactored.
+                 //       It is unclear, whether the intermediate renaming in the callee should be opaque for other analyses or not.
 
         // Create a mapping of IDs from the callee to IDs that should be used in the caller.
         let id_map = self.create_callee_id_to_caller_data_map(
             state_before_call,
-            state_before_return,
+            &state_before_return,
             &call_term.tid,
         );
         let callee_id_to_access_pattern_map =
-            self.create_id_to_access_pattern_map(state_before_return);
+            self.create_id_to_access_pattern_map(&state_before_return);
         // Identify caller IDs for which the callee analysis may be unsound for this callsite.
         let unsound_caller_ids =
             self.get_unsound_caller_ids(&id_map, &callee_id_to_access_pattern_map);
