@@ -49,6 +49,8 @@ pub use state::State;
 
 /// The version number of the analysis.
 const VERSION: &str = "0.2";
+/// The recursion limit for nested pointers.
+const POINTER_RECURSION_DEPTH_LIMIT: u64 = 3;
 
 /// The name and version number of the "Memory" CWE check.
 pub static CWE_MODULE: crate::CweModule = crate::CweModule {

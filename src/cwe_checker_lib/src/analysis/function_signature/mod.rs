@@ -349,6 +349,8 @@ impl Default for FunctionSignature {
     }
 }
 
+/// If the abstract location is a location on the stack
+/// then return its offset relative to the zero position on the stack.
 fn get_offset_if_simple_stack_param(
     param: &AbstractLocation,
     stack_register: &Variable,
@@ -363,6 +365,7 @@ fn get_offset_if_simple_stack_param(
     None
 }
 
+/// Generate an abstract location of a (non-nested) stack parameter.
 fn generate_simple_stack_param(
     offset: i64,
     size: ByteSize,

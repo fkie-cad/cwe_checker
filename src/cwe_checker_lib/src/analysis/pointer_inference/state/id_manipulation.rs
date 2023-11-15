@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::analysis::pointer_inference::object::AbstractObject;
+use crate::analysis::pointer_inference::POINTER_RECURSION_DEPTH_LIMIT;
 
 impl State {
     /// Search (recursively) through all memory objects referenced by the given IDs
@@ -90,22 +91,179 @@ impl State {
         Ok(())
     }
 
-    pub fn map_abstract_locations_to_pointer_data(&self) -> BTreeMap<AbstractLocation, Data> {
-        // TODO: Write doc-string for this function!
-        let mut root_locations = BTreeMap::new();
+    /// Merge the target objects that are non-parameter objects for the given location to data mapping.
+    /// Return the results as a location to memory object map.
+    /// 
+    /// This function is a step in the process of unifying callee-originating memory objects on a return instruction.
+    /// The memory objects are also marked as unique, because they will represent a unique object in the caller.
+    pub fn generate_target_objects_for_new_locations(
+        &self,
+        location_to_data_map: &BTreeMap<AbstractIdentifier, Data>,
+    ) -> BTreeMap<AbstractIdentifier, AbstractObject> {
+        let mut location_to_object_map: BTreeMap<AbstractIdentifier, AbstractObject> =
+            BTreeMap::new();
+        for (location_id, value) in location_to_data_map {
+            let mut new_object: Option<AbstractObject> = None;
+            'target_loop: for (target_id, target_offset) in value.get_relative_values() {
+                if target_id.get_tid() == self.get_fn_tid() || !self.memory.contains(target_id) {
+                    continue 'target_loop;
+                }
+                let target_offset = match target_offset.try_to_offset() {
+                    Ok(offset) => offset,
+                    Err(_) => {
+                        match &mut new_object {
+                            Some(object) => object.assume_arbitrary_writes(&BTreeSet::new()),
+                            None => {
+                                new_object =
+                                    Some(AbstractObject::new(None, self.stack_id.bytesize()))
+                            }
+                        }
+                        continue 'target_loop;
+                    }
+                };
+                let target_object = self.memory.get_object(target_id).unwrap();
+                let mut target_object = target_object.clone();
+                target_object
+                    .add_offset_to_all_indices(&Bitvector::from_i64(-target_offset).into());
+                match &mut new_object {
+                    None => new_object = Some(target_object),
+                    Some(object) => *object = object.merge(&target_object),
+                }
+            }
+            let mut new_object =
+                new_object.unwrap_or_else(|| AbstractObject::new(None, self.stack_id.bytesize()));
+            new_object.mark_as_unique();
+            new_object.set_object_type(None);
+
+            location_to_object_map.insert(location_id.clone(), new_object);
+        }
+        location_to_object_map
+    }
+
+    /// Filter out those locations from the location to pointer data map
+    /// whose non-parameter object targets intersect with any of the other locations.
+    ///
+    /// Note that this does not filter out locations whose targets contain the `Top` flag,
+    /// despite the fact that these locations theoretically may point to the same non-parameter object.
+    /// I.e. we trade soundness in the general case for exactness in the common case here.
+    pub fn filter_location_to_pointer_data_map(
+        &self,
+        location_to_data_map: &mut BTreeMap<AbstractIdentifier, Data>,
+    ) {
+        let mut visited_targets = HashSet::new();
+        let mut non_unique_targets = HashSet::new();
+        for value in location_to_data_map.values() {
+            for (id, offset) in value.get_relative_values() {
+                if id.get_tid() != self.get_fn_tid() && self.memory.contains(id) {
+                    if !visited_targets.insert(id.clone()) {
+                        non_unique_targets.insert(id.clone());
+                    }
+                }
+            }
+        }
+        location_to_data_map.retain(|location, value| {
+            for (id, offset) in value.get_relative_values() {
+                if non_unique_targets.contains(id) {
+                    return false;
+                }
+            }
+            true
+        })
+    }
+
+    /// Generate a map from abstract locations pointing to non-parameter memory objects
+    /// to the data represented by the abstract location in the current state.
+    ///
+    /// The abstract locations get different TIDs depending on the root of the location:
+    /// - If the root is a return register, then the TID is given by the provided `call_tid`.
+    /// - If the root is a parameter memory object, then the TID is given by appending the suffix `_param` to the `call_TID`.
+    ///   Since parameter and return register can overlap, the abstract IDs would overlap 
+    ///   if one would use the same TID in both cases.
+    ///
+    /// This function assumes that
+    /// [`State::minimize_before_return_instruction`](crate::analysis::pointer_inference::State::minimize_before_return_instruction)
+    /// has been called on `self` beforehand.
+    pub fn map_abstract_locations_to_pointer_data(
+        &self,
+        call_tid: &Tid,
+    ) -> BTreeMap<AbstractIdentifier, Data> {
+        let mut location_to_data_map = BTreeMap::new();
+        // Add root IDs based on return registers (all other registers should be cleared from the state)
         for (var, value) in self.register.iter() {
             if !var.is_temp && self.contains_non_param_pointer(value) {
                 let location = AbstractLocation::from_var(var).unwrap();
-                root_locations.insert(location, value.clone());
+                location_to_data_map.insert(
+                    AbstractIdentifier::new(call_tid.clone(), location),
+                    value.clone(),
+                );
             }
         }
-        todo!(); // Add roots from parameter objects to the root locations.
-                 // Needs to be done in its own map to prevent collisions with the return-register based locations
-                 // (in case of ARM, where parameter and return register are the same).
-        todo!(); // For all memory objects contained in the data of the root locations generate derived locations
-                 // and compute the corresponding data values.
-        todo!(); // Iterate until a nested pointer limit is reached.
-        todo!()
+        // Add root locations based on parameter objects
+        for (object_id, object) in self.memory.iter() {
+            if object_id.get_tid() == self.get_fn_tid()
+                && object_id.get_location().recursion_depth() < POINTER_RECURSION_DEPTH_LIMIT
+            {
+                for (index, value) in object.get_mem_region().iter() {
+                    if self.contains_non_param_pointer(value) {
+                        let location = object_id
+                            .get_location()
+                            .clone()
+                            .dereferenced(value.bytesize(), self.stack_id.bytesize())
+                            .with_offset_addendum(*index);
+                        location_to_data_map.insert(
+                            AbstractIdentifier::new(call_tid.clone().with_id_suffix("_param"), location),
+                            value.clone(),
+                        );
+                    }
+                }
+            }
+        }
+        // Add derived locations based on the root locations
+        let mut locations_to_derive = location_to_data_map.clone();
+        while let Some((location_id, location_data)) = locations_to_derive.pop_first() {
+            if location_id.get_location().recursion_depth() >= POINTER_RECURSION_DEPTH_LIMIT {
+                continue;
+            }
+            'data_target_loop: for (object_id, object_offset) in location_data.get_relative_values()
+            {
+                if object_id.get_tid() == self.get_fn_tid() {
+                    // Ignore parameter objects
+                    continue 'data_target_loop;
+                }
+                let object_offset = match object_offset.try_to_offset() {
+                    Ok(offset) => offset,
+                    Err(_) => continue 'data_target_loop,
+                };
+                let mem_object = match self.memory.get_object(object_id) {
+                    Some(object) => object,
+                    None => continue 'data_target_loop,
+                };
+                for (elem_offset, elem_data) in mem_object.get_mem_region().iter() {
+                    if self.contains_non_param_pointer(elem_data) {
+                        // We want to create a new abstract location for this element.
+                        // But the same abstract location may already exist, so we may have to merge values instead.
+                        let new_location_offset = *elem_offset - object_offset; // TODO: Check correctness of this offset!
+                        let new_location = location_id
+                            .get_location()
+                            .clone()
+                            .dereferenced(elem_data.bytesize(), self.stack_id.bytesize())
+                            .with_offset_addendum(new_location_offset);
+                        let new_location_id =
+                            AbstractIdentifier::new(location_id.get_tid().clone(), new_location);
+                        let new_location_data = elem_data.clone();
+                        location_to_data_map
+                            .entry(new_location_id.clone())
+                            .and_modify(|loc_data| *loc_data = loc_data.merge(&new_location_data))
+                            .or_insert(new_location_data.clone());
+                        locations_to_derive
+                            .entry(new_location_id.clone())
+                            .and_modify(|loc_data| *loc_data = loc_data.merge(&new_location_data))
+                            .or_insert(new_location_data);
+                    }
+                }
+            }
+        }
+        location_to_data_map
     }
 
     /// Returns `true` if the value contains at least one reference to a non-parameter

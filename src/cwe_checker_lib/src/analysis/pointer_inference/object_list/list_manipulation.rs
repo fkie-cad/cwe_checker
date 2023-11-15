@@ -5,7 +5,6 @@ use super::*;
 
 impl AbstractObjectList {
     /// Get a reference to the object corresponding to the given ID.
-    #[cfg(test)]
     pub fn get_object(&self, id: &AbstractIdentifier) -> Option<&AbstractObject> {
         self.objects.get(id)
     }

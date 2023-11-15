@@ -157,6 +157,10 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
         todo!(); // TODO: Insert callee objects and callee values into the caller state as usual.
         todo!(); // TODO: The callee-ID to caller-value map used by other analyses needs to be refactored.
                  //       It is unclear, whether the intermediate renaming in the callee should be opaque for other analyses or not.
+        todo!(); // TODO: Make sure that old IDs from the callee are deleted from the pointer targets of all memory objects.
+                 //       We also need to overwrite replaced IDs in the pointer targets.
+
+        // TODO: Below here starts the old code, which will have to be refactored.
 
         // Create a mapping of IDs from the callee to IDs that should be used in the caller.
         let id_map = self.create_callee_id_to_caller_data_map(

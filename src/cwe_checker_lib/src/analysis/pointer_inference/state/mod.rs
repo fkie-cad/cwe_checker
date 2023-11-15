@@ -201,7 +201,7 @@ impl State {
     }
 
     /// Remove all objects and registers from the state whose contents will not be used after returning to a caller.
-    /// 
+    ///
     /// All remaining memory objects after the minimization are reachable in the caller
     /// either via a parameter object that may have been mutated in the call
     /// or via a return register.
@@ -226,7 +226,8 @@ impl State {
                         return false;
                     }
                 }
-                if let Some(access_pattern) = fn_sig.global_parameters.get(object_id.get_location()) {
+                if let Some(access_pattern) = fn_sig.global_parameters.get(object_id.get_location())
+                {
                     if !access_pattern.is_mutably_dereferenced() {
                         return false;
                     }
@@ -248,13 +249,12 @@ impl State {
             .retain(|var, _value| return_register.contains(var));
     }
 
-    pub fn merge_mem_objects_with_unique_abstract_location(&mut self) {
+    pub fn merge_mem_objects_with_unique_abstract_location(&mut self, call_tid: &Tid) {
         // TODO: Write doc-string for this function!
-        todo!(); // Generate a map from all abstract locations to the corresponding pointer value.
-        todo!(); // Throw out non-unique locations: A location is non-unique
-                 // if it shares at least one mem-object with another location.
-                 // Only callee-originating mem-objects count here.
-        todo!(); // Merge mem-objects corresponding to unique abstract locations.
+        let mut location_to_data_map = self.map_abstract_locations_to_pointer_data(call_tid);
+        self.filter_location_to_pointer_data_map(&mut location_to_data_map);
+        let mut location_to_object_map =
+            self.generate_target_objects_for_new_locations(&location_to_data_map);
         todo!(); // Replace callee-originating IDs with an ID generated from the abstract location
                  // if the location is unique.
                  // Implementation probably differs between locations based on param objects and based on return registers.

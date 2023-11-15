@@ -87,9 +87,21 @@ impl AbstractObject {
         inner.is_unique = false;
     }
 
+    /// Mark the abstract object as unique, i.e. it represents exactly one memory object.
+    pub fn mark_as_unique(&mut self) {
+        let inner = Arc::make_mut(&mut self.inner);
+        inner.is_unique = true;
+    }
+
     /// Get the type of the memory object.
     pub fn get_object_type(&self) -> Option<ObjectType> {
         self.inner.type_
+    }
+
+    /// Set the type of the memory object.
+    pub fn set_object_type(&mut self, object_type: Option<ObjectType>) {
+        let inner = Arc::make_mut(&mut self.inner);
+        inner.type_ = object_type;
     }
 
     /// Overwrite the values in `self` with those in `other`
