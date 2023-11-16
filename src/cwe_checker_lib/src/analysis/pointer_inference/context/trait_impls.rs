@@ -160,6 +160,9 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
         todo!(); // TODO: Make sure that old IDs from the callee are deleted from the pointer targets of all memory objects.
                  //       We also need to overwrite replaced IDs in the pointer targets.
 
+        todo!(); // TODO: Review the code for the detection of parameter objects! Detecting TID == fn_tid may not be enough,
+                 //       we may have to also check that no path hints exist!
+
         // TODO: Below here starts the old code, which will have to be refactored.
 
         // Create a mapping of IDs from the callee to IDs that should be used in the caller.

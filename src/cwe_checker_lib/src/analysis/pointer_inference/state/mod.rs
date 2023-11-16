@@ -1,3 +1,4 @@
+use super::object::AbstractObject;
 use super::object_list::AbstractObjectList;
 use super::Data;
 use crate::abstract_domain::*;
@@ -255,13 +256,39 @@ impl State {
         self.filter_location_to_pointer_data_map(&mut location_to_data_map);
         let mut location_to_object_map =
             self.generate_target_objects_for_new_locations(&location_to_data_map);
-        todo!(); // Replace callee-originating IDs with an ID generated from the abstract location
-                 // if the location is unique.
-                 // Implementation probably differs between locations based on param objects and based on return registers.
+        self.replace_unified_mem_objects(&location_to_data_map, location_to_object_map);
+        self.remove_old_ids_to_unified_objects(&location_to_data_map);
+        todo!(); // Rename callee-originating IDs with the normal ID-to-value mapping process.
+                 // Find out whether we should add path hints for the non-renamed callee-IDs in the same step.
+        todo!(); // Explicitly overwrite the new ID locations
+                 // (to prevent having Top or inexact offsets in that locations).
         todo!(); // Decide whether the propagation of other non-unique callee-originating mem-objects should be limited.
                  // For example, one could limit the path length of corresponding IDs.
 
         todo!()
+    }
+
+    /// Remove all memory objects corresponding to non-parameter IDs referenced in the values of the location to data map.
+    /// Afterwards, add the memory objects in the location to object map to the state.
+    fn replace_unified_mem_objects(
+        &mut self,
+        location_to_data_map: &BTreeMap<AbstractIdentifier, Data>,
+        location_to_object_map: BTreeMap<AbstractIdentifier, AbstractObject>,
+    ) {
+        let mut objects_to_remove = HashSet::new();
+        for value in location_to_data_map.values() {
+            for id in value.referenced_ids() {
+                if id.get_tid() != self.get_fn_tid() {
+                    objects_to_remove.insert(id.clone());
+                }
+            }
+        }
+        self.memory.retain(|id, object| {
+            !objects_to_remove.contains(id)
+        });
+        for (id, object) in location_to_object_map {
+            self.memory.insert(id, object);
+        }
     }
 
     /// Clear all non-callee-saved registers from the state.

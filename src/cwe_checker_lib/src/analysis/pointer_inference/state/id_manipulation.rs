@@ -91,9 +91,43 @@ impl State {
         Ok(())
     }
 
+    /// Remove the non-parameter IDs given in the targets of the location to data map.
+    ///
+    /// Note that this function assumes (but does not check)
+    /// that these IDs are only contained in the abstract locations given by the keys of the location to data map.
+    pub fn remove_old_ids_to_unified_objects(
+        &mut self,
+        location_to_data_map: &BTreeMap<AbstractIdentifier, Data>,
+    ) {
+        let mut ids_to_remove = BTreeSet::new();
+        for value in location_to_data_map.values() {
+            for (id, offset) in value.get_relative_values() {
+                if id.get_tid() != self.get_fn_tid() || !id.get_path_hints().is_empty() {
+                    ids_to_remove.insert(id.clone());
+                }
+            }
+        }
+        for value in self.register.values_mut() {
+            value.remove_ids(&ids_to_remove);
+            if value.is_empty() {
+                *value = Data::new_top(value.bytesize());
+            }
+        }
+        for object in self.memory.iter_objects_mut() {
+            object.remove_ids(&ids_to_remove);
+        }
+    }
+
+    pub fn insert_pointers_to_unified_objects(
+        &mut self,
+        location_to_data_map: &BTreeMap<AbstractIdentifier, Data>,
+    ) {
+        todo!()
+    }
+
     /// Merge the target objects that are non-parameter objects for the given location to data mapping.
     /// Return the results as a location to memory object map.
-    /// 
+    ///
     /// This function is a step in the process of unifying callee-originating memory objects on a return instruction.
     /// The memory objects are also marked as unique, because they will represent a unique object in the caller.
     pub fn generate_target_objects_for_new_locations(
@@ -177,7 +211,7 @@ impl State {
     /// The abstract locations get different TIDs depending on the root of the location:
     /// - If the root is a return register, then the TID is given by the provided `call_tid`.
     /// - If the root is a parameter memory object, then the TID is given by appending the suffix `_param` to the `call_TID`.
-    ///   Since parameter and return register can overlap, the abstract IDs would overlap 
+    ///   Since parameter and return register can overlap, the abstract IDs would overlap
     ///   if one would use the same TID in both cases.
     ///
     /// This function assumes that
@@ -211,7 +245,10 @@ impl State {
                             .dereferenced(value.bytesize(), self.stack_id.bytesize())
                             .with_offset_addendum(*index);
                         location_to_data_map.insert(
-                            AbstractIdentifier::new(call_tid.clone().with_id_suffix("_param"), location),
+                            AbstractIdentifier::new(
+                                call_tid.clone().with_id_suffix("_param"),
+                                location,
+                            ),
                             value.clone(),
                         );
                     }
@@ -259,6 +296,11 @@ impl State {
                             .entry(new_location_id.clone())
                             .and_modify(|loc_data| *loc_data = loc_data.merge(&new_location_data))
                             .or_insert(new_location_data);
+                        todo!(); // We *cannot* derive nested non-root IDs in parameter objects!
+                                 // These IDs would not be unique regarding either their root (a nested param or another nested return value)
+                                 // or their ID itself (if both possible roots exist).
+                                 // So we probably have to remove the `and_modify` variant above.
+                                 // And the deriving of nested variants for param object based locations!
                     }
                 }
             }

@@ -63,6 +63,11 @@ impl AbstractObjectList {
         self.objects.iter()
     }
 
+    /// Get an iterator of mutable references over the abstract objects in `self`.
+    pub fn iter_objects_mut(&mut self) -> impl Iterator<Item = &mut AbstractObject> {
+        self.objects.values_mut()
+    }
+
     /// Get the number of objects that are currently tracked.
     #[cfg(test)]
     pub fn get_num_objects(&self) -> usize {
