@@ -142,7 +142,7 @@ impl State {
                 )
             {
                 if access_pattern.is_accessed() {
-                    params.push((id.get_location(), access_pattern.clone()));
+                    params.push((id.get_location(), *access_pattern));
                 } else if matches!(id.get_location(), &AbstractLocation::Pointer { .. }) {
                     // The address of the parameter was explicitly used, despite the parameter not being directly accessed.
                     // We set the read flag to indicate that the parameter is relevant in some (unknown) way.
@@ -207,8 +207,7 @@ impl State {
                         }
                     }
                 } else {
-                    self.tracked_ids
-                        .insert(id.clone(), call_access_pattern.clone());
+                    self.tracked_ids.insert(id.clone(), *call_access_pattern);
                 }
 
                 if *id == self.stack_id && call_access_pattern.is_mutably_dereferenced() {

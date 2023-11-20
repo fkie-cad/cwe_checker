@@ -109,11 +109,11 @@ impl State {
         global_memory: &RuntimeMemoryImage,
     ) {
         let param_id = AbstractIdentifier::new(self.stack_id.get_tid().clone(), param.clone());
-        if !matches!(param, AbstractLocation::GlobalAddress { .. }) {
-            if access_pattern.is_dereferenced() {
-                self.memory
-                    .add_abstract_object(param_id.clone(), self.stack_id.bytesize(), None);
-            }
+        if !matches!(param, AbstractLocation::GlobalAddress { .. })
+            && access_pattern.is_dereferenced()
+        {
+            self.memory
+                .add_abstract_object(param_id.clone(), self.stack_id.bytesize(), None);
         }
         match param {
             AbstractLocation::Register(var) => {

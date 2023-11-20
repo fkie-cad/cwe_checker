@@ -109,7 +109,7 @@ impl State {
             }
         }
         for value in self.register.values() {
-            for (id, _) in value.get_relative_values() {
+            for id in value.get_relative_values().keys() {
                 if id.get_tid() == self.get_fn_tid() && id.get_path_hints().is_empty() {
                     // This is a parameter ID
                     id_replacement_map.insert(
@@ -276,16 +276,18 @@ impl State {
         let mut visited_targets = HashSet::new();
         let mut non_unique_targets = HashSet::new();
         for value in location_to_data_map.values() {
-            for (id, _) in value.get_relative_values() {
+            for id in value.get_relative_values().keys() {
                 if id.get_tid() != self.get_fn_tid() && self.memory.contains(id) {
-                    if !visited_targets.insert(id.clone()) {
+                    if visited_targets.contains(id) {
                         non_unique_targets.insert(id.clone());
+                    } else {
+                        visited_targets.insert(id.clone());
                     }
                 }
             }
         }
         location_to_data_map.retain(|_, value| {
-            for (id, _) in value.get_relative_values() {
+            for id in value.get_relative_values().keys() {
                 if non_unique_targets.contains(id) {
                     return false;
                 }

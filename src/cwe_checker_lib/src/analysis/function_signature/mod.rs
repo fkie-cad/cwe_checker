@@ -261,13 +261,10 @@ impl FunctionSignature {
             }
             _ => (),
         }
-        self.merge_intersecting_stack_parameters(&project.stack_pointer_register);
-        let info_messages = self.check_for_unaligned_stack_params(&project.stack_pointer_register);
-
         // FIXME: We check for intersecting stack parameter register, but not for intersecting nested parameters.
         // We should add a check for these to generate log messages (but probably without trying to merge such parameters)
-
-        info_messages
+        self.merge_intersecting_stack_parameters(&project.stack_pointer_register);
+        self.check_for_unaligned_stack_params(&project.stack_pointer_register)
     }
 
     /// Return a log message for every unaligned stack parameter
@@ -295,11 +292,8 @@ impl FunctionSignature {
             .parameters
             .iter()
             .filter_map(|(location, access_pattern)| {
-                if let Some(offset) = get_offset_if_simple_stack_param(location, stack_register) {
-                    Some((offset, (location.clone(), *access_pattern)))
-                } else {
-                    None
-                }
+                get_offset_if_simple_stack_param(location, stack_register)
+                    .map(|offset| (offset, (location.clone(), *access_pattern)))
             })
             .collect();
 

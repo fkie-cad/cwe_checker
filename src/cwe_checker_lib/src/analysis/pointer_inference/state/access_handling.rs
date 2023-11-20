@@ -120,7 +120,7 @@ impl State {
         } else {
             Data::new_empty(size)
         };
-        result = result.merge(&self.memory.get_value(&address, size));
+        result = result.merge(&self.memory.get_value(address, size));
 
         if let Ok(offset) = result.try_to_offset() {
             if result.bytesize() == self.stack_id.bytesize()

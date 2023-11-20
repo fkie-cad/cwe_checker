@@ -42,24 +42,22 @@ impl State {
                 Ok(stack_offset) => self.load_value_from_stack(stack_offset, id.bytesize()),
                 Err(_) => DataDomain::new_top(id.bytesize()),
             }
+        } else if let (true, Ok(constant_offset)) = (
+            id.get_location().recursion_depth() < POINTER_RECURSION_DEPTH_LIMIT,
+            offset.try_to_offset(),
+        ) {
+            // Extend the abstract location string
+            let new_id = AbstractIdentifier::new(
+                id.get_tid().clone(),
+                id.get_location()
+                    .clone()
+                    .with_offset_addendum(constant_offset)
+                    .dereferenced(id.bytesize(), self.stack_id.bytesize()),
+            );
+            DataDomain::from_target(new_id, Bitvector::zero(id.bytesize().into()).into())
         } else {
-            if let (true, Ok(constant_offset)) = (
-                id.get_location().recursion_depth() < POINTER_RECURSION_DEPTH_LIMIT,
-                offset.try_to_offset(),
-            ) {
-                // Extend the abstract location string
-                let new_id = AbstractIdentifier::new(
-                    id.get_tid().clone(),
-                    id.get_location()
-                        .clone()
-                        .with_offset_addendum(constant_offset)
-                        .dereferenced(id.bytesize(), self.stack_id.bytesize()),
-                );
-                DataDomain::from_target(new_id, Bitvector::zero(id.bytesize().into()).into())
-            } else {
-                // The abstract location string cannot be extended
-                DataDomain::new_top(id.bytesize())
-            }
+            // The abstract location string cannot be extended
+            DataDomain::new_top(id.bytesize())
         }
     }
 
