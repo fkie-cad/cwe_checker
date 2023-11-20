@@ -230,7 +230,7 @@ impl FunctionSignature {
             if let Some(sig_self) = self.global_parameters.get_mut(address) {
                 *sig_self = sig_self.merge(sig_new);
             } else {
-                self.global_parameters.insert(**address, *sig_new);
+                self.global_parameters.insert((*address).clone(), *sig_new);
             }
         }
     }
@@ -291,7 +291,7 @@ impl FunctionSignature {
     ///
     /// Only non-nested stack parameters are joined by this function.
     fn merge_intersecting_stack_parameters(&mut self, stack_register: &Variable) {
-        let mut stack_params: BTreeMap<i64, (AbstractLocation, AccessPattern)> = self
+        let stack_params: BTreeMap<i64, (AbstractLocation, AccessPattern)> = self
             .parameters
             .iter()
             .filter_map(|(location, access_pattern)| {
@@ -357,7 +357,7 @@ fn get_offset_if_simple_stack_param(
 ) -> Option<i64> {
     if let AbstractLocation::Pointer(var, mem_location) = param {
         if var == stack_register {
-            if let AbstractMemoryLocation::Location { offset, size } = mem_location {
+            if let AbstractMemoryLocation::Location { offset, .. } = mem_location {
                 return Some(*offset);
             }
         }

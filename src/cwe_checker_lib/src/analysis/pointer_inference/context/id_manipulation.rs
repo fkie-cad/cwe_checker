@@ -16,7 +16,6 @@ impl<'a> Context<'a> {
         &self,
         state_before_call: &State,
         state_before_return: &State,
-        call_tid: &Tid,
     ) -> BTreeMap<AbstractIdentifier, Data> {
         let stack_register = &self.project.stack_pointer_register;
         let mut id_map = BTreeMap::new();
@@ -65,7 +64,7 @@ impl<'a> Context<'a> {
     }
 
     /// Create a map that maps callee IDs to the value assigned to it in the caller after a return instruction.
-    /// 
+    ///
     /// This is *not* the map used in the internal `update_return` handling.
     /// Instead, the created map combines several ID renaming steps used internally into one renaming map.
     /// The map is intended for use in other analyses depending on the PointerInference,
@@ -76,10 +75,10 @@ impl<'a> Context<'a> {
         state_before_return: &State,
         call_tid: &Tid,
     ) -> BTreeMap<AbstractIdentifier, Data> {
-        let cconv = self.project.program.term.subs[state_before_return.get_fn_tid()]
+        let cconv = &self.project.program.term.subs[state_before_return.get_fn_tid()]
             .term
             .calling_convention;
-        let cconv = match self.project.get_specific_calling_convention(&cconv) {
+        let cconv = match self.project.get_specific_calling_convention(cconv) {
             Some(cconv) => cconv,
             None => {
                 return BTreeMap::new();
@@ -96,11 +95,8 @@ impl<'a> Context<'a> {
         minimized_return_state.filter_location_to_pointer_data_map(&mut location_to_data_map);
         let mut replacement_map =
             minimized_return_state.get_id_to_unified_ids_replacement_map(&location_to_data_map);
-        let unified_to_caller_replacement_map = self.create_callee_id_to_caller_data_map(
-            state_before_call,
-            &minimized_return_state,
-            call_tid,
-        );
+        let unified_to_caller_replacement_map =
+            self.create_callee_id_to_caller_data_map(state_before_call, &minimized_return_state);
         for value in replacement_map.values_mut() {
             value.replace_all_ids(&unified_to_caller_replacement_map);
         }

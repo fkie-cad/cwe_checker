@@ -1,6 +1,6 @@
-use crate::prelude::*;
-use crate::intermediate_representation::*;
 use super::AbstractMemoryLocation;
+use crate::intermediate_representation::*;
+use crate::prelude::*;
 
 /// An abstract location describes how to find the value of a variable in memory at a given time.
 ///
@@ -172,7 +172,7 @@ impl AbstractLocation {
             }
             Self::Register(var) => {
                 assert_eq!(var.size, generic_pointer_size);
-                *self = Self::Pointer(*var, extension);
+                *self = Self::Pointer(var.clone(), extension);
             }
         }
     }
@@ -180,7 +180,7 @@ impl AbstractLocation {
     /// Get the abstract location representing the pointer pointing to the memory object
     /// that contains the location represented by `self`
     /// together with the offset that one has to add to the pointer to get the location of self.
-    /// 
+    ///
     /// Returns an error if the abstract location contains no dereference operation
     /// (e.g. if `self` represents a register value).
     pub fn get_parent_location(

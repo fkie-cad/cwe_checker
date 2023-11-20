@@ -47,7 +47,7 @@ impl<'a> Context for KnownGlobalsContext<'a> {
     ) -> BTreeSet<AbstractLocation> {
         let mut result = set1.clone();
         for address in set2 {
-            result.insert(*address);
+            result.insert(address.clone());
         }
         result
     }
@@ -152,7 +152,7 @@ impl<'a> Context for GlobalsPropagationContext<'a> {
             .iter()
             .filter_map(|(address, access_pattern)| {
                 if caller_known_globals.contains(address) {
-                    Some((*address, *access_pattern))
+                    Some((address.clone(), *access_pattern))
                 } else {
                     None
                 }
@@ -186,7 +186,7 @@ fn propagate_globals_bottom_up(
         let globals = fn_sig
             .global_parameters
             .iter()
-            .map(|(address, access_pattern)| (*address, *access_pattern))
+            .map(|(address, access_pattern)| (address.clone(), *access_pattern))
             .collect();
         computation.set_node_value(node, globals);
     }
@@ -206,7 +206,7 @@ fn propagate_globals_bottom_up(
         let fn_globals = &mut fn_sigs.get_mut(fn_tid).unwrap().global_parameters;
         for (address, propagated_access_pattern) in propagated_globals.iter() {
             fn_globals
-                .entry(*address)
+                .entry(address.clone())
                 .and_modify(|access_pattern| {
                     *access_pattern = access_pattern.merge(propagated_access_pattern);
                 })

@@ -194,13 +194,16 @@ impl State {
                 if let Some(object) = self.tracked_ids.get_mut(id) {
                     *object = object.merge(call_access_pattern);
                 } else if *id == self.stack_id {
-                    // Add stack IDs only if they correspond to stack parameters, i.e. the offset s positive.
+                    // Add stack IDs only if they correspond to stack parameters, i.e. the offset is positive.
                     if let Ok(concrete_offset) = offset.try_to_bitvec() {
-                        if let Some(stack_param) = self
-                            .generate_stack_param_id_if_nonexistent(concrete_offset, id.bytesize())
-                        {
-                            let object = self.tracked_ids.get_mut(id).unwrap();
-                            *object = object.merge(call_access_pattern);
+                        if !concrete_offset.sign_bit().to_bool() {
+                            if let Some(stack_param) = self.generate_stack_param_id_if_nonexistent(
+                                concrete_offset,
+                                id.bytesize(),
+                            ) {
+                                let object = self.tracked_ids.get_mut(&stack_param).unwrap();
+                                *object = object.merge(call_access_pattern);
+                            }
                         }
                     }
                 } else {
@@ -220,7 +223,7 @@ impl State {
     }
 
     /// Evaluate the value of a parameter location from a call on the current state.
-    /// 
+    ///
     /// This function panics for global parameters.
     pub fn eval_param_location(
         &mut self,
@@ -232,7 +235,7 @@ impl State {
                 panic!("Globals are not valid parameter locations.")
             }
             AbstractLocation::Register(var) => {
-                let mut value = self.get_register(var);
+                let value = self.get_register(var);
                 self.substitute_global_mem_address(value, global_memory)
             }
             AbstractLocation::Pointer(var, mem_location) => {

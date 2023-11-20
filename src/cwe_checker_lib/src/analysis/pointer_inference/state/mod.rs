@@ -83,7 +83,7 @@ impl State {
         let mut state = State::new(stack_register, function_tid.clone(), global_addresses);
         // Set parameter values and create parameter memory objects.
         for params in sort_params_by_recursion_depth(&fn_sig.parameters).values() {
-            for (param_location, access_pattern) in *params {
+            for (param_location, access_pattern) in params {
                 state.add_param(param_location, access_pattern, &mock_global_memory);
             }
         }
@@ -122,7 +122,7 @@ impl State {
                     Data::from_target(param_id, Bitvector::zero(param.bytesize().into()).into()),
                 );
             }
-            AbstractLocation::Pointer(var, mem_location) => {
+            AbstractLocation::Pointer(_, _) => {
                 let (parent_location, offset) =
                     param.get_parent_location(self.stack_id.bytesize()).unwrap();
                 let parent_id =
@@ -130,17 +130,18 @@ impl State {
                 self.store_value(
                     &Data::from_target(parent_id, Bitvector::from_i64(offset).into()),
                     &Data::from_target(
-                        param_id,
+                        param_id.clone(),
                         Bitvector::zero(param_id.bytesize().into()).into(),
                     ),
                     global_memory,
-                );
+                )
+                .unwrap();
             }
-            AbstractLocation::GlobalAddress { address, size } => (),
-            AbstractLocation::GlobalPointer(address, mem_location) => {
+            AbstractLocation::GlobalAddress { .. } => (),
+            AbstractLocation::GlobalPointer(_, _) => {
                 let (parent_location, offset) =
                     param.get_parent_location(self.stack_id.bytesize()).unwrap();
-                if let AbstractLocation::GlobalAddress { address, size } = parent_location {
+                if let AbstractLocation::GlobalAddress { address, size: _ } = parent_location {
                     let parent_id = self.get_global_mem_id();
                     self.store_value(
                         &Data::from_target(
@@ -150,11 +151,12 @@ impl State {
                                 .into(),
                         ),
                         &Data::from_target(
-                            param_id,
+                            param_id.clone(),
                             Bitvector::zero(param_id.bytesize().into()).into(),
                         ),
                         global_memory,
-                    );
+                    )
+                    .unwrap();
                 } else {
                     let parent_id =
                         AbstractIdentifier::new(self.stack_id.get_tid().clone(), parent_location);
@@ -166,11 +168,12 @@ impl State {
                                 .into(),
                         ),
                         &Data::from_target(
-                            param_id,
+                            param_id.clone(),
                             Bitvector::zero(param_id.bytesize().into()).into(),
                         ),
                         global_memory,
-                    );
+                    )
+                    .unwrap();
                 }
             }
         }
@@ -220,8 +223,9 @@ impl State {
     /// Remove all parameter objects (including global parameter objects) that are not marked as mutably accessed.
     /// Used to minimize state before a return instruction.
     fn remove_immutable_parameter_objects(&mut self, fn_sig: &FunctionSignature) {
+        let current_fn_tid = self.get_fn_tid().clone();
         self.memory.retain(|object_id, _object| {
-            if object_id.get_tid() == self.get_fn_tid() && object_id.get_path_hints().is_empty() {
+            if *object_id.get_tid() == current_fn_tid && object_id.get_path_hints().is_empty() {
                 if let Some(access_pattern) = fn_sig.parameters.get(object_id.get_location()) {
                     if !access_pattern.is_mutably_dereferenced() {
                         return false;
@@ -261,7 +265,7 @@ impl State {
     pub fn merge_mem_objects_with_unique_abstract_location(&mut self, call_tid: &Tid) {
         let mut location_to_data_map = self.map_abstract_locations_to_pointer_data(call_tid);
         self.filter_location_to_pointer_data_map(&mut location_to_data_map);
-        let mut location_to_object_map =
+        let location_to_object_map =
             self.generate_target_objects_for_new_locations(&location_to_data_map);
         self.replace_unified_mem_objects(location_to_object_map);
         self.replace_ids_to_non_parameter_objects(&location_to_data_map);
@@ -274,8 +278,9 @@ impl State {
         &mut self,
         location_to_object_map: BTreeMap<AbstractIdentifier, AbstractObject>,
     ) {
-        self.memory.retain(|object_id, object| {
-            object_id.get_tid() == self.get_fn_tid() && object_id.get_path_hints().is_empty()
+        let current_fn_tid = self.get_fn_tid().clone();
+        self.memory.retain(|object_id, _| {
+            *object_id.get_tid() == current_fn_tid && object_id.get_path_hints().is_empty()
         });
         for (id, object) in location_to_object_map {
             self.memory.insert(id, object);

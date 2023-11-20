@@ -198,6 +198,8 @@ impl State {
         }
     }
 
+    /// Evaluate the value at the given memory location
+    /// where `value` represents the root pointer relative to which the memory location needs to be computed.
     fn eval_mem_location_relative_value(
         &mut self,
         value: DataDomain<BitvectorDomain>,
@@ -206,6 +208,13 @@ impl State {
         let mut eval_result = DataDomain::new_empty(mem_location.bytesize());
         for (id, offset) in value.get_relative_values() {
             let mut location = id.get_location().clone();
+            match offset.try_to_offset() {
+                Ok(concrete_offset) => location = location.with_offset_addendum(concrete_offset),
+                Err(_) => {
+                    eval_result.set_contains_top_flag();
+                    continue;
+                }
+            };
             location.extend(mem_location.clone(), self.stack_id.bytesize());
             if location.recursion_depth() <= POINTER_RECURSION_DEPTH_LIMIT {
                 eval_result = eval_result.merge(&DataDomain::from_target(
@@ -222,8 +231,7 @@ impl State {
         eval_result
     }
 
-
-
+    /// Add all relative IDs in `data` to the list of tracked IDs.
     pub fn track_contained_ids(&mut self, data: &DataDomain<BitvectorDomain>) {
         for id in data.referenced_ids() {
             self.add_id_to_tracked_ids(id);

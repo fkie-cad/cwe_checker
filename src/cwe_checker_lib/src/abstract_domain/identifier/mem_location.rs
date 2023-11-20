@@ -34,7 +34,7 @@ impl AbstractMemoryLocation {
         generic_pointer_size: ByteSize,
     ) -> Result<(AbstractMemoryLocation, i64), i64> {
         match self {
-            Self::Location { offset, size } => Err(*offset),
+            Self::Location { offset, .. } => Err(*offset),
             Self::Pointer { offset, target } => {
                 match target.get_parent_location(generic_pointer_size) {
                     Ok((inner_parent, innermost_offset)) => Ok((

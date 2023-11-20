@@ -376,7 +376,7 @@ fn compute_call_return_global_var_access_intervals(
         .global_parameters
         .iter()
         .filter_map(|(location, access_pattern)| {
-            if let AbstractLocation::GlobalAddress { address, size } = location {
+            if let AbstractLocation::GlobalAddress { address, .. } = location {
                 if access_pattern.is_mutably_dereferenced() {
                     return Some(*address);
                 }
@@ -388,7 +388,7 @@ fn compute_call_return_global_var_access_intervals(
         .global_parameters
         .iter()
         .filter_map(|(location, access_pattern)| {
-            if let AbstractLocation::GlobalAddress { address, size } = location {
+            if let AbstractLocation::GlobalAddress { address, .. } = location {
                 if access_pattern.is_mutably_dereferenced() {
                     return Some(*address);
                 }
@@ -401,7 +401,7 @@ fn compute_call_return_global_var_access_intervals(
         .keys()
         .chain(callee_fn_sig.global_parameters.keys())
         .filter_map(|location| {
-            if let AbstractLocation::GlobalAddress { address, size } = location {
+            if let AbstractLocation::GlobalAddress { address, .. } = location {
                 Some((*address, AccessPattern::new()))
             } else {
                 None

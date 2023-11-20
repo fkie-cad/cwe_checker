@@ -152,11 +152,8 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
         state_before_return.minimize_before_return_instruction(callee_fn_sig, cconv);
         state_before_return.merge_mem_objects_with_unique_abstract_location(&call_term.tid);
         // Create a mapping of IDs from the callee to IDs that should be used in the caller.
-        let id_map = self.create_callee_id_to_caller_data_map(
-            state_before_call,
-            &state_before_return,
-            &call_term.tid,
-        );
+        let id_map =
+            self.create_callee_id_to_caller_data_map(state_before_call, &state_before_return);
         let callee_id_to_access_pattern_map =
             self.create_id_to_access_pattern_map(&state_before_return);
         // Identify caller IDs for which the callee analysis may be unsound for this callsite.

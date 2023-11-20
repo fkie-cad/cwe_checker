@@ -109,7 +109,7 @@ impl State {
             }
         }
         for value in self.register.values() {
-            for (id, offset) in value.get_relative_values() {
+            for (id, _) in value.get_relative_values() {
                 if id.get_tid() == self.get_fn_tid() && id.get_path_hints().is_empty() {
                     // This is a parameter ID
                     id_replacement_map.insert(
@@ -198,12 +198,14 @@ impl State {
                         .memory
                         .get_object_mut(&AbstractIdentifier::new(parent_tid, parent_location))
                         .unwrap();
-                    parent_object.set_value(
-                        pointer_to_unified_object,
-                        &Bitvector::from_i64(offset_in_parent_object)
-                            .into_resize_signed(self.stack_id.bytesize())
-                            .into(),
-                    );
+                    parent_object
+                        .set_value(
+                            pointer_to_unified_object,
+                            &Bitvector::from_i64(offset_in_parent_object)
+                                .into_resize_signed(self.stack_id.bytesize())
+                                .into(),
+                        )
+                        .unwrap();
                 }
             }
         }
@@ -274,7 +276,7 @@ impl State {
         let mut visited_targets = HashSet::new();
         let mut non_unique_targets = HashSet::new();
         for value in location_to_data_map.values() {
-            for (id, offset) in value.get_relative_values() {
+            for (id, _) in value.get_relative_values() {
                 if id.get_tid() != self.get_fn_tid() && self.memory.contains(id) {
                     if !visited_targets.insert(id.clone()) {
                         non_unique_targets.insert(id.clone());
@@ -282,8 +284,8 @@ impl State {
                 }
             }
         }
-        location_to_data_map.retain(|location, value| {
-            for (id, offset) in value.get_relative_values() {
+        location_to_data_map.retain(|_, value| {
+            for (id, _) in value.get_relative_values() {
                 if non_unique_targets.contains(id) {
                     return false;
                 }

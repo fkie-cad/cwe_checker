@@ -26,18 +26,6 @@ fn mock_stack_id() -> AbstractIdentifier {
     AbstractIdentifier::from_var(Tid::new("mock_fn"), &variable!("sp:4"))
 }
 
-/// Mock an abstract ID of a stack parameter
-fn mock_stack_param_id(offset: i64, size: u64) -> AbstractIdentifier {
-    AbstractIdentifier::new(
-        Tid::new("mock_fn"),
-        AbstractLocation::from_stack_position(
-            mock_stack_id().unwrap_register(),
-            offset,
-            ByteSize::new(size),
-        ),
-    )
-}
-
 #[test]
 fn test_new() {
     let state = State::mock_arm32();

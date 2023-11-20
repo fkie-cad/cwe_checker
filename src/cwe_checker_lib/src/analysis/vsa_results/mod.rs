@@ -30,7 +30,11 @@ pub trait VsaResult {
     fn eval_parameter_arg_at_call(&self, jmp_tid: &Tid, param: &Arg) -> Option<Self::ValueDomain>;
 
     /// Return the value of a parameter at the given jump instruction.
-    fn eval_parameter_location_at_call(&self, jmp_tid: &Tid, param: &AbstractLocation) -> Option<Self::ValueDomain>;
+    fn eval_parameter_location_at_call(
+        &self,
+        jmp_tid: &Tid,
+        param: &AbstractLocation,
+    ) -> Option<Self::ValueDomain>;
 
     /// Evaluate the value of the given expression at the given jump instruction.
     fn eval_at_jmp(&self, jmp_tid: &Tid, expression: &Expression) -> Option<Self::ValueDomain>;
