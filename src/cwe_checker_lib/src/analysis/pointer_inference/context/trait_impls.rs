@@ -150,9 +150,8 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
         // Minimize the callee state and replace callee-originating object IDs whenever possible.
         let mut state_before_return = state_before_return.clone();
         state_before_return.minimize_before_return_instruction(callee_fn_sig, cconv);
+        state_before_return.merge_mem_objects_with_unique_abstract_location(&call_term.tid);
         // TODO: Implement rest of the new handling scheme for update_return!
-        todo!(); // TODO: In the callee-state:
-                 //       Unify callee-originating memory objects that can only be accessed by a unique abstract location strings.
         todo!(); // TODO: Create a callee-ID to caller-value map as usual (with the modified callee state).
         todo!(); // TODO: Insert callee objects and callee values into the caller state as usual.
         todo!(); // TODO: The callee-ID to caller-value map used by other analyses needs to be refactored.

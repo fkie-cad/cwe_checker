@@ -250,41 +250,32 @@ impl State {
             .retain(|var, _value| return_register.contains(var));
     }
 
+    /// Try to determine unique pointer locations for non-parameter memory objects.
+    /// When successful, merge all referenced non-parameter objects for that location
+    /// and replace the pointer with a pointer to the merged object.
+    ///
+    /// The merged objects get new abstract IDs generated from the call TID and their abstract location in the state.
+    ///
+    /// This function leaves pointers to parameter objects as is,
+    /// while pointers to non-parameter objects, that were not merged (e.g. due to pointers being not unique) are replaced with `Top`.
     pub fn merge_mem_objects_with_unique_abstract_location(&mut self, call_tid: &Tid) {
-        // TODO: Write doc-string for this function!
         let mut location_to_data_map = self.map_abstract_locations_to_pointer_data(call_tid);
         self.filter_location_to_pointer_data_map(&mut location_to_data_map);
         let mut location_to_object_map =
             self.generate_target_objects_for_new_locations(&location_to_data_map);
-        self.replace_unified_mem_objects(&location_to_data_map, location_to_object_map);
-        self.remove_old_ids_to_unified_objects(&location_to_data_map);
-        todo!(); // Rename callee-originating IDs with the normal ID-to-value mapping process.
-                 // Find out whether we should add path hints for the non-renamed callee-IDs in the same step.
-        todo!(); // Explicitly overwrite the new ID locations
-                 // (to prevent having Top or inexact offsets in that locations).
-        todo!(); // Decide whether the propagation of other non-unique callee-originating mem-objects should be limited.
-                 // For example, one could limit the path length of corresponding IDs.
-
-        todo!()
+        self.replace_unified_mem_objects(location_to_object_map);
+        self.replace_ids_to_non_parameter_objects(&location_to_data_map);
+        self.insert_pointers_to_unified_objects(&location_to_data_map, call_tid);
     }
 
-    /// Remove all memory objects corresponding to non-parameter IDs referenced in the values of the location to data map.
+    /// Remove all memory objects corresponding to non-parameter IDs.
     /// Afterwards, add the memory objects in the location to object map to the state.
     fn replace_unified_mem_objects(
         &mut self,
-        location_to_data_map: &BTreeMap<AbstractIdentifier, Data>,
         location_to_object_map: BTreeMap<AbstractIdentifier, AbstractObject>,
     ) {
-        let mut objects_to_remove = HashSet::new();
-        for value in location_to_data_map.values() {
-            for id in value.referenced_ids() {
-                if id.get_tid() != self.get_fn_tid() {
-                    objects_to_remove.insert(id.clone());
-                }
-            }
-        }
-        self.memory.retain(|id, object| {
-            !objects_to_remove.contains(id)
+        self.memory.retain(|object_id, object| {
+            object_id.get_tid() == self.get_fn_tid() && object_id.get_path_hints().is_empty()
         });
         for (id, object) in location_to_object_map {
             self.memory.insert(id, object);

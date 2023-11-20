@@ -91,38 +91,112 @@ impl State {
         Ok(())
     }
 
-    /// Remove the non-parameter IDs given in the targets of the location to data map.
-    ///
-    /// Note that this function assumes (but does not check)
-    /// that these IDs are only contained in the abstract locations given by the keys of the location to data map.
-    pub fn remove_old_ids_to_unified_objects(
+    /// Replace all IDs pointing to non-parameter objects.
+    /// - IDs contained in the values of the location to data map are replaced by the corresponding key (with adjusted offset).
+    ///   But the Top flag is also set, because the pointers may point to other objects.
+    /// - All other non-parameter IDs are replaced with Top.
+    pub fn replace_ids_to_non_parameter_objects(
         &mut self,
         location_to_data_map: &BTreeMap<AbstractIdentifier, Data>,
     ) {
-        let mut ids_to_remove = BTreeSet::new();
-        for value in location_to_data_map.values() {
-            for (id, offset) in value.get_relative_values() {
-                if id.get_tid() != self.get_fn_tid() || !id.get_path_hints().is_empty() {
-                    ids_to_remove.insert(id.clone());
+        let mut id_replacement_map = BTreeMap::new();
+        for (unified_id, value) in location_to_data_map.iter() {
+            for (old_id, offset) in value.get_relative_values() {
+                if old_id.get_tid() != self.get_fn_tid() || !old_id.get_path_hints().is_empty() {
+                    let mut pointer_to_unified_id =
+                        Data::from_target(unified_id.clone(), offset.un_op(UnOpType::Int2Comp));
+                    pointer_to_unified_id.set_contains_top_flag();
+                    id_replacement_map.insert(old_id.clone(), pointer_to_unified_id);
                 }
             }
         }
-        for value in self.register.values_mut() {
-            value.remove_ids(&ids_to_remove);
-            if value.is_empty() {
-                *value = Data::new_top(value.bytesize());
+        for value in self.register.values() {
+            for (id, offset) in value.get_relative_values() {
+                if id.get_tid() == self.get_fn_tid() && id.get_path_hints().is_empty() {
+                    // This is a parameter ID
+                    id_replacement_map.insert(
+                        id.clone(),
+                        Data::from_target(id.clone(), Bitvector::zero(id.bytesize().into()).into()),
+                    );
+                }
             }
         }
+        for object_id in self.memory.get_all_object_ids() {
+            for id in self.memory.get_referenced_ids_overapproximation(&object_id) {
+                if id.get_tid() == self.get_fn_tid() && id.get_path_hints().is_empty() {
+                    // This is a parameter ID
+                    id_replacement_map.insert(
+                        id.clone(),
+                        Data::from_target(id.clone(), Bitvector::zero(id.bytesize().into()).into()),
+                    );
+                }
+            }
+        }
+        // Now use the replacement map to replace IDs
+        for value in self.register.values_mut() {
+            value.replace_all_ids(&id_replacement_map);
+        }
         for object in self.memory.iter_objects_mut() {
-            object.remove_ids(&ids_to_remove);
+            object.replace_ids(&id_replacement_map);
         }
     }
 
+    /// Explicitly insert pointers to unified objects at the locations specified by their abstract location.
+    /// 
+    /// Note that these are the only locations where we (by definition) know
+    /// that the pointer is unique, i.e. we do not have to set a Top flag.
+    /// However, we still have to add targets to parameter objects, absolute values or the `Top` flag
+    /// to the pointer if the original pointer value contained them,
+    /// because these targets were not merged to the unified object.
     pub fn insert_pointers_to_unified_objects(
         &mut self,
         location_to_data_map: &BTreeMap<AbstractIdentifier, Data>,
+        call_tid: &Tid,
     ) {
-        todo!()
+        for (unified_id, old_value) in location_to_data_map.iter() {
+            // Compute the pointer (which may also contain pointers to parameter objects and absolute values).
+            let mut pointer_to_unified_object = Data::from_target(
+                unified_id.clone(),
+                Bitvector::zero(unified_id.bytesize().into()).into(),
+            );
+            for (old_id, old_offset) in old_value.get_relative_values() {
+                if old_id.get_tid() == self.get_fn_tid() && old_id.get_path_hints().is_empty() {
+                    pointer_to_unified_object = pointer_to_unified_object
+                        .merge(&Data::from_target(old_id.clone(), old_offset.clone()));
+                }
+            }
+            pointer_to_unified_object.set_absolute_value(old_value.get_absolute_value().cloned());
+            if old_value.contains_top() {
+                pointer_to_unified_object.set_contains_top_flag()
+            }
+            // Insert the pointer at the corresponding abstract location
+            match unified_id.get_location() {
+                AbstractLocation::Register(var) => {
+                    self.set_register(var, pointer_to_unified_object)
+                }
+                unified_location => {
+                    let (parent_location, offset_in_parent_object) = unified_location
+                        .get_parent_location(self.stack_id.bytesize())
+                        .unwrap();
+                    let parent_tid = if unified_id.get_tid() == call_tid {
+                        call_tid.clone()
+                    } else {
+                        // We know that the parent is a parameter object, since we cannot track nested pointers in parameter objects.
+                        self.stack_id.get_tid().clone()
+                    };
+                    let parent_object = self
+                        .memory
+                        .get_object_mut(&AbstractIdentifier::new(parent_tid, parent_location))
+                        .unwrap();
+                    parent_object.set_value(
+                        pointer_to_unified_object,
+                        &Bitvector::from_i64(offset_in_parent_object)
+                            .into_resize_signed(self.stack_id.bytesize())
+                            .into(),
+                    );
+                }
+            }
+        }
     }
 
     /// Merge the target objects that are non-parameter objects for the given location to data mapping.
@@ -214,6 +288,8 @@ impl State {
     ///   Since parameter and return register can overlap, the abstract IDs would overlap
     ///   if one would use the same TID in both cases.
     ///
+    /// For return register based location this function also generates nested abstract locations.
+    ///
     /// This function assumes that
     /// [`State::minimize_before_return_instruction`](crate::analysis::pointer_inference::State::minimize_before_return_instruction)
     /// has been called on `self` beforehand.
@@ -222,14 +298,14 @@ impl State {
         call_tid: &Tid,
     ) -> BTreeMap<AbstractIdentifier, Data> {
         let mut location_to_data_map = BTreeMap::new();
+        let mut locations_to_derive = BTreeMap::new();
         // Add root IDs based on return registers (all other registers should be cleared from the state)
         for (var, value) in self.register.iter() {
             if !var.is_temp && self.contains_non_param_pointer(value) {
                 let location = AbstractLocation::from_var(var).unwrap();
-                location_to_data_map.insert(
-                    AbstractIdentifier::new(call_tid.clone(), location),
-                    value.clone(),
-                );
+                let id = AbstractIdentifier::new(call_tid.clone(), location);
+                location_to_data_map.insert(id.clone(), value.clone());
+                locations_to_derive.insert(id, value.clone());
             }
         }
         // Add root locations based on parameter objects
@@ -251,12 +327,15 @@ impl State {
                             ),
                             value.clone(),
                         );
+                        // Do not add these locations to the `locations_to_derive`.
                     }
                 }
             }
         }
-        // Add derived locations based on the root locations
-        let mut locations_to_derive = location_to_data_map.clone();
+        // Add derived locations based on return register locations.
+        // We cannot add derived locations based on parameter objects,
+        // because the location and ID of their parent objects would be ambiguous
+        // between parameter objects and other derived locations.
         while let Some((location_id, location_data)) = locations_to_derive.pop_first() {
             if location_id.get_location().recursion_depth() >= POINTER_RECURSION_DEPTH_LIMIT {
                 continue;
@@ -296,11 +375,6 @@ impl State {
                             .entry(new_location_id.clone())
                             .and_modify(|loc_data| *loc_data = loc_data.merge(&new_location_data))
                             .or_insert(new_location_data);
-                        todo!(); // We *cannot* derive nested non-root IDs in parameter objects!
-                                 // These IDs would not be unique regarding either their root (a nested param or another nested return value)
-                                 // or their ID itself (if both possible roots exist).
-                                 // So we probably have to remove the `and_modify` variant above.
-                                 // And the deriving of nested variants for param object based locations!
                     }
                 }
             }
