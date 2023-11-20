@@ -19,7 +19,7 @@ impl State {
     ) -> DataDomain<BitvectorDomain> {
         let mut loaded_value = DataDomain::new_empty(size);
         for (id, offset) in address.get_relative_values() {
-            loaded_value = loaded_value.merge(&self.load_value_via_id_and_offset(id, offset));
+            loaded_value = loaded_value.merge(&self.load_value_via_id_and_offset(id, offset, size));
         }
         if let Some(global_address) = address.get_absolute_value() {
             loaded_value =
@@ -31,16 +31,21 @@ impl State {
         loaded_value
     }
 
+    /// Load the value whose position is given by derefencing the given ID and then adding an offset.
+    /// 
+    /// If the ID is the stack then this function actually loads the value at the given stack position.
+    /// Otherwise it only generates the abstract location of the value and returns it as a relative value.
     fn load_value_via_id_and_offset(
         &mut self,
         id: &AbstractIdentifier,
         offset: &BitvectorDomain,
+        size: ByteSize,
     ) -> DataDomain<BitvectorDomain> {
         if *id == self.stack_id {
             // Try to load a value from the stack (which may generate a new stack parameter)
             match offset.try_to_bitvec() {
-                Ok(stack_offset) => self.load_value_from_stack(stack_offset, id.bytesize()),
-                Err(_) => DataDomain::new_top(id.bytesize()),
+                Ok(stack_offset) => self.load_value_from_stack(stack_offset, size),
+                Err(_) => DataDomain::new_top(size),
             }
         } else if let (true, Ok(constant_offset)) = (
             id.get_location().recursion_depth() < POINTER_RECURSION_DEPTH_LIMIT,
@@ -51,16 +56,19 @@ impl State {
                 id.get_tid().clone(),
                 id.get_location()
                     .clone()
-                    .with_offset_addendum(constant_offset)
-                    .dereferenced(id.bytesize(), self.stack_id.bytesize()),
+                    .dereferenced(size, self.stack_id.bytesize())
+                    .with_offset_addendum(constant_offset),
             );
-            DataDomain::from_target(new_id, Bitvector::zero(id.bytesize().into()).into())
+            DataDomain::from_target(new_id, Bitvector::zero(size.into()).into())
         } else {
             // The abstract location string cannot be extended
-            DataDomain::new_top(id.bytesize())
+            DataDomain::new_top(size)
         }
     }
 
+    /// Load a value from the global address space.
+    /// If the address is located in writeable global memory then generate a new abstract ID for the value
+    /// and return a value relative to the new ID.
     fn load_global_address(
         &mut self,
         global_address: &BitvectorDomain,
