@@ -221,7 +221,7 @@ impl State {
     /// Used to minimize state before a return instruction.
     fn remove_immutable_parameter_objects(&mut self, fn_sig: &FunctionSignature) {
         self.memory.retain(|object_id, _object| {
-            if object_id.get_tid() == self.get_fn_tid() {
+            if object_id.get_tid() == self.get_fn_tid() && object_id.get_path_hints().is_empty() {
                 if let Some(access_pattern) = fn_sig.parameters.get(object_id.get_location()) {
                     if !access_pattern.is_mutably_dereferenced() {
                         return false;

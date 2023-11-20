@@ -91,14 +91,12 @@ impl State {
         Ok(())
     }
 
-    /// Replace all IDs pointing to non-parameter objects.
-    /// - IDs contained in the values of the location to data map are replaced by the corresponding key (with adjusted offset).
-    ///   But the Top flag is also set, because the pointers may point to other objects.
-    /// - All other non-parameter IDs are replaced with Top.
-    pub fn replace_ids_to_non_parameter_objects(
-        &mut self,
+    /// Create an ID renaming map that maps IDs in `self` to the values representing them
+    /// after unifying and renaming non-parameter objects in `self` in preparation of returning to a caller.
+    pub fn get_id_to_unified_ids_replacement_map(
+        &self,
         location_to_data_map: &BTreeMap<AbstractIdentifier, Data>,
-    ) {
+    ) -> BTreeMap<AbstractIdentifier, Data> {
         let mut id_replacement_map = BTreeMap::new();
         for (unified_id, value) in location_to_data_map.iter() {
             for (old_id, offset) in value.get_relative_values() {
@@ -132,6 +130,18 @@ impl State {
                 }
             }
         }
+        id_replacement_map
+    }
+
+    /// Replace all IDs pointing to non-parameter objects.
+    /// - IDs contained in the values of the location to data map are replaced by the corresponding key (with adjusted offset).
+    ///   But the Top flag is also set, because the pointers may point to other objects.
+    /// - All other non-parameter IDs are replaced with Top.
+    pub fn replace_ids_to_non_parameter_objects(
+        &mut self,
+        location_to_data_map: &BTreeMap<AbstractIdentifier, Data>,
+    ) {
+        let id_replacement_map = self.get_id_to_unified_ids_replacement_map(location_to_data_map);
         // Now use the replacement map to replace IDs
         for value in self.register.values_mut() {
             value.replace_all_ids(&id_replacement_map);
@@ -142,7 +152,7 @@ impl State {
     }
 
     /// Explicitly insert pointers to unified objects at the locations specified by their abstract location.
-    /// 
+    ///
     /// Note that these are the only locations where we (by definition) know
     /// that the pointer is unique, i.e. we do not have to set a Top flag.
     /// However, we still have to add targets to parameter objects, absolute values or the `Top` flag
@@ -213,7 +223,10 @@ impl State {
         for (location_id, value) in location_to_data_map {
             let mut new_object: Option<AbstractObject> = None;
             'target_loop: for (target_id, target_offset) in value.get_relative_values() {
-                if target_id.get_tid() == self.get_fn_tid() || !self.memory.contains(target_id) {
+                if (target_id.get_tid() == self.get_fn_tid()
+                    && target_id.get_path_hints().is_empty())
+                    || !self.memory.contains(target_id)
+                {
                     continue 'target_loop;
                 }
                 let target_offset = match target_offset.try_to_offset() {
@@ -311,6 +324,7 @@ impl State {
         // Add root locations based on parameter objects
         for (object_id, object) in self.memory.iter() {
             if object_id.get_tid() == self.get_fn_tid()
+                && object_id.get_path_hints().is_empty()
                 && object_id.get_location().recursion_depth() < POINTER_RECURSION_DEPTH_LIMIT
             {
                 for (index, value) in object.get_mem_region().iter() {
@@ -342,7 +356,8 @@ impl State {
             }
             'data_target_loop: for (object_id, object_offset) in location_data.get_relative_values()
             {
-                if object_id.get_tid() == self.get_fn_tid() {
+                if object_id.get_tid() == self.get_fn_tid() && object_id.get_path_hints().is_empty()
+                {
                     // Ignore parameter objects
                     continue 'data_target_loop;
                 }
@@ -386,7 +401,9 @@ impl State {
     /// (and non-stack) memory object tracked by the current state.
     fn contains_non_param_pointer(&self, value: &Data) -> bool {
         for id in value.referenced_ids() {
-            if id.get_tid() != self.get_fn_tid() && self.memory.contains(id) {
+            if (id.get_tid() != self.get_fn_tid() || !id.get_path_hints().is_empty())
+                && self.memory.contains(id)
+            {
                 return true;
             }
         }

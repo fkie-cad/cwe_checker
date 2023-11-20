@@ -395,7 +395,7 @@ fn test_merge_global_mem_from_callee() {
         Data::from_target(caller_state.get_global_mem_id(), bitvec!("0:8").into()),
     )]);
 
-    context.merge_global_mem_from_callee(
+    context.merge_non_nested_global_mem_from_callee(
         &mut caller_state,
         callee_global_mem,
         &replacement_map,

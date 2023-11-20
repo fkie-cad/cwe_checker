@@ -317,7 +317,7 @@ impl<'a> PointerInference<'a> {
                             }) => (state_before_call, state_before_return),
                             _ => continue,
                         };
-                    let id_to_data_map = context.create_callee_id_to_caller_data_map(
+                    let id_to_data_map = context.create_full_callee_id_to_caller_data_map(
                         state_before_call,
                         state_before_return,
                         call_tid,
