@@ -205,21 +205,23 @@ impl State {
         value: DataDomain<BitvectorDomain>,
         mem_location: &AbstractMemoryLocation,
     ) -> DataDomain<BitvectorDomain> {
-        let mut eval_result = DataDomain::new_empty(mem_location.bytesize());
+        let target_size = mem_location.bytesize();
+        let mut eval_result = DataDomain::new_empty(target_size);
         for (id, offset) in value.get_relative_values() {
             let mut location = id.get_location().clone();
+            let mut mem_location = mem_location.clone();
             match offset.try_to_offset() {
-                Ok(concrete_offset) => location = location.with_offset_addendum(concrete_offset),
+                Ok(concrete_offset) => mem_location.add_offset_at_root(concrete_offset),
                 Err(_) => {
                     eval_result.set_contains_top_flag();
                     continue;
                 }
             };
-            location.extend(mem_location.clone(), self.stack_id.bytesize());
+            location.extend(mem_location, self.stack_id.bytesize());
             if location.recursion_depth() <= POINTER_RECURSION_DEPTH_LIMIT {
                 eval_result = eval_result.merge(&DataDomain::from_target(
                     AbstractIdentifier::new(id.get_tid().clone(), location),
-                    Bitvector::zero(mem_location.bytesize().into()).into(),
+                    Bitvector::zero(target_size.into()).into(),
                 ));
             } else {
                 eval_result.set_contains_top_flag();

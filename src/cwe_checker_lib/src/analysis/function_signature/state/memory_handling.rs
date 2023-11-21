@@ -32,7 +32,7 @@ impl State {
     }
 
     /// Load the value whose position is given by derefencing the given ID and then adding an offset.
-    /// 
+    ///
     /// If the ID is the stack then this function actually loads the value at the given stack position.
     /// Otherwise it only generates the abstract location of the value and returns it as a relative value.
     fn load_value_via_id_and_offset(

@@ -64,6 +64,13 @@ impl AbstractMemoryLocation {
         }
     }
 
+    /// Add an offset to the root location of the memory location.
+    pub fn add_offset_at_root(&mut self, addendum: i64) {
+        match self {
+            Self::Location { offset, .. } | Self::Pointer { offset, .. } => *offset += addendum,
+        }
+    }
+
     /// Dereference the pointer that `self` is pointing to.
     ///
     /// Panics if the old value of `self` is not pointer-sized.
@@ -124,5 +131,76 @@ impl std::fmt::Display for AbstractMemoryLocation {
             Self::Location { offset, .. } => write!(formatter, "({offset})"),
             Self::Pointer { offset, target } => write!(formatter, "({offset})->{target}"),
         }
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+
+    impl AbstractMemoryLocation {
+        /// Mock a memory location with a given sequence of offsets.
+        /// The first element in the sequence is the root offset.
+        pub fn mock(offsets: &[i64], size: impl Into<ByteSize>) -> AbstractMemoryLocation {
+            match offsets {
+                [] => panic!(),
+                [offset] => AbstractMemoryLocation::Location {
+                    offset: *offset,
+                    size: size.into(),
+                },
+                [offset, tail @ ..] => AbstractMemoryLocation::Pointer {
+                    offset: *offset,
+                    target: Box::new(AbstractMemoryLocation::mock(tail, size)),
+                },
+            }
+        }
+    }
+
+    #[test]
+    fn test_mock() {
+        let loc = AbstractMemoryLocation::mock(&[1, 2, 3], 4);
+        assert_eq!(&format!("{loc}"), "(1)->(2)->(3)");
+    }
+
+    #[test]
+    fn test_get_parent_location() {
+        let loc = AbstractMemoryLocation::mock(&[1, 2, 3], 4);
+        let (parent_loc, last_offset) = loc.get_parent_location(ByteSize::new(8)).unwrap();
+        assert_eq!(parent_loc, AbstractMemoryLocation::mock(&[1, 2], 8));
+        assert_eq!(last_offset, 3);
+        let loc = AbstractMemoryLocation::mock(&[1], 4);
+        assert!(loc.get_parent_location(ByteSize::new(8)).is_err());
+    }
+
+    #[test]
+    fn test_offset_addendums() {
+        let mut loc = AbstractMemoryLocation::mock(&[1, 2, 3], 4);
+        loc.add_offset(6);
+        assert_eq!(&loc, &AbstractMemoryLocation::mock(&[1, 2, 9], 4));
+        loc.add_offset_at_root(-5);
+        assert_eq!(&loc, &AbstractMemoryLocation::mock(&[-4, 2, 9], 4));
+    }
+
+    #[test]
+    fn test_dereference() {
+        let mut loc = AbstractMemoryLocation::mock(&[1, 2, 3], 4);
+        loc.dereference(ByteSize::new(8), ByteSize::new(4));
+        assert_eq!(loc, AbstractMemoryLocation::mock(&[1, 2, 3, 0], 8))
+    }
+
+    #[test]
+    fn test_extend() {
+        let mut loc = AbstractMemoryLocation::mock(&[1, 2, 3], 4);
+        let extension = AbstractMemoryLocation::mock(&[4, 5, 6], 1);
+        loc.extend(extension, ByteSize::new(4));
+        assert_eq!(loc, AbstractMemoryLocation::mock(&[1, 2, 3, 4, 5, 6], 1));
+    }
+
+    #[test]
+    fn test_recursion_depth() {
+        let loc = AbstractMemoryLocation::mock(&[1, 2, 3], 4);
+        assert_eq!(loc.recursion_depth(), 2);
+        let loc = AbstractMemoryLocation::mock(&[1], 4);
+        assert_eq!(loc.recursion_depth(), 0);
     }
 }

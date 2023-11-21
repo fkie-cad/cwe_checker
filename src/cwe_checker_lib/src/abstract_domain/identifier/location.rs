@@ -4,7 +4,7 @@ use crate::prelude::*;
 
 /// An abstract location describes how to find the value of a variable in memory at a given time.
 ///
-/// It is defined recursively, where the root is always a register.
+/// It is defined recursively, where the root is either a register or a (constant) global address.
 /// This way only locations that the local state knows about are representable.
 /// It is also impossible to accidentally describe circular references.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
@@ -216,5 +216,81 @@ impl AbstractLocation {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use crate::variable;
+
+    impl AbstractLocation {
+        /// Mock an abstract location with a variable as root.
+        pub fn mock(
+            root_var: &str,
+            offsets: &[i64],
+            size: impl Into<ByteSize>,
+        ) -> AbstractLocation {
+            let var = variable!(root_var);
+            match offsets {
+                [] => AbstractLocation::Register(var),
+                _ => AbstractLocation::Pointer(var, AbstractMemoryLocation::mock(offsets, size)),
+            }
+        }
+    }
+
+    #[test]
+    fn test_from_variants() {
+        let loc = AbstractLocation::from_var(&variable!("RAX:8")).unwrap();
+        assert_eq!(&format!("{loc}"), "RAX");
+        let loc = AbstractLocation::from_global_address(&Bitvector::from_u64(32));
+        assert_eq!(
+            loc,
+            AbstractLocation::GlobalAddress {
+                address: 32,
+                size: ByteSize::new(8)
+            }
+        );
+        let loc = AbstractLocation::from_stack_position(&variable!("RSP:8"), 16, ByteSize::new(8));
+        assert_eq!(loc, AbstractLocation::mock("RSP:8", &[16], 8));
+    }
+
+    #[test]
+    fn test_with_offset_addendum() {
+        let loc = AbstractLocation::mock("RAX:8", &[1, 2, 3], 4).with_offset_addendum(12);
+        assert_eq!(loc, AbstractLocation::mock("RAX:8", &[1, 2, 15], 4));
+    }
+
+    #[test]
+    fn test_dereferenced() {
+        let loc = AbstractLocation::mock("RAX:8", &[], 8)
+            .dereferenced(ByteSize::new(4), ByteSize::new(8));
+        assert_eq!(loc, AbstractLocation::mock("RAX:8", &[0], 4));
+    }
+
+    #[test]
+    fn test_recursion_depth() {
+        let loc = AbstractLocation::mock("RAX:8", &[1, 2, 3], 4);
+        assert_eq!(loc.recursion_depth(), 3);
+    }
+
+    #[test]
+    fn test_extend() {
+        let mut loc = AbstractLocation::mock("RAX:8", &[1, 2, 3], 4);
+        let extension = AbstractMemoryLocation::mock(&[4, 5, 6], 1);
+        loc.extend(extension, ByteSize::new(4));
+        assert_eq!(loc, AbstractLocation::mock("RAX:8", &[1, 2, 3, 4, 5, 6], 1));
+    }
+
+    #[test]
+    fn test_get_parent_location() {
+        let loc = AbstractLocation::mock("RAX:8", &[1], 4);
+        let (parent, last_offset) = loc.get_parent_location(ByteSize::new(8)).unwrap();
+        assert_eq!(parent, AbstractLocation::mock("RAX:8", &[], 8));
+        assert_eq!(last_offset, 1);
+        let loc = AbstractLocation::mock("RAX:8", &[1, 2, 3], 4);
+        let (parent, last_offset) = loc.get_parent_location(ByteSize::new(8)).unwrap();
+        assert_eq!(parent, AbstractLocation::mock("RAX:8", &[1, 2], 8));
+        assert_eq!(last_offset, 3);
     }
 }

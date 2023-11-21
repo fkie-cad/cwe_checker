@@ -13,7 +13,7 @@ pub use mem_location::AbstractMemoryLocation;
 /// Since many program states can be represented by the same abstract state in data-flow analysis,
 /// one sometimes needs a way to uniquely identify a variable or a memory object in all of the represented program states.
 /// Abstract identifiers achieve this by identifying a *time*, i.e. a specific abstract state,
-/// and a *location*, i.e. a recipe for abstracting a concrete value from any concrete state that is represented by the abstract state.
+/// and a *location*, i.e. a recipe for computing a concrete value from any concrete state that is represented by the abstract state.
 /// The value in question then serves as the identifier.
 /// For example, a pointer may uniquely determine the memory object it is pointing to.
 /// Or a value may represent the value of a variable at a certain time,
@@ -25,15 +25,15 @@ pub use mem_location::AbstractMemoryLocation;
 /// E.g. it may represent the union of all values at the specific *location* for each time the program point is visited during an execution trace
 /// or it may only represent the value at the last time the program point was visited.
 ///
-/// Alternatively one can also add path hints to an identifier to further distinguish points in time in an execution trace.
+/// Alternatively, one can also add path hints to an identifier to further distinguish points in time in an execution trace.
 /// Path hints are given as a possibly empty array of time identifiers.
 /// To prevent infinitely long path hints, each time identifier is only allowed to appear at most once in the array.
 /// The specific meaning of the path hints depends upon the use case.
 ///
 /// An abstract identifier is given by a time identifier, a location identifier and a path hints array (containing time identifiers).
 ///
-/// For the location identifier see `AbstractLocation`.
-/// The time identifier is given by a `Tid`.
+/// For the location identifier see [`AbstractLocation`].
+/// The time identifier is given by a [`Tid`].
 /// If it is the `Tid` of a basic block, then it describes the point in time *before* execution of the first instruction in the block.
 /// If it is the `Tid` of a `Def` or `Jmp`, then it describes the point in time *after* the execution of the `Def` or `Jmp`.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord, Deref)]
