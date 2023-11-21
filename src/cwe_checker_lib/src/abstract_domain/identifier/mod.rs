@@ -188,6 +188,20 @@ pub mod tests {
                 .unwrap(),
             )
         }
+
+        /// Mock an abstract identifier with the given TID name
+        /// and with a nested abstract location starting at the register given by `var`.
+        pub fn mock_nested(
+            tid: impl ToString,
+            var: &str,
+            offsets: &[i64],
+            size: impl Into<ByteSize>,
+        ) -> Self {
+            AbstractIdentifier::new(
+                Tid::new(tid.to_string()),
+                AbstractLocation::mock(var, offsets, size),
+            )
+        }
     }
 
     #[test]

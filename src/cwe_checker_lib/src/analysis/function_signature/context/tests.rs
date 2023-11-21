@@ -135,3 +135,8 @@ fn test_get_global_mem_address() {
     let result = context.get_global_mem_address(&value);
     assert!(result.is_none());
 }
+
+#[test]
+fn test_generation_of_nested_ids_and_access_patterns_on_load_and_store() {
+    todo!()
+}

@@ -170,6 +170,7 @@ impl State {
     }
 
     /// Get the value located at a positive stack offset.
+    /// This function panics if the address is a negative offset.
     ///
     /// If no corresponding stack parameter ID exists for the value,
     /// generate it and then return it as an unmodified stack parameter.
@@ -227,6 +228,38 @@ pub mod tests {
     }
 
     #[test]
+    fn test_get_offset_if_exact_stack_pointer() {
+        let state = State::mock_arm32();
+        let stack_pointer =
+            DataDomain::from_target(mock_stack_id(), Bitvector::from_i32(-10).into());
+        assert_eq!(
+            state.get_offset_if_exact_stack_pointer(&stack_pointer),
+            Some(Bitvector::from_i32(-10))
+        );
+    }
+
+    #[test]
+    fn test_get_stack_param() {
+        // Reading a previously non-existing stack parameter
+        let mut state = State::mock_arm32();
+        let stack_param = state.get_stack_param(bitvec!("0xc:4"), ByteSize::new(8));
+        let expected_stack_id = AbstractIdentifier::mock_nested("mock_fn", "sp:4", &[12], 8);
+        let expected_value =
+            DataDomain::from_target(expected_stack_id.clone(), bitvec!("0x0:8").into());
+        assert_eq!(&stack_param, &expected_value);
+        assert!(state.tracked_ids.contains_key(&expected_stack_id));
+        // Reading the stack parameter again. The position should still contain the stack parameter.
+        let stack_param = state.get_stack_param(bitvec!("0xc:4"), ByteSize::new(8));
+        assert_eq!(&stack_param, &expected_value);
+        // Reading the stack parameter after it has been overwritten with a value.
+        state
+            .stack
+            .insert_at_byte_index(bitvec!("0x2a:8").into(), 12);
+        let value = state.get_stack_param(bitvec!("0xc:4"), ByteSize::new(8));
+        assert_eq!(value, bitvec!("0x2a:8").into());
+    }
+
+    #[test]
     fn test_store_and_load_from_stack() {
         let mut state = State::mock_arm32();
         let address = DataDomain::from_target(mock_stack_id(), bitvec!("-4:4").into());
@@ -279,5 +312,17 @@ pub mod tests {
         // Unsized load from the current stack frame
         let unsized_load = state.load_unsized_value_from_stack(bitvec!("-4:4"));
         assert_eq!(unsized_load, DataDomain::new_top(ByteSize::new(1)));
+    }
+
+    #[test]
+    fn test_load_nested_pointers() {
+        let mut state = State::mock_arm32();
+        let global_memory = RuntimeMemoryImage::mock();
+        let parent_id = AbstractIdentifier::mock_nested("mock_fn", "r0:4", &[4], 4);
+        let pointer = DataDomain::from_target(parent_id.clone(), bitvec!("0x8:4").into());
+        let loaded_value = state.load_value(pointer, ByteSize::new(4), Some(&global_memory));
+        let expected_id = AbstractIdentifier::mock_nested("mock_fn", "r0:4", &[4, 8], 4);
+        let expected_value = DataDomain::from_target(expected_id.clone(), bitvec!("0x0:4").into());
+        assert_eq!(loaded_value, expected_value);
     }
 }

@@ -233,7 +233,10 @@ pub mod tests {
         ) -> AbstractLocation {
             let var = variable!(root_var);
             match offsets {
-                [] => AbstractLocation::Register(var),
+                [] => {
+                    assert_eq!(var.size, size.into());
+                    AbstractLocation::Register(var)
+                }
                 _ => AbstractLocation::Pointer(var, AbstractMemoryLocation::mock(offsets, size)),
             }
         }
