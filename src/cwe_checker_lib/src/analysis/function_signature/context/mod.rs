@@ -454,9 +454,9 @@ impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
             Some(cconv) => cconv,
             None => return None,
         };
-        let old_state = state_before_call.unwrap();
+        let state_before_call = state_before_call.unwrap();
         let callee_state = state.unwrap();
-        let mut new_state = old_state.clone();
+        let mut new_state = state_before_call.clone();
         // Merge parameter access patterns with the access patterns from the callee.
         let parameters = callee_state.get_params_of_current_function();
         new_state.merge_parameter_access(&parameters, &self.project.runtime_memory_image);
