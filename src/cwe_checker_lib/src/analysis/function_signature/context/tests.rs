@@ -1,5 +1,5 @@
 use super::*;
-use crate::{bitvec, variable};
+use crate::{analysis::forward_interprocedural_fixpoint::Context as _, bitvec, def, variable};
 
 #[test]
 fn test_compute_return_values_of_call() {
@@ -25,21 +25,27 @@ fn test_compute_return_values_of_call() {
         &call,
     );
     let expected_val = DataDomain::from_target(
-        AbstractIdentifier::from_var(Tid::new("call_tid"), &variable!("RAX:8")),
+        AbstractIdentifier::mock("call_tid", "RAX", 8),
         bitvec!("0x0:8").into(),
     );
     assert_eq!(return_values.iter().len(), 3);
     assert_eq!(return_values[0], (&variable!("RAX:8"), expected_val));
     // Test returning a known value.
     let param_ref = DataDomain::from_target(
-        AbstractIdentifier::from_var(Tid::new("callee"), &variable!("RDI:8")),
+        AbstractIdentifier::mock("callee", "RDI", 8),
         bitvec!("0x0:8").into(),
     );
     callee_state.set_register(&variable!("RAX:8"), param_ref);
-    let expected_val = DataDomain::from_target(
-        AbstractIdentifier::from_var(Tid::new("caller"), &variable!("RDI:8")),
-        bitvec!("0x0:8").into(),
-    );
+    let expected_val = DataDomain::mock_from_target_map(BTreeMap::from([
+        (
+            AbstractIdentifier::mock("caller", "RDI", 8),
+            bitvec!("0x0:8").into(),
+        ),
+        (
+            AbstractIdentifier::mock("call_tid", "RAX", 8),
+            bitvec!("0x0:8").into(),
+        ),
+    ]));
     let return_values = context.compute_return_values_of_call(
         &mut caller_state,
         &callee_state,
@@ -138,5 +144,64 @@ fn test_get_global_mem_address() {
 
 #[test]
 fn test_generation_of_nested_ids_and_access_patterns_on_load_and_store() {
-    todo!()
+    let project = Project::mock_arm32();
+    let graph = crate::analysis::graph::get_program_cfg(&project.program);
+    let context = Context::new(&project, &graph);
+    let state = State::mock_arm32();
+    // Load from a tracked pointer value
+    let def = def!["load_instr: r0:4 := Load from r1:4 + 0x10:4"];
+    let new_state = context.update_def(&state, &def).unwrap();
+    let loaded_value = new_state.get_register(&variable!("r0:4"));
+    assert_eq!(
+        loaded_value,
+        DataDomain::from_target(
+            AbstractIdentifier::new(
+                Tid::new("mock_fn"),
+                AbstractLocation::mock("r1:4", &[16], 4)
+            ),
+            bitvec!("0x0:4").into()
+        )
+    );
+    let params = new_state.get_params_of_current_function();
+    assert_eq!(params.len(), 2);
+    assert!(params.contains(&(
+        &AbstractLocation::mock("r1:4", &[], 4),
+        AccessPattern::new()
+            .with_read_flag()
+            .with_dereference_flag()
+    )));
+    assert!(params.contains(&(
+        &AbstractLocation::mock("r1:4", &[16], 4),
+        AccessPattern::new().with_read_flag()
+    )));
+    // Load from an untracked register value
+    let def = def!["load_instr: r0:4 := Load from r8:4 + 0x10:4"];
+    let new_state = context.update_def(&state, &def).unwrap();
+    let loaded_value = new_state.get_register(&variable!("r0:4"));
+    assert!(loaded_value.is_top());
+    assert_eq!(new_state.get_params_of_current_function(), []);
+    // Store a tracked pointer value
+    let def = def!["store_instr: Store at r0:4 := r1:4 + 0x10:4"];
+    let new_state = context.update_def(&state, &def).unwrap();
+    let params = new_state.get_params_of_current_function();
+    assert_eq!(params.len(), 2);
+    assert!(params.contains(&(
+        &AbstractLocation::mock("r0:4", &[], 4),
+        AccessPattern::new()
+            .with_read_flag()
+            .with_mutably_dereferenced_flag()
+    )));
+    assert!(params.contains(&(
+        &AbstractLocation::mock("r1:4", &[], 4),
+        AccessPattern::new().with_read_flag()
+    )));
+    // Store to an untracked register value
+    let def = def!["store_instr: Store at r8:4 := r1:4 + 0x10:4"];
+    let new_state = context.update_def(&state, &def).unwrap();
+    let params = new_state.get_params_of_current_function();
+    assert_eq!(params.len(), 1);
+    assert!(params.contains(&(
+        &AbstractLocation::mock("r1:4", &[], 4),
+        AccessPattern::new().with_read_flag()
+    )));
 }

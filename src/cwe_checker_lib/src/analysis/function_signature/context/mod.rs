@@ -1,3 +1,4 @@
+use super::*;
 use crate::abstract_domain::{
     AbstractDomain, AbstractIdentifier, AbstractLocation, BitvectorDomain, DataDomain, SizedDomain,
     TryToBitvec,
@@ -7,8 +8,6 @@ use crate::{
     analysis::{forward_interprocedural_fixpoint, graph::Graph},
     intermediate_representation::Project,
 };
-
-use super::*;
 
 /// The context struct for the fixpoint algorithm.
 pub struct Context<'a> {
@@ -72,8 +71,9 @@ impl<'a> Context<'a> {
     /// Compute the return value for the given register.
     ///
     /// The return value contains the IDs of all possible input IDs of the call that it may reference.
-    /// If the value may also contain a value not originating from the caller
-    /// then replace it with a call- and register-specific abstract ID.
+    /// Additionally, it also contains a call- and register-specific abstract ID,
+    /// which can be used to track the access patterns of the return value
+    /// independently of whether the return value only references caller values or not.
     fn compute_return_register_value_of_call(
         &self,
         caller_state: &mut State,
