@@ -135,12 +135,7 @@ impl State {
     pub fn get_params_of_current_function(&self) -> Vec<(&AbstractLocation, AccessPattern)> {
         let mut params = Vec::new();
         for (id, access_pattern) in self.tracked_ids.iter() {
-            if id.get_tid() == self.get_current_function_tid()
-                && !matches!(
-                    id.get_location(),
-                    AbstractLocation::GlobalAddress { .. } | AbstractLocation::GlobalPointer(_, _)
-                )
-            {
+            if self.is_param_id(id) {
                 if access_pattern.is_accessed() {
                     params.push((id.get_location(), *access_pattern));
                 } else if matches!(id.get_location(), &AbstractLocation::Pointer { .. }) {
@@ -285,6 +280,35 @@ impl State {
                 }
             }
         }
+    }
+
+    /// Return `true` if the given ID is a parameter ID,
+    /// but not a global parameter.
+    fn is_param_id(&self, id: &AbstractIdentifier) -> bool {
+        if id.get_tid() != self.get_current_function_tid() || id == &self.stack_id {
+            return false;
+        }
+        // Filter out global IDs
+        if matches!(
+            id.get_location(),
+            AbstractLocation::GlobalAddress { .. } | AbstractLocation::GlobalPointer(_, _)
+        ) {
+            return false;
+        }
+        // Filter out IDs starting with a negative stack offset.
+        if let AbstractLocation::Pointer(var, mem_location) = id.get_location() {
+            if var == self.stack_id.unwrap_register() {
+                match mem_location {
+                    AbstractMemoryLocation::Location { offset, .. }
+                    | AbstractMemoryLocation::Pointer { offset, .. } => {
+                        if *offset < 0 {
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+        true
     }
 }
 

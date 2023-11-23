@@ -34,6 +34,10 @@ fn test_get_params_of_current_function() {
     let param_one = AbstractIdentifier::mock("mock_fn", "param_one", 4);
     let param_two = AbstractIdentifier::mock("mock_fn", "param_two", 4);
     let not_param = AbstractIdentifier::mock("call_tid", "r0", 4);
+    let non_param_stack_offset = AbstractIdentifier::new(
+        Tid::new("mock_fn"),
+        AbstractLocation::mock("sp:4", &[-8], 4),
+    );
     let global_param = AbstractIdentifier::new(
         Tid::new("mock_fn"),
         AbstractLocation::GlobalAddress {
@@ -51,6 +55,9 @@ fn test_get_params_of_current_function() {
     state
         .tracked_ids
         .insert(not_param, AccessPattern::new_unknown_access());
+    state
+        .tracked_ids
+        .insert(non_param_stack_offset, AccessPattern::new_unknown_access());
     state
         .tracked_ids
         .insert(global_param.clone(), AccessPattern::new_unknown_access());
