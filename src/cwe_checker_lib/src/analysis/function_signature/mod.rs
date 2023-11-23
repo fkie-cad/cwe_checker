@@ -288,17 +288,21 @@ impl FunctionSignature {
     ///
     /// Only non-nested stack parameters are joined by this function.
     fn merge_intersecting_stack_parameters(&mut self, stack_register: &Variable) {
-        let stack_params: BTreeMap<i64, (AbstractLocation, AccessPattern)> = self
+        let stack_params: BTreeMap<(i64, ByteSize), (AbstractLocation, AccessPattern)> = self
             .parameters
             .iter()
             .filter_map(|(location, access_pattern)| {
-                get_offset_if_simple_stack_param(location, stack_register)
-                    .map(|offset| (offset, (location.clone(), *access_pattern)))
+                get_offset_if_simple_stack_param(location, stack_register).map(|offset| {
+                    (
+                        (offset, location.bytesize()),
+                        (location.clone(), *access_pattern),
+                    )
+                })
             })
             .collect();
 
         let mut current_param: Option<(i64, i64, AccessPattern)> = None;
-        for (offset, (param, access_pattern)) in stack_params.into_iter() {
+        for ((offset, _), (param, access_pattern)) in stack_params.into_iter() {
             self.parameters.remove(&param);
             if let Some((cur_offset, cur_size, cur_access_pattern)) = current_param {
                 if offset < cur_offset + cur_size {
@@ -340,6 +344,37 @@ impl FunctionSignature {
 impl Default for FunctionSignature {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl FunctionSignature {
+    /// Generate a compact JSON-representation of the function signature for pretty printing.
+    #[allow(dead_code)]
+    pub fn to_json_compact(&self) -> serde_json::Value {
+        let mut json_map = serde_json::Map::new();
+        let mut param_map = serde_json::Map::new();
+        for (param, pattern) in self.parameters.iter() {
+            param_map.insert(
+                format!("{param}"),
+                serde_json::Value::String(format!("{pattern}")),
+            );
+        }
+        json_map.insert(
+            "Parameters".to_string(),
+            serde_json::Value::Object(param_map),
+        );
+        let mut global_param_map = serde_json::Map::new();
+        for (param, pattern) in self.global_parameters.iter() {
+            global_param_map.insert(
+                format!("{param}"),
+                serde_json::Value::String(format!("{pattern}")),
+            );
+        }
+        json_map.insert(
+            "Globals".to_string(),
+            serde_json::Value::Object(global_param_map),
+        );
+        serde_json::Value::Object(json_map)
     }
 }
 

@@ -80,10 +80,10 @@ fn test_two_parameter_overlapping_merging() {
 fn test_merging_multiple_parameters() {
     let proj = Project::mock_x64();
     let mut func_sig = FunctionSignature::mock_x64();
-    let stack_parm_1 = mock_stack_arg(0x1000, 8);
-    let stack_parm_2 = mock_stack_arg(0x1000, 1);
-    let stack_parm_3 = mock_stack_arg(0x1007, 1);
-    let stack_parm_4 = mock_stack_arg(0x1008, 8);
+    let stack_parm_1 = mock_stack_arg(0x8, 8);
+    let stack_parm_2 = mock_stack_arg(0x8, 1);
+    let stack_parm_3 = mock_stack_arg(0xf, 1);
+    let stack_parm_4 = mock_stack_arg(0x10, 8);
 
     func_sig.parameters.extend([
         (stack_parm_1.clone(), AccessPattern::new()),
@@ -91,7 +91,8 @@ fn test_merging_multiple_parameters() {
         (stack_parm_3, AccessPattern::new()),
         (stack_parm_4.clone(), AccessPattern::new()),
     ]);
-    assert_eq!(Vec::<String>::new(), func_sig.sanitize(&proj));
+    let logs = func_sig.sanitize(&proj);
+    assert_eq!(logs, Vec::<String>::new());
 
     let mut expected_function_sig = FunctionSignature::mock_x64();
     expected_function_sig.parameters.extend([
