@@ -191,7 +191,8 @@ impl State {
                 size,
                 data_type: _,
             } => {
-                self.set_deref_flag_for_input_ids_of_expression(address);
+                self.set_deref_flag_for_pointer_inputs_of_expression(address);
+                self.set_read_flag_for_input_ids_of_expression(address);
                 let address = self.eval(address);
                 self.load_value(address, *size, None)
             }
@@ -266,18 +267,21 @@ impl State {
         }
     }
 
-    /// Set the read and dereferenced flag for every tracked ID
-    /// that may be referenced when computing the value of the expression.
-    pub fn set_deref_flag_for_input_ids_of_expression(&mut self, expression: &Expression) {
-        for register in expression.input_vars() {
+    /// Set the read and dereferenced flag for every tracked pointer ID
+    /// that may be referenced when computing the value of the given address expression.
+    pub fn set_deref_flag_for_pointer_inputs_of_expression(&mut self, expression: &Expression) {
+        for register in get_pointer_inputs_vars_of_address_expression(expression) {
             self.set_deref_flag_for_contained_ids(&self.get_register(register));
         }
     }
 
-    /// Set the read and mutably dereferenced flag for every tracked ID
-    /// that may be referenced when computing the value of the expression.
-    pub fn set_mutable_deref_flag_for_input_ids_of_expression(&mut self, expression: &Expression) {
-        for register in expression.input_vars() {
+    /// Set the read and mutably dereferenced flag for every tracked pointer ID
+    /// that may be referenced when computing the value of the given address expression.
+    pub fn set_mutable_deref_flag_for_pointer_inputs_of_expression(
+        &mut self,
+        expression: &Expression,
+    ) {
+        for register in get_pointer_inputs_vars_of_address_expression(expression) {
             self.set_deref_mut_flag_for_contained_ids(&self.get_register(register));
         }
     }
@@ -336,6 +340,34 @@ impl State {
         }
         value
     }
+}
+
+/// Get a list of possible pointer input variables for the given address expression.
+///
+/// Only addition, subtraction and bitwise AND, OR, XOR can have pointers as inputs.
+/// All other subexpressions are assumed to only compute offsets.
+fn get_pointer_inputs_vars_of_address_expression(expr: &Expression) -> Vec<&Variable> {
+    let mut input_vars = Vec::new();
+    match expr {
+        Expression::BinOp { op, lhs, rhs } => {
+            match op {
+                BinOpType::IntAdd | BinOpType::IntAnd | BinOpType::IntXOr | BinOpType::IntOr => {
+                    // There could be a pointer on either of the sides
+                    input_vars.extend(get_pointer_inputs_vars_of_address_expression(lhs));
+                    input_vars.extend(get_pointer_inputs_vars_of_address_expression(rhs));
+                }
+                BinOpType::IntSub => {
+                    // Only the left side could be a pointer
+                    input_vars.extend(get_pointer_inputs_vars_of_address_expression(lhs));
+                }
+                _ => (),
+            }
+        }
+        Expression::Var(var) => input_vars.push(var),
+        _ => (),
+    }
+
+    input_vars
 }
 
 impl AbstractDomain for State {

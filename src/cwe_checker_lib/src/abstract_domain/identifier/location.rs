@@ -244,7 +244,7 @@ pub mod tests {
     #[test]
     fn test_from_variants() {
         let loc = AbstractLocation::from_var(&variable!("RAX:8")).unwrap();
-        assert_eq!(&format!("{loc}"), "RAX");
+        assert_eq!(&format!("{loc}"), "RAX:i64");
         let loc = AbstractLocation::from_global_address(&Bitvector::from_u64(32));
         assert_eq!(
             loc,

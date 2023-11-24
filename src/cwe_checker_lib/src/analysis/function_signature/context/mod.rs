@@ -358,7 +358,8 @@ impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
                 new_state.set_register(var, value);
             }
             Def::Load { var, address } => {
-                new_state.set_deref_flag_for_input_ids_of_expression(address);
+                new_state.set_deref_flag_for_pointer_inputs_of_expression(address);
+                new_state.set_read_flag_for_input_ids_of_expression(address);
                 let address = new_state.substitute_global_mem_address(
                     state.eval(address),
                     &self.project.runtime_memory_image,
@@ -375,7 +376,8 @@ impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
                 new_state.set_register(var, value);
             }
             Def::Store { address, value } => {
-                new_state.set_mutable_deref_flag_for_input_ids_of_expression(address);
+                new_state.set_mutable_deref_flag_for_pointer_inputs_of_expression(address);
+                new_state.set_read_flag_for_input_ids_of_expression(address);
                 let address = new_state.substitute_global_mem_address(
                     state.eval(address),
                     &self.project.runtime_memory_image,

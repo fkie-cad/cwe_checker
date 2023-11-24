@@ -208,16 +208,12 @@ fn test_generation_of_nested_ids_and_access_patterns_on_load_and_store() {
         )
     );
     let params = new_state.get_params_of_current_function();
-    assert_eq!(params.len(), 2);
+    assert_eq!(params.len(), 1);
     assert!(params.contains(&(
         &AbstractLocation::mock("r1:4", &[], 4),
         AccessPattern::new()
             .with_read_flag()
             .with_dereference_flag()
-    )));
-    assert!(params.contains(&(
-        &AbstractLocation::mock("r1:4", &[16], 4),
-        AccessPattern::new().with_read_flag()
     )));
     // Load from an untracked register value
     let def = def!["load_instr: r0:4 := Load from r8:4 + 0x10:4"];

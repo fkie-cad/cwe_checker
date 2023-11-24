@@ -132,19 +132,21 @@ impl State {
     ///
     /// A register (or stack position with positive offset) is considered a parameter
     /// if any access to its value at function start is recorded in the corresponding object signature.
+    /// A nested location is considered a parameter if it was dereferenced during the function execution.
     pub fn get_params_of_current_function(&self) -> Vec<(&AbstractLocation, AccessPattern)> {
         let mut params = Vec::new();
         for (id, access_pattern) in self.tracked_ids.iter() {
-            if self.is_param_id(id) {
-                if access_pattern.is_accessed() {
+            if self.is_register_based_param_id(id) {
+                if (id.get_location().recursion_depth() > 0 && access_pattern.is_dereferenced())
+                    || (id.get_location().recursion_depth() == 0 && access_pattern.is_accessed())
+                {
                     params.push((id.get_location(), *access_pattern));
-                } else if matches!(id.get_location(), &AbstractLocation::Pointer { .. }) {
-                    // The address of the parameter was explicitly used, despite the parameter not being directly accessed.
-                    // We set the read flag to indicate that the parameter is relevant in some (unknown) way.
-                    let mut access_pattern = *access_pattern;
-                    access_pattern.set_read_flag();
-                    params.push((id.get_location(), access_pattern));
                 }
+            } else if self.is_stack_based_param_id(id)
+                && ((id.get_location().recursion_depth() > 1 && access_pattern.is_dereferenced())
+                    || (id.get_location().recursion_depth() == 1 && access_pattern.is_accessed()))
+            {
+                params.push((id.get_location(), *access_pattern));
             }
         }
         params
@@ -284,7 +286,8 @@ impl State {
 
     /// Return `true` if the given ID is a parameter ID,
     /// but not a global parameter.
-    fn is_param_id(&self, id: &AbstractIdentifier) -> bool {
+    /// This function does not check access patterns for the ID.
+    fn is_register_based_param_id(&self, id: &AbstractIdentifier) -> bool {
         if id.get_tid() != self.get_current_function_tid() || id == &self.stack_id {
             return false;
         }
@@ -295,9 +298,24 @@ impl State {
         ) {
             return false;
         }
-        // Filter out IDs starting with a negative stack offset.
-        if let AbstractLocation::Pointer(var, mem_location) = id.get_location() {
+        // Filter out stack based IDs
+        if let AbstractLocation::Pointer(var, _) = id.get_location() {
             if var == self.stack_id.unwrap_register() {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Return `true` if the given ID is a stack parameter ID or a nested stack parameter ID.
+    /// This function does not check access patterns for the ID.
+    fn is_stack_based_param_id(&self, id: &AbstractIdentifier) -> bool {
+        if id.get_tid() != self.get_current_function_tid() || id == &self.stack_id {
+            return false;
+        }
+        if let AbstractLocation::Pointer(register, mem_location) = id.get_location() {
+            if register == self.stack_id.unwrap_register() {
+                // ID is stack based, we have to filter out negative stack offsets.
                 match mem_location {
                     AbstractMemoryLocation::Location { offset, .. }
                     | AbstractMemoryLocation::Pointer { offset, .. } => {
@@ -306,9 +324,10 @@ impl State {
                         }
                     }
                 }
+                return true;
             }
         }
-        true
+        false
     }
 }
 

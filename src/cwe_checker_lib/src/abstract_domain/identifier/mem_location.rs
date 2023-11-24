@@ -159,7 +159,7 @@ pub mod tests {
     #[test]
     fn test_mock() {
         let loc = AbstractMemoryLocation::mock(&[1, 2, 3], 4);
-        assert_eq!(&format!("{loc}"), "(1)->(2)->(3)");
+        assert_eq!(&format!("{loc}"), "[1][2][3]");
     }
 
     #[test]
