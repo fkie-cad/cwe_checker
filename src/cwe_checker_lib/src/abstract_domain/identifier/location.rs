@@ -35,13 +35,12 @@ pub enum AbstractLocation {
 impl std::fmt::Display for AbstractLocation {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Self::Register(var) => write!(formatter, "{}", var.name),
-            Self::GlobalAddress { address, size: _ } => write!(formatter, "0x{address:x}"),
-            Self::Pointer(var, location) => write!(formatter, "{}->{}", var.name, location),
-            Self::GlobalPointer(address, location) => {
-                write!(formatter, "0x{address:x}->{location}")
-            }
-        }
+            Self::Register(var) => write!(formatter, "{}", var.name)?,
+            Self::GlobalAddress { address, size: _ } => write!(formatter, "0x{address:x}")?,
+            Self::Pointer(var, location) => write!(formatter, "{}{}", var.name, location)?,
+            Self::GlobalPointer(address, location) => write!(formatter, "0x{address:x}{location}")?,
+        };
+        write!(formatter, ":i{}", self.bytesize().as_bit_length())
     }
 }
 

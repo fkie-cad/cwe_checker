@@ -120,6 +120,51 @@ fn test_call_stub_handling() {
 }
 
 #[test]
+fn test_stack_register_adjustment_after_call() {
+    let project = Project::mock_x64();
+    let graph = crate::analysis::graph::get_program_cfg(&project.program);
+    let context = Context::new(&project, &graph);
+    let mut state_before_call = State::mock_x64("mock_fn");
+    let stack_id = AbstractIdentifier::mock("mock_fn", "RSP", 8);
+    state_before_call.set_register(
+        &variable!("RSP:8"),
+        DataDomain::from_target(stack_id.clone(), bitvec!("0x-20:8").into()),
+    );
+    let call_term = Term {
+        tid: Tid::new("call_tid"),
+        term: Jmp::CallInd {
+            target: Expression::Var(variable!("R15:8")),
+            return_: Some(Tid::new("return_")),
+        },
+    };
+    // Test adjustment on extern calls
+    let state_after_call = context
+        .update_call_stub(&state_before_call, &call_term)
+        .unwrap();
+    let adjusted_sp = state_after_call.get_register(&variable!("RSP:8"));
+    assert_eq!(
+        adjusted_sp,
+        DataDomain::from_target(stack_id.clone(), bitvec!("0x-18:8").into())
+    );
+    // Test adjustment on intern calls
+    let state_before_return = State::mock_x64("callee");
+    let state_after_call = context
+        .update_return(
+            Some(&state_before_return),
+            Some(&state_before_call),
+            &call_term,
+            &call_term,
+            &None,
+        )
+        .unwrap();
+    let adjusted_sp = state_after_call.get_register(&variable!("RSP:8"));
+    assert_eq!(
+        adjusted_sp,
+        DataDomain::from_target(stack_id.clone(), bitvec!("0x-18:8").into())
+    );
+}
+
+#[test]
 fn test_get_global_mem_address() {
     let project = Project::mock_arm32();
     let graph = crate::analysis::graph::get_program_cfg(&project.program);

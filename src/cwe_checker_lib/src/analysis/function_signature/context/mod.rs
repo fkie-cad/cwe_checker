@@ -1,7 +1,7 @@
 use super::*;
 use crate::abstract_domain::{
-    AbstractDomain, AbstractIdentifier, AbstractLocation, BitvectorDomain, DataDomain, SizedDomain,
-    TryToBitvec,
+    AbstractDomain, AbstractIdentifier, AbstractLocation, BitvectorDomain, DataDomain,
+    RegisterDomain as _, SizedDomain, TryToBitvec,
 };
 use crate::utils::arguments;
 use crate::{
@@ -305,6 +305,34 @@ impl<'a> Context<'a> {
         }
         None
     }
+
+    /// Adjust the stack register after a call to a function.
+    ///
+    /// On x86, this removes the return address from the stack
+    /// (other architectures pass the return address in a register, not on the stack).
+    /// On other architectures the stack register retains the value it had before the call.
+    /// Note that in some calling conventions the callee also clears function parameters from the stack.
+    /// We do not detect and handle these cases yet.
+    fn adjust_stack_register_on_return_from_call(
+        &self,
+        state_before_call: &State,
+        new_state: &mut State,
+    ) {
+        let stack_register = &self.project.stack_pointer_register;
+        let stack_pointer = state_before_call.get_register(stack_register);
+        match self.project.cpu_architecture.as_str() {
+            "x86" | "x86_32" | "x86_64" => {
+                let offset = Bitvector::from_u64(stack_register.size.into())
+                    .into_truncate(apint::BitWidth::from(stack_register.size))
+                    .unwrap();
+                new_state.set_register(
+                    stack_register,
+                    stack_pointer.bin_op(BinOpType::IntAdd, &offset.into()),
+                );
+            }
+            _ => new_state.set_register(stack_register, stack_pointer),
+        }
+    }
 }
 
 impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
@@ -412,6 +440,7 @@ impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
                         cconv,
                         &self.project.runtime_memory_image,
                     );
+                    self.adjust_stack_register_on_return_from_call(state, &mut new_state);
                     return Some(new_state);
                 }
             }
@@ -419,6 +448,7 @@ impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
                 if let Some(extern_symbol) = self.project.program.term.extern_symbols.get(target) {
                     self.handle_extern_symbol_call(&mut new_state, extern_symbol, &call.tid);
                     if !extern_symbol.no_return {
+                        self.adjust_stack_register_on_return_from_call(state, &mut new_state);
                         return Some(new_state);
                     }
                 } else if let Some(cconv) = self.project.get_standard_calling_convention() {
@@ -427,6 +457,7 @@ impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
                         cconv,
                         &self.project.runtime_memory_image,
                     );
+                    self.adjust_stack_register_on_return_from_call(state, &mut new_state);
                     return Some(new_state);
                 }
             }
@@ -474,6 +505,7 @@ impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
         for (var, value) in return_value_list {
             new_state.set_register(var, value);
         }
+        self.adjust_stack_register_on_return_from_call(state_before_call, &mut new_state);
         Some(new_state)
     }
 
