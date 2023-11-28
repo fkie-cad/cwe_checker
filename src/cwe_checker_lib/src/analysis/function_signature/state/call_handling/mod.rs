@@ -161,11 +161,19 @@ impl State {
         for (id, access_pattern) in self.tracked_ids.iter() {
             if id.get_tid() == self.get_current_function_tid() {
                 let location = id.get_location();
-                if matches!(
-                    location,
-                    AbstractLocation::GlobalAddress { .. } | AbstractLocation::GlobalPointer(_, _)
-                ) {
-                    global_params.push((location, *access_pattern));
+                match location {
+                    AbstractLocation::GlobalAddress { .. } => {
+                        if access_pattern.is_accessed() {
+                            global_params.push((location, *access_pattern));
+                        }
+                    }
+                    AbstractLocation::GlobalPointer(_, _) => {
+                        // Nested parameters are only explicitly tracked if they are dereferenced.
+                        if access_pattern.is_dereferenced() {
+                            global_params.push((location, *access_pattern));
+                        }
+                    }
+                    _ => (),
                 }
             }
         }
