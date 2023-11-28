@@ -6,6 +6,11 @@
 //! (is the value read, dereferenced for read access or dereferenced for write access).
 //! Accesses to constant addresses that may correspond to global variables are also tracked.
 //!
+//! For values that are not directly tracked,
+//! the algorithm tracks the abstract location that describes how the pointer to that value was computed.
+//! This enables tracking of nested parameter objects
+//! without actually tracking the memory objects where these objects are located.
+//!
 //! Known limitations of the analysis:
 //! * The analysis is an overapproximation in the sense that it may generate more input parameters
 //!   than actually exist in some cases.
@@ -17,14 +22,15 @@
 //! * Parameters that are used as input values for variadic functions may be missed.
 //!   Some variadic functions are stubbed, i.e. parameter recognition should work for these.
 //!   But not all variadic functions are stubbed.
-//! * If only a part (e.g. a single byte) of a stack parameter is accessed instead of the whole parameter
-//!   then a duplicate stack parameter may be generated.
-//!   A proper sanitation for this case is not yet implemented,
-//!   although error messages are generated if such a case is detected.
 //! * For floating point parameter registers the base register is detected as a parameter,
 //!   although only a smaller sub-register is the actual parameter in many cases.
 //!   Also, if a function uses sub-registers of floating point registers as local variables,
 //!   the registers may be incorrectly flagged as input parameters.
+//! * Tracking of nested parameters via their abstract locations is an unsound, heuristic approach,
+//!   as the analysis does not keep track of when such nested pointers might get overwritten.
+//!   Nevertheless, it should result in an overapproximation of parameters and their access patterns in most cases.
+//! * The nesting depth for tracked nested parameters is limited
+//!   to avoid generating infinitely many parameters for recursive types like linked lists.
 
 use crate::abstract_domain::AbstractDomain;
 use crate::abstract_domain::AbstractLocation;
