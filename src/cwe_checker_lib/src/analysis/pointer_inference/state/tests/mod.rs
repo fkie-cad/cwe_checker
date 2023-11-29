@@ -355,3 +355,81 @@ fn add_param_object_from_callee() {
     assert_eq!(value.get_absolute_value().unwrap(), &bv(2).into());
     assert!(value.contains_top());
 }
+
+#[test]
+fn test_minimize_before_return_instruction() {
+    let cconv = CallingConvention::mock_arm32();
+    let full_access = AccessPattern::new_unknown_access();
+    let deref_access = AccessPattern::new().with_dereference_flag();
+    let fn_sig = FunctionSignature {
+        parameters: BTreeMap::from([
+            (AbstractLocation::mock("r0:4", &[], 4), full_access),
+            (AbstractLocation::mock("r0:4", &[0], 4), deref_access),
+            (AbstractLocation::mock("r0:4", &[0, 0], 4), full_access),
+        ]),
+        global_parameters: BTreeMap::from([]),
+    };
+    let mut state = State::from_fn_sig(&fn_sig, &variable!("sp:4"), Tid::new("func"));
+    state.memory.add_abstract_object(
+        AbstractIdentifier::mock("instr", "r0", 4),
+        ByteSize::new(4),
+        None,
+    );
+    state.memory.add_abstract_object(
+        AbstractIdentifier::mock("instr", "r1", 4),
+        ByteSize::new(4),
+        None,
+    );
+    state.set_register(&variable!("r8:4"), bitvec!("0x42:4").into());
+    state.set_register(&variable!("r0:4"), bitvec!("0x42:4").into());
+    state.set_register(
+        &variable!("r3:4"),
+        Data::from_target(
+            AbstractIdentifier::mock("instr", "r0", 4),
+            bitvec!("0x0:4").into(),
+        ),
+    );
+    state.minimize_before_return_instruction(&fn_sig, &cconv);
+    // non-return registers are cleared, but return registers remain
+    assert!(state.get_register(&variable!("r8:4")).is_top());
+    assert!(!state.get_register(&variable!("r3:4")).is_top());
+    // immutable parameter objects are removed, but mutable parameter objects remain (even if no pointer to them remains)
+    assert!(state
+        .memory
+        .get_object(&AbstractIdentifier::new(
+            Tid::new("func"),
+            AbstractLocation::mock("r0:4", &[], 4)
+        ))
+        .is_some());
+    assert!(state
+        .memory
+        .get_object(&AbstractIdentifier::new(
+            Tid::new("func"),
+            AbstractLocation::mock("r0:4", &[0], 4)
+        ))
+        .is_none());
+    assert!(state
+        .memory
+        .get_object(&AbstractIdentifier::new(
+            Tid::new("func"),
+            AbstractLocation::mock("r0:4", &[0, 0], 4)
+        ))
+        .is_some());
+    // The stack is removed
+    assert!(state.memory.get_object(&state.stack_id).is_none());
+    // Unreferenced callee-originating objects are removed, but referenced ones remain
+    assert!(state
+        .memory
+        .get_object(&AbstractIdentifier::new(
+            Tid::new("instr"),
+            AbstractLocation::mock("r0:4", &[], 4)
+        ))
+        .is_some());
+    assert!(state
+        .memory
+        .get_object(&AbstractIdentifier::new(
+            Tid::new("instr"),
+            AbstractLocation::mock("r1:4", &[], 4)
+        ))
+        .is_none());
+}

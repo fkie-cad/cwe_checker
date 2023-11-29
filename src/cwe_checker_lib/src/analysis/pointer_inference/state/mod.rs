@@ -128,7 +128,12 @@ impl State {
                 let parent_id =
                     AbstractIdentifier::new(self.stack_id.get_tid().clone(), parent_location);
                 self.store_value(
-                    &Data::from_target(parent_id, Bitvector::from_i64(offset).into()),
+                    &Data::from_target(
+                        parent_id,
+                        Bitvector::from_i64(offset)
+                            .into_resize_signed(self.stack_id.bytesize())
+                            .into(),
+                    ),
                     &Data::from_target(
                         param_id.clone(),
                         Bitvector::zero(param_id.bytesize().into()).into(),
@@ -147,7 +152,7 @@ impl State {
                         &Data::from_target(
                             parent_id,
                             Bitvector::from_u64(address + offset as u64)
-                                .into_sign_resize(self.stack_id.bytesize())
+                                .into_resize_signed(self.stack_id.bytesize())
                                 .into(),
                         ),
                         &Data::from_target(
@@ -164,7 +169,7 @@ impl State {
                         &Data::from_target(
                             parent_id,
                             Bitvector::from_i64(offset)
-                                .into_sign_resize(self.stack_id.bytesize())
+                                .into_resize_signed(self.stack_id.bytesize())
                                 .into(),
                         ),
                         &Data::from_target(
