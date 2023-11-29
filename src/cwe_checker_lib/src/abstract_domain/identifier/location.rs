@@ -239,6 +239,23 @@ pub mod tests {
                 _ => AbstractLocation::Pointer(var, AbstractMemoryLocation::mock(offsets, size)),
             }
         }
+        /// Mock an abstract location with a global address as root.
+        pub fn mock_global(
+            root_address: u64,
+            offsets: &[i64],
+            size: impl Into<ByteSize>,
+        ) -> AbstractLocation {
+            match offsets {
+                [] => AbstractLocation::GlobalAddress {
+                    address: root_address,
+                    size: size.into(),
+                },
+                _ => AbstractLocation::GlobalPointer(
+                    root_address,
+                    AbstractMemoryLocation::mock(offsets, size),
+                ),
+            }
+        }
     }
 
     #[test]

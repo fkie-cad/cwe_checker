@@ -238,20 +238,23 @@ impl State {
     ) -> Data {
         match location {
             AbstractLocation::GlobalAddress { address, size } => {
-                let pointer = Data::from(
-                    Bitvector::from_u64(*address).into_resize_unsigned(self.stack_id.bytesize()),
+                assert_eq!(*size, self.stack_id.bytesize());
+                let pointer = Data::from_target(
+                    self.get_global_mem_id().clone(),
+                    Bitvector::from_u64(*address)
+                        .into_resize_unsigned(self.stack_id.bytesize())
+                        .into(),
                 );
-                self.load_value_from_address(&pointer, *size, global_memory)
-                    .unwrap_or_else(|_| Data::new_top(*size))
+                pointer
             }
             AbstractLocation::GlobalPointer(address, nested_location) => {
-                let pointer = Data::from(
-                    Bitvector::from_u64(*address).into_resize_unsigned(self.stack_id.bytesize()),
+                let pointer = Data::from_target(
+                    self.get_global_mem_id().clone(),
+                    Bitvector::from_u64(*address)
+                        .into_resize_unsigned(self.stack_id.bytesize())
+                        .into(),
                 );
-                let nested_pointer = self
-                    .load_value_from_address(&pointer, self.stack_id.bytesize(), global_memory)
-                    .unwrap_or_else(|_| Data::new_top(self.stack_id.bytesize()));
-                self.eval_abstract_memory_location(nested_location, nested_pointer, global_memory)
+                self.eval_abstract_memory_location(nested_location, pointer, global_memory)
             }
             AbstractLocation::Register(var) => self.get_register(var),
             AbstractLocation::Pointer(var, nested_location) => {
