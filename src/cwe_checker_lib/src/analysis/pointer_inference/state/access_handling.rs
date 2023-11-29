@@ -239,13 +239,12 @@ impl State {
         match location {
             AbstractLocation::GlobalAddress { address, size } => {
                 assert_eq!(*size, self.stack_id.bytesize());
-                let pointer = Data::from_target(
+                Data::from_target(
                     self.get_global_mem_id().clone(),
                     Bitvector::from_u64(*address)
                         .into_resize_unsigned(self.stack_id.bytesize())
                         .into(),
-                );
-                pointer
+                )
             }
             AbstractLocation::GlobalPointer(address, nested_location) => {
                 let pointer = Data::from_target(

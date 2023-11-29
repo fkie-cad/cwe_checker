@@ -140,9 +140,12 @@ fn test_eval_abstract_location() {
     let value = state.eval_abstract_location(&location, &global_memory);
     assert_eq!(value, bitvec!("0x42:8").into());
     // Also test evaluation of a global address
-    state.memory.get_object_mut(&state.get_global_mem_id().clone()).unwrap().set_value(
-        bitvec!("0x43:8").into(), &bitvec!("0x2000:8").into()
-    ).unwrap();
+    state
+        .memory
+        .get_object_mut(&state.get_global_mem_id().clone())
+        .unwrap()
+        .set_value(bitvec!("0x43:8").into(), &bitvec!("0x2000:8").into())
+        .unwrap();
     let location = AbstractLocation::mock_global(0x2000, &[0], 8);
     let value = state.eval_abstract_location(&location, &global_memory);
     assert_eq!(value, bitvec!("0x43:8").into());

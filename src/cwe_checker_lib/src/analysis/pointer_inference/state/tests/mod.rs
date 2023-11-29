@@ -244,14 +244,38 @@ fn test_check_def_for_null_dereferences() {
 
 #[test]
 fn from_fn_sig() {
-    let fn_sig = FunctionSignature::mock_x64();
+    let global_memory = RuntimeMemoryImage::mock();
+    let full_access = AccessPattern::new_unknown_access();
+    let fn_sig = FunctionSignature {
+        parameters: BTreeMap::from([
+            (AbstractLocation::mock("RSI:8", &[], 8), full_access),
+            (AbstractLocation::mock("RSI:8", &[8], 8), full_access),
+            (
+                AbstractLocation::mock("RDI:8", &[], 8),
+                AccessPattern::new().with_read_flag(),
+            ),
+        ]),
+        global_parameters: BTreeMap::from([
+            (AbstractLocation::mock_global(0x2000, &[], 8), full_access),
+            (AbstractLocation::mock_global(0x2000, &[0], 8), full_access),
+        ]),
+    };
     let state = State::from_fn_sig(&fn_sig, &variable!("RSP:8"), Tid::new("func"));
-
-    assert_eq!(state.memory.get_num_objects(), 3);
+    // The state should have 5 objects: The stack, the global memory space and 3 parameter objects.
     assert_eq!(
-        *state.memory.get_object(&new_id("func", "RSI")).unwrap(),
-        AbstractObject::new(None, ByteSize::new(8))
+        state.memory.get_all_object_ids(),
+        BTreeSet::from([
+            AbstractIdentifier::new(Tid::new("func"), AbstractLocation::mock("RSP:8", &[], 8)),
+            AbstractIdentifier::new(Tid::new("func"), AbstractLocation::mock("RSI:8", &[], 8)),
+            AbstractIdentifier::new(Tid::new("func"), AbstractLocation::mock("RSI:8", &[8], 8)),
+            AbstractIdentifier::new(Tid::new("func"), AbstractLocation::mock_global(0x0, &[], 8)),
+            AbstractIdentifier::new(
+                Tid::new("func"),
+                AbstractLocation::mock_global(0x2000, &[0], 8)
+            ),
+        ])
     );
+    // Check that pointers have been correctly added to the state.
     assert_eq!(
         state.get_register(&variable!("RSP:8")),
         Data::from_target(new_id("func", "RSP"), bv(0).into())
@@ -263,6 +287,32 @@ fn from_fn_sig() {
     assert_eq!(
         state.get_register(&variable!("RSI:8")),
         Data::from_target(new_id("func", "RSI"), bv(0).into())
+    );
+    assert_eq!(
+        state.eval_abstract_location(&AbstractLocation::mock("RSI:8", &[8], 8), &global_memory),
+        Data::from_target(
+            AbstractIdentifier::new(Tid::new("func"), AbstractLocation::mock("RSI:8", &[8], 8)),
+            bitvec!("0x0:8").into()
+        )
+    );
+    assert_eq!(
+        state
+            .load_value_from_address(
+                &Data::from_target(
+                    state.get_global_mem_id().clone(),
+                    bitvec!("0x2000:8").into()
+                ),
+                ByteSize::new(8),
+                &global_memory
+            )
+            .unwrap(),
+        Data::from_target(
+            AbstractIdentifier::new(
+                Tid::new("func"),
+                AbstractLocation::mock_global(0x2000, &[0], 8)
+            ),
+            bitvec!("0x0:8").into()
+        )
     );
 }
 
