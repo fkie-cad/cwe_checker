@@ -296,36 +296,37 @@ impl State {
         })
     }
 
-    /// Generate a map from abstract locations pointing to non-parameter memory objects
-    /// to the data represented by the abstract location in the current state.
+    /// Add abstract locations based on register values to the location to pointer data map.
+    /// The TID for the corresponding abstract IDs is the given `call_tid`.
     ///
-    /// The abstract locations get different TIDs depending on the root of the location:
-    /// - If the root is a return register, then the TID is given by the provided `call_tid`.
-    /// - If the root is a parameter memory object, then the TID is given by appending the suffix `_param` to the `call_TID`.
-    ///   Since parameter and return register can overlap, the abstract IDs would overlap
-    ///   if one would use the same TID in both cases.
-    ///
-    /// For return register based location this function also generates nested abstract locations.
-    ///
-    /// This function assumes that
-    /// [`State::minimize_before_return_instruction`](crate::analysis::pointer_inference::State::minimize_before_return_instruction)
-    /// has been called on `self` beforehand.
-    pub fn map_abstract_locations_to_pointer_data(
+    /// This function assumes that `self` has already been minimized
+    /// and thus all non-parameter register values have been removed from the state.
+    fn add_register_based_root_locations_to_location_to_pointer_data_map(
         &self,
         call_tid: &Tid,
-    ) -> BTreeMap<AbstractIdentifier, Data> {
-        let mut location_to_data_map = BTreeMap::new();
-        let mut locations_to_derive = BTreeMap::new();
-        // Add root IDs based on return registers (all other registers should be cleared from the state)
+        location_to_data_map: &mut BTreeMap<AbstractIdentifier, Data>,
+    ) {
         for (var, value) in self.register.iter() {
             if !var.is_temp && self.contains_non_param_pointer(value) {
                 let location = AbstractLocation::from_var(var).unwrap();
                 let id = AbstractIdentifier::new(call_tid.clone(), location);
                 location_to_data_map.insert(id.clone(), value.clone());
-                locations_to_derive.insert(id, value.clone());
             }
         }
-        // Add root locations based on parameter objects
+    }
+
+    /// Add abstract locations based on parameter objects to the location to pointer data map.
+    /// The TID for the corresponding abstract IDs is the given `call_tid` with a `_param` suffix.
+    ///
+    /// The TID suffix is necessary to prevent naming collisions with locations based on return registers.
+    ///
+    /// This function assumes that the stack memory object of `self` has already been deleted by a call to
+    /// [`State::minimize_before_return_instruction`](crate::analysis::pointer_inference::State::minimize_before_return_instruction).
+    fn add_param_based_root_locations_to_location_to_pointer_data_map(
+        &self,
+        call_tid: &Tid,
+        location_to_data_map: &mut BTreeMap<AbstractIdentifier, Data>,
+    ) {
         for (object_id, object) in self.memory.iter() {
             if object_id.get_tid() == self.get_fn_tid()
                 && object_id.get_path_hints().is_empty()
@@ -345,15 +346,19 @@ impl State {
                             ),
                             value.clone(),
                         );
-                        // Do not add these locations to the `locations_to_derive`.
                     }
                 }
             }
         }
-        // Add derived locations based on return register locations.
-        // We cannot add derived locations based on parameter objects,
-        // because the location and ID of their parent objects would be ambiguous
-        // between parameter objects and other derived locations.
+    }
+
+    /// Derive nested locations from the given list of locations to derive
+    /// and add them to the location to pointer data map.
+    fn add_derived_locations_to_location_to_pointer_data_map(
+        &self,
+        location_to_data_map: &mut BTreeMap<AbstractIdentifier, Data>,
+        mut locations_to_derive: BTreeMap<AbstractIdentifier, Data>,
+    ) {
         while let Some((location_id, location_data)) = locations_to_derive.pop_first() {
             if location_id.get_location().recursion_depth() >= POINTER_RECURSION_DEPTH_LIMIT {
                 continue;
@@ -398,6 +403,44 @@ impl State {
                 }
             }
         }
+    }
+
+    /// Generate a map from abstract locations pointing to non-parameter memory objects
+    /// to the data represented by the abstract location in the current state.
+    ///
+    /// The abstract locations get different TIDs depending on the root of the location:
+    /// - If the root is a return register, then the TID is given by the provided `call_tid`.
+    /// - If the root is a parameter memory object, then the TID is given by appending the suffix `_param` to the `call_tid`.
+    ///   Since parameter and return register can overlap, the abstract IDs would overlap
+    ///   if one would use the same TID in both cases.
+    ///
+    /// For return register based location this function also generates nested abstract locations.
+    ///
+    /// This function assumes that
+    /// [`State::minimize_before_return_instruction`](crate::analysis::pointer_inference::State::minimize_before_return_instruction)
+    /// has been called on `self` beforehand.
+    pub fn map_abstract_locations_to_pointer_data(
+        &self,
+        call_tid: &Tid,
+    ) -> BTreeMap<AbstractIdentifier, Data> {
+        let mut location_to_data_map = BTreeMap::new();
+        self.add_register_based_root_locations_to_location_to_pointer_data_map(
+            call_tid,
+            &mut location_to_data_map,
+        );
+        let locations_to_derive = location_to_data_map.clone();
+        self.add_param_based_root_locations_to_location_to_pointer_data_map(
+            call_tid,
+            &mut location_to_data_map,
+        );
+        // Add derived locations based on return register locations.
+        // FIXME: We cannot add derived locations based on parameter objects,
+        // because the location and ID of their parent objects would be ambiguous
+        // between parameter objects and other derived locations.
+        self.add_derived_locations_to_location_to_pointer_data_map(
+            &mut location_to_data_map,
+            locations_to_derive,
+        );
         location_to_data_map
     }
 

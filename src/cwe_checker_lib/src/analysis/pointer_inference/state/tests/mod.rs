@@ -4,6 +4,7 @@ use crate::analysis::pointer_inference::object::*;
 use crate::{bitvec, def, expr, variable};
 
 mod access_handling;
+mod id_manipulation;
 mod specialized_expressions;
 
 fn bv(value: i64) -> ValueDomain {
@@ -432,4 +433,10 @@ fn test_minimize_before_return_instruction() {
             AbstractLocation::mock("r1:4", &[], 4)
         ))
         .is_none());
+}
+
+#[test]
+fn test_merge_mem_objects_with_unique_abstract_location() {
+    // TODO: decide whether to test the results of this complete pipeline or whether to test the parts instead.
+    todo!();
 }
