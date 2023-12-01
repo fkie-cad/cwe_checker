@@ -1,9 +1,9 @@
 use super::*;
 
-#[test]
-fn test_map_abstract_locations_to_pointer_data() {
-    let call_tid = Tid::new("call");
-    let global_memory = RuntimeMemoryImage::mock();
+/// Mock an ARM32 function start state with a function signature that has one mutably dereferenced parameter in r0
+/// and mutably dereferenced global parameter at address 0x2000.
+/// The function Tid of the state is named `callee`.
+fn mock_arm32_fn_start_state() -> (State, FunctionSignature) {
     let full_access = AccessPattern::new_unknown_access();
     let fn_sig = FunctionSignature {
         parameters: BTreeMap::from([(AbstractLocation::mock("r0:4", &[], 4), full_access)]),
@@ -12,7 +12,15 @@ fn test_map_abstract_locations_to_pointer_data() {
             full_access,
         )]),
     };
-    let mut state = State::from_fn_sig(&fn_sig, &variable!("sp:4"), Tid::new("callee"));
+    let state = State::from_fn_sig(&fn_sig, &variable!("sp:4"), Tid::new("callee"));
+    (state, fn_sig)
+}
+
+#[test]
+fn test_map_abstract_locations_to_pointer_data() {
+    let call_tid = Tid::new("call");
+    let global_memory = RuntimeMemoryImage::mock();
+    let (mut state, _) = mock_arm32_fn_start_state();
     let param_id =
         AbstractIdentifier::new(Tid::new("callee"), AbstractLocation::mock("r0:4", &[], 4));
     let param_pointer = Data::from_target(param_id.clone(), bitvec!("0x2:4").into());
@@ -85,15 +93,7 @@ fn test_map_abstract_locations_to_pointer_data() {
 
 #[test]
 fn test_filter_location_to_data_map() {
-    let full_access = AccessPattern::new_unknown_access();
-    let fn_sig = FunctionSignature {
-        parameters: BTreeMap::from([(AbstractLocation::mock("r0:4", &[], 4), full_access)]),
-        global_parameters: BTreeMap::from([(
-            AbstractLocation::mock_global(0x2000, &[], 4),
-            full_access,
-        )]),
-    };
-    let mut state = State::from_fn_sig(&fn_sig, &variable!("sp:4"), Tid::new("callee"));
+    let (mut state, _) = mock_arm32_fn_start_state();
     state.memory.add_abstract_object(
         AbstractIdentifier::mock("callee_orig", "r0", 4),
         ByteSize::new(4),
@@ -172,15 +172,7 @@ fn test_filter_location_to_data_map() {
 #[test]
 fn test_generate_target_objects_for_new_locations() {
     let global_memory = RuntimeMemoryImage::mock();
-    let full_access = AccessPattern::new_unknown_access();
-    let fn_sig = FunctionSignature {
-        parameters: BTreeMap::from([(AbstractLocation::mock("r0:4", &[], 4), full_access)]),
-        global_parameters: BTreeMap::from([(
-            AbstractLocation::mock_global(0x2000, &[], 4),
-            full_access,
-        )]),
-    };
-    let mut state = State::from_fn_sig(&fn_sig, &variable!("sp:4"), Tid::new("callee"));
+    let (mut state, _) = mock_arm32_fn_start_state();
     let param_id = AbstractIdentifier::mock("callee", "r0", 4);
     let callee_orig_id = AbstractIdentifier::mock("callee_orig", "r0", 4);
     let callee_orig_2_id = AbstractIdentifier::mock("callee_orig_2", "r0", 4);
@@ -230,15 +222,7 @@ fn test_generate_target_objects_for_new_locations() {
 #[test]
 fn test_get_id_to_unified_id_replacement_map() {
     let cconv = CallingConvention::mock_arm32();
-    let full_access = AccessPattern::new_unknown_access();
-    let fn_sig = FunctionSignature {
-        parameters: BTreeMap::from([(AbstractLocation::mock("r0:4", &[], 4), full_access)]),
-        global_parameters: BTreeMap::from([(
-            AbstractLocation::mock_global(0x2000, &[], 4),
-            full_access,
-        )]),
-    };
-    let mut state = State::from_fn_sig(&fn_sig, &variable!("sp:4"), Tid::new("callee"));
+    let (mut state, fn_sig) = mock_arm32_fn_start_state();
     state.minimize_before_return_instruction(&fn_sig, &cconv);
     let location_to_data_map = BTreeMap::from([(
         AbstractIdentifier::mock("call", "r0", 4),
