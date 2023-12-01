@@ -273,12 +273,20 @@ impl State {
     ) -> Data {
         match location {
             AbstractMemoryLocation::Location { offset, size } => {
-                let pointer = root_pointer.add_offset(&Bitvector::from_i64(*offset).into());
+                let pointer = root_pointer.add_offset(
+                    &Bitvector::from_i64(*offset)
+                        .into_resize_unsigned(self.stack_id.bytesize())
+                        .into(),
+                );
                 self.load_value_from_address(&pointer, *size, global_memory)
                     .unwrap_or_else(|_| Data::new_top(*size))
             }
             AbstractMemoryLocation::Pointer { offset, target } => {
-                let pointer = root_pointer.add_offset(&Bitvector::from_i64(*offset).into());
+                let pointer = root_pointer.add_offset(
+                    &Bitvector::from_i64(*offset)
+                        .into_resize_unsigned(self.stack_id.bytesize())
+                        .into(),
+                );
                 match self.load_value_from_address(
                     &pointer,
                     self.stack_id.bytesize(),
