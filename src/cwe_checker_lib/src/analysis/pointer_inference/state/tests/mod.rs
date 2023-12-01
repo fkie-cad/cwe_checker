@@ -437,6 +437,62 @@ fn test_minimize_before_return_instruction() {
 
 #[test]
 fn test_merge_mem_objects_with_unique_abstract_location() {
-    // TODO: decide whether to test the results of this complete pipeline or whether to test the parts instead.
-    todo!();
+    let call_tid = Tid::new("call");
+    let global_memory = RuntimeMemoryImage::mock();
+    let cconv = CallingConvention::mock_arm32();
+    let full_access = AccessPattern::new_unknown_access();
+    let fn_sig = FunctionSignature {
+        parameters: BTreeMap::from([(AbstractLocation::mock("r0:4", &[], 4), full_access)]),
+        global_parameters: BTreeMap::from([(
+            AbstractLocation::mock_global(0x2000, &[], 4),
+            full_access,
+        )]),
+    };
+    let mut state = State::from_fn_sig(&fn_sig, &variable!("sp:4"), Tid::new("callee"));
+    let param_id = AbstractIdentifier::mock("callee", "r0", 4);
+    let old_callee_orig_id = AbstractIdentifier::mock("instr", "r0", 4);
+    let old_callee_orig_id_2 = AbstractIdentifier::mock("instr_2", "r0", 4);
+    let new_id = AbstractIdentifier::mock_nested("call_param", "r0:4", &[0], 4);
+    state
+        .memory
+        .add_abstract_object(old_callee_orig_id.clone(), ByteSize::new(4), None);
+    state
+        .memory
+        .add_abstract_object(old_callee_orig_id_2.clone(), ByteSize::new(4), None);
+    // The pointer locations to callee_orig_id_2 will not be unique and thus removed from the state.
+    state.set_register(
+        &variable!("r1:4"),
+        Data::from_target(old_callee_orig_id_2.clone(), bitvec!("0x0:4").into()),
+    );
+    state.set_register(
+        &variable!("r2:4"),
+        Data::from_target(old_callee_orig_id_2.clone(), bitvec!("0x0:4").into()),
+    );
+    // This register should be cleared before computing return objects.
+    state.set_register(
+        &variable!("r8:4"),
+        Data::from_target(old_callee_orig_id.clone(), bitvec!("0x0:4").into()),
+    );
+    state
+        .store_value(
+            &Data::from_target(param_id.clone(), bitvec!("0x0:4").into()),
+            &Data::from_target(old_callee_orig_id, bitvec!("0x0:4").into()),
+            &global_memory,
+        )
+        .unwrap();
+    state.minimize_before_return_instruction(&fn_sig, &cconv);
+    state.merge_mem_objects_with_unique_abstract_location(&call_tid);
+    let mut expected_state = State::from_fn_sig(&fn_sig, &variable!("sp:4"), Tid::new("callee"));
+    expected_state.minimize_before_return_instruction(&fn_sig, &cconv);
+    expected_state
+        .memory
+        .add_abstract_object(new_id.clone(), ByteSize::new(4), None);
+    expected_state
+        .store_value(
+            &Data::from_target(param_id.clone(), bitvec!("0x0:4").into()),
+            &Data::from_target(new_id, bitvec!("0x0:4").into()),
+            &global_memory,
+        )
+        .unwrap();
+    assert_eq!(state, expected_state);
 }

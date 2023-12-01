@@ -149,6 +149,8 @@ impl State {
         for object in self.memory.iter_objects_mut() {
             object.replace_ids(&id_replacement_map);
         }
+        // Clean up registers left as Top after the replacement
+        self.register.retain(|_var, value| !value.is_top());
     }
 
     /// Explicitly insert pointers to unified objects at the locations specified by their abstract location.
