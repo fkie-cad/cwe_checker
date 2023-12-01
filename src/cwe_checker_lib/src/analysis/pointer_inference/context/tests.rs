@@ -173,6 +173,12 @@ fn update_return() {
         &variable!("RDX:8"),
         Data::from_target(new_id("callee", "RDI"), bv(0)),
     );
+    state_before_return
+        .memory
+        .get_object_mut(&callee_created_heap_id)
+        .unwrap()
+        .set_value(bitvec!("0x42:8").into(), &bitvec!("0x6:8").into())
+        .unwrap();
 
     let state_before_call = State::new(&variable!("RSP:8"), Tid::new("caller"), BTreeSet::new());
     let mut state_before_call = context
@@ -210,10 +216,8 @@ fn update_return() {
     assert_eq!(
         state.get_register(&variable!("RAX:8")),
         Data::from_target(
-            callee_created_heap_id
-                .with_path_hint(Tid::new("call_callee"))
-                .unwrap(),
-            bv(16).into()
+            AbstractIdentifier::mock("call_callee", "RAX", 8),
+            bv(0).into()
         )
     );
     assert_eq!(
@@ -234,15 +238,12 @@ fn update_return() {
         .get_all_object_ids()
         .get(&param_obj_id)
         .is_some());
-    assert!(state
+    let value = state
         .memory
-        .get_all_object_ids()
-        .get(
-            &callee_created_heap_id
-                .with_path_hint(Tid::new("call_callee"))
-                .unwrap()
-        )
-        .is_some());
+        .get_object(&AbstractIdentifier::mock("call_callee", "RAX", 8))
+        .unwrap()
+        .get_value(bitvec!("0x-a:8"), ByteSize::new(8));
+    assert_eq!(value, bitvec!("0x42:8").into());
 }
 
 #[test]
@@ -296,6 +297,20 @@ fn get_unsound_caller_ids() {
     callee_id_to_caller_data_map.insert(
         new_id("callee", "RSI"),
         Data::from_target(new_id("caller", "RAX"), bv(2).into()),
+    );
+    callee_id_to_caller_data_map.insert(
+        AbstractIdentifier::new(
+            Tid::new("callee"),
+            AbstractLocation::mock_global(0x2000, &[], 8),
+        ),
+        bv(42).into(),
+    );
+    callee_id_to_caller_data_map.insert(
+        AbstractIdentifier::new(
+            Tid::new("callee"),
+            AbstractLocation::mock_global(0x3000, &[], 8),
+        ),
+        bv(42).into(),
     );
 
     let callee_tid = Tid::new("callee");

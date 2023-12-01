@@ -2,10 +2,10 @@ use super::*;
 use crate::variable;
 
 /// Mock the abstract location of a global parameter.
-fn mock_global(address: u64) -> AbstractLocation {
+fn mock_global_x64(address: u64) -> AbstractLocation {
     AbstractLocation::GlobalAddress {
         address: address,
-        size: ByteSize::new(4),
+        size: ByteSize::new(8),
     }
 }
 
@@ -29,9 +29,9 @@ impl FunctionSignature {
         FunctionSignature {
             parameters,
             global_parameters: BTreeMap::from([
-                (mock_global(0x2000), AccessPattern::new_unknown_access()),
+                (mock_global_x64(0x2000), AccessPattern::new_unknown_access()),
                 (
-                    mock_global(0x3000),
+                    mock_global_x64(0x3000),
                     AccessPattern::new().with_dereference_flag(),
                 ),
             ]),
