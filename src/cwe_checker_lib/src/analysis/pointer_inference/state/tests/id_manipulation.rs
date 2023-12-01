@@ -267,5 +267,46 @@ fn test_get_id_to_unified_id_replacement_map() {
 
 #[test]
 fn test_insert_pointers_to_unified_objects() {
-    todo!();
+    let call_tid = Tid::new("call");
+    let (mut state, _) = mock_arm32_fn_start_state();
+    let param_id = AbstractIdentifier::mock("callee", "r0", 4);
+    let old_callee_orig_id = AbstractIdentifier::mock("instr", "r0", 4);
+    let old_callee_orig_id_2 = AbstractIdentifier::mock("instr_2", "r0", 4);
+    let new_id = AbstractIdentifier::mock("call", "r0", 4);
+    let new_id_2 = AbstractIdentifier::mock_nested("call", "r0:4", &[0], 4);
+    state
+        .memory
+        .add_abstract_object(new_id.clone(), ByteSize::new(4), None);
+    state
+        .memory
+        .add_abstract_object(new_id_2.clone(), ByteSize::new(4), None);
+    let location_to_data_map = BTreeMap::from([
+        (
+            new_id.clone(),
+            Data::mock_from_target_map(BTreeMap::from([
+                (param_id.clone(), bitvec!("0x0:4").into()),
+                (old_callee_orig_id.clone(), bitvec!("0x0:4").into()),
+            ])),
+        ),
+        (
+            new_id_2.clone(),
+            Data::from_target(old_callee_orig_id_2.clone(), bitvec!("0x0:4").into()),
+        ),
+    ]);
+    state.insert_pointers_to_unified_objects(&location_to_data_map, &call_tid);
+    assert_eq!(
+        state.get_register(&variable!("r0:4")),
+        Data::mock_from_target_map(BTreeMap::from([
+            (param_id.clone(), bitvec!("0x0:4").into()),
+            (new_id.clone(), bitvec!("0x0:4").into()),
+        ]))
+    );
+    assert_eq!(
+        state
+            .memory
+            .get_object(&new_id)
+            .unwrap()
+            .get_value(bitvec!("0x0:4"), ByteSize::new(4)),
+        Data::from_target(new_id_2.clone(), bitvec!("0x0:4").into())
+    );
 }
