@@ -505,6 +505,8 @@ impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
         new_state.clear_non_callee_saved_register(&calling_convention.callee_saved_register);
         // Now we can insert the return values into the state
         for (var, value) in return_value_list {
+            // The return values may contain new IDs that have to be tracked.
+            new_state.track_contained_ids(&value);
             new_state.set_register(var, value);
         }
         self.adjust_stack_register_on_return_from_call(state_before_call, &mut new_state);
