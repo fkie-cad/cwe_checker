@@ -14,6 +14,7 @@ use crate::intermediate_representation::*;
 use crate::utils::log::LogMessage;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::collections::HashSet;
 
 /// The context object for propagating known global variables top-down in the call graph.
 struct KnownGlobalsContext<'a> {
@@ -215,6 +216,48 @@ fn propagate_globals_bottom_up(
     }
 }
 
+/// For all nested global parameters add the corresponding parent locations to the function signatures.
+///
+/// This ensures that subsequent analyses can safely assume
+/// that for each nested parameter the parent location is also a parameter.
+fn add_parents_of_known_nested_globals(
+    fn_sigs: &mut BTreeMap<Tid, FunctionSignature>,
+    generic_pointer_size: ByteSize,
+) {
+    for fn_sig in fn_sigs.values_mut() {
+        let mut parents_to_add = HashSet::new();
+        for global in fn_sig.global_parameters.keys() {
+            parents_to_add.extend(get_parents_of_global(global, generic_pointer_size).into_iter());
+        }
+        for parent in parents_to_add {
+            fn_sig
+                .global_parameters
+                .entry(parent)
+                .and_modify(|pattern| pattern.set_dereference_flag())
+                .or_insert(
+                    AccessPattern::new()
+                        .with_read_flag()
+                        .with_dereference_flag(),
+                );
+        }
+    }
+}
+
+/// get all parent locations for the given potentially nested global location.
+fn get_parents_of_global(
+    location: &AbstractLocation,
+    generic_pointer_size: ByteSize,
+) -> Vec<AbstractLocation> {
+    if let AbstractLocation::GlobalPointer(_, _) = location {
+        let (parent, _offset) = location.get_parent_location(generic_pointer_size).unwrap();
+        let mut parents = get_parents_of_global(&parent, generic_pointer_size);
+        parents.push(parent);
+        parents
+    } else {
+        Vec::new()
+    }
+}
+
 /// Propagate the access patterns of global variables along the edges of the call graph of the given project.
 ///
 /// The propagation works as follows:
@@ -238,6 +281,8 @@ pub fn propagate_globals(
 ) {
     let known_globals = propagate_known_globals_top_down(project, fn_sigs);
     propagate_globals_bottom_up(project, &known_globals, fn_sigs, logs);
+    // Also add parent locations of propagated globals to the function signatures
+    add_parents_of_known_nested_globals(fn_sigs, project.get_pointer_bytesize());
 }
 
 #[cfg(test)]
@@ -315,6 +360,38 @@ pub mod tests {
         assert_eq!(
             &fn_sigs[&Tid::new("callee2")].global_parameters,
             &BTreeMap::from([(mock_global(1000), AccessPattern::new_unknown_access())])
+        );
+    }
+
+    #[test]
+    fn test_add_parent_locations() {
+        // The case of a known nested global parameter without knowing the parent locations happens
+        // when a callee returns a nested global in a return register.
+        let location = AbstractLocation::mock_global(0x2000, &[8, 16], 8);
+        let globals = BTreeMap::from([(location, AccessPattern::new_unknown_access())]);
+        let fn_sig = FunctionSignature {
+            parameters: BTreeMap::new(),
+            global_parameters: globals,
+        };
+        let mut fn_sigs = BTreeMap::from([(Tid::new("func"), fn_sig)]);
+        add_parents_of_known_nested_globals(&mut fn_sigs, ByteSize::new(8));
+        let fn_sig = &fn_sigs[&Tid::new("func")];
+        let deref_pattern = AccessPattern::new()
+            .with_read_flag()
+            .with_dereference_flag();
+        assert_eq!(
+            fn_sig.global_parameters,
+            BTreeMap::from([
+                (
+                    AbstractLocation::mock_global(0x2000, &[8, 16], 8),
+                    AccessPattern::new_unknown_access()
+                ),
+                (
+                    AbstractLocation::mock_global(0x2000, &[8], 8),
+                    deref_pattern
+                ),
+                (AbstractLocation::mock_global(0x2000, &[], 8), deref_pattern),
+            ])
         );
     }
 }
