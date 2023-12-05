@@ -58,7 +58,7 @@ pub mod stubs;
 /// The recursion depth limit for abstract locations to be tracked by the function signature analysis,
 /// i.e. how many dereference operations an abstract location is allowed to contain
 /// before the analysis stops tracking the location.
-const POINTER_RECURSION_DEPTH_LIMIT: u64 = 3;
+const POINTER_RECURSION_DEPTH_LIMIT: u64 = 2;
 
 /// Generate the computation object for the fixpoint computation
 /// and set the node values for all function entry nodes.

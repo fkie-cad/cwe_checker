@@ -216,6 +216,23 @@ impl AbstractLocation {
             }
         }
     }
+
+    /// Get a list of all (recursive) parent locations.
+    /// The list is sorted by recursion depth, starting with the root location.
+    pub fn get_all_parent_locations(
+        &self,
+        generic_pointer_size: ByteSize,
+    ) -> Vec<AbstractLocation> {
+        match self {
+            AbstractLocation::GlobalAddress { .. } | AbstractLocation::Register(_) => Vec::new(),
+            AbstractLocation::GlobalPointer(_, _) | AbstractLocation::Pointer(_, _) => {
+                let (parent, _) = self.get_parent_location(generic_pointer_size).unwrap();
+                let mut all_parents = parent.get_all_parent_locations(generic_pointer_size);
+                all_parents.push(parent);
+                all_parents
+            }
+        }
+    }
 }
 
 #[cfg(test)]

@@ -288,14 +288,32 @@ impl State {
                 }
             }
         }
-        location_to_data_map.retain(|_, value| {
+        let mut filtered_out_ids = HashSet::new();
+        location_to_data_map.retain(|location_id, value| {
             for id in value.get_relative_values().keys() {
                 if non_unique_targets.contains(id) {
+                    filtered_out_ids.insert(location_id.clone());
                     return false;
                 }
             }
             true
-        })
+        });
+        // Also filter out those locations whose parent locations were filtered out.
+        location_to_data_map.retain(|location, _| {
+            if location.get_tid().has_id_suffix("_param") {
+                return true;
+            }
+            for parent in location
+                .get_location()
+                .get_all_parent_locations(self.stack_id.bytesize())
+            {
+                let parent_id = AbstractIdentifier::new(location.get_tid().clone(), parent);
+                if filtered_out_ids.contains(&parent_id) {
+                    return false;
+                }
+            }
+            true
+        });
     }
 
     /// Add abstract locations based on register values to the location to pointer data map.
