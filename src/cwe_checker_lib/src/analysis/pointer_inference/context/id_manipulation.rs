@@ -97,8 +97,16 @@ impl<'a> Context<'a> {
             minimized_return_state.get_id_to_unified_ids_replacement_map(&location_to_data_map);
         let unified_to_caller_replacement_map =
             self.create_callee_id_to_caller_data_map(state_before_call, &minimized_return_state);
+        // In the ID-to-unified-ID map replace parameter IDs with their corresponding values in the caller.
         for value in replacement_map.values_mut() {
             value.replace_all_ids(&unified_to_caller_replacement_map);
+        }
+        // Add all parameter IDs to the map
+        let callee_tid = state_before_return.get_fn_tid();
+        for (id, value) in unified_to_caller_replacement_map {
+            if id.get_tid() == callee_tid && id.get_path_hints().is_empty() {
+                replacement_map.insert(id, value);
+            }
         }
         replacement_map
     }
