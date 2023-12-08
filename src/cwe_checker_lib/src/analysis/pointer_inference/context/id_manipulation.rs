@@ -95,7 +95,7 @@ impl<'a> Context<'a> {
         minimized_return_state.filter_location_to_pointer_data_map(&mut location_to_data_map);
         let mut replacement_map =
             minimized_return_state.get_id_to_unified_ids_replacement_map(&location_to_data_map);
-        minimized_return_state.merge_mem_objects_with_unique_abstract_location(&call_tid);
+        minimized_return_state.merge_mem_objects_with_unique_abstract_location(call_tid);
         let unified_to_caller_replacement_map =
             self.create_callee_id_to_caller_data_map(state_before_call, &minimized_return_state);
         // In the ID-to-unified-ID map replace parameter IDs with their corresponding values in the caller.
