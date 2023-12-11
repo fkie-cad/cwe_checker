@@ -373,6 +373,7 @@ impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
                 let value = new_state
                     .substitute_global_mem_address(value, &self.project.runtime_memory_image);
                 new_state.track_contained_ids(&value);
+                new_state.set_read_flag_for_contained_ids(&value);
                 new_state.set_register(var, value);
             }
             Def::Store { address, value } => {

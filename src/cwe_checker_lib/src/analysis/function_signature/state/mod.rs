@@ -286,6 +286,15 @@ impl State {
         }
     }
 
+    /// Set the read flag for every tracked ID contained in the given value.
+    pub fn set_read_flag_for_contained_ids(&mut self, value: &DataDomain<BitvectorDomain>) {
+        for id in value.referenced_ids() {
+            if let Some(object) = self.tracked_ids.get_mut(id) {
+                object.set_read_flag();
+            }
+        }
+    }
+
     /// Set the read and dereferenced flag for every tracked ID contained in the given value.
     pub fn set_deref_flag_for_contained_ids(&mut self, value: &DataDomain<BitvectorDomain>) {
         for id in value.referenced_ids() {
