@@ -135,6 +135,8 @@ impl<'a> Context<'a> {
         object_id: &AbstractIdentifier,
         current_stack_frame_id: &AbstractIdentifier,
     ) -> (Option<BoundsMetadata>, Option<BoundsMetadata>) {
+        // FIXME: The malloc-tid-to-object-size-map check does not work anymore,
+        // because we do not use path hints in the PointerInference anymore.
         if self
             .malloc_tid_to_object_size_map
             .contains_key(object_id.get_tid())

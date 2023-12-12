@@ -89,6 +89,8 @@ impl<'a> Context<'a> {
     /// then the absolute value is used and unknown origins of the size value are ignored.
     /// If more than one possible absolute value for the size is found then the minimum value for the size is returned.
     pub fn compute_size_of_heap_object(&self, object_id: &AbstractIdentifier) -> BitvectorDomain {
+        // FIXME: We use path hints, which are not longer provided by the PointerInference, to substitute some values.
+        // We either have to change that or make sure that we provide the path hints ourselves.
         if let Some(object_size) = self.malloc_tid_to_object_size_map.get(object_id.get_tid()) {
             let fn_tid_at_malloc_call = self.call_to_caller_fn_map[object_id.get_tid()].clone();
             let object_size = self.recursively_substitute_param_values_context_sensitive(
