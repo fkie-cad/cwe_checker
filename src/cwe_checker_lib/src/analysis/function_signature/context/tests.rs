@@ -246,3 +246,22 @@ fn test_generation_of_nested_ids_and_access_patterns_on_load_and_store() {
         AccessPattern::new().with_read_flag()
     )));
 }
+
+#[test]
+fn test_stack_param_loaded_but_not_accessed() {
+    // Regression test for the case that a stack parameter is loaded into a register but then not directly accessed.
+    // In such a case the stack parameter must still be proactively marked as read,
+    // because its later usage might simply be missed by the analysis
+    let project = Project::mock_arm32();
+    let graph = crate::analysis::graph::get_program_cfg(&project.program);
+    let context = Context::new(&project, &graph);
+    let state = State::mock_arm32();
+
+    let def = def!["r0:4 := Load from sp:4"];
+    let new_state = context.update_def(&state, &def).unwrap();
+    let fn_sig = new_state.get_params_of_current_function();
+    assert!(fn_sig.contains(&(
+        &AbstractLocation::mock("sp:4", &[0], 4),
+        AccessPattern::new().with_read_flag()
+    )));
+}
