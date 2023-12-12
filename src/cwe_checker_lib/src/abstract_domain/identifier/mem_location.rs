@@ -128,8 +128,8 @@ impl AbstractMemoryLocation {
 impl std::fmt::Display for AbstractMemoryLocation {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Self::Location { offset, .. } => write!(formatter, "[{offset}]"),
-            Self::Pointer { offset, target } => write!(formatter, "[{offset}]{target}"),
+            Self::Location { offset, .. } => write!(formatter, "[0x{offset:x}]"),
+            Self::Pointer { offset, target } => write!(formatter, "[0x{offset:x}]{target}"),
         }
     }
 }
@@ -159,7 +159,7 @@ pub mod tests {
     #[test]
     fn test_mock() {
         let loc = AbstractMemoryLocation::mock(&[1, 2, 3], 4);
-        assert_eq!(&format!("{loc}"), "[1][2][3]");
+        assert_eq!(&format!("{loc}"), "[0x1][0x2][0x3]");
     }
 
     #[test]
