@@ -6,6 +6,11 @@
 //! (is the value read, dereferenced for read access or dereferenced for write access).
 //! Accesses to constant addresses that may correspond to global variables are also tracked.
 //!
+//! For values that are not directly tracked,
+//! the algorithm tracks the abstract location that describes how the pointer to that value was computed.
+//! This enables tracking of nested parameter objects
+//! without actually tracking the memory objects where these objects are located.
+//!
 //! Known limitations of the analysis:
 //! * The analysis is an overapproximation in the sense that it may generate more input parameters
 //!   than actually exist in some cases.
@@ -17,16 +22,19 @@
 //! * Parameters that are used as input values for variadic functions may be missed.
 //!   Some variadic functions are stubbed, i.e. parameter recognition should work for these.
 //!   But not all variadic functions are stubbed.
-//! * If only a part (e.g. a single byte) of a stack parameter is accessed instead of the whole parameter
-//!   then a duplicate stack parameter may be generated.
-//!   A proper sanitation for this case is not yet implemented,
-//!   although error messages are generated if such a case is detected.
 //! * For floating point parameter registers the base register is detected as a parameter,
 //!   although only a smaller sub-register is the actual parameter in many cases.
 //!   Also, if a function uses sub-registers of floating point registers as local variables,
 //!   the registers may be incorrectly flagged as input parameters.
+//! * Tracking of nested parameters via their abstract locations is an unsound, heuristic approach,
+//!   as the analysis does not keep track of when such nested pointers might get overwritten.
+//!   Nevertheless, it should result in an overapproximation of parameters and their access patterns in most cases.
+//! * The nesting depth for tracked nested parameters is limited
+//!   to avoid generating infinitely many parameters for recursive types like linked lists.
 
 use crate::abstract_domain::AbstractDomain;
+use crate::abstract_domain::AbstractLocation;
+use crate::abstract_domain::AbstractMemoryLocation;
 use crate::analysis::fixpoint::Computation;
 use crate::analysis::forward_interprocedural_fixpoint::create_computation;
 use crate::analysis::forward_interprocedural_fixpoint::GeneralizedContext;
@@ -36,18 +44,21 @@ use crate::intermediate_representation::*;
 use crate::prelude::*;
 use crate::utils::log::LogMessage;
 use std::collections::BTreeMap;
-use std::collections::HashMap;
 
 mod context;
 use context::*;
 mod state;
-use itertools::Itertools;
 use state::State;
 mod access_pattern;
 pub use access_pattern::AccessPattern;
 mod global_var_propagation;
 use global_var_propagation::propagate_globals;
 pub mod stubs;
+
+/// The recursion depth limit for abstract locations to be tracked by the function signature analysis,
+/// i.e. how many dereference operations an abstract location is allowed to contain
+/// before the analysis stops tracking the location.
+const POINTER_RECURSION_DEPTH_LIMIT: u64 = 2;
 
 /// Generate the computation object for the fixpoint computation
 /// and set the node values for all function entry nodes.
@@ -147,17 +158,10 @@ pub fn compute_function_signatures<'a>(
     // Sanitize the parameters
     let mut logs = Vec::new();
     for (fn_tid, fn_sig) in fn_sig_map.iter_mut() {
-        let (info_log, debug_log) = fn_sig.sanitize(project);
+        let info_log = fn_sig.sanitize(project);
         for log in info_log {
             logs.push(
                 LogMessage::new_info(log)
-                    .location(fn_tid.clone())
-                    .source("Function Signature Analysis"),
-            )
-        }
-        for log in debug_log {
-            logs.push(
-                LogMessage::new_debug(log)
                     .location(fn_tid.clone())
                     .source("Function Signature Analysis"),
             )
@@ -174,30 +178,42 @@ pub fn compute_function_signatures<'a>(
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct FunctionSignature {
     /// The parameters of the function together with their access patterns.
-    pub parameters: HashMap<Arg, AccessPattern>,
+    pub parameters: BTreeMap<AbstractLocation, AccessPattern>,
     /// Values in writeable global memory accessed by the function.
-    /// Does not contain indirectly accessed values, e.g. values accessed by callees of this function.
-    pub global_parameters: HashMap<u64, AccessPattern>,
+    pub global_parameters: BTreeMap<AbstractLocation, AccessPattern>,
 }
 
 impl FunctionSignature {
     /// Generate an empty function signature.
     pub fn new() -> Self {
         Self {
-            parameters: HashMap::new(),
-            global_parameters: HashMap::new(),
+            parameters: BTreeMap::new(),
+            global_parameters: BTreeMap::new(),
         }
     }
 
     /// The returned number is the maximum of stack offset plus parameter size
     /// taken over all stack parameters in the function signature.
-    pub fn get_stack_params_total_size(&self) -> i64 {
+    pub fn get_stack_params_total_size(&self, stack_register: &Variable) -> i64 {
         let mut stack_params_total_size: i64 = 0;
         for param in self.parameters.keys() {
-            if let Ok(param_offset) = param.eval_stack_offset() {
-                let param_upper_bound =
-                    param_offset.try_to_i64().unwrap() + (u64::from(param.bytesize()) as i64);
-                stack_params_total_size = std::cmp::max(stack_params_total_size, param_upper_bound);
+            if let AbstractLocation::Pointer(var, mem_location) = param {
+                if var == stack_register {
+                    match mem_location {
+                        AbstractMemoryLocation::Location { offset, size } => {
+                            stack_params_total_size = std::cmp::max(
+                                stack_params_total_size,
+                                offset + (u64::from(*size) as i64),
+                            );
+                        }
+                        AbstractMemoryLocation::Pointer { offset, target: _ } => {
+                            stack_params_total_size = std::cmp::max(
+                                stack_params_total_size,
+                                offset + (u64::from(stack_register.size) as i64),
+                            );
+                        }
+                    }
+                }
             }
         }
         stack_params_total_size
@@ -206,21 +222,21 @@ impl FunctionSignature {
     /// Merge the parameter list and the global parameter list of `self` with the given lists.
     fn merge_parameter_lists(
         &mut self,
-        params: &[(Arg, AccessPattern)],
-        global_params: &[(u64, AccessPattern)],
+        params: &[(&AbstractLocation, AccessPattern)],
+        global_params: &[(&AbstractLocation, AccessPattern)],
     ) {
         for (arg, sig_new) in params {
             if let Some(sig_self) = self.parameters.get_mut(arg) {
                 *sig_self = sig_self.merge(sig_new);
             } else {
-                self.parameters.insert(arg.clone(), *sig_new);
+                self.parameters.insert((*arg).clone(), *sig_new);
             }
         }
         for (address, sig_new) in global_params {
             if let Some(sig_self) = self.global_parameters.get_mut(address) {
                 *sig_self = sig_self.merge(sig_new);
             } else {
-                self.global_parameters.insert(*address, *sig_new);
+                self.global_parameters.insert((*address).clone(), *sig_new);
             }
         }
     }
@@ -239,172 +255,161 @@ impl FunctionSignature {
     ///   This may indicate an error in the analysis
     ///   as no proper sanitation pass is implemented for such cases yet.
     /// * Merge intersecting stack parameters
-    fn sanitize(&mut self, project: &Project) -> (Vec<String>, Vec<String>) {
+    fn sanitize(&mut self, project: &Project) -> Vec<String> {
         match project.cpu_architecture.as_str() {
             "x86" | "x86_32" | "x86_64" => {
-                let return_addr_expr = Expression::Var(project.stack_pointer_register.clone());
-                let return_addr_arg = Arg::Stack {
-                    address: return_addr_expr,
-                    size: project.stack_pointer_register.size,
-                    data_type: None,
-                };
-                self.parameters.remove(&return_addr_arg);
+                let return_addr_location = AbstractLocation::from_stack_position(
+                    &project.stack_pointer_register,
+                    0,
+                    project.get_pointer_bytesize(),
+                );
+                self.parameters.remove(&return_addr_location);
             }
             _ => (),
         }
-        let debug_messages = self.merge_intersecting_stack_parameters();
-        let info_messages = self.check_for_unaligned_stack_params(&project.stack_pointer_register);
-
-        (info_messages, debug_messages)
+        // FIXME: We check for intersecting stack parameter register, but not for intersecting nested parameters.
+        // We should add a check for these to generate log messages (but probably without trying to merge such parameters)
+        self.merge_intersecting_stack_parameters(&project.stack_pointer_register);
+        self.check_for_unaligned_stack_params(&project.stack_pointer_register)
     }
 
     /// Return a log message for every unaligned stack parameter
     /// or a stack parameter of different size than the generic pointer size is found.
     fn check_for_unaligned_stack_params(&self, stack_register: &Variable) -> Vec<String> {
         let mut log_messages: Vec<String> = vec![];
-        for arg in self.parameters.keys() {
-            if let Arg::Stack { size, .. } = arg {
-                if *size != stack_register.size {
+        for param in self.parameters.keys() {
+            if let Some(offset) = get_offset_if_simple_stack_param(param, stack_register) {
+                if param.bytesize() != stack_register.size {
                     log_messages.push("Unexpected stack parameter size".into());
                 }
-                if let Ok(offset) = arg.eval_stack_offset() {
-                    if offset.try_to_u64().unwrap_or(0) % u64::from(stack_register.size) != 0 {
-                        log_messages.push("Unexpected stack parameter alignment".into());
-                    }
+                if offset % u64::from(stack_register.size) as i64 != 0 {
+                    log_messages.push("Unexpected stack parameter alignment".into());
                 }
             }
         }
         log_messages
     }
-    /// Merges two intersecting stack parameters by joining them into one stack parameter.
+
+    /// Merges intersecting stack parameters by joining them into one stack parameter.
     ///
-    /// Two [Arg](crate::intermediate_representation::Arg) are merged if *all* of the following applies:
-    /// * parameters return `Ok` on `Arg::eval_stack_offset()`
-    /// * parameters intersect
-    fn merge_intersecting_stack_parameters(&mut self) -> Vec<String> {
-        let mut stack_parms = self
+    /// Only non-nested stack parameters are joined by this function.
+    fn merge_intersecting_stack_parameters(&mut self, stack_register: &Variable) {
+        let stack_params: BTreeMap<(i64, ByteSize), (AbstractLocation, AccessPattern)> = self
             .parameters
-            .clone()
-            .into_iter()
-            .filter(|x| x.0.eval_stack_offset().is_ok())
-            .sorted_by(|a, b| {
-                match a
-                    .0
-                    .eval_stack_offset()
-                    .unwrap()
-                    .checked_sgt(&b.0.eval_stack_offset().unwrap())
-                    .unwrap()
-                {
-                    true => std::cmp::Ordering::Greater,
-                    false => std::cmp::Ordering::Less,
-                }
+            .iter()
+            .filter_map(|(location, access_pattern)| {
+                get_offset_if_simple_stack_param(location, stack_register).map(|offset| {
+                    (
+                        (offset, location.bytesize()),
+                        (location.clone(), *access_pattern),
+                    )
+                })
             })
-            .collect_vec();
-        let mut logs = vec![];
+            .collect();
 
-        if !stack_parms.is_empty() {
-            let mut i = 0;
-            while i < stack_parms.len() - 1 {
-                if let Ok((merged_arg, log)) =
-                    get_bounds_intersecting_stack_arg(&stack_parms[i].0, &stack_parms[i + 1].0)
-                {
-                    self.parameters.remove(&stack_parms[i].0);
-                    self.parameters.remove(&stack_parms[i + 1].0);
-                    self.parameters.insert(
-                        merged_arg.clone(),
-                        stack_parms[i].1.merge(&stack_parms[i + 1].1),
+        let mut current_param: Option<(i64, i64, AccessPattern)> = None;
+        for ((offset, _), (param, access_pattern)) in stack_params.into_iter() {
+            self.parameters.remove(&param);
+            if let Some((cur_offset, cur_size, cur_access_pattern)) = current_param {
+                if offset < cur_offset + cur_size {
+                    let merged_size = std::cmp::max(
+                        cur_size,
+                        offset - cur_offset + u64::from(param.bytesize()) as i64,
                     );
-
-                    stack_parms.insert(
-                        i,
-                        (merged_arg, stack_parms[i].1.merge(&stack_parms[i + 1].1)),
-                    );
-                    stack_parms.remove(i + 1);
-                    stack_parms.remove(i + 1);
-
-                    logs.extend(log);
+                    let merged_access_pattern = cur_access_pattern.merge(&access_pattern);
+                    current_param = Some((cur_offset, merged_size, merged_access_pattern));
                 } else {
-                    i += 1;
+                    self.parameters.insert(
+                        generate_simple_stack_param(
+                            cur_offset,
+                            ByteSize::new(cur_size as u64),
+                            stack_register,
+                        ),
+                        cur_access_pattern,
+                    );
+                    current_param =
+                        Some((offset, u64::from(param.bytesize()) as i64, access_pattern));
                 }
+            } else {
+                current_param = Some((offset, u64::from(param.bytesize()) as i64, access_pattern));
             }
         }
-
-        logs
-    }
-}
-
-/// Merges two stack parameters and returns the merged [Arg](crate::intermediate_representation::Arg).
-/// Also returns a message, if one argument is not a subset of the other one.
-///
-/// Assumes the provided `Arg` are ordered by equal or increasing stack offset.
-///
-/// Returns `Err` if `first_arg` or `second_arg`:
-/// * are not `Arg::Stack` types
-/// * return `Err` on `Arg::eval_stack_offset()`
-/// * do not intersect
-fn get_bounds_intersecting_stack_arg(
-    first_arg: &Arg,
-    second_arg: &Arg,
-) -> Result<(Arg, Vec<String>), Error> {
-    if let (
-        Arg::Stack {
-            data_type: _,
-            size: first_size,
-            address: first_address,
-        },
-        Arg::Stack {
-            data_type: _,
-            size: second_size,
-            ..
-        },
-    ) = (first_arg, second_arg)
-    {
-        let first_arg_offset = first_arg.eval_stack_offset()?.try_to_u64()?;
-        let first_arg_size = u64::from(*first_size);
-        let second_arg_offset = second_arg.eval_stack_offset()?.try_to_u64()?;
-        let second_arg_size = u64::from(*second_size);
-
-        let mut logs = vec![];
-        let first_arg_upper_bound = first_arg_offset + first_arg_size;
-
-        // Check if they intersect
-        if first_arg_upper_bound > second_arg_offset {
-            let second_arg_upper_bound = second_arg_offset + second_arg_size;
-
-            // Check if subset
-            if second_arg_upper_bound <= first_arg_upper_bound
-                && second_arg_offset >= first_arg_offset
-            {
-                // second arg is a subset, we just keep first_arg
-                return Ok((first_arg.clone(), logs));
-            }
-            if first_arg_upper_bound <= second_arg_upper_bound
-                && first_arg_offset >= second_arg_offset
-            {
-                // first arg is a subset, we just keep second_arg
-                return Ok((second_arg.clone(), logs));
-            }
-            logs.push(
-                "Merged a stack parameter, that intersect another but is no subset".to_string(),
+        if let Some((cur_offset, cur_size, cur_access_pattern)) = current_param {
+            self.parameters.insert(
+                generate_simple_stack_param(
+                    cur_offset,
+                    ByteSize::new(cur_size as u64),
+                    stack_register,
+                ),
+                cur_access_pattern,
             );
-
-            let merged_arg = Arg::Stack {
-                address: first_address.clone(),
-                size: (second_arg_upper_bound - first_arg_offset).into(),
-                data_type: None,
-            };
-            return Ok((merged_arg, logs));
-        } else {
-            return Err(anyhow!("Args do not intersect"));
         }
     }
-    Err(anyhow!("Args are no stack arguments"))
 }
 
 impl Default for FunctionSignature {
     fn default() -> Self {
         Self::new()
     }
+}
+
+impl FunctionSignature {
+    /// Generate a compact JSON-representation of the function signature for pretty printing.
+    #[allow(dead_code)]
+    pub fn to_json_compact(&self) -> serde_json::Value {
+        let mut json_map = serde_json::Map::new();
+        let mut param_map = serde_json::Map::new();
+        for (param, pattern) in self.parameters.iter() {
+            param_map.insert(
+                format!("{param}"),
+                serde_json::Value::String(format!("{pattern}")),
+            );
+        }
+        json_map.insert(
+            "Parameters".to_string(),
+            serde_json::Value::Object(param_map),
+        );
+        let mut global_param_map = serde_json::Map::new();
+        for (param, pattern) in self.global_parameters.iter() {
+            global_param_map.insert(
+                format!("{param}"),
+                serde_json::Value::String(format!("{pattern}")),
+            );
+        }
+        json_map.insert(
+            "Globals".to_string(),
+            serde_json::Value::Object(global_param_map),
+        );
+        serde_json::Value::Object(json_map)
+    }
+}
+
+/// If the abstract location is a location on the stack
+/// then return its offset relative to the zero position on the stack.
+fn get_offset_if_simple_stack_param(
+    param: &AbstractLocation,
+    stack_register: &Variable,
+) -> Option<i64> {
+    if let AbstractLocation::Pointer(var, mem_location) = param {
+        if var == stack_register {
+            if let AbstractMemoryLocation::Location { offset, .. } = mem_location {
+                return Some(*offset);
+            }
+        }
+    }
+    None
+}
+
+/// Generate an abstract location of a (non-nested) stack parameter.
+fn generate_simple_stack_param(
+    offset: i64,
+    size: ByteSize,
+    stack_register: &Variable,
+) -> AbstractLocation {
+    AbstractLocation::Pointer(
+        stack_register.clone(),
+        AbstractMemoryLocation::Location { offset, size },
+    )
 }
 
 #[cfg(test)]

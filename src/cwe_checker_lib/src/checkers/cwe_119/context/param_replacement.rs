@@ -192,9 +192,10 @@ fn add_param_replacements_for_call(
         .get(callee_tid)
     {
         for param_arg in fn_sig.parameters.keys() {
-            if let Some(param_value) = vsa_results.eval_parameter_arg_at_call(&call.tid, param_arg)
+            if let Some(param_value) =
+                vsa_results.eval_parameter_location_at_call(&call.tid, param_arg)
             {
-                let param_id = AbstractIdentifier::from_arg(&call.tid, param_arg);
+                let param_id = AbstractIdentifier::new(call.tid.clone(), param_arg.clone());
                 replacement_map.insert(param_id, param_value);
             }
         }

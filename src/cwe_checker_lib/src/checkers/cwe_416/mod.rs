@@ -300,7 +300,7 @@ pub mod tests {
         assert_eq!(processed_warnings.len(), 1);
         let processed_cwe = processed_warnings.iter().next().unwrap();
         assert_eq!(&processed_cwe.other[0], &[
-            "Accessed ID object_origin_tid(->call_tid) @ RAX may have been freed before at free_tid.".to_string(),
+            "Accessed ID object_origin_tid(->call_tid) @ RAX:i64 may have been freed before at free_tid.".to_string(),
             "Relevant callgraph TIDs: [root_func_tid, call_tid]".to_string(),
         ]);
 

@@ -112,7 +112,7 @@ impl<'a> Context<'a> {
             if access_pattern.is_dereferenced() {
                 if let Some(arg_value) = self
                     .pointer_inference
-                    .eval_parameter_arg_at_call(call_tid, arg)
+                    .eval_parameter_location_at_call(call_tid, arg)
                 {
                     if let Some(mut warnings) = state.check_address_for_use_after_free(&arg_value) {
                         warning_causes.append(&mut warnings);

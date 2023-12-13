@@ -5,7 +5,6 @@ use super::*;
 
 impl AbstractObjectList {
     /// Get a reference to the object corresponding to the given ID.
-    #[cfg(test)]
     pub fn get_object(&self, id: &AbstractIdentifier) -> Option<&AbstractObject> {
         self.objects.get(id)
     }
@@ -62,6 +61,11 @@ impl AbstractObjectList {
     /// Get an iterator over the contained abstract objects in `self`.
     pub fn iter(&self) -> std::collections::btree_map::Iter<AbstractIdentifier, AbstractObject> {
         self.objects.iter()
+    }
+
+    /// Get an iterator of mutable references over the abstract objects in `self`.
+    pub fn iter_objects_mut(&mut self) -> impl Iterator<Item = &mut AbstractObject> {
+        self.objects.values_mut()
     }
 
     /// Get the number of objects that are currently tracked.

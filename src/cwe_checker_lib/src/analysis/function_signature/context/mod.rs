@@ -1,14 +1,13 @@
+use super::*;
 use crate::abstract_domain::{
-    AbstractDomain, AbstractIdentifier, AbstractLocation, BitvectorDomain, DataDomain, SizedDomain,
-    TryToBitvec,
+    AbstractDomain, AbstractIdentifier, AbstractLocation, BitvectorDomain, DataDomain,
+    RegisterDomain as _, SizedDomain, TryToBitvec,
 };
 use crate::utils::arguments;
 use crate::{
     analysis::{forward_interprocedural_fixpoint, graph::Graph},
     intermediate_representation::Project,
 };
-
-use super::*;
 
 /// The context struct for the fixpoint algorithm.
 pub struct Context<'a> {
@@ -35,11 +34,9 @@ impl<'a> Context<'a> {
     /// Compute the return values of a call and return them (without adding them to the caller state).
     ///
     /// The `callee_state` is the state of the callee at the return site.
-    /// The return values are expressed in the abstract IDs that are known to the caller.
-    /// If a return value may contain `Top` values,
-    /// i.e. values for which the origin is not known or not expressible in the abstract IDs known to the caller,
-    /// then a call- and register-specific abstract ID is added to the corresponding return value.
-    /// This ID is not added to the tracked IDs of the caller state.
+    /// Return values corresponding to callee parameters are expressed in the abstract IDs that are known to the caller.
+    /// Additionally, each return value also contains one abstract ID specific to the call instruction and return register.
+    /// This ID is used to track abstract location access patterns to the return value of the call in the caller.
     fn compute_return_values_of_call<'cconv>(
         &self,
         caller_state: &mut State,
@@ -74,8 +71,9 @@ impl<'a> Context<'a> {
     /// Compute the return value for the given register.
     ///
     /// The return value contains the IDs of all possible input IDs of the call that it may reference.
-    /// If the value may also contain a value not originating from the caller
-    /// then replace it with a call- and register-specific abstract ID.
+    /// Additionally, it also contains a call- and register-specific abstract ID,
+    /// which can be used to track the access patterns of the return value
+    /// independently of whether the return value only references caller values or not.
     fn compute_return_register_value_of_call(
         &self,
         caller_state: &mut State,
@@ -86,20 +84,18 @@ impl<'a> Context<'a> {
         let callee_value = callee_state.get_register(return_register);
         let mut return_value: DataDomain<BitvectorDomain> =
             DataDomain::new_empty(return_register.size);
-        // For absolute or Top-values originating in the callee the Top-flag of the return value is set.
-        if callee_value.contains_top() || callee_value.get_absolute_value().is_some() {
-            return_value.set_contains_top_flag();
-        }
+
         // For every relative value in the callee we check whether it is relative a parameter to the callee.
         // If yes, we can compute it relative to the value of the parameter at the callsite and add the result to the return value.
-        // Else we just set the Top-flag of the return value to indicate some value originating in the callee.
-        for (callee_id, callee_offset) in callee_value.get_relative_values() {
-            if callee_id.get_tid() == callee_state.get_current_function_tid()
-                && matches!(
-                    callee_id.get_location(),
-                    AbstractLocation::GlobalAddress { .. }
-                )
-            {
+        for (callee_id, callee_offset) in callee_value
+            .get_relative_values()
+            .iter()
+            .filter(|(callee_id, _)| callee_id.get_tid() == callee_state.get_current_function_tid())
+        {
+            if matches!(
+                callee_id.get_location(),
+                AbstractLocation::GlobalAddress { .. } | AbstractLocation::GlobalPointer(_, _)
+            ) {
                 // Globals get the same ID as if the global pointer originated in the caller.
                 let caller_global_id = AbstractIdentifier::new(
                     caller_state.get_current_function_tid().clone(),
@@ -109,13 +105,13 @@ impl<'a> Context<'a> {
                 let caller_global =
                     DataDomain::from_target(caller_global_id, callee_offset.clone());
                 return_value = return_value.merge(&caller_global);
-            } else if let Some(param_arg) = callee_state.get_arg_corresponding_to_id(callee_id) {
-                let param_value = caller_state.eval_parameter_arg(&param_arg);
+            } else {
+                let param_value = caller_state.eval_param_location(
+                    callee_id.get_location(),
+                    &self.project.runtime_memory_image,
+                );
                 let param_value = caller_state
                     .substitute_global_mem_address(param_value, &self.project.runtime_memory_image);
-                if param_value.contains_top() || param_value.get_absolute_value().is_some() {
-                    return_value.set_contains_top_flag()
-                }
                 for (param_id, param_offset) in param_value.get_relative_values() {
                     let value = DataDomain::from_target(
                         param_id.clone(),
@@ -123,19 +119,14 @@ impl<'a> Context<'a> {
                     );
                     return_value = return_value.merge(&value);
                 }
-            } else {
-                return_value.set_contains_top_flag();
             }
         }
-        // If the Top-flag of the return value was set we replace it with an ID representing the return register
-        // to indicate where the unknown value originated from.
-        if return_value.contains_top() {
-            let id = AbstractIdentifier::from_var(call.tid.clone(), return_register);
-            let value =
-                DataDomain::from_target(id, Bitvector::zero(return_register.size.into()).into());
-            return_value = return_value.merge(&value);
-            return_value.unset_contains_top_flag();
-        }
+        // Also add an ID representing the return register (regardless of what was added before).
+        // This ID is used to track abstract location access patterns in relation to the return value.
+        let id = AbstractIdentifier::from_var(call.tid.clone(), return_register);
+        let value =
+            DataDomain::from_target(id, Bitvector::zero(return_register.size.into()).into());
+        return_value = return_value.merge(&value);
 
         return_value
     }
@@ -314,6 +305,34 @@ impl<'a> Context<'a> {
         }
         None
     }
+
+    /// Adjust the stack register after a call to a function.
+    ///
+    /// On x86, this removes the return address from the stack
+    /// (other architectures pass the return address in a register, not on the stack).
+    /// On other architectures the stack register retains the value it had before the call.
+    /// Note that in some calling conventions the callee also clears function parameters from the stack.
+    /// We do not detect and handle these cases yet.
+    fn adjust_stack_register_on_return_from_call(
+        &self,
+        state_before_call: &State,
+        new_state: &mut State,
+    ) {
+        let stack_register = &self.project.stack_pointer_register;
+        let stack_pointer = state_before_call.get_register(stack_register);
+        match self.project.cpu_architecture.as_str() {
+            "x86" | "x86_32" | "x86_64" => {
+                let offset = Bitvector::from_u64(stack_register.size.into())
+                    .into_truncate(apint::BitWidth::from(stack_register.size))
+                    .unwrap();
+                new_state.set_register(
+                    stack_register,
+                    stack_pointer.bin_op(BinOpType::IntAdd, &offset.into()),
+                );
+            }
+            _ => new_state.set_register(stack_register, stack_pointer),
+        }
+    }
 }
 
 impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
@@ -339,7 +358,8 @@ impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
                 new_state.set_register(var, value);
             }
             Def::Load { var, address } => {
-                new_state.set_deref_flag_for_input_ids_of_expression(address);
+                new_state.set_deref_flag_for_pointer_inputs_of_expression(address);
+                new_state.set_read_flag_for_input_ids_of_expression(address);
                 let address = new_state.substitute_global_mem_address(
                     state.eval(address),
                     &self.project.runtime_memory_image,
@@ -352,10 +372,13 @@ impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
                 );
                 let value = new_state
                     .substitute_global_mem_address(value, &self.project.runtime_memory_image);
+                new_state.track_contained_ids(&value);
+                new_state.set_read_flag_for_contained_ids(&value);
                 new_state.set_register(var, value);
             }
             Def::Store { address, value } => {
-                new_state.set_mutable_deref_flag_for_input_ids_of_expression(address);
+                new_state.set_mutable_deref_flag_for_pointer_inputs_of_expression(address);
+                new_state.set_read_flag_for_input_ids_of_expression(address);
                 let address = new_state.substitute_global_mem_address(
                     state.eval(address),
                     &self.project.runtime_memory_image,
@@ -420,6 +443,7 @@ impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
                         cconv,
                         &self.project.runtime_memory_image,
                     );
+                    self.adjust_stack_register_on_return_from_call(state, &mut new_state);
                     return Some(new_state);
                 }
             }
@@ -427,6 +451,7 @@ impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
                 if let Some(extern_symbol) = self.project.program.term.extern_symbols.get(target) {
                     self.handle_extern_symbol_call(&mut new_state, extern_symbol, &call.tid);
                     if !extern_symbol.no_return {
+                        self.adjust_stack_register_on_return_from_call(state, &mut new_state);
                         return Some(new_state);
                     }
                 } else if let Some(cconv) = self.project.get_standard_calling_convention() {
@@ -435,6 +460,7 @@ impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
                         cconv,
                         &self.project.runtime_memory_image,
                     );
+                    self.adjust_stack_register_on_return_from_call(state, &mut new_state);
                     return Some(new_state);
                 }
             }
@@ -462,9 +488,9 @@ impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
             Some(cconv) => cconv,
             None => return None,
         };
-        let old_state = state_before_call.unwrap();
+        let state_before_call = state_before_call.unwrap();
         let callee_state = state.unwrap();
-        let mut new_state = old_state.clone();
+        let mut new_state = state_before_call.clone();
         // Merge parameter access patterns with the access patterns from the callee.
         let parameters = callee_state.get_params_of_current_function();
         new_state.merge_parameter_access(&parameters, &self.project.runtime_memory_image);
@@ -480,8 +506,11 @@ impl<'a> forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
         new_state.clear_non_callee_saved_register(&calling_convention.callee_saved_register);
         // Now we can insert the return values into the state
         for (var, value) in return_value_list {
+            // The return values may contain new IDs that have to be tracked.
+            new_state.track_contained_ids(&value);
             new_state.set_register(var, value);
         }
+        self.adjust_stack_register_on_return_from_call(state_before_call, &mut new_state);
         Some(new_state)
     }
 

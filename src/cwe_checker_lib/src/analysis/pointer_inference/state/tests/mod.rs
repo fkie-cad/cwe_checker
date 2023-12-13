@@ -3,6 +3,8 @@ use super::*;
 use crate::analysis::pointer_inference::object::*;
 use crate::{bitvec, def, expr, variable};
 
+mod access_handling;
+mod id_manipulation;
 mod specialized_expressions;
 
 fn bv(value: i64) -> ValueDomain {
@@ -78,58 +80,6 @@ fn state() {
     assert_eq!(state.memory.get_num_objects(), 3);
     state.remove_unreferenced_objects();
     assert_eq!(state.memory.get_num_objects(), 2);
-}
-
-#[test]
-fn handle_store() {
-    let global_memory = RuntimeMemoryImage::mock();
-    let mut state = State::new(&variable!("RSP:8"), Tid::new("time0"), BTreeSet::new());
-    let stack_id = new_id("time0", "RSP");
-    assert_eq!(
-        state.eval(&expr!("RSP:8")),
-        Data::from_target(stack_id.clone(), bv(0))
-    );
-
-    state.handle_register_assign(&variable!("RSP:8"), &expr!("RSP:8 - 32:8"));
-    assert_eq!(
-        state.eval(&expr!("RSP:8")),
-        Data::from_target(stack_id.clone(), bv(-32))
-    );
-    state.handle_register_assign(&variable!("RSP:8"), &expr!("RSP:8 + -8:8"));
-    assert_eq!(
-        state.eval(&expr!("RSP:8")),
-        Data::from_target(stack_id.clone(), bv(-40))
-    );
-
-    state
-        .handle_store(&expr!("RSP:8 + 8:8"), &expr!("1:8"), &global_memory)
-        .unwrap();
-    state
-        .handle_store(&expr!("RSP:8 - 8:8"), &expr!("2:8"), &global_memory)
-        .unwrap();
-    state
-        .handle_store(&expr!("RSP:8 + -16:8"), &expr!("3:8"), &global_memory)
-        .unwrap();
-    state.handle_register_assign(&variable!("RSP:8"), &expr!("RSP:8 - 4:8"));
-
-    assert_eq!(
-        state
-            .load_value(&expr!("RSP:8 + 12:8"), ByteSize::new(8), &global_memory)
-            .unwrap(),
-        bv(1).into()
-    );
-    assert_eq!(
-        state
-            .load_value(&expr!("RSP:8 - 4:8"), ByteSize::new(8), &global_memory)
-            .unwrap(),
-        bv(2).into()
-    );
-    assert_eq!(
-        state
-            .load_value(&expr!("RSP:8 + -12:8"), ByteSize::new(8), &global_memory)
-            .unwrap(),
-        bv(3).into()
-    );
 }
 
 #[test]
@@ -226,61 +176,6 @@ fn reachable_ids_under_and_overapproximation() {
     );
 }
 
-#[test]
-fn global_mem_access() {
-    let global_memory = RuntimeMemoryImage::mock();
-    let mut state = State::new(
-        &variable!("RSP:8"),
-        Tid::new("func_tid"),
-        BTreeSet::from([0x2000]),
-    );
-    // global read-only address
-    let address_expr = expr!("0x1000:8");
-    assert_eq!(
-        state
-            .load_value(&address_expr, ByteSize::new(4), &global_memory)
-            .unwrap(),
-        bitvec!("0xb3b2b1b0:4").into() // note that we read in little-endian byte order
-    );
-    assert!(state
-        .write_to_address(
-            &address_expr,
-            &DataDomain::new_top(ByteSize::new(4)),
-            &global_memory
-        )
-        .is_err());
-    // global writeable address
-    let address_expr = expr!("0x2000:8");
-    assert_eq!(
-        state
-            .load_value(&address_expr, ByteSize::new(4), &global_memory)
-            .unwrap(),
-        DataDomain::new_top(ByteSize::new(4))
-    );
-    assert!(state
-        .write_to_address(&address_expr, &bitvec!("21:4").into(), &global_memory)
-        .is_ok());
-    assert_eq!(
-        state
-            .load_value(&address_expr, ByteSize::new(4), &global_memory)
-            .unwrap(),
-        bitvec!("21:4").into()
-    );
-
-    // invalid global address
-    let address_expr = expr!("0x3456:8");
-    assert!(state
-        .load_value(&address_expr, ByteSize::new(4), &global_memory)
-        .is_err());
-    assert!(state
-        .write_to_address(
-            &address_expr,
-            &DataDomain::new_top(ByteSize::new(4)),
-            &global_memory
-        )
-        .is_err());
-}
-
 /// Test that value specialization does not introduce unintended widening hints.
 /// This is a regression test for cases where pointer comparisons introduced two-sided bounds
 /// (resulting in two-sided widenings) instead of one-sided bounds.
@@ -350,14 +245,38 @@ fn test_check_def_for_null_dereferences() {
 
 #[test]
 fn from_fn_sig() {
-    let fn_sig = FunctionSignature::mock_x64();
+    let global_memory = RuntimeMemoryImage::mock();
+    let full_access = AccessPattern::new_unknown_access();
+    let fn_sig = FunctionSignature {
+        parameters: BTreeMap::from([
+            (AbstractLocation::mock("RSI:8", &[], 8), full_access),
+            (AbstractLocation::mock("RSI:8", &[8], 8), full_access),
+            (
+                AbstractLocation::mock("RDI:8", &[], 8),
+                AccessPattern::new().with_read_flag(),
+            ),
+        ]),
+        global_parameters: BTreeMap::from([
+            (AbstractLocation::mock_global(0x2000, &[], 8), full_access),
+            (AbstractLocation::mock_global(0x2000, &[0], 8), full_access),
+        ]),
+    };
     let state = State::from_fn_sig(&fn_sig, &variable!("RSP:8"), Tid::new("func"));
-
-    assert_eq!(state.memory.get_num_objects(), 3);
+    // The state should have 5 objects: The stack, the global memory space and 3 parameter objects.
     assert_eq!(
-        *state.memory.get_object(&new_id("func", "RSI")).unwrap(),
-        AbstractObject::new(None, ByteSize::new(8))
+        state.memory.get_all_object_ids(),
+        BTreeSet::from([
+            AbstractIdentifier::new(Tid::new("func"), AbstractLocation::mock("RSP:8", &[], 8)),
+            AbstractIdentifier::new(Tid::new("func"), AbstractLocation::mock("RSI:8", &[], 8)),
+            AbstractIdentifier::new(Tid::new("func"), AbstractLocation::mock("RSI:8", &[8], 8)),
+            AbstractIdentifier::new(Tid::new("func"), AbstractLocation::mock_global(0x0, &[], 8)),
+            AbstractIdentifier::new(
+                Tid::new("func"),
+                AbstractLocation::mock_global(0x2000, &[0], 8)
+            ),
+        ])
     );
+    // Check that pointers have been correctly added to the state.
     assert_eq!(
         state.get_register(&variable!("RSP:8")),
         Data::from_target(new_id("func", "RSP"), bv(0).into())
@@ -369,6 +288,32 @@ fn from_fn_sig() {
     assert_eq!(
         state.get_register(&variable!("RSI:8")),
         Data::from_target(new_id("func", "RSI"), bv(0).into())
+    );
+    assert_eq!(
+        state.eval_abstract_location(&AbstractLocation::mock("RSI:8", &[8], 8), &global_memory),
+        Data::from_target(
+            AbstractIdentifier::new(Tid::new("func"), AbstractLocation::mock("RSI:8", &[8], 8)),
+            bitvec!("0x0:8").into()
+        )
+    );
+    assert_eq!(
+        state
+            .load_value_from_address(
+                &Data::from_target(
+                    state.get_global_mem_id().clone(),
+                    bitvec!("0x2000:8").into()
+                ),
+                ByteSize::new(8),
+                &global_memory
+            )
+            .unwrap(),
+        Data::from_target(
+            AbstractIdentifier::new(
+                Tid::new("func"),
+                AbstractLocation::mock_global(0x2000, &[0], 8)
+            ),
+            bitvec!("0x0:8").into()
+        )
     );
 }
 
@@ -410,4 +355,144 @@ fn add_param_object_from_callee() {
         .unwrap();
     assert_eq!(value.get_absolute_value().unwrap(), &bv(2).into());
     assert!(value.contains_top());
+}
+
+#[test]
+fn test_minimize_before_return_instruction() {
+    let cconv = CallingConvention::mock_arm32();
+    let full_access = AccessPattern::new_unknown_access();
+    let deref_access = AccessPattern::new().with_dereference_flag();
+    let fn_sig = FunctionSignature {
+        parameters: BTreeMap::from([
+            (AbstractLocation::mock("r0:4", &[], 4), full_access),
+            (AbstractLocation::mock("r0:4", &[0], 4), deref_access),
+            (AbstractLocation::mock("r0:4", &[0, 0], 4), full_access),
+        ]),
+        global_parameters: BTreeMap::from([]),
+    };
+    let mut state = State::from_fn_sig(&fn_sig, &variable!("sp:4"), Tid::new("func"));
+    state.memory.add_abstract_object(
+        AbstractIdentifier::mock("instr", "r0", 4),
+        ByteSize::new(4),
+        None,
+    );
+    state.memory.add_abstract_object(
+        AbstractIdentifier::mock("instr", "r1", 4),
+        ByteSize::new(4),
+        None,
+    );
+    state.set_register(&variable!("r8:4"), bitvec!("0x42:4").into());
+    state.set_register(&variable!("r0:4"), bitvec!("0x42:4").into());
+    state.set_register(
+        &variable!("r3:4"),
+        Data::from_target(
+            AbstractIdentifier::mock("instr", "r0", 4),
+            bitvec!("0x0:4").into(),
+        ),
+    );
+    state.minimize_before_return_instruction(&fn_sig, &cconv);
+    // non-return registers are cleared, but return registers remain
+    assert!(state.get_register(&variable!("r8:4")).is_top());
+    assert!(!state.get_register(&variable!("r3:4")).is_top());
+    // immutable parameter objects are removed, but mutable parameter objects remain (even if no pointer to them remains)
+    assert!(state
+        .memory
+        .get_object(&AbstractIdentifier::new(
+            Tid::new("func"),
+            AbstractLocation::mock("r0:4", &[], 4)
+        ))
+        .is_some());
+    assert!(state
+        .memory
+        .get_object(&AbstractIdentifier::new(
+            Tid::new("func"),
+            AbstractLocation::mock("r0:4", &[0], 4)
+        ))
+        .is_none());
+    assert!(state
+        .memory
+        .get_object(&AbstractIdentifier::new(
+            Tid::new("func"),
+            AbstractLocation::mock("r0:4", &[0, 0], 4)
+        ))
+        .is_some());
+    // The stack is removed
+    assert!(state.memory.get_object(&state.stack_id).is_none());
+    // Unreferenced callee-originating objects are removed, but referenced ones remain
+    assert!(state
+        .memory
+        .get_object(&AbstractIdentifier::new(
+            Tid::new("instr"),
+            AbstractLocation::mock("r0:4", &[], 4)
+        ))
+        .is_some());
+    assert!(state
+        .memory
+        .get_object(&AbstractIdentifier::new(
+            Tid::new("instr"),
+            AbstractLocation::mock("r1:4", &[], 4)
+        ))
+        .is_none());
+}
+
+#[test]
+fn test_merge_mem_objects_with_unique_abstract_location() {
+    let call_tid = Tid::new("call");
+    let global_memory = RuntimeMemoryImage::mock();
+    let cconv = CallingConvention::mock_arm32();
+    let full_access = AccessPattern::new_unknown_access();
+    let fn_sig = FunctionSignature {
+        parameters: BTreeMap::from([(AbstractLocation::mock("r0:4", &[], 4), full_access)]),
+        global_parameters: BTreeMap::from([(
+            AbstractLocation::mock_global(0x2000, &[], 4),
+            full_access,
+        )]),
+    };
+    let mut state = State::from_fn_sig(&fn_sig, &variable!("sp:4"), Tid::new("callee"));
+    let param_id = AbstractIdentifier::mock("callee", "r0", 4);
+    let old_callee_orig_id = AbstractIdentifier::mock("instr", "r0", 4);
+    let old_callee_orig_id_2 = AbstractIdentifier::mock("instr_2", "r0", 4);
+    let new_id = AbstractIdentifier::mock_nested("call_param", "r0:4", &[0], 4);
+    state
+        .memory
+        .add_abstract_object(old_callee_orig_id.clone(), ByteSize::new(4), None);
+    state
+        .memory
+        .add_abstract_object(old_callee_orig_id_2.clone(), ByteSize::new(4), None);
+    // The pointer locations to callee_orig_id_2 will not be unique and thus removed from the state.
+    state.set_register(
+        &variable!("r1:4"),
+        Data::from_target(old_callee_orig_id_2.clone(), bitvec!("0x0:4").into()),
+    );
+    state.set_register(
+        &variable!("r2:4"),
+        Data::from_target(old_callee_orig_id_2.clone(), bitvec!("0x0:4").into()),
+    );
+    // This register should be cleared before computing return objects.
+    state.set_register(
+        &variable!("r8:4"),
+        Data::from_target(old_callee_orig_id.clone(), bitvec!("0x0:4").into()),
+    );
+    state
+        .store_value(
+            &Data::from_target(param_id.clone(), bitvec!("0x0:4").into()),
+            &Data::from_target(old_callee_orig_id, bitvec!("0x0:4").into()),
+            &global_memory,
+        )
+        .unwrap();
+    state.minimize_before_return_instruction(&fn_sig, &cconv);
+    state.merge_mem_objects_with_unique_abstract_location(&call_tid);
+    let mut expected_state = State::from_fn_sig(&fn_sig, &variable!("sp:4"), Tid::new("callee"));
+    expected_state.minimize_before_return_instruction(&fn_sig, &cconv);
+    expected_state
+        .memory
+        .add_abstract_object(new_id.clone(), ByteSize::new(4), None);
+    expected_state
+        .store_value(
+            &Data::from_target(param_id.clone(), bitvec!("0x0:4").into()),
+            &Data::from_target(new_id, bitvec!("0x0:4").into()),
+            &global_memory,
+        )
+        .unwrap();
+    assert_eq!(state, expected_state);
 }

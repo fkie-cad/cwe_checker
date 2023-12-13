@@ -137,6 +137,26 @@ impl AbstractObjectList {
             None => Err(anyhow!("Object ID not contained in object list.")),
         }
     }
+
+    /// Only retain those memory objects for which the provided predicate returns `true`.
+    /// All memory objects for which the predicate returns `False` are removed from `self`.
+    pub fn retain<F>(&mut self, f: F)
+    where
+        F: FnMut(&AbstractIdentifier, &mut AbstractObject) -> bool,
+    {
+        self.objects.retain(f)
+    }
+
+    /// Remove an object from the object list.
+    /// Returns the removed object if its ID was indeed contained in the object list.
+    pub fn remove(&mut self, id: &AbstractIdentifier) -> Option<AbstractObject> {
+        self.objects.remove(id)
+    }
+
+    /// Return `true` if the object list contains a memory object indexed by the given ID.
+    pub fn contains(&self, id: &AbstractIdentifier) -> bool {
+        self.objects.contains_key(id)
+    }
 }
 
 impl AbstractDomain for AbstractObjectList {

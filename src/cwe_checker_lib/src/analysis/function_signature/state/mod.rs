@@ -1,14 +1,15 @@
-use std::collections::BTreeMap;
-use std::collections::BTreeSet;
-
+use super::AccessPattern;
+use super::POINTER_RECURSION_DEPTH_LIMIT;
 use crate::abstract_domain::*;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
-
-use super::AccessPattern;
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 /// Methods of [`State`] related to handling call instructions.
 mod call_handling;
+/// Methods of [`State`] related to handling load and store instructions.
+mod memory_handling;
 
 /// The state tracks knowledge about known register values,
 /// known values on the stack, and access patterns of tracked variables.
@@ -113,90 +114,6 @@ impl State {
         self.stack_id.get_tid()
     }
 
-    /// Load the value at the given address.
-    ///
-    /// Only constant addresses on the stack are tracked.
-    /// Thus this function will always return a `Top` domain for any address
-    /// that may not be a stack address with constant offset.
-    ///
-    /// This function does not set any access flags for input IDs in the address value.
-    pub fn load_value(
-        &mut self,
-        address: DataDomain<BitvectorDomain>,
-        size: ByteSize,
-        global_memory: Option<&RuntimeMemoryImage>,
-    ) -> DataDomain<BitvectorDomain> {
-        if let Some(stack_offset) = self.get_offset_if_exact_stack_pointer(&address) {
-            self.load_value_from_stack(stack_offset, size)
-        } else if let (Ok(global_address), Some(global_mem)) =
-            (address.try_to_bitvec(), global_memory)
-        {
-            if let Ok(Some(value)) = global_mem.read(&global_address, size) {
-                value.into()
-            } else {
-                DataDomain::new_top(size)
-            }
-        } else {
-            DataDomain::new_top(size)
-        }
-    }
-
-    /// Load the value at the given stack offset.
-    /// If the offset is non-negative a corresponding stack parameter is generated if necessary.
-    fn load_value_from_stack(
-        &mut self,
-        stack_offset: Bitvector,
-        size: ByteSize,
-    ) -> DataDomain<BitvectorDomain> {
-        if !stack_offset.sign_bit().to_bool() {
-            // Stack offset is nonnegative, i.e. this is a stack parameter access.
-            self.get_stack_param(stack_offset, size)
-        } else {
-            self.stack.get(stack_offset, size)
-        }
-    }
-
-    /// Load a value of unknown bytesize at the given stack offset.
-    /// If the offset is non-negative, a corresponding stack parameter is generated if necessary.
-    ///
-    /// One must be careful to not rely on the correctness of the bytesize of the returned value!
-    /// If the size of the value cannot be guessed from the contents of the stack,
-    /// then a size of 1 byte is assumed, which will be wrong in general!
-    fn load_unsized_value_from_stack(&mut self, offset: Bitvector) -> DataDomain<BitvectorDomain> {
-        if !offset.sign_bit().to_bool() {
-            // This is a pointer to a stack parameter of the current function
-            self.stack
-                .get_unsized(offset.clone())
-                .unwrap_or_else(|| self.get_stack_param(offset, ByteSize::new(1)))
-        } else {
-            self.stack
-                .get_unsized(offset)
-                .unwrap_or_else(|| DataDomain::new_top(ByteSize::new(1)))
-        }
-    }
-
-    /// If `address` is a stack offset, then write `value` onto the stack.
-    ///
-    /// If address points to a stack parameter, whose ID does not yet exists,
-    /// then the ID is generated and added to the tracked IDs.
-    ///
-    /// This function does not set any access flags for input IDs of the given address or value.
-    pub fn write_value(
-        &mut self,
-        address: DataDomain<BitvectorDomain>,
-        value: DataDomain<BitvectorDomain>,
-    ) {
-        if let Some(stack_offset) = self.get_offset_if_exact_stack_pointer(&address) {
-            // We generate a new stack parameter object, but do not set any access flags,
-            // since the stack parameter is not accessed but overwritten.
-            if !stack_offset.sign_bit().to_bool() {
-                let _ = self
-                    .generate_stack_param_id_if_nonexistent(stack_offset.clone(), value.bytesize());
-            }
-            self.stack.add(value, stack_offset);
-        }
-    }
-
     /// If the stack parameter ID corresponding to the given stack offset does not exist
     /// then generate it, add it to the list of tracked IDs, and return it.
     fn generate_stack_param_id_if_nonexistent(
@@ -226,40 +143,6 @@ impl State {
         if self.tracked_ids.get(id).is_none() {
             self.tracked_ids.insert(id.clone(), AccessPattern::new());
         }
-    }
-
-    /// Get the value located at a positive stack offset.
-    ///
-    /// If no corresponding stack parameter ID exists for the value,
-    /// generate it and then return it as an unmodified stack parameter.
-    /// Otherwise just read the value at the given stack address.
-    fn get_stack_param(
-        &mut self,
-        address: Bitvector,
-        size: ByteSize,
-    ) -> DataDomain<BitvectorDomain> {
-        assert!(!address.sign_bit().to_bool());
-        if let Some(param_id) = self.generate_stack_param_id_if_nonexistent(address.clone(), size) {
-            let stack_param =
-                DataDomain::from_target(param_id, Bitvector::zero(size.into()).into());
-            self.stack.add(stack_param.clone(), address);
-            stack_param
-        } else {
-            self.stack.get(address, size)
-        }
-    }
-
-    /// If the address is an exactly known pointer to the stack with a constant offset, then return the offset.
-    pub fn get_offset_if_exact_stack_pointer(
-        &self,
-        address: &DataDomain<BitvectorDomain>,
-    ) -> Option<Bitvector> {
-        if let Some((target, offset)) = address.get_if_unique_target() {
-            if *target == self.stack_id {
-                return offset.try_to_bitvec().ok();
-            }
-        }
-        None
     }
 
     /// Merges the access pattern of the given abstract identifer in `self` with the provided access pattern.
@@ -308,10 +191,53 @@ impl State {
                 size,
                 data_type: _,
             } => {
-                self.set_deref_flag_for_input_ids_of_expression(address);
+                self.set_deref_flag_for_pointer_inputs_of_expression(address);
+                self.set_read_flag_for_input_ids_of_expression(address);
                 let address = self.eval(address);
                 self.load_value(address, *size, None)
             }
+        }
+    }
+
+    /// Evaluate the value at the given memory location
+    /// where `value` represents the root pointer relative to which the memory location needs to be computed.
+    fn eval_mem_location_relative_value(
+        &mut self,
+        value: DataDomain<BitvectorDomain>,
+        mem_location: &AbstractMemoryLocation,
+    ) -> DataDomain<BitvectorDomain> {
+        let target_size = mem_location.bytesize();
+        let mut eval_result = DataDomain::new_empty(target_size);
+        for (id, offset) in value.get_relative_values() {
+            let mut location = id.get_location().clone();
+            let mut mem_location = mem_location.clone();
+            match offset.try_to_offset() {
+                Ok(concrete_offset) => mem_location.add_offset_at_root(concrete_offset),
+                Err(_) => {
+                    eval_result.set_contains_top_flag();
+                    continue;
+                }
+            };
+            location.extend(mem_location, self.stack_id.bytesize());
+            if location.recursion_depth() <= POINTER_RECURSION_DEPTH_LIMIT {
+                eval_result = eval_result.merge(&DataDomain::from_target(
+                    AbstractIdentifier::new(id.get_tid().clone(), location),
+                    Bitvector::zero(target_size.into()).into(),
+                ));
+            } else {
+                eval_result.set_contains_top_flag();
+            }
+        }
+        if value.contains_top() || value.get_absolute_value().is_some() {
+            eval_result.set_contains_top_flag();
+        }
+        eval_result
+    }
+
+    /// Add all relative IDs in `data` to the list of tracked IDs.
+    pub fn track_contained_ids(&mut self, data: &DataDomain<BitvectorDomain>) {
+        for id in data.referenced_ids() {
+            self.add_id_to_tracked_ids(id);
         }
     }
 
@@ -341,19 +267,31 @@ impl State {
         }
     }
 
-    /// Set the read and dereferenced flag for every tracked ID
-    /// that may be referenced when computing the value of the expression.
-    pub fn set_deref_flag_for_input_ids_of_expression(&mut self, expression: &Expression) {
-        for register in expression.input_vars() {
+    /// Set the read and dereferenced flag for every tracked pointer ID
+    /// that may be referenced when computing the value of the given address expression.
+    pub fn set_deref_flag_for_pointer_inputs_of_expression(&mut self, expression: &Expression) {
+        for register in get_pointer_inputs_vars_of_address_expression(expression) {
             self.set_deref_flag_for_contained_ids(&self.get_register(register));
         }
     }
 
-    /// Set the read and mutably dereferenced flag for every tracked ID
-    /// that may be referenced when computing the value of the expression.
-    pub fn set_mutable_deref_flag_for_input_ids_of_expression(&mut self, expression: &Expression) {
-        for register in expression.input_vars() {
+    /// Set the read and mutably dereferenced flag for every tracked pointer ID
+    /// that may be referenced when computing the value of the given address expression.
+    pub fn set_mutable_deref_flag_for_pointer_inputs_of_expression(
+        &mut self,
+        expression: &Expression,
+    ) {
+        for register in get_pointer_inputs_vars_of_address_expression(expression) {
             self.set_deref_mut_flag_for_contained_ids(&self.get_register(register));
+        }
+    }
+
+    /// Set the read flag for every tracked ID contained in the given value.
+    pub fn set_read_flag_for_contained_ids(&mut self, value: &DataDomain<BitvectorDomain>) {
+        for id in value.referenced_ids() {
+            if let Some(object) = self.tracked_ids.get_mut(id) {
+                object.set_read_flag();
+            }
         }
     }
 
@@ -411,6 +349,34 @@ impl State {
         }
         value
     }
+}
+
+/// Get a list of possible pointer input variables for the given address expression.
+///
+/// Only addition, subtraction and bitwise AND, OR, XOR can have pointers as inputs.
+/// All other subexpressions are assumed to only compute offsets.
+fn get_pointer_inputs_vars_of_address_expression(expr: &Expression) -> Vec<&Variable> {
+    let mut input_vars = Vec::new();
+    match expr {
+        Expression::BinOp { op, lhs, rhs } => {
+            match op {
+                BinOpType::IntAdd | BinOpType::IntAnd | BinOpType::IntXOr | BinOpType::IntOr => {
+                    // There could be a pointer on either of the sides
+                    input_vars.extend(get_pointer_inputs_vars_of_address_expression(lhs));
+                    input_vars.extend(get_pointer_inputs_vars_of_address_expression(rhs));
+                }
+                BinOpType::IntSub => {
+                    // Only the left side could be a pointer
+                    input_vars.extend(get_pointer_inputs_vars_of_address_expression(lhs));
+                }
+                _ => (),
+            }
+        }
+        Expression::Var(var) => input_vars.push(var),
+        _ => (),
+    }
+
+    input_vars
 }
 
 impl AbstractDomain for State {
@@ -472,4 +438,4 @@ impl State {
 }
 
 #[cfg(test)]
-mod tests;
+pub mod tests;

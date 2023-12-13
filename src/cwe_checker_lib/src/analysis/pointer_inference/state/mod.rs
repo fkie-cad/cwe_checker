@@ -1,9 +1,12 @@
+use super::object::AbstractObject;
 use super::object_list::AbstractObjectList;
 use super::Data;
 use crate::abstract_domain::*;
+use crate::analysis::function_signature::AccessPattern;
 use crate::analysis::function_signature::FunctionSignature;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
+use std::collections::HashSet;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
@@ -67,36 +70,118 @@ impl State {
         stack_register: &Variable,
         function_tid: Tid,
     ) -> State {
-        let global_addresses = fn_sig.global_parameters.keys().cloned().collect();
+        let global_addresses = fn_sig
+            .global_parameters
+            .keys()
+            .map(|location| match location {
+                AbstractLocation::GlobalAddress { address, .. }
+                | AbstractLocation::GlobalPointer(address, _) => *address,
+                _ => panic!("Unexpected non-global parameter"),
+            })
+            .collect();
         let mock_global_memory = RuntimeMemoryImage::empty(true);
         let mut state = State::new(stack_register, function_tid.clone(), global_addresses);
         // Set parameter values and create parameter memory objects.
-        for (arg, access_pattern) in &fn_sig.parameters {
-            let param_id = AbstractIdentifier::from_arg(&function_tid, arg);
-            match arg {
-                Arg::Register {
-                    expr: Expression::Var(var),
-                    ..
-                } => state.set_register(
-                    var,
-                    Data::from_target(param_id.clone(), Bitvector::zero(var.size.into()).into()),
-                ),
-                Arg::Register { .. } => continue, // Parameters in floating point registers are currently ignored.
-                Arg::Stack { address, size, .. } => {
-                    let param_data =
-                        Data::from_target(param_id.clone(), Bitvector::zero((*size).into()).into());
-                    state
-                        .write_to_address(address, &param_data, &mock_global_memory)
-                        .unwrap();
-                }
+        for params in sort_params_by_recursion_depth(&fn_sig.parameters).values() {
+            for (param_location, access_pattern) in params {
+                state.add_param(param_location, access_pattern, &mock_global_memory);
             }
-            if access_pattern.is_dereferenced() {
-                state
-                    .memory
-                    .add_abstract_object(param_id, stack_register.size, None);
+        }
+        for (recursion_depth, params) in sort_params_by_recursion_depth(&fn_sig.global_parameters) {
+            if recursion_depth > 0 {
+                for (param_location, access_pattern) in params {
+                    state.add_param(param_location, access_pattern, &mock_global_memory);
+                }
             }
         }
         state
+    }
+
+    /// Add the given parameter to the function start state represented by `self`:
+    /// For the given parameter location, add a parameter object if it was dereferenced (according to the access pattern)
+    /// and write the pointer to the parameter object to the corresponding existing memory object of `self`.
+    ///
+    /// This function assumes that the parent memory object of `param` already exists if `param` is a nested parameter.
+    fn add_param(
+        &mut self,
+        param: &AbstractLocation,
+        access_pattern: &AccessPattern,
+        global_memory: &RuntimeMemoryImage,
+    ) {
+        let param_id = AbstractIdentifier::new(self.stack_id.get_tid().clone(), param.clone());
+        if !matches!(param, AbstractLocation::GlobalAddress { .. })
+            && access_pattern.is_dereferenced()
+        {
+            self.memory
+                .add_abstract_object(param_id.clone(), self.stack_id.bytesize(), None);
+        }
+        match param {
+            AbstractLocation::Register(var) => {
+                self.set_register(
+                    var,
+                    Data::from_target(param_id, Bitvector::zero(param.bytesize().into()).into()),
+                );
+            }
+            AbstractLocation::Pointer(_, _) => {
+                let (parent_location, offset) =
+                    param.get_parent_location(self.stack_id.bytesize()).unwrap();
+                let parent_id =
+                    AbstractIdentifier::new(self.stack_id.get_tid().clone(), parent_location);
+                self.store_value(
+                    &Data::from_target(
+                        parent_id,
+                        Bitvector::from_i64(offset)
+                            .into_resize_signed(self.stack_id.bytesize())
+                            .into(),
+                    ),
+                    &Data::from_target(
+                        param_id.clone(),
+                        Bitvector::zero(param_id.bytesize().into()).into(),
+                    ),
+                    global_memory,
+                )
+                .unwrap();
+            }
+            AbstractLocation::GlobalAddress { .. } => (),
+            AbstractLocation::GlobalPointer(_, _) => {
+                let (parent_location, offset) =
+                    param.get_parent_location(self.stack_id.bytesize()).unwrap();
+                if let AbstractLocation::GlobalAddress { address, size: _ } = parent_location {
+                    let parent_id = self.get_global_mem_id();
+                    self.store_value(
+                        &Data::from_target(
+                            parent_id,
+                            Bitvector::from_u64(address + offset as u64)
+                                .into_resize_signed(self.stack_id.bytesize())
+                                .into(),
+                        ),
+                        &Data::from_target(
+                            param_id.clone(),
+                            Bitvector::zero(param_id.bytesize().into()).into(),
+                        ),
+                        global_memory,
+                    )
+                    .unwrap();
+                } else {
+                    let parent_id =
+                        AbstractIdentifier::new(self.stack_id.get_tid().clone(), parent_location);
+                    self.store_value(
+                        &Data::from_target(
+                            parent_id,
+                            Bitvector::from_i64(offset)
+                                .into_resize_signed(self.stack_id.bytesize())
+                                .into(),
+                        ),
+                        &Data::from_target(
+                            param_id.clone(),
+                            Bitvector::zero(param_id.bytesize().into()).into(),
+                        ),
+                        global_memory,
+                    )
+                    .unwrap();
+                }
+            }
+        }
     }
 
     /// Set the MIPS link register `t9` to the address of the callee TID.
@@ -122,6 +207,89 @@ impl State {
             .into_resize_unsigned(generic_pointer_size);
         self.set_register(&link_register, address.into());
         Ok(())
+    }
+
+    /// Remove all objects and registers from the state whose contents will not be used after returning to a caller.
+    ///
+    /// All remaining memory objects after the minimization are reachable in the caller
+    /// either via a parameter object that may have been mutated in the call
+    /// or via a return register.
+    pub fn minimize_before_return_instruction(
+        &mut self,
+        fn_sig: &FunctionSignature,
+        cconv: &CallingConvention,
+    ) {
+        self.clear_non_return_register(cconv);
+        self.remove_immutable_parameter_objects(fn_sig);
+        self.memory.remove(&self.stack_id);
+        self.remove_unreferenced_objects();
+    }
+
+    /// Remove all parameter objects (including global parameter objects) that are not marked as mutably accessed.
+    /// Used to minimize state before a return instruction.
+    fn remove_immutable_parameter_objects(&mut self, fn_sig: &FunctionSignature) {
+        let current_fn_tid = self.get_fn_tid().clone();
+        self.memory.retain(|object_id, _object| {
+            if *object_id.get_tid() == current_fn_tid && object_id.get_path_hints().is_empty() {
+                if let Some(access_pattern) = fn_sig.parameters.get(object_id.get_location()) {
+                    if !access_pattern.is_mutably_dereferenced() {
+                        return false;
+                    }
+                }
+                if let Some(access_pattern) = fn_sig.global_parameters.get(object_id.get_location())
+                {
+                    if !access_pattern.is_mutably_dereferenced() {
+                        return false;
+                    }
+                }
+            }
+            true
+        });
+    }
+
+    /// Clear all non-return registers from the state, including all virtual registers.
+    /// This function is used to minimize the state before a return instruction.
+    fn clear_non_return_register(&mut self, cconv: &CallingConvention) {
+        let return_register: HashSet<Variable> = cconv
+            .get_all_return_register()
+            .into_iter()
+            .cloned()
+            .collect();
+        self.register
+            .retain(|var, _value| return_register.contains(var));
+    }
+
+    /// Try to determine unique pointer locations for non-parameter memory objects.
+    /// When successful, merge all referenced non-parameter objects for that location
+    /// and replace the pointer with a pointer to the merged object.
+    ///
+    /// The merged objects get new abstract IDs generated from the call TID and their abstract location in the state.
+    ///
+    /// This function leaves pointers to parameter objects as is,
+    /// while pointers to non-parameter objects, that were not merged (e.g. due to pointers being not unique) are replaced with `Top`.
+    pub fn merge_mem_objects_with_unique_abstract_location(&mut self, call_tid: &Tid) {
+        let mut location_to_data_map = self.map_abstract_locations_to_pointer_data(call_tid);
+        self.filter_location_to_pointer_data_map(&mut location_to_data_map);
+        let location_to_object_map =
+            self.generate_target_objects_for_new_locations(&location_to_data_map);
+        self.replace_unified_mem_objects(location_to_object_map);
+        self.replace_ids_to_non_parameter_objects(&location_to_data_map);
+        self.insert_pointers_to_unified_objects(&location_to_data_map, call_tid);
+    }
+
+    /// Remove all memory objects corresponding to non-parameter IDs.
+    /// Afterwards, add the memory objects in the location to object map to the state.
+    fn replace_unified_mem_objects(
+        &mut self,
+        location_to_object_map: BTreeMap<AbstractIdentifier, AbstractObject>,
+    ) {
+        let current_fn_tid = self.get_fn_tid().clone();
+        self.memory.retain(|object_id, _| {
+            *object_id.get_tid() == current_fn_tid && object_id.get_path_hints().is_empty()
+        });
+        for (id, object) in location_to_object_map {
+            self.memory.insert(id, object);
+        }
     }
 
     /// Clear all non-callee-saved registers from the state.
@@ -258,6 +426,22 @@ impl State {
 
         Value::Object(state_map)
     }
+}
+
+/// Sort parameters by recursion depth.
+/// Helper function when one has to iterate over parameters in order of their recursion depth.
+fn sort_params_by_recursion_depth(
+    params: &BTreeMap<AbstractLocation, AccessPattern>,
+) -> BTreeMap<u64, BTreeMap<&AbstractLocation, &AccessPattern>> {
+    let mut sorted_params = BTreeMap::new();
+    for (param, access_pattern) in params {
+        let recursion_depth = param.recursion_depth();
+        let bucket = sorted_params
+            .entry(recursion_depth)
+            .or_insert(BTreeMap::new());
+        bucket.insert(param, access_pattern);
+    }
+    sorted_params
 }
 
 #[cfg(test)]
