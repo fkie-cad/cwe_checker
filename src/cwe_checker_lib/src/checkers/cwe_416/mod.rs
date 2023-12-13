@@ -47,6 +47,10 @@
 //! - Memory objects not tracked by the Pointer Inference analysis or pointer targets missed by the Pointer Inference
 //! may lead to missed CWEs in this check.
 //! - Pointers freed by other operations than calls to the deallocation symbols contained in the config.json will be missed by the analysis.
+//! - Pointers freed and flagged in the same call are not marked as freed in the caller.
+//! This reduces false positives and duplicates, but may also result in some false negatives.
+//! - Objects freed in the same call where they are created are not marked as freed in the caller.
+//! This reduces false positives, but may also result in some false negatives.
 
 use crate::abstract_domain::AbstractIdentifier;
 use crate::prelude::*;

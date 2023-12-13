@@ -189,19 +189,31 @@ impl State {
         call_tid: &Tid,
         pi_state: &PiState,
     ) {
+        let call_tid_with_suffix = call_tid.clone().with_id_suffix("_param");
+
         for (callee_id, callee_object_state) in state_before_return.dangling_objects.iter() {
             if let Some(caller_value) = id_replacement_map.get(callee_id) {
                 for caller_id in caller_value.get_relative_values().keys() {
+                    if caller_id.get_tid() == call_tid
+                        || caller_id.get_tid() == &call_tid_with_suffix
+                    {
+                        // FIXME: We heuristically ignore free operations if the happen in the same call as the creation of the object.
+                        // This reduces false positives, but also produces false negatives for some returned dangling pointers.
+                        continue;
+                    }
+
                     match callee_object_state {
-                        ObjectState::Dangling(callee_free_path)
-                        | ObjectState::AlreadyFlagged(callee_free_path) => {
+                        ObjectState::Dangling(callee_free_path) => {
                             let mut free_id_path = callee_free_path.clone();
                             free_id_path.push(call_tid.clone());
-                            // FIXME: If the object was not created in the callee and it is also marked as flagged in the callee
-                            // then one could interpret accesses in the caller as duplicates and mark the object ID as already flagged.
-                            // But analysis errors in the callee could mask real Use-After-Frees in the caller if we do that.
                             let _ = self.mark_as_freed(caller_id, free_id_path, pi_state);
                         }
+                        // FIXME: To reduce false positives and duplicates we heuristically assume
+                        // that if an object is flagged in the callee
+                        // then Use After Frees in the caller are duplicates from the flagged access in the callee.
+                        // And that the corresponding dangling objects do not reach the caller in this case.
+                        // Note that this heuristic will produce false negatives in some cases.
+                        ObjectState::AlreadyFlagged(_) => (),
                     }
                 }
             }
