@@ -1,5 +1,4 @@
 use super::State;
-use super::POINTER_RECURSION_DEPTH_LIMIT;
 use crate::abstract_domain::*;
 use crate::intermediate_representation::*;
 
@@ -48,7 +47,7 @@ impl State {
                 Err(_) => DataDomain::new_top(size),
             }
         } else if let (true, Ok(constant_offset)) = (
-            id.get_location().recursion_depth() < POINTER_RECURSION_DEPTH_LIMIT,
+            id.get_location().recursion_depth() < self.pointer_recursion_depth_limit,
             offset.try_to_offset(),
         ) {
             // Extend the abstract location string

@@ -68,6 +68,7 @@ fn test_call_stub_handling() {
         &Tid::new("func"),
         &project.stack_pointer_register,
         project.get_standard_calling_convention().unwrap(),
+        2,
     );
     let extern_symbol = ExternSymbol::mock_malloc_symbol_arm();
     let call_tid = Tid::new("call_malloc");
@@ -93,6 +94,7 @@ fn test_call_stub_handling() {
         &Tid::new("func"),
         &project.stack_pointer_register,
         project.get_standard_calling_convention().unwrap(),
+        2,
     );
     // Set the format string param register to a pointer to the string 'cat %s %s %s %s'.
     state.set_register(&variable!("r1:4"), bitvec!("0x6000:4").into());

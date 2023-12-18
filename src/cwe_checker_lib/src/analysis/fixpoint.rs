@@ -234,6 +234,16 @@ impl<T: Context> Computation<T> {
         &self.node_values
     }
 
+    /// Get a mutable iterator over all node values.
+    /// Also add all nodes that have values to the worklist, because one can change all their values through the iterator.
+    pub fn node_values_mut(&mut self) -> impl Iterator<Item = &mut T::NodeValue> {
+        for node in self.node_values.keys() {
+            let priority = self.node_priority_list[node.index()];
+            self.worklist.insert(priority);
+        }
+        self.node_values.values_mut()
+    }
+
     /// Get a reference to the underlying graph
     pub fn get_graph(&self) -> &DiGraph<T::NodeLabel, T::EdgeLabel> {
         self.fp_context.get_graph()

@@ -31,6 +31,9 @@
 //!   Nevertheless, it should result in an overapproximation of parameters and their access patterns in most cases.
 //! * The nesting depth for tracked nested parameters is limited
 //!   to avoid generating infinitely many parameters for recursive types like linked lists.
+//! * For arrays no parameters should be created for the array elements.
+//!   However, if only a particular element in an array is accessed without iteration over the array,
+//!   then a parameter might be generated for that element.
 
 use crate::abstract_domain::AbstractDomain;
 use crate::abstract_domain::AbstractLocation;
@@ -55,16 +58,12 @@ mod global_var_propagation;
 use global_var_propagation::propagate_globals;
 pub mod stubs;
 
-/// The recursion depth limit for abstract locations to be tracked by the function signature analysis,
-/// i.e. how many dereference operations an abstract location is allowed to contain
-/// before the analysis stops tracking the location.
-const POINTER_RECURSION_DEPTH_LIMIT: u64 = 2;
-
 /// Generate the computation object for the fixpoint computation
 /// and set the node values for all function entry nodes.
 fn generate_fixpoint_computation<'a>(
     project: &'a Project,
     graph: &'a Graph,
+    pointer_recursion_depth_limit: u64,
 ) -> Computation<GeneralizedContext<'a, Context<'a>>> {
     let context = Context::new(project, graph);
     let mut computation = create_computation(context, None);
@@ -81,6 +80,7 @@ fn generate_fixpoint_computation<'a>(
                         &sub.tid,
                         &project.stack_pointer_register,
                         calling_convention,
+                        pointer_recursion_depth_limit,
                     );
                     if project.cpu_architecture.contains("MIPS") {
                         let _ = fn_start_state
@@ -152,8 +152,35 @@ pub fn compute_function_signatures<'a>(
     project: &'a Project,
     graph: &'a Graph,
 ) -> (BTreeMap<Tid, FunctionSignature>, Vec<LogMessage>) {
-    let mut computation = generate_fixpoint_computation(project, graph);
+    let max_pointer_recursion_depth_limit: u64 = 2;
+    // We gradually increase the recursion depth limit used in the fixpoint computation.
+    // The idea is that for array accesses the offset has time to converge to `Top` before IDs for nested objects are created.
+    // Otherwise the algorithm would generate an object for the first element of an array
+    // before it can check that it is an array access that we want to ignore.
+    let mut computation = generate_fixpoint_computation(project, graph, 0);
     computation.compute_with_max_steps(100);
+    for pointer_recursion_limit in 1..=max_pointer_recursion_depth_limit {
+        for node_value in computation.node_values_mut() {
+            match node_value {
+                NodeValue::Value(state) => {
+                    state.set_pointer_recursion_depth_limit(pointer_recursion_limit)
+                }
+                NodeValue::CallFlowCombinator {
+                    call_stub,
+                    interprocedural_flow,
+                } => {
+                    for state in call_stub.iter_mut() {
+                        state.set_pointer_recursion_depth_limit(pointer_recursion_limit);
+                    }
+                    for state in interprocedural_flow.iter_mut() {
+                        state.set_pointer_recursion_depth_limit(pointer_recursion_limit);
+                    }
+                }
+            }
+        }
+        computation.compute_with_max_steps(100);
+    }
+
     let mut fn_sig_map = extract_fn_signatures_from_fixpoint(project, graph, computation);
     // Sanitize the parameters
     let mut logs = Vec::new();
