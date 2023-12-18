@@ -51,6 +51,9 @@
 //! This reduces false positives and duplicates, but may also result in some false negatives.
 //! - Objects freed in the same call where they are created are not marked as freed in the caller.
 //! This reduces false positives, but may also result in some false negatives.
+//! - Pointers to recursively defined data structures like linked lists are heuristically identified and ignored.
+//! This reduces false positives generated when such structures are recursively freed in a loop,
+//! but also prevents detection of bugs involving such pointers.
 
 use crate::abstract_domain::AbstractIdentifier;
 use crate::prelude::*;
