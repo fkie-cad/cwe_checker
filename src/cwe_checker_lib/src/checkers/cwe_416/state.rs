@@ -4,7 +4,7 @@ use crate::{
     analysis::pointer_inference::Data,
     prelude::*,
 };
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// The state of a memory object for which at least one possible call to a `free`-like function was detected.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
@@ -159,6 +159,9 @@ impl State {
 
     /// All TIDs that the given `param` may point to are marked as freed, i.e. pointers to them are dangling.
     /// For each ID that was already marked as dangling return a string describing the root cause of a possible double free bug.
+    ///
+    /// The function heuristically detects IDs related to recursive data structures (e.g. linked lists).
+    /// Such IDs are ignored when marking objects as freed.
     pub fn handle_param_of_free_call(
         &mut self,
         call_tid: &Tid,
@@ -168,7 +171,9 @@ impl State {
         // FIXME: This function could also generate debug log messages whenever nonsensical information is detected.
         // E.g. stack frame IDs or non-zero ID offsets can be indicators of other bugs.
         let mut warnings = Vec::new();
-        for id in param.get_relative_values().keys() {
+        let generic_pointer_size = pi_state.stack_id.bytesize();
+        // Heuristically ignore recursive IDs
+        for id in get_non_recursive_ids(param, generic_pointer_size) {
             if let Some(warning_data) = self.mark_as_freed(id, vec![call_tid.clone()], pi_state) {
                 warnings.push(warning_data);
             }
@@ -182,6 +187,10 @@ impl State {
 
     /// Add objects that were freed in the callee of a function call to the list of dangling pointers of `self`.
     /// Note that this function does not check for double frees.
+    ///
+    /// The function heuristically detects when parameter values contain IDs
+    /// corresponding to recursive data structures (e.g. linked lists).
+    /// Such IDs are ignored, i.e. their object status is not transferred from the callee.
     pub fn collect_freed_objects_from_called_function(
         &mut self,
         state_before_return: &State,
@@ -189,19 +198,33 @@ impl State {
         call_tid: &Tid,
         pi_state: &PiState,
     ) {
+        let generic_pointer_size = pi_state.stack_id.bytesize();
+        let call_tid_with_suffix = call_tid.clone().with_id_suffix("_param");
+
         for (callee_id, callee_object_state) in state_before_return.dangling_objects.iter() {
             if let Some(caller_value) = id_replacement_map.get(callee_id) {
-                for caller_id in caller_value.get_relative_values().keys() {
+                // Heuristically filter out recursive IDs
+                for caller_id in get_non_recursive_ids(caller_value, generic_pointer_size) {
+                    if caller_id.get_tid() == call_tid
+                        || caller_id.get_tid() == &call_tid_with_suffix
+                    {
+                        // FIXME: We heuristically ignore free operations if they happen in the same call as the creation of the object.
+                        // This reduces false positives, but also produces false negatives for some returned dangling pointers.
+                        continue;
+                    }
+
                     match callee_object_state {
-                        ObjectState::Dangling(callee_free_path)
-                        | ObjectState::AlreadyFlagged(callee_free_path) => {
+                        ObjectState::Dangling(callee_free_path) => {
                             let mut free_id_path = callee_free_path.clone();
                             free_id_path.push(call_tid.clone());
-                            // FIXME: If the object was not created in the callee and it is also marked as flagged in the callee
-                            // then one could interpret accesses in the caller as duplicates and mark the object ID as already flagged.
-                            // But analysis errors in the callee could mask real Use-After-Frees in the caller if we do that.
                             let _ = self.mark_as_freed(caller_id, free_id_path, pi_state);
                         }
+                        // FIXME: To reduce false positives and duplicates we heuristically assume
+                        // that if an object is flagged in the callee
+                        // then Use After Frees in the caller are duplicates from the flagged access in the callee.
+                        // And that the corresponding dangling objects do not reach the caller in this case.
+                        // Note that this heuristic will produce false negatives in some cases.
+                        ObjectState::AlreadyFlagged(_) => (),
                     }
                 }
             }
@@ -277,10 +300,34 @@ impl State {
     }
 }
 
+/// Return the set of relative IDs contained in the input `data` after filtering out recursive IDs.
+///
+/// An ID is *recursive*, i.e. assumed to correspond to a recursive data structure like a linked list,
+/// if its parent abstract location is also contained as an ID in `data`
+/// or if some ID contained in `data` has this ID as its parent.
+fn get_non_recursive_ids(
+    data: &Data,
+    generic_pointer_size: ByteSize,
+) -> BTreeSet<&AbstractIdentifier> {
+    let ids: BTreeSet<_> = data.get_relative_values().keys().collect();
+    let mut filtered_ids = ids.clone();
+    for id in &ids {
+        if let Some(parent_id) = id.get_id_with_parent_location(generic_pointer_size) {
+            if ids.contains(&parent_id) {
+                filtered_ids.remove(*id);
+                filtered_ids.remove(&parent_id);
+            }
+        }
+    }
+    filtered_ids
+}
+
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::{bitvec, intermediate_representation::parsing, variable};
+    use crate::{
+        abstract_domain::DataDomain, bitvec, intermediate_representation::parsing, variable,
+    };
     use std::collections::BTreeSet;
 
     #[test]
@@ -384,6 +431,36 @@ pub mod tests {
                 .get(&AbstractIdentifier::mock("caller_tid", "RBX", 8))
                 .unwrap(),
             &ObjectState::Dangling(vec![Tid::new("free_tid"), Tid::new("call_tid")])
+        );
+    }
+
+    #[test]
+    fn test_filtering_of_recursive_ids() {
+        let data = DataDomain::mock_from_target_map(BTreeMap::from([
+            (
+                AbstractIdentifier::mock_nested("time1", "r0:4", &[], 4),
+                bitvec!("0x0:4").into(),
+            ),
+            (
+                AbstractIdentifier::mock_nested("time1", "r0:4", &[0], 4),
+                bitvec!("0x0:4").into(),
+            ),
+            (
+                AbstractIdentifier::mock_nested("unique1", "r0:4", &[], 4),
+                bitvec!("0x0:4").into(),
+            ),
+            (
+                AbstractIdentifier::mock_nested("unique2", "r0:4", &[0], 4),
+                bitvec!("0x0:4").into(),
+            ),
+        ]));
+        let filtered_ids = get_non_recursive_ids(&data, ByteSize::new(4));
+        assert_eq!(
+            filtered_ids,
+            BTreeSet::from([
+                &AbstractIdentifier::mock_nested("unique1", "r0:4", &[], 4),
+                &AbstractIdentifier::mock_nested("unique2", "r0:4", &[0], 4)
+            ])
         );
     }
 }

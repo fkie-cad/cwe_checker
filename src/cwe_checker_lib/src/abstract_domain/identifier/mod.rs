@@ -1,6 +1,7 @@
 use crate::intermediate_representation::*;
 use crate::prelude::*;
 use derive_more::Deref;
+use std::ops::Deref;
 use std::sync::Arc;
 
 mod location;
@@ -149,6 +150,24 @@ impl AbstractIdentifier {
     /// Get the bytesize of the value represented by the abstract ID.
     pub fn bytesize(&self) -> ByteSize {
         self.location.bytesize()
+    }
+
+    /// If the abstract location of `self` has a parent location
+    /// then return the ID one gets when replacing the abstract location in `self` with its parent location.
+    pub fn get_id_with_parent_location(
+        &self,
+        generic_pointer_size: ByteSize,
+    ) -> Option<AbstractIdentifier> {
+        if let Ok((parent_location, _)) = self.location.get_parent_location(generic_pointer_size) {
+            let id_data = AbstractIdentifierData {
+                time: self.deref().time.clone(),
+                location: parent_location,
+                path_hints: self.deref().path_hints.clone(),
+            };
+            Some(AbstractIdentifier(Arc::new(id_data)))
+        } else {
+            None
+        }
     }
 }
 

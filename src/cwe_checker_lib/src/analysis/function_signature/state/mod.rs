@@ -1,5 +1,4 @@
 use super::AccessPattern;
-use super::POINTER_RECURSION_DEPTH_LIMIT;
 use crate::abstract_domain::*;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
@@ -27,6 +26,10 @@ pub struct State {
     stack: MemRegion<DataDomain<BitvectorDomain>>,
     /// Maps each tracked ID to an [`AccessPattern`], which tracks known access patterns to the object.
     tracked_ids: DomainMap<AbstractIdentifier, AccessPattern, UnionMergeStrategy>,
+    /// The recursion depth limit for abstract locations to be tracked by the function signature analysis,
+    /// i.e. how many dereference operations an abstract location is allowed to contain
+    /// before the analysis stops tracking the location.
+    pointer_recursion_depth_limit: u64,
 }
 
 impl State {
@@ -37,6 +40,7 @@ impl State {
         func_tid: &Tid,
         stack_register: &Variable,
         calling_convention: &CallingConvention,
+        pointer_recursion_depth_limit: u64,
     ) -> State {
         let mut register_map = BTreeMap::new();
         let mut tracked_ids = BTreeMap::new();
@@ -64,7 +68,16 @@ impl State {
             stack_id,
             stack,
             tracked_ids: DomainMap::from(tracked_ids),
+            pointer_recursion_depth_limit,
         }
+    }
+
+    /// Set the pointer recursion depth limit to the provided value.
+    ///
+    /// Note that one should call this function for all states,
+    /// because merging two states with different depth limits will panic.
+    pub fn set_pointer_recursion_depth_limit(&mut self, limit: u64) {
+        self.pointer_recursion_depth_limit = limit;
     }
 
     /// Set the MIPS link register `t9` to the address of the function TID.
@@ -219,7 +232,7 @@ impl State {
                 }
             };
             location.extend(mem_location, self.stack_id.bytesize());
-            if location.recursion_depth() <= POINTER_RECURSION_DEPTH_LIMIT {
+            if location.recursion_depth() <= self.pointer_recursion_depth_limit {
                 eval_result = eval_result.merge(&DataDomain::from_target(
                     AbstractIdentifier::new(id.get_tid().clone(), location),
                     Bitvector::zero(target_size.into()).into(),
@@ -382,6 +395,10 @@ fn get_pointer_inputs_vars_of_address_expression(expr: &Expression) -> Vec<&Vari
 impl AbstractDomain for State {
     /// Merge two states
     fn merge(&self, other: &Self) -> Self {
+        assert_eq!(
+            self.pointer_recursion_depth_limit,
+            other.pointer_recursion_depth_limit
+        );
         let stack_id = self.stack_id.clone();
         let stack = self.stack.merge(&other.stack);
         State {
@@ -389,6 +406,7 @@ impl AbstractDomain for State {
             stack_id,
             stack,
             tracked_ids: self.tracked_ids.merge(&other.tracked_ids),
+            pointer_recursion_depth_limit: self.pointer_recursion_depth_limit,
         }
     }
 

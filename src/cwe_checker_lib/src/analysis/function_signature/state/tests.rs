@@ -1,5 +1,10 @@
 use super::*;
-use crate::{bitvec, expr, variable};
+use crate::{
+    analysis::{
+        forward_interprocedural_fixpoint::Context as _, function_signature::context::Context,
+    },
+    bitvec, defs, expr, variable,
+};
 
 impl State {
     /// Generate a mock state for an ARM-32 state.
@@ -8,6 +13,7 @@ impl State {
             &Tid::new("mock_fn"),
             &variable!("sp:4"),
             &CallingConvention::mock_arm32(),
+            2,
         )
     }
 
@@ -17,6 +23,7 @@ impl State {
             &Tid::new(tid_name),
             &variable!("RSP:8"),
             &CallingConvention::mock_x64(),
+            2,
         )
     }
 }
@@ -136,4 +143,53 @@ fn test_substitute_global_mem_address() {
         substituted_address,
         DataDomain::from_target(expected_global_id, bitvec!("0x0:4").into())
     );
+}
+
+#[test]
+fn test_pointer_recursion_depth_limit_handling() {
+    let project = Project::mock_arm32();
+    let graph = crate::analysis::graph::get_program_cfg(&project.program);
+    let context = Context::new(&project, &graph);
+    // Test interaction of gradually increasing the pointer recursion depth limit with a loop that
+    // - iterates over an array
+    // - recursively dereferences a variable
+    let mut state = State::mock_arm32();
+    let defs = defs![
+        "instr_1: Store at r1:4 := r0:4",
+        "instr_2: r1:4 = r1:4 + 0x1:4",
+        "instr_3: r3:4 := Load from r3:4"
+    ];
+    let array_elem_location = AbstractLocation::mock("r1:4", &[0], 4);
+    let array_elem_id = AbstractIdentifier::new(
+        state.get_current_function_tid().clone(),
+        array_elem_location,
+    );
+    let recursive_elem_location = AbstractLocation::mock("r3:4", &[0], 4);
+    let recursive_elem_id = AbstractIdentifier::new(
+        state.get_current_function_tid().clone(),
+        recursive_elem_location,
+    );
+    // Iteration with depth limit 0
+    state.pointer_recursion_depth_limit = 0;
+    let prev_state = state.clone();
+    for def in &defs {
+        state = context.update_def(&state, def).unwrap();
+    }
+    state = state.merge(&prev_state);
+    // No array element ID should have been created.
+    assert!(state.tracked_ids.get(&array_elem_id).is_none());
+    // No recursive access ID should have been created.
+    assert!(state.tracked_ids.get(&recursive_elem_id).is_none());
+
+    // Iteration with depth limit 1
+    state.pointer_recursion_depth_limit = 1;
+    let prev_state = state.clone();
+    for def in &defs {
+        state = context.update_def(&state, def).unwrap();
+    }
+    state = state.merge(&prev_state);
+    // No array element ID should have been created.
+    assert!(state.tracked_ids.get(&array_elem_id).is_none());
+    // But the recursive access ID should now exist.
+    assert!(state.tracked_ids.get(&recursive_elem_id).is_some());
 }
