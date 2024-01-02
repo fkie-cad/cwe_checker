@@ -74,7 +74,7 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String> + DomainInsertion> Conte
         for (node_id, node) in pointer_inference_results.get_graph().node_references() {
             match node {
                 Node::BlkStart(block, sub) => {
-                    if let Some(def) = block.term.defs.get(0) {
+                    if let Some(def) = block.term.defs.first() {
                         block_start_node_map.insert((def.tid.clone(), sub.tid.clone()), node_id);
                         block_first_def_set.insert((def.tid.clone(), sub.tid.clone()));
                     }

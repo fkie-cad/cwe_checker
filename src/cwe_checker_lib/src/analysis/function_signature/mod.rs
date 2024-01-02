@@ -70,7 +70,7 @@ fn generate_fixpoint_computation<'a>(
     // Set the node values for all function entry nodes.
     for node in graph.node_indices() {
         if let Node::BlkStart(block, sub) = graph[node] {
-            if let Some(entry_block) = sub.term.blocks.get(0) {
+            if let Some(entry_block) = sub.term.blocks.first() {
                 if entry_block.tid == block.tid {
                     // The node of a function entry point
                     let calling_convention = project

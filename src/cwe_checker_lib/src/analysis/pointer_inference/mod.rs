@@ -305,7 +305,7 @@ impl<'a> PointerInference<'a> {
                     call: (caller_blk, _caller_sub),
                     return_: _,
                 } => {
-                    let call_tid = match caller_blk.term.jmps.get(0) {
+                    let call_tid = match caller_blk.term.jmps.first() {
                         Some(call) => &call.tid,
                         _ => continue,
                     };

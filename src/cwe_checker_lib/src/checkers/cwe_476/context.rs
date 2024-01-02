@@ -70,7 +70,7 @@ impl<'a> Context<'a> {
         for (node_id, node) in graph.node_references() {
             match node {
                 Node::BlkStart(block, sub) => {
-                    if let Some(def) = block.term.defs.get(0) {
+                    if let Some(def) = block.term.defs.first() {
                         block_start_node_map.insert((def.tid.clone(), sub.tid.clone()), node_id);
                     }
                 }

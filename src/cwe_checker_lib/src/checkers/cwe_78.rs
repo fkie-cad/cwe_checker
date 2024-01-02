@@ -158,7 +158,7 @@ pub fn check_system_call_parameter(
     if let Some(Arg::Register {
         expr: Expression::Var(var),
         ..
-    }) = system_symbol.parameters.get(0)
+    }) = system_symbol.parameters.first()
     {
         if let Some(value) = source_state.get_variable_to_pointer_map().get(var) {
             let contains_string_constant = value.get_absolute_value().is_some();

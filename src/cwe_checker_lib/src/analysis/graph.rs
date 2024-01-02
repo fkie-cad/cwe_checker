@@ -512,7 +512,7 @@ pub fn get_entry_nodes_of_subs(graph: &Graph) -> HashMap<Tid, NodeIndex> {
     let mut sub_to_entry_node_map: HashMap<Tid, NodeIndex> = HashMap::new();
     for node in graph.node_indices() {
         if let Node::BlkStart(block, sub) = graph[node] {
-            if let Some(entry_block) = sub.term.blocks.get(0) {
+            if let Some(entry_block) = sub.term.blocks.first() {
                 if block.tid == entry_block.tid {
                     sub_to_entry_node_map.insert(sub.tid.clone(), node);
                 }

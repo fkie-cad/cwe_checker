@@ -165,15 +165,13 @@ impl BricksDomain {
 
         for i in 0..long_list.len() {
             if empty_bricks_added >= len_diff {
-                new_list.push(short_list.get(0).unwrap().clone());
+                new_list.push(short_list[0].clone());
                 short_list.remove(0);
-            } else if short_list.is_empty()
-                || short_list.get(0).unwrap() != long_list.get(i).unwrap()
-            {
+            } else if short_list.is_empty() || &short_list[0] != long_list.get(i).unwrap() {
                 new_list.push(BrickDomain::get_empty_brick_domain());
                 empty_bricks_added += 1;
             } else {
-                new_list.push(short_list.get(0).unwrap().clone());
+                new_list.push(short_list[0].clone());
                 short_list.remove(0);
             }
         }
