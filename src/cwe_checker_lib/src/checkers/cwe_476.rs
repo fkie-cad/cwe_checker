@@ -47,10 +47,10 @@ use crate::CweModule;
 use petgraph::visit::EdgeRef;
 use std::collections::BTreeMap;
 
-mod state;
+pub mod state;
 use state::*;
 
-mod taint;
+pub mod taint;
 pub use taint::*;
 
 mod context;
