@@ -47,9 +47,11 @@ use crate::CweModule;
 use petgraph::visit::EdgeRef;
 use std::collections::BTreeMap;
 
+/// Module for the taint tracking state. Reused by the check for CWE-337, hence public.
 pub mod state;
 use state::*;
 
+/// Taint tracking module. Reused by the check for CWE-337, hence public.
 pub mod taint;
 pub use taint::*;
 
