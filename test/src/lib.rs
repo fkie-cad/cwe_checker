@@ -398,7 +398,14 @@ mod tests {
     #[ignore]
     fn cwe_337() {
         let mut error_log = Vec::new();
-        let tests = all_test_cases("cwe_337", "CWE337");
+        let mut tests = all_test_cases("cwe_337", "CWE337");
+
+        mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
+        mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.
+
+        mark_skipped(&mut tests, "x86", "gcc"); // x86 uses the stack for return values/arguments, the check is only register based.
+        mark_skipped(&mut tests, "x86", "clang"); // x86 uses the stack for return values/arguments, the check is only register based.
+        mark_compiler_skipped(&mut tests, "mingw32-gcc"); // x86 uses the stack for return values/arguments, the check is only register based.
 
         for test_case in tests {
             let num_expected_occurences = 1;
