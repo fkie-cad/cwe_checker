@@ -85,7 +85,7 @@
     "sources": [
       "time"
     ],
-    "sinks": [
+    "seeding_functions": [
       "srand"
     ]
   },

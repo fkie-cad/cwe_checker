@@ -14,7 +14,6 @@
 //!
 //! Both the sources of predictable seeds and the seeding functions can be configured using the `sources`
 //! and `sinks` respectively.
-//!
 
 use crate::analysis::graph::{Edge, Graph, Node};
 use crate::intermediate_representation::*;
@@ -46,13 +45,13 @@ pub struct Config {
     /// Sources of predictable seeds.
     sources: Vec<String>,
     /// Random number seeding functions.
-    sinks: Vec<String>,
+    seeding_functions: Vec<String>,
 }
 
 /// This check checks if a return value of any of the sources (as determined by the config file)
 /// is used as a direct parameter of any of the sinks (as determined by the config file).
 /// Currently, this is only used to detect whether a call of `time` leads into a call of `srand`,
-/// only tracks registers and not memory loctions and stops at any call.
+/// only tracks registers and not memory locations and stops at any call.
 pub fn check_cwe(
     analysis_results: &AnalysisResults,
     cwe_params: &serde_json::Value,
@@ -62,38 +61,38 @@ pub fn check_cwe(
 
     let (cwe_sender, cwe_receiver) = crossbeam_channel::unbounded();
 
-    let config: Config = serde_json::from_value(cwe_params.clone()).unwrap();
+    let config: Config = serde_json::from_value(cwe_params.clone())
+        .expect("Invalid configuration inside config.json for CWE337.");
     let source_map = crate::utils::symbol_utils::get_symbol_map(project, &config.sources[..]);
-    let sink_map = crate::utils::symbol_utils::get_symbol_map(project, &config.sinks[..]);
+    let sink_map =
+        crate::utils::symbol_utils::get_symbol_map(project, &config.seeding_functions[..]);
+
+    if source_map.is_empty() || sink_map.is_empty() {
+        return (Vec::new(), Vec::new());
+    }
+
+    let context = Context {
+        control_flow_graph: graph,
+        sink_map: &sink_map,
+        cwe_collector: &cwe_sender,
+    };
+    let mut computation = create_computation(context, None);
 
     for edge in graph.edge_references() {
         if let Edge::ExternCallStub(jmp) = edge.weight() {
             if let Jmp::Call { target, .. } = &jmp.term {
                 if let Some(symbol) = source_map.get(target) {
                     let node = edge.target();
-
-                    let context = Context {
-                        control_flow_graph: graph,
-                        sink_map: &sink_map,
-                        cwe_collector: &cwe_sender,
-                        source_call: jmp,
-                        source_symbol: symbol,
-                    };
-
-                    let mut computation = create_computation(context, None);
                     computation.set_node_value(node, NodeValue::Value(State::new(symbol, None)));
-                    computation.compute_with_max_steps(100); // FIXME: This number should be in the config.
                 }
             }
         }
     }
+    computation.compute_with_max_steps(100); // FIXME: This number should be in the config.
 
     let mut cwe_warnings = BTreeMap::new();
     for cwe in cwe_receiver.try_iter() {
-        match &cwe.addresses[..] {
-            [taint_source_address, ..] => cwe_warnings.insert(taint_source_address.clone(), cwe),
-            _ => panic!(),
-        };
+        cwe_warnings.insert(cwe.addresses[0].clone(), cwe);
     }
     let cwe_warnings = cwe_warnings.into_values().collect();
 
@@ -106,10 +105,6 @@ pub struct Context<'a> {
     control_flow_graph: &'a Graph<'a>,
     /// A map of symbols to use as sinks for the algorithm.
     sink_map: &'a HashMap<Tid, &'a ExternSymbol>,
-    /// The call whose return values are the sources for taint for the analysis.
-    source_call: &'a Term<Jmp>,
-    /// The symbol associated with the `source_call`.
-    source_symbol: &'a ExternSymbol,
     /// A channel where found CWE hits can be sent to.
     cwe_collector: &'a crossbeam_channel::Sender<CweWarning>,
 }
@@ -120,25 +115,13 @@ impl<'a> Context<'a> {
             CWE_MODULE.name,
             CWE_MODULE.version,
             format!(
-                "Return value of {} at {} leads into call of {} at {}.",
-                self.source_symbol.name,
-                self.source_call.tid.address,
-                sink_symbol.name,
-                sink_call.tid.address,
+                "RNG seed function {} at {} is seeded with predictable seed source.",
+                sink_symbol.name, sink_call.tid.address,
             ),
         )
-        .tids(vec![
-            format!("{}", self.source_call.tid),
-            format!("{}", sink_call.tid),
-        ])
-        .addresses(vec![
-            self.source_call.tid.address.clone(),
-            sink_call.tid.address.clone(),
-        ])
-        .symbols(vec![
-            self.source_symbol.name.clone(),
-            sink_symbol.name.clone(),
-        ]);
+        .tids(vec![format!("{}", sink_call.tid)])
+        .addresses(vec![sink_call.tid.address.clone()])
+        .symbols(vec![sink_symbol.name.clone()]);
         let _ = self.cwe_collector.send(cwe_warning);
     }
 }
@@ -156,7 +139,7 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
         value_1.merge(value_2)
     }
 
-    /// Keep track of register taint trough Defs.
+    /// Keep track of register taint through Defs.
     /// Currently, we never taint memory.
     fn update_def(&self, state: &State, def: &Term<Def>) -> Option<Self::Value> {
         if state.is_empty() {
@@ -169,7 +152,7 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
                 new_state.set_register_taint(var, state.eval(value));
             }
             Def::Load { var, .. } => {
-                // @cleanup: CWE476 uses pointer_inference here to load taint from memory.
+                // FIXME: CWE476 uses pointer_inference here to load taint from memory.
                 new_state.set_register_taint(var, Taint::Top(var.size));
             }
             Def::Store { .. } => {}
@@ -238,7 +221,7 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
         None
     }
 
-    /// I have no idea what this is but I copied the implementation (as almost everything else) from CWE476.
+    /// We don't care if there was some condition on the random value.
     fn specialize_conditional(
         &self,
         state: &State,
