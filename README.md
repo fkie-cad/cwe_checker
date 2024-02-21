@@ -103,6 +103,7 @@ So far the following analyses are implemented:
 -   [CWE-215](https://cwe.mitre.org/data/definitions/215.html): Information Exposure Through Debug Information
 -   [CWE-243](https://cwe.mitre.org/data/definitions/243.html): Creation of chroot Jail Without Changing Working Directory
 -   [CWE-332](https://cwe.mitre.org/data/definitions/332.html): Insufficient Entropy in PRNG
+-   [CWE-337](https://cwe.mitre.org/data/definitions/337.html): Predictable Seed in Pseudo-Random Number Generator (PRNG)
 -   [CWE-367](https://cwe.mitre.org/data/definitions/367.html): Time-of-check Time-of-use (TOCTOU) Race Condition
 -   [CWE-416](https://cwe.mitre.org/data/definitions/416.html): Use After Free and its variant [CWE-415](https://cwe.mitre.org/data/definitions/415.html): Double Free
 -   [CWE-426](https://cwe.mitre.org/data/definitions/426.html): Untrusted Search Path
