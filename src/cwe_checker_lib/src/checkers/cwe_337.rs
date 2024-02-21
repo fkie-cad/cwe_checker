@@ -13,7 +13,7 @@
 //! ### Symbols configurable in config.json
 //!
 //! Both the sources of predictable seeds and the seeding functions can be configured using the `sources`
-//! and `sinks` respectively.
+//! and `seeding_functions` respectively.
 
 use crate::analysis::graph::{Edge, Graph, Node};
 use crate::intermediate_representation::*;
