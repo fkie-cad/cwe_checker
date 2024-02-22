@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":["cwe_119","cwe_134","cwe_190","cwe_215","cwe_243","cwe_332","cwe_367","cwe_416","cwe_426","cwe_467","cwe_476","cwe_560","cwe_676","cwe_78","cwe_782","cwe_789"]};
+window.SIDEBAR_ITEMS = {"mod":["cwe_119","cwe_134","cwe_190","cwe_215","cwe_243","cwe_332","cwe_337","cwe_367","cwe_416","cwe_426","cwe_467","cwe_476","cwe_560","cwe_676","cwe_78","cwe_782","cwe_789"]};

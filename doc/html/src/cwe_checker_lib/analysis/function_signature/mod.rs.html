@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/analysis/function_signature/mod.rs`."><title>mod.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../../static.files/rustdoc-ba5701c5741a7b69.css" id="mainThemeStyle"><div id="rustdoc-vars" data-root-path="../../../../" data-static-root-path="../../../../static.files/" data-current-crate="cwe_checker_lib" data-themes="" data-resource-suffix="" data-rustdoc-version="1.70.0 (90c541806 2023-05-31)" data-search-js="search-e077946657036a58.js" data-settings-js="settings-298e1ea74db45b39.js" data-settings-css="settings-7bfb4c59cc6bc502.css" data-theme-light-css="light-0f8c037637f9eb3e.css" data-theme-dark-css="dark-1097f8e92a01e3cf.css" data-theme-ayu-css="ayu-614652228113ac93.css" ></div><script src="../../../../static.files/storage-62ce34ea385b278a.js"></script><script defer src="../../../../static.files/source-script-905937fbbdc8e9ea.js"></script><script defer src="../../../../source-files.js"></script><script defer src="../../../../static.files/main-f61008743c98d196.js"></script><noscript><link rel="stylesheet" media="(prefers-color-scheme:light)" href="../../../../static.files/light-0f8c037637f9eb3e.css"><link rel="stylesheet" media="(prefers-color-scheme:dark)" href="../../../../static.files/dark-1097f8e92a01e3cf.css"><link rel="stylesheet" href="../../../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../../../cwe_checker_lib/index.html"><img class="rust-logo" src="../../../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/analysis/function_signature/mod.rs`."><title>mod.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../../static.files/rustdoc-9ee3a5e31a2afa3e.css"><meta name="rustdoc-vars" data-root-path="../../../../" data-static-root-path="../../../../static.files/" data-current-crate="cwe_checker_lib" data-themes="" data-resource-suffix="" data-rustdoc-version="1.75.0 (82e1608df 2023-12-21)" data-channel="1.75.0" data-search-js="search-8fbf244ebcf71464.js" data-settings-js="settings-74424d7eec62a23e.js" ><script src="../../../../static.files/storage-fec3eaa3851e447d.js"></script><script defer src="../../../../static.files/src-script-3280b574d94e47b4.js"></script><script defer src="../../../../src-files.js"></script><script defer src="../../../../static.files/main-9dd44ab47b99a0fb.js"></script><noscript><link rel="stylesheet" href="../../../../static.files/noscript-5d8b3c7633ad77ba.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -413,6 +413,34 @@
 <a href="#413" id="413">413</a>
 <a href="#414" id="414">414</a>
 <a href="#415" id="415">415</a>
+<a href="#416" id="416">416</a>
+<a href="#417" id="417">417</a>
+<a href="#418" id="418">418</a>
+<a href="#419" id="419">419</a>
+<a href="#420" id="420">420</a>
+<a href="#421" id="421">421</a>
+<a href="#422" id="422">422</a>
+<a href="#423" id="423">423</a>
+<a href="#424" id="424">424</a>
+<a href="#425" id="425">425</a>
+<a href="#426" id="426">426</a>
+<a href="#427" id="427">427</a>
+<a href="#428" id="428">428</a>
+<a href="#429" id="429">429</a>
+<a href="#430" id="430">430</a>
+<a href="#431" id="431">431</a>
+<a href="#432" id="432">432</a>
+<a href="#433" id="433">433</a>
+<a href="#434" id="434">434</a>
+<a href="#435" id="435">435</a>
+<a href="#436" id="436">436</a>
+<a href="#437" id="437">437</a>
+<a href="#438" id="438">438</a>
+<a href="#439" id="439">439</a>
+<a href="#440" id="440">440</a>
+<a href="#441" id="441">441</a>
+<a href="#442" id="442">442</a>
+<a href="#443" id="443">443</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! A fixpoint algorithm computing parameters of functions and their access patterns.
 //!
 //! The fixpoint algorithm tracks the values of registers and the stack,
@@ -420,6 +448,11 @@
 //! Accesses to potential function parameters are collected together with the type of the access
 //! (is the value read, dereferenced for read access or dereferenced for write access).
 //! Accesses to constant addresses that may correspond to global variables are also tracked.
+//!
+//! For values that are not directly tracked,
+//! the algorithm tracks the abstract location that describes how the pointer to that value was computed.
+//! This enables tracking of nested parameter objects
+//! without actually tracking the memory objects where these objects are located.
 //!
 //! Known limitations of the analysis:
 //! * The analysis is an overapproximation in the sense that it may generate more input parameters
@@ -432,16 +465,22 @@
 //! * Parameters that are used as input values for variadic functions may be missed.
 //!   Some variadic functions are stubbed, i.e. parameter recognition should work for these.
 //!   But not all variadic functions are stubbed.
-//! * If only a part (e.g. a single byte) of a stack parameter is accessed instead of the whole parameter
-//!   then a duplicate stack parameter may be generated.
-//!   A proper sanitation for this case is not yet implemented,
-//!   although error messages are generated if such a case is detected.
 //! * For floating point parameter registers the base register is detected as a parameter,
 //!   although only a smaller sub-register is the actual parameter in many cases.
 //!   Also, if a function uses sub-registers of floating point registers as local variables,
 //!   the registers may be incorrectly flagged as input parameters.
+//! * Tracking of nested parameters via their abstract locations is an unsound, heuristic approach,
+//!   as the analysis does not keep track of when such nested pointers might get overwritten.
+//!   Nevertheless, it should result in an overapproximation of parameters and their access patterns in most cases.
+//! * The nesting depth for tracked nested parameters is limited
+//!   to avoid generating infinitely many parameters for recursive types like linked lists.
+//! * For arrays no parameters should be created for the array elements.
+//!   However, if only a particular element in an array is accessed without iteration over the array,
+//!   then a parameter might be generated for that element.
 
 </span><span class="kw">use </span><span class="kw">crate</span>::abstract_domain::AbstractDomain;
+<span class="kw">use </span><span class="kw">crate</span>::abstract_domain::AbstractLocation;
+<span class="kw">use </span><span class="kw">crate</span>::abstract_domain::AbstractMemoryLocation;
 <span class="kw">use </span><span class="kw">crate</span>::analysis::fixpoint::Computation;
 <span class="kw">use </span><span class="kw">crate</span>::analysis::forward_interprocedural_fixpoint::create_computation;
 <span class="kw">use </span><span class="kw">crate</span>::analysis::forward_interprocedural_fixpoint::GeneralizedContext;
@@ -451,12 +490,10 @@
 <span class="kw">use </span><span class="kw">crate</span>::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::utils::log::LogMessage;
 <span class="kw">use </span>std::collections::BTreeMap;
-<span class="kw">use </span>std::collections::HashMap;
 
 <span class="kw">mod </span>context;
 <span class="kw">use </span>context::<span class="kw-2">*</span>;
 <span class="kw">mod </span>state;
-<span class="kw">use </span>itertools::Itertools;
 <span class="kw">use </span>state::State;
 <span class="kw">mod </span>access_pattern;
 <span class="kw">pub use </span>access_pattern::AccessPattern;
@@ -469,26 +506,24 @@
 </span><span class="kw">fn </span>generate_fixpoint_computation&lt;<span class="lifetime">&#39;a</span>&gt;(
     project: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>Project,
     graph: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>Graph,
+    pointer_recursion_depth_limit: u64,
 ) -&gt; Computation&lt;GeneralizedContext&lt;<span class="lifetime">&#39;a</span>, Context&lt;<span class="lifetime">&#39;a</span>&gt;&gt;&gt; {
     <span class="kw">let </span>context = Context::new(project, graph);
     <span class="kw">let </span><span class="kw-2">mut </span>computation = create_computation(context, <span class="prelude-val">None</span>);
     <span class="comment">// Set the node values for all function entry nodes.
     </span><span class="kw">for </span>node <span class="kw">in </span>graph.node_indices() {
         <span class="kw">if let </span>Node::BlkStart(block, sub) = graph[node] {
-            <span class="kw">if let </span><span class="prelude-val">Some</span>(entry_block) = sub.term.blocks.get(<span class="number">0</span>) {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(entry_block) = sub.term.blocks.first() {
                 <span class="kw">if </span>entry_block.tid == block.tid {
                     <span class="comment">// The node of a function entry point
                     </span><span class="kw">let </span>calling_convention = project
                         .get_specific_calling_convention(<span class="kw-2">&amp;</span>sub.term.calling_convention)
-                        .unwrap_or_else(|| {
-                            project
-                                .get_standard_calling_convention()
-                                .expect(<span class="string">&quot;No standard calling convention found.&quot;</span>)
-                        });
+                        .expect(<span class="string">&quot;No standard calling convention found.&quot;</span>);
                     <span class="kw">let </span><span class="kw-2">mut </span>fn_start_state = State::new(
                         <span class="kw-2">&amp;</span>sub.tid,
                         <span class="kw-2">&amp;</span>project.stack_pointer_register,
                         calling_convention,
+                        pointer_recursion_depth_limit,
                     );
                     <span class="kw">if </span>project.cpu_architecture.contains(<span class="string">&quot;MIPS&quot;</span>) {
                         <span class="kw">let _ </span>= fn_start_state
@@ -560,23 +595,43 @@
     project: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>Project,
     graph: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>Graph,
 ) -&gt; (BTreeMap&lt;Tid, FunctionSignature&gt;, Vec&lt;LogMessage&gt;) {
-    <span class="kw">let </span><span class="kw-2">mut </span>computation = generate_fixpoint_computation(project, graph);
+    <span class="kw">let </span>max_pointer_recursion_depth_limit: u64 = <span class="number">2</span>;
+    <span class="comment">// We gradually increase the recursion depth limit used in the fixpoint computation.
+    // The idea is that for array accesses the offset has time to converge to `Top` before IDs for nested objects are created.
+    // Otherwise the algorithm would generate an object for the first element of an array
+    // before it can check that it is an array access that we want to ignore.
+    </span><span class="kw">let </span><span class="kw-2">mut </span>computation = generate_fixpoint_computation(project, graph, <span class="number">0</span>);
     computation.compute_with_max_steps(<span class="number">100</span>);
+    <span class="kw">for </span>pointer_recursion_limit <span class="kw">in </span><span class="number">1</span>..=max_pointer_recursion_depth_limit {
+        <span class="kw">for </span>node_value <span class="kw">in </span>computation.node_values_mut() {
+            <span class="kw">match </span>node_value {
+                NodeValue::Value(state) =&gt; {
+                    state.set_pointer_recursion_depth_limit(pointer_recursion_limit)
+                }
+                NodeValue::CallFlowCombinator {
+                    call_stub,
+                    interprocedural_flow,
+                } =&gt; {
+                    <span class="kw">for </span>state <span class="kw">in </span>call_stub.iter_mut() {
+                        state.set_pointer_recursion_depth_limit(pointer_recursion_limit);
+                    }
+                    <span class="kw">for </span>state <span class="kw">in </span>interprocedural_flow.iter_mut() {
+                        state.set_pointer_recursion_depth_limit(pointer_recursion_limit);
+                    }
+                }
+            }
+        }
+        computation.compute_with_max_steps(<span class="number">100</span>);
+    }
+
     <span class="kw">let </span><span class="kw-2">mut </span>fn_sig_map = extract_fn_signatures_from_fixpoint(project, graph, computation);
     <span class="comment">// Sanitize the parameters
     </span><span class="kw">let </span><span class="kw-2">mut </span>logs = Vec::new();
     <span class="kw">for </span>(fn_tid, fn_sig) <span class="kw">in </span>fn_sig_map.iter_mut() {
-        <span class="kw">let </span>(info_log, debug_log) = fn_sig.sanitize(project);
+        <span class="kw">let </span>info_log = fn_sig.sanitize(project);
         <span class="kw">for </span>log <span class="kw">in </span>info_log {
             logs.push(
                 LogMessage::new_info(log)
-                    .location(fn_tid.clone())
-                    .source(<span class="string">&quot;Function Signature Analysis&quot;</span>),
-            )
-        }
-        <span class="kw">for </span>log <span class="kw">in </span>debug_log {
-            logs.push(
-                LogMessage::new_debug(log)
                     .location(fn_tid.clone())
                     .source(<span class="string">&quot;Function Signature Analysis&quot;</span>),
             )
@@ -593,30 +648,42 @@
 </span><span class="attr">#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 </span><span class="kw">pub struct </span>FunctionSignature {
     <span class="doccomment">/// The parameters of the function together with their access patterns.
-    </span><span class="kw">pub </span>parameters: HashMap&lt;Arg, AccessPattern&gt;,
+    </span><span class="kw">pub </span>parameters: BTreeMap&lt;AbstractLocation, AccessPattern&gt;,
     <span class="doccomment">/// Values in writeable global memory accessed by the function.
-    /// Does not contain indirectly accessed values, e.g. values accessed by callees of this function.
-    </span><span class="kw">pub </span>global_parameters: HashMap&lt;u64, AccessPattern&gt;,
+    </span><span class="kw">pub </span>global_parameters: BTreeMap&lt;AbstractLocation, AccessPattern&gt;,
 }
 
 <span class="kw">impl </span>FunctionSignature {
     <span class="doccomment">/// Generate an empty function signature.
     </span><span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
-            parameters: HashMap::new(),
-            global_parameters: HashMap::new(),
+            parameters: BTreeMap::new(),
+            global_parameters: BTreeMap::new(),
         }
     }
 
     <span class="doccomment">/// The returned number is the maximum of stack offset plus parameter size
     /// taken over all stack parameters in the function signature.
-    </span><span class="kw">pub fn </span>get_stack_params_total_size(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; i64 {
+    </span><span class="kw">pub fn </span>get_stack_params_total_size(<span class="kw-2">&amp;</span><span class="self">self</span>, stack_register: <span class="kw-2">&amp;</span>Variable) -&gt; i64 {
         <span class="kw">let </span><span class="kw-2">mut </span>stack_params_total_size: i64 = <span class="number">0</span>;
         <span class="kw">for </span>param <span class="kw">in </span><span class="self">self</span>.parameters.keys() {
-            <span class="kw">if let </span><span class="prelude-val">Ok</span>(param_offset) = param.eval_stack_offset() {
-                <span class="kw">let </span>param_upper_bound =
-                    param_offset.try_to_i64().unwrap() + (u64::from(param.bytesize()) <span class="kw">as </span>i64);
-                stack_params_total_size = std::cmp::max(stack_params_total_size, param_upper_bound);
+            <span class="kw">if let </span>AbstractLocation::Pointer(var, mem_location) = param {
+                <span class="kw">if </span>var == stack_register {
+                    <span class="kw">match </span>mem_location {
+                        AbstractMemoryLocation::Location { offset, size } =&gt; {
+                            stack_params_total_size = std::cmp::max(
+                                stack_params_total_size,
+                                offset + (u64::from(<span class="kw-2">*</span>size) <span class="kw">as </span>i64),
+                            );
+                        }
+                        AbstractMemoryLocation::Pointer { offset, target: <span class="kw">_ </span>} =&gt; {
+                            stack_params_total_size = std::cmp::max(
+                                stack_params_total_size,
+                                offset + (u64::from(stack_register.size) <span class="kw">as </span>i64),
+                            );
+                        }
+                    }
+                }
             }
         }
         stack_params_total_size
@@ -625,21 +692,21 @@
     <span class="doccomment">/// Merge the parameter list and the global parameter list of `self` with the given lists.
     </span><span class="kw">fn </span>merge_parameter_lists(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
-        params: <span class="kw-2">&amp;</span>[(Arg, AccessPattern)],
-        global_params: <span class="kw-2">&amp;</span>[(u64, AccessPattern)],
+        params: <span class="kw-2">&amp;</span>[(<span class="kw-2">&amp;</span>AbstractLocation, AccessPattern)],
+        global_params: <span class="kw-2">&amp;</span>[(<span class="kw-2">&amp;</span>AbstractLocation, AccessPattern)],
     ) {
         <span class="kw">for </span>(arg, sig_new) <span class="kw">in </span>params {
             <span class="kw">if let </span><span class="prelude-val">Some</span>(sig_self) = <span class="self">self</span>.parameters.get_mut(arg) {
                 <span class="kw-2">*</span>sig_self = sig_self.merge(sig_new);
             } <span class="kw">else </span>{
-                <span class="self">self</span>.parameters.insert(arg.clone(), <span class="kw-2">*</span>sig_new);
+                <span class="self">self</span>.parameters.insert((<span class="kw-2">*</span>arg).clone(), <span class="kw-2">*</span>sig_new);
             }
         }
         <span class="kw">for </span>(address, sig_new) <span class="kw">in </span>global_params {
             <span class="kw">if let </span><span class="prelude-val">Some</span>(sig_self) = <span class="self">self</span>.global_parameters.get_mut(address) {
                 <span class="kw-2">*</span>sig_self = sig_self.merge(sig_new);
             } <span class="kw">else </span>{
-                <span class="self">self</span>.global_parameters.insert(<span class="kw-2">*</span>address, <span class="kw-2">*</span>sig_new);
+                <span class="self">self</span>.global_parameters.insert((<span class="kw-2">*</span>address).clone(), <span class="kw-2">*</span>sig_new);
             }
         }
     }
@@ -658,172 +725,161 @@
     ///   This may indicate an error in the analysis
     ///   as no proper sanitation pass is implemented for such cases yet.
     /// * Merge intersecting stack parameters
-    </span><span class="kw">fn </span>sanitize(<span class="kw-2">&amp;mut </span><span class="self">self</span>, project: <span class="kw-2">&amp;</span>Project) -&gt; (Vec&lt;String&gt;, Vec&lt;String&gt;) {
+    </span><span class="kw">fn </span>sanitize(<span class="kw-2">&amp;mut </span><span class="self">self</span>, project: <span class="kw-2">&amp;</span>Project) -&gt; Vec&lt;String&gt; {
         <span class="kw">match </span>project.cpu_architecture.as_str() {
             <span class="string">&quot;x86&quot; </span>| <span class="string">&quot;x86_32&quot; </span>| <span class="string">&quot;x86_64&quot; </span>=&gt; {
-                <span class="kw">let </span>return_addr_expr = Expression::Var(project.stack_pointer_register.clone());
-                <span class="kw">let </span>return_addr_arg = Arg::Stack {
-                    address: return_addr_expr,
-                    size: project.stack_pointer_register.size,
-                    data_type: <span class="prelude-val">None</span>,
-                };
-                <span class="self">self</span>.parameters.remove(<span class="kw-2">&amp;</span>return_addr_arg);
+                <span class="kw">let </span>return_addr_location = AbstractLocation::from_stack_position(
+                    <span class="kw-2">&amp;</span>project.stack_pointer_register,
+                    <span class="number">0</span>,
+                    project.get_pointer_bytesize(),
+                );
+                <span class="self">self</span>.parameters.remove(<span class="kw-2">&amp;</span>return_addr_location);
             }
             <span class="kw">_ </span>=&gt; (),
         }
-        <span class="kw">let </span>debug_messages = <span class="self">self</span>.merge_intersecting_stack_parameters();
-        <span class="kw">let </span>info_messages = <span class="self">self</span>.check_for_unaligned_stack_params(<span class="kw-2">&amp;</span>project.stack_pointer_register);
-
-        (info_messages, debug_messages)
+        <span class="comment">// FIXME: We check for intersecting stack parameter register, but not for intersecting nested parameters.
+        // We should add a check for these to generate log messages (but probably without trying to merge such parameters)
+        </span><span class="self">self</span>.merge_intersecting_stack_parameters(<span class="kw-2">&amp;</span>project.stack_pointer_register);
+        <span class="self">self</span>.check_for_unaligned_stack_params(<span class="kw-2">&amp;</span>project.stack_pointer_register)
     }
 
     <span class="doccomment">/// Return a log message for every unaligned stack parameter
     /// or a stack parameter of different size than the generic pointer size is found.
     </span><span class="kw">fn </span>check_for_unaligned_stack_params(<span class="kw-2">&amp;</span><span class="self">self</span>, stack_register: <span class="kw-2">&amp;</span>Variable) -&gt; Vec&lt;String&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>log_messages: Vec&lt;String&gt; = <span class="macro">vec!</span>[];
-        <span class="kw">for </span>arg <span class="kw">in </span><span class="self">self</span>.parameters.keys() {
-            <span class="kw">if let </span>Arg::Stack { size, .. } = arg {
-                <span class="kw">if </span><span class="kw-2">*</span>size != stack_register.size {
+        <span class="kw">for </span>param <span class="kw">in </span><span class="self">self</span>.parameters.keys() {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(offset) = get_offset_if_simple_stack_param(param, stack_register) {
+                <span class="kw">if </span>param.bytesize() != stack_register.size {
                     log_messages.push(<span class="string">&quot;Unexpected stack parameter size&quot;</span>.into());
                 }
-                <span class="kw">if let </span><span class="prelude-val">Ok</span>(offset) = arg.eval_stack_offset() {
-                    <span class="kw">if </span>offset.try_to_u64().unwrap_or(<span class="number">0</span>) % u64::from(stack_register.size) != <span class="number">0 </span>{
-                        log_messages.push(<span class="string">&quot;Unexpected stack parameter alignment&quot;</span>.into());
-                    }
+                <span class="kw">if </span>offset % u64::from(stack_register.size) <span class="kw">as </span>i64 != <span class="number">0 </span>{
+                    log_messages.push(<span class="string">&quot;Unexpected stack parameter alignment&quot;</span>.into());
                 }
             }
         }
         log_messages
     }
-    <span class="doccomment">/// Merges two intersecting stack parameters by joining them into one stack parameter.
+
+    <span class="doccomment">/// Merges intersecting stack parameters by joining them into one stack parameter.
     ///
-    /// Two [Arg](crate::intermediate_representation::Arg) are merged if *all* of the following applies:
-    /// * parameters return `Ok` on `Arg::eval_stack_offset()`
-    /// * parameters intersect
-    </span><span class="kw">fn </span>merge_intersecting_stack_parameters(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; Vec&lt;String&gt; {
-        <span class="kw">let </span><span class="kw-2">mut </span>stack_parms = <span class="self">self
+    /// Only non-nested stack parameters are joined by this function.
+    </span><span class="kw">fn </span>merge_intersecting_stack_parameters(<span class="kw-2">&amp;mut </span><span class="self">self</span>, stack_register: <span class="kw-2">&amp;</span>Variable) {
+        <span class="kw">let </span>stack_params: BTreeMap&lt;(i64, ByteSize), (AbstractLocation, AccessPattern)&gt; = <span class="self">self
             </span>.parameters
-            .clone()
-            .into_iter()
-            .filter(|x| x.<span class="number">0</span>.eval_stack_offset().is_ok())
-            .sorted_by(|a, b| {
-                <span class="kw">match </span>a
-                    .<span class="number">0
-                    </span>.eval_stack_offset()
-                    .unwrap()
-                    .checked_sgt(<span class="kw-2">&amp;</span>b.<span class="number">0</span>.eval_stack_offset().unwrap())
-                    .unwrap()
-                {
-                    <span class="bool-val">true </span>=&gt; std::cmp::Ordering::Greater,
-                    <span class="bool-val">false </span>=&gt; std::cmp::Ordering::Less,
-                }
+            .iter()
+            .filter_map(|(location, access_pattern)| {
+                get_offset_if_simple_stack_param(location, stack_register).map(|offset| {
+                    (
+                        (offset, location.bytesize()),
+                        (location.clone(), <span class="kw-2">*</span>access_pattern),
+                    )
+                })
             })
-            .collect_vec();
-        <span class="kw">let </span><span class="kw-2">mut </span>logs = <span class="macro">vec!</span>[];
+            .collect();
 
-        <span class="kw">if </span>!stack_parms.is_empty() {
-            <span class="kw">let </span><span class="kw-2">mut </span>i = <span class="number">0</span>;
-            <span class="kw">while </span>i &lt; stack_parms.len() - <span class="number">1 </span>{
-                <span class="kw">if let </span><span class="prelude-val">Ok</span>((merged_arg, log)) =
-                    get_bounds_intersecting_stack_arg(<span class="kw-2">&amp;</span>stack_parms[i].<span class="number">0</span>, <span class="kw-2">&amp;</span>stack_parms[i + <span class="number">1</span>].<span class="number">0</span>)
-                {
-                    <span class="self">self</span>.parameters.remove(<span class="kw-2">&amp;</span>stack_parms[i].<span class="number">0</span>);
-                    <span class="self">self</span>.parameters.remove(<span class="kw-2">&amp;</span>stack_parms[i + <span class="number">1</span>].<span class="number">0</span>);
-                    <span class="self">self</span>.parameters.insert(
-                        merged_arg.clone(),
-                        stack_parms[i].<span class="number">1</span>.merge(<span class="kw-2">&amp;</span>stack_parms[i + <span class="number">1</span>].<span class="number">1</span>),
+        <span class="kw">let </span><span class="kw-2">mut </span>current_param: <span class="prelude-ty">Option</span>&lt;(i64, i64, AccessPattern)&gt; = <span class="prelude-val">None</span>;
+        <span class="kw">for </span>((offset, <span class="kw">_</span>), (param, access_pattern)) <span class="kw">in </span>stack_params.into_iter() {
+            <span class="self">self</span>.parameters.remove(<span class="kw-2">&amp;</span>param);
+            <span class="kw">if let </span><span class="prelude-val">Some</span>((cur_offset, cur_size, cur_access_pattern)) = current_param {
+                <span class="kw">if </span>offset &lt; cur_offset + cur_size {
+                    <span class="kw">let </span>merged_size = std::cmp::max(
+                        cur_size,
+                        offset - cur_offset + u64::from(param.bytesize()) <span class="kw">as </span>i64,
                     );
-
-                    stack_parms.insert(
-                        i,
-                        (merged_arg, stack_parms[i].<span class="number">1</span>.merge(<span class="kw-2">&amp;</span>stack_parms[i + <span class="number">1</span>].<span class="number">1</span>)),
-                    );
-                    stack_parms.remove(i + <span class="number">1</span>);
-                    stack_parms.remove(i + <span class="number">1</span>);
-
-                    logs.extend(log);
+                    <span class="kw">let </span>merged_access_pattern = cur_access_pattern.merge(<span class="kw-2">&amp;</span>access_pattern);
+                    current_param = <span class="prelude-val">Some</span>((cur_offset, merged_size, merged_access_pattern));
                 } <span class="kw">else </span>{
-                    i += <span class="number">1</span>;
+                    <span class="self">self</span>.parameters.insert(
+                        generate_simple_stack_param(
+                            cur_offset,
+                            ByteSize::new(cur_size <span class="kw">as </span>u64),
+                            stack_register,
+                        ),
+                        cur_access_pattern,
+                    );
+                    current_param =
+                        <span class="prelude-val">Some</span>((offset, u64::from(param.bytesize()) <span class="kw">as </span>i64, access_pattern));
                 }
+            } <span class="kw">else </span>{
+                current_param = <span class="prelude-val">Some</span>((offset, u64::from(param.bytesize()) <span class="kw">as </span>i64, access_pattern));
             }
         }
-
-        logs
-    }
-}
-
-<span class="doccomment">/// Merges two stack parameters and returns the merged [Arg](crate::intermediate_representation::Arg).
-/// Also returns a message, if one argument is not a subset of the other one.
-///
-/// Assumes the provided `Arg` are ordered by equal or increasing stack offset.
-///
-/// Returns `Err` if `first_arg` or `second_arg`:
-/// * are not `Arg::Stack` types
-/// * return `Err` on `Arg::eval_stack_offset()`
-/// * do not intersect
-</span><span class="kw">fn </span>get_bounds_intersecting_stack_arg(
-    first_arg: <span class="kw-2">&amp;</span>Arg,
-    second_arg: <span class="kw-2">&amp;</span>Arg,
-) -&gt; <span class="prelude-ty">Result</span>&lt;(Arg, Vec&lt;String&gt;), Error&gt; {
-    <span class="kw">if let </span>(
-        Arg::Stack {
-            data_type: <span class="kw">_</span>,
-            size: first_size,
-            address: first_address,
-        },
-        Arg::Stack {
-            data_type: <span class="kw">_</span>,
-            size: second_size,
-            ..
-        },
-    ) = (first_arg, second_arg)
-    {
-        <span class="kw">let </span>first_arg_offset = first_arg.eval_stack_offset()<span class="question-mark">?</span>.try_to_u64()<span class="question-mark">?</span>;
-        <span class="kw">let </span>first_arg_size = u64::from(<span class="kw-2">*</span>first_size);
-        <span class="kw">let </span>second_arg_offset = second_arg.eval_stack_offset()<span class="question-mark">?</span>.try_to_u64()<span class="question-mark">?</span>;
-        <span class="kw">let </span>second_arg_size = u64::from(<span class="kw-2">*</span>second_size);
-
-        <span class="kw">let </span><span class="kw-2">mut </span>logs = <span class="macro">vec!</span>[];
-        <span class="kw">let </span>first_arg_upper_bound = first_arg_offset + first_arg_size;
-
-        <span class="comment">// Check if they intersect
-        </span><span class="kw">if </span>first_arg_upper_bound &gt; second_arg_offset {
-            <span class="kw">let </span>second_arg_upper_bound = second_arg_offset + second_arg_size;
-
-            <span class="comment">// Check if subset
-            </span><span class="kw">if </span>second_arg_upper_bound &lt;= first_arg_upper_bound
-                &amp;&amp; second_arg_offset &gt;= first_arg_offset
-            {
-                <span class="comment">// second arg is a subset, we just keep first_arg
-                </span><span class="kw">return </span><span class="prelude-val">Ok</span>((first_arg.clone(), logs));
-            }
-            <span class="kw">if </span>first_arg_upper_bound &lt;= second_arg_upper_bound
-                &amp;&amp; first_arg_offset &gt;= second_arg_offset
-            {
-                <span class="comment">// first arg is a subset, we just keep second_arg
-                </span><span class="kw">return </span><span class="prelude-val">Ok</span>((second_arg.clone(), logs));
-            }
-            logs.push(
-                <span class="string">&quot;Merged a stack parameter, that intersect another but is no subset&quot;</span>.to_string(),
+        <span class="kw">if let </span><span class="prelude-val">Some</span>((cur_offset, cur_size, cur_access_pattern)) = current_param {
+            <span class="self">self</span>.parameters.insert(
+                generate_simple_stack_param(
+                    cur_offset,
+                    ByteSize::new(cur_size <span class="kw">as </span>u64),
+                    stack_register,
+                ),
+                cur_access_pattern,
             );
-
-            <span class="kw">let </span>merged_arg = Arg::Stack {
-                address: first_address.clone(),
-                size: (second_arg_upper_bound - first_arg_offset).into(),
-                data_type: <span class="prelude-val">None</span>,
-            };
-            <span class="kw">return </span><span class="prelude-val">Ok</span>((merged_arg, logs));
-        } <span class="kw">else </span>{
-            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="macro">anyhow!</span>(<span class="string">&quot;Args do not intersect&quot;</span>));
         }
     }
-    <span class="prelude-val">Err</span>(<span class="macro">anyhow!</span>(<span class="string">&quot;Args are no stack arguments&quot;</span>))
 }
 
 <span class="kw">impl </span>Default <span class="kw">for </span>FunctionSignature {
     <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
         <span class="self">Self</span>::new()
     }
+}
+
+<span class="kw">impl </span>FunctionSignature {
+    <span class="doccomment">/// Generate a compact JSON-representation of the function signature for pretty printing.
+    </span><span class="attr">#[allow(dead_code)]
+    </span><span class="kw">pub fn </span>to_json_compact(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; serde_json::Value {
+        <span class="kw">let </span><span class="kw-2">mut </span>json_map = serde_json::Map::new();
+        <span class="kw">let </span><span class="kw-2">mut </span>param_map = serde_json::Map::new();
+        <span class="kw">for </span>(param, pattern) <span class="kw">in </span><span class="self">self</span>.parameters.iter() {
+            param_map.insert(
+                <span class="macro">format!</span>(<span class="string">&quot;{param}&quot;</span>),
+                serde_json::Value::String(<span class="macro">format!</span>(<span class="string">&quot;{pattern}&quot;</span>)),
+            );
+        }
+        json_map.insert(
+            <span class="string">&quot;Parameters&quot;</span>.to_string(),
+            serde_json::Value::Object(param_map),
+        );
+        <span class="kw">let </span><span class="kw-2">mut </span>global_param_map = serde_json::Map::new();
+        <span class="kw">for </span>(param, pattern) <span class="kw">in </span><span class="self">self</span>.global_parameters.iter() {
+            global_param_map.insert(
+                <span class="macro">format!</span>(<span class="string">&quot;{param}&quot;</span>),
+                serde_json::Value::String(<span class="macro">format!</span>(<span class="string">&quot;{pattern}&quot;</span>)),
+            );
+        }
+        json_map.insert(
+            <span class="string">&quot;Globals&quot;</span>.to_string(),
+            serde_json::Value::Object(global_param_map),
+        );
+        serde_json::Value::Object(json_map)
+    }
+}
+
+<span class="doccomment">/// If the abstract location is a location on the stack
+/// then return its offset relative to the zero position on the stack.
+</span><span class="kw">fn </span>get_offset_if_simple_stack_param(
+    param: <span class="kw-2">&amp;</span>AbstractLocation,
+    stack_register: <span class="kw-2">&amp;</span>Variable,
+) -&gt; <span class="prelude-ty">Option</span>&lt;i64&gt; {
+    <span class="kw">if let </span>AbstractLocation::Pointer(var, mem_location) = param {
+        <span class="kw">if </span>var == stack_register {
+            <span class="kw">if let </span>AbstractMemoryLocation::Location { offset, .. } = mem_location {
+                <span class="kw">return </span><span class="prelude-val">Some</span>(<span class="kw-2">*</span>offset);
+            }
+        }
+    }
+    <span class="prelude-val">None
+</span>}
+
+<span class="doccomment">/// Generate an abstract location of a (non-nested) stack parameter.
+</span><span class="kw">fn </span>generate_simple_stack_param(
+    offset: i64,
+    size: ByteSize,
+    stack_register: <span class="kw-2">&amp;</span>Variable,
+) -&gt; AbstractLocation {
+    AbstractLocation::Pointer(
+        stack_register.clone(),
+        AbstractMemoryLocation::Location { offset, size },
+    )
 }
 
 <span class="attr">#[cfg(test)]

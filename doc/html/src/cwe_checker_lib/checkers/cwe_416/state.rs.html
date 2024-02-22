@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/checkers/cwe_416/state.rs`."><title>state.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../../static.files/rustdoc-ba5701c5741a7b69.css" id="mainThemeStyle"><div id="rustdoc-vars" data-root-path="../../../../" data-static-root-path="../../../../static.files/" data-current-crate="cwe_checker_lib" data-themes="" data-resource-suffix="" data-rustdoc-version="1.70.0 (90c541806 2023-05-31)" data-search-js="search-e077946657036a58.js" data-settings-js="settings-298e1ea74db45b39.js" data-settings-css="settings-7bfb4c59cc6bc502.css" data-theme-light-css="light-0f8c037637f9eb3e.css" data-theme-dark-css="dark-1097f8e92a01e3cf.css" data-theme-ayu-css="ayu-614652228113ac93.css" ></div><script src="../../../../static.files/storage-62ce34ea385b278a.js"></script><script defer src="../../../../static.files/source-script-905937fbbdc8e9ea.js"></script><script defer src="../../../../source-files.js"></script><script defer src="../../../../static.files/main-f61008743c98d196.js"></script><noscript><link rel="stylesheet" media="(prefers-color-scheme:light)" href="../../../../static.files/light-0f8c037637f9eb3e.css"><link rel="stylesheet" media="(prefers-color-scheme:dark)" href="../../../../static.files/dark-1097f8e92a01e3cf.css"><link rel="stylesheet" href="../../../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../../../cwe_checker_lib/index.html"><img class="rust-logo" src="../../../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/checkers/cwe_416/state.rs`."><title>state.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../../static.files/rustdoc-9ee3a5e31a2afa3e.css"><meta name="rustdoc-vars" data-root-path="../../../../" data-static-root-path="../../../../static.files/" data-current-crate="cwe_checker_lib" data-themes="" data-resource-suffix="" data-rustdoc-version="1.75.0 (82e1608df 2023-12-21)" data-channel="1.75.0" data-search-js="search-8fbf244ebcf71464.js" data-settings-js="settings-74424d7eec62a23e.js" ><script src="../../../../static.files/storage-fec3eaa3851e447d.js"></script><script defer src="../../../../static.files/src-script-3280b574d94e47b4.js"></script><script defer src="../../../../src-files.js"></script><script defer src="../../../../static.files/main-9dd44ab47b99a0fb.js"></script><noscript><link rel="stylesheet" href="../../../../static.files/noscript-5d8b3c7633ad77ba.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -338,35 +338,182 @@
 <a href="#338" id="338">338</a>
 <a href="#339" id="339">339</a>
 <a href="#340" id="340">340</a>
+<a href="#341" id="341">341</a>
+<a href="#342" id="342">342</a>
+<a href="#343" id="343">343</a>
+<a href="#344" id="344">344</a>
+<a href="#345" id="345">345</a>
+<a href="#346" id="346">346</a>
+<a href="#347" id="347">347</a>
+<a href="#348" id="348">348</a>
+<a href="#349" id="349">349</a>
+<a href="#350" id="350">350</a>
+<a href="#351" id="351">351</a>
+<a href="#352" id="352">352</a>
+<a href="#353" id="353">353</a>
+<a href="#354" id="354">354</a>
+<a href="#355" id="355">355</a>
+<a href="#356" id="356">356</a>
+<a href="#357" id="357">357</a>
+<a href="#358" id="358">358</a>
+<a href="#359" id="359">359</a>
+<a href="#360" id="360">360</a>
+<a href="#361" id="361">361</a>
+<a href="#362" id="362">362</a>
+<a href="#363" id="363">363</a>
+<a href="#364" id="364">364</a>
+<a href="#365" id="365">365</a>
+<a href="#366" id="366">366</a>
+<a href="#367" id="367">367</a>
+<a href="#368" id="368">368</a>
+<a href="#369" id="369">369</a>
+<a href="#370" id="370">370</a>
+<a href="#371" id="371">371</a>
+<a href="#372" id="372">372</a>
+<a href="#373" id="373">373</a>
+<a href="#374" id="374">374</a>
+<a href="#375" id="375">375</a>
+<a href="#376" id="376">376</a>
+<a href="#377" id="377">377</a>
+<a href="#378" id="378">378</a>
+<a href="#379" id="379">379</a>
+<a href="#380" id="380">380</a>
+<a href="#381" id="381">381</a>
+<a href="#382" id="382">382</a>
+<a href="#383" id="383">383</a>
+<a href="#384" id="384">384</a>
+<a href="#385" id="385">385</a>
+<a href="#386" id="386">386</a>
+<a href="#387" id="387">387</a>
+<a href="#388" id="388">388</a>
+<a href="#389" id="389">389</a>
+<a href="#390" id="390">390</a>
+<a href="#391" id="391">391</a>
+<a href="#392" id="392">392</a>
+<a href="#393" id="393">393</a>
+<a href="#394" id="394">394</a>
+<a href="#395" id="395">395</a>
+<a href="#396" id="396">396</a>
+<a href="#397" id="397">397</a>
+<a href="#398" id="398">398</a>
+<a href="#399" id="399">399</a>
+<a href="#400" id="400">400</a>
+<a href="#401" id="401">401</a>
+<a href="#402" id="402">402</a>
+<a href="#403" id="403">403</a>
+<a href="#404" id="404">404</a>
+<a href="#405" id="405">405</a>
+<a href="#406" id="406">406</a>
+<a href="#407" id="407">407</a>
+<a href="#408" id="408">408</a>
+<a href="#409" id="409">409</a>
+<a href="#410" id="410">410</a>
+<a href="#411" id="411">411</a>
+<a href="#412" id="412">412</a>
+<a href="#413" id="413">413</a>
+<a href="#414" id="414">414</a>
+<a href="#415" id="415">415</a>
+<a href="#416" id="416">416</a>
+<a href="#417" id="417">417</a>
+<a href="#418" id="418">418</a>
+<a href="#419" id="419">419</a>
+<a href="#420" id="420">420</a>
+<a href="#421" id="421">421</a>
+<a href="#422" id="422">422</a>
+<a href="#423" id="423">423</a>
+<a href="#424" id="424">424</a>
+<a href="#425" id="425">425</a>
+<a href="#426" id="426">426</a>
+<a href="#427" id="427">427</a>
+<a href="#428" id="428">428</a>
+<a href="#429" id="429">429</a>
+<a href="#430" id="430">430</a>
+<a href="#431" id="431">431</a>
+<a href="#432" id="432">432</a>
+<a href="#433" id="433">433</a>
+<a href="#434" id="434">434</a>
+<a href="#435" id="435">435</a>
+<a href="#436" id="436">436</a>
+<a href="#437" id="437">437</a>
+<a href="#438" id="438">438</a>
+<a href="#439" id="439">439</a>
+<a href="#440" id="440">440</a>
+<a href="#441" id="441">441</a>
+<a href="#442" id="442">442</a>
+<a href="#443" id="443">443</a>
+<a href="#444" id="444">444</a>
+<a href="#445" id="445">445</a>
+<a href="#446" id="446">446</a>
+<a href="#447" id="447">447</a>
+<a href="#448" id="448">448</a>
+<a href="#449" id="449">449</a>
+<a href="#450" id="450">450</a>
+<a href="#451" id="451">451</a>
+<a href="#452" id="452">452</a>
+<a href="#453" id="453">453</a>
+<a href="#454" id="454">454</a>
+<a href="#455" id="455">455</a>
+<a href="#456" id="456">456</a>
+<a href="#457" id="457">457</a>
+<a href="#458" id="458">458</a>
+<a href="#459" id="459">459</a>
+<a href="#460" id="460">460</a>
+<a href="#461" id="461">461</a>
+<a href="#462" id="462">462</a>
+<a href="#463" id="463">463</a>
+<a href="#464" id="464">464</a>
+<a href="#465" id="465">465</a>
+<a href="#466" id="466">466</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::analysis::pointer_inference::State <span class="kw">as </span>PiState;
 <span class="kw">use crate</span>::{
     abstract_domain::{AbstractDomain, AbstractIdentifier, DomainMap, UnionMergeStrategy},
     analysis::pointer_inference::Data,
     prelude::<span class="kw-2">*</span>,
 };
-<span class="kw">use </span>std::collections::BTreeMap;
+<span class="kw">use </span>std::collections::{BTreeMap, BTreeSet};
 
 <span class="doccomment">/// The state of a memory object for which at least one possible call to a `free`-like function was detected.
 </span><span class="attr">#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 </span><span class="kw">enum </span>ObjectState {
     <span class="doccomment">/// The object is already freed, i.e. pointers to it are dangling.
-    /// The associated TID denotes the point in time when the object was freed.
-    </span>Dangling(Tid),
+    /// The associated TIDs denote the point in time when the object was freed
+    /// and possibly the call path taken to that point in time.
+    </span>Dangling(Vec&lt;Tid&gt;),
     <span class="doccomment">/// The object is already freed and a use-after-free CWE message for it was already generated.
     /// This object state is used to prevent duplicate CWE warnings with the same root cause.
-    </span>AlreadyFlagged,
+    /// It still holds a path to a point in time where the object was freed.
+    </span>AlreadyFlagged(Vec&lt;Tid&gt;),
 }
 
 <span class="kw">impl </span>AbstractDomain <span class="kw">for </span>ObjectState {
     <span class="doccomment">/// Merge two object states.
-    /// If both object states are dangling then use the source TID of `self` in the result.
+    /// If both object states are identical then use the shorter path to `free` in the result.
     </span><span class="kw">fn </span>merge(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="self">Self </span>{
+        <span class="kw">use </span>std::cmp::Ordering;
+
         <span class="kw">match </span>(<span class="self">self</span>, other) {
-            (ObjectState::AlreadyFlagged, <span class="kw">_</span>) | (<span class="kw">_</span>, ObjectState::AlreadyFlagged) =&gt; {
-                ObjectState::AlreadyFlagged
+            (
+                ObjectState::AlreadyFlagged(free_path),
+                ObjectState::AlreadyFlagged(other_free_path),
+            ) =&gt; {
+                <span class="kw">let </span>shortest_path = <span class="kw">match </span>free_path.len().cmp(<span class="kw-2">&amp;</span>other_free_path.len()) {
+                    Ordering::Less =&gt; free_path.clone(),
+                    Ordering::Equal =&gt; std::cmp::min(free_path, other_free_path).clone(),
+                    Ordering::Greater =&gt; other_free_path.clone(),
+                };
+                ObjectState::AlreadyFlagged(shortest_path)
             }
-            (ObjectState::Dangling(tid), ObjectState::Dangling(other_tid)) =&gt; {
-                ObjectState::Dangling(std::cmp::min(tid, other_tid).clone())
+            (ObjectState::AlreadyFlagged(free_path), <span class="kw">_</span>)
+            | (<span class="kw">_</span>, ObjectState::AlreadyFlagged(free_path)) =&gt; {
+                ObjectState::AlreadyFlagged(free_path.clone())
+            }
+            (ObjectState::Dangling(free_path), ObjectState::Dangling(other_free_path)) =&gt; {
+                <span class="kw">let </span>shortest_path = <span class="kw">match </span>free_path.len().cmp(<span class="kw-2">&amp;</span>other_free_path.len()) {
+                    Ordering::Less =&gt; free_path.clone(),
+                    Ordering::Equal =&gt; std::cmp::min(free_path, other_free_path).clone(),
+                    Ordering::Greater =&gt; other_free_path.clone(),
+                };
+                ObjectState::Dangling(shortest_path)
             }
         }
     }
@@ -377,12 +524,19 @@
     }
 }
 
-<span class="doccomment">/// The `State` currently only keeps track of the list of TIDs of memory object that may have been freed already
+<span class="doccomment">/// The `State` keeps track of the list of abstract IDs of memory objects that may have been freed already
 /// together with the corresponding object states.
 </span><span class="attr">#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 </span><span class="kw">pub struct </span>State {
-    <span class="kw">pub </span>current_fn_tid: Tid,
-    dangling_objects: DomainMap&lt;AbstractIdentifier, ObjectState, UnionMergeStrategy&gt;,
+    <span class="doccomment">/// The TID of the current function.
+    </span><span class="kw">pub </span>current_fn_tid: Tid,
+    <span class="doccomment">/// Map from the abstract ID of dangling objects to their object state.
+    </span>dangling_objects: DomainMap&lt;AbstractIdentifier, ObjectState, UnionMergeStrategy&gt;,
+    <span class="doccomment">/// Memory objects that were generated and freed in the same call are tracked in a separate map.
+    /// Such objects are often analysis errors.
+    /// Tracking them separately prevents them from masking genuine Use-After-Free cases in the caller.
+    </span>dangling_objects_generated_and_freed_in_same_call:
+        DomainMap&lt;AbstractIdentifier, ObjectState, UnionMergeStrategy&gt;,
 }
 
 <span class="kw">impl </span>State {
@@ -391,40 +545,37 @@
         State {
             current_fn_tid,
             dangling_objects: BTreeMap::new().into(),
+            dangling_objects_generated_and_freed_in_same_call: BTreeMap::new().into(),
         }
-    }
-
-    <span class="doccomment">/// Return whether the given object ID is already flagged in this state,
-    /// i.e. whether a CWE warning was already generated for this object.
-    </span><span class="kw">pub fn </span>is_id_already_flagged(<span class="kw-2">&amp;</span><span class="self">self</span>, object_id: <span class="kw-2">&amp;</span>AbstractIdentifier) -&gt; bool {
-        <span class="self">self</span>.dangling_objects.get(object_id) == <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>ObjectState::AlreadyFlagged)
-    }
-
-    <span class="doccomment">/// If the given `object_id` represents a dangling object, return the TID of the site where it was freed.
-    </span><span class="kw">pub fn </span>get_free_tid_if_dangling(<span class="kw-2">&amp;</span><span class="self">self</span>, object_id: <span class="kw-2">&amp;</span>AbstractIdentifier) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>Tid&gt; {
-        <span class="kw">if let </span><span class="prelude-val">Some</span>(ObjectState::Dangling(free_tid)) = <span class="self">self</span>.dangling_objects.get(object_id) {
-            <span class="prelude-val">Some</span>(free_tid)
-        } <span class="kw">else </span>{
-            <span class="prelude-val">None
-        </span>}
     }
 
     <span class="doccomment">/// Check the given address on whether it may point to already freed memory.
     /// For each possible dangling pointer target the abstract ID of the object
-    /// and the TID of the corresponding site where the object was freed is returned.
+    /// and the path to the corresponding site where the object was freed is returned.
     /// The object states of corresponding memory objects are set to [`ObjectState::AlreadyFlagged`]
     /// to prevent reporting duplicate CWE messages with the same root cause.
     </span><span class="kw">pub fn </span>check_address_for_use_after_free(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         address: <span class="kw-2">&amp;</span>Data,
-    ) -&gt; <span class="prelude-ty">Option</span>&lt;Vec&lt;(AbstractIdentifier, Tid)&gt;&gt; {
+    ) -&gt; <span class="prelude-ty">Option</span>&lt;Vec&lt;(AbstractIdentifier, Vec&lt;Tid&gt;)&gt;&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>free_ids_of_dangling_pointers = Vec::new();
         <span class="kw">for </span>id <span class="kw">in </span>address.get_relative_values().keys() {
-            <span class="kw">if let </span><span class="prelude-val">Some</span>(ObjectState::Dangling(free_id)) = <span class="self">self</span>.dangling_objects.get(id) {
-                free_ids_of_dangling_pointers.push((id.clone(), free_id.clone()));
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(ObjectState::Dangling(free_id_path)) = <span class="self">self</span>.dangling_objects.get(id) {
+                <span class="kw">let </span>free_id_path = free_id_path.clone();
+                free_ids_of_dangling_pointers.push((id.clone(), free_id_path.clone()));
 
                 <span class="self">self</span>.dangling_objects
-                    .insert(id.clone(), ObjectState::AlreadyFlagged);
+                    .insert(id.clone(), ObjectState::AlreadyFlagged(free_id_path));
+            }
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(ObjectState::Dangling(free_id_path)) = <span class="self">self
+                </span>.dangling_objects_generated_and_freed_in_same_call
+                .get(id)
+            {
+                <span class="kw">let </span>free_id_path = free_id_path.clone();
+                free_ids_of_dangling_pointers.push((id.clone(), free_id_path.clone()));
+
+                <span class="self">self</span>.dangling_objects_generated_and_freed_in_same_call
+                    .insert(id.clone(), ObjectState::AlreadyFlagged(free_id_path));
             }
         }
         <span class="kw">if </span>free_ids_of_dangling_pointers.is_empty() {
@@ -434,29 +585,63 @@
         }
     }
 
+    <span class="doccomment">/// Mark the given object ID as freed with the given `free_id_path` denoting the path to the site where it is freed.
+    ///
+    /// If the object ID was already marked as dangling,
+    /// return it plus the (previously saved) path to the site where it was freed.
+    </span><span class="attr">#[must_use]
+    </span><span class="kw">fn </span>mark_as_freed(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        object_id: <span class="kw-2">&amp;</span>AbstractIdentifier,
+        free_id_path: Vec&lt;Tid&gt;,
+        pi_state: <span class="kw-2">&amp;</span>PiState,
+    ) -&gt; <span class="prelude-ty">Option</span>&lt;(AbstractIdentifier, Vec&lt;Tid&gt;)&gt; {
+        <span class="kw">if </span>pi_state.memory.is_unique_object(object_id).ok() == <span class="prelude-val">Some</span>(<span class="bool-val">false</span>) {
+            <span class="comment">// FIXME: We cannot distinguish different objects represented by the same ID.
+            // So to avoid producing lots of false positive warnings
+            // we ignore these cases by not marking these IDs as freed.
+            </span><span class="kw">return </span><span class="prelude-val">None</span>;
+        }
+        <span class="kw">if </span>object_id.get_path_hints().last() == free_id_path.last() {
+            <span class="comment">// The object was created in the same call as it is now freed.
+            </span><span class="kw">if let </span><span class="prelude-val">Some</span>(ObjectState::Dangling(old_free_id_path)) = <span class="self">self
+                </span>.dangling_objects_generated_and_freed_in_same_call
+                .insert(
+                    object_id.clone(),
+                    ObjectState::Dangling(free_id_path.clone()),
+                )
+            {
+                <span class="kw">return </span><span class="prelude-val">Some</span>((object_id.clone(), old_free_id_path.clone()));
+            }
+        } <span class="kw">else if let </span><span class="prelude-val">Some</span>(ObjectState::Dangling(old_free_id_path)) = <span class="self">self</span>.dangling_objects.insert(
+            object_id.clone(),
+            ObjectState::Dangling(free_id_path.clone()),
+        ) {
+            <span class="kw">return </span><span class="prelude-val">Some</span>((object_id.clone(), old_free_id_path.clone()));
+        }
+
+        <span class="prelude-val">None
+    </span>}
+
     <span class="doccomment">/// All TIDs that the given `param` may point to are marked as freed, i.e. pointers to them are dangling.
     /// For each ID that was already marked as dangling return a string describing the root cause of a possible double free bug.
+    ///
+    /// The function heuristically detects IDs related to recursive data structures (e.g. linked lists).
+    /// Such IDs are ignored when marking objects as freed.
     </span><span class="kw">pub fn </span>handle_param_of_free_call(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         call_tid: <span class="kw-2">&amp;</span>Tid,
         param: <span class="kw-2">&amp;</span>Data,
         pi_state: <span class="kw-2">&amp;</span>PiState,
-    ) -&gt; <span class="prelude-ty">Option</span>&lt;Vec&lt;(AbstractIdentifier, Tid)&gt;&gt; {
+    ) -&gt; <span class="prelude-ty">Option</span>&lt;Vec&lt;(AbstractIdentifier, Vec&lt;Tid&gt;)&gt;&gt; {
         <span class="comment">// FIXME: This function could also generate debug log messages whenever nonsensical information is detected.
         // E.g. stack frame IDs or non-zero ID offsets can be indicators of other bugs.
         </span><span class="kw">let </span><span class="kw-2">mut </span>warnings = Vec::new();
-        <span class="kw">for </span>id <span class="kw">in </span>param.get_relative_values().keys() {
-            <span class="kw">if </span>pi_state.memory.is_unique_object(id).ok() == <span class="prelude-val">Some</span>(<span class="bool-val">false</span>) {
-                <span class="comment">// FIXME: We cannot distinguish different objects represented by the same ID.
-                // So to avoid producing lots of false positive warnings
-                // we ignore these cases by not marking these IDs as freed.
-                </span><span class="kw">continue</span>;
-            }
-            <span class="kw">if let </span><span class="prelude-val">Some</span>(ObjectState::Dangling(old_free_id)) = <span class="self">self
-                </span>.dangling_objects
-                .insert(id.clone(), ObjectState::Dangling(call_tid.clone()))
-            {
-                warnings.push((id.clone(), old_free_id.clone()));
+        <span class="kw">let </span>generic_pointer_size = pi_state.stack_id.bytesize();
+        <span class="comment">// Heuristically ignore recursive IDs
+        </span><span class="kw">for </span>id <span class="kw">in </span>get_non_recursive_ids(param, generic_pointer_size) {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(warning_data) = <span class="self">self</span>.mark_as_freed(id, <span class="macro">vec!</span>[call_tid.clone()], pi_state) {
+                warnings.push(warning_data);
             }
         }
         <span class="kw">if </span>!warnings.is_empty() {
@@ -467,8 +652,11 @@
     }
 
     <span class="doccomment">/// Add objects that were freed in the callee of a function call to the list of dangling pointers of `self`.
-    /// May return a list of warnings if cases of possible double frees are detected,
-    /// i.e. if an already freed object may also have been freed in the callee.
+    /// Note that this function does not check for double frees.
+    ///
+    /// The function heuristically detects when parameter values contain IDs
+    /// corresponding to recursive data structures (e.g. linked lists).
+    /// Such IDs are ignored, i.e. their object status is not transferred from the callee.
     </span><span class="kw">pub fn </span>collect_freed_objects_from_called_function(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         state_before_return: <span class="kw-2">&amp;</span>State,
@@ -476,27 +664,33 @@
         call_tid: <span class="kw-2">&amp;</span>Tid,
         pi_state: <span class="kw-2">&amp;</span>PiState,
     ) {
+        <span class="kw">let </span>generic_pointer_size = pi_state.stack_id.bytesize();
+        <span class="kw">let </span>call_tid_with_suffix = call_tid.clone().with_id_suffix(<span class="string">&quot;_param&quot;</span>);
+
         <span class="kw">for </span>(callee_id, callee_object_state) <span class="kw">in </span>state_before_return.dangling_objects.iter() {
             <span class="kw">if let </span><span class="prelude-val">Some</span>(caller_value) = id_replacement_map.get(callee_id) {
-                <span class="kw">for </span>caller_id <span class="kw">in </span>caller_value.get_relative_values().keys() {
-                    <span class="kw">if </span>pi_state.memory.is_unique_object(caller_id).ok() != <span class="prelude-val">Some</span>(<span class="bool-val">false</span>) {
-                        <span class="comment">// FIXME: We cannot distinguish different objects represented by the same ID.
-                        // So to avoid producing lots of false positive warnings we ignore these cases.
-                        </span><span class="kw">match </span>(callee_object_state, <span class="self">self</span>.dangling_objects.get(caller_id)) {
-                            <span class="comment">// Case 1: The dangling object is unknown to the caller, so we add it.
-                            </span>(ObjectState::Dangling(<span class="kw">_</span>), <span class="prelude-val">None</span>)
-                            | (ObjectState::AlreadyFlagged, <span class="prelude-val">None</span>) =&gt; {
-                                <span class="self">self</span>.dangling_objects.insert(
-                                    caller_id.clone(),
-                                    ObjectState::Dangling(call_tid.clone()),
-                                );
-                            }
-                            <span class="comment">// Case 2: The dangling object is already known to the caller.
-                            // If this were a case of Use-After-Free, then this should have been flagged when checking the call parameters.
-                            // Thus we can simply leave the object state as it is.
-                            </span>(<span class="kw">_</span>, <span class="prelude-val">Some</span>(ObjectState::Dangling(<span class="kw">_</span>)))
-                            | (<span class="kw">_</span>, <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>ObjectState::AlreadyFlagged)) =&gt; (),
+                <span class="comment">// Heuristically filter out recursive IDs
+                </span><span class="kw">for </span>caller_id <span class="kw">in </span>get_non_recursive_ids(caller_value, generic_pointer_size) {
+                    <span class="kw">if </span>caller_id.get_tid() == call_tid
+                        || caller_id.get_tid() == <span class="kw-2">&amp;</span>call_tid_with_suffix
+                    {
+                        <span class="comment">// FIXME: We heuristically ignore free operations if they happen in the same call as the creation of the object.
+                        // This reduces false positives, but also produces false negatives for some returned dangling pointers.
+                        </span><span class="kw">continue</span>;
+                    }
+
+                    <span class="kw">match </span>callee_object_state {
+                        ObjectState::Dangling(callee_free_path) =&gt; {
+                            <span class="kw">let </span><span class="kw-2">mut </span>free_id_path = callee_free_path.clone();
+                            free_id_path.push(call_tid.clone());
+                            <span class="kw">let _ </span>= <span class="self">self</span>.mark_as_freed(caller_id, free_id_path, pi_state);
                         }
+                        <span class="comment">// FIXME: To reduce false positives and duplicates we heuristically assume
+                        // that if an object is flagged in the callee
+                        // then Use After Frees in the caller are duplicates from the flagged access in the callee.
+                        // And that the corresponding dangling objects do not reach the caller in this case.
+                        // Note that this heuristic will produce false negatives in some cases.
+                        </span>ObjectState::AlreadyFlagged(<span class="kw">_</span>) =&gt; (),
                     }
                 }
             }
@@ -510,6 +704,9 @@
         State {
             current_fn_tid: <span class="self">self</span>.current_fn_tid.clone(),
             dangling_objects: <span class="self">self</span>.dangling_objects.merge(<span class="kw-2">&amp;</span>other.dangling_objects),
+            dangling_objects_generated_and_freed_in_same_call: <span class="self">self
+                </span>.dangling_objects_generated_and_freed_in_same_call
+                .merge(<span class="kw-2">&amp;</span>other.dangling_objects_generated_and_freed_in_same_call),
         }
     }
 
@@ -525,65 +722,90 @@
     </span><span class="attr">#[allow(dead_code)]
     </span><span class="kw">pub fn </span>to_json_compact(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; serde_json::Value {
         <span class="kw">use </span>serde_json::<span class="kw-2">*</span>;
+        <span class="kw">let </span>format_vec = |vec| {
+            <span class="kw">let </span><span class="kw-2">mut </span>string = String::new();
+            <span class="kw">for </span>elem <span class="kw">in </span>vec {
+                string += <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{},&quot;</span>, elem);
+            }
+            string
+        };
+
         <span class="kw">let </span><span class="kw-2">mut </span>state_map = Map::new();
         state_map.insert(
             <span class="string">&quot;current_function&quot;</span>.to_string(),
             Value::String(<span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, <span class="self">self</span>.current_fn_tid)),
         );
         <span class="kw">for </span>(id, object_state) <span class="kw">in </span><span class="self">self</span>.dangling_objects.iter() {
-            <span class="kw">if let </span>ObjectState::Dangling(free_tid) = object_state {
-                state_map.insert(
+            <span class="kw">match </span>object_state {
+                ObjectState::Dangling(free_path) =&gt; state_map.insert(
                     <span class="macro">format!</span>(<span class="string">&quot;{id}&quot;</span>),
-                    Value::String(<span class="macro">format!</span>(<span class="string">&quot;Dangling({free_tid})&quot;</span>)),
-                );
-            } <span class="kw">else </span>{
-                state_map.insert(
+                    Value::String(<span class="macro">format!</span>(<span class="string">&quot;Dangling([{}])&quot;</span>, format_vec(free_path))),
+                ),
+                ObjectState::AlreadyFlagged(free_path) =&gt; state_map.insert(
                     <span class="macro">format!</span>(<span class="string">&quot;{id}&quot;</span>),
-                    Value::String(<span class="string">&quot;Already flagged&quot;</span>.to_string()),
-                );
-            }
+                    Value::String(<span class="macro">format!</span>(<span class="string">&quot;Already flagged([{}])&quot;</span>, format_vec(free_path))),
+                ),
+            };
+        }
+        <span class="kw">for </span>(id, object_state) <span class="kw">in </span><span class="self">self
+            </span>.dangling_objects_generated_and_freed_in_same_call
+            .iter()
+        {
+            <span class="kw">match </span>object_state {
+                ObjectState::Dangling(free_path) =&gt; state_map.insert(
+                    <span class="macro">format!</span>(<span class="string">&quot;{id} (already dangling in callee)&quot;</span>),
+                    Value::String(<span class="macro">format!</span>(<span class="string">&quot;Dangling([{}])&quot;</span>, format_vec(free_path))),
+                ),
+                ObjectState::AlreadyFlagged(free_path) =&gt; state_map.insert(
+                    <span class="macro">format!</span>(<span class="string">&quot;{id} (already dangling in callee)&quot;</span>),
+                    Value::String(<span class="macro">format!</span>(<span class="string">&quot;Already flagged([{}])&quot;</span>, format_vec(free_path))),
+                ),
+            };
         }
         Value::Object(state_map)
     }
 }
 
+<span class="doccomment">/// Return the set of relative IDs contained in the input `data` after filtering out recursive IDs.
+///
+/// An ID is *recursive*, i.e. assumed to correspond to a recursive data structure like a linked list,
+/// if its parent abstract location is also contained as an ID in `data`
+/// or if some ID contained in `data` has this ID as its parent.
+</span><span class="kw">fn </span>get_non_recursive_ids(
+    data: <span class="kw-2">&amp;</span>Data,
+    generic_pointer_size: ByteSize,
+) -&gt; BTreeSet&lt;<span class="kw-2">&amp;</span>AbstractIdentifier&gt; {
+    <span class="kw">let </span>ids: BTreeSet&lt;<span class="kw">_</span>&gt; = data.get_relative_values().keys().collect();
+    <span class="kw">let </span><span class="kw-2">mut </span>filtered_ids = ids.clone();
+    <span class="kw">for </span>id <span class="kw">in </span><span class="kw-2">&amp;</span>ids {
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(parent_id) = id.get_id_with_parent_location(generic_pointer_size) {
+            <span class="kw">if </span>ids.contains(<span class="kw-2">&amp;</span>parent_id) {
+                filtered_ids.remove(<span class="kw-2">*</span>id);
+                filtered_ids.remove(<span class="kw-2">&amp;</span>parent_id);
+            }
+        }
+    }
+    filtered_ids
+}
+
 <span class="attr">#[cfg(test)]
 </span><span class="kw">pub mod </span>tests {
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
-    <span class="kw">use crate</span>::{bitvec, intermediate_representation::parsing, variable};
+    <span class="kw">use crate</span>::{
+        abstract_domain::DataDomain, bitvec, intermediate_representation::parsing, variable,
+    };
     <span class="kw">use </span>std::collections::BTreeSet;
-
-    <span class="kw">impl </span>State {
-        <span class="kw">pub fn </span>mock(
-            current_fn_tid: Tid,
-            dangling_ids: <span class="kw-2">&amp;</span>[(AbstractIdentifier, Tid)],
-            already_flagged_ids: <span class="kw-2">&amp;</span>[AbstractIdentifier],
-        ) -&gt; <span class="self">Self </span>{
-            <span class="kw">let </span><span class="kw-2">mut </span>state = State::new(current_fn_tid);
-            <span class="kw">for </span>(id, free_id) <span class="kw">in </span>dangling_ids.iter() {
-                state
-                    .dangling_objects
-                    .insert(id.clone(), ObjectState::Dangling(free_id.clone()));
-            }
-            <span class="kw">for </span>id <span class="kw">in </span>already_flagged_ids.iter() {
-                state
-                    .dangling_objects
-                    .insert(id.clone(), ObjectState::AlreadyFlagged);
-            }
-            state
-        }
-    }
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>test_check_address_for_use_after_free() {
         <span class="kw">let </span><span class="kw-2">mut </span>state = State::new(Tid::new(<span class="string">&quot;current_fn&quot;</span>));
         state.dangling_objects.insert(
             AbstractIdentifier::mock(<span class="string">&quot;obj_id&quot;</span>, <span class="string">&quot;RAX&quot;</span>, <span class="number">8</span>),
-            ObjectState::Dangling(Tid::new(<span class="string">&quot;free_call&quot;</span>)),
+            ObjectState::Dangling(<span class="macro">vec!</span>[Tid::new(<span class="string">&quot;free_call&quot;</span>)]),
         );
         state.dangling_objects.insert(
             AbstractIdentifier::mock(<span class="string">&quot;flagged_obj_id&quot;</span>, <span class="string">&quot;RAX&quot;</span>, <span class="number">8</span>),
-            ObjectState::AlreadyFlagged,
+            ObjectState::AlreadyFlagged(<span class="macro">vec!</span>[Tid::new(<span class="string">&quot;free_call&quot;</span>)]),
         );
         <span class="kw">let </span>address = Data::mock_from_target_map(BTreeMap::from([
             (
@@ -609,14 +831,14 @@
                 .dangling_objects
                 .get(<span class="kw-2">&amp;</span>AbstractIdentifier::mock(<span class="string">&quot;obj_id&quot;</span>, <span class="string">&quot;RAX&quot;</span>, <span class="number">8</span>))
                 .unwrap(),
-            ObjectState::AlreadyFlagged
+            ObjectState::AlreadyFlagged(<span class="macro">vec!</span>[Tid::new(<span class="string">&quot;free_call&quot;</span>)])
         );
         <span class="macro">assert_eq!</span>(
             <span class="kw-2">*</span>state
                 .dangling_objects
                 .get(<span class="kw-2">&amp;</span>AbstractIdentifier::mock(<span class="string">&quot;flagged_obj_id&quot;</span>, <span class="string">&quot;RAX&quot;</span>, <span class="number">8</span>))
                 .unwrap(),
-            ObjectState::AlreadyFlagged
+            ObjectState::AlreadyFlagged(<span class="macro">vec!</span>[Tid::new(<span class="string">&quot;free_call&quot;</span>)])
         );
     }
 
@@ -637,7 +859,7 @@
                 .dangling_objects
                 .get(<span class="kw-2">&amp;</span>AbstractIdentifier::mock(<span class="string">&quot;obj_id&quot;</span>, <span class="string">&quot;RAX&quot;</span>, <span class="number">8</span>))
                 .unwrap(),
-            ObjectState::Dangling(Tid::new(<span class="string">&quot;free_call&quot;</span>))
+            ObjectState::Dangling(<span class="macro">vec!</span>[Tid::new(<span class="string">&quot;free_call&quot;</span>)])
         );
         <span class="comment">// Check that a second free operation yields a double free warning.
         </span><span class="macro">assert!</span>(state
@@ -651,7 +873,7 @@
         <span class="kw">let </span><span class="kw-2">mut </span>state_before_return = State::new(Tid::new(<span class="string">&quot;callee_fn_tid&quot;</span>));
         state_before_return.dangling_objects.insert(
             AbstractIdentifier::mock(<span class="string">&quot;callee_obj_tid&quot;</span>, <span class="string">&quot;RAX&quot;</span>, <span class="number">8</span>),
-            ObjectState::Dangling(Tid::new(<span class="string">&quot;free_tid&quot;</span>)),
+            ObjectState::Dangling(<span class="macro">vec!</span>[Tid::new(<span class="string">&quot;free_tid&quot;</span>)]),
         );
         <span class="kw">let </span>pi_state = PiState::new(<span class="kw-2">&amp;</span><span class="macro">variable!</span>(<span class="string">&quot;RSP:8&quot;</span>), Tid::new(<span class="string">&quot;call&quot;</span>), BTreeSet::new());
         <span class="kw">let </span>id_replacement_map = BTreeMap::from([(
@@ -674,7 +896,37 @@
                 .dangling_objects
                 .get(<span class="kw-2">&amp;</span>AbstractIdentifier::mock(<span class="string">&quot;caller_tid&quot;</span>, <span class="string">&quot;RBX&quot;</span>, <span class="number">8</span>))
                 .unwrap(),
-            <span class="kw-2">&amp;</span>ObjectState::Dangling(Tid::new(<span class="string">&quot;call_tid&quot;</span>))
+            <span class="kw-2">&amp;</span>ObjectState::Dangling(<span class="macro">vec!</span>[Tid::new(<span class="string">&quot;free_tid&quot;</span>), Tid::new(<span class="string">&quot;call_tid&quot;</span>)])
+        );
+    }
+
+    <span class="attr">#[test]
+    </span><span class="kw">fn </span>test_filtering_of_recursive_ids() {
+        <span class="kw">let </span>data = DataDomain::mock_from_target_map(BTreeMap::from([
+            (
+                AbstractIdentifier::mock_nested(<span class="string">&quot;time1&quot;</span>, <span class="string">&quot;r0:4&quot;</span>, <span class="kw-2">&amp;</span>[], <span class="number">4</span>),
+                <span class="macro">bitvec!</span>(<span class="string">&quot;0x0:4&quot;</span>).into(),
+            ),
+            (
+                AbstractIdentifier::mock_nested(<span class="string">&quot;time1&quot;</span>, <span class="string">&quot;r0:4&quot;</span>, <span class="kw-2">&amp;</span>[<span class="number">0</span>], <span class="number">4</span>),
+                <span class="macro">bitvec!</span>(<span class="string">&quot;0x0:4&quot;</span>).into(),
+            ),
+            (
+                AbstractIdentifier::mock_nested(<span class="string">&quot;unique1&quot;</span>, <span class="string">&quot;r0:4&quot;</span>, <span class="kw-2">&amp;</span>[], <span class="number">4</span>),
+                <span class="macro">bitvec!</span>(<span class="string">&quot;0x0:4&quot;</span>).into(),
+            ),
+            (
+                AbstractIdentifier::mock_nested(<span class="string">&quot;unique2&quot;</span>, <span class="string">&quot;r0:4&quot;</span>, <span class="kw-2">&amp;</span>[<span class="number">0</span>], <span class="number">4</span>),
+                <span class="macro">bitvec!</span>(<span class="string">&quot;0x0:4&quot;</span>).into(),
+            ),
+        ]));
+        <span class="kw">let </span>filtered_ids = get_non_recursive_ids(<span class="kw-2">&amp;</span>data, ByteSize::new(<span class="number">4</span>));
+        <span class="macro">assert_eq!</span>(
+            filtered_ids,
+            BTreeSet::from([
+                <span class="kw-2">&amp;</span>AbstractIdentifier::mock_nested(<span class="string">&quot;unique1&quot;</span>, <span class="string">&quot;r0:4&quot;</span>, <span class="kw-2">&amp;</span>[], <span class="number">4</span>),
+                <span class="kw-2">&amp;</span>AbstractIdentifier::mock_nested(<span class="string">&quot;unique2&quot;</span>, <span class="string">&quot;r0:4&quot;</span>, <span class="kw-2">&amp;</span>[<span class="number">0</span>], <span class="number">4</span>)
+            ])
         );
     }
 }

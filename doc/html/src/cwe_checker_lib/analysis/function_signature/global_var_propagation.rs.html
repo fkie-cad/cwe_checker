@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/analysis/function_signature/global_var_propagation.rs`."><title>global_var_propagation.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../../static.files/rustdoc-ba5701c5741a7b69.css" id="mainThemeStyle"><div id="rustdoc-vars" data-root-path="../../../../" data-static-root-path="../../../../static.files/" data-current-crate="cwe_checker_lib" data-themes="" data-resource-suffix="" data-rustdoc-version="1.70.0 (90c541806 2023-05-31)" data-search-js="search-e077946657036a58.js" data-settings-js="settings-298e1ea74db45b39.js" data-settings-css="settings-7bfb4c59cc6bc502.css" data-theme-light-css="light-0f8c037637f9eb3e.css" data-theme-dark-css="dark-1097f8e92a01e3cf.css" data-theme-ayu-css="ayu-614652228113ac93.css" ></div><script src="../../../../static.files/storage-62ce34ea385b278a.js"></script><script defer src="../../../../static.files/source-script-905937fbbdc8e9ea.js"></script><script defer src="../../../../source-files.js"></script><script defer src="../../../../static.files/main-f61008743c98d196.js"></script><noscript><link rel="stylesheet" media="(prefers-color-scheme:light)" href="../../../../static.files/light-0f8c037637f9eb3e.css"><link rel="stylesheet" media="(prefers-color-scheme:dark)" href="../../../../static.files/dark-1097f8e92a01e3cf.css"><link rel="stylesheet" href="../../../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../../../cwe_checker_lib/index.html"><img class="rust-logo" src="../../../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/analysis/function_signature/global_var_propagation.rs`."><title>global_var_propagation.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../../static.files/rustdoc-9ee3a5e31a2afa3e.css"><meta name="rustdoc-vars" data-root-path="../../../../" data-static-root-path="../../../../static.files/" data-current-crate="cwe_checker_lib" data-themes="" data-resource-suffix="" data-rustdoc-version="1.75.0 (82e1608df 2023-12-21)" data-channel="1.75.0" data-search-js="search-8fbf244ebcf71464.js" data-settings-js="settings-74424d7eec62a23e.js" ><script src="../../../../static.files/storage-fec3eaa3851e447d.js"></script><script defer src="../../../../static.files/src-script-3280b574d94e47b4.js"></script><script defer src="../../../../src-files.js"></script><script defer src="../../../../static.files/main-9dd44ab47b99a0fb.js"></script><noscript><link rel="stylesheet" href="../../../../static.files/noscript-5d8b3c7633ad77ba.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -300,12 +300,108 @@
 <a href="#300" id="300">300</a>
 <a href="#301" id="301">301</a>
 <a href="#302" id="302">302</a>
+<a href="#303" id="303">303</a>
+<a href="#304" id="304">304</a>
+<a href="#305" id="305">305</a>
+<a href="#306" id="306">306</a>
+<a href="#307" id="307">307</a>
+<a href="#308" id="308">308</a>
+<a href="#309" id="309">309</a>
+<a href="#310" id="310">310</a>
+<a href="#311" id="311">311</a>
+<a href="#312" id="312">312</a>
+<a href="#313" id="313">313</a>
+<a href="#314" id="314">314</a>
+<a href="#315" id="315">315</a>
+<a href="#316" id="316">316</a>
+<a href="#317" id="317">317</a>
+<a href="#318" id="318">318</a>
+<a href="#319" id="319">319</a>
+<a href="#320" id="320">320</a>
+<a href="#321" id="321">321</a>
+<a href="#322" id="322">322</a>
+<a href="#323" id="323">323</a>
+<a href="#324" id="324">324</a>
+<a href="#325" id="325">325</a>
+<a href="#326" id="326">326</a>
+<a href="#327" id="327">327</a>
+<a href="#328" id="328">328</a>
+<a href="#329" id="329">329</a>
+<a href="#330" id="330">330</a>
+<a href="#331" id="331">331</a>
+<a href="#332" id="332">332</a>
+<a href="#333" id="333">333</a>
+<a href="#334" id="334">334</a>
+<a href="#335" id="335">335</a>
+<a href="#336" id="336">336</a>
+<a href="#337" id="337">337</a>
+<a href="#338" id="338">338</a>
+<a href="#339" id="339">339</a>
+<a href="#340" id="340">340</a>
+<a href="#341" id="341">341</a>
+<a href="#342" id="342">342</a>
+<a href="#343" id="343">343</a>
+<a href="#344" id="344">344</a>
+<a href="#345" id="345">345</a>
+<a href="#346" id="346">346</a>
+<a href="#347" id="347">347</a>
+<a href="#348" id="348">348</a>
+<a href="#349" id="349">349</a>
+<a href="#350" id="350">350</a>
+<a href="#351" id="351">351</a>
+<a href="#352" id="352">352</a>
+<a href="#353" id="353">353</a>
+<a href="#354" id="354">354</a>
+<a href="#355" id="355">355</a>
+<a href="#356" id="356">356</a>
+<a href="#357" id="357">357</a>
+<a href="#358" id="358">358</a>
+<a href="#359" id="359">359</a>
+<a href="#360" id="360">360</a>
+<a href="#361" id="361">361</a>
+<a href="#362" id="362">362</a>
+<a href="#363" id="363">363</a>
+<a href="#364" id="364">364</a>
+<a href="#365" id="365">365</a>
+<a href="#366" id="366">366</a>
+<a href="#367" id="367">367</a>
+<a href="#368" id="368">368</a>
+<a href="#369" id="369">369</a>
+<a href="#370" id="370">370</a>
+<a href="#371" id="371">371</a>
+<a href="#372" id="372">372</a>
+<a href="#373" id="373">373</a>
+<a href="#374" id="374">374</a>
+<a href="#375" id="375">375</a>
+<a href="#376" id="376">376</a>
+<a href="#377" id="377">377</a>
+<a href="#378" id="378">378</a>
+<a href="#379" id="379">379</a>
+<a href="#380" id="380">380</a>
+<a href="#381" id="381">381</a>
+<a href="#382" id="382">382</a>
+<a href="#383" id="383">383</a>
+<a href="#384" id="384">384</a>
+<a href="#385" id="385">385</a>
+<a href="#386" id="386">386</a>
+<a href="#387" id="387">387</a>
+<a href="#388" id="388">388</a>
+<a href="#389" id="389">389</a>
+<a href="#390" id="390">390</a>
+<a href="#391" id="391">391</a>
+<a href="#392" id="392">392</a>
+<a href="#393" id="393">393</a>
+<a href="#394" id="394">394</a>
+<a href="#395" id="395">395</a>
+<a href="#396" id="396">396</a>
+<a href="#397" id="397">397</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! This module implements propagation of global variables via two fixpoint algorithms on the call graph.
 //! For more details see [`propagate_globals`].
 
 </span><span class="kw">use </span><span class="kw">super</span>::AccessPattern;
 <span class="kw">use </span><span class="kw">super</span>::FunctionSignature;
 <span class="kw">use </span><span class="kw">crate</span>::abstract_domain::AbstractDomain;
+<span class="kw">use </span><span class="kw">crate</span>::abstract_domain::AbstractLocation;
 <span class="kw">use </span><span class="kw">crate</span>::abstract_domain::DomainMap;
 <span class="kw">use </span><span class="kw">crate</span>::abstract_domain::UnionMergeStrategy;
 <span class="kw">use </span><span class="kw">crate</span>::analysis::callgraph::get_program_callgraph;
@@ -314,6 +410,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::intermediate_representation::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::utils::log::LogMessage;
 <span class="kw">use </span>std::collections::BTreeMap;
+<span class="kw">use </span>std::collections::BTreeSet;
 <span class="kw">use </span>std::collections::HashSet;
 
 <span class="doccomment">/// The context object for propagating known global variables top-down in the call graph.
@@ -333,7 +430,7 @@
     <span class="kw">type </span>EdgeLabel = <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>Term&lt;Jmp&gt;;
     <span class="kw">type </span>NodeLabel = Tid;
     <span class="doccomment">/// The values at nodes are the sets of known addresses of global variables for that function.
-    </span><span class="kw">type </span>NodeValue = HashSet&lt;u64&gt;;
+    </span><span class="kw">type </span>NodeValue = BTreeSet&lt;AbstractLocation&gt;;
 
     <span class="doccomment">/// Get the call graph corresponding to the context object.
     </span><span class="kw">fn </span>get_graph(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>CallGraph&lt;<span class="lifetime">&#39;a</span>&gt; {
@@ -341,10 +438,14 @@
     }
 
     <span class="doccomment">/// The merge function returns the union of the two input sets of global addresses.
-    </span><span class="kw">fn </span>merge(<span class="kw-2">&amp;</span><span class="self">self</span>, set1: <span class="kw-2">&amp;</span>HashSet&lt;u64&gt;, set2: <span class="kw-2">&amp;</span>HashSet&lt;u64&gt;) -&gt; HashSet&lt;u64&gt; {
+    </span><span class="kw">fn </span>merge(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        set1: <span class="kw-2">&amp;</span>BTreeSet&lt;AbstractLocation&gt;,
+        set2: <span class="kw-2">&amp;</span>BTreeSet&lt;AbstractLocation&gt;,
+    ) -&gt; BTreeSet&lt;AbstractLocation&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>result = set1.clone();
         <span class="kw">for </span>address <span class="kw">in </span>set2 {
-            result.insert(<span class="kw-2">*</span>address);
+            result.insert(address.clone());
         }
         result
     }
@@ -352,9 +453,9 @@
     <span class="doccomment">/// We always propagate all known addresses of global variables along the edges of the call graph.
     </span><span class="kw">fn </span>update_edge(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        globals: <span class="kw-2">&amp;</span>HashSet&lt;u64&gt;,
+        globals: <span class="kw-2">&amp;</span>BTreeSet&lt;AbstractLocation&gt;,
         _edge: petgraph::stable_graph::EdgeIndex,
-    ) -&gt; <span class="prelude-ty">Option</span>&lt;HashSet&lt;u64&gt;&gt; {
+    ) -&gt; <span class="prelude-ty">Option</span>&lt;BTreeSet&lt;AbstractLocation&gt;&gt; {
         <span class="prelude-val">Some</span>(globals.clone())
     }
 }
@@ -368,7 +469,7 @@
 </span><span class="kw">fn </span>propagate_known_globals_top_down(
     project: <span class="kw-2">&amp;</span>Project,
     fn_sigs: <span class="kw-2">&amp;</span>BTreeMap&lt;Tid, FunctionSignature&gt;,
-) -&gt; BTreeMap&lt;Tid, HashSet&lt;u64&gt;&gt; {
+) -&gt; BTreeMap&lt;Tid, BTreeSet&lt;AbstractLocation&gt;&gt; {
     <span class="kw">let </span>graph = get_program_callgraph(<span class="kw-2">&amp;</span>project.program);
     <span class="kw">let </span>context = KnownGlobalsContext::new(<span class="kw-2">&amp;</span>graph);
     <span class="kw">let </span><span class="kw-2">mut </span>computation = Computation::new(context, <span class="prelude-val">None</span>);
@@ -398,12 +499,15 @@
     <span class="doccomment">/// The reversed (!) call graph of the program.
     </span>graph: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>CallGraph&lt;<span class="lifetime">&#39;a</span>&gt;,
     <span class="doccomment">/// A map from TIDs of functions to the set of known addresses of global variables for that function.
-    </span>known_globals: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>BTreeMap&lt;Tid, HashSet&lt;u64&gt;&gt;,
+    </span>known_globals: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>BTreeMap&lt;Tid, BTreeSet&lt;AbstractLocation&gt;&gt;,
 }
 
 <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; GlobalsPropagationContext&lt;<span class="lifetime">&#39;a</span>&gt; {
     <span class="doccomment">/// Create a new [`GlobalsPropagationContext`] object.
-    </span><span class="kw">fn </span>new(graph: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>CallGraph&lt;<span class="lifetime">&#39;a</span>&gt;, known_globals: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>BTreeMap&lt;Tid, HashSet&lt;u64&gt;&gt;) -&gt; <span class="self">Self </span>{
+    </span><span class="kw">fn </span>new(
+        graph: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>CallGraph&lt;<span class="lifetime">&#39;a</span>&gt;,
+        known_globals: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>BTreeMap&lt;Tid, BTreeSet&lt;AbstractLocation&gt;&gt;,
+    ) -&gt; <span class="self">Self </span>{
         GlobalsPropagationContext {
             graph,
             known_globals,
@@ -415,9 +519,9 @@
     <span class="kw">type </span>EdgeLabel = <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>Term&lt;Jmp&gt;;
     <span class="kw">type </span>NodeLabel = Tid;
     <span class="doccomment">/// The node values for the fixpoint comutation
-    /// are maps from addresses of global variables known to the function represented by the node
+    /// are maps from locations of (possibly nested) global variables known to the function represented by the node
     /// to the corresponding access pattern of the global variable.
-    </span><span class="kw">type </span>NodeValue = DomainMap&lt;u64, AccessPattern, UnionMergeStrategy&gt;;
+    </span><span class="kw">type </span>NodeValue = DomainMap&lt;AbstractLocation, AccessPattern, UnionMergeStrategy&gt;;
 
     <span class="doccomment">/// Get the (reversed!) call graph corresponding to the program
     </span><span class="kw">fn </span>get_graph(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>CallGraph&lt;<span class="lifetime">&#39;a</span>&gt; {
@@ -446,7 +550,7 @@
             .iter()
             .filter_map(|(address, access_pattern)| {
                 <span class="kw">if </span>caller_known_globals.contains(address) {
-                    <span class="prelude-val">Some</span>((<span class="kw-2">*</span>address, <span class="kw-2">*</span>access_pattern))
+                    <span class="prelude-val">Some</span>((address.clone(), <span class="kw-2">*</span>access_pattern))
                 } <span class="kw">else </span>{
                     <span class="prelude-val">None
                 </span>}
@@ -463,7 +567,7 @@
 /// that are known to the caller anyway (i.e. some function upwards in the call graph accesses the global variable).
 </span><span class="kw">fn </span>propagate_globals_bottom_up(
     project: <span class="kw-2">&amp;</span>Project,
-    known_globals: <span class="kw-2">&amp;</span>BTreeMap&lt;Tid, HashSet&lt;u64&gt;&gt;,
+    known_globals: <span class="kw-2">&amp;</span>BTreeMap&lt;Tid, BTreeSet&lt;AbstractLocation&gt;&gt;,
     fn_sigs: <span class="kw-2">&amp;mut </span>BTreeMap&lt;Tid, FunctionSignature&gt;,
     logs: <span class="kw-2">&amp;mut </span>Vec&lt;LogMessage&gt;,
 ) {
@@ -480,7 +584,7 @@
         <span class="kw">let </span>globals = fn_sig
             .global_parameters
             .iter()
-            .map(|(address, access_pattern)| (<span class="kw-2">*</span>address, <span class="kw-2">*</span>access_pattern))
+            .map(|(address, access_pattern)| (address.clone(), <span class="kw-2">*</span>access_pattern))
             .collect();
         computation.set_node_value(node, globals);
     }
@@ -500,12 +604,54 @@
         <span class="kw">let </span>fn_globals = <span class="kw-2">&amp;mut </span>fn_sigs.get_mut(fn_tid).unwrap().global_parameters;
         <span class="kw">for </span>(address, propagated_access_pattern) <span class="kw">in </span>propagated_globals.iter() {
             fn_globals
-                .entry(<span class="kw-2">*</span>address)
+                .entry(address.clone())
                 .and_modify(|access_pattern| {
                     <span class="kw-2">*</span>access_pattern = access_pattern.merge(propagated_access_pattern);
                 })
                 .or_insert(<span class="kw-2">*</span>propagated_access_pattern);
         }
+    }
+}
+
+<span class="doccomment">/// For all nested global parameters add the corresponding parent locations to the function signatures.
+///
+/// This ensures that subsequent analyses can safely assume
+/// that for each nested parameter the parent location is also a parameter.
+</span><span class="kw">fn </span>add_parents_of_known_nested_globals(
+    fn_sigs: <span class="kw-2">&amp;mut </span>BTreeMap&lt;Tid, FunctionSignature&gt;,
+    generic_pointer_size: ByteSize,
+) {
+    <span class="kw">for </span>fn_sig <span class="kw">in </span>fn_sigs.values_mut() {
+        <span class="kw">let </span><span class="kw-2">mut </span>parents_to_add = HashSet::new();
+        <span class="kw">for </span>global <span class="kw">in </span>fn_sig.global_parameters.keys() {
+            parents_to_add.extend(get_parents_of_global(global, generic_pointer_size).into_iter());
+        }
+        <span class="kw">for </span>parent <span class="kw">in </span>parents_to_add {
+            fn_sig
+                .global_parameters
+                .entry(parent)
+                .and_modify(|pattern| pattern.set_dereference_flag())
+                .or_insert(
+                    AccessPattern::new()
+                        .with_read_flag()
+                        .with_dereference_flag(),
+                );
+        }
+    }
+}
+
+<span class="doccomment">/// get all parent locations for the given potentially nested global location.
+</span><span class="kw">fn </span>get_parents_of_global(
+    location: <span class="kw-2">&amp;</span>AbstractLocation,
+    generic_pointer_size: ByteSize,
+) -&gt; Vec&lt;AbstractLocation&gt; {
+    <span class="kw">if let </span>AbstractLocation::GlobalPointer(<span class="kw">_</span>, <span class="kw">_</span>) = location {
+        <span class="kw">let </span>(parent, _offset) = location.get_parent_location(generic_pointer_size).unwrap();
+        <span class="kw">let </span><span class="kw-2">mut </span>parents = get_parents_of_global(<span class="kw-2">&amp;</span>parent, generic_pointer_size);
+        parents.push(parent);
+        parents
+    } <span class="kw">else </span>{
+        Vec::new()
     }
 }
 
@@ -532,13 +678,21 @@
 ) {
     <span class="kw">let </span>known_globals = propagate_known_globals_top_down(project, fn_sigs);
     propagate_globals_bottom_up(project, <span class="kw-2">&amp;</span>known_globals, fn_sigs, logs);
+    <span class="comment">// Also add parent locations of propagated globals to the function signatures
+    </span>add_parents_of_known_nested_globals(fn_sigs, project.get_pointer_bytesize());
 }
 
 <span class="attr">#[cfg(test)]
 </span><span class="kw">pub mod </span>tests {
-    <span class="kw">use </span>std::collections::HashMap;
-
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
+
+    <span class="doccomment">/// Mock the abstract location of a global parameter.
+    </span><span class="kw">fn </span>mock_global(address: u64) -&gt; AbstractLocation {
+        AbstractLocation::GlobalAddress {
+            address: address,
+            size: ByteSize::new(<span class="number">4</span>),
+        }
+    }
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>test_globals_propagation() {
@@ -567,15 +721,16 @@
         </span><span class="kw">let </span><span class="kw-2">mut </span>sig_main = FunctionSignature::new();
         sig_main
             .global_parameters
-            .insert(<span class="number">1000</span>, AccessPattern::new().with_read_flag());
+            .insert(mock_global(<span class="number">1000</span>), AccessPattern::new().with_read_flag());
         <span class="kw">let </span><span class="kw-2">mut </span>sig_callee1 = FunctionSignature::new();
-        sig_callee1
-            .global_parameters
-            .insert(<span class="number">2000</span>, AccessPattern::new().with_dereference_flag());
+        sig_callee1.global_parameters.insert(
+            mock_global(<span class="number">2000</span>),
+            AccessPattern::new().with_dereference_flag(),
+        );
         <span class="kw">let </span><span class="kw-2">mut </span>sig_callee2 = FunctionSignature::new();
         sig_callee2
             .global_parameters
-            .insert(<span class="number">1000</span>, AccessPattern::new_unknown_access());
+            .insert(mock_global(<span class="number">1000</span>), AccessPattern::new_unknown_access());
         <span class="kw">let </span><span class="kw-2">mut </span>fn_sigs = BTreeMap::from([
             (Tid::new(<span class="string">&quot;main&quot;</span>), sig_main),
             (Tid::new(<span class="string">&quot;callee1&quot;</span>), sig_callee1),
@@ -587,18 +742,53 @@
         <span class="comment">// Check propagation results
         </span><span class="macro">assert_eq!</span>(
             <span class="kw-2">&amp;</span>fn_sigs[<span class="kw-2">&amp;</span>Tid::new(<span class="string">&quot;main&quot;</span>)].global_parameters,
-            <span class="kw-2">&amp;</span>HashMap::from([(<span class="number">1000</span>, AccessPattern::new_unknown_access())])
+            <span class="kw-2">&amp;</span>BTreeMap::from([(mock_global(<span class="number">1000</span>), AccessPattern::new_unknown_access())])
         );
         <span class="macro">assert_eq!</span>(
             <span class="kw-2">&amp;</span>fn_sigs[<span class="kw-2">&amp;</span>Tid::new(<span class="string">&quot;callee1&quot;</span>)].global_parameters,
-            <span class="kw-2">&amp;</span>HashMap::from([
-                (<span class="number">1000</span>, AccessPattern::new_unknown_access()),
-                (<span class="number">2000</span>, AccessPattern::new().with_dereference_flag())
+            <span class="kw-2">&amp;</span>BTreeMap::from([
+                (mock_global(<span class="number">1000</span>), AccessPattern::new_unknown_access()),
+                (
+                    mock_global(<span class="number">2000</span>),
+                    AccessPattern::new().with_dereference_flag()
+                )
             ])
         );
         <span class="macro">assert_eq!</span>(
             <span class="kw-2">&amp;</span>fn_sigs[<span class="kw-2">&amp;</span>Tid::new(<span class="string">&quot;callee2&quot;</span>)].global_parameters,
-            <span class="kw-2">&amp;</span>HashMap::from([(<span class="number">1000</span>, AccessPattern::new_unknown_access())])
+            <span class="kw-2">&amp;</span>BTreeMap::from([(mock_global(<span class="number">1000</span>), AccessPattern::new_unknown_access())])
+        );
+    }
+
+    <span class="attr">#[test]
+    </span><span class="kw">fn </span>test_add_parent_locations() {
+        <span class="comment">// The case of a known nested global parameter without knowing the parent locations happens
+        // when a callee returns a nested global in a return register.
+        </span><span class="kw">let </span>location = AbstractLocation::mock_global(<span class="number">0x2000</span>, <span class="kw-2">&amp;</span>[<span class="number">8</span>, <span class="number">16</span>], <span class="number">8</span>);
+        <span class="kw">let </span>globals = BTreeMap::from([(location, AccessPattern::new_unknown_access())]);
+        <span class="kw">let </span>fn_sig = FunctionSignature {
+            parameters: BTreeMap::new(),
+            global_parameters: globals,
+        };
+        <span class="kw">let </span><span class="kw-2">mut </span>fn_sigs = BTreeMap::from([(Tid::new(<span class="string">&quot;func&quot;</span>), fn_sig)]);
+        add_parents_of_known_nested_globals(<span class="kw-2">&amp;mut </span>fn_sigs, ByteSize::new(<span class="number">8</span>));
+        <span class="kw">let </span>fn_sig = <span class="kw-2">&amp;</span>fn_sigs[<span class="kw-2">&amp;</span>Tid::new(<span class="string">&quot;func&quot;</span>)];
+        <span class="kw">let </span>deref_pattern = AccessPattern::new()
+            .with_read_flag()
+            .with_dereference_flag();
+        <span class="macro">assert_eq!</span>(
+            fn_sig.global_parameters,
+            BTreeMap::from([
+                (
+                    AbstractLocation::mock_global(<span class="number">0x2000</span>, <span class="kw-2">&amp;</span>[<span class="number">8</span>, <span class="number">16</span>], <span class="number">8</span>),
+                    AccessPattern::new_unknown_access()
+                ),
+                (
+                    AbstractLocation::mock_global(<span class="number">0x2000</span>, <span class="kw-2">&amp;</span>[<span class="number">8</span>], <span class="number">8</span>),
+                    deref_pattern
+                ),
+                (AbstractLocation::mock_global(<span class="number">0x2000</span>, <span class="kw-2">&amp;</span>[], <span class="number">8</span>), deref_pattern),
+            ])
         );
     }
 }

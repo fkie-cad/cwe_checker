@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/checkers/cwe_476/context.rs`."><title>context.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../../static.files/rustdoc-ba5701c5741a7b69.css" id="mainThemeStyle"><div id="rustdoc-vars" data-root-path="../../../../" data-static-root-path="../../../../static.files/" data-current-crate="cwe_checker_lib" data-themes="" data-resource-suffix="" data-rustdoc-version="1.70.0 (90c541806 2023-05-31)" data-search-js="search-e077946657036a58.js" data-settings-js="settings-298e1ea74db45b39.js" data-settings-css="settings-7bfb4c59cc6bc502.css" data-theme-light-css="light-0f8c037637f9eb3e.css" data-theme-dark-css="dark-1097f8e92a01e3cf.css" data-theme-ayu-css="ayu-614652228113ac93.css" ></div><script src="../../../../static.files/storage-62ce34ea385b278a.js"></script><script defer src="../../../../static.files/source-script-905937fbbdc8e9ea.js"></script><script defer src="../../../../source-files.js"></script><script defer src="../../../../static.files/main-f61008743c98d196.js"></script><noscript><link rel="stylesheet" media="(prefers-color-scheme:light)" href="../../../../static.files/light-0f8c037637f9eb3e.css"><link rel="stylesheet" media="(prefers-color-scheme:dark)" href="../../../../static.files/dark-1097f8e92a01e3cf.css"><link rel="stylesheet" href="../../../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../../../cwe_checker_lib/index.html"><img class="rust-logo" src="../../../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/checkers/cwe_476/context.rs`."><title>context.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../../static.files/rustdoc-9ee3a5e31a2afa3e.css"><meta name="rustdoc-vars" data-root-path="../../../../" data-static-root-path="../../../../static.files/" data-current-crate="cwe_checker_lib" data-themes="" data-resource-suffix="" data-rustdoc-version="1.75.0 (82e1608df 2023-12-21)" data-channel="1.75.0" data-search-js="search-8fbf244ebcf71464.js" data-settings-js="settings-74424d7eec62a23e.js" ><script src="../../../../static.files/storage-fec3eaa3851e447d.js"></script><script defer src="../../../../static.files/src-script-3280b574d94e47b4.js"></script><script defer src="../../../../src-files.js"></script><script defer src="../../../../static.files/main-9dd44ab47b99a0fb.js"></script><noscript><link rel="stylesheet" href="../../../../static.files/noscript-5d8b3c7633ad77ba.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -534,6 +534,26 @@
 <a href="#534" id="534">534</a>
 <a href="#535" id="535">535</a>
 <a href="#536" id="536">536</a>
+<a href="#537" id="537">537</a>
+<a href="#538" id="538">538</a>
+<a href="#539" id="539">539</a>
+<a href="#540" id="540">540</a>
+<a href="#541" id="541">541</a>
+<a href="#542" id="542">542</a>
+<a href="#543" id="543">543</a>
+<a href="#544" id="544">544</a>
+<a href="#545" id="545">545</a>
+<a href="#546" id="546">546</a>
+<a href="#547" id="547">547</a>
+<a href="#548" id="548">548</a>
+<a href="#549" id="549">549</a>
+<a href="#550" id="550">550</a>
+<a href="#551" id="551">551</a>
+<a href="#552" id="552">552</a>
+<a href="#553" id="553">553</a>
+<a href="#554" id="554">554</a>
+<a href="#555" id="555">555</a>
+<a href="#556" id="556">556</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::State;
 <span class="kw">use </span><span class="kw">super</span>::Taint;
 <span class="kw">use </span><span class="kw">super</span>::CWE_MODULE;
@@ -606,7 +626,7 @@
         <span class="kw">for </span>(node_id, node) <span class="kw">in </span>graph.node_references() {
             <span class="kw">match </span>node {
                 Node::BlkStart(block, sub) =&gt; {
-                    <span class="kw">if let </span><span class="prelude-val">Some</span>(def) = block.term.defs.get(<span class="number">0</span>) {
+                    <span class="kw">if let </span><span class="prelude-val">Some</span>(def) = block.term.defs.first() {
                         block_start_node_map.insert((def.tid.clone(), sub.tid.clone()), node_id);
                     }
                 }
@@ -751,14 +771,26 @@
     <span class="doccomment">/// If a possible  parameter register of the call contains taint,
     /// generate a CWE warning and return `None`.
     /// Else remove all taint contained in non-callee-saved registers.
-    </span><span class="kw">fn </span>handle_generic_call(<span class="kw-2">&amp;</span><span class="self">self</span>, state: <span class="kw-2">&amp;</span>State, call_tid: <span class="kw-2">&amp;</span>Tid) -&gt; <span class="prelude-ty">Option</span>&lt;State&gt; {
+    </span><span class="kw">fn </span>handle_generic_call(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        state: <span class="kw-2">&amp;</span>State,
+        call_tid: <span class="kw-2">&amp;</span>Tid,
+        calling_convention_hint: <span class="kw-2">&amp;</span><span class="prelude-ty">Option</span>&lt;String&gt;,
+    ) -&gt; <span class="prelude-ty">Option</span>&lt;State&gt; {
         <span class="kw">let </span>pi_state_option = <span class="self">self</span>.get_current_pointer_inference_state(state, call_tid);
-        <span class="kw">if </span>state.check_generic_function_params_for_taint(<span class="self">self</span>.project, pi_state_option.as_ref()) {
+        <span class="kw">if </span>state.check_generic_function_params_for_taint(
+            <span class="self">self</span>.project,
+            pi_state_option.as_ref(),
+            calling_convention_hint,
+        ) {
             <span class="self">self</span>.generate_cwe_warning(call_tid);
             <span class="kw">return </span><span class="prelude-val">None</span>;
         }
         <span class="kw">let </span><span class="kw-2">mut </span>new_state = state.clone();
-        <span class="kw">if let </span><span class="prelude-val">Some</span>(calling_conv) = <span class="self">self</span>.project.get_standard_calling_convention() {
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(calling_conv) = <span class="self">self
+            </span>.project
+            .get_specific_calling_convention(calling_convention_hint)
+        {
             new_state.remove_non_callee_saved_taint(calling_conv);
         }
         <span class="prelude-val">Some</span>(new_state)
@@ -796,10 +828,14 @@
         state: <span class="kw-2">&amp;</span>State,
         call: <span class="kw-2">&amp;</span>Term&lt;Jmp&gt;,
         _target: <span class="kw-2">&amp;</span>Node,
-        _calling_convention: <span class="kw-2">&amp;</span><span class="prelude-ty">Option</span>&lt;String&gt;,
+        calling_convention: <span class="kw-2">&amp;</span><span class="prelude-ty">Option</span>&lt;String&gt;,
     ) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::Value&gt; {
         <span class="kw">let </span>pi_state_option = <span class="self">self</span>.get_current_pointer_inference_state(state, <span class="kw-2">&amp;</span>call.tid);
-        <span class="kw">if </span>state.check_generic_function_params_for_taint(<span class="self">self</span>.project, pi_state_option.as_ref()) {
+        <span class="kw">if </span>state.check_generic_function_params_for_taint(
+            <span class="self">self</span>.project,
+            pi_state_option.as_ref(),
+            calling_convention,
+        ) {
             <span class="self">self</span>.generate_cwe_warning(<span class="kw-2">&amp;</span>call.tid);
         }
         <span class="prelude-val">None
@@ -831,7 +867,7 @@
                     <span class="macro">panic!</span>(<span class="string">&quot;Extern symbol not found.&quot;</span>);
                 }
             }
-            Jmp::CallInd { .. } =&gt; <span class="self">self</span>.handle_generic_call(state, <span class="kw-2">&amp;</span>call.tid),
+            Jmp::CallInd { .. } =&gt; <span class="self">self</span>.handle_generic_call(state, <span class="kw-2">&amp;</span>call.tid, <span class="kw-2">&amp;</span><span class="prelude-val">None</span>),
             <span class="kw">_ </span>=&gt; <span class="macro">panic!</span>(<span class="string">&quot;Malformed control flow graph encountered.&quot;</span>),
         }
     }
@@ -927,18 +963,22 @@
         state_before_call: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>State&gt;,
         call_term: <span class="kw-2">&amp;</span>Term&lt;Jmp&gt;,
         return_term: <span class="kw-2">&amp;</span>Term&lt;Jmp&gt;,
-        _calling_convention: <span class="kw-2">&amp;</span><span class="prelude-ty">Option</span>&lt;String&gt;,
+        calling_convention: <span class="kw-2">&amp;</span><span class="prelude-ty">Option</span>&lt;String&gt;,
     ) -&gt; <span class="prelude-ty">Option</span>&lt;State&gt; {
         <span class="kw">if let </span><span class="prelude-val">Some</span>(state) = state_before_return {
             <span class="comment">// If taint is returned, generate a CWE warning
             </span><span class="kw">let </span>pi_state_option = <span class="self">self</span>.get_current_pointer_inference_state(state, <span class="kw-2">&amp;</span>return_term.tid);
-            <span class="kw">if </span>state.check_return_values_for_taint(<span class="self">self</span>.project, pi_state_option.as_ref()) {
+            <span class="kw">if </span>state.check_return_values_for_taint(
+                <span class="self">self</span>.project,
+                pi_state_option.as_ref(),
+                calling_convention,
+            ) {
                 <span class="self">self</span>.generate_cwe_warning(<span class="kw-2">&amp;</span>return_term.tid);
             }
             <span class="comment">// Do not return early in case `state_before_call` is also set (possible for recursive functions).
         </span>}
         <span class="kw">if let </span><span class="prelude-val">Some</span>(state) = state_before_call {
-            <span class="self">self</span>.handle_generic_call(state, <span class="kw-2">&amp;</span>call_term.tid)
+            <span class="self">self</span>.handle_generic_call(state, <span class="kw-2">&amp;</span>call_term.tid, calling_convention)
         } <span class="kw">else </span>{
             <span class="prelude-val">None
         </span>}
@@ -1007,12 +1047,12 @@
         <span class="kw">let </span><span class="kw-2">mut </span>state = State::mock();
 
         <span class="macro">assert!</span>(context
-            .handle_generic_call(<span class="kw-2">&amp;</span>state, <span class="kw-2">&amp;</span>Tid::new(<span class="string">&quot;call_tid&quot;</span>))
+            .handle_generic_call(<span class="kw-2">&amp;</span>state, <span class="kw-2">&amp;</span>Tid::new(<span class="string">&quot;call_tid&quot;</span>), <span class="kw-2">&amp;</span><span class="prelude-val">None</span>)
             .is_some());
 
         state.set_register_taint(<span class="kw-2">&amp;</span><span class="macro">variable!</span>(<span class="string">&quot;RDX:8&quot;</span>), Taint::Tainted(ByteSize::new(<span class="number">8</span>)));
         <span class="macro">assert!</span>(context
-            .handle_generic_call(<span class="kw-2">&amp;</span>state, <span class="kw-2">&amp;</span>Tid::new(<span class="string">&quot;call_tid&quot;</span>))
+            .handle_generic_call(<span class="kw-2">&amp;</span>state, <span class="kw-2">&amp;</span>Tid::new(<span class="string">&quot;call_tid&quot;</span>), <span class="kw-2">&amp;</span><span class="prelude-val">None</span>)
             .is_none());
     }
 

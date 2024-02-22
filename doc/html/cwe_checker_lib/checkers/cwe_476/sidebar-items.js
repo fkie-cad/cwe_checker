@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["Taint"],"fn":["check_cwe"],"static":["CWE_MODULE"],"struct":["Config"]};
+window.SIDEBAR_ITEMS = {"fn":["check_cwe"],"mod":["state","taint"],"static":["CWE_MODULE"],"struct":["Config"]};

@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/checkers/cwe_416/mod.rs`."><title>mod.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../../static.files/rustdoc-ba5701c5741a7b69.css" id="mainThemeStyle"><div id="rustdoc-vars" data-root-path="../../../../" data-static-root-path="../../../../static.files/" data-current-crate="cwe_checker_lib" data-themes="" data-resource-suffix="" data-rustdoc-version="1.70.0 (90c541806 2023-05-31)" data-search-js="search-e077946657036a58.js" data-settings-js="settings-298e1ea74db45b39.js" data-settings-css="settings-7bfb4c59cc6bc502.css" data-theme-light-css="light-0f8c037637f9eb3e.css" data-theme-dark-css="dark-1097f8e92a01e3cf.css" data-theme-ayu-css="ayu-614652228113ac93.css" ></div><script src="../../../../static.files/storage-62ce34ea385b278a.js"></script><script defer src="../../../../static.files/source-script-905937fbbdc8e9ea.js"></script><script defer src="../../../../source-files.js"></script><script defer src="../../../../static.files/main-f61008743c98d196.js"></script><noscript><link rel="stylesheet" media="(prefers-color-scheme:light)" href="../../../../static.files/light-0f8c037637f9eb3e.css"><link rel="stylesheet" media="(prefers-color-scheme:dark)" href="../../../../static.files/dark-1097f8e92a01e3cf.css"><link rel="stylesheet" href="../../../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../../../cwe_checker_lib/index.html"><img class="rust-logo" src="../../../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/cwe_checker_lib/src/checkers/cwe_416/mod.rs`."><title>mod.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../../static.files/rustdoc-9ee3a5e31a2afa3e.css"><meta name="rustdoc-vars" data-root-path="../../../../" data-static-root-path="../../../../static.files/" data-current-crate="cwe_checker_lib" data-themes="" data-resource-suffix="" data-rustdoc-version="1.75.0 (82e1608df 2023-12-21)" data-channel="1.75.0" data-search-js="search-8fbf244ebcf71464.js" data-settings-js="settings-74424d7eec62a23e.js" ><script src="../../../../static.files/storage-fec3eaa3851e447d.js"></script><script defer src="../../../../static.files/src-script-3280b574d94e47b4.js"></script><script defer src="../../../../src-files.js"></script><script defer src="../../../../static.files/main-9dd44ab47b99a0fb.js"></script><noscript><link rel="stylesheet" href="../../../../static.files/noscript-5d8b3c7633ad77ba.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -318,6 +318,18 @@
 <a href="#318" id="318">318</a>
 <a href="#319" id="319">319</a>
 <a href="#320" id="320">320</a>
+<a href="#321" id="321">321</a>
+<a href="#322" id="322">322</a>
+<a href="#323" id="323">323</a>
+<a href="#324" id="324">324</a>
+<a href="#325" id="325">325</a>
+<a href="#326" id="326">326</a>
+<a href="#327" id="327">327</a>
+<a href="#328" id="328">328</a>
+<a href="#329" id="329">329</a>
+<a href="#330" id="330">330</a>
+<a href="#331" id="331">331</a>
+<a href="#332" id="332">332</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! This module implements a check for CWE-415: Double Free and CWE-416: Use After Free.
 //!
 //! If a program tries to reference memory objects or other resources after they have been freed
@@ -339,10 +351,15 @@
 //!
 //! ### Symbols configurable in config.json
 //!
-//! The `deallocation_symbols` are the names of extern functions that deallocate memory.
+//! - The `deallocation_symbols` are the names of extern functions that deallocate memory.
 //! The check always assumes that the first parameter of such a function is the memory object to be freed.
 //! The check also assumes that memory is always freed by such a call,
 //! which can lead to false positive warnings for functions like `realloc`, where the memory object may not be freed by the call.
+//! - The `always_include_full_path_to_free_site` flag controls the amount of context information printed in the CWE warnings.
+//! If set to `true`, then the warning contains the full path in the callgraph from the root function to an actual `free`-site.
+//! If set to `false`, then the path may be shortened:
+//! A call to some function `func` may be reported as the `free`-site
+//! if the actual `free`-operation is contained in `func` or some callee of `func`.
 //!
 //! ## False Positives
 //!
@@ -362,21 +379,21 @@
 //! - Memory objects not tracked by the Pointer Inference analysis or pointer targets missed by the Pointer Inference
 //! may lead to missed CWEs in this check.
 //! - Pointers freed by other operations than calls to the deallocation symbols contained in the config.json will be missed by the analysis.
+//! - Pointers freed and flagged in the same call are not marked as freed in the caller.
+//! This reduces false positives and duplicates, but may also result in some false negatives.
+//! - Objects freed in the same call where they are created are not marked as freed in the caller.
+//! This reduces false positives, but may also result in some false negatives.
+//! - Pointers to recursively defined data structures like linked lists are heuristically identified and ignored.
+//! This reduces false positives generated when such structures are recursively freed in a loop,
+//! but also prevents detection of bugs involving such pointers.
 
-</span><span class="kw">use </span>std::collections::BTreeSet;
-<span class="kw">use </span>std::collections::HashMap;
-<span class="kw">use </span>std::collections::HashSet;
-
-<span class="kw">use </span><span class="kw">crate</span>::abstract_domain::AbstractDomain;
-<span class="kw">use </span><span class="kw">crate</span>::abstract_domain::AbstractIdentifier;
-<span class="kw">use </span><span class="kw">crate</span>::analysis::fixpoint::Computation;
-<span class="kw">use </span><span class="kw">crate</span>::analysis::forward_interprocedural_fixpoint::GeneralizedContext;
-<span class="kw">use </span><span class="kw">crate</span>::analysis::graph::Node;
-<span class="kw">use </span><span class="kw">crate</span>::analysis::interprocedural_fixpoint_generic::NodeValue;
+</span><span class="kw">use </span><span class="kw">crate</span>::abstract_domain::AbstractIdentifier;
 <span class="kw">use </span><span class="kw">crate</span>::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::utils::log::CweWarning;
 <span class="kw">use </span><span class="kw">crate</span>::utils::log::LogMessage;
 <span class="kw">use </span><span class="kw">crate</span>::CweModule;
+<span class="kw">use </span>std::collections::BTreeSet;
+<span class="kw">use </span>std::collections::HashSet;
 
 <span class="doccomment">/// The module name and version
 </span><span class="kw">pub static </span>CWE_MODULE: CweModule = CweModule {
@@ -391,6 +408,9 @@
     <span class="doccomment">/// The names of symbols that free memory (e.g. the &quot;free&quot; function of C).
     /// The analysis always assumes that the memory object to be freed is the first parameter of the function.
     </span>deallocation_symbols: Vec&lt;String&gt;,
+    <span class="doccomment">/// If this flag is set to `true`,
+    /// then always include the full path to the actual `free`-site in the callgraph in the CWE warning context information.
+    </span>always_include_full_path_to_free_site: bool,
 }
 
 <span class="kw">mod </span>context;
@@ -434,12 +454,14 @@
 
     fixpoint_computation.compute_with_max_steps(<span class="number">100</span>);
 
-    <span class="kw">let </span><span class="kw-2">mut </span>warnings = HashSet::new();
+    <span class="kw">let </span><span class="kw-2">mut </span>warnings = BTreeSet::new();
     <span class="kw">while let </span><span class="prelude-val">Ok</span>(warning) = cwe_warning_receiver.try_recv() {
         warnings.insert(warning);
     }
-    <span class="kw">let </span>return_site_states = collect_return_site_states(<span class="kw-2">&amp;</span>fixpoint_computation);
-    <span class="kw">let </span>cwes = generate_context_information_for_warnings(return_site_states, warnings);
+    <span class="kw">let </span>cwes = generate_context_information_for_warnings(
+        warnings,
+        config.always_include_full_path_to_free_site,
+    );
 
     <span class="kw">let </span><span class="kw-2">mut </span>logs = BTreeSet::new();
     <span class="kw">while let </span><span class="prelude-val">Ok</span>(log_msg) = log_receiver.try_recv() {
@@ -457,18 +479,15 @@
     </span>cwe: CweWarning,
     <span class="doccomment">/// The TID of the function in which the CWE warning was generated.
     </span>root_function: Tid,
-    <span class="doccomment">/// Pairs of object IDs and the sites where the object was freed.
-    /// If the free-site is the same function call from which the object ID originates
-    /// then the CWE needs to be post-processed to give more exact information about the
-    /// free-site inside the function call.
-    </span>object_and_free_ids: Vec&lt;(AbstractIdentifier, Tid)&gt;,
+    <span class="doccomment">/// Pairs of object IDs and the paths to the actual free sites.
+    </span>object_and_free_ids: Vec&lt;(AbstractIdentifier, Vec&lt;Tid&gt;)&gt;,
 }
 
 <span class="kw">impl </span>WarningContext {
     <span class="doccomment">/// Generate a new warning context object.
     </span><span class="kw">pub fn </span>new(
         cwe: CweWarning,
-        object_and_free_ids: Vec&lt;(AbstractIdentifier, Tid)&gt;,
+        object_and_free_ids: Vec&lt;(AbstractIdentifier, Vec&lt;Tid&gt;)&gt;,
         root_function: Tid,
     ) -&gt; <span class="self">Self </span>{
         WarningContext {
@@ -479,96 +498,94 @@
     }
 }
 
-<span class="doccomment">/// For each function call TID collect the state of the callee just before returning to the caller.
-</span><span class="kw">fn </span>collect_return_site_states&lt;<span class="lifetime">&#39;a</span>&gt;(
-    fixpoint: <span class="kw-2">&amp;</span>Computation&lt;GeneralizedContext&lt;<span class="lifetime">&#39;a</span>, Context&lt;<span class="lifetime">&#39;a</span>&gt;&gt;&gt;,
-) -&gt; HashMap&lt;Tid, State&gt; {
-    <span class="kw">let </span><span class="kw-2">mut </span>call_tid_to_return_state_map: HashMap&lt;Tid, State&gt; = HashMap::new();
-    <span class="kw">let </span>graph = fixpoint.get_graph();
-    <span class="kw">for </span>node <span class="kw">in </span>graph.node_indices() {
-        <span class="kw">let </span>call_tid = <span class="kw">match </span>graph[node] {
-            Node::CallReturn { call, return_: <span class="kw">_ </span>} =&gt; call.<span class="number">0</span>.term.jmps[<span class="number">0</span>].tid.clone(),
-            <span class="kw">_ </span>=&gt; <span class="kw">continue</span>,
-        };
-        <span class="kw">let </span>node_value = <span class="kw">match </span>fixpoint.get_node_value(node) {
-            <span class="prelude-val">Some</span>(value) =&gt; value,
-            <span class="prelude-val">None </span>=&gt; <span class="kw">continue</span>,
-        };
-        <span class="kw">let </span>return_state = <span class="kw">match </span>node_value {
-            NodeValue::CallFlowCombinator {
-                call_stub: <span class="kw">_</span>,
-                interprocedural_flow,
-            } =&gt; {
-                <span class="kw">if let </span><span class="prelude-val">Some</span>(state) = interprocedural_flow {
-                    state.clone()
-                } <span class="kw">else </span>{
-                    <span class="kw">continue</span>;
-                }
-            }
-            <span class="kw">_ </span>=&gt; <span class="macro">panic!</span>(<span class="string">&quot;Unexpexted NodeValue type encountered.&quot;</span>),
-        };
-        <span class="comment">// There exists one CallReturn node for each return instruction in the callee,
-        // so we have to merge the corresponding states here.
-        </span>call_tid_to_return_state_map
-            .entry(call_tid)
-            .and_modify(|saved_return_state| {
-                <span class="kw-2">*</span>saved_return_state = saved_return_state.merge(<span class="kw-2">&amp;</span>return_state)
-            })
-            .or_insert(return_state);
-    }
-    call_tid_to_return_state_map
-}
-
-<span class="doccomment">/// If the ID of the &quot;free&quot;-site is the same call from which the object ID originates from
-/// then (recursively) identify the real &quot;free&quot;-site inside the call.
-/// Also return a list of call TIDs that lead to the real &quot;free&quot;-site.
-///
-/// The function returns an error if the source object was already flagged in some of the callees.
-/// In such a case the corresponding CWE warning should be removed,
-/// since there already exists another CWE warning with the same root cause.
-</span><span class="kw">fn </span>get_source_of_free(
+<span class="doccomment">/// Shorten the path to the &quot;free&quot;-site so that it ends in the first call
+/// that is not contained in the path to the object origin.
+</span><span class="kw">fn </span>get_shortended_path_to_source_of_free(
     object_id: <span class="kw-2">&amp;</span>AbstractIdentifier,
-    free_id: <span class="kw-2">&amp;</span>Tid,
-    return_site_states: <span class="kw-2">&amp;</span>HashMap&lt;Tid, State&gt;,
-) -&gt; <span class="prelude-ty">Result</span>&lt;(Tid, Vec&lt;Tid&gt;), ()&gt; {
-    <span class="kw">if let </span>(inner_object, <span class="prelude-val">Some</span>(path_hint_id)) = object_id.without_last_path_hint() {
-        <span class="kw">if </span>path_hint_id == <span class="kw-2">*</span>free_id {
-            <span class="kw">if let </span><span class="prelude-val">Some</span>(return_state) = return_site_states.get(free_id) {
-                <span class="kw">if </span>return_state.is_id_already_flagged(<span class="kw-2">&amp;</span>inner_object) {
-                    <span class="kw">return </span><span class="prelude-val">Err</span>(());
-                }
-                <span class="kw">if let </span><span class="prelude-val">Some</span>(inner_free) = return_state.get_free_tid_if_dangling(<span class="kw-2">&amp;</span>inner_object) {
-                    <span class="kw">let </span>(root_free, <span class="kw-2">mut </span>callgraph_ids) =
-                        get_source_of_free(<span class="kw-2">&amp;</span>inner_object, inner_free, return_site_states)<span class="question-mark">?</span>;
-                    callgraph_ids.push(path_hint_id);
-                    <span class="kw">return </span><span class="prelude-val">Ok</span>((root_free, callgraph_ids));
-                }
-            }
+    free_path: <span class="kw-2">&amp;</span>[Tid],
+) -&gt; Vec&lt;Tid&gt; {
+    <span class="kw">let </span><span class="kw-2">mut </span>object_id = object_id.clone();
+    <span class="kw">let </span><span class="kw-2">mut </span>shortened_free_path = free_path.to_vec();
+    <span class="kw">while let </span>(shortened_id, <span class="prelude-val">Some</span>(last_path_hint)) = object_id.without_last_path_hint() {
+        <span class="kw">if </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>last_path_hint) == shortened_free_path.last() {
+            object_id = shortened_id;
+            shortened_free_path.pop();
+        } <span class="kw">else </span>{
+            <span class="kw">break</span>;
         }
     }
-    <span class="comment">// No inner source apart from the given free_id could be identified
-    </span><span class="prelude-val">Ok</span>((free_id.clone(), Vec::new()))
+    <span class="comment">// Return the free path without the shortened free path
+    </span><span class="kw">if </span>shortened_free_path.is_empty() {
+        free_path.to_vec()
+    } <span class="kw">else </span>{
+        free_path[(shortened_free_path.len() - <span class="number">1</span>)..].to_vec()
+    }
+}
+
+<span class="doccomment">/// Get the part of the path to the &quot;free&quot;-site that is not shared with the path to the object origin site.
+</span><span class="kw">fn </span>get_root_cause_for_returned_dangling_pointers(
+    object_id: <span class="kw-2">&amp;</span>AbstractIdentifier,
+    free_path: <span class="kw-2">&amp;</span>[Tid],
+) -&gt; Vec&lt;Tid&gt; {
+    <span class="kw">let </span><span class="kw-2">mut </span>object_id = object_id.clone();
+    <span class="kw">let </span><span class="kw-2">mut </span>shortened_free_path = free_path.to_vec();
+    <span class="kw">while let </span>(shortened_id, <span class="prelude-val">Some</span>(last_path_hint)) = object_id.without_last_path_hint() {
+        <span class="kw">if </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>last_path_hint) == shortened_free_path.last() {
+            object_id = shortened_id;
+            shortened_free_path.pop();
+        } <span class="kw">else </span>{
+            <span class="kw">break</span>;
+        }
+    }
+    <span class="kw">if </span>shortened_free_path.is_empty() {
+        <span class="macro">vec!</span>[free_path[<span class="number">0</span>].clone()]
+    } <span class="kw">else </span>{
+        shortened_free_path
+    }
+}
+
+<span class="doccomment">/// Return `true` if the object originates in the same call as the &quot;free&quot;-site.
+</span><span class="kw">fn </span>is_case_of_returned_dangling_pointer(object_id: <span class="kw-2">&amp;</span>AbstractIdentifier, free_path: <span class="kw-2">&amp;</span>[Tid]) -&gt; bool {
+    <span class="comment">// This implicitly uses that the `free_path` is never empty.
+    </span>object_id.get_path_hints().last() == free_path.last()
 }
 
 <span class="doccomment">/// Generate context information for CWE warnings.
 /// E.g. relevant callgraph addresses are added to each CWE here.
 </span><span class="kw">fn </span>generate_context_information_for_warnings(
-    return_site_states: HashMap&lt;Tid, State&gt;,
-    warnings: HashSet&lt;WarningContext&gt;,
+    warnings: BTreeSet&lt;WarningContext&gt;,
+    generate_full_paths_to_free_site: bool,
 ) -&gt; BTreeSet&lt;CweWarning&gt; {
     <span class="kw">let </span><span class="kw-2">mut </span>processed_warnings = BTreeSet::new();
+    <span class="kw">let </span><span class="kw-2">mut </span>root_causes_for_returned_dangling_pointers = HashSet::new();
+
     <span class="kw">for </span><span class="kw-2">mut </span>warning <span class="kw">in </span>warnings {
         <span class="kw">let </span><span class="kw-2">mut </span>context_infos = Vec::new();
-        <span class="kw">let </span><span class="kw-2">mut </span>relevant_callgraph_tids = Vec::new();
-        <span class="kw">for </span>(object_id, free_id) <span class="kw">in </span>warning.object_and_free_ids.iter() {
-            <span class="kw">if let </span><span class="prelude-val">Ok</span>((root_free_id, <span class="kw-2">mut </span>callgraph_ids_to_free)) =
-                get_source_of_free(object_id, free_id, <span class="kw-2">&amp;</span>return_site_states)
-            {
-                relevant_callgraph_tids.append(<span class="kw-2">&amp;mut </span>callgraph_ids_to_free);
-                context_infos.push(<span class="macro">format!</span>(
-                    <span class="string">&quot;Accessed ID {object_id} may have been freed before at {root_free_id}.&quot;
-                </span>));
+        <span class="kw">let </span><span class="kw-2">mut </span>relevant_callgraph_tids = BTreeSet::new();
+        <span class="kw">for </span>(object_id, <span class="kw-2">mut </span>free_path) <span class="kw">in </span>warning.object_and_free_ids.into_iter() {
+            <span class="kw">if </span>is_case_of_returned_dangling_pointer(<span class="kw-2">&amp;</span>object_id, <span class="kw-2">&amp;</span>free_path) {
+                <span class="kw">let </span>root_cause =
+                    get_root_cause_for_returned_dangling_pointers(<span class="kw-2">&amp;</span>object_id, <span class="kw-2">&amp;</span>free_path);
+                <span class="kw">if </span>root_causes_for_returned_dangling_pointers.contains(<span class="kw-2">&amp;</span>root_cause) {
+                    <span class="comment">// Skip this warning root cause, since another warning with the same root cause was already generated.
+                    // FIXME: This is a coarse heuristic to reduce false positives.
+                    // However, it is still possible that some but not all of these cases are real bugs
+                    // and that this heuristic chooses the wrong representative.
+                    </span><span class="kw">continue</span>;
+                } <span class="kw">else </span>{
+                    root_causes_for_returned_dangling_pointers.insert(root_cause);
+                }
             }
+            <span class="kw">if </span>!generate_full_paths_to_free_site {
+                free_path = get_shortended_path_to_source_of_free(<span class="kw-2">&amp;</span>object_id, <span class="kw-2">&amp;</span>free_path);
+            }
+            <span class="kw">for </span>id <span class="kw">in </span><span class="kw-2">&amp;</span>free_path[<span class="number">1</span>..] {
+                relevant_callgraph_tids.insert(id.clone());
+            }
+            context_infos.push(<span class="macro">format!</span>(
+                <span class="string">&quot;Accessed ID {object_id} may have been freed before at {}.&quot;</span>,
+                free_path[<span class="number">0</span>]
+            ));
         }
         <span class="kw">if </span>context_infos.is_empty() {
             <span class="comment">// Skip (delete) this CWE warning,
@@ -606,36 +623,43 @@
             Tid::new(<span class="string">&quot;object_origin_tid&quot;</span>),
             AbstractLocation::Register(<span class="macro">variable!</span>(<span class="string">&quot;RAX:8&quot;</span>)),
         );
-        <span class="kw">let </span>path_id = id.with_path_hint(Tid::new(<span class="string">&quot;call_tid&quot;</span>)).unwrap();
-        <span class="kw">let </span>object_and_free_ids = <span class="macro">vec!</span>[(path_id, Tid::new(<span class="string">&quot;call_tid&quot;</span>))];
+        <span class="kw">let </span>object_id = id.with_path_hint(Tid::new(<span class="string">&quot;call_tid&quot;</span>)).unwrap();
+        <span class="kw">let </span>object_and_free_ids = <span class="macro">vec!</span>[(
+            object_id.clone(),
+            <span class="macro">vec!</span>[Tid::new(<span class="string">&quot;free_tid&quot;</span>), Tid::new(<span class="string">&quot;call_tid&quot;</span>)],
+        )];
 
         <span class="kw">let </span>cwe = CweWarning::new(<span class="string">&quot;CWE416&quot;</span>, <span class="string">&quot;test&quot;</span>, <span class="string">&quot;mock_cwe&quot;</span>);
         <span class="kw">let </span>warning_context =
             WarningContext::new(cwe, object_and_free_ids, Tid::new(<span class="string">&quot;root_func_tid&quot;</span>));
-        <span class="kw">let </span>warnings = HashSet::from([warning_context]);
+        <span class="kw">let </span>warnings = BTreeSet::from([warning_context.clone()]);
 
         <span class="comment">// Test warning context generation
-        </span><span class="kw">let </span>return_state = State::mock(
-            Tid::new(<span class="string">&quot;callee_tid&quot;</span>),
-            <span class="kw-2">&amp;</span>[(id.clone(), Tid::new(<span class="string">&quot;free_tid&quot;</span>))],
-            <span class="kw-2">&amp;</span>[],
-        );
-        <span class="kw">let </span>return_site_states = HashMap::from([(Tid::new(<span class="string">&quot;call_tid&quot;</span>), return_state)]);
-        <span class="kw">let </span>processed_warnings =
-            generate_context_information_for_warnings(return_site_states, warnings.clone());
+        </span><span class="kw">let </span>processed_warnings = generate_context_information_for_warnings(warnings.clone(), <span class="bool-val">false</span>);
         <span class="macro">assert_eq!</span>(processed_warnings.len(), <span class="number">1</span>);
         <span class="kw">let </span>processed_cwe = processed_warnings.iter().next().unwrap();
         <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span>processed_cwe.other[<span class="number">0</span>], <span class="kw-2">&amp;</span>[
-            <span class="string">&quot;Accessed ID object_origin_tid(-&gt;call_tid) @ RAX may have been freed before at free_tid.&quot;</span>.to_string(),
+            <span class="string">&quot;Accessed ID object_origin_tid(-&gt;call_tid) @ RAX:i64 may have been freed before at free_tid.&quot;</span>.to_string(),
             <span class="string">&quot;Relevant callgraph TIDs: [root_func_tid, call_tid]&quot;</span>.to_string(),
         ]);
 
         <span class="comment">// Test warning filtering
-        </span><span class="kw">let </span>return_state = State::mock(Tid::new(<span class="string">&quot;callee_tid&quot;</span>), <span class="kw-2">&amp;</span>[], <span class="kw-2">&amp;</span>[id.clone()]);
-        <span class="kw">let </span>return_site_states = HashMap::from([(Tid::new(<span class="string">&quot;call_tid&quot;</span>), return_state)]);
-        <span class="kw">let </span>processed_warnings =
-            generate_context_information_for_warnings(return_site_states, warnings);
-        <span class="macro">assert_eq!</span>(processed_warnings.len(), <span class="number">0</span>)
+        </span><span class="kw">let </span>object_and_free_ids_2 = <span class="macro">vec!</span>[(
+            object_id
+                .with_path_hint(Tid::new(<span class="string">&quot;outer_call_tid&quot;</span>))
+                .unwrap(),
+            <span class="macro">vec!</span>[
+                Tid::new(<span class="string">&quot;free_tid&quot;</span>),
+                Tid::new(<span class="string">&quot;call_tid&quot;</span>),
+                Tid::new(<span class="string">&quot;outer_call_tid&quot;</span>),
+            ],
+        )];
+        <span class="kw">let </span>cwe_2 = CweWarning::new(<span class="string">&quot;CWE416&quot;</span>, <span class="string">&quot;test&quot;</span>, <span class="string">&quot;mock_cwe_2&quot;</span>);
+        <span class="kw">let </span>warning_context_2 =
+            WarningContext::new(cwe_2, object_and_free_ids_2, Tid::new(<span class="string">&quot;root_func_tid_2&quot;</span>));
+        <span class="kw">let </span>warnings = BTreeSet::from([warning_context, warning_context_2]);
+        <span class="kw">let </span>processed_warnings = generate_context_information_for_warnings(warnings, <span class="bool-val">false</span>);
+        <span class="macro">assert_eq!</span>(processed_warnings.len(), <span class="number">1</span>)
     }
 }
 </code></pre></div></section></main></body></html>
