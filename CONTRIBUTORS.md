@@ -4,7 +4,7 @@
     -   Original author, maintainer 2018-2019
 
 -   [Nils-Edvin Enkelmann](https://github.com/Enkelmann)
-    -   Maintainer since 2020
+    -   Maintainer 2020-2024
 
 -   [Jörg Stucke](https://github.com/jstucke)
 
