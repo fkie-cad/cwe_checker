@@ -81,6 +81,14 @@
       ]
     ]
   },
+  "CWE337": {
+    "sources": [
+      "time"
+    ],
+    "seeding_functions": [
+      "srand"
+    ]
+  },
   "CWE367": {
     "pairs": [
       [
