@@ -1,7 +1,7 @@
 [package]
 name = "cwe_checker"
-version = "0.8.0-dev"
-authors = ["Nils-Edvin Enkelmann <nils-edvin.enkelmann@fkie.fraunhofer.de>"]
+version = "0.8.0"
+authors = ["Nils-Edvin Enkelmann <firmware-security@fkie.fraunhofer.de>"]
 edition = "2021"
 
 [dependencies]

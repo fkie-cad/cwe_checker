@@ -39,7 +39,7 @@ The following arguments should convince you to give *cwe_checker* a try:
 The simplest way is to pull the latest Docker image from the [Github container registry](https://github.com/fkie-cad/cwe_checker/pkgs/container/cwe_checker):
 -   `docker pull ghcr.io/fkie-cad/cwe_checker:latest` yields an image based on the current master branch.
 -   `docker pull ghcr.io/fkie-cad/cwe_checker:stable` yields an image based on the latest stable release version.
--   `docker pull ghcr.io/fkie-cad/cwe_checker:v0.7` yields an image based on the v0.7 stable release version.
+-   `docker pull ghcr.io/fkie-cad/cwe_checker:v0.8` yields an image based on the v0.8 stable release version.
 However, it is recommended to switch to newer stable releases as soon as they get published, since improvements between stable versions can be quite significant.
 
 If you want to build the docker image yourself, just run
@@ -155,7 +155,7 @@ A special thanks goes out to the BAP community (especially the official gitter) 
 
 ## License ##
 ```
-    Copyright (C) 2018 - 2023  Fraunhofer FKIE  (firmware-security@fkie.fraunhofer.de)
+    Copyright (C) 2018 - 2024  Fraunhofer FKIE  (firmware-security@fkie.fraunhofer.de)
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Library General Public
