@@ -78,7 +78,7 @@ impl State {
         self.write_to_address(address, &self.eval(value), global_memory)
     }
 
-    /// Evaluate the given load instruction and return the data read on success.
+    /// Evaluate the given address expression and return the data read from that address on success.
     pub fn load_value(
         &self,
         address: &Expression,
@@ -86,6 +86,17 @@ impl State {
         global_memory: &RuntimeMemoryImage,
     ) -> Result<Data, Error> {
         let address = self.eval(address);
+        self.load_value_from_address(&address, size, global_memory)
+    }
+
+    /// Load the value at the given address from the state and return the data read on success.
+    /// If the address contains more than one possible pointer target the results are merged for all possible pointer targets.
+    pub fn load_value_from_address(
+        &self,
+        address: &Data,
+        size: ByteSize,
+        global_memory: &RuntimeMemoryImage,
+    ) -> Result<Data, Error> {
         let mut result = if let Some(global_address) = address.get_absolute_value() {
             if let Ok(address_bitvector) = global_address.try_to_bitvec() {
                 match global_memory.read(&address_bitvector, size) {
@@ -109,7 +120,7 @@ impl State {
         } else {
             Data::new_empty(size)
         };
-        result = result.merge(&self.memory.get_value(&address, size));
+        result = result.merge(&self.memory.get_value(address, size));
 
         if let Ok(offset) = result.try_to_offset() {
             if result.bytesize() == self.stack_id.bytesize()
@@ -214,6 +225,81 @@ impl State {
         match parameter {
             Arg::Register { expr, .. } => Ok(self.eval(expr)),
             Arg::Stack { address, size, .. } => self.load_value(address, *size, global_memory),
+        }
+    }
+
+    /// Evaluate the value of the given abstract location on the current state.
+    /// If the actual value cannot be determined (e.g. if an intermediate pointer returns `Top`)
+    /// then a `Top` value is returned.
+    pub fn eval_abstract_location(
+        &self,
+        location: &AbstractLocation,
+        global_memory: &RuntimeMemoryImage,
+    ) -> Data {
+        match location {
+            AbstractLocation::GlobalAddress { address, size } => {
+                assert_eq!(*size, self.stack_id.bytesize());
+                Data::from_target(
+                    self.get_global_mem_id().clone(),
+                    Bitvector::from_u64(*address)
+                        .into_resize_unsigned(self.stack_id.bytesize())
+                        .into(),
+                )
+            }
+            AbstractLocation::GlobalPointer(address, nested_location) => {
+                let pointer = Data::from_target(
+                    self.get_global_mem_id().clone(),
+                    Bitvector::from_u64(*address)
+                        .into_resize_unsigned(self.stack_id.bytesize())
+                        .into(),
+                );
+                self.eval_abstract_memory_location(nested_location, pointer, global_memory)
+            }
+            AbstractLocation::Register(var) => self.get_register(var),
+            AbstractLocation::Pointer(var, nested_location) => {
+                let pointer = self.get_register(var);
+                self.eval_abstract_memory_location(nested_location, pointer, global_memory)
+            }
+        }
+    }
+
+    /// Evaluate the value of the given abstract memory location on the current state
+    /// with the given `root_pointer` as the start point of the location description.
+    fn eval_abstract_memory_location(
+        &self,
+        location: &AbstractMemoryLocation,
+        root_pointer: Data,
+        global_memory: &RuntimeMemoryImage,
+    ) -> Data {
+        match location {
+            AbstractMemoryLocation::Location { offset, size } => {
+                let pointer = root_pointer.add_offset(
+                    &Bitvector::from_i64(*offset)
+                        .into_resize_unsigned(self.stack_id.bytesize())
+                        .into(),
+                );
+                self.load_value_from_address(&pointer, *size, global_memory)
+                    .unwrap_or_else(|_| Data::new_top(*size))
+            }
+            AbstractMemoryLocation::Pointer { offset, target } => {
+                let pointer = root_pointer.add_offset(
+                    &Bitvector::from_i64(*offset)
+                        .into_resize_unsigned(self.stack_id.bytesize())
+                        .into(),
+                );
+                match self.load_value_from_address(
+                    &pointer,
+                    self.stack_id.bytesize(),
+                    global_memory,
+                ) {
+                    Ok(nested_root_pointer) => self.eval_abstract_memory_location(
+                        target,
+                        nested_root_pointer,
+                        global_memory,
+                    ),
+                    Err(_) => Data::new_top(location.bytesize()),
+                }
+            }
         }
     }
 

@@ -81,6 +81,14 @@
       ]
     ]
   },
+  "CWE337": {
+    "sources": [
+      "time"
+    ],
+    "seeding_functions": [
+      "srand"
+    ]
+  },
   "CWE367": {
     "pairs": [
       [
@@ -96,7 +104,8 @@
       "reallocarray",
       "operator.delete",
       "operator.delete[]"
-    ]
+    ],
+    "always_include_full_path_to_free_site": true
   },
   "CWE426": {
     "_comment": "functions that change/drop privileges",

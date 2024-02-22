@@ -76,7 +76,7 @@ impl<'a> Context<'a> {
         state: &mut State,
         call_tid: &Tid,
         call_params: impl IntoIterator<Item = &'b Arg>,
-    ) -> Option<Vec<(AbstractIdentifier, Tid)>> {
+    ) -> Option<Vec<(AbstractIdentifier, Vec<Tid>)>> {
         let mut warnings = Vec::new();
         for arg in call_params {
             if let Some(arg_value) = self
@@ -112,7 +112,7 @@ impl<'a> Context<'a> {
             if access_pattern.is_dereferenced() {
                 if let Some(arg_value) = self
                     .pointer_inference
-                    .eval_parameter_arg_at_call(call_tid, arg)
+                    .eval_parameter_location_at_call(call_tid, arg)
                 {
                     if let Some(mut warnings) = state.check_address_for_use_after_free(&arg_value) {
                         warning_causes.append(&mut warnings);
@@ -174,7 +174,7 @@ impl<'a> Context<'a> {
         name: &str,
         description: String,
         location: &Tid,
-        warning_causes: Vec<(AbstractIdentifier, Tid)>,
+        warning_causes: Vec<(AbstractIdentifier, Vec<Tid>)>,
         root_function: &Tid,
     ) {
         let cwe_warning = CweWarning {

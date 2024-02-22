@@ -396,6 +396,29 @@ mod tests {
 
     #[test]
     #[ignore]
+    fn cwe_337() {
+        let mut error_log = Vec::new();
+        let mut tests = all_test_cases("cwe_337", "CWE337");
+
+        mark_architecture_skipped(&mut tests, "ppc64"); // Ghidra generates mangled function names here for some reason.
+        mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.
+
+        mark_architecture_skipped(&mut tests, "x86"); // x86 uses the stack for return values/arguments, the check is only register based.
+
+        for test_case in tests {
+            let num_expected_occurences = 1;
+            if let Err(error) = test_case.run_test("[CWE337]", num_expected_occurences) {
+                error_log.push((test_case.get_filepath(), error));
+            }
+        }
+        if !error_log.is_empty() {
+            print_errors(error_log);
+            panic!();
+        }
+    }
+
+    #[test]
+    #[ignore]
     fn cwe_367() {
         let mut error_log = Vec::new();
         let mut tests = all_test_cases("cwe_367", "CWE367");
@@ -450,6 +473,7 @@ mod tests {
         mark_architecture_skipped(&mut tests, "ppc64le"); // Ghidra generates mangled function names here for some reason.
 
         mark_skipped(&mut tests, "x86", "mingw32-gcc"); // TODO: Check reason for failure! Probably same as above?
+        mark_skipped(&mut tests, "x64", "mingw32-gcc"); // We find an additional false positive in unrelated code.
 
         for test_case in tests {
             let num_expected_occurences = 1;

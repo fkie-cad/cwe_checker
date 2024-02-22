@@ -10,7 +10,7 @@ use crate::utils::log::LogMessage;
 use crate::utils::{binary::BareMetalConfig, ghidra::get_project_from_ghidra};
 use std::path::Path;
 
-/// Disassemble the given binary and parse it to a [`Project`](crate::intermediate_representation::Project) struct.
+/// Disassemble the given binary and parse it to a [`Project`] struct.
 ///
 /// If successful, returns the binary file (as a byte vector), the parsed project struct,
 /// and a vector of log messages generated during the process.

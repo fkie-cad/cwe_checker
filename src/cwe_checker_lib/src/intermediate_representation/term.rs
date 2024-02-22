@@ -31,6 +31,11 @@ impl Tid {
         }
     }
 
+    /// Returns true if the ID string ends with the provided suffix.
+    pub fn has_id_suffix(&self, suffix: &str) -> bool {
+        self.id.ends_with(suffix)
+    }
+
     /// Generate the ID of a block starting at the given address.
     ///
     /// Note that the block may not actually exist.

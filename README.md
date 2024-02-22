@@ -3,8 +3,8 @@
 </p>
 
 # cwe_checker #
-![Acceptance tests](https://github.com/fkie-cad/cwe_checker/actions/workflows/acceptance-tests.yml/badge.svg)
-![Unit tests](https://github.com/fkie-cad/cwe_checker/actions/workflows/unit-tests.yml/badge.svg)
+![Acceptance tests](https://github.com/fkie-cad/cwe_checker/actions/workflows/acceptance-tests.yml/badge.svg?branch=master)
+![Unit tests](https://github.com/fkie-cad/cwe_checker/actions/workflows/unit-tests.yml/badge.svg?branch=master)
 ![Docker-Pulls](https://img.shields.io/docker/pulls/fkiecad/cwe_checker.svg)
 [![Documentation](https://img.shields.io/badge/doc-stable-green.svg)](https://fkie-cad.github.io/cwe_checker/index.html)
 
@@ -39,7 +39,7 @@ The following arguments should convince you to give *cwe_checker* a try:
 The simplest way is to pull the latest Docker image from the [Github container registry](https://github.com/fkie-cad/cwe_checker/pkgs/container/cwe_checker):
 -   `docker pull ghcr.io/fkie-cad/cwe_checker:latest` yields an image based on the current master branch.
 -   `docker pull ghcr.io/fkie-cad/cwe_checker:stable` yields an image based on the latest stable release version.
--   `docker pull ghcr.io/fkie-cad/cwe_checker:v0.7` yields an image based on the v0.7 stable release version.
+-   `docker pull ghcr.io/fkie-cad/cwe_checker:v0.8` yields an image based on the v0.8 stable release version.
 However, it is recommended to switch to newer stable releases as soon as they get published, since improvements between stable versions can be quite significant.
 
 If you want to build the docker image yourself, just run
@@ -52,7 +52,7 @@ The prebuilt Docker images are currently only x86-based.
 ### Local installation ###
 
 The following dependencies must be installed in order to build and install the *cwe_checker* locally:
--   [Rust](https://www.rust-lang.org) >= 1.69
+-   [Rust](https://www.rust-lang.org) >= 1.70
 -   [Ghidra](https://ghidra-sre.org/) >= 10.2
 
 Run `make all GHIDRA_PATH=/path/to/ghidra_folder` (with the correct path to the local Ghidra installation inserted) to compile and install the cwe_checker.
@@ -103,6 +103,7 @@ So far the following analyses are implemented:
 -   [CWE-215](https://cwe.mitre.org/data/definitions/215.html): Information Exposure Through Debug Information
 -   [CWE-243](https://cwe.mitre.org/data/definitions/243.html): Creation of chroot Jail Without Changing Working Directory
 -   [CWE-332](https://cwe.mitre.org/data/definitions/332.html): Insufficient Entropy in PRNG
+-   [CWE-337](https://cwe.mitre.org/data/definitions/337.html): Predictable Seed in Pseudo-Random Number Generator (PRNG)
 -   [CWE-367](https://cwe.mitre.org/data/definitions/367.html): Time-of-check Time-of-use (TOCTOU) Race Condition
 -   [CWE-416](https://cwe.mitre.org/data/definitions/416.html): Use After Free and its variant [CWE-415](https://cwe.mitre.org/data/definitions/415.html): Double Free
 -   [CWE-426](https://cwe.mitre.org/data/definitions/426.html): Untrusted Search Path
@@ -154,7 +155,7 @@ A special thanks goes out to the BAP community (especially the official gitter) 
 
 ## License ##
 ```
-    Copyright (C) 2018 - 2023  Fraunhofer FKIE  (firmware-security@fkie.fraunhofer.de)
+    Copyright (C) 2018 - 2024  Fraunhofer FKIE  (firmware-security@fkie.fraunhofer.de)
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Library General Public

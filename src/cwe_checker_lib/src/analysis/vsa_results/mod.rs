@@ -1,6 +1,7 @@
 //! This module provides the [`VsaResult`] trait
 //! which defines an interface for the results of analyses similar to a value set analysis.
 
+use crate::abstract_domain::AbstractLocation;
 use crate::intermediate_representation::{Arg, Expression};
 use crate::prelude::*;
 
@@ -27,6 +28,13 @@ pub trait VsaResult {
 
     /// Return the value of a parameter at the given jump instruction.
     fn eval_parameter_arg_at_call(&self, jmp_tid: &Tid, param: &Arg) -> Option<Self::ValueDomain>;
+
+    /// Return the value of a parameter at the given jump instruction.
+    fn eval_parameter_location_at_call(
+        &self,
+        jmp_tid: &Tid,
+        param: &AbstractLocation,
+    ) -> Option<Self::ValueDomain>;
 
     /// Evaluate the value of the given expression at the given jump instruction.
     fn eval_at_jmp(&self, jmp_tid: &Tid, expression: &Expression) -> Option<Self::ValueDomain>;

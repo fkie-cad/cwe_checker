@@ -44,7 +44,7 @@ pub struct Context<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<
     /// The keys are of the form `(Def-TID, Current-Sub-TID)`
     /// to distinguish the nodes for blocks contained in more than one function.
     pub block_start_node_map: HashMap<(Tid, Tid), NodeIndex>,
-    /// A set containing a given [`Def`](crate::intermediate_representation::Def) as the first `Def` of the block.
+    /// A set containing a given [`Def`] as the first `Def` of the block.
     /// The keys are of the form `(Def-TID, Current-Sub-TID)`
     /// to distinguish the nodes for blocks contained in more than one function.
     pub block_first_def_set: HashSet<(Tid, Tid)>,
@@ -74,7 +74,7 @@ impl<'a, T: AbstractDomain + HasTop + Eq + From<String> + DomainInsertion> Conte
         for (node_id, node) in pointer_inference_results.get_graph().node_references() {
             match node {
                 Node::BlkStart(block, sub) => {
-                    if let Some(def) = block.term.defs.get(0) {
+                    if let Some(def) = block.term.defs.first() {
                         block_start_node_map.insert((def.tid.clone(), sub.tid.clone()), node_id);
                         block_first_def_set.insert((def.tid.clone(), sub.tid.clone()));
                     }

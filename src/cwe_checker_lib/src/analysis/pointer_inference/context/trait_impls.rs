@@ -124,6 +124,20 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
                 return None;
             }
         };
+        let callee_fn_sig = match self.fn_signatures.get(state_before_return.get_fn_tid()) {
+            Some(fn_sig) => fn_sig,
+            None => {
+                let location = state_before_return.get_fn_tid();
+                self.log_error(
+                    Err(anyhow!(
+                        "Internal function {} has no function signature.",
+                        location
+                    )),
+                    Some(location),
+                );
+                return None;
+            }
+        };
 
         // Detect possible information loss on the stack pointer and report it.
         if let Err(err) = self.detect_stack_pointer_information_loss_on_return(state_before_return)
@@ -133,19 +147,19 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
             // or a call to a non-returning extern function that was not marked as non-returning.
             return None;
         }
-
+        // Minimize the callee state and replace callee-originating object IDs whenever possible.
+        let mut state_before_return = state_before_return.clone();
+        state_before_return.minimize_before_return_instruction(callee_fn_sig, cconv);
+        state_before_return.merge_mem_objects_with_unique_abstract_location(&call_term.tid);
         // Create a mapping of IDs from the callee to IDs that should be used in the caller.
-        let id_map = self.create_callee_id_to_caller_data_map(
-            state_before_call,
-            state_before_return,
-            &call_term.tid,
-        );
+        let id_map =
+            self.create_callee_id_to_caller_data_map(state_before_call, &state_before_return);
         let callee_id_to_access_pattern_map =
-            self.create_id_to_access_pattern_map(state_before_return);
+            self.create_id_to_access_pattern_map(&state_before_return);
         // Identify caller IDs for which the callee analysis may be unsound for this callsite.
         let unsound_caller_ids =
             self.get_unsound_caller_ids(&id_map, &callee_id_to_access_pattern_map);
-        // TODO: Unsound caller IDs occur too often to log the cases right now.
+        // FIXME: Unsound caller IDs occur too often to log the cases right now.
         // We have to investigate the reasons for it (maybe too many parameters on the caller stack?)
         // and find better heuristics to prevent them poisoning the analysis soundness.
 
@@ -167,11 +181,7 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
                 continue;
             }
             if *callee_object_id == state_before_return.get_global_mem_id() {
-                let callee_fn_sig = self
-                    .fn_signatures
-                    .get(state_before_return.get_fn_tid())
-                    .unwrap();
-                self.merge_global_mem_from_callee(
+                self.merge_non_nested_global_mem_from_callee(
                     &mut state_after_return,
                     callee_object,
                     &id_map,
@@ -196,11 +206,9 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
                 .is_none()
             {
                 // Add a callee object that does not correspond to a parameter to the caller or the stack of the callee.
-                if let Ok(new_object_id) = callee_object_id.with_path_hint(call_term.tid.clone()) {
-                    state_after_return
-                        .memory
-                        .insert(new_object_id, callee_object);
-                }
+                state_after_return
+                    .memory
+                    .insert(callee_object_id.clone(), callee_object);
             } else {
                 // The callee object is a parameter object.
                 self.log_debug(
@@ -217,7 +225,6 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
             state_after_return
                 .memory
                 .assume_arbitrary_writes_to_object(id, &BTreeSet::new());
-            // TODO: We should specify more possible reference targets.
         }
         // Cleanup
         state_after_return.remove_unreferenced_objects();

@@ -13,9 +13,12 @@
 //!
 //! The check uses the results of the [Pointer Inference analysis](`crate::analysis::pointer_inference`)
 //! to check whether any memory accesses may point outside of the bounds of the corresponding memory objects.
-//! For this the results of the Pointer Inference analysis are aggregated interprocedurally.
-//! Additionally, the check uses a lightweight intraprocedural dataflow fixpoint computation
+//! Additionally, the check uses a lightweight dataflow fixpoint computation
 //! to ensure that for each memory object only the first access outside of its bounds is flagged as a CWE.
+//!
+//! Currently, the check is only partially interprocedural.
+//! Bounds of parameter objects can be detected, but bounds of memory objects created in called functions
+//! (other than the standard allocation functions) will not be detected.
 //!
 //! ## False Positives
 //!
@@ -40,6 +43,20 @@
 //! this still may miss buffer overflows occuring in the called function.
 //! - Right now the check only considers buffers on the stack or the heap, but not buffers in global memory.
 //! Thus corresponding overflows of buffers in global memory are not detected.
+//! - Since the check is only partially interprocedural at the moment,
+//! it will miss object sizes of objects created in called functions.
+//! For example, if allocations are wrapped in simple wrapper functions,
+//! the analysis will miss overflows for corresponding objects, because it cannot determine their object sizes.
+
+// FIXME: The current implementation uses path hints for memory object IDs to determine object sizes interprocedurally.
+// But the number of path hint combinations can grow exponentially
+// with the call depth to the actual allocation size of a callee-created object.
+// This led to state explosion in the PointerInference and thus path hints are not longer provided by the PointerInference.
+// But without the path hints that this analysis depended on, the check can only resolve sizes of parameter objects,
+// but not of objects returned from called functions (other than the standard allocation functions).
+// A future implementation needs a better way to determine object sizes interprocedurally,
+// probably depending on several fixpoint computations to circumvent the state explosion problems
+// that the old implementation is vulnerable to.
 
 use crate::analysis::pointer_inference::Data;
 use crate::prelude::*;

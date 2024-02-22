@@ -37,7 +37,7 @@ impl State {
         };
         let stack_upper_bound = std::cmp::max(
             stack_upper_bound,
-            function_sig.get_stack_params_total_size(),
+            function_sig.get_stack_params_total_size(&project.stack_pointer_register),
         );
         let object_lower_bounds = BTreeMap::from([(
             stack_id.clone(),
@@ -261,7 +261,7 @@ fn collect_tids_for_cwe_warning(
             &caller_tid,
             state.stack_id.get_tid(),
         );
-        tids.extend(call_sequence_tids.into_iter());
+        tids.extend(call_sequence_tids);
     }
     // Build a string out of the TID list
     tids.iter()

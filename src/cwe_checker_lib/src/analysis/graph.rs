@@ -477,8 +477,7 @@ impl<'a> GraphBuilder<'a> {
 
     /// Add all non-return-instruction-related jump edges to the graph.
     fn add_jump_and_call_edges(&mut self) {
-        while !self.block_worklist.is_empty() {
-            let node = self.block_worklist.pop().unwrap();
+        while let Some(node) = self.block_worklist.pop() {
             match self.graph[node] {
                 Node::BlkEnd(block, _) => self.add_outgoing_edges(node, block),
                 _ => panic!(),
@@ -513,7 +512,7 @@ pub fn get_entry_nodes_of_subs(graph: &Graph) -> HashMap<Tid, NodeIndex> {
     let mut sub_to_entry_node_map: HashMap<Tid, NodeIndex> = HashMap::new();
     for node in graph.node_indices() {
         if let Node::BlkStart(block, sub) = graph[node] {
-            if let Some(entry_block) = sub.term.blocks.get(0) {
+            if let Some(entry_block) = sub.term.blocks.first() {
                 if block.tid == entry_block.tid {
                     sub_to_entry_node_map.insert(sub.tid.clone(), node);
                 }

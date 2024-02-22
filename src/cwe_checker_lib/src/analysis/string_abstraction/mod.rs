@@ -56,7 +56,7 @@ impl<'a, T: AbstractDomain + DomainInsertion + HasTop + Eq + From<String>>
 
         let mut sub_to_entry_blocks_map = HashMap::new();
         for sub in project.program.term.subs.values() {
-            if let Some(entry_block) = sub.term.blocks.get(0) {
+            if let Some(entry_block) = sub.term.blocks.first() {
                 sub_to_entry_blocks_map.insert(sub.tid.clone(), entry_block.tid.clone());
             }
         }

@@ -97,6 +97,18 @@ impl<'a> Context<'a> {
         }
     }
 
+    /// If `result` is an `Err`, log the error message as an error message through the `log_collector` channel.
+    pub fn log_error(&self, result: Result<(), Error>, location: Option<&Tid>) {
+        if let Err(err) = result {
+            let mut log_message =
+                LogMessage::new_error(format!("{err}")).source("Pointer Inference");
+            if let Some(loc) = location {
+                log_message = log_message.location(loc.clone());
+            };
+            let _ = self.log_collector.send(LogThreadMsg::Log(log_message));
+        }
+    }
+
     /// Detect and log if the stack pointer is not as expected when returning from a function.
     fn detect_stack_pointer_information_loss_on_return(
         &self,
@@ -299,7 +311,7 @@ impl<'a> Context<'a> {
 
     /// Merge global memory data from the callee global memory object to the caller global memory object
     /// if the corresponding global variable is marked as mutable in both the caller and callee.
-    fn merge_global_mem_from_callee(
+    fn merge_non_nested_global_mem_from_callee(
         &self,
         caller_state: &mut State,
         callee_global_mem: &AbstractObject,
@@ -360,21 +372,45 @@ fn compute_call_return_global_var_access_intervals(
     caller_fn_sig: &FunctionSignature,
     callee_fn_sig: &FunctionSignature,
 ) -> BTreeMap<u64, AccessPattern> {
+    let caller_mut_indices: BTreeSet<u64> = caller_fn_sig
+        .global_parameters
+        .iter()
+        .filter_map(|(location, access_pattern)| {
+            if let AbstractLocation::GlobalAddress { address, .. } = location {
+                if access_pattern.is_mutably_dereferenced() {
+                    return Some(*address);
+                }
+            }
+            None
+        })
+        .collect();
+    let callee_mut_indices: BTreeSet<u64> = callee_fn_sig
+        .global_parameters
+        .iter()
+        .filter_map(|(location, access_pattern)| {
+            if let AbstractLocation::GlobalAddress { address, .. } = location {
+                if access_pattern.is_mutably_dereferenced() {
+                    return Some(*address);
+                }
+            }
+            None
+        })
+        .collect();
     let mut intervals: BTreeMap<u64, AccessPattern> = caller_fn_sig
         .global_parameters
         .keys()
         .chain(callee_fn_sig.global_parameters.keys())
-        .map(|index| (*index, AccessPattern::new()))
+        .filter_map(|location| {
+            if let AbstractLocation::GlobalAddress { address, .. } = location {
+                Some((*address, AccessPattern::new()))
+            } else {
+                None
+            }
+        })
         .collect();
     for (index, access_pattern) in intervals.iter_mut() {
-        if let (Some(caller_pattern), Some(callee_pattern)) = (
-            caller_fn_sig.global_parameters.get(index),
-            callee_fn_sig.global_parameters.get(index),
-        ) {
-            if caller_pattern.is_mutably_dereferenced() && callee_pattern.is_mutably_dereferenced()
-            {
-                access_pattern.set_mutably_dereferenced_flag();
-            }
+        if caller_mut_indices.contains(index) && callee_mut_indices.contains(index) {
+            access_pattern.set_mutably_dereferenced_flag();
         }
     }
 
