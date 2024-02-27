@@ -1,0 +1,131 @@
+{
+  "CWE134": {
+    "_comment": "Functions that take format string arguments.",
+    "format_string_symbols": [],
+    "format_string_index": {}
+  },
+  "CWE190": {
+    "symbols": []
+  },
+  "CWE215": {
+    "symbols": []
+  },
+  "CWE416": {
+    "_comment": "Functions that invalidate the pointer passed as the first argument.",
+    "deallocation_symbols": [],
+    "always_include_full_path_to_free_site": true
+  },
+  "CWE457": {
+    "symbols": []
+  },
+  "CWE467": {
+    "_comment": "Any function that takes something of type `size_t` could be a possible candidate.",
+    "symbols": [
+      "bcmp",
+      "memchr",
+      "memcmp",
+      "memcpy",
+      "memmove",
+      "memscan",
+      "memset",
+      "memset16",
+      "memset32",
+      "memset64",
+      "strlcat",
+      "strlcpy",
+      "strncasecmp",
+      "strncat",
+      "strnchr",
+      "strnchrnul",
+      "strncmp",
+      "strncpy",
+      "strnlen",
+      "strnstr",
+      "strscpy"
+    ]
+  },
+  "CWE476": {
+    "_comment": "Any function that possibly returns a NULL value.",
+    "parameters": [
+      "strict_call_policy=true",
+      "strict_memory_policy=false",
+      "max_steps=100"
+    ],
+    "symbols": [
+      "__kmalloc",
+      "__kmalloc_node",
+      "__kmalloc_node_track_caller",
+      "__vcalloc",
+      "kmalloc_large_node",
+      "kmalloc_node_trace",
+      "kmalloc_order",
+      "kmalloc_order_trace",
+      "kmalloc_trace",
+      "kmem_cache_alloc_node",
+      "kmem_cache_alloc_trace",
+      "kmemdup",
+      "kmemdup_nul",
+      "krealloc",
+      "kstrdup",
+      "kstrdup_const",
+      "kstrndup",
+      "kvmalloc_node",
+      "kvmemdup",
+      "kvrealloc",
+      "memdup_user_nul",
+      "strndup_user",
+      "vcalloc",
+      "vmalloc_array",
+      "vmemdup_user"
+    ]
+  },
+  "CWE676": {
+    "_comment": "https://github.com/01org/safestringlib/wiki/SDL-List-of-Banned-Functions",
+    "symbols": [
+      "memcmp",
+      "memcpy",
+      "memmove",
+      "memset",
+      "strcat",
+      "strcpy",
+      "strlen",
+      "strncat",
+      "strncpy"
+    ]
+  },
+  "CWE789": {
+    "_comment": "Allocation functions that accept a size argument.",
+    "stack_threshold": 7500,
+    "heap_threshold": 1000000,
+    "symbols": []
+  },
+  "Memory": {
+    "allocation_symbols": [
+      "__kmalloc",
+      "__kmalloc_node",
+      "__kmalloc_node_track_caller",
+      "__vcalloc",
+      "kmalloc_large_node",
+      "kmalloc_node_trace",
+      "kmalloc_order",
+      "kmalloc_order_trace",
+      "kmalloc_trace",
+      "kmem_cache_alloc_node",
+      "kmem_cache_alloc_trace",
+      "kmemdup",
+      "kmemdup_nul",
+      "krealloc",
+      "kstrdup",
+      "kstrdup_const",
+      "kstrndup",
+      "kvmalloc_node",
+      "kvmemdup",
+      "kvrealloc",
+      "memdup_user_nul",
+      "strndup_user",
+      "vcalloc",
+      "vmalloc_array",
+      "vmemdup_user"
+    ]
+  }
+}

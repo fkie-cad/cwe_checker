@@ -5,6 +5,11 @@
 //! but directly incorporated into the [`pointer_inference`](crate::analysis::pointer_inference) module.
 //! See there for detailed information about this check.
 
+/// Checkers that are supported for Linux kernel modules.
+pub const MODULES_LKM: [&str; 9] = [
+    "CWE134", "CWE190", "CWE215", "CWE416", "CWE457", "CWE467", "CWE476", "CWE676", "CWE789",
+];
+
 pub mod cwe_119;
 pub mod cwe_134;
 pub mod cwe_190;

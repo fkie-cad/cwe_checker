@@ -87,6 +87,7 @@ impl RuntimeMemoryImage {
                 },
             ],
             is_little_endian: true,
+            is_lkm: false,
         }
     }
 }

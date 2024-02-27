@@ -9,6 +9,8 @@ pub struct RuntimeMemoryImage {
     pub memory_segments: Vec<MemorySegment>,
     /// Endianness
     pub is_little_endian: bool,
+    /// True iff we are analyzing a Linux loadable kernel module.
+    pub is_lkm: bool,
 }
 
 impl RuntimeMemoryImage {
@@ -22,6 +24,7 @@ impl RuntimeMemoryImage {
         RuntimeMemoryImage {
             memory_segments: Vec::new(),
             is_little_endian,
+            is_lkm: false,
         }
     }
 
@@ -51,6 +54,7 @@ impl RuntimeMemoryImage {
                 let mut memory_image = RuntimeMemoryImage {
                     memory_segments,
                     is_little_endian: true,
+                    is_lkm: false,
                 };
                 memory_image.add_global_memory_offset(pe_file.image_base as u64);
                 Ok(memory_image)
@@ -76,6 +80,7 @@ impl RuntimeMemoryImage {
         Ok(Self {
             memory_segments,
             is_little_endian: elf_file.header.endianness().unwrap().is_little(),
+            is_lkm: false,
         })
     }
 
@@ -114,6 +119,8 @@ impl RuntimeMemoryImage {
                 })
                 .collect(),
             is_little_endian: elf_file.header.endianness().unwrap().is_little(),
+            is_lkm: get_section(".modinfo", &elf_file).is_some()
+                && get_section(".gnu.linkonce.this_module", &elf_file).is_some(),
         })
     }
 
@@ -157,6 +164,7 @@ impl RuntimeMemoryImage {
                 MemorySegment::new_bare_metal_ram_segment(ram_base_address, ram_size),
             ],
             is_little_endian,
+            is_lkm: false,
         })
     }
 
@@ -357,6 +365,15 @@ impl RuntimeMemoryImage {
         }
         Err(anyhow!("Address not contained in runtime memory image"))
     }
+}
+
+/// Returns the section header of the first section with this name.
+fn get_section<'a>(name: &str, elf_file: &'a elf::Elf<'a>) -> Option<&'a elf::SectionHeader> {
+    let sh_strtab = &elf_file.shdr_strtab;
+
+    elf_file.section_headers.iter().find(|section_header| {
+        matches!(sh_strtab.get_at(section_header.sh_name), Some(sh_name) if sh_name == name)
+    })
 }
 
 #[cfg(test)]
