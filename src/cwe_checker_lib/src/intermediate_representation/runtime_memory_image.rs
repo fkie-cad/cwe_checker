@@ -12,6 +12,10 @@ pub struct RuntimeMemoryImage {
 }
 
 impl RuntimeMemoryImage {
+    /// Base address of the first [`MemorySegment`] when mapping relocatable
+    /// object files.
+    pub const ELF_REL_BASE_ADDRESS: u64 = 0x100_000;
+
     /// Generate a runtime memory image containing no memory segments.
     /// Primarily useful in situations where any access to global memory would be an error.
     pub fn empty(is_little_endian: bool) -> RuntimeMemoryImage {
@@ -25,24 +29,14 @@ impl RuntimeMemoryImage {
     ///
     /// The function can parse ELF and PE files as input.
     pub fn new(binary: &[u8]) -> Result<Self, Error> {
-        let parsed_object = Object::parse(binary)?;
-
-        match parsed_object {
-            Object::Elf(elf_file) => {
-                let mut memory_segments = Vec::new();
-                for header in elf_file.program_headers.iter() {
-                    if header.p_type == elf::program_header::PT_LOAD {
-                        memory_segments.push(MemorySegment::from_elf_segment(binary, header));
-                    }
+        match Object::parse(binary)? {
+            Object::Elf(elf_file) => match elf_file.header.e_type {
+                elf::header::ET_REL => Self::from_elf_sections(binary, elf_file),
+                elf::header::ET_DYN | elf::header::ET_EXEC => {
+                    Self::from_elf_segments(binary, elf_file)
                 }
-                if memory_segments.is_empty() {
-                    return Err(anyhow!("No loadable segments found"));
-                }
-                Ok(RuntimeMemoryImage {
-                    memory_segments,
-                    is_little_endian: elf_file.header.endianness().unwrap().is_little(),
-                })
-            }
+                ty => Err(anyhow!("Unsupported ELF type: e_type {}", ty)),
+            },
             Object::PE(pe_file) => {
                 let mut memory_segments = Vec::new();
                 for header in pe_file.sections.iter() {
@@ -63,6 +57,64 @@ impl RuntimeMemoryImage {
             }
             _ => Err(anyhow!("Object type not supported.")),
         }
+    }
+
+    /// Generate a runtime memory image for an executable ELF file or shared object.
+    fn from_elf_segments(binary: &[u8], elf_file: elf::Elf) -> Result<Self, Error> {
+        let mut memory_segments = Vec::new();
+
+        for header in elf_file.program_headers.iter() {
+            if header.p_type == elf::program_header::PT_LOAD {
+                memory_segments.push(MemorySegment::from_elf_segment(binary, header));
+            }
+        }
+
+        if memory_segments.is_empty() {
+            return Err(anyhow!("No loadable segments found"));
+        }
+
+        Ok(Self {
+            memory_segments,
+            is_little_endian: elf_file.header.endianness().unwrap().is_little(),
+        })
+    }
+
+    /// Generate a runtime memory image for a relocatable object file.
+    ///
+    /// These files do not contain information about the expected memory layout.
+    /// Ghidra implements a basic loader that essentially concatenates all
+    /// `SHF_ALLOC` sections that are not `SHT_NULL`. They are placed in memory
+    /// as close as possible while respecting their alignment at a fixed
+    /// address.
+    ///
+    /// It is important that this implementation stays in sync with
+    /// `processSectionHeaders` in [`ElfProgramBuilder`] for the cases that we
+    /// care about.
+    ///
+    /// [`ElfProgramBuilder`]: https://github.com/NationalSecurityAgency/ghidra/blob/master/Ghidra/Features/Base/src/main/java/ghidra/app/util/opinion/ElfProgramBuilder.java
+    fn from_elf_sections(binary: &[u8], elf_file: elf::Elf) -> Result<Self, Error> {
+        let mut next_base = Self::ELF_REL_BASE_ADDRESS;
+
+        Ok(Self {
+            memory_segments: elf_file
+                .section_headers
+                .iter()
+                .filter_map(|section_header| {
+                    if section_header.is_alloc()
+                        && section_header.sh_type != elf::section_header::SHT_NULL
+                        && section_header.sh_size != 0
+                    {
+                        let mem_seg =
+                            MemorySegment::from_elf_section(binary, next_base, section_header);
+                        next_base = mem_seg.base_address + mem_seg.bytes.len() as u64;
+                        Some(mem_seg)
+                    } else {
+                        None
+                    }
+                })
+                .collect(),
+            is_little_endian: elf_file.header.endianness().unwrap().is_little(),
+        })
     }
 
     /// Generate a runtime memory image for a bare metal binary.
@@ -106,6 +158,35 @@ impl RuntimeMemoryImage {
             ],
             is_little_endian,
         })
+    }
+
+    /// Get the base address for the image of a binary when loaded into memory.
+    pub fn get_base_address(binary: &[u8]) -> Result<u64, Error> {
+        match Object::parse(binary)? {
+            Object::Elf(elf_file) => match elf_file.header.e_type {
+                elf::header::ET_REL => Ok(Self::ELF_REL_BASE_ADDRESS),
+                elf::header::ET_DYN | elf::header::ET_EXEC => {
+                    elf_file
+                        .program_headers
+                        .iter()
+                        .find_map(|header| {
+                            let vm_range = header.vm_range();
+                            if !vm_range.is_empty()
+                                && header.p_type == goblin::elf::program_header::PT_LOAD
+                            {
+                                // The loadable segments have to occur in order in the program header table.
+                                // So the start address of the first loadable segment is the base offset of the binary.
+                                Some(vm_range.start as u64)
+                            } else {
+                                None
+                            }
+                        })
+                        .context("No loadable segment bounds found.")
+                }
+                ty => Err(anyhow!("Unsupported ELF type: e_type {}", ty)),
+            },
+            _ => Err(anyhow!("Binary type not yet supported")),
+        }
     }
 
     /// Return whether values in the memory image should be interpreted in little-endian

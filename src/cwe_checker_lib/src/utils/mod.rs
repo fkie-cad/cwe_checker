@@ -27,22 +27,3 @@ pub fn get_ghidra_plugin_path(plugin_name: &str) -> std::path::PathBuf {
     let data_dir = project_dirs.data_dir();
     data_dir.join("ghidra").join(plugin_name)
 }
-
-/// Get the base address for the image of a binary when loaded into memory.
-pub fn get_binary_base_address(binary: &[u8]) -> Result<u64, Error> {
-    use goblin::Object;
-    match Object::parse(binary)? {
-        Object::Elf(elf_file) => {
-            for header in elf_file.program_headers.iter() {
-                let vm_range = header.vm_range();
-                if !vm_range.is_empty() && header.p_type == goblin::elf::program_header::PT_LOAD {
-                    // The loadable segments have to occur in order in the program header table.
-                    // So the start address of the first loadable segment is the base offset of the binary.
-                    return Ok(vm_range.start as u64);
-                }
-            }
-            Err(anyhow!("No loadable segment bounds found."))
-        }
-        _ => Err(anyhow!("Binary type not yet supported")),
-    }
-}

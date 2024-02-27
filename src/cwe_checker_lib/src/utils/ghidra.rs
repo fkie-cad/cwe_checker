@@ -3,7 +3,10 @@
 use crate::prelude::*;
 use crate::utils::binary::BareMetalConfig;
 use crate::utils::{get_ghidra_plugin_path, read_config_file};
-use crate::{intermediate_representation::Project, utils::log::LogMessage};
+use crate::{
+    intermediate_representation::{Project, RuntimeMemoryImage},
+    utils::log::LogMessage,
+};
 use directories::ProjectDirs;
 use nix::{sys::stat, unistd};
 use std::path::{Path, PathBuf};
@@ -54,7 +57,7 @@ fn parse_pcode_project_to_ir_project(
         .as_ref()
         .map(|config| config.parse_binary_base_address());
     let mut log_messages = pcode_project.normalize();
-    let project: Project = match crate::utils::get_binary_base_address(binary) {
+    let project: Project = match RuntimeMemoryImage::get_base_address(binary) {
         Ok(binary_base_address) => pcode_project.into_ir_project(binary_base_address),
         Err(_err) => {
             if let Some(binary_base_address) = bare_metal_base_address_opt {
