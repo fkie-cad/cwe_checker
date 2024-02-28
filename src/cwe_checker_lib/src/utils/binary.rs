@@ -80,9 +80,7 @@ impl MemorySegment {
         let bytes: Vec<u8> = match section_header.file_range() {
             Some(range) => binary[range].to_vec(),
             // `SHT_NOBITS`
-            None => core::iter::repeat(0)
-                .take(section_header.sh_size as usize)
-                .collect(),
+            None => vec![0; section_header.sh_size as usize],
         };
         let alignment = section_header.sh_addralign.next_power_of_two();
         Self {
