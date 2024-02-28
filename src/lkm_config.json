@@ -1,4 +1,5 @@
 {
+  "_comment": "This file is loaded instead of config.json when analyzing an LKM. The analysis of LKMs requires a different set of options compared to the analysis of user-space programs.",
   "CWE134": {
     "_comment": "Functions that take format string arguments.",
     "format_string_symbols": [],
