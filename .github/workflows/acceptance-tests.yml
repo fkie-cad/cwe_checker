@@ -24,7 +24,7 @@ jobs:
         run: |
           pushd test/artificial_samples
           docker build -t cross_compiling .
-          docker run --rm -v $(pwd)/build:/home/cwe/artificial_samples/build cross_compiling sudo /home/cwe/.local/bin/scons
+          docker run --rm -v $(pwd)/build:/home/cwe/artificial_samples/build cross_compiling sudo python3 -m SCons
           popd
           pushd test/lkm_samples
           ./build.sh
