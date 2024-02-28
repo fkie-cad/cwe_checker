@@ -14,6 +14,12 @@ pub const COMPILERS: &[&str] = &["gcc", "clang"];
 pub const WINDOWS_ARCHITECTURES: &[&str] = &["x64", "x86"];
 /// Compilers used for the Windows-based test samples
 pub const WINDOWS_COMPILERS: &[&str] = &["mingw32-gcc"];
+/// CPU architectures that are supported for Linux kernel modules.
+pub const LKM_ARCHITECTURES: &[&str] = &["aarch64"];
+/// Compilers used for the Linux kernel module test samples.
+pub const LKM_COMPILERS: &[&str] = &["clang"];
+/// CWEs that are supported for Linux kernel modules.
+pub const LKM_CWE: &[&str] = &["cwe_467", "cwe_476", "cwe_676"];
 
 /// A test case containing the necessary information to run an acceptance test.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -28,15 +34,24 @@ pub struct CweTestCase {
     check_name: &'static str,
     /// Whether the test case should be skipped
     skipped: bool,
+    /// True iff the test binary is a Linux kernel module.
+    is_lkm: bool,
 }
 
 impl CweTestCase {
     /// Get the file path of the test binary
     fn get_filepath(&self) -> String {
-        format!(
-            "artificial_samples/build/{}_{}_{}.out",
-            self.cwe, self.architecture, self.compiler
-        )
+        if self.is_lkm {
+            format!(
+                "lkm_samples/build/{}_{}_{}.ko",
+                self.cwe, self.architecture, self.compiler
+            )
+        } else {
+            format!(
+                "artificial_samples/build/{}_{}_{}.out",
+                self.cwe, self.architecture, self.compiler
+            )
+        }
     }
 
     /// Run the test case and print to the shell, whether the test case succeeded or not.
@@ -86,28 +101,38 @@ impl CweTestCase {
 
 /// Mark test cases using the given CPU architecture as `skipped`.
 pub fn mark_architecture_skipped(test_cases: &mut [CweTestCase], arch: &str) {
-    for test in test_cases.iter_mut() {
-        if test.architecture == arch {
-            test.skipped = true;
-        }
-    }
+    mark_skipped_closure(test_cases, |test| test.architecture == arch)
 }
 
 /// Mark test cases using the given compiler as `skipped`.
 pub fn mark_compiler_skipped(test_cases: &mut [CweTestCase], comp: &str) {
-    for test in test_cases.iter_mut() {
-        if test.compiler == comp {
-            test.skipped = true;
-        }
-    }
+    mark_skipped_closure(test_cases, |test| test.compiler == comp)
 }
 
 /// Mark test cases using the given CPU architecture + compiler combination as `skipped`.
 pub fn mark_skipped(test_cases: &mut [CweTestCase], value1: &str, value2: &str) {
-    for test in test_cases.iter_mut() {
-        if (test.architecture == value1 && test.compiler == value2)
+    mark_skipped_closure(test_cases, |test| {
+        (test.architecture == value1 && test.compiler == value2)
             || (test.architecture == value2 && test.compiler == value1)
-        {
+    })
+}
+
+/// Mark test cases using the given CPU architecture + compiler combination as `skipped`
+/// iff they are not Linux kernel modules.
+pub fn mark_skipped_user(test_cases: &mut [CweTestCase], value1: &str, value2: &str) {
+    mark_skipped_closure(test_cases, |test| {
+        !test.is_lkm
+            && ((test.architecture == value1 && test.compiler == value2)
+                || (test.architecture == value2 && test.compiler == value1))
+    })
+}
+
+fn mark_skipped_closure<F>(test_cases: &mut [CweTestCase], predecate: F)
+where
+    F: Fn(&CweTestCase) -> bool,
+{
+    for test in test_cases.iter_mut() {
+        if predecate(test) {
             test.skipped = true;
         }
     }
@@ -115,7 +140,7 @@ pub fn mark_skipped(test_cases: &mut [CweTestCase], value1: &str, value2: &str) 
 
 /// Return a list with all possible Linux test cases for the given CWE.
 pub fn linux_test_cases(cwe: &'static str, check_name: &'static str) -> Vec<CweTestCase> {
-    new_test_cases(cwe, ARCHITECTURES, COMPILERS, check_name)
+    new_test_cases(cwe, ARCHITECTURES, COMPILERS, check_name, false)
         .into_iter()
         .filter(|test| test.architecture != "ppc" || test.compiler != "clang")
         .collect()
@@ -123,7 +148,23 @@ pub fn linux_test_cases(cwe: &'static str, check_name: &'static str) -> Vec<CweT
 
 /// Return a list with all possible Windows test cases for the given CWE
 pub fn windows_test_cases(cwe: &'static str, check_name: &'static str) -> Vec<CweTestCase> {
-    new_test_cases(cwe, WINDOWS_ARCHITECTURES, WINDOWS_COMPILERS, check_name)
+    new_test_cases(
+        cwe,
+        WINDOWS_ARCHITECTURES,
+        WINDOWS_COMPILERS,
+        check_name,
+        false,
+    )
+}
+
+/// Returns a list with all possible Linux kernel module test cases for the
+/// given CWE.
+pub fn lkm_test_cases(cwe: &'static str, check_name: &'static str) -> Vec<CweTestCase> {
+    if LKM_CWE.contains(&cwe) {
+        new_test_cases(cwe, LKM_ARCHITECTURES, LKM_COMPILERS, check_name, true)
+    } else {
+        Vec::new()
+    }
 }
 
 /// Generate test cases for all combinations of CPU architecture and compiler given.
@@ -132,6 +173,7 @@ pub fn new_test_cases(
     architectures: &[&'static str],
     compilers: &[&'static str],
     check_name: &'static str,
+    is_lkm: bool,
 ) -> Vec<CweTestCase> {
     let mut vec = Vec::new();
     for architecture in architectures {
@@ -142,6 +184,7 @@ pub fn new_test_cases(
                 compiler,
                 check_name,
                 skipped: false,
+                is_lkm,
             });
         }
     }
@@ -152,6 +195,7 @@ pub fn new_test_cases(
 pub fn all_test_cases(cwe: &'static str, check_name: &'static str) -> Vec<CweTestCase> {
     let mut vec = linux_test_cases(cwe, check_name);
     vec.append(&mut windows_test_cases(cwe, check_name));
+    vec.append(&mut lkm_test_cases(cwe, check_name));
     vec
 }
 
@@ -336,7 +380,9 @@ mod tests {
     #[ignore]
     fn cwe_215() {
         let mut error_log = Vec::new();
-        let tests = linux_test_cases("cwe_476", "CWE215"); // We use the test binaries of another check here.
+        // We use the test binaries of another check here.
+        let mut tests = linux_test_cases("cwe_476", "CWE215");
+        tests.extend(lkm_test_cases("cwe_476", "CWE215"));
 
         for test_case in tests {
             let num_expected_occurences = 1;
@@ -518,7 +564,7 @@ mod tests {
 
         // Only one instance is found.
         // Other instance cannot be found, since the constant is not defined in the basic block of the call instruction.
-        mark_skipped(&mut tests, "aarch64", "clang");
+        mark_skipped_user(&mut tests, "aarch64", "clang");
         mark_skipped(&mut tests, "arm", "clang");
         mark_skipped(&mut tests, "mips", "clang");
         mark_skipped(&mut tests, "mipsel", "clang");
@@ -620,7 +666,7 @@ mod tests {
     #[ignore]
     fn cwe_782() {
         let mut error_log = Vec::new();
-        let tests = new_test_cases("cwe_782", &["x64"], COMPILERS, "CWE782");
+        let tests = new_test_cases("cwe_782", &["x64"], COMPILERS, "CWE782", false);
         for test_case in tests {
             let num_expected_occurences = 1;
             if let Err(error) = test_case.run_test("[CWE782]", num_expected_occurences) {
