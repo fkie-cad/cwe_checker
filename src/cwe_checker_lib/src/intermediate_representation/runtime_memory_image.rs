@@ -14,10 +14,6 @@ pub struct RuntimeMemoryImage {
 }
 
 impl RuntimeMemoryImage {
-    /// Base address of the first [`MemorySegment`] when mapping relocatable
-    /// object files.
-    pub const ELF_REL_BASE_ADDRESS: u64 = 0x100_000;
-
     /// Generate a runtime memory image containing no memory segments.
     /// Primarily useful in situations where any access to global memory would be an error.
     pub fn empty(is_little_endian: bool) -> RuntimeMemoryImage {
@@ -89,26 +85,24 @@ impl RuntimeMemoryImage {
     /// These files do not contain information about the expected memory layout.
     /// Ghidra implements a basic loader that essentially concatenates all
     /// `SHF_ALLOC` sections that are not `SHT_NULL`. They are placed in memory
-    /// as close as possible while respecting their alignment at a fixed
-    /// address.
+    /// as close as possible while respecting their alignment, starting at a
+    /// fixed address. We start mapping at zero and shift by the actual base
+    /// address that Ghidra has chosen after running our plugin.
     ///
-    /// It is important that this implementation stays in sync with
-    /// `processSectionHeaders` in [`ElfProgramBuilder`] for the cases that we
-    /// care about.
+    /// NOTE: It is important that this implementation stays in sync with what
+    /// `processSectionHeaders` in [`ElfProgramBuilder`] does in the cases that
+    /// we care about.
     ///
     /// [`ElfProgramBuilder`]: https://github.com/NationalSecurityAgency/ghidra/blob/master/Ghidra/Features/Base/src/main/java/ghidra/app/util/opinion/ElfProgramBuilder.java
     fn from_elf_sections(binary: &[u8], elf_file: elf::Elf) -> Result<Self, Error> {
-        let mut next_base = Self::ELF_REL_BASE_ADDRESS;
+        let mut next_base = 0;
 
         Ok(Self {
             memory_segments: elf_file
                 .section_headers
                 .iter()
                 .filter_map(|section_header| {
-                    if section_header.is_alloc()
-                        && section_header.sh_type != elf::section_header::SHT_NULL
-                        && section_header.sh_size != 0
-                    {
+                    if is_loaded(section_header) {
                         let mem_seg =
                             MemorySegment::from_elf_section(binary, next_base, section_header);
                         next_base = mem_seg.base_address + mem_seg.bytes.len() as u64;
@@ -172,7 +166,7 @@ impl RuntimeMemoryImage {
     pub fn get_base_address(binary: &[u8]) -> Result<u64, Error> {
         match Object::parse(binary)? {
             Object::Elf(elf_file) => match elf_file.header.e_type {
-                elf::header::ET_REL => Ok(Self::ELF_REL_BASE_ADDRESS),
+                elf::header::ET_REL => Ok(0),
                 elf::header::ET_DYN | elf::header::ET_EXEC => {
                     elf_file
                         .program_headers
@@ -374,6 +368,14 @@ fn get_section<'a>(name: &str, elf_file: &'a elf::Elf<'a>) -> Option<&'a elf::Se
     elf_file.section_headers.iter().find(|section_header| {
         matches!(sh_strtab.get_at(section_header.sh_name), Some(sh_name) if sh_name == name)
     })
+}
+
+/// Returns true iff the section header will be loaded into memory by Ghidra.
+#[inline]
+fn is_loaded(section_header: &elf::SectionHeader) -> bool {
+    section_header.is_alloc()
+        && section_header.sh_type != elf::section_header::SHT_NULL
+        && section_header.sh_size != 0
 }
 
 #[cfg(test)]
