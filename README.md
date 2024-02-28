@@ -76,6 +76,11 @@ You can adjust the behavior of most checks via a configuration file located at `
 If you modify it, add the command line flag `--config=src/config.json` to tell the *cwe_checker* to use the modified file.
 For information about other available command line flags you can pass the `--help` flag to the *cwe_checker*.
 
+There is _experimental_ support for the analysis of Linux loadable kernel modules
+(LKMs). `cwe_checker` will recognize if you pass an LKM and will execute a
+subset of the CWE checks available for user-space programs. Analyses are
+configurable via a separate [configuration file](src/lkm_config.json).
+
 If you use the stable version, you can also look at the [online documentation](https://fkie-cad.github.io/cwe_checker/index.html) for more information.
 
 ### For Bare-Metal Binaries ###
