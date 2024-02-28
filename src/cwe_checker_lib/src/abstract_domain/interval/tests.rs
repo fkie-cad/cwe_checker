@@ -652,3 +652,17 @@ fn stride_rounding() {
     );
     assert_eq!(bitvec!("-123:1").round_down_to_stride_of(&interval), None);
 }
+
+#[test]
+fn lzcount_op() {
+    use super::RegisterDomain;
+    // Test exact computation
+    let interval: IntervalDomain = Interval::mock_i8(3, 3).into();
+    let result = interval.cast(CastOpType::LzCount, ByteSize::new(2));
+    assert_eq!(result, bitvec!("0x6:2").into()); // leading 6 bits of the 8-bit value are zeroes
+
+    // Test result for non-exact interval
+    let interval: IntervalDomain = Interval::mock(3, 53).with_stride(5).into();
+    let result = interval.cast(CastOpType::LzCount, ByteSize::new(8));
+    assert_eq!(result, Interval::mock(0, 64).into());
+}

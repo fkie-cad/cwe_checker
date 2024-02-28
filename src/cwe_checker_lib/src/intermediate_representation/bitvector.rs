@@ -61,6 +61,9 @@ impl BitvectorExtended for Bitvector {
             CastOpType::PopCount => Ok(Bitvector::from_u64(self.count_ones() as u64)
                 .into_truncate(width)
                 .unwrap()),
+            CastOpType::LzCount => Ok(Bitvector::from_u64(self.leading_zeros() as u64)
+                .into_truncate(width)
+                .unwrap()),
         }
     }
 

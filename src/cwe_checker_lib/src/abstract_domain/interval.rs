@@ -667,7 +667,7 @@ impl RegisterDomain for IntervalDomain {
                 self.clone().sign_extend(width)
             }
             Float2Float | Int2Float | Trunc => IntervalDomain::new_top(width),
-            PopCount => {
+            PopCount | LzCount => {
                 if let Ok(bitvec) = self.try_to_bitvec() {
                     bitvec.cast(kind, width).unwrap().into()
                 } else {

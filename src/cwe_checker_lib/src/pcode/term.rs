@@ -166,7 +166,7 @@ impl Def {
                 size: target_var.size,
                 arg: Box::new(self.rhs.input0.unwrap().into()),
             },
-            INT_ZEXT | INT_SEXT | INT2FLOAT | FLOAT2FLOAT | TRUNC | POPCOUNT => {
+            INT_ZEXT | INT_SEXT | INT2FLOAT | FLOAT2FLOAT | TRUNC | POPCOUNT | LZCOUNT => {
                 IrExpression::Cast {
                     op: self.rhs.mnemonic.into(),
                     size: target_var.size,
