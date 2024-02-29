@@ -33,7 +33,7 @@ and read the [check-specific documentation](crate::checkers) for more details ab
 There is _experimental_ support for the analysis of Linux loadable kernel modules
 (LKMs). *cwe_checker* will recognize if you pass an LKM and will execute a
 subset of the CWE checks available for user-space programs. Analyses are
-configurable via a separate [configuration file](../../../src/lkm_config.json).
+configurable via a separate configuration file at `src/lkm_config.json`.
 
 ## For bare-metal binaries
 
