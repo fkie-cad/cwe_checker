@@ -100,14 +100,6 @@ fn run_with_ghidra(args: &CmdlineArgs) -> Result<(), Error> {
         return Ok(());
     }
 
-    // Get the configuration file
-    let config: serde_json::Value = if let Some(ref config_path) = args.config {
-        let file = std::io::BufReader::new(std::fs::File::open(config_path).unwrap());
-        serde_json::from_reader(file).context("Parsing of the configuration file failed")?
-    } else {
-        read_config_file("config.json")?
-    };
-
     // Get the bare metal configuration file if it is provided
     let bare_metal_config_opt: Option<BareMetalConfig> =
         args.bare_metal_config.as_ref().map(|config_path| {
@@ -116,18 +108,31 @@ fn run_with_ghidra(args: &CmdlineArgs) -> Result<(), Error> {
                 .expect("Parsing of the bare metal configuration file failed")
         });
 
-    // Filter the modules to be executed if the `--partial` parameter is set.
+    let binary_file_path = PathBuf::from(args.binary.clone().unwrap());
+
+    let (binary, project, mut all_logs) =
+        disassemble_binary(&binary_file_path, bare_metal_config_opt, args.verbose)?;
+
+    // Filter the modules to be executed.
     if let Some(ref partial_module_list) = args.partial {
         filter_modules_for_partial_run(&mut modules, partial_module_list);
+    } else if project.runtime_memory_image.is_lkm {
+        modules.retain(|module| cwe_checker_lib::checkers::MODULES_LKM.contains(&module.name));
     } else {
         // TODO: CWE78 is disabled on a standard run for now,
         // because it uses up huge amounts of RAM and computation time on some binaries.
         modules.retain(|module| module.name != "CWE78");
     }
-    let binary_file_path = PathBuf::from(args.binary.clone().unwrap());
 
-    let (binary, project, mut all_logs) =
-        disassemble_binary(&binary_file_path, bare_metal_config_opt, args.verbose)?;
+    // Get the configuration file.
+    let config: serde_json::Value = if let Some(ref config_path) = args.config {
+        let file = std::io::BufReader::new(std::fs::File::open(config_path).unwrap());
+        serde_json::from_reader(file).context("Parsing of the configuration file failed")?
+    } else if project.runtime_memory_image.is_lkm {
+        read_config_file("lkm_config.json")?
+    } else {
+        read_config_file("config.json")?
+    };
 
     // Generate the control flow graph of the program
     let (control_flow_graph, mut logs_graph) = graph::get_program_cfg_with_logs(&project.program);

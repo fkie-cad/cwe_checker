@@ -30,6 +30,11 @@ through the `--config` command line option.
 Start by taking a look at the standard configuration file located at `src/config.json`
 and read the [check-specific documentation](crate::checkers) for more details about each field in the configuration file.
 
+There is _experimental_ support for the analysis of Linux loadable kernel modules
+(LKMs). *cwe_checker* will recognize if you pass an LKM and will execute a
+subset of the CWE checks available for user-space programs. Analyses are
+configurable via a separate configuration file at `src/lkm_config.json`.
+
 ## For bare-metal binaries
 
 The cwe_checker offers experimental support for analyzing bare-metal binaries.

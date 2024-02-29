@@ -70,6 +70,30 @@ pub struct MemorySegment {
 }
 
 impl MemorySegment {
+    /// Generate a segment from a section header of a relocatable ELF object
+    /// file.
+    pub fn from_elf_section(
+        binary: &[u8],
+        base_address: u64,
+        section_header: &elf::SectionHeader,
+    ) -> Self {
+        let bytes: Vec<u8> = match section_header.file_range() {
+            Some(range) => binary[range].to_vec(),
+            // `SHT_NOBITS`
+            None => vec![0; section_header.sh_size as usize],
+        };
+        let alignment = section_header.sh_addralign.next_power_of_two();
+        Self {
+            bytes,
+            base_address: base_address.next_multiple_of(alignment),
+            // ELF format specification does not allow for Declaration of
+            // sections as non-readable.
+            read_flag: true,
+            write_flag: section_header.is_writable(),
+            execute_flag: section_header.is_executable(),
+        }
+    }
+
     /// Generate a segment from a program header of an ELF file.
     pub fn from_elf_segment(binary: &[u8], program_header: &elf::ProgramHeader) -> MemorySegment {
         let mut bytes: Vec<u8> = binary[program_header.file_range()].to_vec();

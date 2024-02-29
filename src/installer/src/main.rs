@@ -30,12 +30,16 @@ struct GhidraConfig {
     ghidra_path: PathBuf,
 }
 
-/// Copies src/config.json to specified location
+/// Copies the configuration files to the specified location.
 fn copy_config_json(location: &Path) -> Result<()> {
     let repo_dir = env::current_dir().unwrap();
     std::fs::copy(
         repo_dir.join("src/config.json"),
         location.join("config.json"),
+    )?;
+    std::fs::copy(
+        repo_dir.join("src/lkm_config.json"),
+        location.join("lkm_config.json"),
     )?;
     Ok(())
 }

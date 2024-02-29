@@ -11,12 +11,19 @@ test:
 		echo "Acceptance test binaries not found. Please see test/artificial_samples/Readme.md for build instructions."; \
 		exit -1; \
 	fi
+	if [ ! -d "test/lkm_samples/build" ]; then \
+		echo "Acceptance test LKMs not found. Please see test/lkm_samples/Readme.md for build instructions."; \
+		exit -1; \
+	fi
 	cargo test --no-fail-fast -p acceptance_tests_ghidra -- --show-output --ignored --test-threads 1
 
 compile_test_files:
-	cd test/artificial_samples \
+	pushd test/artificial_samples \
 	&& docker build -t cross_compiling . \
-	&& docker run --rm -v $(pwd)/build:/home/cwe/artificial_samples/build cross_compiling sudo /home/cwe/.local/bin/scons
+	&& docker run --rm -v $(pwd)/build:/home/cwe/artificial_samples/build cross_compiling sudo /home/cwe/.local/bin/scons \
+	&& popd \
+	&& pushd test/lkm_samples \
+	&& ./build.sh
 
 codestyle-check:
 	cargo fmt -- --check

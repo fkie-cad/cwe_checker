@@ -22,9 +22,12 @@ jobs:
       - uses: actions/checkout@v3
       - name: Build and run docker image for cross compiling
         run: |
-          cd test/artificial_samples
+          pushd test/artificial_samples
           docker build -t cross_compiling .
           docker run --rm -v $(pwd)/build:/home/cwe/artificial_samples/build cross_compiling sudo python3 -m SCons
+          popd
+          pushd test/lkm_samples
+          ./build.sh
       - uses: actions/setup-java@v1
         with:
           java-version: "17.0.x"
