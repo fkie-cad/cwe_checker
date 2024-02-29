@@ -127,12 +127,12 @@ pub fn mark_skipped_user(test_cases: &mut [CweTestCase], value1: &str, value2: &
     })
 }
 
-fn mark_skipped_closure<F>(test_cases: &mut [CweTestCase], predecate: F)
+fn mark_skipped_closure<F>(test_cases: &mut [CweTestCase], predicate: F)
 where
     F: Fn(&CweTestCase) -> bool,
 {
     for test in test_cases.iter_mut() {
-        if predecate(test) {
+        if predicate(test) {
             test.skipped = true;
         }
     }
