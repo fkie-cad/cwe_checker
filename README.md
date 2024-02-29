@@ -77,7 +77,7 @@ If you modify it, add the command line flag `--config=src/config.json` to tell t
 For information about other available command line flags you can pass the `--help` flag to the *cwe_checker*.
 
 There is _experimental_ support for the analysis of Linux loadable kernel modules
-(LKMs). `cwe_checker` will recognize if you pass an LKM and will execute a
+(LKMs). *cwe_checker* will recognize if you pass an LKM and will execute a
 subset of the CWE checks available for user-space programs. Analyses are
 configurable via a separate [configuration file](src/lkm_config.json).
 
