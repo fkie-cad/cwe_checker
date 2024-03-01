@@ -1,6 +1,7 @@
 use super::{Blk, ExternSymbol, Sub};
 use crate::prelude::*;
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt;
 
 /// The `Program` structure represents a disassembled binary.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
@@ -47,5 +48,36 @@ impl Program {
             }
         }
         None
+    }
+}
+
+impl fmt::Display for Program {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for Term { tid, term: sub } in self.subs.values() {
+            writeln!(
+                f,
+                "SUB [{}] n:{} e:{}",
+                tid,
+                sub.name,
+                if self.entry_points.contains(tid) {
+                    1
+                } else {
+                    0
+                }
+            )?;
+            for Term { tid, term: blk } in sub.blocks.iter() {
+                writeln!(f, "  BLK [{}]", tid)?;
+                for Term { tid, term: def } in blk.defs.iter() {
+                    writeln!(f, "    DEF [{}] {}", tid, def)?;
+                }
+                for Term { tid, term: jmp } in blk.jmps.iter() {
+                    writeln!(f, "    JMP [{}] {}", tid, jmp)?;
+                }
+            }
+        }
+        for ext in self.extern_symbols.values() {
+            writeln!(f, "EXT {}", ext)?;
+        }
+        Ok(())
     }
 }
