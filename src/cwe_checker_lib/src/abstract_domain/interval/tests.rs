@@ -664,5 +664,11 @@ fn lzcount_op() {
     // Test result for non-exact interval
     let interval: IntervalDomain = Interval::mock(3, 53).with_stride(5).into();
     let result = interval.cast(CastOpType::LzCount, ByteSize::new(8));
+    assert_eq!(result, Interval::mock(58, 62).into());
+    let interval: IntervalDomain = Interval::mock(-1, 1).into();
+    let result = interval.cast(CastOpType::LzCount, ByteSize::new(8));
     assert_eq!(result, Interval::mock(0, 64).into());
+    let interval: IntervalDomain = Interval::mock(-10, -4).into();
+    let result = interval.cast(CastOpType::LzCount, ByteSize::new(8));
+    assert_eq!(result, Interval::mock(0, 0).into());
 }

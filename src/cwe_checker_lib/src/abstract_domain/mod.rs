@@ -129,7 +129,7 @@ pub trait TryToInterval {
     fn try_to_interval(&self) -> Result<Interval, Error>;
 
     /// If `self` represents an interval of absolute values (or can be widened to represent such an interval)
-    /// then return it as an interval of signed integers if the interval is bounded.
+    /// then return it as an interval of signed integers of the form `(start, end)` if the interval is bounded.
     /// Else return an error.
     /// Note that the conversion loses information about the bytesize of the values contained in the interval.
     fn try_to_offset_interval(&self) -> Result<(i64, i64), Error> {

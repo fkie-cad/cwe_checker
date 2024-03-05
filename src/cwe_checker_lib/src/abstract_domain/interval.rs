@@ -667,9 +667,36 @@ impl RegisterDomain for IntervalDomain {
                 self.clone().sign_extend(width)
             }
             Float2Float | Int2Float | Trunc => IntervalDomain::new_top(width),
-            PopCount | LzCount => {
+            PopCount => {
                 if let Ok(bitvec) = self.try_to_bitvec() {
                     bitvec.cast(kind, width).unwrap().into()
+                } else {
+                    IntervalDomain::new(
+                        Bitvector::zero(width.into()),
+                        Bitvector::from_u64(self.bytesize().as_bit_length() as u64)
+                            .into_truncate(width)
+                            .unwrap(),
+                    )
+                }
+            }
+            LzCount => {
+                if let Ok(interval) = self.try_to_interval() {
+                    let start_lz = interval.start.leading_zeros() as u64;
+                    let end_lz = interval.end.leading_zeros() as u64;
+                    // "leading zeroes" is monotonically decreasing for non-negative numbers.
+                    if start_lz >= end_lz {
+                        IntervalDomain::new(
+                            Bitvector::from_u64(end_lz).into_zero_resize(width),
+                            Bitvector::from_u64(start_lz).into_zero_resize(width),
+                        )
+                    } else {
+                        IntervalDomain::new(
+                            Bitvector::zero(width.into()),
+                            Bitvector::from_u64(self.bytesize().as_bit_length() as u64)
+                                .into_truncate(width)
+                                .unwrap(),
+                        )
+                    }
                 } else {
                     IntervalDomain::new(
                         Bitvector::zero(width.into()),
