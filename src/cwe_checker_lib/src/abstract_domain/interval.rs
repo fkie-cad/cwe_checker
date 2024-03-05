@@ -674,8 +674,7 @@ impl RegisterDomain for IntervalDomain {
                     IntervalDomain::new(
                         Bitvector::zero(width.into()),
                         Bitvector::from_u64(self.bytesize().as_bit_length() as u64)
-                            .into_truncate(width)
-                            .unwrap(),
+                            .into_zero_resize(width),
                     )
                 }
             }
@@ -693,16 +692,14 @@ impl RegisterDomain for IntervalDomain {
                         IntervalDomain::new(
                             Bitvector::zero(width.into()),
                             Bitvector::from_u64(self.bytesize().as_bit_length() as u64)
-                                .into_truncate(width)
-                                .unwrap(),
+                                .into_zero_resize(width),
                         )
                     }
                 } else {
                     IntervalDomain::new(
                         Bitvector::zero(width.into()),
                         Bitvector::from_u64(self.bytesize().as_bit_length() as u64)
-                            .into_truncate(width)
-                            .unwrap(),
+                            .into_zero_resize(width),
                     )
                 }
             }
