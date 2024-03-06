@@ -128,6 +128,7 @@ pub enum CastOpType {
     Float2Float,
     Trunc,
     PopCount,
+    LzCount,
 }
 
 /// The type/mnemonic of an unary operation

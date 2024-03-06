@@ -58,9 +58,12 @@ impl BitvectorExtended for Bitvector {
             CastOpType::Int2Float | CastOpType::Float2Float | CastOpType::Trunc => {
                 Err(anyhow!("Float operations not yet implemented"))
             }
-            CastOpType::PopCount => Ok(Bitvector::from_u64(self.count_ones() as u64)
-                .into_truncate(width)
-                .unwrap()),
+            CastOpType::PopCount => {
+                Ok(Bitvector::from_u64(self.count_ones() as u64).into_resize_unsigned(width))
+            }
+            CastOpType::LzCount => {
+                Ok(Bitvector::from_u64(self.leading_zeros() as u64).into_resize_unsigned(width))
+            }
         }
     }
 

@@ -245,7 +245,16 @@ pub mod tests {
         assert_eq!(
             BitvectorDomain::Value(bitvec!("-1:4")).cast(PopCount, ByteSize::new(8)),
             bv(32)
-        )
+        );
+
+        assert_eq!(
+            BitvectorDomain::Value(bitvec!("-1:4")).cast(LzCount, ByteSize::new(8)),
+            bv(0)
+        );
+        assert_eq!(
+            BitvectorDomain::Value(bitvec!("0:4")).cast(LzCount, ByteSize::new(8)),
+            bv(32)
+        );
     }
 
     #[test]
