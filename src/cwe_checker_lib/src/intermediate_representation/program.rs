@@ -56,13 +56,13 @@ impl fmt::Display for Program {
         for Term { tid, term: sub } in self.subs.values() {
             writeln!(
                 f,
-                "SUB [{}] n:{} e:{}",
+                "SUB [{}] name:{} entry:{}",
                 tid,
                 sub.name,
                 if self.entry_points.contains(tid) {
-                    1
+                    "yes"
                 } else {
-                    0
+                    "no"
                 }
             )?;
             for Term { tid, term: blk } in sub.blocks.iter() {

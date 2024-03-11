@@ -154,9 +154,9 @@ impl ExternSymbol {
 
 impl fmt::Display for ExternSymbol {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "[{}] n:{}", self.tid, self.name)?;
+        write!(f, "[{}] name:{}", self.tid, self.name)?;
         for addr in self.addresses.iter() {
-            write!(f, " a:{}", addr)?;
+            write!(f, " address:{}", addr)?;
         }
         Ok(())
     }
