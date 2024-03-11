@@ -1,5 +1,6 @@
 use super::{Blk, Datatype, Expression, Project, Variable};
 use crate::prelude::*;
+use std::fmt;
 
 /// A `Sub` or subroutine represents a function with a given name and a list of basic blocks belonging to it.
 ///
@@ -148,6 +149,16 @@ impl ExternSymbol {
     /// Get the calling convention corresponding to the extern symbol.
     pub fn get_calling_convention<'a>(&self, project: &'a Project) -> &'a CallingConvention {
         project.get_calling_convention(self)
+    }
+}
+
+impl fmt::Display for ExternSymbol {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}] name:{}", self.tid, self.name)?;
+        for addr in self.addresses.iter() {
+            write!(f, " address:{}", addr)?;
+        }
+        Ok(())
     }
 }
 
