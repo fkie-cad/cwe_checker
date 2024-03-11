@@ -71,11 +71,11 @@ impl Term<Blk> {
 
 impl fmt::Display for Blk {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for def in self.defs.iter() {
-            writeln!(f, "{}: {}", def.tid, def.term)?;
+        for Term { tid, term: def } in self.defs.iter() {
+            writeln!(f, "DEF [{}] {}", tid, def)?;
         }
-        for jmp in self.jmps.iter() {
-            writeln!(f, "{}: {}", jmp.tid, jmp.term)?;
+        for Term { tid, term: jmp } in self.jmps.iter() {
+            writeln!(f, "JMP [{}] {}", tid, jmp)?;
         }
         Ok(())
     }
