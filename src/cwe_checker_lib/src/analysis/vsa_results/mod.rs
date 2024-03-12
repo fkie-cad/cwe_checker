@@ -5,6 +5,19 @@ use crate::abstract_domain::AbstractLocation;
 use crate::intermediate_representation::{Arg, Expression};
 use crate::prelude::*;
 
+/// Trait for types that provide access to results of the value set analysis.
+///
+/// The generic type parameter can be used to implement this trait multiple
+/// times, i.e., the same type can  provide access to VSA results with
+/// different value domains.
+pub trait HasVsaResult<T> {
+    /// Converts a reference to `Self` into a reference to a type that implements
+    /// [`VsaResult`] with [`ValueDomain`] `T`.
+    ///
+    /// [`ValueDomain`]: VsaResult::ValueDomain
+    fn vsa_result(&self) -> &impl VsaResult<ValueDomain = T>;
+}
+
 /// A trait providing an interface for accessing the results of a value set analysis.
 /// Note that the returned values may be any type of information associated with values at certain program points,
 /// i.e. the trait can also be used for other analyses than just value set analyses.
