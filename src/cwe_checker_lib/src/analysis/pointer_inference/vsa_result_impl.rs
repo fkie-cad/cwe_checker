@@ -1,4 +1,5 @@
 use super::*;
+use crate::analysis::graph::NodeIndex;
 use crate::{abstract_domain::AbstractLocation, analysis::vsa_results::VsaResult};
 
 /// Implementation of the [`VsaResult`] trait for providing other analyses with an easy-to-use interface
@@ -40,5 +41,13 @@ impl<'a> VsaResult for PointerInference<'a> {
         let state = self.states_at_tids.get(jmp_tid)?;
         let context = self.computation.get_context().get_context();
         Some(state.eval_abstract_location(parameter, &context.project.runtime_memory_image))
+    }
+
+    fn eval_at_node(&self, node: NodeIndex, expression: &Expression) -> Option<Data> {
+        if let NodeValue::Value(state) = self.get_node_value(node)? {
+            Some(state.eval(expression))
+        } else {
+            None
+        }
     }
 }

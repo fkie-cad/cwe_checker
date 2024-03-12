@@ -45,8 +45,10 @@
 use crate::intermediate_representation::*;
 use crate::prelude::*;
 use crate::utils::log::LogMessage;
-use petgraph::graph::{DiGraph, NodeIndex};
+use petgraph::graph::DiGraph;
 use std::collections::{HashMap, HashSet};
+
+pub use petgraph::graph::NodeIndex;
 
 /// The graph type of an interprocedural control flow graph
 pub type Graph<'a> = DiGraph<Node<'a>, Edge<'a>>;

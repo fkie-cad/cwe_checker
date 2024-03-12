@@ -2,6 +2,7 @@
 //! which defines an interface for the results of analyses similar to a value set analysis.
 
 use crate::abstract_domain::AbstractLocation;
+use crate::analysis::graph::NodeIndex;
 use crate::intermediate_representation::{Arg, Expression};
 use crate::prelude::*;
 
@@ -51,4 +52,8 @@ pub trait VsaResult {
 
     /// Evaluate the value of the given expression at the given jump instruction.
     fn eval_at_jmp(&self, jmp_tid: &Tid, expression: &Expression) -> Option<Self::ValueDomain>;
+
+    /// Evaluate the given expression at the given node of the graph that the
+    /// value set analysis was computed on.
+    fn eval_at_node(&self, node: NodeIndex, expression: &Expression) -> Option<Self::ValueDomain>;
 }
