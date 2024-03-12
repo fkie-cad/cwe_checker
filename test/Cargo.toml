@@ -1,7 +1,7 @@
 [package]
 name = "acceptance_tests_ghidra"
 version = "0.1.0"
-authors = ["Nils-Edvin Enkelmann <firmware-security@fkie.fraunhofer.de>"]
+authors = ["Faunhofer FKIE <firmware-security@fkie.fraunhofer.de>"]
 edition = "2021"
 
 [dependencies]

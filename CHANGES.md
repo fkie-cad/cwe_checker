@@ -1,3 +1,9 @@
+0.9-dev
+===
+
+-   Implemented experimental support for Linux Kernel Modules (PR #441)
+-   Support LZCOUNT P-Code operation (PR #444)
+
 0.8 (2024-02)
 ===
 
