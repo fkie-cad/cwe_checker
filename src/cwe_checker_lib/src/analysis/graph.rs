@@ -51,6 +51,12 @@ use std::collections::{HashMap, HashSet};
 /// The graph type of an interprocedural control flow graph
 pub type Graph<'a> = DiGraph<Node<'a>, Edge<'a>>;
 
+/// Trait for types that provide access to a control flow graph.
+pub trait HasCfg<'a> {
+    /// Returns a reference to the control flow graph managed by this type.
+    fn get_cfg(&self) -> &Graph<'a>;
+}
+
 /// The node type of an interprocedural control flow graph
 ///
 /// Each node carries a pointer to its associated block with it.
