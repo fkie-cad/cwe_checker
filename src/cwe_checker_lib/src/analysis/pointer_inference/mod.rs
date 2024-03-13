@@ -460,8 +460,12 @@ pub fn run<'a>(
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
+    use crate::abstract_domain::AbstractLocation;
+    use crate::analysis::vsa_results::VsaResult;
+    use crate::intermediate_representation::{Arg, Expression, RuntimeMemoryImage, Tid};
+    use crate::ByteSize;
 
     impl<'a> PointerInference<'a> {
         pub fn mock(project: &'a Project) -> PointerInference<'a> {
@@ -489,6 +493,75 @@ mod tests {
 
         pub fn get_mut_states_at_tids(&mut self) -> &mut HashMap<Tid, State> {
             &mut self.states_at_tids
+        }
+    }
+
+    /// Simple placeholder for an object that implements the [`VsaResult`]
+    /// trait.
+    ///
+    /// It always uses the stored `state` to evaluate any given expression.
+    /// When asked to return values or addresses at Defs it always just returns
+    /// the stored `value_at_def` or `address_at_def` members. In general, it
+    /// completely ignores any [`Tid`] you give it as an argument.
+    #[derive(Debug)]
+    pub struct MockVsaResult {
+        state: State,
+        address_at_def: Data,
+        value_at_def: Data,
+        runtime_memory_image: RuntimeMemoryImage,
+    }
+
+    impl MockVsaResult {
+        pub fn new(
+            state: State,
+            address_at_def: Option<Data>,
+            value_at_def: Option<Data>,
+            runtime_memory_image: Option<RuntimeMemoryImage>,
+        ) -> Self {
+            Self {
+                state,
+                address_at_def: address_at_def.unwrap_or(Data::new_empty(ByteSize::new(8))),
+                value_at_def: value_at_def.unwrap_or(Data::new_empty(ByteSize::new(8))),
+                runtime_memory_image: runtime_memory_image
+                    .unwrap_or(RuntimeMemoryImage::empty(true)),
+            }
+        }
+    }
+
+    impl VsaResult for MockVsaResult {
+        type ValueDomain = Data;
+
+        fn eval_address_at_def(&self, _def_tid: &Tid) -> Option<Data> {
+            Some(self.address_at_def.clone())
+        }
+
+        fn eval_value_at_def(&self, _def_tid: &Tid) -> Option<Data> {
+            Some(self.value_at_def.clone())
+        }
+
+        fn eval_at_jmp(&self, _jmp_tid: &Tid, expression: &Expression) -> Option<Data> {
+            Some(self.state.eval(expression))
+        }
+
+        fn eval_parameter_arg_at_call(&self, _jmp_tid: &Tid, parameter: &Arg) -> Option<Data> {
+            self.state
+                .eval_parameter_arg(parameter, &self.runtime_memory_image)
+                .ok()
+        }
+
+        fn eval_parameter_location_at_call(
+            &self,
+            _jmp_tid: &Tid,
+            parameter: &AbstractLocation,
+        ) -> Option<Data> {
+            Some(
+                self.state
+                    .eval_abstract_location(parameter, &self.runtime_memory_image),
+            )
+        }
+
+        fn eval_at_node(&self, _node: NodeIndex, expression: &Expression) -> Option<Data> {
+            Some(self.state.eval(expression))
         }
     }
 }
