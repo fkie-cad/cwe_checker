@@ -73,6 +73,11 @@
   "CWE248": {
     "symbols": []
   },
+  "CWE252": {
+    "symbols": [
+      "fgets"
+    ]
+  },
   "CWE332": {
     "pairs": [
       [
