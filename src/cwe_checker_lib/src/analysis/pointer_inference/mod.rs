@@ -499,10 +499,17 @@ pub mod tests {
     /// Simple placeholder for an object that implements the [`VsaResult`]
     /// trait.
     ///
-    /// It always uses the stored `state` to evaluate any given expression.
-    /// When asked to return values or addresses at Defs it always just returns
-    /// the stored `value_at_def` or `address_at_def` members. In general, it
-    /// completely ignores any [`Tid`] you give it as an argument.
+    /// The [`ValueDomain`] of the VSA is the pointer inference [`Data`] and
+    /// expressions are evaluated based on a fixed pointer inference [`State`]
+    /// that is stored in the `state` member.
+    ///
+    /// When asked to return [`values`] or [`addresses`] at Defs it always just
+    /// returns the stored `value_at_def` or `address_at_def` members. In
+    /// general, it completely ignores any [`Tid`] you give it as an argument.
+    ///
+    /// [`ValueDomain`]: VsaResult::ValueDomain
+    /// [`values`]: VsaResult::eval_value_at_def
+    /// [`addresses`]: VsaResult::eval_address_at_def
     #[derive(Debug)]
     pub struct MockVsaResult {
         state: State,
