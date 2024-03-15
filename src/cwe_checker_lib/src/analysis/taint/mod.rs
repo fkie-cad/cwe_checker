@@ -202,9 +202,12 @@ pub trait TaintAnalysis<'a>: HasCfg<'a> + HasVsaResult<PiData> + AsRef<Project> 
             (Some(state_before_call), None) => {
                 self.update_call_generic(state_before_call, &call_term.tid, calling_convention)
             }
-            (None, Some(state_before_return)) => {
-                self.update_return_callee(state_before_return, call_term, return_term, calling_convention)
-            }
+            (None, Some(state_before_return)) => self.update_return_callee(
+                state_before_return,
+                call_term,
+                return_term,
+                calling_convention,
+            ),
             _ => None,
         }
     }
