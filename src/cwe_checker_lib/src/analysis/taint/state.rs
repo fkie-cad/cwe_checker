@@ -43,11 +43,14 @@ impl<const POINTER_TAINT: bool> AbstractDomain for State<POINTER_TAINT> {
     ///
     /// Any value tainted in at least one input state is also tainted in the
     /// merged state.
-    ///
-    /// The used algorithm for merging the taints contained in memory regions is
-    /// unsound when merging taints that intersect only partially. However, this
-    /// should not have an effect in practice, since these values are usually
-    /// unsound and unused by the program anyway.
+    // FIXME: The used algorithm for merging the taints contained in memory
+    // regions is unsound when merging taints that intersect only partially.
+    // If, for example, in state A `RSP[0:3]` is tainted and in state B
+    // `RSP[2:3]` is tainted, A u B will only report `RSP[2:3]` as tainted.
+    //
+    // For the NULL pointer dereference check, however, this should not have an
+    // effect in practice, since these values are usually unsound or a sign of
+    // incorrect behavior of the analysed program.
     fn merge(&self, other: &Self) -> Self {
         let mut register_taint = self.register_taint.clone();
         for (var, other_taint) in other.register_taint.iter() {
@@ -63,8 +66,8 @@ impl<const POINTER_TAINT: bool> AbstractDomain for State<POINTER_TAINT> {
             if let Some(mem_region) = memory_taint.get_mut(tid) {
                 for (index, taint) in other_mem_region.iter() {
                     mem_region.insert_at_byte_index(*taint, *index);
-                    // Unsound in theory for partially intersecting taints.
-                    // Should not matter in practice.
+                    // FIXME: Unsound in theory for partially intersecting
+                    // taints. Should not matter in practice.
                 }
             } else {
                 memory_taint.insert(tid.clone(), other_mem_region.clone());
