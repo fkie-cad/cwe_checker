@@ -178,7 +178,7 @@ impl<'a> TaintAnalysis<'a> for Context<'a> {
         match &call.term {
             Jmp::Call { target, .. } => {
                 if let Some(sink_symbol) = self.sink_map.get(target) {
-                    if state.check_extern_parameters_for_taint(
+                    if state.check_extern_parameters_for_taint::<true>(
                         self.vsa_result(),
                         sink_symbol,
                         &call.tid,

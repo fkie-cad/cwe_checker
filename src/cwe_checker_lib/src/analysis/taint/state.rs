@@ -19,26 +19,22 @@ use super::Taint;
 
 /// The state object of the taint analysis representing all known tainted memory
 /// and register values at a certain location within the program.
-///
-/// The `POINTER_TAINT` const generic can be used to select if the state should
-/// treat pointers to tainted memory as tainted when analyzing function calls
-/// and returns.
 #[derive(Serialize, Deserialize, Debug, Eq, Clone, Default)]
-pub struct State<const POINTER_TAINT: bool = true> {
+pub struct State {
     /// The set of currently tainted registers.
     register_taint: HashMap<Variable, Taint>,
     /// The Taint contained in memory objects
     memory_taint: HashMap<AbstractIdentifier, MemRegion<Taint>>,
 }
 
-impl<const POINTER_TAINT: bool> PartialEq for State<POINTER_TAINT> {
+impl PartialEq for State {
     /// Two states are equal if the same values are tainted in both states.
     fn eq(&self, other: &Self) -> bool {
         self.register_taint == other.register_taint && self.memory_taint == other.memory_taint
     }
 }
 
-impl<const POINTER_TAINT: bool> AbstractDomain for State<POINTER_TAINT> {
+impl AbstractDomain for State {
     /// Merge two states.
     ///
     /// Any value tainted in at least one input state is also tainted in the
@@ -86,7 +82,7 @@ impl<const POINTER_TAINT: bool> AbstractDomain for State<POINTER_TAINT> {
     }
 }
 
-impl<const POINTER_TAINT: bool> State<POINTER_TAINT> {
+impl State {
     /// Returns an empty state.
     pub fn new_empty() -> Self {
         Self::default()
@@ -255,11 +251,13 @@ impl<const POINTER_TAINT: bool> State<POINTER_TAINT> {
             })
     }
 
-    /// Check if any register in the given register list contains taint (or, if
-    /// `POINTER_TAINT` is selected, points to tainted memory).
+    /// Check if any register in the given register list contains taint.
+    ///
+    /// If `POINTER_TAINT` is selected, pointers to tainted memory are
+    /// considered to be tainted.
     ///
     /// Returns `true` if taint was found and `false` if no taint was found.
-    fn check_register_list_for_taint(
+    fn check_register_list_for_taint<const POINTER_TAINT: bool>(
         &self,
         vsa_result: &impl VsaResult<ValueDomain = PiData>,
         jmp_tid: &Tid,
@@ -280,8 +278,10 @@ impl<const POINTER_TAINT: bool> State<POINTER_TAINT> {
     }
 
     /// Check if a generic function call may contain tainted values in its
-    /// parameters (or, if `POINTER_TAINT` is selected, receives pointers to
-    /// tainted memory).
+    /// arguments.
+    ///
+    /// If `POINTER_TAINT` is selected, pointers to tainted memory are
+    /// considered to be tainted.
     ///
     /// Since we don't know the actual parameters of the call, we approximate
     /// the parameters with all parameter registers of the calling convention of
@@ -290,7 +290,7 @@ impl<const POINTER_TAINT: bool> State<POINTER_TAINT> {
     /// In case no standard calling convention is found. We assume everything
     /// may be parameters or referenced by parameters, i.e., we assume the
     /// parameters of the call are tainted iff there is taint in the state.
-    pub fn check_generic_function_params_for_taint(
+    pub fn check_generic_function_params_for_taint<const POINTER_TAINT: bool>(
         &self,
         vsa_result: &impl VsaResult<ValueDomain = PiData>,
         call_tid: &Tid,
@@ -305,14 +305,20 @@ impl<const POINTER_TAINT: bool> State<POINTER_TAINT> {
                     all_parameters.push(var.clone());
                 }
             }
-            self.check_register_list_for_taint(vsa_result, call_tid, &all_parameters)
+            self.check_register_list_for_taint::<POINTER_TAINT>(
+                vsa_result,
+                call_tid,
+                &all_parameters,
+            )
         } else {
             !self.is_empty()
         }
     }
 
-    /// Check if the return registers may contain tainted values (or, if
-    /// `POINTER_TAINT` is selected, point to tainted memory).
+    /// Check if the return registers may contain tainted values.
+    ///
+    /// If `POINTER_TAINT` is selected, pointers to tainted memory are
+    /// considered to be tainted.
     ///
     /// Since we don't know the actual return registers, we approximate them by
     /// all return registers of the calling convention of the function or of the
@@ -320,7 +326,7 @@ impl<const POINTER_TAINT: bool> State<POINTER_TAINT> {
     ///
     /// If no standard calling convention is found, we assume that everything
     /// may be a return value or referenced by return values.
-    pub fn check_return_values_for_taint(
+    pub fn check_return_values_for_taint<const POINTER_TAINT: bool>(
         &self,
         vsa_result: &impl VsaResult<ValueDomain = PiData>,
         return_tid: &Tid,
@@ -329,7 +335,7 @@ impl<const POINTER_TAINT: bool> State<POINTER_TAINT> {
     ) -> bool {
         if let Some(calling_conv) = project.get_specific_calling_convention(calling_convention_hint)
         {
-            self.check_register_list_for_taint(
+            self.check_register_list_for_taint::<POINTER_TAINT>(
                 vsa_result,
                 return_tid,
                 &calling_conv.integer_return_register[..],
@@ -363,7 +369,7 @@ impl<const POINTER_TAINT: bool> State<POINTER_TAINT> {
     ///
     /// If `POINTER_TAINT` is selected, we also return true if a pointer to
     /// tainted memory is passed as an argument.
-    pub fn check_extern_parameters_for_taint(
+    pub fn check_extern_parameters_for_taint<const POINTER_TAINT: bool>(
         &self,
         vsa_result: &impl VsaResult<ValueDomain = PiData>,
         extern_symbol: &ExternSymbol,
@@ -553,12 +559,60 @@ mod tests {
     }
 
     #[test]
-    fn check_extern_parameter_for_taint() {
-        let (mut state, pi_state) = State::mock_with_pi_state();
-        let vsa_results = MockVsaResult::new(pi_state, None, None, None);
+    fn check_register_list_for_taint() {
+        let (mut state, mut pi_state) = State::mock_with_pi_state();
+        let mut vsa_results = MockVsaResult::new(pi_state.clone(), None, None, None);
+        let taint = Taint::Tainted(ByteSize::new(8));
+        let untainted = Taint::Top(ByteSize::new(8));
+        let (rdi, rsi, rdx) = (variable!("RDI:8"), variable!("RSI:8"), variable!("RDX:8"));
+        let address = new_pointer("mem", 10);
+        let tid = Tid::new("foo".to_string());
+
+        state.save_taint_to_memory(&address, taint);
+        state.set_register_taint(&rdi, untainted);
+        state.set_register_taint(&rsi, untainted);
+        state.set_register_taint(&rdx, untainted);
+        let register_list = [rdi.clone(), rsi, rdx];
 
         assert_eq!(
-            state.check_extern_parameters_for_taint(
+            state.check_register_list_for_taint::<true>(&vsa_results, &tid, &register_list),
+            false
+        );
+        assert_eq!(
+            state.check_register_list_for_taint::<false>(&vsa_results, &tid, &register_list),
+            false
+        );
+
+        state.set_register_taint(&rdi, taint);
+        assert_eq!(
+            state.check_register_list_for_taint::<true>(&vsa_results, &tid, &register_list),
+            true
+        );
+        assert_eq!(
+            state.check_register_list_for_taint::<false>(&vsa_results, &tid, &register_list),
+            true
+        );
+
+        state.set_register_taint(&rdi, untainted);
+        pi_state.set_register(&rdi, address);
+        vsa_results.set_state(pi_state.clone());
+        assert_eq!(
+            state.check_register_list_for_taint::<true>(&vsa_results, &tid, &register_list),
+            true
+        );
+        assert_eq!(
+            state.check_register_list_for_taint::<false>(&vsa_results, &tid, &register_list),
+            false
+        );
+    }
+
+    #[test]
+    fn check_extern_parameter_for_taint() {
+        let (mut state, mut pi_state) = State::mock_with_pi_state();
+        let mut vsa_results = MockVsaResult::new(pi_state.clone(), None, None, None);
+
+        assert_eq!(
+            state.check_extern_parameters_for_taint::<true>(
                 &vsa_results,
                 &ExternSymbol::mock_x64("mock_symbol"),
                 &Tid::new("call".to_string()),
@@ -568,12 +622,44 @@ mod tests {
 
         state.set_register_taint(&variable!("RDI:8"), Taint::Tainted(ByteSize::new(8)));
         assert_eq!(
-            state.check_extern_parameters_for_taint(
+            state.check_extern_parameters_for_taint::<true>(
                 &vsa_results,
                 &ExternSymbol::mock_x64("mock_symbol"),
                 &Tid::new("call".to_string()),
             ),
             true
+        );
+
+        let taint = Taint::Tainted(ByteSize::new(8));
+        let address = new_pointer("mem", 10);
+        state.save_taint_to_memory(&address, taint);
+        state.set_register_taint(&variable!("RDI:8"), Taint::Top(ByteSize::new(8)));
+        assert_eq!(
+            state.check_extern_parameters_for_taint::<true>(
+                &vsa_results,
+                &ExternSymbol::mock_x64("mock_symbol"),
+                &Tid::new("call".to_string()),
+            ),
+            false
+        );
+
+        pi_state.set_register(&variable!("RDI:8"), address);
+        vsa_results.set_state(pi_state.clone());
+        assert_eq!(
+            state.check_extern_parameters_for_taint::<true>(
+                &vsa_results,
+                &ExternSymbol::mock_x64("mock_symbol"),
+                &Tid::new("call".to_string()),
+            ),
+            true
+        );
+        assert_eq!(
+            state.check_extern_parameters_for_taint::<false>(
+                &vsa_results,
+                &ExternSymbol::mock_x64("mock_symbol"),
+                &Tid::new("call".to_string()),
+            ),
+            false
         );
     }
 }

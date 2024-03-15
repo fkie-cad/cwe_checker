@@ -533,6 +533,10 @@ pub mod tests {
                     .unwrap_or(RuntimeMemoryImage::empty(true)),
             }
         }
+
+        pub fn set_state(&mut self, new_state: State) {
+            self.state = new_state
+        }
     }
 
     impl VsaResult for MockVsaResult {

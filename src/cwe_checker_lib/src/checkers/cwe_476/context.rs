@@ -83,7 +83,7 @@ impl<'a> TaintAnalysis<'a> for Context<'a> {
         call_tid: &Tid,
         calling_convention_hint: &Option<String>,
     ) -> Option<TaState> {
-        if state.check_generic_function_params_for_taint(
+        if state.check_generic_function_params_for_taint::<true>(
             self.vsa_result(),
             call_tid,
             self.project,
@@ -115,7 +115,7 @@ impl<'a> TaintAnalysis<'a> for Context<'a> {
         _target: &CfgNode,
         calling_convention: &Option<String>,
     ) -> Option<TaState> {
-        if state.check_generic_function_params_for_taint(
+        if state.check_generic_function_params_for_taint::<true>(
             self.vsa_result(),
             &call.tid,
             self.project,
@@ -144,7 +144,7 @@ impl<'a> TaintAnalysis<'a> for Context<'a> {
                     .get(target)
                     .expect("Extern symbol not found.");
 
-                if state.check_extern_parameters_for_taint(
+                if state.check_extern_parameters_for_taint::<true>(
                     self.vsa_result(),
                     extern_symbol,
                     &call.tid,
@@ -220,7 +220,7 @@ impl<'a> TaintAnalysis<'a> for Context<'a> {
         return_term: &Term<Jmp>,
         calling_convention: &Option<String>,
     ) {
-        if state.check_return_values_for_taint(
+        if state.check_return_values_for_taint::<true>(
             self.vsa_result(),
             &return_term.tid,
             self.project,
