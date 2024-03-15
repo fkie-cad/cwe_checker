@@ -6,11 +6,14 @@ use crate::analysis::graph::NodeIndex;
 use crate::intermediate_representation::{Arg, Expression};
 use crate::prelude::*;
 
-/// Trait for types that provide access to results of the value set analysis.
+/// Trait for types that provide access to the result of a value set analysis.
 ///
 /// The generic type parameter can be used to implement this trait multiple
 /// times, i.e., the same type can  provide access to VSA results with
 /// different value domains.
+// NOTE: We can not implement `AsRef` on the type instead since `impl Trait` is
+// only allowed in function parameters and return types, not generic type
+// parameters or trait bounds.
 pub trait HasVsaResult<T> {
     /// Converts a reference to `Self` into a reference to a type that implements
     /// [`VsaResult`] with [`ValueDomain`] `T`.
