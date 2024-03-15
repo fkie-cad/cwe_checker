@@ -445,6 +445,7 @@ mod tests {
         use crate::intermediate_representation::*;
 
         let taint = Taint::Tainted(ByteSize::new(4));
+        let taint_8 = Taint::Tainted(ByteSize::new(8));
         let top = Taint::Top(ByteSize::new(4));
 
         assert_eq!(taint.bin_op(BinOpType::IntAdd, &top), taint);
@@ -452,7 +453,7 @@ mod tests {
         assert_eq!(taint.un_op(UnOpType::FloatFloor), taint);
         assert_eq!(taint.subpiece(ByteSize::new(0), ByteSize::new(4)), taint);
         assert_eq!(top.cast(CastOpType::IntZExt, ByteSize::new(4)), top);
-        assert_ne!(taint.cast(CastOpType::LzCount, ByteSize::new(8)), taint);
+        assert_eq!(taint.cast(CastOpType::LzCount, ByteSize::new(8)), taint_8);
         assert_eq!(taint.cast(CastOpType::LzCount, ByteSize::new(4)), taint);
     }
 
