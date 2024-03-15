@@ -23,7 +23,7 @@ use super::Taint;
 /// The `POINTER_TAINT` const generic can be used to select if the state should
 /// treat pointers to tainted memory as tainted when analyzing function calls
 /// and returns.
-#[derive(Serialize, Deserialize, Debug, Eq, Clone)]
+#[derive(Serialize, Deserialize, Debug, Eq, Clone, Default)]
 pub struct State<const POINTER_TAINT: bool = true> {
     /// The set of currently tainted registers.
     register_taint: HashMap<Variable, Taint>,
@@ -84,9 +84,16 @@ impl<const POINTER_TAINT: bool> AbstractDomain for State<POINTER_TAINT> {
 }
 
 impl<const POINTER_TAINT: bool> State<POINTER_TAINT> {
+    /// Returns an empty state.
+    pub fn new_empty() -> Self {
+        Self::default()
+    }
+
+    /// Returns a state where only return values of the extern call are tainted.
+    ///
     /// Get a new state in which only the return values of the given call to an
     /// extern symbol are tainted.
-    pub fn new(
+    pub fn new_return(
         taint_source: &ExternSymbol,
         vsa_result: &impl VsaResult<ValueDomain = PiData>,
         return_node: NodeIndex,
@@ -464,7 +471,7 @@ mod tests {
             let pi_state = PiState::new(&variable!("RSP:8"), Tid::new("func"), BTreeSet::new());
             let vsa_result = MockVsaResult::new(pi_state.clone(), None, None, None);
 
-            let state = State::new(&symbol, &vsa_result, NodeIndex::new(42));
+            let state = State::new_return(&symbol, &vsa_result, NodeIndex::new(42));
 
             (state, pi_state)
         }

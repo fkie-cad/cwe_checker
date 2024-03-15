@@ -112,7 +112,7 @@ pub fn check_cwe(
         let mut computation = create_computation(context, None);
         computation.set_node_value(
             return_node,
-            NodeValue::Value(TaState::new(symbol, pi_result, return_node)),
+            NodeValue::Value(TaState::new_return(symbol, pi_result, return_node)),
         );
         computation.compute_with_max_steps(100);
     }

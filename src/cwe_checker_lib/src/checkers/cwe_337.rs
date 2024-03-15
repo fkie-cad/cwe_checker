@@ -102,7 +102,7 @@ pub fn check_cwe(
 
         computation.set_node_value(
             return_node,
-            NodeValue::Value(TaState::new(symbol, pi_result, return_node)),
+            NodeValue::Value(TaState::new_return(symbol, pi_result, return_node)),
         );
     }
 
