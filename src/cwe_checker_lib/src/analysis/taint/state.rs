@@ -430,7 +430,6 @@ impl State {
     }
 }
 
-// TODO: Fix tests!
 #[cfg(test)]
 mod tests {
     use super::*;
