@@ -1,4 +1,15 @@
 //! Taint Analysis.
+//!
+//! This module provides general-purpose infrastructure for performing inter- or
+//! intraprocedural Taint Analyses. In general, a Taint Analysis is a special
+//! case of a forward "may" data flow analysis, where "may" means that merging
+//! of flows is performed by taking unions, i.e., a value is tainted at a point
+//! P iff there *some* flow to P where it is tainted.
+// NOTE: Should we allow other merge strategies?
+//!
+//! A user defines the specific *instance* of a Taint Analyses that they want to
+//! perform by implementing the [`TaintAnalysis`] trait. See its documentation
+//! for further information.
 
 use crate::abstract_domain::{AbstractDomain, HasTop, RegisterDomain, SizedDomain};
 use crate::analysis::graph::Node as CfgNode;
@@ -17,21 +28,21 @@ pub mod state;
 
 use state::State;
 
-/// Trait representing the definition of a taint analysis.
+/// Trait representing the definition of a Taint Analysis.
 ///
-/// Taken together, these callbacks define the transfer function of the taint
-/// analysis. Individual callbacks define the transfer functions for the
+/// Taken together, these callbacks define the transfer function of the Taint
+/// Analysis. Individual callbacks define the transfer functions for the
 /// different kinds of statements that can occur in the intermediate
 /// representation.
 ///
 /// The property space of this analysis is the [`State`] type, it represents the
-/// taint information we have about partial point in the program.
+/// taint information we have about particular point in the program.
 ///
 /// # Default Implementations
 ///
-/// Many callbacks have default implementations that contains a behavior common
+/// Many callbacks have default implementations that contain a behavior common
 /// to many taint analyses. However, you almost certainly want to override some
-/// of them to implement the custom logic of you analysis.
+/// of them to implement the custom logic of your analysis.
 pub trait TaintAnalysis<'a>: HasCfg<'a> + HasVsaResult<PiData> + AsRef<Project> {
     /// Update taint state on a function call without further target information.
     ///
