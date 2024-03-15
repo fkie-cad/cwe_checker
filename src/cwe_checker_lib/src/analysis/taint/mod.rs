@@ -465,7 +465,7 @@ mod tests {
     impl<'a> HasCfg<'a> for TestContext<'a> {
         fn get_cfg(&self) -> &Cfg<'a> {
             // Should not be called.
-            todo!()
+            panic!()
         }
     }
 
