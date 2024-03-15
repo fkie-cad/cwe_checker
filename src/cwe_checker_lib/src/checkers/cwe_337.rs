@@ -84,6 +84,13 @@ pub fn check_cwe(
         pi_result,
         control_flow_graph: graph,
         sink_map,
+        extern_symbol_map: project
+            .program
+            .term
+            .extern_symbols
+            .iter()
+            .map(|(tid, sym)| (tid.clone(), sym))
+            .collect(),
         cwe_collector: cwe_sender,
     };
     let mut computation = create_computation(context, None);
@@ -131,6 +138,8 @@ pub struct Context<'a> {
     control_flow_graph: &'a Graph<'a>,
     /// A map of symbols to use as sinks for the algorithm.
     sink_map: HashMap<Tid, &'a ExternSymbol>,
+    /// Maps the TID of an extern symbol to the extern symbol struct.
+    extern_symbol_map: HashMap<Tid, &'a ExternSymbol>,
     /// A channel where found CWE hits can be sent to.
     cwe_collector: crossbeam_channel::Sender<CweWarning>,
 }
@@ -178,18 +187,15 @@ impl<'a> TaintAnalysis<'a> for Context<'a> {
 
                         None
                     } else {
-                        let mut new_state = state.clone();
-
-                        new_state.remove_non_callee_saved_taint(
-                            self.project.get_calling_convention(sink_symbol),
-                        );
-
-                        Some(new_state)
+                        Some(self.update_extern_symbol(state, sink_symbol))
                     }
                 } else {
-                    // FIXME: We could do better here if we would have access to
-                    // all extern symbols.
-                    self.update_call_generic(state, &call.tid, &None)
+                    let extern_symbol = self
+                        .extern_symbol_map
+                        .get(target)
+                        .expect("Extern symbol not found.");
+
+                    Some(self.update_extern_symbol(state, extern_symbol))
                 }
             }
             Jmp::CallInd { .. } => self.update_call_generic(state, &call.tid, &None),
@@ -199,6 +205,17 @@ impl<'a> TaintAnalysis<'a> for Context<'a> {
 }
 
 impl<'a> Context<'a> {
+    /// Transition function for calls to external functions that do not
+    /// trigger a CWE warning, i.e., its not a sink function or no taint is in
+    /// the arguments.
+    fn update_extern_symbol(&self, state: &TaState, extern_symbol: &ExternSymbol) -> TaState {
+        let mut new_state = state.clone();
+
+        new_state.remove_non_callee_saved_taint(self.project.get_calling_convention(extern_symbol));
+
+        new_state
+    }
+
     fn generate_cwe_warning(&self, sink_call: &Term<Jmp>, sink_symbol: &ExternSymbol) {
         let cwe_warning = CweWarning::new(
             CWE_MODULE.name,
