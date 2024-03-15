@@ -19,7 +19,7 @@ use super::Taint;
 
 /// The state object of the taint analysis representing all known tainted memory
 /// and register values at a certain location within the program.
-#[derive(Serialize, Deserialize, Debug, Eq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Eq, Clone)]
 pub struct State {
     /// The set of currently tainted registers.
     register_taint: HashMap<Variable, Taint>,
@@ -85,7 +85,12 @@ impl AbstractDomain for State {
 impl State {
     /// Returns an empty state.
     pub fn new_empty() -> Self {
-        Self::default()
+        // Using capacity zero guarantees that the implementation will not
+        // allocate. Do that to keep the cost of creating a new state low.
+        Self {
+            register_taint: HashMap::with_capacity(0),
+            memory_taint: HashMap::with_capacity(0),
+        }
     }
 
     /// Returns a state where only return values of the extern call are tainted.

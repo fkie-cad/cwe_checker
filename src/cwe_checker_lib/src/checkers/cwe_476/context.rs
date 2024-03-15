@@ -91,6 +91,7 @@ impl<'a> TaintAnalysis<'a> for Context<'a> {
         ) {
             self.generate_cwe_warning(call_tid);
 
+            // Stop taint propagation to suppress futher warnings.
             None
         } else {
             let mut new_state = state.clone();
@@ -213,13 +214,13 @@ impl<'a> TaintAnalysis<'a> for Context<'a> {
     /// We assume that returning a tainted value means that the function may
     /// return a NULL pointer. This always generates a warning, even if this may
     /// be expected by the caller.
-    fn update_return(
+    fn update_return_callee(
         &self,
         state: &TaState,
         _call_term: &Term<Jmp>,
         return_term: &Term<Jmp>,
         calling_convention: &Option<String>,
-    ) {
+    ) -> Option<TaState> {
         if state.check_return_values_for_taint::<true>(
             self.vsa_result(),
             &return_term.tid,
@@ -228,6 +229,10 @@ impl<'a> TaintAnalysis<'a> for Context<'a> {
         ) {
             self.generate_cwe_warning(&return_term.tid);
         }
+
+        // Keep analysis intraprocedural but do not force propagation to be
+        // stopped in the caller.
+        Some(TaState::new_empty())
     }
 
     /// Generate a CWE warning if the Def was a load/store through a tainted pointer.

@@ -118,19 +118,95 @@ pub trait TaintAnalysis<'a>: HasCfg<'a> + HasVsaResult<PiData> + AsRef<Project> 
     /// Corresponds to returns from calls to other functions within the program.
     ///
     /// Only invoked if we have information about the taint state in the called
-    /// subroutine at the time it returns. The `state` parameter corresponds to
-    /// the taint state at the end of the called subroutine.
+    /// subroutine at the time it returns, i.e., we are in the first column of
+    /// the table in [`update_return`]. The `state` parameter corresponds to
+    /// the taint state at the return sites of the called subroutine.
+    ///
+    /// By implementing this method you can perform a limited interprocedural
+    /// taint analysis. If you return `Some(state)`, it may influence the taint
+    /// state in the caller (see the documentation of [`update_return`] for more
+    /// information). If you return `None`, no information will be
+    /// propagated through this call.
+    ///
+    /// The interprocedural analysis capabilities are limited since it is not
+    /// possible to propagate memory taint. It is possible to propagate taint in
+    /// registers.
+    ///
+    /// [`update_return`]: TaintAnalysis::update_return
     ///
     /// # Default
     ///
-    /// Do nothing.
-    fn update_return(
+    /// Returns an empty state, i.e., information is propagated through the call
+    /// but the analysis stays intraprocedural.
+    fn update_return_callee(
         &self,
         _state: &State,
         _call_term: &Term<Jmp>,
         _return_term: &Term<Jmp>,
         _calling_convention: &Option<String>,
-    ) {
+    ) -> Option<State> {
+        Some(State::new_empty())
+    }
+
+    /// Corresponds to returns from calls to other functions within the program.
+    ///
+    /// By implementing this method you can perform interprocedural taint
+    /// analysis. See
+    /// [`forward_interprocedural_fixpoint::Context::update_return`] for more
+    /// information.
+    ///
+    /// # Default
+    ///
+    /// Depending on the availability of `state_before_call` and
+    /// `state_before_return` the return value is computed according to the
+    /// following scheme:
+    ///
+    /// ```table
+    /// | state_before_call/    |                                                       |                     |
+    /// |   state_before_return | Some                                                  | None                |
+    /// |-----------------------|-------------------------------------------------------|---------------------|
+    /// | Some                  | Some(update_call_generic.merge(update_return_callee)) | update_call_generic |
+    /// |                       | IF both are Some ELSE None                            |                     |
+    /// |-----------------------|-------------------------------------------------------|---------------------|
+    /// | None                  | update_return_callee                                  | None                |
+    /// ```
+    fn update_return(
+        &self,
+        state_before_return: Option<&State>,
+        state_before_call: Option<&State>,
+        call_term: &Term<Jmp>,
+        return_term: &Term<Jmp>,
+        calling_convention: &Option<String>,
+    ) -> Option<State> {
+        match (state_before_call, state_before_return) {
+            (Some(state_before_call), Some(state_before_return)) => {
+                let state_from_caller =
+                    self.update_call_generic(state_before_call, &call_term.tid, calling_convention);
+                let state_from_callee = self.update_return_callee(
+                    state_before_return,
+                    call_term,
+                    return_term,
+                    calling_convention,
+                );
+
+                match (state_from_caller, state_from_callee) {
+                    (Some(state_caller), Some(state_callee)) => {
+                        Some(state_caller.merge(&state_callee))
+                    }
+                    // If one implementation indicated that no information
+                    // should be propagated by returning `None` we ignore what
+                    // the other call returned.
+                    _ => None,
+                }
+            }
+            (Some(state_before_call), None) => {
+                self.update_call_generic(state_before_call, &call_term.tid, calling_convention)
+            }
+            (None, Some(state_before_return)) => {
+                self.update_return_callee(state_before_return, call_term, return_term, calling_convention)
+            }
+            _ => None,
+        }
     }
 
     /// Returns the new taint state after an assignment.
@@ -300,21 +376,14 @@ impl<'a, T: TaintAnalysis<'a>> forward_interprocedural_fixpoint::Context<'a> for
         return_term: &Term<Jmp>,
         calling_convention: &Option<String>,
     ) -> Option<State> {
-        if let Some(state) = state_before_return {
-            <Self as TaintAnalysis>::update_return(
-                self,
-                state,
-                call_term,
-                return_term,
-                calling_convention,
-            )
-        }
-
-        if let Some(state) = state_before_call {
-            self.update_call_generic(state, &call_term.tid, calling_convention)
-        } else {
-            None
-        }
+        <Self as TaintAnalysis>::update_return(
+            self,
+            state_before_return,
+            state_before_call,
+            call_term,
+            return_term,
+            calling_convention,
+        )
     }
 }
 
