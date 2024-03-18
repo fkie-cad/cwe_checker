@@ -223,6 +223,14 @@ impl State {
         }
     }
 
+    /// Returns the taint state of the given register.
+    pub fn get_register_taint(&self, register: &Variable) -> Taint {
+        self.register_taint
+            .get(register)
+            .copied()
+            .unwrap_or(Taint::Top(register.size))
+    }
+
     /// Returns true if the memory object with the given ID contains a tainted
     /// value.
     pub fn check_mem_id_for_taint(&self, id: &AbstractIdentifier) -> bool {
@@ -405,7 +413,14 @@ impl State {
 
     /// Check whether `self` contains any taint at all.
     pub fn is_empty(&self) -> bool {
-        !self.has_memory_taint() && self.register_taint.is_empty()
+        !self.has_memory_taint() && !self.has_register_taint()
+    }
+
+    /// Check whether there are any tainted registers in the state.
+    pub fn has_register_taint(&self) -> bool {
+        self.register_taint
+            .iter()
+            .any(|(_, taint)| matches!(*taint, Taint::Tainted(_)))
     }
 
     /// Check whether there is any tainted memory in the state.
