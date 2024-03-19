@@ -3,7 +3,7 @@ name = "cwe_checker"
 version = "0.9.0-dev"
 authors = ["Fraunhofer FKIE <firmware-security@fkie.fraunhofer.de>"]
 edition = "2021"
-rust-version = "1.75"
+rust-version = "1.76"
 
 [dependencies]
 clap = { version = "4.0.32", features = ["derive"] }
