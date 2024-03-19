@@ -12,6 +12,7 @@ use crate::analysis::pointer_inference::Data as PiData;
 use crate::analysis::vsa_results::VsaResult;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
+use crate::utils::debug::ToJsonCompact;
 
 use std::collections::HashMap;
 
@@ -28,6 +29,31 @@ pub struct State {
     register_taint: HashMap<Variable, Taint>,
     /// The Taint contained in memory objects
     memory_taint: HashMap<AbstractIdentifier, MemRegion<Taint>>,
+}
+
+impl ToJsonCompact for State {
+    fn to_json_compact(&self) -> serde_json::Value {
+        let mut state_map = serde_json::Map::new();
+
+        let register_taint = self
+            .register_taint
+            .iter()
+            .map(|(reg, taint)| (reg.name.clone(), taint.to_json_compact()))
+            .collect();
+        let register_taint = serde_json::Value::Object(register_taint);
+
+        let memory_taint = self
+            .memory_taint
+            .iter()
+            .map(|(mem_id, mem_region)| (mem_id.to_string(), mem_region.to_json_compact()))
+            .collect();
+        let memory_taint = serde_json::Value::Object(memory_taint);
+
+        state_map.insert("registers".into(), register_taint);
+        state_map.insert("memory".into(), memory_taint);
+
+        serde_json::Value::Object(state_map)
+    }
 }
 
 impl PartialEq for State {

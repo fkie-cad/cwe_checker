@@ -66,7 +66,7 @@ use crate::intermediate_representation::{ExternSymbol, Jmp, Project, Term};
 use crate::pipeline::AnalysisResults;
 use crate::prelude::*;
 use crate::utils::log::{CweWarning, LogMessage};
-use crate::utils::{symbol_utils, ToJsonCompact};
+use crate::utils::{debug::ToJsonCompact, symbol_utils};
 use crate::CweModule;
 
 use petgraph::visit::EdgeRef;

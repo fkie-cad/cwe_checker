@@ -20,6 +20,7 @@ use crate::analysis::{
 };
 use crate::intermediate_representation::*;
 use crate::prelude::*;
+use crate::utils::debug::ToJsonCompact;
 use std::convert::AsRef;
 use std::fmt::Display;
 
@@ -590,6 +591,12 @@ impl RegisterDomain for Taint {
         } else {
             Self::Top(width)
         }
+    }
+}
+
+impl ToJsonCompact for Taint {
+    fn to_json_compact(&self) -> serde_json::Value {
+        serde_json::json!(self.to_string())
     }
 }
 
