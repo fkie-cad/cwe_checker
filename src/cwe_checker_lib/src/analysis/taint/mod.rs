@@ -35,7 +35,7 @@ use state::State;
 /// representation.
 ///
 /// The property space of this analysis is the [`State`] type, it represents the
-/// taint information we have about particular point in the program.
+/// taint information we have about a particular point in the program.
 ///
 /// # Default Implementations
 ///
