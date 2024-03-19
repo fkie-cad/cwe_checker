@@ -404,6 +404,11 @@ impl State {
     pub fn is_empty(&self) -> bool {
         self.memory_taint.is_empty() && self.register_taint.is_empty()
     }
+
+    /// Check whether there is any tainted memory in the state.
+    pub fn has_memory_taint(&self) -> bool {
+        !self.memory_taint.is_empty()
+    }
 }
 
 impl State {

@@ -121,17 +121,30 @@ pub trait TaintAnalysis<'a>: HasCfg<'a> + HasVsaResult<PiData> + AsRef<Project> 
     /// the table in [`update_return`]. The `state` parameter corresponds to
     /// the taint state at the return sites of the called subroutine.
     ///
-    /// By implementing this method you can perform a limited interprocedural
-    /// taint analysis. If you return `Some(state)`, it may influence the taint
-    /// state in the caller (see the documentation of [`update_return`] for more
-    /// information). If you return `None`, no information will be
-    /// propagated through this call.
-    ///
-    /// The interprocedural analysis capabilities are limited since it is not
-    /// possible to propagate memory taint. It is possible to propagate taint in
-    /// registers.
+    /// By implementing this method you can perform a **limited**
+    /// interprocedural taint analysis:
+    /// - If you return `Some(state)` you may influence the taint
+    ///   state in the caller (see the documentation of [`update_return`] for
+    ///   more information), by having it be [`merged`] into the state coming
+    ///   from the call site.
+    /// - If you return `None`, **no** information will be propagated through
+    ///   this call. (This includes possible state information from the call
+    ///   site!); thus, return the empty state if you want to keep the analysis
+    ///   in the caller going.
     ///
     /// [`update_return`]: TaintAnalysis::update_return
+    /// [`merged`]: State::merge
+    ///
+    /// # Limitations
+    ///
+    /// The interprocedural analysis capabilities are limited since it is
+    /// forbidden to propagate memory taint. Memory objects from the callee are
+    /// meaningless in the caller and thus any state returned by this method
+    /// **MUST** have an empty memory taint, i.e., `State::has_memory_taint`
+    /// must evaluate to `false`. Future work may lift this requirement.
+    // FIXME: Add translation of memory objects to default implementation.
+    ///
+    /// It is possible to propagate taint in registers.
     ///
     /// # Default
     ///
@@ -181,12 +194,19 @@ pub trait TaintAnalysis<'a>: HasCfg<'a> + HasVsaResult<PiData> + AsRef<Project> 
             (Some(state_before_call), Some(state_before_return)) => {
                 let state_from_caller =
                     self.update_call_generic(state_before_call, &call_term.tid, calling_convention);
-                let state_from_callee = self.update_return_callee(
-                    state_before_return,
-                    call_term,
-                    return_term,
-                    calling_convention,
-                );
+                let state_from_callee = self
+                    .update_return_callee(
+                        state_before_return,
+                        call_term,
+                        return_term,
+                        calling_convention,
+                    )
+                    .inspect(|s| {
+                        assert!(
+                            !s.has_memory_taint(),
+                            "TA: BUG: `update_return_callee` returned memory taint."
+                        )
+                    });
 
                 match (state_from_caller, state_from_callee) {
                     (Some(state_caller), Some(state_callee)) => {
@@ -201,12 +221,19 @@ pub trait TaintAnalysis<'a>: HasCfg<'a> + HasVsaResult<PiData> + AsRef<Project> 
             (Some(state_before_call), None) => {
                 self.update_call_generic(state_before_call, &call_term.tid, calling_convention)
             }
-            (None, Some(state_before_return)) => self.update_return_callee(
-                state_before_return,
-                call_term,
-                return_term,
-                calling_convention,
-            ),
+            (None, Some(state_before_return)) => self
+                .update_return_callee(
+                    state_before_return,
+                    call_term,
+                    return_term,
+                    calling_convention,
+                )
+                .inspect(|s| {
+                    assert!(
+                        !s.has_memory_taint(),
+                        "TA: BUG: `update_return_callee` returned memory taint."
+                    )
+                }),
             _ => None,
         }
     }
