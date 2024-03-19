@@ -94,9 +94,6 @@ impl State {
     }
 
     /// Returns a state where only return values of the extern call are tainted.
-    ///
-    /// Get a new state in which only the return values of the given call to an
-    /// extern symbol are tainted.
     pub fn new_return(
         taint_source: &ExternSymbol,
         vsa_result: &impl VsaResult<ValueDomain = PiData>,
