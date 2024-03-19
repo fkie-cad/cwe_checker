@@ -235,10 +235,6 @@ impl State {
     ///
     /// Returns true iff the value at any of the exact memory locations that the
     /// pointer may point to is tainted.
-    // FIXME: The original implementation in CWE476 distinguished between stack
-    // memory and all other memory objects. If the given address points to a
-    // non-stack memory object, it returns true if the memory object contains
-    // any tainted value (at any position).
     pub fn check_if_address_points_to_taint(&self, address: PiData) -> bool {
         address
             .get_relative_values()
