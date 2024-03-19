@@ -25,6 +25,23 @@ pub type FpComputation<'a, 'b> = fixpoint::Computation<
     forward_interprocedural_fixpoint::GeneralizedContext<'a, TaCompCtx<'a, 'b>>,
 >;
 
+impl ToJsonCompact for FpComputation<'_, '_> {
+    fn to_json_compact(&self) -> serde_json::Value {
+        let graph = self.get_graph();
+        let mut json_nodes = serde_json::Map::new();
+
+        for (node_index, node_value) in self.node_values().iter() {
+            let node = graph.node_weight(*node_index).unwrap();
+
+            if let NodeValue::Value(value) = node_value {
+                json_nodes.insert(format!("{node}"), value.to_json_compact());
+            }
+        }
+
+        serde_json::Value::Object(json_nodes)
+    }
+}
+
 /// Type that represents the definition of the taint analysis.
 ///
 /// Values of this type represent the taint analysis for a particular call to an

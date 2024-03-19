@@ -14,7 +14,7 @@ use crate::prelude::*;
 /// The interprocedural_flow value will either be transferred from the end of the called subroutine
 /// to the return site in case of a forward analysis or from the beginning of the called subroutine
 /// to the callsite in a backward analysis.
-#[derive(PartialEq, Eq, Serialize, Deserialize, Clone)]
+#[derive(PartialEq, Eq, Serialize, Deserialize, Clone, Debug)]
 pub enum NodeValue<T: PartialEq + Eq + Clone> {
     /// A single abstract value
     Value(T),
