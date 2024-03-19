@@ -402,12 +402,18 @@ impl State {
 
     /// Check whether `self` contains any taint at all.
     pub fn is_empty(&self) -> bool {
-        self.memory_taint.is_empty() && self.register_taint.is_empty()
+        !self.has_memory_taint() && self.register_taint.is_empty()
     }
 
     /// Check whether there is any tainted memory in the state.
     pub fn has_memory_taint(&self) -> bool {
-        !self.memory_taint.is_empty()
+        // NOTE: `self.memory_taint.is_empty()` would be incorrect since we may
+        // track memory objects that contain no taint, e.g., if we overwrite a
+        // tainted memory location with an untainted value.
+        self.memory_taint
+            .iter()
+            .flat_map(|(_, mem_region)| mem_region.iter())
+            .any(|(_, taint)| taint.is_tainted())
     }
 }
 
