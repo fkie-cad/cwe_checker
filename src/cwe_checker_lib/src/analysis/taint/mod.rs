@@ -4,8 +4,7 @@
 //! intraprocedural Taint Analyses. In general, a Taint Analysis is a special
 //! case of a forward "may" data flow analysis, where "may" means that merging
 //! of flows is performed by taking unions, i.e., a value is tainted at a point
-//! P iff there *some* flow to P where it is tainted.
-// NOTE: Should we allow other merge strategies?
+//! P iff there is *some* flow to P where it is tainted.
 //!
 //! A user defines the specific *instance* of a Taint Analyses that they want to
 //! perform by implementing the [`TaintAnalysis`] trait. See its documentation
