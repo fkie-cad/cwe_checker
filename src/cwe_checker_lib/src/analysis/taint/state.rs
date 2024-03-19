@@ -450,4 +450,3 @@ impl State {
         Value::Object(Map::from_iter(state_map))
     }
 }
-
