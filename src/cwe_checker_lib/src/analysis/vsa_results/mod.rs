@@ -2,8 +2,25 @@
 //! which defines an interface for the results of analyses similar to a value set analysis.
 
 use crate::abstract_domain::AbstractLocation;
+use crate::analysis::graph::NodeIndex;
 use crate::intermediate_representation::{Arg, Expression};
 use crate::prelude::*;
+
+/// Trait for types that provide access to the result of a value set analysis.
+///
+/// The generic type parameter can be used to implement this trait multiple
+/// times, i.e., the same type can  provide access to VSA results with
+/// different value domains.
+// NOTE: We can not implement `AsRef` on the type instead since `impl Trait` is
+// only allowed in function parameters and return types, not generic type
+// parameters or trait bounds.
+pub trait HasVsaResult<T> {
+    /// Converts a reference to `Self` into a reference to a type that implements
+    /// [`VsaResult`] with [`ValueDomain`] `T`.
+    ///
+    /// [`ValueDomain`]: VsaResult::ValueDomain
+    fn vsa_result(&self) -> &impl VsaResult<ValueDomain = T>;
+}
 
 /// A trait providing an interface for accessing the results of a value set analysis.
 /// Note that the returned values may be any type of information associated with values at certain program points,
@@ -38,4 +55,8 @@ pub trait VsaResult {
 
     /// Evaluate the value of the given expression at the given jump instruction.
     fn eval_at_jmp(&self, jmp_tid: &Tid, expression: &Expression) -> Option<Self::ValueDomain>;
+
+    /// Evaluate the given expression at the given node of the graph that the
+    /// value set analysis was computed on.
+    fn eval_at_node(&self, node: NodeIndex, expression: &Expression) -> Option<Self::ValueDomain>;
 }

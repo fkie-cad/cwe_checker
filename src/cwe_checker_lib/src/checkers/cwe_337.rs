@@ -15,31 +15,36 @@
 //! Both the sources of predictable seeds and the seeding functions can be configured using the `sources`
 //! and `seeding_functions` respectively.
 
-use crate::analysis::graph::{Edge, Graph, Node};
+use crate::analysis::forward_interprocedural_fixpoint::create_computation;
+use crate::analysis::graph::{Edge, Graph, HasCfg};
+use crate::analysis::interprocedural_fixpoint_generic::NodeValue;
+use crate::analysis::pointer_inference::{
+    Data as PiData, PointerInference as PointerInferenceComputation,
+};
+use crate::analysis::taint::{state::State as TaState, TaintAnalysis};
+use crate::analysis::vsa_results::{HasVsaResult, VsaResult};
 use crate::intermediate_representation::*;
 use crate::prelude::*;
-use crate::utils::log::{CweWarning, LogMessage};
+use crate::utils::{
+    log::{CweWarning, LogMessage},
+    symbol_utils,
+};
 use crate::CweModule;
 
-use crate::abstract_domain::AbstractDomain;
-use crate::analysis::forward_interprocedural_fixpoint::create_computation;
-use crate::analysis::interprocedural_fixpoint_generic::NodeValue;
-
 use petgraph::visit::EdgeRef;
+
 use std::collections::BTreeMap;
 use std::collections::HashMap;
+use std::convert::AsRef;
 
-use crate::checkers::cwe_476::state::*;
-use crate::checkers::cwe_476::taint::*;
-
-/// The module name and version
+/// The module name and version.
 pub static CWE_MODULE: CweModule = CweModule {
     name: "CWE337",
     version: "0.1",
     run: check_cwe,
 };
 
-/// The configuration struct
+/// The configuration struct.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Config {
     /// Sources of predictable seeds.
@@ -48,47 +53,68 @@ pub struct Config {
     seeding_functions: Vec<String>,
 }
 
-/// This check checks if a return value of any of the sources (as determined by the config file)
-/// is used as a direct parameter of any of the sinks (as determined by the config file).
-/// Currently, this is only used to detect whether a call of `time` leads into a call of `srand`,
-/// only tracks registers and not memory locations and stops at any call.
+/// Run the CWE check.
+///
+/// We check if a return value of any of the sources (as determined by the
+/// config file) is used as a direct parameter of any of the sinks (as
+/// determined by the config file).
+///
+/// Currently, this is only used to detect whether a call of `time` leads into a
+/// call of `srand`.
 pub fn check_cwe(
     analysis_results: &AnalysisResults,
     cwe_params: &serde_json::Value,
 ) -> (Vec<LogMessage>, Vec<CweWarning>) {
     let project = analysis_results.project;
-    let graph = analysis_results.control_flow_graph;
-
-    let (cwe_sender, cwe_receiver) = crossbeam_channel::unbounded();
-
     let config: Config = serde_json::from_value(cwe_params.clone())
         .expect("Invalid configuration inside config.json for CWE337.");
-    let source_map = crate::utils::symbol_utils::get_symbol_map(project, &config.sources[..]);
-    let sink_map =
-        crate::utils::symbol_utils::get_symbol_map(project, &config.seeding_functions[..]);
 
+    let source_map = symbol_utils::get_symbol_map(project, &config.sources[..]);
+    let sink_map = symbol_utils::get_symbol_map(project, &config.seeding_functions[..]);
     if source_map.is_empty() || sink_map.is_empty() {
         return (Vec::new(), Vec::new());
     }
 
+    let pi_result = analysis_results.pointer_inference.unwrap();
+    let graph = analysis_results.control_flow_graph;
+    let (cwe_sender, cwe_receiver) = crossbeam_channel::unbounded();
+
     let context = Context {
+        project: analysis_results.project,
+        pi_result,
         control_flow_graph: graph,
-        sink_map: &sink_map,
-        cwe_collector: &cwe_sender,
+        sink_map,
+        extern_symbol_map: project
+            .program
+            .term
+            .extern_symbols
+            .iter()
+            .map(|(tid, sym)| (tid.clone(), sym))
+            .collect(),
+        cwe_collector: cwe_sender,
     };
     let mut computation = create_computation(context, None);
 
     for edge in graph.edge_references() {
-        if let Edge::ExternCallStub(jmp) = edge.weight() {
-            if let Jmp::Call { target, .. } = &jmp.term {
-                if let Some(symbol) = source_map.get(target) {
-                    let node = edge.target();
-                    computation.set_node_value(node, NodeValue::Value(State::new(symbol, None)));
-                }
-            }
-        }
+        let Edge::ExternCallStub(jmp) = edge.weight() else {
+            continue;
+        };
+        let Jmp::Call { target, .. } = &jmp.term else {
+            continue;
+        };
+        let Some(symbol) = source_map.get(target) else {
+            continue;
+        };
+        let return_node = edge.target();
+
+        computation.set_node_value(
+            return_node,
+            NodeValue::Value(TaState::new_return(symbol, pi_result, return_node)),
+        );
     }
-    computation.compute_with_max_steps(100); // FIXME: This number should be in the config.
+
+    // FIXME: This number should be in the config.
+    computation.compute_with_max_steps(100);
 
     let mut cwe_warnings = BTreeMap::new();
     for cwe in cwe_receiver.try_iter() {
@@ -99,17 +125,97 @@ pub fn check_cwe(
     (Vec::new(), cwe_warnings)
 }
 
-/// The Context struct for the forward_interprocedural_fixpoint algorithm.
+/// The Context struct for the taint analysis.
 pub struct Context<'a> {
+    /// A pointer to the corresponding project struct.
+    project: &'a Project,
+    /// A pointer to the results of the pointer inference analysis.
+    ///
+    /// They are used to determine the targets of pointers to memory, which in
+    /// turn is used to keep track of taint on the stack or on the heap.
+    pi_result: &'a PointerInferenceComputation<'a>,
     /// The underlying control flow graph for the algorithm.
     control_flow_graph: &'a Graph<'a>,
     /// A map of symbols to use as sinks for the algorithm.
-    sink_map: &'a HashMap<Tid, &'a ExternSymbol>,
+    sink_map: HashMap<Tid, &'a ExternSymbol>,
+    /// Maps the TID of an extern symbol to the extern symbol struct.
+    extern_symbol_map: HashMap<Tid, &'a ExternSymbol>,
     /// A channel where found CWE hits can be sent to.
-    cwe_collector: &'a crossbeam_channel::Sender<CweWarning>,
+    cwe_collector: crossbeam_channel::Sender<CweWarning>,
+}
+
+impl<'a> HasCfg<'a> for Context<'a> {
+    fn get_cfg(&self) -> &Graph<'a> {
+        self.control_flow_graph
+    }
+}
+
+impl<'a> HasVsaResult<PiData> for Context<'a> {
+    fn vsa_result(&self) -> &impl VsaResult<ValueDomain = PiData> {
+        self.pi_result
+    }
+}
+
+impl<'a> AsRef<Project> for Context<'a> {
+    fn as_ref(&self) -> &Project {
+        self.project
+    }
+}
+
+impl<'a> TaintAnalysis<'a> for Context<'a> {
+    /// Generate a CWE warning if taint may be contained in the arguments to a
+    /// sink function.
+    ///
+    /// If this is a call to a sink function and the passed arguments may
+    /// contain taint we generate a CWE waning and return `None` to suppress
+    /// the generation of further warnings. Else we just clear the taint from
+    /// all non-caller-saved registers.
+    fn update_call_stub(&self, state: &TaState, call: &Term<Jmp>) -> Option<TaState> {
+        if state.is_empty() {
+            return None;
+        }
+
+        match &call.term {
+            Jmp::Call { target, .. } => {
+                if let Some(sink_symbol) = self.sink_map.get(target) {
+                    if state.check_extern_parameters_for_taint::<true>(
+                        self.vsa_result(),
+                        sink_symbol,
+                        &call.tid,
+                    ) {
+                        self.generate_cwe_warning(call, sink_symbol);
+
+                        None
+                    } else {
+                        Some(self.update_extern_symbol(state, sink_symbol))
+                    }
+                } else {
+                    let extern_symbol = self
+                        .extern_symbol_map
+                        .get(target)
+                        .expect("Extern symbol not found.");
+
+                    Some(self.update_extern_symbol(state, extern_symbol))
+                }
+            }
+            Jmp::CallInd { .. } => self.update_call_generic(state, &call.tid, &None),
+            _ => panic!("Malformed control flow graph encountered."),
+        }
+    }
 }
 
 impl<'a> Context<'a> {
+    /// Transition function for calls to external functions that do not
+    /// trigger a CWE warning, i.e., its not a sink function or no taint is in
+    /// the arguments.
+    fn update_extern_symbol(&self, state: &TaState, extern_symbol: &ExternSymbol) -> TaState {
+        let mut new_state = state.clone();
+
+        new_state.remove_non_callee_saved_taint(self.project.get_calling_convention(extern_symbol));
+
+        new_state
+    }
+
     fn generate_cwe_warning(&self, sink_call: &Term<Jmp>, sink_symbol: &ExternSymbol) {
         let cwe_warning = CweWarning::new(
             CWE_MODULE.name,
@@ -123,112 +229,5 @@ impl<'a> Context<'a> {
         .addresses(vec![sink_call.tid.address.clone()])
         .symbols(vec![sink_symbol.name.clone()]);
         let _ = self.cwe_collector.send(cwe_warning);
-    }
-}
-
-impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Context<'a> {
-    type Value = State;
-
-    /// Provide access to the control flow graph.
-    fn get_graph(&self) -> &Graph<'a> {
-        self.control_flow_graph
-    }
-
-    /// Just forward the value merging to the [`AbstractDomain`].
-    fn merge(&self, value_1: &Self::Value, value_2: &Self::Value) -> Self::Value {
-        value_1.merge(value_2)
-    }
-
-    /// Keep track of register taint through Defs.
-    /// Currently, we never taint memory.
-    fn update_def(&self, state: &State, def: &Term<Def>) -> Option<Self::Value> {
-        if state.is_empty() {
-            return None;
-        }
-
-        let mut new_state = state.clone();
-        match &def.term {
-            Def::Assign { var, value } => {
-                new_state.set_register_taint(var, state.eval(value));
-            }
-            Def::Load { var, .. } => {
-                // FIXME: CWE476 uses pointer_inference here to load taint from memory.
-                new_state.set_register_taint(var, Taint::Top(var.size));
-            }
-            Def::Store { .. } => {}
-        }
-
-        Some(new_state)
-    }
-
-    /// We don't care if there was some condition on the random value.
-    fn update_jump(
-        &self,
-        state: &State,
-        _jump: &Term<Jmp>,
-        _untaken_conditional: Option<&Term<Jmp>>,
-        _target: &Term<Blk>,
-    ) -> Option<Self::Value> {
-        Some(state.clone())
-    }
-
-    /// For now we stop the search on any sort of call.
-    fn update_call(
-        &self,
-        _value: &Self::Value,
-        _call: &Term<Jmp>,
-        _target: &Node,
-        _calling_convention: &Option<String>,
-    ) -> Option<Self::Value> {
-        None
-    }
-
-    /// For now we stop the search on any sort of call.
-    fn update_return(
-        &self,
-        _value: Option<&Self::Value>,
-        _value_before_call: Option<&Self::Value>,
-        _call_term: &Term<Jmp>,
-        _return_term: &Term<Jmp>,
-        _calling_convention: &Option<String>,
-    ) -> Option<Self::Value> {
-        None
-    }
-
-    /// For now we stop the search on any sort of call.
-    /// But report a cwe warning, if we encountered a call to one of the sink symbols.
-    fn update_call_stub(&self, state: &State, call: &Term<Jmp>) -> Option<Self::Value> {
-        if state.is_empty() {
-            return None;
-        }
-
-        match &call.term {
-            Jmp::Call { target, .. } => {
-                if let Some(sink_symbol) = self.sink_map.get(target) {
-                    for parameter in sink_symbol.parameters.iter() {
-                        if let Arg::Register { expr, .. } = parameter {
-                            if state.eval(expr).is_tainted() {
-                                self.generate_cwe_warning(call, sink_symbol);
-                            }
-                        }
-                    }
-                }
-            }
-            Jmp::CallInd { .. } => {}
-            _ => panic!("Malformed control flow graph encountered."),
-        }
-
-        None
-    }
-
-    /// We don't care if there was some condition on the random value.
-    fn specialize_conditional(
-        &self,
-        state: &State,
-        _condition: &Expression,
-        _block_before_condition: &Term<Blk>,
-        _is_true: bool,
-    ) -> Option<Self::Value> {
-        Some(state.clone())
     }
 }

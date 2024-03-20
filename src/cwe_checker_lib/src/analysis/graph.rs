@@ -45,11 +45,19 @@
 use crate::intermediate_representation::*;
 use crate::prelude::*;
 use crate::utils::log::LogMessage;
-use petgraph::graph::{DiGraph, NodeIndex};
+use petgraph::graph::DiGraph;
 use std::collections::{HashMap, HashSet};
+
+pub use petgraph::graph::NodeIndex;
 
 /// The graph type of an interprocedural control flow graph
 pub type Graph<'a> = DiGraph<Node<'a>, Edge<'a>>;
+
+/// Trait for types that provide access to a control flow graph.
+pub trait HasCfg<'a> {
+    /// Returns a reference to the control flow graph managed by this type.
+    fn get_cfg(&self) -> &Graph<'a>;
+}
 
 /// The node type of an interprocedural control flow graph
 ///
