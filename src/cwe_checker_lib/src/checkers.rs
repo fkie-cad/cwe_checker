@@ -6,8 +6,9 @@
 //! See there for detailed information about this check.
 
 /// Checkers that are supported for Linux kernel modules.
-pub const MODULES_LKM: [&str; 9] = [
-    "CWE134", "CWE190", "CWE215", "CWE416", "CWE457", "CWE467", "CWE476", "CWE676", "CWE789",
+pub const MODULES_LKM: [&str; 10] = [
+    "CWE134", "CWE190", "CWE215", "CWE252", "CWE416", "CWE457", "CWE467", "CWE476", "CWE676",
+    "CWE789",
 ];
 
 pub mod cwe_119;
