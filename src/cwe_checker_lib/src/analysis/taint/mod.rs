@@ -107,10 +107,34 @@ pub trait TaintAnalysis<'a>: HasCfg<'a> + HasVsaResult<PiData> + AsRef<Project> 
         None
     }
 
+    /// Transition function for calls to external functions.
+    ///
+    /// # Default
+    ///
+    /// Removes taint from non-callee-saved registers.
+    fn update_extern_call(
+        &self,
+        state: &State,
+        _call: &Term<Jmp>,
+        project: &Project,
+        extern_symbol: &ExternSymbol,
+    ) -> Option<State> {
+        let mut new_state = state.clone();
+
+        new_state.remove_non_callee_saved_taint(project.get_calling_convention(extern_symbol));
+
+        Some(new_state)
+    }
+
     /// Transition function for edges of type [`ExternCallStub`].
     ///
     /// Corresponds to inter-program calls, i.e., calls to shared libraries.
+    /// Currently, indirect calls also lead to edges of type [`ExternCallStub`].
+    /// If you are only interested in handling calls to library functions
+    /// consider implementing [`update_extern_call`] instead.
     ///
+    /// [`update_extern_call`]: TaintAnalysis::update_extern_call
+    /// [indirect calls]: crate::intermediate_representation::Jmp::CallInd
     /// [`ExternCallStub`]: crate::analysis::graph::Edge::ExternCallStub
     ///
     /// # Default
@@ -126,15 +150,12 @@ pub trait TaintAnalysis<'a>: HasCfg<'a> + HasVsaResult<PiData> + AsRef<Project> 
                     .extern_symbols
                     .get(target)
                     .expect("TA: BUG: Unable to find extern symbol for call.");
-                let mut new_state = state.clone();
 
-                new_state
-                    .remove_non_callee_saved_taint(project.get_calling_convention(extern_symbol));
-
-                if new_state.is_empty() {
-                    self.handle_empty_state_out(&call.tid)
-                } else {
-                    Some(new_state)
+                match self.update_extern_call(state, call, project, extern_symbol) {
+                    Some(new_state) if new_state.is_empty() => {
+                        self.handle_empty_state_out(&call.tid)
+                    }
+                    new_state_option => new_state_option,
                 }
             }
             Jmp::CallInd { .. } => self.update_call_generic(state, &call.tid, &None),
