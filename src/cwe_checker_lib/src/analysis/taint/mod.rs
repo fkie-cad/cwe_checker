@@ -20,6 +20,7 @@ use crate::analysis::{
 };
 use crate::intermediate_representation::*;
 use crate::prelude::*;
+use crate::utils::debug::ToJsonCompact;
 use std::convert::AsRef;
 use std::fmt::Display;
 
@@ -43,6 +44,23 @@ use state::State;
 /// to many taint analyses. However, you almost certainly want to override some
 /// of them to implement the custom logic of your analysis.
 pub trait TaintAnalysis<'a>: HasCfg<'a> + HasVsaResult<PiData> + AsRef<Project> {
+    /// Called when a transition function mapped the input state to the empty
+    /// state.
+    ///
+    /// This function will be called every time a default transition function
+    /// maps a (possibly empty) input state to the empty state. Its return value
+    /// will override the `Some(empty_state)` return value of the transition
+    /// function.
+    ///
+    /// # Default
+    ///
+    /// Just returns `None`. This is the desired behavior as long as it is
+    /// impossible for transition functions to generate taint from an empty
+    /// state.
+    fn handle_empty_state_out(&self, _tid: &Tid) -> Option<State> {
+        None
+    }
+
     /// Update taint state on a function call without further target information.
     ///
     /// # Default
@@ -51,7 +69,7 @@ pub trait TaintAnalysis<'a>: HasCfg<'a> + HasVsaResult<PiData> + AsRef<Project> 
     fn update_call_generic(
         &self,
         state: &State,
-        _call_tid: &Tid,
+        call_tid: &Tid,
         calling_convention_hint: &Option<String>,
     ) -> Option<State> {
         let mut new_state = state.clone();
@@ -62,7 +80,11 @@ pub trait TaintAnalysis<'a>: HasCfg<'a> + HasVsaResult<PiData> + AsRef<Project> 
             new_state.remove_non_callee_saved_taint(calling_conv);
         }
 
-        Some(new_state)
+        if new_state.is_empty() {
+            self.handle_empty_state_out(call_tid)
+        } else {
+            Some(new_state)
+        }
     }
 
     /// Transition function for edges of type [`Call`].
@@ -86,29 +108,76 @@ pub trait TaintAnalysis<'a>: HasCfg<'a> + HasVsaResult<PiData> + AsRef<Project> 
         None
     }
 
+    /// Transition function for calls to external functions.
+    ///
+    /// # Default
+    ///
+    /// Removes taint from non-callee-saved registers.
+    fn update_extern_call(
+        &self,
+        state: &State,
+        _call: &Term<Jmp>,
+        project: &Project,
+        extern_symbol: &ExternSymbol,
+    ) -> Option<State> {
+        let mut new_state = state.clone();
+
+        new_state.remove_non_callee_saved_taint(project.get_calling_convention(extern_symbol));
+
+        Some(new_state)
+    }
+
     /// Transition function for edges of type [`ExternCallStub`].
     ///
     /// Corresponds to inter-program calls, i.e., calls to shared libraries.
+    /// Currently, indirect calls also lead to edges of type [`ExternCallStub`].
+    /// If you are only interested in handling calls to library functions
+    /// consider implementing [`update_extern_call`] instead.
     ///
+    /// [`update_extern_call`]: TaintAnalysis::update_extern_call
+    /// [indirect calls]: crate::intermediate_representation::Jmp::CallInd
     /// [`ExternCallStub`]: crate::analysis::graph::Edge::ExternCallStub
-    fn update_call_stub(&self, state: &State, call: &Term<Jmp>) -> Option<State>;
+    ///
+    /// # Default
+    ///
+    /// Remove taint from non-callee-saved registers.
+    fn update_call_stub(&self, state: &State, call: &Term<Jmp>) -> Option<State> {
+        match &call.term {
+            Jmp::Call { target, .. } => {
+                let project = <Self as AsRef<Project>>::as_ref(self);
+                let extern_symbol = project
+                    .program
+                    .term
+                    .extern_symbols
+                    .get(target)
+                    .expect("TA: BUG: Unable to find extern symbol for call.");
+
+                match self.update_extern_call(state, call, project, extern_symbol) {
+                    Some(new_state) if new_state.is_empty() => {
+                        self.handle_empty_state_out(&call.tid)
+                    }
+                    new_state_option => new_state_option,
+                }
+            }
+            Jmp::CallInd { .. } => self.update_call_generic(state, &call.tid, &None),
+            _ => panic!("TA: BUG: Malformed control flow graph encountered."),
+        }
+    }
 
     /// Returns the new taint state after a jump.
     ///
     /// # Default
     ///
-    /// Clones the state before the jump, or returns `None` if the state is
-    /// empty.
+    /// Clones the state before the jump.
     fn update_jump(
         &self,
         state: &State,
-        _jump: &Term<Jmp>,
+        jump: &Term<Jmp>,
         _untaken_conditional: Option<&Term<Jmp>>,
         _target: &Term<Blk>,
     ) -> Option<State> {
         if state.is_empty() {
-            // Without taint there is nothing to propagate.
-            None
+            self.handle_empty_state_out(&jump.tid)
         } else {
             Some(state.clone())
         }
@@ -190,7 +259,7 @@ pub trait TaintAnalysis<'a>: HasCfg<'a> + HasVsaResult<PiData> + AsRef<Project> 
         return_term: &Term<Jmp>,
         calling_convention: &Option<String>,
     ) -> Option<State> {
-        match (state_before_call, state_before_return) {
+        let new_state = match (state_before_call, state_before_return) {
             (Some(state_before_call), Some(state_before_return)) => {
                 let state_from_caller =
                     self.update_call_generic(state_before_call, &call_term.tid, calling_convention);
@@ -235,6 +304,17 @@ pub trait TaintAnalysis<'a>: HasCfg<'a> + HasVsaResult<PiData> + AsRef<Project> 
                     )
                 }),
             _ => None,
+        };
+
+        match new_state {
+            Some(state) => {
+                if state.is_empty() {
+                    self.handle_empty_state_out(&return_term.tid)
+                } else {
+                    Some(state)
+                }
+            }
+            None => None,
         }
     }
 
@@ -331,9 +411,13 @@ pub trait TaintAnalysis<'a>: HasCfg<'a> + HasVsaResult<PiData> + AsRef<Project> 
         &self,
         _old_state: &State,
         new_state: State,
-        _def: &Term<Def>,
+        def: &Term<Def>,
     ) -> Option<State> {
-        Some(new_state)
+        if new_state.is_empty() {
+            self.handle_empty_state_out(&def.tid)
+        } else {
+            Some(new_state)
+        }
     }
 }
 
@@ -383,11 +467,6 @@ impl<'a, T: TaintAnalysis<'a>> forward_interprocedural_fixpoint::Context<'a> for
     }
 
     fn update_def(&self, state: &Self::Value, def: &Term<Def>) -> Option<Self::Value> {
-        if state.is_empty() {
-            // Without taint there is nothing to propagate.
-            return None;
-        }
-
         let new_state = match &def.term {
             Def::Assign { var, value } => self.update_def_assign(state, &def.tid, var, value),
             Def::Load { var, address } => self.update_def_load(state, &def.tid, var, address),
@@ -512,6 +591,12 @@ impl RegisterDomain for Taint {
         } else {
             Self::Top(width)
         }
+    }
+}
+
+impl ToJsonCompact for Taint {
+    fn to_json_compact(&self) -> serde_json::Value {
+        serde_json::json!(self.to_string())
     }
 }
 

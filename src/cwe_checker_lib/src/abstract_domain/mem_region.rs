@@ -1,6 +1,7 @@
 use super::{AbstractDomain, HasTop, SizedDomain};
 use crate::intermediate_representation::ByteSize;
 use crate::prelude::*;
+use crate::utils::debug::ToJsonCompact;
 use apint::{Int, Width};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -63,6 +64,19 @@ impl<T: AbstractDomain + SizedDomain + HasTop + std::fmt::Debug> HasTop for MemR
     /// Return a new, empty memory region with the same address bytesize as `self`, representing the *Top* element of the abstract domain.
     fn top(&self) -> Self {
         Self::new(self.get_address_bytesize())
+    }
+}
+
+impl<T> ToJsonCompact for MemRegion<T>
+where
+    T: ToJsonCompact + AbstractDomain + SizedDomain + HasTop + std::fmt::Debug,
+{
+    fn to_json_compact(&self) -> serde_json::Value {
+        serde_json::Value::Object(
+            self.iter()
+                .map(|(offset, val)| (offset.to_string(), val.to_json_compact()))
+                .collect(),
+        )
     }
 }
 

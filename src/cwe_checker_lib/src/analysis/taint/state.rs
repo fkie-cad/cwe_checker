@@ -12,6 +12,7 @@ use crate::analysis::pointer_inference::Data as PiData;
 use crate::analysis::vsa_results::VsaResult;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
+use crate::utils::debug::ToJsonCompact;
 
 use std::collections::HashMap;
 
@@ -28,6 +29,31 @@ pub struct State {
     register_taint: HashMap<Variable, Taint>,
     /// The Taint contained in memory objects
     memory_taint: HashMap<AbstractIdentifier, MemRegion<Taint>>,
+}
+
+impl ToJsonCompact for State {
+    fn to_json_compact(&self) -> serde_json::Value {
+        let mut state_map = serde_json::Map::new();
+
+        let register_taint = self
+            .register_taint
+            .iter()
+            .map(|(reg, taint)| (reg.name.clone(), taint.to_json_compact()))
+            .collect();
+        let register_taint = serde_json::Value::Object(register_taint);
+
+        let memory_taint = self
+            .memory_taint
+            .iter()
+            .map(|(mem_id, mem_region)| (mem_id.to_string(), mem_region.to_json_compact()))
+            .collect();
+        let memory_taint = serde_json::Value::Object(memory_taint);
+
+        state_map.insert("registers".into(), register_taint);
+        state_map.insert("memory".into(), memory_taint);
+
+        serde_json::Value::Object(state_map)
+    }
 }
 
 impl PartialEq for State {
@@ -223,6 +249,14 @@ impl State {
         }
     }
 
+    /// Returns the taint state of the given register.
+    pub fn get_register_taint(&self, register: &Variable) -> Taint {
+        self.register_taint
+            .get(register)
+            .copied()
+            .unwrap_or(Taint::Top(register.size))
+    }
+
     /// Returns true if the memory object with the given ID contains a tainted
     /// value.
     pub fn check_mem_id_for_taint(&self, id: &AbstractIdentifier) -> bool {
@@ -405,7 +439,14 @@ impl State {
 
     /// Check whether `self` contains any taint at all.
     pub fn is_empty(&self) -> bool {
-        !self.has_memory_taint() && self.register_taint.is_empty()
+        !self.has_memory_taint() && !self.has_register_taint()
+    }
+
+    /// Check whether there are any tainted registers in the state.
+    pub fn has_register_taint(&self) -> bool {
+        self.register_taint
+            .iter()
+            .any(|(_, taint)| matches!(*taint, Taint::Tainted(_)))
     }
 
     /// Check whether there is any tainted memory in the state.
