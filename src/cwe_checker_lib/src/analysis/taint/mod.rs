@@ -190,8 +190,8 @@ pub trait TaintAnalysis<'a>: HasCfg<'a> + HasVsaResult<PiData> + AsRef<Project> 
     /// the table in [`update_return`]. The `state` parameter corresponds to
     /// the taint state at the return sites of the called subroutine.
     ///
-    /// By implementing this method you can perform a **limited**
-    /// interprocedural taint analysis:
+    /// By implementing this method you can perform an interprocedural taint
+    /// analysis:
     /// - If you return `Some(state)` you may influence the taint
     ///   state in the caller (see the documentation of [`update_return`] for
     ///   more information), by having it be [`merged`] into the state coming
@@ -203,17 +203,6 @@ pub trait TaintAnalysis<'a>: HasCfg<'a> + HasVsaResult<PiData> + AsRef<Project> 
     ///
     /// [`update_return`]: TaintAnalysis::update_return
     /// [`merged`]: State::merge
-    ///
-    /// # Limitations
-    ///
-    /// The interprocedural analysis capabilities are limited since it is
-    /// forbidden to propagate memory taint. Memory objects from the callee are
-    /// meaningless in the caller and thus any state returned by this method
-    /// **MUST** have an empty memory taint, i.e., `State::has_memory_taint`
-    /// must evaluate to `false`. Future work may lift this requirement.
-    // FIXME: Add translation of memory objects to default implementation.
-    ///
-    /// It is possible to propagate taint in registers.
     ///
     /// # Default
     ///
@@ -263,23 +252,21 @@ pub trait TaintAnalysis<'a>: HasCfg<'a> + HasVsaResult<PiData> + AsRef<Project> 
             (Some(state_before_call), Some(state_before_return)) => {
                 let state_from_caller =
                     self.update_call_generic(state_before_call, &call_term.tid, calling_convention);
-                let state_from_callee = self
-                    .update_return_callee(
-                        state_before_return,
-                        call_term,
-                        return_term,
-                        calling_convention,
-                    )
-                    .inspect(|s| {
-                        assert!(
-                            !s.has_memory_taint(),
-                            "TA: BUG: `update_return_callee` returned memory taint."
-                        )
-                    });
+                let state_from_callee = self.update_return_callee(
+                    state_before_return,
+                    call_term,
+                    return_term,
+                    calling_convention,
+                );
 
                 match (state_from_caller, state_from_callee) {
-                    (Some(state_caller), Some(state_callee)) => {
-                        Some(state_caller.merge(&state_callee))
+                    (Some(mut state_caller), Some(state_callee)) => {
+                        state_caller.merge_with_renaming(
+                            &state_callee,
+                            self.vsa_result().get_call_renaming_map(&call_term.tid),
+                        );
+
+                        Some(state_caller)
                     }
                     // If one implementation indicated that no information
                     // should be propagated by returning `None` we ignore what
@@ -297,11 +284,15 @@ pub trait TaintAnalysis<'a>: HasCfg<'a> + HasVsaResult<PiData> + AsRef<Project> 
                     return_term,
                     calling_convention,
                 )
-                .inspect(|s| {
-                    assert!(
-                        !s.has_memory_taint(),
-                        "TA: BUG: `update_return_callee` returned memory taint."
-                    )
+                .map(|state_callee| {
+                    let mut dummy_caller_state = State::new_empty();
+
+                    dummy_caller_state.merge_with_renaming(
+                        &state_callee,
+                        self.vsa_result().get_call_renaming_map(&call_term.tid),
+                    );
+
+                    dummy_caller_state
                 }),
             _ => None,
         };

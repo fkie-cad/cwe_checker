@@ -1,7 +1,7 @@
 //! Definition of the Taint Analysis for CWE252.
 //!
-//! Implementation of the [`TaintAnalysis`] for this CWE check. See the module
-//! documentation for more details on the algorithm and its limitations.
+//! Implementation of the [`TaintAnalysis`] trait for this CWE check. See the
+//! module documentation for more details on the algorithm and its limitations.
 
 use super::MustUseCall;
 
@@ -12,7 +12,8 @@ use crate::analysis::forward_interprocedural_fixpoint::{
 use crate::analysis::graph::{Graph as Cfg, HasCfg};
 use crate::analysis::interprocedural_fixpoint_generic::NodeValue;
 use crate::analysis::pointer_inference::{Data as PiData, PointerInference};
-use crate::analysis::taint::{state::State as TaState, TaintAnalysis};
+use crate::analysis::taint::state::{MemoryTaint, RegisterTaint, State as TaState};
+use crate::analysis::taint::TaintAnalysis;
 use crate::analysis::vsa_results::{HasVsaResult, VsaResult};
 use crate::intermediate_representation::{Blk, ExternSymbol, Jmp, Project, Term, Tid};
 use crate::utils::debug::ToJsonCompact;
@@ -233,19 +234,22 @@ impl<'a> TaintAnalysis<'a> for TaCompCtx<'a, '_> {
 
     /// Propagates taint from callee to caller.
     ///
-    /// The check performs a limited interprocedural taint analysis. The main
+    /// The check performs a bottom-up interprocedural taint analysis. The main
     /// idea is that: *If a function may propagate the return value of a
     /// fallible function call to its caller without checking it, then the
     /// function itself becomes "must check".* (In the sense that the caller is
     /// now responsible for checking its return value.)
     ///
+    /// The taint may be returned directly, indirectly by returning a pointer
+    /// that can be used to reach taint, or written to global variables
+    /// (possibly as a pointer).
+    ///
     /// Limitations stem from two sources:
     ///
-    /// - It is not possible to propagate memory taint from the callee to the
-    ///   caller.
-    /// - The calling convention may be unknown.
+    /// - The calling convention may be unknown, which means we can not
+    ///   determine precisely which taint will be reachable for the caller.
     ///
-    /// The the source code comments for further information.
+    /// See the the source code comments for further information.
     ///
     /// Furthermore, this callback is responsible for detecting cases where
     /// taint may reach the end of a function without being returned.
@@ -255,57 +259,42 @@ impl<'a> TaintAnalysis<'a> for TaCompCtx<'a, '_> {
     fn update_return_callee(
         &self,
         state: &TaState,
-        _call_term: &Term<Jmp>,
+        call_term: &Term<Jmp>,
         return_term: &Term<Jmp>,
         calling_convention: &Option<String>,
     ) -> Option<TaState> {
-        if !state.has_register_taint() {
-            // No register taint means that we can not propagate any taint to
-            // the caller (since we are currently unable to propagate memory
-            // taint from callee to caller).
-            //
-            // We consider the information in the tainted memory to be "lost",
-            // and thus we generate a CWE warning since its presence implies
-            // that the return value of a fallible function call may have been
-            // ignored by the called function.
-            self.generate_cwe_warning(&return_term.tid, "return_no_reg_taint");
+        let (register_taint, memory_taint) = state.clone().into_mem_reg_taint();
 
-            // We still want to allow for the propagation of taint from the
-            // call site.
-            Some(TaState::new_empty())
-        } else if let Some(calling_convention) = self
+        // Only keep memory taint that will be propagated to the caller. We
+        // compute this here since we want to notice when no taint is
+        // propagated.
+        let renaming_map = self.pi_result.get_call_renaming_map(&call_term.tid);
+        let propagated_memory_taint: MemoryTaint = memory_taint
+            .into_iter()
+            .filter(|(aid, _)| {
+                // This is still an over-approximation to the taint that will be
+                // available to the caller since it might happen that all relative
+                // values have non-exactly-known offsets.
+                renaming_map.is_some_and(|renaming_map| {
+                    renaming_map
+                        .get(aid)
+                        .is_some_and(|value| value.referenced_ids().next().is_some())
+                })
+            })
+            .collect();
+
+        let propagated_register_taint: RegisterTaint = if let Some(calling_convention) = self
             .project
             .get_specific_calling_convention(calling_convention)
         {
-            // We have tainted registers and we know the calling convention:
-            //
-            // If there is a non-empty overlap between the tainted registers and
-            // the return registers we propagate the taint to the caller,
-            // which makes them responsible for checking it.
-            //
-            // Else it means that the called function may have ignored the
-            // return value of a fallible function call and we emit a warning.
-            let propagated_state = calling_convention.get_all_return_register().iter().fold(
-                TaState::new_empty(),
-                |mut propagated_state, return_register| {
-                    propagated_state.set_register_taint(
-                        return_register,
-                        state.get_register_taint(return_register),
-                    );
+            let return_registers = calling_convention.get_all_return_register();
 
-                    propagated_state
-                },
-            );
-
-            if propagated_state.has_register_taint() {
-                Some(propagated_state)
-            } else {
-                self.generate_cwe_warning(&return_term.tid, "return_no_taint_returned");
-
-                // We still want to allow for the propagation of taint from the
-                // call site.
-                Some(TaState::new_empty())
-            }
+            // If there are tainted return registers we propagate the taint to
+            // the caller, which makes them responsible for checking it.
+            register_taint
+                .into_iter()
+                .filter(|(reg, taint)| return_registers.contains(&reg) && taint.is_tainted())
+                .collect()
         } else {
             // We have tainted registers but we do not know the calling
             // convention. Here we simply return the complete register taint
@@ -320,11 +309,30 @@ impl<'a> TaintAnalysis<'a> for TaCompCtx<'a, '_> {
             //   by the caller such that the taint is immediatly eliminated and
             //   we catch cases where the called function has ignored tainted
             //   values.
-            let mut new_state = state.clone();
+            register_taint
+        };
 
-            new_state.remove_all_memory_taints();
+        let propagated_state = TaState::from_mem_reg_taint(
+            propagated_register_taint,
+            propagated_memory_taint
+        );
 
-            Some(new_state)
+        if propagated_state.is_empty() {
+            // If we can not propagate any taint to the caller it is implied
+            // that
+            //
+            // - the return value of a fallible function call may have been
+            //   ignored by the callee
+            // - AND the result is not returned to the caller
+            //
+            // Thus, callers of this function have no way to know if the
+            // operation it performs was successful and the function itself
+            // might not have checked it either.
+            self.generate_cwe_warning(&return_term.tid, "return_no_taint");
+
+            None
+        } else {
+            Some(propagated_state)
         }
     }
 }

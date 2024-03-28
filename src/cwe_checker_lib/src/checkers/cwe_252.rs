@@ -224,6 +224,8 @@ impl<'a, 'b: 'a> CweAnalysis<'a, 'b> {
             Vec::new(),
             self.cwe_collector
                 .try_iter()
+                // FIXME: It would be nice to preerve all reasons during
+                // deduplication.
                 .map(|msg| (msg.tids.clone(), msg))
                 .collect::<BTreeMap<_, _>>()
                 .into_values()

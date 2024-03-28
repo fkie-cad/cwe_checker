@@ -80,7 +80,10 @@ impl<'a> IsolatedReturnAnalysis<'a> {
     /// Checks isolated return sites for taint with the results of the given
     /// `computation`.
     ///
-    /// Generates CWE warnings when non-returned taint is found.
+    /// Generates CWE warnings when non-returned taint is found. We have no
+    /// caller context, i.e., no aID renaming map, so we can not tell if memory
+    /// taint is returned or not. Currently we always assume that memory taint
+    /// will *not* be reachable for the caller (generates FPs).
     pub fn analyze(&self, computation: &context::FpComputation<'_, '_>) {
         for (taint_state, calling_convention, ret_insn_tid) in
             // Filter isolated returns with a taint state.
@@ -120,7 +123,7 @@ impl<'a> IsolatedReturnAnalysis<'a> {
                         &self.cwe_sender,
                         &self.call,
                         ret_insn_tid,
-                        "isolated_returns_no_taint_returned",
+                        "isolated_returns_no_reg_taint_returned",
                     );
                 }
             }
