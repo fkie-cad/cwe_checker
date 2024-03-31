@@ -23,7 +23,7 @@ use std::convert::AsRef;
 
 /// Type of the fixpoint computation of the taint analysis.
 pub type FpComputation<'a, 'b> = fixpoint::Computation<
-    forward_interprocedural_fixpoint::GeneralizedContext<'a, TaCompCtx<'a, 'b>>,
+    forward_interprocedural_fixpoint::GeneralizedContext<'a, TaComputationContext<'a, 'b>>,
 >;
 
 impl ToJsonCompact for FpComputation<'_, '_> {
@@ -47,7 +47,7 @@ impl ToJsonCompact for FpComputation<'_, '_> {
 ///
 /// Values of this type represent the taint analysis for a particular call to an
 /// external function.
-pub struct TaCompCtx<'a, 'b: 'a> {
+pub struct TaComputationContext<'a, 'b: 'a> {
     /// Extern function call that is analyzed.
     call: MustUseCall<'a>,
     project: &'a Project,
@@ -56,7 +56,7 @@ pub struct TaCompCtx<'a, 'b: 'a> {
     cwe_sender: crossbeam_channel::Sender<CweWarning>,
 }
 
-impl<'a, 'b: 'a> TaCompCtx<'a, 'b> {
+impl<'a, 'b: 'a> TaComputationContext<'a, 'b> {
     /// Creates a new taint analysis context for the given call to an external
     /// function.
     pub(super) fn new(
@@ -95,25 +95,25 @@ impl<'a, 'b: 'a> TaCompCtx<'a, 'b> {
     }
 }
 
-impl<'a> HasCfg<'a> for TaCompCtx<'a, '_> {
+impl<'a> HasCfg<'a> for TaComputationContext<'a, '_> {
     fn get_cfg(&self) -> &Cfg<'a> {
         self.pi_result.get_graph()
     }
 }
 
-impl HasVsaResult<PiData> for TaCompCtx<'_, '_> {
+impl HasVsaResult<PiData> for TaComputationContext<'_, '_> {
     fn vsa_result(&self) -> &impl VsaResult<ValueDomain = PiData> {
         self.pi_result
     }
 }
 
-impl AsRef<Project> for TaCompCtx<'_, '_> {
+impl AsRef<Project> for TaComputationContext<'_, '_> {
     fn as_ref(&self) -> &Project {
         self.project
     }
 }
 
-impl<'a> TaintAnalysis<'a> for TaCompCtx<'a, '_> {
+impl<'a> TaintAnalysis<'a> for TaComputationContext<'a, '_> {
     /// Generates a CWE warning when a transition function returns the empty
     /// state.
     ///
@@ -312,10 +312,8 @@ impl<'a> TaintAnalysis<'a> for TaCompCtx<'a, '_> {
             register_taint
         };
 
-        let propagated_state = TaState::from_mem_reg_taint(
-            propagated_register_taint,
-            propagated_memory_taint
-        );
+        let propagated_state =
+            TaState::from_mem_reg_taint(propagated_register_taint, propagated_memory_taint);
 
         if propagated_state.is_empty() {
             // If we can not propagate any taint to the caller it is implied

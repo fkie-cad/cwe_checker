@@ -196,7 +196,9 @@ impl<'a, 'b: 'a> CweAnalysis<'a, 'b> {
 
     /// Pops a call of the worklist and returns the taint analysis definition
     /// for it.
-    fn next_call_ctx(&mut self) -> Option<(IsolatedReturnAnalysis<'_>, TaCompCtx<'_, 'b>)> {
+    fn next_call_ctx(
+        &mut self,
+    ) -> Option<(IsolatedReturnAnalysis<'_>, TaComputationContext<'_, 'b>)> {
         self.worklist.calls.pop_front().map(|call| {
             (
                 IsolatedReturnAnalysis::new(
@@ -205,7 +207,12 @@ impl<'a, 'b: 'a> CweAnalysis<'a, 'b> {
                     self.project,
                     self.cwe_sender_proto.clone(),
                 ),
-                TaCompCtx::new(call, self.project, self.pi_result, &self.cwe_sender_proto),
+                TaComputationContext::new(
+                    call,
+                    self.project,
+                    self.pi_result,
+                    &self.cwe_sender_proto,
+                ),
             )
         })
     }
