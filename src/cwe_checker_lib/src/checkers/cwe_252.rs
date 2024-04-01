@@ -9,7 +9,7 @@
 //!
 //! # Examples
 //!
-//! See CVE for examples in Linux user-mode programs:
+//! See the following CVEs for examples in Linux user-mode programs:
 //!
 //! - CVE-2007-5191
 //! - CVE-2017-6964
@@ -34,7 +34,7 @@
 //!   call was successful.
 //!
 //! Taint propagation is stopped along paths as soon as a conditional control
-//! flow transfer depend on a tainted value.
+//! flow transfer depends on a tainted value.
 //!
 //! # Limitations
 //!
@@ -47,7 +47,8 @@
 //!   irrespective of the success or failure of the call.
 //! - Patterns where the return value is handled by giving it as an argument to
 //!   another function call.
-//! - ...
+//! - Taint loss due to Pointer Inference inexactness may cause the return value
+//!   check to not be recognized as such.
 //!
 //! ## False Negatives
 //!

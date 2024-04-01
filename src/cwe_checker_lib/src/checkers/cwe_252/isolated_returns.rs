@@ -2,7 +2,7 @@
 //!
 //! Taint that reaches a return site implies that there is some path from the
 //! call to a fallible function to the return instruction where the return value
-//! is not checked. If additionally, the taint is not not returned to the caller
+//! is not checked. If additionally, the taint is not returned to the caller
 //! we have a bug, since with the return of the function all information about
 //! success or failure of the function call is lost.
 //!

@@ -249,7 +249,7 @@ impl<'a> TaintAnalysis<'a> for TaComputationContext<'a, '_> {
     /// - The calling convention may be unknown, which means we can not
     ///   determine precisely which taint will be reachable for the caller.
     ///
-    /// See the the source code comments for further information.
+    /// See the source code comments for further information.
     ///
     /// Furthermore, this callback is responsible for detecting cases where
     /// taint may reach the end of a function without being returned.
