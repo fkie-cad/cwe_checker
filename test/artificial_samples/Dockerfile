@@ -17,10 +17,10 @@ RUN sudo pip3 install scons
 
 ENV PATH="/home/cwe/.local/bin/:${PATH}"
 
-COPY ./install_cross_compilers.sh .
+COPY --chown=cwe:cwe ./install_cross_compilers.sh .
 
 RUN ./install_cross_compilers.sh
 
-COPY . /home/cwe/artificial_samples/
+COPY --chown=cwe:cwe . /home/cwe/artificial_samples/
 
 WORKDIR /home/cwe/artificial_samples/
