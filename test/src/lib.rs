@@ -19,7 +19,7 @@ pub const LKM_ARCHITECTURES: &[&str] = &["aarch64"];
 /// Compilers used for the Linux kernel module test samples.
 pub const LKM_COMPILERS: &[&str] = &["clang"];
 /// CWEs that are supported for Linux kernel modules.
-pub const LKM_CWE: &[&str] = &["cwe_467", "cwe_476", "cwe_676"];
+pub const LKM_CWE: &[&str] = &["cwe_252", "cwe_467", "cwe_476", "cwe_676"];
 
 /// A test case containing the necessary information to run an acceptance test.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -430,6 +430,9 @@ mod tests {
         let mut error_log = Vec::new();
         let mut tests = linux_test_cases("cwe_252", "CWE252");
         let num_expected_occurences = 9;
+        let num_expected_occurences_lkm = 1;
+
+        tests.extend(lkm_test_cases("cwe_252", "CWE252"));
 
         mark_architecture_skipped(&mut tests, "ppc64");
         mark_architecture_skipped(&mut tests, "ppc64le");
@@ -441,6 +444,12 @@ mod tests {
         mark_skipped(&mut tests, "x86", "gcc");
 
         for test_case in tests {
+            let num_expected_occurences = if test_case.is_lkm {
+                num_expected_occurences_lkm
+            } else {
+                num_expected_occurences
+            };
+
             if let Err(error) = test_case.run_test("[CWE252]", num_expected_occurences) {
                 error_log.push((test_case.get_filepath(), error));
             }
