@@ -33,4 +33,7 @@ sudo apt install -y clang
 
 sudo ln -s /usr/include/asm-generic /usr/include/asm
 
+echo "Cleaning package index."
+sudo apt-get clean && sudo rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
+
 echo "Done."
