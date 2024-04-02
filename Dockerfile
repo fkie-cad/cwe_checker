@@ -9,10 +9,13 @@ FROM ghcr.io/fkie-cad/ghidra_headless_base:11.0.1 as runtime
 
 RUN apt-get -y update \
     && apt-get -y install sudo \
+    && apt-get clean \
+    && rm -rf /var/cache/apt/archives /var/lib/apt/lists/* \
     && useradd -m cwe \
     && echo "cwe:cwe" | chpasswd \
     && adduser cwe sudo \
     && sed -i.bkp -e 's/%sudo\s\+ALL=(ALL\(:ALL\)\?)\s\+ALL/%sudo ALL=NOPASSWD:ALL/g' /etc/sudoers
+
 USER cwe
 
 # Install all necessary files from the builder stage
