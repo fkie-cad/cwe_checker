@@ -4,6 +4,7 @@ use colored::*;
 use std::process::Command;
 
 /// CPU architectures contained in the test samples
+// FIXME: add riscv64 once `register_calling_convention` issue is fixed.
 pub const ARCHITECTURES: &[&str] = &[
     "aarch64", "arm", "mips64", "mips64el", "mips", "mipsel", "ppc64", "ppc64le", "ppc", "x64",
     "x86",

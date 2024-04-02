@@ -25,12 +25,15 @@ echo "Installing cross compiler for ELF PPC architecture."
 sudo apt install -y gcc-powerpc-linux-gnu g++-powerpc-linux-gnu
 sudo apt install -y gcc-powerpc64-linux-gnu g++-powerpc64-linux-gnu
 sudo apt install -y gcc-powerpc64le-linux-gnu g++-powerpc64le-linux-gnu
+echo "Installing cross compiler for ELF RISCV architecture."
+sudo apt install -y gcc-riscv64-linux-gnu g++-riscv64-linux-gnu
 
 echo "Installing llvm compiler backend"
-sudo apt install -y llvm
+sudo apt install -y llvm llvm-10
 echo "Installing clang compiler frontend"
-sudo apt install -y clang
+sudo apt install -y clang clang-10
 
 sudo ln -s /usr/include/asm-generic /usr/include/asm
+sudo ln -s /usr/riscv64-linux-gnu/include/gnu/stubs-lp64d.h /usr/riscv64-linux-gnu/include/gnu/stubs-lp64.h
 
 echo "Done."
