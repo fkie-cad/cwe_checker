@@ -12,7 +12,7 @@ use crate::analysis::forward_interprocedural_fixpoint::{
 use crate::analysis::graph::{Graph as Cfg, HasCfg};
 use crate::analysis::interprocedural_fixpoint_generic::NodeValue;
 use crate::analysis::pointer_inference::{Data as PiData, PointerInference};
-use crate::analysis::taint::state::{MemoryTaint, RegisterTaint, State as TaState};
+use crate::analysis::taint::state::State as TaState;
 use crate::analysis::taint::TaintAnalysis;
 use crate::analysis::vsa_results::{HasVsaResult, VsaResult};
 use crate::intermediate_representation::{Blk, ExternSymbol, Jmp, Project, Term, Tid};
@@ -263,27 +263,25 @@ impl<'a> TaintAnalysis<'a> for TaComputationContext<'a, '_> {
         return_term: &Term<Jmp>,
         calling_convention: &Option<String>,
     ) -> Option<TaState> {
-        let (register_taint, memory_taint) = state.clone().into_mem_reg_taint();
+        let (mut propagated_register_taint, mut propagated_memory_taint) =
+            state.clone().into_mem_reg_taint();
 
         // Only keep memory taint that will be propagated to the caller. We
         // compute this here since we want to notice when no taint is
         // propagated.
         let renaming_map = self.pi_result.get_call_renaming_map(&call_term.tid);
-        let propagated_memory_taint: MemoryTaint = memory_taint
-            .into_iter()
-            .filter(|(aid, _)| {
-                // This is still an over-approximation to the taint that will be
-                // available to the caller since it might happen that all relative
-                // values have non-exactly-known offsets.
-                renaming_map.is_some_and(|renaming_map| {
-                    renaming_map
-                        .get(aid)
-                        .is_some_and(|value| value.referenced_ids().next().is_some())
-                })
+        propagated_memory_taint.retain(|aid, _| {
+            // This is still an over-approximation to the taint that will be
+            // available to the caller since it might happen that all relative
+            // values have non-exactly-known offsets.
+            renaming_map.is_some_and(|renaming_map| {
+                renaming_map
+                    .get(aid)
+                    .is_some_and(|value| value.referenced_ids().next().is_some())
             })
-            .collect();
+        });
 
-        let propagated_register_taint: RegisterTaint = if let Some(calling_convention) = self
+        if let Some(calling_convention) = self
             .project
             .get_specific_calling_convention(calling_convention)
         {
@@ -291,10 +289,8 @@ impl<'a> TaintAnalysis<'a> for TaComputationContext<'a, '_> {
 
             // If there are tainted return registers we propagate the taint to
             // the caller, which makes them responsible for checking it.
-            register_taint
-                .into_iter()
-                .filter(|(reg, taint)| return_registers.contains(&reg) && taint.is_tainted())
-                .collect()
+            propagated_register_taint
+                .retain(|reg, taint| return_registers.contains(&reg) && taint.is_tainted());
         } else {
             // We have tainted registers but we do not know the calling
             // convention. Here we simply return the complete register taint
@@ -309,7 +305,6 @@ impl<'a> TaintAnalysis<'a> for TaComputationContext<'a, '_> {
             //   by the caller such that the taint is immediatly eliminated and
             //   we catch cases where the called function has ignored tainted
             //   values.
-            register_taint
         };
 
         let propagated_state =

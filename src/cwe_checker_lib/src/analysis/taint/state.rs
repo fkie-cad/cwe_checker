@@ -14,27 +14,17 @@ use crate::intermediate_representation::*;
 use crate::prelude::*;
 use crate::utils::debug::ToJsonCompact;
 
-use std::collections::{hash_map, BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 use super::Taint;
 
+mod memory_taint;
+mod register_taint;
 #[cfg(test)]
 mod tests;
 
-// FIXME: Turn those type aliases into proper New Types that are
-// `AbstractDomain`s.
-//
-// Background: Those types are in fact representing complete lattices
-// (space of total functionsfrom some set to complete lattice) and `State` is
-// just their cartesian product. Having this explicit in the type system would
-// make the code in this module a lot cleaner. (When doing this one should also
-// fix the memory merging such that this one actually IS a complete lattice...).
-/// Represents our knowledge about taint in registers at a particular point in
-/// the program.
-pub type RegisterTaint = HashMap<Variable, Taint>;
-/// Represents our knowledge about taint in memory at a particular point in the
-/// program.
-pub type MemoryTaint = HashMap<AbstractIdentifier, MemRegion<Taint>>;
+use memory_taint::MemoryTaint;
+use register_taint::RegisterTaint;
 
 /// The state object of the taint analysis representing all known tainted memory
 /// and register values at a certain location within the program.
@@ -86,13 +76,14 @@ impl AbstractDomain for State {
     fn merge(&self, other: &Self) -> Self {
         let mut new_state = self.clone();
 
-        new_state.merge_register_taint(&other.register_taint);
-
-        for (aid, other_memory_object) in other.memory_taint.iter() {
-            new_state.merge_memory_object_with_offset(aid, other_memory_object, 0);
-        }
+        new_state.merge_with(other);
 
         new_state
+    }
+
+    fn merge_with(&mut self, other: &Self) {
+        self.register_taint.merge_with(&other.register_taint);
+        self.memory_taint.merge_with(&other.memory_taint);
     }
 
     /// The state has no explicit Top element.
@@ -104,11 +95,9 @@ impl AbstractDomain for State {
 impl State {
     /// Returns an empty state.
     pub fn new_empty() -> Self {
-        // Using capacity zero guarantees that the implementation will not
-        // allocate. Do that to keep the cost of creating a new state low.
         Self {
-            register_taint: HashMap::with_capacity(0),
-            memory_taint: HashMap::with_capacity(0),
+            register_taint: RegisterTaint::new(),
+            memory_taint: MemoryTaint::new(),
         }
     }
 
@@ -119,8 +108,8 @@ impl State {
         return_node: NodeIndex,
     ) -> Self {
         let mut state = Self {
-            register_taint: HashMap::new(),
-            memory_taint: HashMap::new(),
+            register_taint: RegisterTaint::new(),
+            memory_taint: MemoryTaint::new(),
         };
 
         for return_arg in taint_source.return_values.iter() {
@@ -227,7 +216,7 @@ impl State {
 
     /// Remove all knowledge about taints contained in memory objects.
     pub fn remove_all_memory_taints(&mut self) {
-        self.memory_taint = HashMap::new();
+        self.memory_taint = MemoryTaint::new();
     }
 
     /// Set the taint of a register.
@@ -472,7 +461,7 @@ impl State {
         } = other;
 
         // Naive merging works for register taint.
-        self.merge_register_taint(other_register_taint);
+        self.register_taint.merge_with(other_register_taint);
 
         let Some(renaming_map) = renaming_map else {
             // Without a renaming rule we can not do anything meaningful with
@@ -506,60 +495,8 @@ impl State {
                 };
 
                 // Starts tracking the object if it does not exist.
-                self.merge_memory_object_with_offset(aid, other_memory_object, offset);
-            }
-        }
-    }
-
-    /// Merges the given register taint into the state.
-    ///
-    /// Equivalent to merging
-    ///     `other_register_taint` x bottom
-    /// into the state.
-    fn merge_register_taint(&mut self, other_register_taint: &RegisterTaint) {
-        use hash_map::Entry::*;
-
-        for (reg, other_taint) in other_register_taint.iter() {
-            match self.register_taint.entry(reg.clone()) {
-                Occupied(mut taint) => {
-                    // FIXME: We create a new owned taint even though we could
-                    // modify in-place.
-                    let new_taint = taint.get().merge(other_taint);
-
-                    taint.insert(new_taint);
-                }
-                Vacant(entry) => {
-                    entry.insert(*other_taint);
-                }
-            }
-        }
-    }
-
-    /// Merges the given pair of abstract identifier and memory object into the
-    /// state.
-    ///
-    /// Equivalent to merging
-    ///     bottom x (`aid` -> (`other_memory_object` + `offset`))
-    /// into the state.
-    fn merge_memory_object_with_offset(
-        &mut self,
-        aid: &AbstractIdentifier,
-        other_memory_object: &MemRegion<Taint>,
-        offset: i64,
-    ) {
-        use hash_map::Entry::*;
-
-        match self.memory_taint.entry(aid.clone()) {
-            Occupied(mut current_memory_object) => {
-                let current_memory_object = current_memory_object.get_mut();
-
-                merge_memory_object_with_offset(current_memory_object, other_memory_object, offset);
-            }
-            Vacant(entry) => {
-                let mut new_memory_object = other_memory_object.clone();
-
-                new_memory_object.add_offset_to_all_indices(offset);
-                entry.insert(new_memory_object);
+                self.memory_taint
+                    .merge_memory_object_with_offset(aid, other_memory_object, offset);
             }
         }
     }
@@ -575,27 +512,6 @@ impl State {
             register_taint,
             memory_taint,
         }
-    }
-}
-
-// FIXME: The used algorithm for merging the taints contained in memory
-// regions is unsound when merging taints that intersect only partially.
-// If, for example, in state A `RSP[0:3]` is tainted and in state B
-// `RSP[2:3]` is tainted, A u B will only report `RSP[2:3]` as tainted.
-//
-// For the NULL pointer dereference check, however, this should not have an
-// effect in practice, since these values are usually unsound or a sign of
-// incorrect behavior of the analysed program.
-// FIXME: This looks a lot like it should be a method on `MemRegion<T>`.
-fn merge_memory_object_with_offset(
-    mem_object: &mut MemRegion<Taint>,
-    other_memory_object: &MemRegion<Taint>,
-    offset: i64,
-) {
-    for (index, taint) in other_memory_object.iter() {
-        mem_object.insert_at_byte_index(*taint, *index + offset);
-        // FIXME: Unsound in theory for partially intersecting
-        // taints. Should not matter in practice.
     }
 }
 

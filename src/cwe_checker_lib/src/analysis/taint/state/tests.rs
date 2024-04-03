@@ -9,8 +9,8 @@ use std::collections::BTreeSet;
 impl State {
     pub fn mock() -> State {
         State {
-            register_taint: HashMap::new(),
-            memory_taint: HashMap::new(),
+            register_taint: RegisterTaint::new(),
+            memory_taint: MemoryTaint::new(),
         }
     }
 
@@ -58,69 +58,6 @@ fn new_id(name: &str) -> AbstractIdentifier {
 fn new_pointer(location: &str, offset: i64) -> DataDomain<ValueDomain> {
     let id = new_id(location);
     DataDomain::from_target(id, bv(offset))
-}
-
-// FIXME: This illustrates the current, unsound merging of memory taints. Make
-// sure to change this test when you work on a better memory model.
-#[test]
-fn merge_memory_object_overlapping() {
-    let taint_8 = Taint::Tainted(ByteSize::new(8));
-    let taint_4 = Taint::Tainted(ByteSize::new(4));
-
-    let mut memory_object = MemRegion::<Taint>::new(ByteSize::new(8));
-    let mut other_memory_object = MemRegion::<Taint>::new(ByteSize::new(8));
-
-    memory_object.insert_at_byte_index(taint_4, 2);
-    memory_object.insert_at_byte_index(taint_8, 8);
-    memory_object.insert_at_byte_index(taint_4, 16);
-    other_memory_object.insert_at_byte_index(taint_8, 0);
-    other_memory_object.insert_at_byte_index(taint_4, 8);
-    other_memory_object.insert_at_byte_index(taint_4, 14);
-
-    merge_memory_object_with_offset(&mut memory_object, &other_memory_object, 0);
-
-    assert_eq!(
-        memory_object.get_unsized(Bitvector::from_i64(0)),
-        Some(taint_8)
-    );
-    assert_eq!(memory_object.get_unsized(Bitvector::from_i64(2)), None);
-    assert_eq!(
-        memory_object.get_unsized(Bitvector::from_i64(8)),
-        Some(taint_4)
-    );
-    assert_eq!(memory_object.get_unsized(Bitvector::from_i64(12)), None);
-    assert_eq!(
-        memory_object.get_unsized(Bitvector::from_i64(14)),
-        Some(taint_4)
-    );
-    assert_eq!(memory_object.get_unsized(Bitvector::from_i64(16)), None);
-}
-
-#[test]
-fn merge_memory_object_nonoverlapping() {
-    let taint_8 = Taint::Tainted(ByteSize::new(8));
-    let taint_4 = Taint::Tainted(ByteSize::new(4));
-    let untaint_4 = Taint::Top(ByteSize::new(4));
-
-    let mut memory_object = MemRegion::<Taint>::new(ByteSize::new(8));
-    let mut other_memory_object = MemRegion::<Taint>::new(ByteSize::new(8));
-
-    memory_object.insert_at_byte_index(taint_8, 8);
-    other_memory_object.insert_at_byte_index(untaint_4, 0);
-    other_memory_object.insert_at_byte_index(taint_4, 4);
-    other_memory_object.insert_at_byte_index(untaint_4, 8);
-
-    merge_memory_object_with_offset(&mut memory_object, &other_memory_object, 0);
-
-    assert_eq!(memory_object.get_unsized(Bitvector::from_i64(0)), None);
-    assert_eq!(
-        memory_object.get_unsized(Bitvector::from_i64(4)),
-        Some(taint_4)
-    );
-    assert_eq!(
-        memory_object.get_unsized(Bitvector::from_i64(8)),
-        Some(taint_8)
-    );
 }
 
 #[test]
