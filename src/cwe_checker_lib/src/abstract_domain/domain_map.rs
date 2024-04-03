@@ -98,16 +98,54 @@ where
         if self == other {
             self.clone()
         } else {
-            DomainMap {
-                inner: Arc::new(S::merge_map(&self.inner, &other.inner)),
-                phantom: PhantomData,
-            }
+            let mut new_map = self.clone();
+
+            new_map.merge_with(other);
+
+            new_map
         }
+    }
+
+    fn merge_with(&mut self, other: &Self) {
+        if self == other {
+            return;
+        }
+
+        let mut_map = Arc::make_mut(&mut self.inner);
+
+        S::merge_map_with(mut_map, &other.inner);
     }
 
     /// A `DomainMap` is considered to be a `Top` element if it is empty.
     fn is_top(&self) -> bool {
         self.inner.is_empty()
+    }
+}
+
+impl<K, V, S> Default for DomainMap<K, V, S>
+where
+    K: PartialOrd + Ord + Clone,
+    V: AbstractDomain,
+    S: MapMergeStrategy<K, V> + Clone + Eq,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<K, V, S> DomainMap<K, V, S>
+where
+    K: PartialOrd + Ord + Clone,
+    V: AbstractDomain,
+    S: MapMergeStrategy<K, V> + Clone + Eq,
+{
+    /// Returns a new, empty map into the abstract domain `V`.
+    ///
+    /// The semantics of an empty map depend on the use case. Oftentimes
+    /// non-existent keys will be mapped to the Top, Bottom, or some default
+    /// element in the target domain.
+    pub fn new() -> Self {
+        BTreeMap::new().into()
     }
 }
 
@@ -118,8 +156,23 @@ where
 /// * [`IntersectMergeStrategy`]
 /// * [`MergeTopStrategy`]
 pub trait MapMergeStrategy<K: Ord + Clone, V: AbstractDomain> {
-    /// This function determines how two [`DomainMap`] instances are merged as abstract domains.
-    fn merge_map(map_left: &BTreeMap<K, V>, map_right: &BTreeMap<K, V>) -> BTreeMap<K, V>;
+    /// This function determines how two [`DomainMap`] instances are merged as
+    /// abstract domains.
+    ///
+    /// # Default
+    ///
+    /// Clones the left side and uses [`MapMergeStrategy::merge_map_with`] to
+    /// combine it with the right side.
+    fn merge_map(map_left: &BTreeMap<K, V>, map_right: &BTreeMap<K, V>) -> BTreeMap<K, V> {
+        let mut map = map_left.clone();
+
+        Self::merge_map_with(&mut map, map_right);
+
+        map
+    }
+
+    /// Merges `map` with `other` by modifying `map` in-place.
+    fn merge_map_with(map: &mut BTreeMap<K, V>, other: &BTreeMap<K, V>);
 }
 
 /// A [`MapMergeStrategy`] where key-value pairs whose key is only present in one input map
@@ -135,45 +188,43 @@ pub struct UnionMergeStrategy {
 }
 
 impl<K: Ord + Clone, V: AbstractDomain> MapMergeStrategy<K, V> for UnionMergeStrategy {
-    fn merge_map(map_left: &BTreeMap<K, V>, map_right: &BTreeMap<K, V>) -> BTreeMap<K, V> {
-        let mut merged_map = map_left.clone();
-        for (key, value_right) in map_right.iter() {
-            merged_map
-                .entry(key.clone())
+    fn merge_map_with(map: &mut BTreeMap<K, V>, other: &BTreeMap<K, V>) {
+        for (key, value_other) in other.iter() {
+            map.entry(key.clone())
                 .and_modify(|value| {
-                    *value = value.merge(value_right);
+                    value.merge_with(value_other);
                 })
-                .or_insert_with(|| value_right.clone());
+                .or_insert_with(|| value_other.clone());
         }
-        merged_map
     }
 }
 
-/// A [`MapMergeStrategy`] where the merge function only keeps keys
-/// that are present in both input maps.
-/// Furthermore, keys whose values are merged to the `Top` value are also removed from the merged map.
+/// A [`MapMergeStrategy`] where the merge function only keeps keys that are
+/// present in both input maps.
 ///
-/// The strategy is meant to be used for maps,
-/// where keys not present in the map have an implicit `Top` value associated to them.
-/// The strategy implicitly assumes
-/// that the `Top` value of the value abstract domain is an actual maximal value of the domain.
+/// Furthermore, keys whose values are merged to the `Top` value are also
+/// removed from the merged map.
+///
+/// The strategy is meant to be used for maps, where keys not present in the map
+/// have an implicit `Top` value associated to them. The strategy implicitly
+/// assumes that the `Top` value of the value abstract domain is an actual
+/// maximal value of the domain.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct IntersectMergeStrategy {
     _private: (), // Marker to prevent instantiation
 }
 
 impl<K: Ord + Clone, V: AbstractDomain> MapMergeStrategy<K, V> for IntersectMergeStrategy {
-    fn merge_map(map_left: &BTreeMap<K, V>, map_right: &BTreeMap<K, V>) -> BTreeMap<K, V> {
-        let mut merged_map = BTreeMap::new();
-        for (key, value_left) in map_left.iter() {
-            if let Some(value_right) = map_right.get(key) {
-                let merged_value = value_left.merge(value_right);
-                if !merged_value.is_top() {
-                    merged_map.insert(key.clone(), merged_value);
-                }
-            }
-        }
-        merged_map
+    fn merge_map_with(map: &mut BTreeMap<K, V>, other: &BTreeMap<K, V>) {
+        map.retain(|k, value| {
+            let Some(value_other) = other.get(k) else {
+                return false;
+            };
+
+            value.merge_with(value_other);
+
+            !value.is_top()
+        });
     }
 }
 
@@ -190,27 +241,29 @@ pub struct MergeTopStrategy {
 }
 
 impl<K: Ord + Clone, V: AbstractDomain + HasTop> MapMergeStrategy<K, V> for MergeTopStrategy {
-    fn merge_map(map_left: &BTreeMap<K, V>, map_right: &BTreeMap<K, V>) -> BTreeMap<K, V> {
-        let mut merged_map = BTreeMap::new();
-        for (var, value_left) in map_left.iter() {
-            let merged_value = if let Some(value_right) = map_right.get(var) {
-                value_left.merge(value_right)
+    fn merge_map_with(map: &mut BTreeMap<K, V>, other: &BTreeMap<K, V>) {
+        map.retain(|key, value| {
+            if let Some(value_other) = other.get(key) {
+                value.merge_with(value_other)
             } else {
-                value_left.top().merge(value_left)
+                let top = value.top();
+
+                value.merge_with(&top);
             };
-            if !merged_value.is_top() {
-                merged_map.insert(var.clone(), merged_value);
-            }
-        }
-        for (var, value_right) in map_right.iter() {
-            if map_left.get(var).is_none() {
-                let merged_value = value_right.top().merge(value_right);
+
+            !value.is_top()
+        });
+        for (k, value_other) in other.iter() {
+            if map.get(k).is_none() {
+                let mut merged_value = value_other.top();
+
+                merged_value.merge_with(value_other);
+
                 if !merged_value.is_top() {
-                    merged_map.insert(var.clone(), merged_value);
+                    map.insert(k.clone(), merged_value);
                 }
             }
         }
-        merged_map
     }
 }
 
