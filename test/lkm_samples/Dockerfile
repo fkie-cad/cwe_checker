@@ -13,7 +13,6 @@ RUN set -x && \
     apt-get update && \
     apt-get install -y -q apt-utils dialog && \
     apt-get install -y -q \
-	aptitude \
 	bc \
 	bison \
 	bsdmainutils \
