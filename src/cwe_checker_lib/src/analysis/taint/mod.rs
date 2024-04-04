@@ -522,6 +522,18 @@ impl AbstractDomain for Taint {
         }
     }
 
+    /// Replaces `self` with `other` iff `self` is untainted and `other` is
+    /// tainted.
+    ///
+    /// No change to `self` is required in the other cases.
+    fn merge_with(&mut self, other: &Self) {
+        use Taint::*;
+
+        if let (Top(_), Tainted(_)) = (&self, other) {
+            *self = *other;
+        };
+    }
+
     /// Checks whether the value is an untainted `Top`-value.
     fn is_top(&self) -> bool {
         matches!(self, Taint::Top(_))
