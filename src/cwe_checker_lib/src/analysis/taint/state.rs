@@ -5,7 +5,8 @@
 
 use crate::abstract_domain::AbstractLocation;
 use crate::abstract_domain::{
-    AbstractDomain, AbstractIdentifier, MemRegion, RegisterDomain, SizedDomain, TryToBitvec,
+    AbstractDomain, AbstractIdentifier, IntervalDomain, MemRegion, RegisterDomain, SizedDomain,
+    TryToBitvec,
 };
 use crate::analysis::graph::NodeIndex;
 use crate::analysis::pointer_inference::Data as PiData;
@@ -187,10 +188,15 @@ impl State {
     /// Mark the value at the given address with the given taint.
     ///
     /// If the address may point to more than one object, we merge the taint
-    /// object with the object at the targets, possibly tainting all possible
-    /// targets.
+    /// into all objects for which the corresponding offset is exact. Since we
+    /// merge, this will never remove any taint.
+    ///
+    /// If the pointee object and offset are exactly known, we write the
+    /// `taint` to the object at the given offset. This may remove taint.
+    ///
+    /// In all other cases we do nothing.
     pub fn save_taint_to_memory(&mut self, address: &PiData, taint: Taint) {
-        if let Some((mem_id, offset)) = address.get_if_unique_target() {
+        if let Some((mem_id, offset)) = get_if_unique_target(address) {
             if let Ok(position) = offset.try_to_bitvec() {
                 if let Some(mem_region) = self.memory_taint.get_mut(mem_id) {
                     mem_region.add(taint, position);
@@ -545,5 +551,19 @@ impl State {
         ];
 
         Value::Object(Map::from_iter(state_map))
+    }
+}
+
+/// Returns target ID and offset iff there is a single relative value.
+///
+/// In contrast to `DataDomain::get_if_unique_target` this function also
+/// returns the pair when the `is_top` flag is set or the value may be absolute.
+fn get_if_unique_target(address: &PiData) -> Option<(&AbstractIdentifier, &IntervalDomain)> {
+    let relative_values = address.get_relative_values();
+
+    if relative_values.len() == 1 {
+        Some(relative_values.iter().next().unwrap())
+    } else {
+        None
     }
 }
