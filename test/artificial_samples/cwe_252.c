@@ -3,6 +3,43 @@
 #include <stdlib.h>
 #include <time.h>
 
+/*
+Explanation of the general naming scheme used for functions in this test and how
+to parse the comments.
+
+Everything between two horizontal / *---- ... ---* / lines belongs to a single
+test case. If there are no `CWE_WARNING...` comments, then the test should not
+cause a warning. If there are such comments, then the test case should cause
+exactly one warning, where the first reported address (source) belongs to the
+line with the comment that has a `1` and the second reported address (sink)
+belongs to a line with a `2`. The `reason=` field in the comment should match
+the one in the cwe warning.
+
+Now to the names:
+
+cwe252_ INTER_OR_INTRA STORAGE+ RETURN? USAGE
+
+INTER_OR_INTRA -> intra | inter_caller | inter_callee
+Tells you if the test is exercising our interprocedural or intraprocedural
+analysis, and if the function is the caller or callee for interprocedural tests.
+
+STORAGE -> r | s | h | g
+Tells you where the relevant tainted values will be stored (register, stack,
+heap, global). So the test checks that we properly track those locations.
+
+RETURN -> return | return ptr | return param | gptr
+For interprocedural test cases, this tells you how the information is propagated
+from the callee to the caller. Taint may be returned directly, a pointer to
+taint may be returned, taint may be written to a pointer parameter, taint may be
+written to a pointer that is stored in a global variable.
+
+USAGE -> lost | unchecked | checked
+This tells you what the test does with the tainted value. Is there a point where
+all taint vanishes from the state (lost)? Is the taint reaching the end of a
+function without being returned (unchecked)? Or is there a check on every path
+from the call site to the end of the function (checked)?
+*/
+
 char *g_ret;
 char **g_ret_store;
 
