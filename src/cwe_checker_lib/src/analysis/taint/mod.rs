@@ -526,12 +526,14 @@ impl AbstractDomain for Taint {
     /// tainted.
     ///
     /// No change to `self` is required in the other cases.
-    fn merge_with(&mut self, other: &Self) {
+    fn merge_with(&mut self, other: &Self) -> &mut Self {
         use Taint::*;
 
         if let (Top(_), Tainted(_)) = (&self, other) {
             *self = *other;
         };
+
+        self
     }
 
     /// Checks whether the value is an untainted `Top`-value.

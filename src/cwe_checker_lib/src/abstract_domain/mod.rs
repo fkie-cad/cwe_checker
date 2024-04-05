@@ -52,14 +52,14 @@ pub trait AbstractDomain: Sized + Eq + Clone {
     ///
     /// Calls [`AbstractDomain::merge`] on the inputs and overwrites `self` with
     /// the result. Does nothing when `self` is equal to `other`.
-    fn merge_with(&mut self, other: &Self) {
-        if self == other {
-            return;
+    fn merge_with(&mut self, other: &Self) -> &mut Self {
+        if self != other {
+            let new_value = self.merge(other);
+
+            *self = new_value;
         }
 
-        let new_value = self.merge(other);
-
-        *self = new_value;
+        self
     }
 
     /// Returns whether the element represents the top element (i.e. maximal with respect to the partial order) or not.

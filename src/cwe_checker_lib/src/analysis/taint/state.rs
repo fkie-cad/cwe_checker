@@ -81,9 +81,11 @@ impl AbstractDomain for State {
         new_state
     }
 
-    fn merge_with(&mut self, other: &Self) {
+    fn merge_with(&mut self, other: &Self) -> &mut Self {
         self.register_taint.merge_with(&other.register_taint);
         self.memory_taint.merge_with(&other.memory_taint);
+
+        self
     }
 
     /// The state has no explicit Top element.

@@ -106,14 +106,14 @@ where
         }
     }
 
-    fn merge_with(&mut self, other: &Self) {
-        if self == other {
-            return;
+    fn merge_with(&mut self, other: &Self) -> &mut Self {
+        if self != other {
+            let mut_map = Arc::make_mut(&mut self.inner);
+
+            S::merge_map_with(mut_map, &other.inner);
         }
 
-        let mut_map = Arc::make_mut(&mut self.inner);
-
-        S::merge_map_with(mut_map, &other.inner);
+        self
     }
 
     /// A `DomainMap` is considered to be a `Top` element if it is empty.
@@ -244,7 +244,7 @@ impl<K: Ord + Clone, V: AbstractDomain + HasTop> MapMergeStrategy<K, V> for Merg
     fn merge_map_with(map: &mut BTreeMap<K, V>, other: &BTreeMap<K, V>) {
         map.retain(|key, value| {
             if let Some(value_other) = other.get(key) {
-                value.merge_with(value_other)
+                value.merge_with(value_other);
             } else {
                 let top = value.top();
 
