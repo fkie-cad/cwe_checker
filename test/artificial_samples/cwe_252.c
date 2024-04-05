@@ -133,7 +133,7 @@ int cwe252_inter_caller_h_gptr_checked(void)
 
 static char **cwe252_inter_callee_h_return_ptr_checked(char *buf, size_t n)
 {
-    char **ret_store = malloc(8);
+    char **ret_store = (char**)malloc(16) + 1;
 
     if (!ret_store)
         return NULL;
