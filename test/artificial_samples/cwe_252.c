@@ -11,7 +11,7 @@ int main()
     return 1;
 }
 
-__attribute_noinline__ int some_func(int x)
+int some_func(int x)
 {
     int seed = x + (int)time(NULL);
     srand(seed);
@@ -20,8 +20,7 @@ __attribute_noinline__ int some_func(int x)
 
 /*----------------------------------------------------------------------------*/
 
-__attribute_noinline__ static void cwe252_inter_callee_g_checked(char *buf,
-                                                                 size_t n)
+static void cwe252_inter_callee_g_checked(char *buf, size_t n)
 {
     g_ret = fgets(buf, n, stdin);
 }
@@ -44,7 +43,7 @@ int cwe252_inter_caller_g_checked(void)
 
 /*----------------------------------------------------------------------------*/
 
-__attribute_noinline__ static void cwe252_inter_callee_g_unchecked(void)
+static void cwe252_inter_callee_g_unchecked(void)
 {
     char buf[10];
 
@@ -67,8 +66,7 @@ int cwe252_inter_caller_g_unchecked(void)
 
 /*----------------------------------------------------------------------------*/
 
-__attribute_noinline__ static void cwe252_inter_callee_h_gptr_checked(char *buf,
-                                                                      size_t n)
+static void cwe252_inter_callee_h_gptr_checked(char *buf, size_t n)
 {
     g_ret_store = malloc(8);
 
@@ -96,8 +94,7 @@ int cwe252_inter_caller_h_gptr_checked(void)
 
 /*----------------------------------------------------------------------------*/
 
-__attribute_noinline__ static char **
-cwe252_inter_callee_h_return_ptr_checked(char *buf, size_t n)
+static char **cwe252_inter_callee_h_return_ptr_checked(char *buf, size_t n)
 {
     char **ret_store = malloc(8);
 
@@ -129,7 +126,7 @@ int cwe252_inter_caller_h_return_ptr_checked(void)
 
 /*----------------------------------------------------------------------------*/
 
-__attribute_noinline__ static char *cwe252_inter_callee_r_return_lost(void)
+static char *cwe252_inter_callee_r_return_lost(void)
 {
     char buf[10];
 
@@ -149,7 +146,7 @@ int cwe252_inter_caller_r_return_lost(void)
 
 /*----------------------------------------------------------------------------*/
 
-__attribute_noinline__ static char *cwe252_inter_callee_rh_return_checked(void)
+static char *cwe252_inter_callee_rh_return_checked(void)
 {
     char buf[10];
     char *volatile *ret_storage = malloc(8);
@@ -181,9 +178,8 @@ int cwe252_inter_caller_rh_return_checked(void)
 
 /*----------------------------------------------------------------------------*/
 
-__attribute_noinline__ static void
-cwe252_inter_callee_s_return_param_checked(char **ret_store, char *buf,
-                                           size_t n)
+static void cwe252_inter_callee_s_return_param_checked(char **ret_store,
+                                                       char *buf, size_t n)
 {
     *ret_store = fgets(buf, n, stdin);
 }
@@ -207,7 +203,7 @@ int cwe252_inter_caller_s_return_param_checked(void)
 
 /*----------------------------------------------------------------------------*/
 
-__attribute_noinline__ static void cwe252_inter_callee_s_unchecked(void)
+static void cwe252_inter_callee_s_unchecked(void)
 {
     char buf[10];
     char *volatile ret;

@@ -428,20 +428,18 @@ mod tests {
     #[ignore]
     fn cwe_252() {
         let mut error_log = Vec::new();
-        let mut tests = linux_test_cases("cwe_252", "CWE252");
+        let mut tests = all_test_cases("cwe_252", "CWE252");
         let num_expected_occurences = 9;
         let num_expected_occurences_lkm = 1;
 
-        tests.extend(lkm_test_cases("cwe_252", "CWE252"));
-
         mark_architecture_skipped(&mut tests, "ppc64");
         mark_architecture_skipped(&mut tests, "ppc64le");
-        mark_skipped(&mut tests, "aarch64", "gcc");
         mark_skipped(&mut tests, "mips", "gcc");
-        mark_skipped(&mut tests, "mips64", "gcc");
-        mark_skipped(&mut tests, "mips64el", "gcc");
+        mark_skipped(&mut tests, "mips64", "clang");
+        mark_skipped(&mut tests, "mips64el", "clang");
         mark_skipped(&mut tests, "mipsel", "gcc");
         mark_skipped(&mut tests, "x86", "gcc");
+        mark_skipped(&mut tests, "x86", "mingw32-gcc");
 
         for test_case in tests {
             let num_expected_occurences = if test_case.is_lkm {
