@@ -1,6 +1,8 @@
 0.9-dev
 ===
 
+-   Improve taint analysis abstraction to simplify interprocedural bottom-up
+    analysis of memory taint (PR #451)
 -   Added check for CWE-252: Unchecked Return Value (PR #451)
 -   Implemented experimental support for Linux Kernel Modules (PR #441)
 -   Support LZCOUNT P-Code operation (PR #444)
