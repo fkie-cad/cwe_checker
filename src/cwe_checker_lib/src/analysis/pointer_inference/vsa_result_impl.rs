@@ -50,4 +50,11 @@ impl<'a> VsaResult for PointerInference<'a> {
             None
         }
     }
+
+    fn get_call_renaming_map(
+        &self,
+        call: &Tid,
+    ) -> Option<&BTreeMap<AbstractIdentifier, Self::ValueDomain>> {
+        self.id_renaming_maps_at_calls.get(call)
+    }
 }

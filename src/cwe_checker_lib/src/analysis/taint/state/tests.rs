@@ -1,14 +1,16 @@
 use super::*;
+
 use crate::analysis::graph::NodeIndex;
 use crate::analysis::pointer_inference::{tests::MockVsaResult, State as PiState, ValueDomain};
 use crate::{abstract_domain::*, expr, variable};
+
 use std::collections::BTreeSet;
 
 impl State {
     pub fn mock() -> State {
         State {
-            register_taint: HashMap::new(),
-            memory_taint: HashMap::new(),
+            register_taint: RegisterTaint::new(),
+            memory_taint: MemoryTaint::new(),
         }
     }
 

@@ -19,7 +19,7 @@ pub const LKM_ARCHITECTURES: &[&str] = &["aarch64"];
 /// Compilers used for the Linux kernel module test samples.
 pub const LKM_COMPILERS: &[&str] = &["clang"];
 /// CWEs that are supported for Linux kernel modules.
-pub const LKM_CWE: &[&str] = &["cwe_467", "cwe_476", "cwe_676"];
+pub const LKM_CWE: &[&str] = &["cwe_252", "cwe_467", "cwe_476", "cwe_676"];
 
 /// A test case containing the necessary information to run an acceptance test.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -41,15 +41,21 @@ pub struct CweTestCase {
 impl CweTestCase {
     /// Get the file path of the test binary
     fn get_filepath(&self) -> String {
+        let cwd = std::env::current_dir()
+            .unwrap()
+            .into_os_string()
+            .into_string()
+            .unwrap();
+
         if self.is_lkm {
             format!(
-                "lkm_samples/build/{}_{}_{}.ko",
-                self.cwe, self.architecture, self.compiler
+                "{}/lkm_samples/build/{}_{}_{}.ko",
+                cwd, self.cwe, self.architecture, self.compiler
             )
         } else {
             format!(
-                "artificial_samples/build/{}_{}_{}.out",
-                self.cwe, self.architecture, self.compiler
+                "{}/artificial_samples/build/{}_{}_{}.out",
+                cwd, self.cwe, self.architecture, self.compiler
             )
         }
     }
@@ -412,6 +418,41 @@ mod tests {
                 error_log.push((test_case.get_filepath(), error));
             }
         }
+        if !error_log.is_empty() {
+            print_errors(error_log);
+            panic!();
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn cwe_252() {
+        let mut error_log = Vec::new();
+        let mut tests = all_test_cases("cwe_252", "CWE252");
+        let num_expected_occurences = 9;
+        let num_expected_occurences_lkm = 1;
+
+        mark_architecture_skipped(&mut tests, "ppc64");
+        mark_architecture_skipped(&mut tests, "ppc64le");
+        mark_skipped(&mut tests, "mips", "gcc");
+        mark_skipped(&mut tests, "mips64", "clang");
+        mark_skipped(&mut tests, "mips64el", "clang");
+        mark_skipped(&mut tests, "mipsel", "gcc");
+        mark_skipped(&mut tests, "x86", "gcc");
+        mark_skipped(&mut tests, "x86", "mingw32-gcc");
+
+        for test_case in tests {
+            let num_expected_occurences = if test_case.is_lkm {
+                num_expected_occurences_lkm
+            } else {
+                num_expected_occurences
+            };
+
+            if let Err(error) = test_case.run_test("[CWE252]", num_expected_occurences) {
+                error_log.push((test_case.get_filepath(), error));
+            }
+        }
+
         if !error_log.is_empty() {
             print_errors(error_log);
             panic!();

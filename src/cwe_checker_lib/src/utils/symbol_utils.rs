@@ -1,7 +1,7 @@
 //! Helper functions for common tasks utilizing extern symbols,
 //! e.g. searching for calls to a specific extern symbol.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::intermediate_representation::*;
 
@@ -42,7 +42,12 @@ pub fn get_calls_to_symbols<'a, 'b>(
 }
 
 /// Get a map from TIDs to the corresponding extern symbol struct.
-/// Only symbols with names contained in `symbols_to_find` are contained in the map.
+///
+/// Only symbols with names contained in `symbols_to_find` are contained in the
+/// map.
+///
+/// This is O(|symbols_to_find| x |extern_symbols|), prefer
+/// [`get_symbol_map_fast`] if speed matters.
 pub fn get_symbol_map<'a>(
     project: &'a Project,
     symbols_to_find: &[String],
@@ -67,6 +72,33 @@ pub fn get_symbol_map<'a>(
         }
     }
     tid_map
+}
+
+/// Get a map from TIDs to the corresponding extern symbol struct.
+///
+/// Only symbols with names contained in `symbols_to_find` are contained in the
+/// map.
+///
+/// More efficient than [`get_symbol_map`], prefer this if `symbols_to_find` is
+/// huge since this is O(|extern_symbols|) and not
+/// O(|symbols_to_find|x|extern_symbols|).
+pub fn get_symbol_map_fast<'a>(
+    project: &'a Project,
+    symbols_to_find: &HashSet<String>,
+) -> HashMap<Tid, &'a ExternSymbol> {
+    project
+        .program
+        .term
+        .extern_symbols
+        .iter()
+        .filter_map(|(_tid, symbol)| {
+            if symbols_to_find.contains(&symbol.name) {
+                Some((symbol.tid.clone(), symbol))
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 /// Find calls to TIDs contained as keys in the given symbol map.

@@ -5,29 +5,61 @@
 
 use crate::abstract_domain::AbstractLocation;
 use crate::abstract_domain::{
-    AbstractDomain, AbstractIdentifier, MemRegion, RegisterDomain, SizedDomain, TryToBitvec,
+    AbstractDomain, AbstractIdentifier, IntervalDomain, MemRegion, RegisterDomain, SizedDomain,
+    TryToBitvec,
 };
 use crate::analysis::graph::NodeIndex;
 use crate::analysis::pointer_inference::Data as PiData;
 use crate::analysis::vsa_results::VsaResult;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
+use crate::utils::debug::ToJsonCompact;
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use super::Taint;
 
+mod memory_taint;
+mod register_taint;
 #[cfg(test)]
 mod tests;
+
+use memory_taint::MemoryTaint;
+use register_taint::RegisterTaint;
 
 /// The state object of the taint analysis representing all known tainted memory
 /// and register values at a certain location within the program.
 #[derive(Serialize, Deserialize, Debug, Eq, Clone)]
 pub struct State {
     /// The set of currently tainted registers.
-    register_taint: HashMap<Variable, Taint>,
+    register_taint: RegisterTaint,
     /// The Taint contained in memory objects
-    memory_taint: HashMap<AbstractIdentifier, MemRegion<Taint>>,
+    memory_taint: MemoryTaint,
+}
+
+impl ToJsonCompact for State {
+    fn to_json_compact(&self) -> serde_json::Value {
+        let mut state_map = serde_json::Map::new();
+
+        let register_taint = self
+            .register_taint
+            .iter()
+            .map(|(reg, taint)| (reg.name.clone(), taint.to_json_compact()))
+            .collect();
+        let register_taint = serde_json::Value::Object(register_taint);
+
+        let memory_taint = self
+            .memory_taint
+            .iter()
+            .map(|(mem_id, mem_region)| (mem_id.to_string(), mem_region.to_json_compact()))
+            .collect();
+        let memory_taint = serde_json::Value::Object(memory_taint);
+
+        state_map.insert("registers".into(), register_taint);
+        state_map.insert("memory".into(), memory_taint);
+
+        serde_json::Value::Object(state_map)
+    }
 }
 
 impl PartialEq for State {
@@ -42,41 +74,19 @@ impl AbstractDomain for State {
     ///
     /// Any value tainted in at least one input state is also tainted in the
     /// merged state.
-    // FIXME: The used algorithm for merging the taints contained in memory
-    // regions is unsound when merging taints that intersect only partially.
-    // If, for example, in state A `RSP[0:3]` is tainted and in state B
-    // `RSP[2:3]` is tainted, A u B will only report `RSP[2:3]` as tainted.
-    //
-    // For the NULL pointer dereference check, however, this should not have an
-    // effect in practice, since these values are usually unsound or a sign of
-    // incorrect behavior of the analysed program.
     fn merge(&self, other: &Self) -> Self {
-        let mut register_taint = self.register_taint.clone();
-        for (var, other_taint) in other.register_taint.iter() {
-            if let Some(taint) = self.register_taint.get(var) {
-                register_taint.insert(var.clone(), taint.merge(other_taint));
-            } else {
-                register_taint.insert(var.clone(), *other_taint);
-            }
-        }
+        let mut new_state = self.clone();
 
-        let mut memory_taint = self.memory_taint.clone();
-        for (tid, other_mem_region) in other.memory_taint.iter() {
-            if let Some(mem_region) = memory_taint.get_mut(tid) {
-                for (index, taint) in other_mem_region.iter() {
-                    mem_region.insert_at_byte_index(*taint, *index);
-                    // FIXME: Unsound in theory for partially intersecting
-                    // taints. Should not matter in practice.
-                }
-            } else {
-                memory_taint.insert(tid.clone(), other_mem_region.clone());
-            }
-        }
+        new_state.merge_with(other);
 
-        State {
-            register_taint,
-            memory_taint,
-        }
+        new_state
+    }
+
+    fn merge_with(&mut self, other: &Self) -> &mut Self {
+        self.register_taint.merge_with(&other.register_taint);
+        self.memory_taint.merge_with(&other.memory_taint);
+
+        self
     }
 
     /// The state has no explicit Top element.
@@ -88,11 +98,9 @@ impl AbstractDomain for State {
 impl State {
     /// Returns an empty state.
     pub fn new_empty() -> Self {
-        // Using capacity zero guarantees that the implementation will not
-        // allocate. Do that to keep the cost of creating a new state low.
         Self {
-            register_taint: HashMap::with_capacity(0),
-            memory_taint: HashMap::with_capacity(0),
+            register_taint: RegisterTaint::new(),
+            memory_taint: MemoryTaint::new(),
         }
     }
 
@@ -103,8 +111,8 @@ impl State {
         return_node: NodeIndex,
     ) -> Self {
         let mut state = Self {
-            register_taint: HashMap::new(),
-            memory_taint: HashMap::new(),
+            register_taint: RegisterTaint::new(),
+            memory_taint: MemoryTaint::new(),
         };
 
         for return_arg in taint_source.return_values.iter() {
@@ -180,10 +188,15 @@ impl State {
     /// Mark the value at the given address with the given taint.
     ///
     /// If the address may point to more than one object, we merge the taint
-    /// object with the object at the targets, possibly tainting all possible
-    /// targets.
+    /// into all objects for which the corresponding offset is exact. Since we
+    /// merge, this will never remove any taint.
+    ///
+    /// If the pointee object and offset are exactly known, we write the
+    /// `taint` to the object at the given offset. This may remove taint.
+    ///
+    /// In all other cases we do nothing.
     pub fn save_taint_to_memory(&mut self, address: &PiData, taint: Taint) {
-        if let Some((mem_id, offset)) = address.get_if_unique_target() {
+        if let Some((mem_id, offset)) = get_if_unique_target(address) {
             if let Ok(position) = offset.try_to_bitvec() {
                 if let Some(mem_region) = self.memory_taint.get_mut(mem_id) {
                     mem_region.add(taint, position);
@@ -211,7 +224,7 @@ impl State {
 
     /// Remove all knowledge about taints contained in memory objects.
     pub fn remove_all_memory_taints(&mut self) {
-        self.memory_taint = HashMap::new();
+        self.memory_taint = MemoryTaint::new();
     }
 
     /// Set the taint of a register.
@@ -221,6 +234,14 @@ impl State {
         } else {
             self.register_taint.insert(register.clone(), taint);
         }
+    }
+
+    /// Returns the taint state of the given register.
+    pub fn get_register_taint(&self, register: &Variable) -> Taint {
+        self.register_taint
+            .get(register)
+            .copied()
+            .unwrap_or(Taint::Top(register.size))
     }
 
     /// Returns true if the memory object with the given ID contains a tainted
@@ -405,7 +426,14 @@ impl State {
 
     /// Check whether `self` contains any taint at all.
     pub fn is_empty(&self) -> bool {
-        !self.has_memory_taint() && self.register_taint.is_empty()
+        !self.has_memory_taint() && !self.has_register_taint()
+    }
+
+    /// Check whether there are any tainted registers in the state.
+    pub fn has_register_taint(&self) -> bool {
+        self.register_taint
+            .iter()
+            .any(|(_, taint)| matches!(*taint, Taint::Tainted(_)))
     }
 
     /// Check whether there is any tainted memory in the state.
@@ -417,6 +445,81 @@ impl State {
             .iter()
             .flat_map(|(_, mem_region)| mem_region.iter())
             .any(|(_, taint)| taint.is_tainted())
+    }
+
+    /// Merges the given `other` state into this state with renaming of abstract
+    /// identifiers.
+    ///
+    /// The set of valid abstract identfiers (aIDs) is local to a given
+    /// function. When merging states across function boundaries it is necessary
+    /// to map aIDs into the set of valid aIDs in the target context before
+    /// performing the merging.
+    ///
+    /// This function assumes that the target context is the one of `self` and
+    /// that `renaming_map` specifies how valid aIDs in the context of `other`
+    /// correspond to the aIDs of this context.
+    pub fn merge_with_renaming(
+        &mut self,
+        other: &Self,
+        renaming_map: Option<&BTreeMap<AbstractIdentifier, PiData>>,
+    ) {
+        let Self {
+            register_taint: other_register_taint,
+            memory_taint: other_memory_taint,
+        } = other;
+
+        // Naive merging works for register taint.
+        self.register_taint.merge_with(other_register_taint);
+
+        let Some(renaming_map) = renaming_map else {
+            // Without a renaming rule we can not do anything meaningful with
+            // the memory objects of the other state, i.e., we are done here.
+            return;
+        };
+
+        for (other_aid, other_memory_object) in other_memory_taint.iter() {
+            let Some(value) = renaming_map.get(other_aid) else {
+                // The pointer inference decided that this object is not
+                // referenced in the context of `self`, so no need to merge it.
+                continue;
+            };
+            // There is more information in `value` that we could base our
+            // decision on; however,
+            // - we decide to ignore whether the `value` may  be absolute in the
+            //   context of `self`. This is not important for taint analyses.
+            // - in cases where it may be some unknown base + offset it is still
+            //   worth handling the bases that we know about.
+            for (aid, offset_interval) in value.get_relative_values() {
+                let Ok(offset) = offset_interval.try_to_offset() else {
+                    // The offset of the old memory object into the new one is
+                    // not known exactly. At this point we could merge the old
+                    // object at every possible offset (sound) or not merge at
+                    // all (unsound).
+                    //
+                    // Depending on the analysis it will lead to more FP
+                    // (CWE252) or FN (CWE476); on the upside, we have to track
+                    // less state and are faster.
+                    continue;
+                };
+
+                // Starts tracking the object if it does not exist.
+                self.memory_taint
+                    .merge_memory_object_with_offset(aid, other_memory_object, offset);
+            }
+        }
+    }
+
+    /// Deconstructs a `State` into its register and memory taint maps.
+    pub fn into_mem_reg_taint(self) -> (RegisterTaint, MemoryTaint) {
+        (self.register_taint, self.memory_taint)
+    }
+
+    /// Constructs a `State` from register and memory taint maps.
+    pub fn from_mem_reg_taint(register_taint: RegisterTaint, memory_taint: MemoryTaint) -> Self {
+        Self {
+            register_taint,
+            memory_taint,
+        }
     }
 }
 
@@ -448,5 +551,19 @@ impl State {
         ];
 
         Value::Object(Map::from_iter(state_map))
+    }
+}
+
+/// Returns target ID and offset iff there is a single relative value.
+///
+/// In contrast to `DataDomain::get_if_unique_target` this function also
+/// returns the pair when the `is_top` flag is set or the value may be absolute.
+fn get_if_unique_target(address: &PiData) -> Option<(&AbstractIdentifier, &IntervalDomain)> {
+    let relative_values = address.get_relative_values();
+
+    if relative_values.len() == 1 {
+        Some(relative_values.iter().next().unwrap())
+    } else {
+        None
     }
 }

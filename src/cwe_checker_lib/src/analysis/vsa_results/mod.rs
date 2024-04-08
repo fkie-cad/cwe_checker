@@ -1,10 +1,12 @@
 //! This module provides the [`VsaResult`] trait
 //! which defines an interface for the results of analyses similar to a value set analysis.
 
-use crate::abstract_domain::AbstractLocation;
+use crate::abstract_domain::{AbstractIdentifier, AbstractLocation};
 use crate::analysis::graph::NodeIndex;
 use crate::intermediate_representation::{Arg, Expression};
 use crate::prelude::*;
+
+use std::collections::BTreeMap;
 
 /// Trait for types that provide access to the result of a value set analysis.
 ///
@@ -59,4 +61,13 @@ pub trait VsaResult {
     /// Evaluate the given expression at the given node of the graph that the
     /// value set analysis was computed on.
     fn eval_at_node(&self, node: NodeIndex, expression: &Expression) -> Option<Self::ValueDomain>;
+
+    /// Returns the mapping of abstract identfiers in the callee to values in
+    /// the caller for the given call.
+    fn get_call_renaming_map(
+        &self,
+        _call: &Tid,
+    ) -> Option<&BTreeMap<AbstractIdentifier, Self::ValueDomain>> {
+        None
+    }
 }

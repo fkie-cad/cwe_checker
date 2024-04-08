@@ -36,9 +36,31 @@ pub use domain_map::*;
 /// Each abstract domain is partially ordered.
 /// Abstract domains of the same type can be merged.
 pub trait AbstractDomain: Sized + Eq + Clone {
-    /// Return an upper bound (with respect to the partial order on the domain) for the two inputs `self` and `other`.
+    /// Returns an upper bound (with respect to the partial order on the domain)
+    /// for the two inputs `self` and `other`.
     #[must_use]
     fn merge(&self, other: &Self) -> Self;
+
+    /// Returns an upper bound (with respect to the partial order on the domain)
+    /// for the two inputs `self` and `other`.
+    ///
+    /// Modifies `self` in-place to hold the result. This can be useful in
+    /// situations where it is not necessary to create a new object and more
+    /// efficient to modify an existing one in-place.
+    ///
+    /// # Default
+    ///
+    /// Calls [`AbstractDomain::merge`] on the inputs and overwrites `self` with
+    /// the result. Does nothing when `self` is equal to `other`.
+    fn merge_with(&mut self, other: &Self) -> &mut Self {
+        if self != other {
+            let new_value = self.merge(other);
+
+            *self = new_value;
+        }
+
+        self
+    }
 
     /// Returns whether the element represents the top element (i.e. maximal with respect to the partial order) or not.
     /// If a domain has no maximal element, this function should always return false.
