@@ -2,7 +2,7 @@ import os
 
 build_path = 'build'
 
-supported_architectures = ['x64', 'x86', 'arm', 'aarch64', 'mips', 'mipsel', 'mips64', 'mips64el', 'ppc', 'ppc64', 'ppc64le']
+supported_architectures = ['x64', 'x86', 'arm', 'aarch64', 'mips', 'mipsel', 'mips64', 'mips64el', 'ppc', 'ppc64', 'ppc64le', 'riscv64']
 skip_for_pe = ['cwe_782.c', 'cwe_426.c', 'cwe_243.c', 'cwe_243_clean.c']
 
 c_compilers = {'x64': ['gcc', 'x86_64-w64-mingw32-gcc', 'clang'],
@@ -15,7 +15,8 @@ c_compilers = {'x64': ['gcc', 'x86_64-w64-mingw32-gcc', 'clang'],
                'mips64el': ['mips64el-linux-gnuabi64-gcc', 'clang'],
                'ppc': ['powerpc-linux-gnu-gcc'],
                'ppc64': ['powerpc64-linux-gnu-gcc', 'clang'],
-               'ppc64le': ['powerpc64le-linux-gnu-gcc', 'clang']}
+               'ppc64le': ['powerpc64le-linux-gnu-gcc', 'clang'],
+               'riscv64': ['riscv64-linux-gnu-gcc', 'clang-10']}
 
 cpp_compilers = {'x64': ['g++', 'x86_64-w64-mingw32-g++', 'clang++'],
                  'x86': ['g++', 'i686-w64-mingw32-g++', 'clang++'],
@@ -27,7 +28,8 @@ cpp_compilers = {'x64': ['g++', 'x86_64-w64-mingw32-g++', 'clang++'],
                  'mips64el': ['mips64el-linux-gnuabi64-g++'],
                  'ppc': ['powerpc-linux-gnu-g++'],
                  'ppc64': ['powerpc64-linux-gnu-g++'],
-                 'ppc64le': ['powerpc64le-linux-gnu-g++']}
+                 'ppc64le': ['powerpc64le-linux-gnu-g++'],
+                 'riscv64': ['riscv64-linux-gnu-g++']}
 
 flags = {'x64': ' -g -fno-stack-protector -std=c11',
          'x86': ' -g -m32 -fno-stack-protector -std=c11',
@@ -39,7 +41,8 @@ flags = {'x64': ' -g -fno-stack-protector -std=c11',
          'mips64el': ' -g -fno-stack-protector -std=c11',
          'ppc': ' -g -fno-stack-protector -std=c11',
          'ppc64': ' -g -fno-stack-protector -std=c11',
-         'ppc64le': ' -g -fno-stack-protector -std=c11'}
+         'ppc64le': ' -g -fno-stack-protector -std=c11',
+         'riscv64': ' -g -fno-stack-protector -std=c11'}
 
 target_flags = {'x64': '',
                'x86': ' -m32 ',
@@ -50,7 +53,8 @@ target_flags = {'x64': '',
                'mips64': ' -target mips64-linux-gnuabi64',
                'mips64el': ' -target mips64el-linux-gnuabi64',
                'ppc64': ' -target powerpc64-linux-gnu',
-               'ppc64le': ' -target powerpc64le-linux-gnu'}
+               'ppc64le': ' -target powerpc64le-linux-gnu',
+               'riscv64': ' -target riscv64-linux-gnu'}
 
 
 cpp_flags = {'x64': ' -g -fno-stack-protector',
@@ -63,7 +67,8 @@ cpp_flags = {'x64': ' -g -fno-stack-protector',
              'mips64el': ' -g -fno-stack-protector',
              'ppc': ' -g -fno-stack-protector',
              'ppc64': ' -g -fno-stack-protector',
-             'ppc64le': ' -g -fno-stack-protector',}
+             'ppc64le': ' -g -fno-stack-protector',
+             'riscv64': ' -g -fno-stack-protector',}
 
 def which(pgm):
     # check compilers on path
@@ -85,8 +90,8 @@ def optimize(filename):
         return ' -O0'
 
 
-def get_compiler_abrev(compiler_name):
-    if 'clang' == compiler_name:
+def get_compiler_abrev(compiler_name: str):
+    if 'clang' == compiler_name or compiler_name.startswith('clang-'):
         return 'clang'
     if 'clang++' == compiler_name:
         return 'clang++'
@@ -105,7 +110,7 @@ def compile_only_on_x64(filename, arch):
     return filename in only_x64 and arch != 'x64'
 
 
-def build_c(arch, compiler):
+def build_c(arch, compiler: str):
     if which(compiler) is not None:
         for prog in Glob('*.c'):
             if compile_only_on_x64(str(prog), arch):
@@ -114,7 +119,7 @@ def build_c(arch, compiler):
 
             env = Environment()
             env['CC'] = compiler
-            if compiler == 'clang':
+            if compiler == 'clang' or compiler.startswith('clang-'):
                 env['CCFLAGS'] = target_flags[arch] + flags[arch] + optimize(str(prog))
                 env['LINKFLAGS'] = target_flags[arch]
             else:
