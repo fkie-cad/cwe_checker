@@ -743,6 +743,13 @@ impl From<Bitvector> for IntervalDomain {
     }
 }
 
+impl From<i64> for IntervalDomain {
+    /// Create a new interval containing only `value`.
+    fn from(value: i64) -> Self {
+        Self::new(value.into(), value.into())
+    }
+}
+
 impl TryToBitvec for IntervalDomain {
     /// If the domain represents an interval of length one, return the contained value.
     fn try_to_bitvec(&self) -> Result<Bitvector, Error> {
