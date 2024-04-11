@@ -8,6 +8,7 @@
 //! [taint analysis module]: crate::analysis::taint
 
 use super::CWE_MODULE;
+use crate::analysis::function_signature::FunctionSignature;
 use crate::analysis::graph::{Graph as Cfg, HasCfg, Node as CfgNode};
 use crate::analysis::pointer_inference::{
     Data as PiData, PointerInference as PointerInferenceComputation,
@@ -17,7 +18,7 @@ use crate::analysis::vsa_results::{HasVsaResult, VsaResult};
 use crate::intermediate_representation::*;
 use crate::utils::log::CweWarning;
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::convert::AsRef;
 
 use super::Config;
@@ -38,6 +39,9 @@ pub struct Context<'a> {
     /// They are used to determine the targets of pointers to memory, which in
     /// turn is used to keep track of taint on the stack or on the heap.
     pi_result: &'a PointerInferenceComputation<'a>,
+    /// A pointer to the computed function signatures for all internal
+    /// functions.
+    function_signatures: &'a BTreeMap<Tid, FunctionSignature>,
     /// The call whose return values are the sources for taint for the analysis.
     taint_source: Option<&'a Term<Jmp>>,
     /// The name of the function, whose return values are the taint sources.
@@ -126,7 +130,7 @@ impl<'a> TaintAnalysis<'a> for Context<'a> {
         &self,
         state: &TaState,
         call: &Term<Jmp>,
-        _target: &CfgNode,
+        target: &CfgNode,
         calling_convention: &Option<String>,
     ) -> Option<TaState> {
         if self.strict_call_policy {
@@ -139,7 +143,19 @@ impl<'a> TaintAnalysis<'a> for Context<'a> {
                 self.generate_cwe_warning(&call.tid, "call_arg_taint");
             }
         } else {
-            // pass
+            let CfgNode::BlkStart(_, sub) = *target else {
+                return None;
+            };
+            let function_signature = self.function_signatures.get(&sub.tid)?;
+
+            for (arg, access_pattern) in &function_signature.parameters {
+                if !access_pattern.is_dereferenced() {
+                    continue;
+                }
+                if state.check_abstract_location_for_taint(self.vsa_result(), &call.tid, arg) {
+                    self.generate_cwe_warning(&call.tid, "call_arg_taint_fn_sig");
+                }
+            }
         }
 
         None
@@ -267,6 +283,7 @@ impl<'a> Context<'a> {
         config: &Config,
         project: &'a Project,
         pi_result: &'a PointerInferenceComputation<'a>,
+        function_signatures: &'a BTreeMap<Tid, FunctionSignature>,
         cwe_collector: crossbeam_channel::Sender<CweWarning>,
     ) -> Self {
         let mut extern_symbol_map = HashMap::new();
@@ -276,6 +293,7 @@ impl<'a> Context<'a> {
         Context {
             project,
             pi_result,
+            function_signatures,
             taint_source: None,
             taint_source_name: None,
             cwe_collector,
@@ -336,9 +354,16 @@ mod tests {
             config: &Config,
             project: &'a Project,
             pi_results: &'a PointerInferenceComputation<'a>,
+            function_signatures: &'a BTreeMap<Tid, FunctionSignature>,
         ) -> Context<'a> {
             let (cwe_sender, _) = crossbeam_channel::unbounded();
-            let mut context = Context::new(&config, project, pi_results, cwe_sender);
+            let mut context = Context::new(
+                &config,
+                project,
+                pi_results,
+                function_signatures,
+                cwe_sender,
+            );
             let taint_source = Box::new(Term {
                 tid: Tid::new("taint_source"),
                 term: Jmp::Call {
@@ -358,8 +383,9 @@ mod tests {
     fn update_call_generic() {
         let project = Project::mock_x64();
         let pi_results = PointerInferenceComputation::mock(&project);
+        let function_signatures = BTreeMap::new();
         let config = Config::mock(true);
-        let context = Context::mock(&config, &project, &pi_results);
+        let context = Context::mock(&config, &project, &pi_results, &function_signatures);
         let mut state = TaState::mock();
 
         // Test that taint is propagated through calls that do not receive
@@ -381,8 +407,9 @@ mod tests {
     fn update_jump() {
         let project = Project::mock_x64();
         let pi_results = PointerInferenceComputation::mock(&project);
+        let function_signatures = BTreeMap::new();
         let config = Config::mock(true);
-        let context = Context::mock(&config, &project, &pi_results);
+        let context = Context::mock(&config, &project, &pi_results, &function_signatures);
         let (state, _pi_state) = TaState::mock_with_pi_state();
 
         // Test that no taint is propagated through conditions that depend on a

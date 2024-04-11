@@ -97,7 +97,13 @@ pub fn check_cwe(
 
     let config: Config = serde_json::from_value(cwe_params.clone()).unwrap();
     let symbol_map = symbol_utils::get_symbol_map(project, &config.symbols[..]);
-    let general_context = Context::new(&config, project, pi_result, cwe_sender);
+    let general_context = Context::new(
+        &config,
+        project,
+        pi_result,
+        analysis_results.function_signatures.unwrap(),
+        cwe_sender,
+    );
 
     for edge in general_context.get_graph().edge_references() {
         let Edge::ExternCallStub(jmp) = edge.weight() else {
