@@ -256,7 +256,7 @@ impl State {
     ///
     /// Returns true iff the value at any of the exact memory locations that the
     /// pointer may point to is tainted.
-    pub fn check_if_address_points_to_taint(&self, address: PiData) -> bool {
+    pub fn check_if_address_points_to_taint(&self, address: &PiData) -> bool {
         address
             .get_relative_values()
             .iter()
@@ -294,7 +294,7 @@ impl State {
                 POINTER_TAINT
                 && vsa_result
                 .eval_parameter_location_at_call(jmp_tid, &AbstractLocation::Register(register.clone()))
-                .is_some_and(|register_value| self.check_if_address_points_to_taint(register_value))
+                .is_some_and(|register_value| self.check_if_address_points_to_taint(&register_value))
             )
         })
     }
@@ -405,7 +405,7 @@ impl State {
                     ||
                     // Check if value in parameter register points to taint.
                     (POINTER_TAINT && vsa_result.eval_at_jmp(call_tid, expr).is_some_and(|register_value| {
-                        self.check_if_address_points_to_taint(register_value)
+                        self.check_if_address_points_to_taint(&register_value)
                     }))
                 }
                 Arg::Stack { address, size, .. } => {
@@ -417,7 +417,7 @@ impl State {
                     ||
                     // Check if stack-based argument points to taint.
                     (POINTER_TAINT && vsa_result.eval_parameter_arg_at_call(call_tid, parameter).is_some_and(|stack_value| {
-                        self.check_if_address_points_to_taint(stack_value)
+                        self.check_if_address_points_to_taint(&stack_value)
                     }))
                 },
             }
