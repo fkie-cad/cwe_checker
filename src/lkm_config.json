@@ -618,11 +618,8 @@
   },
   "CWE476": {
     "_comment": "Every function in the Linux LKM API that returns a pointer to a non-pointer type.",
-    "parameters": [
-      "strict_call_policy=true",
-      "strict_memory_policy=false",
-      "max_steps=100"
-    ],
+    "strict_call_policy": false,
+    "max_steps": 100,
     "symbols": [
       "I_BDEV",
       "ZSTD_customCalloc",
