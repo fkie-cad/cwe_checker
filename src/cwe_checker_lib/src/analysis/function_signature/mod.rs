@@ -45,6 +45,7 @@ use crate::analysis::graph::*;
 use crate::analysis::interprocedural_fixpoint_generic::NodeValue;
 use crate::intermediate_representation::*;
 use crate::prelude::*;
+use crate::utils::debug::ToJsonCompact;
 use crate::utils::log::LogMessage;
 use std::collections::BTreeMap;
 
@@ -380,10 +381,10 @@ impl Default for FunctionSignature {
     }
 }
 
-impl FunctionSignature {
-    /// Generate a compact JSON-representation of the function signature for pretty printing.
-    #[allow(dead_code)]
-    pub fn to_json_compact(&self) -> serde_json::Value {
+impl ToJsonCompact for FunctionSignature {
+    /// Generate a compact JSON-representation of the function signature for
+    /// pretty printing.
+    fn to_json_compact(&self) -> serde_json::Value {
         let mut json_map = serde_json::Map::new();
         let mut param_map = serde_json::Map::new();
         for (param, pattern) in self.parameters.iter() {
