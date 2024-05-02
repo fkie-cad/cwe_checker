@@ -378,6 +378,40 @@ pub mod tests {
         }
     }
 
+    fn mock_jump_only_block(name: &str, return_target: &str) -> Term<Blk> {
+        let jmp = Jmp::Branch(Tid::new(return_target));
+        let jmp = Term {
+            tid: Tid::new(name.to_string() + "_jmp"),
+            term: jmp,
+        };
+        let blk = Blk {
+            defs: Vec::new(),
+            jmps: vec![jmp],
+            indirect_jmp_targets: Vec::new(),
+        };
+        Term {
+            tid: Tid::new(name),
+            term: blk,
+        }
+    }
+
+    fn mock_ret_only_block(name: &str) -> Term<Blk> {
+        let ret = Jmp::Return(expr!("0x0:8"));
+        let ret = Term {
+            tid: Tid::new(name.to_string() + "_ret"),
+            term: ret,
+        };
+        let blk = Blk {
+            defs: Vec::new(),
+            jmps: vec![ret],
+            indirect_jmp_targets: Vec::new(),
+        };
+        Term {
+            tid: Tid::new(name),
+            term: blk,
+        }
+    }
+
     fn mock_block_with_defs(name: &str, return_target: &str) -> Term<Blk> {
         let def = def![format!("{name}_def: r0:4 = r1:4")];
         let jmp = Jmp::Branch(Tid::new(return_target));
@@ -388,6 +422,31 @@ pub mod tests {
         let blk = Blk {
             defs: vec![def],
             jmps: vec![jmp],
+            indirect_jmp_targets: Vec::new(),
+        };
+        Term {
+            tid: Tid::new(name),
+            term: blk,
+        }
+    }
+
+    fn mock_block_with_defs_and_call(
+        name: &str,
+        call_target: &str,
+        return_target: &str,
+    ) -> Term<Blk> {
+        let def = def![format!("{name}_def: r0:4 = r1:4")];
+        let call = Jmp::Call {
+            target: Tid::new(call_target),
+            return_: Some(Tid::new(return_target)),
+        };
+        let call = Term {
+            tid: Tid::new(name.to_string() + "_call"),
+            term: call,
+        };
+        let blk = Blk {
+            defs: vec![def],
+            jmps: vec![call],
             indirect_jmp_targets: Vec::new(),
         };
         Term {
@@ -430,6 +489,92 @@ pub mod tests {
         ];
         assert_eq!(
             &project.program.term.subs[&Tid::new("sub")].term.blocks[..],
+            &expected_blocks[..]
+        );
+    }
+
+    #[test]
+    fn call_return_to_jump() {
+        let sub_1 = Sub {
+            name: "sub_1".to_string(),
+            calling_convention: None,
+            blocks: vec![
+                mock_block_with_defs_and_call("call_blk", "sub_2", "jump_blk"),
+                mock_jump_only_block("jump_blk", "end_blk"),
+                mock_block_with_defs("end_blk", "end_blk"),
+            ],
+        };
+        let sub_1 = Term {
+            tid: Tid::new("sub_1"),
+            term: sub_1,
+        };
+        let sub_2 = Sub {
+            name: "sub_2".to_string(),
+            calling_convention: None,
+            blocks: vec![mock_ret_only_block("ret_blk")],
+        };
+        let sub_2 = Term {
+            tid: Tid::new("sub_2"),
+            term: sub_2,
+        };
+        let mut project = Project::mock_arm32();
+        project.program.term.subs =
+            BTreeMap::from([(Tid::new("sub_1"), sub_1), (Tid::new("sub_2"), sub_2)]);
+
+        propagate_control_flow(&mut project);
+        let expected_blocks = vec![
+            mock_block_with_defs_and_call("call_blk", "sub_2", "end_blk"),
+            // jump_blk removed since it has no incoming edges
+            mock_block_with_defs("end_blk", "end_blk"),
+        ];
+        assert_eq!(
+            &project.program.term.subs[&Tid::new("sub_1")].term.blocks[..],
+            &expected_blocks[..]
+        );
+    }
+
+    #[test]
+    fn call_return_to_cond_jump() {
+        let sub_1 = Sub {
+            name: "sub_1".to_string(),
+            calling_convention: None,
+            blocks: vec![
+                mock_condition_block("cond_blk_1", "call_blk", "end_blk_1"),
+                mock_block_with_defs_and_call("call_blk", "sub_2", "cond_blk_2"),
+                mock_condition_block("cond_blk_2", "end_blk_2", "end_blk_1"),
+                mock_block_with_defs("end_blk_1", "end_blk_1"),
+                mock_block_with_defs("end_blk_2", "end_blk_2"),
+            ],
+        };
+        let sub_1 = Term {
+            tid: Tid::new("sub_1"),
+            term: sub_1,
+        };
+        let sub_2 = Sub {
+            name: "sub_2".to_string(),
+            calling_convention: None,
+            blocks: vec![mock_ret_only_block("ret_blk")],
+        };
+        let sub_2 = Term {
+            tid: Tid::new("sub_2"),
+            term: sub_2,
+        };
+        let mut project = Project::mock_arm32();
+        project.program.term.subs =
+            BTreeMap::from([(Tid::new("sub_1"), sub_1), (Tid::new("sub_2"), sub_2)]);
+
+        propagate_control_flow(&mut project);
+        let expected_blocks = vec![
+            mock_condition_block("cond_blk_1", "call_blk", "end_blk_1"),
+            mock_block_with_defs_and_call("call_blk", "sub_2", "cond_blk_2"),
+            // cond_blk_2 can not be skipped as call may modify the inputs to
+            // the conditional expresion.
+            mock_condition_block("cond_blk_2", "end_blk_2", "end_blk_1"),
+            mock_block_with_defs("end_blk_1", "end_blk_1"),
+            mock_block_with_defs("end_blk_2", "end_blk_2"),
+        ];
+        assert_eq!(
+            &project.program.term.subs[&Tid::new("sub_1")].term.blocks[..],
             &expected_blocks[..]
         );
     }
