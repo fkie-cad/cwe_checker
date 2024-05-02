@@ -216,22 +216,26 @@ fn check_for_retargetable_block<'a>(
     }
 }
 
-/// Check whether the given node in the control flow graph has exactly on incoming edge
-/// and if that edge stems from a conditional jump.
-/// If both are true, return the condition expression that needs to evaluate to true whenever this edge is taken.
-fn check_if_single_conditional_incoming(graph: &Graph, node: NodeIndex) -> Option<Expression> {
+/// Returns a condition that we know to be true before the execution of the
+/// block.
+///
+/// Checks whether all edges incoming to the given block are conditioned on the
+/// same condition. If true, the shared condition is returned.
+fn check_if_same_conditional_incoming(graph: &Graph, node: NodeIndex) -> Option<Expression> {
     let incoming_edges: Vec<_> = graph
         .edges_directed(node, petgraph::Direction::Incoming)
         .collect();
-    if incoming_edges.len() == 1 {
-        match incoming_edges[0].weight() {
+    let mut first_condition: Option<Expression> = None;
+
+    for edge in incoming_edges.iter() {
+        let condition = match edge.weight() {
             Edge::Jump(
                 Term {
                     term: Jmp::CBranch { condition, .. },
                     ..
                 },
                 None,
-            ) => Some(condition.clone()),
+            ) => condition.clone(),
             Edge::Jump(
                 Term {
                     term: Jmp::Branch(_),
@@ -241,23 +245,38 @@ fn check_if_single_conditional_incoming(graph: &Graph, node: NodeIndex) -> Optio
                     term: Jmp::CBranch { condition, .. },
                     ..
                 }),
-            ) => Some(negate_condition(condition.clone())),
-            _ => None,
+            ) => negate_condition(condition.clone()),
+            _ => return None,
+        };
+
+        match &mut first_condition {
+            // First iteration.
+            None => first_condition = Some(condition),
+            // Same condition as first incoming edge.
+            Some(prev_condition) if *prev_condition == condition => continue,
+            // A different condition implies that we can not make a definitive
+            // statement.
+            _ => return None,
         }
-    } else {
-        None
     }
+
+    first_condition
 }
 
-/// Check if the block at the given `BlkStart` node only has one input edge stemming from a conditional jump.
-/// If yes, check whether the conditional expression for that jump will still evaluate to true at the end of the block.
+/// Returns a condition that we know to be true after the execution of all DEFs
+/// in the block.
+///
+/// Check if all incoming edges of the given `BlkStart` node are conditioned on
+/// the same condition.
+/// If yes, check whether the conditional expression will still evaluate to true
+/// after the execution of all DEFs of the block.
 /// If yes, return the conditional expression.
 fn get_known_conditional_at_end_of_block(cfg: &Graph, node: NodeIndex) -> Option<Expression> {
     if let Node::BlkStart(block, sub) = cfg[node] {
         // Check whether we know the result of a conditional at the start of the block
         let mut known_conditional_result: Option<Expression> =
             if block.tid != sub.term.blocks[0].tid {
-                check_if_single_conditional_incoming(cfg, node)
+                check_if_same_conditional_incoming(cfg, node)
             } else {
                 // Function start blocks always have incoming caller edges
                 // even if these edges are missing in the CFG because we do not know the callers.
@@ -408,6 +427,78 @@ pub mod tests {
             // cond_blk_3 removed, since no incoming edge anymore
             mock_block_with_defs("def_blk_3", "end_blk"),
             mock_block_with_defs("end_blk", "end_blk"),
+        ];
+        assert_eq!(
+            &project.program.term.subs[&Tid::new("sub")].term.blocks[..],
+            &expected_blocks[..]
+        );
+    }
+
+    #[test]
+    fn multiple_incoming_same_condition() {
+        let sub = Sub {
+            name: "sub".to_string(),
+            calling_convention: None,
+            blocks: vec![
+                mock_condition_block("cond_blk_1_1", "def_blk_1", "end_blk_1"),
+                mock_condition_block("cond_blk_1_2", "def_blk_1", "end_blk_1"),
+                mock_block_with_defs("def_blk_1", "cond_blk_2"),
+                mock_condition_block("cond_blk_2", "end_blk_2", "end_blk_1"),
+                mock_block_with_defs("end_blk_1", "end_blk_1"),
+                mock_block_with_defs("end_blk_2", "end_blk_2"),
+            ],
+        };
+        let sub = Term {
+            tid: Tid::new("sub"),
+            term: sub,
+        };
+        let mut project = Project::mock_arm32();
+        project.program.term.subs = BTreeMap::from([(Tid::new("sub"), sub)]);
+
+        propagate_control_flow(&mut project);
+        let expected_blocks = vec![
+            mock_condition_block("cond_blk_1_1", "def_blk_1", "end_blk_1"),
+            mock_condition_block("cond_blk_1_2", "def_blk_1", "end_blk_1"),
+            mock_block_with_defs("def_blk_1", "end_blk_2"),
+            // cond_blk_2 removed, since no incoming edge anymore
+            mock_block_with_defs("end_blk_1", "end_blk_1"),
+            mock_block_with_defs("end_blk_2", "end_blk_2"),
+        ];
+        assert_eq!(
+            &project.program.term.subs[&Tid::new("sub")].term.blocks[..],
+            &expected_blocks[..]
+        );
+    }
+
+    #[test]
+    fn multiple_incoming_different_condition() {
+        let sub = Sub {
+            name: "sub".to_string(),
+            calling_convention: None,
+            blocks: vec![
+                mock_condition_block("cond_blk_1_1", "def_blk_1", "end_blk_1"),
+                mock_condition_block("cond_blk_1_2", "end_blk_1", "def_blk_1"),
+                mock_block_with_defs("def_blk_1", "cond_blk_2"),
+                mock_condition_block("cond_blk_2", "end_blk_2", "end_blk_1"),
+                mock_block_with_defs("end_blk_1", "end_blk_1"),
+                mock_block_with_defs("end_blk_2", "end_blk_2"),
+            ],
+        };
+        let sub = Term {
+            tid: Tid::new("sub"),
+            term: sub,
+        };
+        let mut project = Project::mock_arm32();
+        project.program.term.subs = BTreeMap::from([(Tid::new("sub"), sub)]);
+
+        propagate_control_flow(&mut project);
+        let expected_blocks = vec![
+            mock_condition_block("cond_blk_1_1", "def_blk_1", "end_blk_1"),
+            mock_condition_block("cond_blk_1_2", "end_blk_1", "def_blk_1"),
+            mock_block_with_defs("def_blk_1", "cond_blk_2"),
+            mock_condition_block("cond_blk_2", "end_blk_2", "end_blk_1"),
+            mock_block_with_defs("end_blk_1", "end_blk_1"),
+            mock_block_with_defs("end_blk_2", "end_blk_2"),
         ];
         assert_eq!(
             &project.program.term.subs[&Tid::new("sub")].term.blocks[..],
