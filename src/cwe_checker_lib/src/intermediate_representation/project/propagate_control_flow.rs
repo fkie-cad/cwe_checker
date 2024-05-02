@@ -22,9 +22,12 @@ pub fn propagate_control_flow(project: &mut Project) {
     let mut jmps_to_retarget = HashMap::new();
     for node in cfg.node_indices() {
         if let Node::BlkStart(block, sub) = cfg[node] {
-            // Check whether we already know the result of a conditional at the end of the block
-            let known_conditional_result = get_known_conditional_at_end_of_block(&cfg, node);
-            // Check whether we can propagate the control flow for outgoing jumps
+            // Conditions that we know to be true "on" a particular outgoing
+            // edge.
+            let mut true_conditions = Vec::new();
+            if let Some(block_precondition) = get_known_conditional_at_end_of_block(&cfg, node) {
+                true_conditions.push(block_precondition);
+            }
             match &block.term.jmps[..] {
                 [Term {
                     tid: call_tid,
@@ -56,7 +59,7 @@ pub fn propagate_control_flow(project: &mut Project) {
                         // Call may have side-effects that invalidate our
                         // knowledge about any condition we know to be true
                         // after execution of all DEFs in a block.
-                        None,
+                        &Vec::new(),
                     ) {
                         jmps_to_retarget.insert(call_tid.clone(), new_target);
                     }
@@ -65,11 +68,9 @@ pub fn propagate_control_flow(project: &mut Project) {
                     tid: jump_tid,
                     term: Jmp::Branch(target),
                 }] => {
-                    if let Some(new_target) = find_target_for_retargetable_jump(
-                        target,
-                        &sub.term,
-                        known_conditional_result.as_ref(),
-                    ) {
+                    if let Some(new_target) =
+                        find_target_for_retargetable_jump(target, &sub.term, &true_conditions)
+                    {
                         jmps_to_retarget.insert(jump_tid.clone(), new_target);
                     }
                 }
@@ -84,16 +85,18 @@ pub fn propagate_control_flow(project: &mut Project) {
                     term: Jmp::Branch(else_target),
                     tid: jump_tid_else,
                 }] => {
+                    true_conditions.push(condition.clone());
                     if let Some(new_target) =
-                        find_target_for_retargetable_jump(if_target, &sub.term, Some(condition))
+                        find_target_for_retargetable_jump(if_target, &sub.term, &true_conditions)
                     {
                         jmps_to_retarget.insert(jump_tid_if.clone(), new_target);
                     }
-                    if let Some(new_target) = find_target_for_retargetable_jump(
-                        else_target,
-                        &sub.term,
-                        Some(&negate_condition(condition.clone())),
-                    ) {
+
+                    let condition = true_conditions.pop().unwrap();
+                    true_conditions.push(negate_condition(condition));
+                    if let Some(new_target) =
+                        find_target_for_retargetable_jump(else_target, &sub.term, &true_conditions)
+                    {
                         jmps_to_retarget.insert(jump_tid_else.clone(), new_target);
                     }
                 }
@@ -149,12 +152,12 @@ fn retarget_jumps(project: &mut Project, mut jmps_to_retarget: HashMap<Tid, Tid>
 fn find_target_for_retargetable_jump(
     target: &Tid,
     sub: &Sub,
-    true_condition: Option<&Expression>,
+    true_conditions: &[Expression],
 ) -> Option<Tid> {
     let mut visited_tids = BTreeSet::from([target.clone()]);
     let mut new_target = target;
     while let Some(block) = sub.blocks.iter().find(|blk| blk.tid == *new_target) {
-        if let Some(retarget) = check_for_retargetable_block(block, true_condition) {
+        if let Some(retarget) = check_for_retargetable_block(block, true_conditions) {
             if !visited_tids.insert(retarget.clone()) {
                 // The target was already visited, so we abort the search to avoid infinite loops.
                 break;
@@ -177,41 +180,36 @@ fn find_target_for_retargetable_jump(
 /// If it can be predicted, return the target of the jump.
 fn check_for_retargetable_block<'a>(
     block: &'a Term<Blk>,
-    true_condition: Option<&Expression>,
+    true_conditions: &[Expression],
 ) -> Option<&'a Tid> {
     if !block.term.defs.is_empty() {
         return None;
     }
-    match (&block.term.jmps[..], true_condition) {
-        (
-            [Term {
-                term: Jmp::Branch(target),
-                ..
-            }],
-            _,
-        ) => Some(target),
-        (
-            [Term {
-                term:
-                    Jmp::CBranch {
-                        target: if_target,
-                        condition,
-                    },
-                ..
-            }, Term {
-                term: Jmp::Branch(else_target),
-                ..
-            }],
-            Some(true_condition),
-        ) => {
+
+    match &block.term.jmps[..] {
+        [Term {
+            term: Jmp::Branch(target),
+            ..
+        }] => Some(target),
+        [Term {
+            term:
+                Jmp::CBranch {
+                    target: if_target,
+                    condition,
+                },
+            ..
+        }, Term {
+            term: Jmp::Branch(else_target),
+            ..
+        }] => true_conditions.iter().find_map(|true_condition| {
             if condition == true_condition {
                 Some(if_target)
-            } else if *condition == negate_condition(true_condition.clone()) {
+            } else if *condition == negate_condition(true_condition.to_owned()) {
                 Some(else_target)
             } else {
                 None
             }
-        }
+        }),
         _ => None,
     }
 }
@@ -353,10 +351,15 @@ pub mod tests {
     use crate::{def, expr};
     use std::collections::BTreeMap;
 
-    fn mock_condition_block(name: &str, if_target: &str, else_target: &str) -> Term<Blk> {
+    fn mock_condition_block_custom(
+        name: &str,
+        if_target: &str,
+        else_target: &str,
+        condition: &str,
+    ) -> Term<Blk> {
         let if_jmp = Jmp::CBranch {
             target: Tid::new(if_target),
-            condition: expr!("ZF:1"),
+            condition: expr!(condition),
         };
         let if_jmp = Term {
             tid: Tid::new(name.to_string() + "_jmp_if"),
@@ -376,6 +379,10 @@ pub mod tests {
             tid: Tid::new(name),
             term: blk,
         }
+    }
+
+    fn mock_condition_block(name: &str, if_target: &str, else_target: &str) -> Term<Blk> {
+        mock_condition_block_custom(name, if_target, else_target, "ZF:1")
     }
 
     fn mock_jump_only_block(name: &str, return_target: &str) -> Term<Blk> {
@@ -642,6 +649,42 @@ pub mod tests {
             mock_condition_block("cond_blk_1_2", "end_blk_1", "def_blk_1"),
             mock_block_with_defs("def_blk_1", "cond_blk_2"),
             mock_condition_block("cond_blk_2", "end_blk_2", "end_blk_1"),
+            mock_block_with_defs("end_blk_1", "end_blk_1"),
+            mock_block_with_defs("end_blk_2", "end_blk_2"),
+        ];
+        assert_eq!(
+            &project.program.term.subs[&Tid::new("sub")].term.blocks[..],
+            &expected_blocks[..]
+        );
+    }
+
+    #[test]
+    fn multiple_known_conditions() {
+        let sub = Sub {
+            name: "sub".to_string(),
+            calling_convention: None,
+            blocks: vec![
+                mock_condition_block("cond1_blk_1", "cond2_blk", "end_blk_1"),
+                mock_condition_block_custom("cond2_blk", "cond1_blk_2", "end_blk_1", "CF:1"),
+                mock_condition_block("cond1_blk_2", "def_blk", "end_blk_1"),
+                mock_block_with_defs("def_blk", "end_blk_2"),
+                mock_block_with_defs("end_blk_1", "end_blk_1"),
+                mock_block_with_defs("end_blk_2", "end_blk_2"),
+            ],
+        };
+        let sub = Term {
+            tid: Tid::new("sub"),
+            term: sub,
+        };
+        let mut project = Project::mock_arm32();
+        project.program.term.subs = BTreeMap::from([(Tid::new("sub"), sub)]);
+
+        propagate_control_flow(&mut project);
+        let expected_blocks = vec![
+            mock_condition_block("cond1_blk_1", "cond2_blk", "end_blk_1"),
+            mock_condition_block_custom("cond2_blk", "def_blk", "end_blk_1", "CF:1"),
+            // removed since no incoming edges
+            mock_block_with_defs("def_blk", "end_blk_2"),
             mock_block_with_defs("end_blk_1", "end_blk_1"),
             mock_block_with_defs("end_blk_2", "end_blk_2"),
         ];
