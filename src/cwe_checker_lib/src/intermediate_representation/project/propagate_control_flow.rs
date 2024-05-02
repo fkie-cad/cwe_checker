@@ -27,15 +27,50 @@ pub fn propagate_control_flow(project: &mut Project) {
             // Check whether we can propagate the control flow for outgoing jumps
             match &block.term.jmps[..] {
                 [Term {
-                    term: Jmp::Branch(target),
-                    tid: jump_tid,
+                    tid: call_tid,
+                    term:
+                        Jmp::Call {
+                            target: _,
+                            return_: Some(return_target),
+                        },
+                }]
+                | [Term {
+                    tid: call_tid,
+                    term:
+                        Jmp::CallInd {
+                            target: _,
+                            return_: Some(return_target),
+                        },
+                }]
+                | [Term {
+                    tid: call_tid,
+                    term:
+                        Jmp::CallOther {
+                            description: _,
+                            return_: Some(return_target),
+                        },
                 }] => {
-                    if let Some(true_condition) = &known_conditional_result {
-                        if let Some(new_target) =
-                            find_target_for_retargetable_jump(target, &sub.term, true_condition)
-                        {
-                            jmps_to_retarget.insert(jump_tid.clone(), new_target);
-                        }
+                    if let Some(new_target) = find_target_for_retargetable_jump(
+                        return_target,
+                        &sub.term,
+                        // Call may have side-effects that invalidate our
+                        // knowledge about any condition we know to be true
+                        // after execution of all DEFs in a block.
+                        None,
+                    ) {
+                        jmps_to_retarget.insert(call_tid.clone(), new_target);
+                    }
+                }
+                [Term {
+                    tid: jump_tid,
+                    term: Jmp::Branch(target),
+                }] => {
+                    if let Some(new_target) = find_target_for_retargetable_jump(
+                        target,
+                        &sub.term,
+                        known_conditional_result.as_ref(),
+                    ) {
+                        jmps_to_retarget.insert(jump_tid.clone(), new_target);
                     }
                 }
                 [Term {
@@ -50,14 +85,14 @@ pub fn propagate_control_flow(project: &mut Project) {
                     tid: jump_tid_else,
                 }] => {
                     if let Some(new_target) =
-                        find_target_for_retargetable_jump(if_target, &sub.term, condition)
+                        find_target_for_retargetable_jump(if_target, &sub.term, Some(condition))
                     {
                         jmps_to_retarget.insert(jump_tid_if.clone(), new_target);
                     }
                     if let Some(new_target) = find_target_for_retargetable_jump(
                         else_target,
                         &sub.term,
-                        &negate_condition(condition.clone()),
+                        Some(&negate_condition(condition.clone())),
                     ) {
                         jmps_to_retarget.insert(jump_tid_else.clone(), new_target);
                     }
@@ -85,7 +120,20 @@ fn retarget_jumps(project: &mut Project, mut jmps_to_retarget: HashMap<Tid, Tid>
             for jmp in blk.term.jmps.iter_mut() {
                 if let Some(new_target) = jmps_to_retarget.remove(&jmp.tid) {
                     match &mut jmp.term {
-                        Jmp::Branch(target) | Jmp::CBranch { target, .. } => *target = new_target,
+                        Jmp::Branch(target)
+                        | Jmp::CBranch { target, .. }
+                        | Jmp::Call {
+                            target: _,
+                            return_: Some(target),
+                        }
+                        | Jmp::CallInd {
+                            target: _,
+                            return_: Some(target),
+                        }
+                        | Jmp::CallOther {
+                            description: _,
+                            return_: Some(target),
+                        } => *target = new_target,
                         _ => panic!("Unexpected type of jump encountered."),
                     }
                 }
@@ -101,7 +149,7 @@ fn retarget_jumps(project: &mut Project, mut jmps_to_retarget: HashMap<Tid, Tid>
 fn find_target_for_retargetable_jump(
     target: &Tid,
     sub: &Sub,
-    true_condition: &Expression,
+    true_condition: Option<&Expression>,
 ) -> Option<Tid> {
     let mut visited_tids = BTreeSet::from([target.clone()]);
     let mut new_target = target;
@@ -129,27 +177,33 @@ fn find_target_for_retargetable_jump(
 /// If it can be predicted, return the target of the jump.
 fn check_for_retargetable_block<'a>(
     block: &'a Term<Blk>,
-    true_condition: &Expression,
+    true_condition: Option<&Expression>,
 ) -> Option<&'a Tid> {
     if !block.term.defs.is_empty() {
         return None;
     }
-    match &block.term.jmps[..] {
-        [Term {
-            term: Jmp::Branch(target),
-            ..
-        }] => Some(target),
-        [Term {
-            term:
-                Jmp::CBranch {
-                    target: if_target,
-                    condition,
-                },
-            ..
-        }, Term {
-            term: Jmp::Branch(else_target),
-            ..
-        }] => {
+    match (&block.term.jmps[..], true_condition) {
+        (
+            [Term {
+                term: Jmp::Branch(target),
+                ..
+            }],
+            _,
+        ) => Some(target),
+        (
+            [Term {
+                term:
+                    Jmp::CBranch {
+                        target: if_target,
+                        condition,
+                    },
+                ..
+            }, Term {
+                term: Jmp::Branch(else_target),
+                ..
+            }],
+            Some(true_condition),
+        ) => {
             if condition == true_condition {
                 Some(if_target)
             } else if *condition == negate_condition(true_condition.clone()) {
