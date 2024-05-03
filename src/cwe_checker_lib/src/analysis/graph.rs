@@ -44,11 +44,14 @@
 
 use crate::intermediate_representation::*;
 use crate::prelude::*;
-use crate::utils::log::LogMessage;
-use petgraph::graph::DiGraph;
+use crate::utils::{debug::ToJsonCompact, log::LogMessage};
 use std::collections::{HashMap, HashSet};
 
 pub use petgraph::graph::NodeIndex;
+use petgraph::{
+    graph::DiGraph,
+    visit::{EdgeRef, IntoNodeReferences},
+};
 
 /// The graph type of an interprocedural control flow graph
 pub type Graph<'a> = DiGraph<Node<'a>, Edge<'a>>;
@@ -180,6 +183,25 @@ pub enum Edge<'a> {
     /// An artificial edge to combine intra- and interprocedural data flows at the return-to site of calls.
     /// See the module-level documentation for more information.
     ReturnCombine(&'a Term<Jmp>),
+}
+
+impl<'a> std::fmt::Display for Edge<'a> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::Block => {
+                write!(formatter, "Block")
+            }
+            Self::Jump(..) => {
+                write!(formatter, "Jump")
+            }
+            Self::Call { .. } => write!(formatter, "Call",),
+            Self::ExternCallStub { .. } => write!(formatter, "ExternCallStub",),
+            Self::CrCallStub => write!(formatter, "CrCallStub"),
+            Self::CrReturnStub => write!(formatter, "CrReturnStub"),
+            Self::CallCombine(..) => write!(formatter, "CallCombine"),
+            Self::ReturnCombine(..) => write!(formatter, "ReturnCombine"),
+        }
+    }
 }
 
 /// A builder struct for building graphs
@@ -529,6 +551,82 @@ pub fn get_entry_nodes_of_subs(graph: &Graph) -> HashMap<Tid, NodeIndex> {
     }
 
     sub_to_entry_node_map
+}
+
+impl ToJsonCompact for Graph<'_> {
+    fn to_json_compact(&self) -> serde_json::Value {
+        let mut map = serde_json::Map::new();
+        let mut node_counts_map = serde_json::Map::new();
+        let mut edge_counts_map = serde_json::Map::new();
+        let mut nodes_map = serde_json::Map::new();
+        let mut edges_map = serde_json::Map::new();
+
+        let total_nodes = self.node_count();
+        let mut blk_start_nodes = 0u64;
+        let mut blk_end_nodes = 0u64;
+        let mut call_return_nodes = 0u64;
+        let mut call_source_nodes = 0u64;
+
+        for (idx, node) in self.node_references() {
+            nodes_map.insert(idx.index().to_string(), node.to_string().into());
+            match node {
+                Node::BlkStart(..) => blk_start_nodes += 1,
+                Node::BlkEnd(..) => blk_end_nodes += 1,
+                Node::CallReturn { .. } => call_return_nodes += 1,
+                Node::CallSource { .. } => call_source_nodes += 1,
+            }
+        }
+
+        node_counts_map.insert("total".into(), total_nodes.into());
+        node_counts_map.insert("blk_start".into(), blk_start_nodes.into());
+        node_counts_map.insert("blk_end".into(), blk_end_nodes.into());
+        node_counts_map.insert("call_return".into(), call_return_nodes.into());
+        node_counts_map.insert("call_source".into(), call_source_nodes.into());
+
+        let total_edges = self.edge_count();
+        let mut block_edges = 0u64;
+        let mut jump_edges = 0u64;
+        let mut call_edges = 0u64;
+        let mut extern_call_stub_edges = 0u64;
+        let mut cr_call_stub_edges = 0u64;
+        let mut cr_return_stub_edges = 0u64;
+        let mut call_combine_edges = 0u64;
+        let mut return_combine_edges = 0u64;
+
+        for edge in self.edge_references() {
+            edges_map.insert(
+                format!("{} -> {}", edge.source().index(), edge.target().index()),
+                edge.weight().to_string().into(),
+            );
+            match edge.weight() {
+                Edge::Block => block_edges += 1,
+                Edge::Jump(..) => jump_edges += 1,
+                Edge::Call(..) => call_edges += 1,
+                Edge::ExternCallStub(..) => extern_call_stub_edges += 1,
+                Edge::CrCallStub => cr_call_stub_edges += 1,
+                Edge::CrReturnStub => cr_return_stub_edges += 1,
+                Edge::CallCombine(..) => call_combine_edges += 1,
+                Edge::ReturnCombine(..) => return_combine_edges += 1,
+            }
+        }
+
+        edge_counts_map.insert("total".into(), total_edges.into());
+        edge_counts_map.insert("block".into(), block_edges.into());
+        edge_counts_map.insert("jump".into(), jump_edges.into());
+        edge_counts_map.insert("call".into(), call_edges.into());
+        edge_counts_map.insert("extern_call_stub".into(), extern_call_stub_edges.into());
+        edge_counts_map.insert("cr_call_stub".into(), cr_call_stub_edges.into());
+        edge_counts_map.insert("cr_return_stub".into(), cr_return_stub_edges.into());
+        edge_counts_map.insert("call_combine".into(), call_combine_edges.into());
+        edge_counts_map.insert("return_combine".into(), return_combine_edges.into());
+
+        map.insert("node_counts".into(), node_counts_map.into());
+        map.insert("edge_counts".into(), edge_counts_map.into());
+        map.insert("nodes".into(), nodes_map.into());
+        map.insert("edges".into(), edges_map.into());
+
+        serde_json::Value::Object(map)
+    }
 }
 
 #[cfg(test)]
