@@ -5,7 +5,6 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 /// Contains implementation of the block duplication normalization pass.
 mod block_duplication_normalization;
 use block_duplication_normalization::*;
-/// Contains implementation of the propagate control flow normalization pass.
 mod propagate_control_flow;
 use propagate_control_flow::*;
 
