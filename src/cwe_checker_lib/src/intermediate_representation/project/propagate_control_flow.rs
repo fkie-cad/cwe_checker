@@ -1,8 +1,10 @@
-use crate::analysis::graph::{Edge, Graph, Node};
+use crate::analysis::graph::{self, Edge, Graph, Node};
 use crate::intermediate_representation::*;
+
+use std::collections::{BTreeSet, HashMap, HashSet};
+
 use petgraph::graph::NodeIndex;
 use petgraph::Direction::Incoming;
-use std::collections::{BTreeSet, HashMap, HashSet};
 
 /// The `propagate_control_flow` normalization pass tries to simplify the representation of
 /// sequences of if-else blocks that all have the same condition
@@ -16,98 +18,103 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 /// For such a sequence we then retarget the destination of the first jump to the final jump destination of the sequence.
 /// Lastly, the newly bypassed blocks are considered dead code and are removed.
 pub fn propagate_control_flow(project: &mut Project) {
-    let cfg = crate::analysis::graph::get_program_cfg(&project.program);
-    let nodes_without_incoming_edges_at_beginning = get_nodes_without_incoming_edge(&cfg);
+    let cfg_before_normalization = graph::get_program_cfg(&project.program);
+    let nodes_without_incoming_edges_at_beginning =
+        get_nodes_without_incoming_edge(&cfg_before_normalization);
 
     let mut jmps_to_retarget = HashMap::new();
-    for node in cfg.node_indices() {
-        if let Node::BlkStart(block, sub) = cfg[node] {
-            // Conditions that we know to be true "on" a particular outgoing
-            // edge.
-            let mut true_conditions = Vec::new();
-            if let Some(block_precondition) = get_known_conditional_at_end_of_block(&cfg, node) {
-                true_conditions.push(block_precondition);
+    for node in cfg_before_normalization.node_indices() {
+        let Node::BlkStart(block, sub) = cfg_before_normalization[node] else {
+            continue;
+        };
+        // Conditions that we know to be true "on" a particular outgoing
+        // edge.
+        let mut true_conditions = Vec::new();
+        if let Some(block_precondition) =
+            get_block_precondition_after_defs(&cfg_before_normalization, node)
+        {
+            true_conditions.push(block_precondition);
+        }
+        match &block.term.jmps[..] {
+            [Term {
+                tid: call_tid,
+                term:
+                    Jmp::Call {
+                        target: _,
+                        return_: Some(return_target),
+                    },
+            }]
+            | [Term {
+                tid: call_tid,
+                term:
+                    Jmp::CallInd {
+                        target: _,
+                        return_: Some(return_target),
+                    },
+            }]
+            | [Term {
+                tid: call_tid,
+                term:
+                    Jmp::CallOther {
+                        description: _,
+                        return_: Some(return_target),
+                    },
+            }] => {
+                if let Some(new_target) = find_target_for_retargetable_jump(
+                    return_target,
+                    &sub.term,
+                    // Call may have side-effects that invalidate our
+                    // knowledge about any condition we know to be true
+                    // after execution of all DEFs in a block.
+                    &Vec::new(),
+                ) {
+                    jmps_to_retarget.insert(call_tid.clone(), new_target);
+                }
             }
-            match &block.term.jmps[..] {
-                [Term {
-                    tid: call_tid,
-                    term:
-                        Jmp::Call {
-                            target: _,
-                            return_: Some(return_target),
-                        },
-                }]
-                | [Term {
-                    tid: call_tid,
-                    term:
-                        Jmp::CallInd {
-                            target: _,
-                            return_: Some(return_target),
-                        },
-                }]
-                | [Term {
-                    tid: call_tid,
-                    term:
-                        Jmp::CallOther {
-                            description: _,
-                            return_: Some(return_target),
-                        },
-                }] => {
-                    if let Some(new_target) = find_target_for_retargetable_jump(
-                        return_target,
-                        &sub.term,
-                        // Call may have side-effects that invalidate our
-                        // knowledge about any condition we know to be true
-                        // after execution of all DEFs in a block.
-                        &Vec::new(),
-                    ) {
-                        jmps_to_retarget.insert(call_tid.clone(), new_target);
-                    }
+            [Term {
+                tid: jump_tid,
+                term: Jmp::Branch(target),
+            }] => {
+                if let Some(new_target) =
+                    find_target_for_retargetable_jump(target, &sub.term, &true_conditions)
+                {
+                    jmps_to_retarget.insert(jump_tid.clone(), new_target);
                 }
-                [Term {
-                    tid: jump_tid,
-                    term: Jmp::Branch(target),
-                }] => {
-                    if let Some(new_target) =
-                        find_target_for_retargetable_jump(target, &sub.term, &true_conditions)
-                    {
-                        jmps_to_retarget.insert(jump_tid.clone(), new_target);
-                    }
+            }
+            [Term {
+                term:
+                    Jmp::CBranch {
+                        condition,
+                        target: if_target,
+                    },
+                tid: jump_tid_if,
+            }, Term {
+                term: Jmp::Branch(else_target),
+                tid: jump_tid_else,
+            }] => {
+                true_conditions.push(condition.clone());
+                if let Some(new_target) =
+                    find_target_for_retargetable_jump(if_target, &sub.term, &true_conditions)
+                {
+                    jmps_to_retarget.insert(jump_tid_if.clone(), new_target);
                 }
-                [Term {
-                    term:
-                        Jmp::CBranch {
-                            condition,
-                            target: if_target,
-                        },
-                    tid: jump_tid_if,
-                }, Term {
-                    term: Jmp::Branch(else_target),
-                    tid: jump_tid_else,
-                }] => {
-                    true_conditions.push(condition.clone());
-                    if let Some(new_target) =
-                        find_target_for_retargetable_jump(if_target, &sub.term, &true_conditions)
-                    {
-                        jmps_to_retarget.insert(jump_tid_if.clone(), new_target);
-                    }
 
-                    let condition = true_conditions.pop().unwrap();
-                    true_conditions.push(negate_condition(condition));
-                    if let Some(new_target) =
-                        find_target_for_retargetable_jump(else_target, &sub.term, &true_conditions)
-                    {
-                        jmps_to_retarget.insert(jump_tid_else.clone(), new_target);
-                    }
+                let condition = true_conditions.pop().unwrap();
+                true_conditions.push(negate_condition(condition));
+                if let Some(new_target) =
+                    find_target_for_retargetable_jump(else_target, &sub.term, &true_conditions)
+                {
+                    jmps_to_retarget.insert(jump_tid_else.clone(), new_target);
                 }
-                _ => (),
             }
+            _ => (),
         }
     }
     retarget_jumps(project, jmps_to_retarget);
 
-    let cfg = crate::analysis::graph::get_program_cfg(&project.program);
-    let nodes_without_incoming_edges_at_end = get_nodes_without_incoming_edge(&cfg);
+    let cfg_after_normalization = graph::get_program_cfg(&project.program);
+    let nodes_without_incoming_edges_at_end =
+        get_nodes_without_incoming_edge(&cfg_after_normalization);
 
     remove_new_orphaned_blocks(
         project,
@@ -121,24 +128,25 @@ fn retarget_jumps(project: &mut Project, mut jmps_to_retarget: HashMap<Tid, Tid>
     for sub in project.program.term.subs.values_mut() {
         for blk in sub.term.blocks.iter_mut() {
             for jmp in blk.term.jmps.iter_mut() {
-                if let Some(new_target) = jmps_to_retarget.remove(&jmp.tid) {
-                    match &mut jmp.term {
-                        Jmp::Branch(target)
-                        | Jmp::CBranch { target, .. }
-                        | Jmp::Call {
-                            target: _,
-                            return_: Some(target),
-                        }
-                        | Jmp::CallInd {
-                            target: _,
-                            return_: Some(target),
-                        }
-                        | Jmp::CallOther {
-                            description: _,
-                            return_: Some(target),
-                        } => *target = new_target,
-                        _ => panic!("Unexpected type of jump encountered."),
+                let Some(new_target) = jmps_to_retarget.remove(&jmp.tid) else {
+                    continue;
+                };
+                match &mut jmp.term {
+                    Jmp::Branch(target)
+                    | Jmp::CBranch { target, .. }
+                    | Jmp::Call {
+                        target: _,
+                        return_: Some(target),
                     }
+                    | Jmp::CallInd {
+                        target: _,
+                        return_: Some(target),
+                    }
+                    | Jmp::CallOther {
+                        description: _,
+                        return_: Some(target),
+                    } => *target = new_target,
+                    _ => panic!("Unexpected type of jump encountered."),
                 }
             }
         }
@@ -156,17 +164,20 @@ fn find_target_for_retargetable_jump(
 ) -> Option<Tid> {
     let mut visited_tids = BTreeSet::from([target.clone()]);
     let mut new_target = target;
+
     while let Some(block) = sub.blocks.iter().find(|blk| blk.tid == *new_target) {
-        if let Some(retarget) = check_for_retargetable_block(block, true_conditions) {
-            if !visited_tids.insert(retarget.clone()) {
-                // The target was already visited, so we abort the search to avoid infinite loops.
-                break;
-            }
-            new_target = retarget;
-        } else {
+        let Some(retarget) = check_for_retargetable_block(block, true_conditions) else {
+            break;
+        };
+
+        if !visited_tids.insert(retarget.clone()) {
+            // The target was already visited, so we abort the search to avoid infinite loops.
             break;
         }
+
+        new_target = retarget;
     }
+
     if new_target != target {
         Some(new_target.clone())
     } else {
@@ -219,7 +230,7 @@ fn check_for_retargetable_block<'a>(
 ///
 /// Checks whether all edges incoming to the given block are conditioned on the
 /// same condition. If true, the shared condition is returned.
-fn check_if_same_conditional_incoming(graph: &Graph, node: NodeIndex) -> Option<Expression> {
+fn get_precondition_from_incoming_edges(graph: &Graph, node: NodeIndex) -> Option<Expression> {
     let incoming_edges: Vec<_> = graph
         .edges_directed(node, petgraph::Direction::Incoming)
         .collect();
@@ -251,7 +262,7 @@ fn check_if_same_conditional_incoming(graph: &Graph, node: NodeIndex) -> Option<
             // First iteration.
             None => first_condition = Some(condition),
             // Same condition as first incoming edge.
-            Some(prev_condition) if *prev_condition == condition => continue,
+            Some(first_condition) if *first_condition == condition => continue,
             // A different condition implies that we can not make a definitive
             // statement.
             _ => return None,
@@ -269,37 +280,35 @@ fn check_if_same_conditional_incoming(graph: &Graph, node: NodeIndex) -> Option<
 /// If yes, check whether the conditional expression will still evaluate to true
 /// after the execution of all DEFs of the block.
 /// If yes, return the conditional expression.
-fn get_known_conditional_at_end_of_block(cfg: &Graph, node: NodeIndex) -> Option<Expression> {
-    if let Node::BlkStart(block, sub) = cfg[node] {
-        // Check whether we know the result of a conditional at the start of the block
-        let mut known_conditional_result: Option<Expression> =
-            if block.tid != sub.term.blocks[0].tid {
-                check_if_same_conditional_incoming(cfg, node)
-            } else {
-                // Function start blocks always have incoming caller edges
-                // even if these edges are missing in the CFG because we do not know the callers.
-                None
-            };
-        // If we have a known conditional result at the start of the block,
-        // check whether it will still hold true at the end of the block.
-        if let Some(conditional) = &known_conditional_result {
-            let input_vars = conditional.input_vars();
-            for def in block.term.defs.iter() {
-                match &def.term {
-                    Def::Assign { var, .. } | Def::Load { var, .. } => {
-                        if input_vars.contains(&var) {
-                            known_conditional_result = None;
-                            break;
-                        }
-                    }
-                    Def::Store { .. } => (),
+fn get_block_precondition_after_defs(cfg: &Graph, node: NodeIndex) -> Option<Expression> {
+    let Node::BlkStart(block, sub) = cfg[node] else {
+        return None;
+    };
+
+    if block.tid == sub.term.blocks[0].tid {
+        // Function start blocks always have incoming caller edges
+        // even if these edges are missing in the CFG because we do not know the callers.
+        return None;
+    }
+
+    // Check whether we know the result of a conditional at the start of the block
+    let block_precondition = get_precondition_from_incoming_edges(cfg, node)?;
+
+    // If we have a known conditional result at the start of the block,
+    // check whether it will still hold true at the end of the block.
+    let input_vars = block_precondition.input_vars();
+    for def in block.term.defs.iter() {
+        match &def.term {
+            Def::Assign { var, .. } | Def::Load { var, .. } => {
+                if input_vars.contains(&var) {
+                    return None;
                 }
             }
+            Def::Store { .. } => (),
         }
-        known_conditional_result
-    } else {
-        None
     }
+
+    Some(block_precondition)
 }
 
 /// Negate the given boolean condition expression, removing double negations in the process.
@@ -320,13 +329,15 @@ fn negate_condition(expr: Expression) -> Expression {
 
 /// Iterates the CFG and returns all node's blocks, that do not have an incoming edge.
 fn get_nodes_without_incoming_edge(cfg: &Graph) -> HashSet<Tid> {
-    let mut nodes_without_incoming_edges = HashSet::new();
-    for node in cfg.node_indices() {
-        if cfg.neighbors_directed(node, Incoming).next().is_none() {
-            nodes_without_incoming_edges.insert(cfg[node].get_block().tid.clone());
-        }
-    }
-    nodes_without_incoming_edges
+    cfg.node_indices()
+        .filter_map(|node| {
+            if cfg.neighbors_directed(node, Incoming).next().is_none() {
+                Some(cfg[node].get_block().tid.clone())
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 /// Calculates the difference of the orphaned blocks and removes them from the project.
