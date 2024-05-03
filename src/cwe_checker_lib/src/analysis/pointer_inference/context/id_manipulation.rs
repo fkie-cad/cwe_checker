@@ -150,8 +150,8 @@ impl<'a> Context<'a> {
                 .unwrap()
                 .referenced_ids()
             {
-                if ids_modified.get(id).is_some()
-                    || (access_pattern.is_mutably_dereferenced() && ids_touched.get(id).is_some())
+                if ids_modified.contains(id)
+                    || (access_pattern.is_mutably_dereferenced() && ids_touched.contains(id))
                 {
                     unsound_caller_ids.insert(id.clone());
                 }

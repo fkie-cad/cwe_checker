@@ -201,10 +201,7 @@ impl<'a> crate::analysis::forward_interprocedural_fixpoint::Context<'a> for Cont
             let mut callee_object = callee_object.clone();
             callee_object.replace_ids(&id_map);
 
-            if callee_id_to_access_pattern_map
-                .get(callee_object_id)
-                .is_none()
-            {
+            if !callee_id_to_access_pattern_map.contains_key(callee_object_id) {
                 // Add a callee object that does not correspond to a parameter to the caller or the stack of the callee.
                 state_after_return
                     .memory

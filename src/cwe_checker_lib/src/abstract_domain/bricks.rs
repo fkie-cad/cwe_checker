@@ -144,7 +144,7 @@ impl BricksDomain {
             if lookup == normalized {
                 unchanged = true;
             } else {
-                lookup = normalized.clone();
+                lookup.clone_from(&normalized);
             }
         }
 

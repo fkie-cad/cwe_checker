@@ -99,7 +99,7 @@ fn remove_dead_var_assignments_of_block(
     let mut cleaned_defs = Vec::new();
     for def in block.term.defs.iter().rev() {
         match &def.term {
-            Def::Assign { var, .. } if alive_vars.get(var).is_none() => (), // Dead Assignment
+            Def::Assign { var, .. } if !alive_vars.contains(var) => (), // Dead Assignment
             _ => cleaned_defs.push(def.clone()),
         }
         alive_vars_computation::update_alive_vars_by_def(&mut alive_vars, def);

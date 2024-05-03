@@ -246,7 +246,7 @@ impl Blk {
             if let Some(input) = &def.term.rhs.input0 {
                 if input.address.is_some() {
                     let load_def = input.to_load_def("$load_temp0", generic_pointer_size);
-                    cleaned_def.term.rhs.input0 = load_def.lhs.clone();
+                    cleaned_def.term.rhs.input0.clone_from(&load_def.lhs);
                     refactored_defs.push(Term {
                         tid: def.tid.clone().with_id_suffix("_load0"),
                         term: load_def,
@@ -256,7 +256,7 @@ impl Blk {
             if let Some(input) = &def.term.rhs.input1 {
                 if input.address.is_some() {
                     let load_def = input.to_load_def("$load_temp1", generic_pointer_size);
-                    cleaned_def.term.rhs.input1 = load_def.lhs.clone();
+                    cleaned_def.term.rhs.input1.clone_from(&load_def.lhs);
                     refactored_defs.push(Term {
                         tid: def.tid.clone().with_id_suffix("_load1"),
                         term: load_def,
@@ -266,7 +266,7 @@ impl Blk {
             if let Some(input) = &def.term.rhs.input2 {
                 if input.address.is_some() {
                     let load_def = input.to_load_def("$load_temp2", generic_pointer_size);
-                    cleaned_def.term.rhs.input2 = load_def.lhs.clone();
+                    cleaned_def.term.rhs.input2.clone_from(&load_def.lhs);
                     refactored_defs.push(Term {
                         tid: def.tid.clone().with_id_suffix("_load2"),
                         term: load_def,

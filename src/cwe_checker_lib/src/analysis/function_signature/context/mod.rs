@@ -153,8 +153,7 @@ impl<'a> Context<'a> {
             }
             if self
                 .stubbed_variadic_symbols
-                .get(extern_symbol.name.as_str())
-                .is_some()
+                .contains_key(extern_symbol.name.as_str())
                 && self
                     .set_access_flags_for_variadic_parameters(state, extern_symbol)
                     .is_none()
