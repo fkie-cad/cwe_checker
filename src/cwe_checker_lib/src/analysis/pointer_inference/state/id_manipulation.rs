@@ -20,7 +20,7 @@ impl State {
             unsearched_ids.remove(&id);
             let memory_ids = self.memory.get_referenced_ids_underapproximation(&id);
             for mem_id in memory_ids {
-                if ids.get(&mem_id).is_none() {
+                if !ids.contains(&mem_id) {
                     ids.insert(mem_id.clone());
                     unsearched_ids.insert(mem_id.clone());
                 }
@@ -45,7 +45,7 @@ impl State {
             unsearched_ids.remove(&id);
             let memory_ids = self.memory.get_referenced_ids_overapproximation(&id);
             for mem_id in memory_ids {
-                if ids.get(&mem_id).is_none() {
+                if !ids.contains(&mem_id) {
                     ids.insert(mem_id.clone());
                     unsearched_ids.insert(mem_id.clone());
                 }

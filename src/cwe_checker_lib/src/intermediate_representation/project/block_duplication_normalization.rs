@@ -77,20 +77,20 @@ impl Project {
                 sub.term.blocks.iter().map(|blk| blk.tid.clone()).collect();
             let mut block_set = HashSet::new();
             while let Some(block_tid) = worklist.pop() {
-                if block_set.get(&block_tid).is_none() {
+                if !block_set.contains(&block_tid) {
                     block_set.insert(block_tid.clone());
 
                     if let Some(block) = block_tid_to_block_map.get(&block_tid) {
                         for jmp in block.term.jmps.iter() {
                             if let Some(tid) = jmp.get_intraprocedural_target_or_return_block_tid()
                             {
-                                if block_set.get(&tid).is_none() {
+                                if !block_set.contains(&tid) {
                                     worklist.push(tid);
                                 }
                             }
                         }
                         for target_tid in block.term.indirect_jmp_targets.iter() {
-                            if block_set.get(target_tid).is_none() {
+                            if !block_set.contains(target_tid) {
                                 worklist.push(target_tid.clone())
                             }
                         }

@@ -293,7 +293,7 @@ impl<T: AbstractDomain + SizedDomain + HasTop + std::fmt::Debug> MemRegion<T> {
             }
         }
         for (index, other_elem) in other.inner.values.iter() {
-            if self.inner.values.get(index).is_none() {
+            if !self.inner.values.contains_key(index) {
                 zipped.insert(*index, (None, Some(other_elem)));
             }
         }

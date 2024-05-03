@@ -432,7 +432,7 @@ impl<'a> GraphBuilder<'a> {
         return_from_sub: &'a Term<Sub>,
         return_source: NodeIndex,
     ) {
-        if self.return_addresses.get(&return_from_sub.tid).is_none() {
+        if !self.return_addresses.contains_key(&return_from_sub.tid) {
             return;
         }
         for (call_node, return_to_node) in self.return_addresses[&return_from_sub.tid].iter() {

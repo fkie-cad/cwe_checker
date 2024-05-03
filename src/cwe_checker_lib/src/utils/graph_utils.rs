@@ -48,7 +48,7 @@ pub fn is_sink_call_reachable_from_source_call(
                 | Edge::ReturnCombine(_)
                 | Edge::Jump(_, _)
                 | Edge::ExternCallStub(_) => {
-                    if visited_nodes.get(&edge.target()).is_none() {
+                    if !visited_nodes.contains(&edge.target()) {
                         visited_nodes.insert(edge.target());
                         worklist.push(edge.target())
                     }
