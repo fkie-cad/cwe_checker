@@ -623,6 +623,72 @@ pub mod tests {
     }
 
     #[test]
+    fn call_return_to_cond_jump_removed() {
+        let sub_1 = Sub {
+            name: "sub_1".to_string(),
+            calling_convention: None,
+            blocks: vec![
+                mock_condition_block("cond_blk_1", "cond_blk_2", "end_blk_1"),
+                mock_block_with_defs_and_call("call_blk", "sub_2", "cond_blk_2"),
+                mock_condition_block("cond_blk_2", "end_blk_2", "end_blk_1"),
+                mock_block_with_defs("end_blk_1", "end_blk_1"),
+                mock_block_with_defs("end_blk_2", "end_blk_2"),
+            ],
+        };
+        let sub_1 = Term {
+            tid: Tid::new("sub_1"),
+            term: sub_1,
+        };
+        let sub_2 = Sub {
+            name: "sub_2".to_string(),
+            calling_convention: None,
+            blocks: vec![mock_block_with_defs("loop_block", "loop_block")],
+        };
+        let sub_2 = Term {
+            tid: Tid::new("sub_2"),
+            term: sub_2,
+        };
+        let mut project = Project::mock_arm32();
+        project.program.term.subs =
+            BTreeMap::from([(Tid::new("sub_1"), sub_1), (Tid::new("sub_2"), sub_2)]);
+
+        project.add_artifical_sinks();
+        let mut log_msg_non_returning = project.retarget_non_returning_calls_to_artificial_sink();
+        assert_eq!(
+            log_msg_non_returning.pop().unwrap().text,
+            "Call @ call_blk_call to sub_2 does not return to cond_blk_2.".to_owned()
+        );
+        assert_eq!(
+            log_msg_non_returning.pop().unwrap().text,
+            "sub_2 is non-returning.".to_owned()
+        );
+        assert_eq!(
+            log_msg_non_returning.pop().unwrap().text,
+            "sub_1 is non-returning.".to_owned()
+        );
+
+        propagate_control_flow(&mut project);
+
+        // Does not panic even though original call return block was removed.
+        let _ = graph::get_program_cfg(&project.program);
+
+        let expected_blocks = vec![
+            // `cond_blk_1` can be retarget.
+            mock_condition_block("cond_blk_1", "end_blk_2", "end_blk_1"),
+            // `call_blk` was re-targeted to artificial sink.
+            mock_block_with_defs_and_call("call_blk", "sub_2", "Artificial Sink Block"),
+            // `cond_blk_2` was removed since cond_blk_1 was re-targeted.
+            mock_block_with_defs("end_blk_1", "end_blk_1"),
+            mock_block_with_defs("end_blk_2", "end_blk_2"),
+        ];
+
+        assert_eq!(
+            &project.program.term.subs[&Tid::new("sub_1")].term.blocks[..],
+            &expected_blocks[..]
+        );
+    }
+
+    #[test]
     fn multiple_incoming_same_condition() {
         let sub = Sub {
             name: "sub".to_string(),
