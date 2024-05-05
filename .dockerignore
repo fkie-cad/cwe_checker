@@ -1,2 +1,3 @@
 test/**/build
 target/
+src/cwe_checker_lib/benches/_data/

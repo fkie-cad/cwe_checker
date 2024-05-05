@@ -223,6 +223,8 @@ test/run_real_world_samples.sh
 doc/html
 
 test/artificial_samples/dockcross*
+src/cwe_checker_lib/benches/_data/*
+!src/cwe_checker_lib/benches/_data/.gitkeep
 
 .#*
 
