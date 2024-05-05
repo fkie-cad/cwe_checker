@@ -1,11 +1,12 @@
 use super::*;
+use crate::analysis;
 use crate::utils::log::LogMessage;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 /// Contains implementation of the block duplication normalization pass.
 mod block_duplication_normalization;
 use block_duplication_normalization::*;
-mod propagate_control_flow;
+pub mod propagate_control_flow;
 use propagate_control_flow::*;
 
 /// The `Project` struct is the main data structure representing a binary.
@@ -79,7 +80,7 @@ impl Project {
 impl Project {
     /// For all expressions contained in the project,
     /// replace trivially computable subexpressions like `a XOR a` with their result.
-    fn substitute_trivial_expressions(&mut self) {
+    pub fn substitute_trivial_expressions(&mut self) {
         for sub in self.program.term.subs.values_mut() {
             for block in sub.term.blocks.iter_mut() {
                 for def in block.term.defs.iter_mut() {
@@ -353,22 +354,25 @@ impl Project {
         errors
     }
 
-    /// Run some normalization passes over the project.
+    /// Performs only the normalizations necessary to analyze the project.
     ///
-    /// Passes:
-    /// - Remove duplicate TIDs.
-    ///   This is a workaround for a bug in the P-Code-Extractor and should be removed once the bug is fixed.
-    /// - Replace jumps to nonexisting TIDs with jumps to artificial sink targets in the CFG.
-    ///   Also replace return addresses of non-returning external symbols with artificial sink targets.
-    /// - Duplicate blocks so that if a block is contained in several functions, each function gets its own unique copy.
-    /// - Propagate input expressions along variable assignments.
-    /// - Replace trivial expressions like `a XOR a` with their result.
-    /// - Remove dead register assignments.
-    /// - Propagate the control flow along chains of conditionals with the same condition.
-    /// - Substitute bitwise `AND` and `OR` operations with the stack pointer
-    ///   in cases where the result is known due to known stack pointer alignment.
+    /// Runs only the normalization passes that bring the project to a form
+    /// in which it can be consumed by the later analyses. Currently those are:
+    ///
+    /// - Removal of duplicate TIDs. (This is a workaround for a bug in the
+    ///   P-Code-Extractor and should be removed once the bug is fixed.)
+    /// - Replacement of references to nonexisting TIDs with jumps to artificial
+    ///   sink targets in the CFG.
+    /// - Duplication of blocks so that if a block is contained in several
+    ///   functions, each function gets its own unique copy.
+    /// - Replacement of return addresses for calls to non-returning functions
+    ///   with artificial sink targets.
+    ///
+    /// After those passes all of the later analyses can be computed. However,
+    /// they are expected to run faster if you also run
+    /// [`Project::normalize_optimize`] beforehand.
     #[must_use]
-    pub fn normalize(&mut self) -> Vec<LogMessage> {
+    pub fn normalize_basic(&mut self) -> Vec<LogMessage> {
         let mut logs = self.remove_duplicate_tids();
         self.add_artifical_sink();
         logs.append(self.remove_references_to_nonexisting_tids().as_mut());
@@ -377,15 +381,45 @@ impl Project {
             self.retarget_non_returning_calls_to_artificial_sink()
                 .as_mut(),
         );
-        crate::analysis::expression_propagation::propagate_input_expression(self);
+
+        logs
+    }
+
+    /// Performs only the optimizing normalization passes.
+    ///
+    /// [`Project::normalize_basic`] **must** be called before this method.
+    ///
+    /// Runs only the optimization passes that transform the program to an
+    /// equivalent, simpler representation. This step is exprected to improve
+    /// the speed and precision of later analyses.
+    ///
+    /// Currently, the following optimizations are performed:
+    ///
+    /// - Propagate input expressions along variable assignments.
+    /// - Replace trivial expressions like `a XOR a` with their result.
+    /// - Remove dead register assignments.
+    /// - Propagate the control flow along chains of conditionals with the same condition.
+    /// - Substitute bitwise `AND` and `OR` operations with the stack pointer
+    ///   in cases where the result is known due to known stack pointer alignment.
+    #[must_use]
+    pub fn normalize_optimize(&mut self) -> Vec<LogMessage> {
+        analysis::expression_propagation::propagate_input_expression(self);
         self.substitute_trivial_expressions();
-        crate::analysis::dead_variable_elimination::remove_dead_var_assignments(self);
+        analysis::dead_variable_elimination::remove_dead_var_assignments(self);
         propagate_control_flow(self);
-        logs.append(
-            crate::analysis::stack_alignment_substitution::substitute_and_on_stackpointer(self)
-                .unwrap_or_default()
-                .as_mut(),
-        );
+        analysis::stack_alignment_substitution::substitute_and_on_stackpointer(self)
+            .unwrap_or_default()
+    }
+
+    /// Run all normalization passes over the project.
+    ///
+    /// Convenience wrapper that calls [`Project::normalize_basic`] and
+    /// [`Project::normalize_optimize`].
+    #[must_use]
+    pub fn normalize(&mut self) -> Vec<LogMessage> {
+        let mut logs = self.normalize_basic();
+        logs.append(self.normalize_optimize().as_mut());
+
         logs
     }
 }
