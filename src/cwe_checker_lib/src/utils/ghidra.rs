@@ -48,7 +48,7 @@ pub fn get_project_from_ghidra(
 
 /// Normalize the given P-Code project
 /// and then parse it into a project struct of the internally used intermediate representation.
-fn parse_pcode_project_to_ir_project(
+pub fn parse_pcode_project_to_ir_project(
     mut pcode_project: crate::pcode::Project,
     binary: &[u8],
     bare_metal_config_opt: &Option<BareMetalConfig>,
