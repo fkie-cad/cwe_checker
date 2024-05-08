@@ -237,10 +237,15 @@ fn compute_size_values_of_malloc_calls(analysis_results: &AnalysisResults) -> Ha
     malloc_size_map
 }
 
-/// Compute the size value of a call to a malloc-like function according to the pointer inference and return it.
-/// Returns `None` if the called symbol is not an allocating function or the size computation for the symbol is not yet implemented.
+/// Compute the size value of a call to a malloc-like function according to the
+/// pointer inference and return it.
 ///
-/// Currently this function computes the size values for the symbols `malloc`, `realloc`, `reallocarray`, `calloc` and the C++-`new` operator.
+/// Returns `None` if the called symbol is not an allocating function, the size
+/// computation for the symbol is not yet implemented, or Ghidra did not supply
+/// storage locations for the arguments.
+///
+/// Currently this function computes the size values for the symbols `malloc`,
+/// `realloc`, `reallocarray`, `calloc` and the C++-`new` operator.
 fn compute_size_value_of_malloc_like_call(
     jmp_tid: &Tid,
     called_symbol: &ExternSymbol,
@@ -262,16 +267,21 @@ fn compute_size_value_of_malloc_like_call(
             }
         }
         "reallocarray" => {
-            let count_param = &called_symbol.parameters[1];
-            let size_param = &called_symbol.parameters[2];
-            match (
-                pointer_inference.eval_parameter_arg_at_call(jmp_tid, count_param),
-                pointer_inference.eval_parameter_arg_at_call(jmp_tid, size_param),
-            ) {
-                (Some(count_value), Some(size_value)) => {
-                    Some(count_value.bin_op(BinOpType::IntMult, &size_value))
+            match called_symbol.parameters.as_slice() {
+                [_, count_param, size_param] => {
+                    match (
+                        pointer_inference.eval_parameter_arg_at_call(jmp_tid, count_param),
+                        pointer_inference.eval_parameter_arg_at_call(jmp_tid, size_param),
+                    ) {
+                        (Some(count_value), Some(size_value)) => {
+                            Some(count_value.bin_op(BinOpType::IntMult, &size_value))
+                        }
+                        _ => Some(Data::new_top(size_param.bytesize())),
+                    }
                 }
-                _ => Some(Data::new_top(size_param.bytesize())),
+                // Ghidra may not be supplying parameter information for
+                // reallocarray.
+                _ => None,
             }
         }
         "calloc" => {
