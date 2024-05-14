@@ -109,11 +109,11 @@ impl Project {
     }
 
     /// Replaces the return-to TID of calls to non-returning functions with the
-    /// TID of the artificial sink block.
+    /// TID of the artificial sink block in the caller.
     ///
     /// We distinguish two kinds of non-returning functions:
     ///
-    /// - extern symbols that are marked as non-returning (e.g. `exit(..)`),
+    /// - extern symbols that are marked as non-returning, e.g.,`exit(..)`,
     /// - functions without a return instruction.
     ///
     /// For calls to the latter functions, no [`CallReturn`] nodes and
@@ -133,18 +133,79 @@ impl Project {
     ///   Ghidra sometimes thinks its an indirect jump,
     /// - cases where the callee code that we get from Gidra is incomplete.
     ///
-    /// This heuristic works better when the sub-to-block mapping is unique
+    /// This heuristic works better when the block-to-sub mapping is unique
     /// since this pass may inline return site into callees that end in a tail
     /// jump, i.e., call this after [`make_block_to_sub_mapping_unique`].
+    /// This pass preserves a unique block-to-sub mapping.
     ///
     /// [`CallReturn`]: crate::analysis::graph::Node::CallReturn
     /// [control flow propagation pass]: mod@propagate_control_flow
     #[must_use]
     fn retarget_non_returning_calls_to_artificial_sink(&mut self) -> Vec<LogMessage> {
+        let (non_returning_subs, mut log_messages) = self.find_non_returning_subs();
+
+        // INVARIANT: A unique block-to-sub mapping is preserved.
+        for sub in self
+            .program
+            .term
+            .subs
+            .values_mut()
+            .filter(|sub| !sub.tid.is_artificial_sink_sub())
+        {
+            let sub_id_suffix = sub.id_suffix();
+            let mut one_or_more_call_retargeted = false;
+
+            for block in sub.term.blocks.iter_mut() {
+                for jmp in block.term.jmps.iter_mut() {
+                    let Jmp::Call {
+                        target,
+                        return_: Some(return_tid),
+                    } = &mut jmp.term
+                    else {
+                        continue;
+                    };
+
+                    if return_tid.is_artificial_sink_block(&sub_id_suffix) {
+                        // The call is already returning to the function's
+                        // artificial sink so there is nothing to do.
+                        continue;
+                    } else if let Some(extern_symbol) = self.program.term.extern_symbols.get(target)
+                    {
+                        if extern_symbol.no_return {
+                            // Reroute returns from calls to non-returning
+                            // library functions.
+                            *return_tid = Tid::artificial_sink_block(&sub_id_suffix);
+
+                            one_or_more_call_retargeted = true;
+                        }
+                    } else if non_returning_subs.contains(target) {
+                        // Reroute returns from calls to non-returning
+                        // functions within the program.
+                        log_messages.push(LogMessage::new_info(format!(
+                            "Call @ {} to {} does not return to {}.",
+                            jmp.tid, target, return_tid
+                        )));
+
+                        *return_tid = Tid::artificial_sink_block(&sub_id_suffix);
+
+                        one_or_more_call_retargeted = true;
+                    }
+                }
+            }
+
+            // Add artificial sink block if required.
+            if one_or_more_call_retargeted {
+                sub.add_artifical_sink();
+            }
+        }
+
+        log_messages
+    }
+
+    /// Returns the set of all subs without a return instruction.
+    fn find_non_returning_subs(&self) -> (HashSet<Tid>, Vec<LogMessage>) {
         let mut log_messages = Vec::new();
-        let dummy_sub_tid = Tid::new("Artificial Sink Sub");
-        let dummy_blk_tid = Tid::new("Artificial Sink Block");
-        let non_returning_subs: HashSet<_> = self
+        let non_returning_subs = self
             .program
             .term
             .subs
@@ -158,7 +219,7 @@ impl Project {
                         .any(|jmp| matches!(jmp.term, Jmp::Return(..)))
                 });
 
-                if sub_returns || sub.tid == dummy_sub_tid {
+                if sub_returns || sub.tid.is_artificial_sink_sub() {
                     None
                 } else {
                     log_messages.push(LogMessage::new_info(format!(
@@ -171,58 +232,33 @@ impl Project {
             })
             .collect();
 
-        for sub in self.program.term.subs.values_mut() {
-            for block in sub.term.blocks.iter_mut() {
-                for jmp in block.term.jmps.iter_mut() {
-                    if let Jmp::Call {
-                        target,
-                        return_: Some(return_tid),
-                    } = &mut jmp.term
-                    {
-                        if let Some(extern_symbol) = self.program.term.extern_symbols.get(target) {
-                            if extern_symbol.no_return {
-                                *return_tid = dummy_blk_tid.clone();
-                            }
-                        } else if non_returning_subs.contains(target) {
-                            log_messages.push(LogMessage::new_info(format!(
-                                "Call @ {} to {} does not return to {}.",
-                                jmp.tid, target, return_tid
-                            )));
-                            *return_tid = dummy_blk_tid.clone();
-                        }
-                    }
-                }
-            }
-        }
-
-        log_messages
+        (non_returning_subs, log_messages)
     }
 
-    /// Adds an artificial target for returns from non-returning functions and
-    /// jumps to non-existing TIDs.
-    fn add_artifical_sinks(&mut self) {
-        let dummy_sub_tid = Tid::new("Artificial Sink Sub");
-        let dummy_blk_tid = Tid::new("Artificial Sink Block");
-        let dummy_sub: Term<Sub> = Term {
-            tid: dummy_sub_tid,
-            term: Sub {
-                name: "Artificial Sink Sub".to_string(),
-                blocks: vec![Term {
-                    tid: dummy_blk_tid,
-                    term: Blk {
-                        defs: Vec::new(),
-                        jmps: Vec::new(),
-                        indirect_jmp_targets: Vec::new(),
-                    },
-                }],
-                calling_convention: None,
-            },
-        };
-
+    /// Adds a function that serves as an artificial sink in the CFG.
+    fn add_artifical_sink(&mut self) {
         self.program
             .term
             .subs
-            .insert(dummy_sub.tid.clone(), dummy_sub);
+            .insert(Tid::artificial_sink_sub(), Term::<Sub>::artificial_sink());
+    }
+
+    /// Returns the set of all valid jump targets.
+    fn find_all_jump_targets(&self) -> HashSet<Tid> {
+        let mut jump_target_tids = HashSet::new();
+
+        for sub in self.program.term.subs.values() {
+            jump_target_tids.insert(sub.tid.clone());
+            for block in sub.term.blocks.iter() {
+                jump_target_tids.insert(block.tid.clone());
+            }
+        }
+
+        for symbol_tid in self.program.term.extern_symbols.keys() {
+            jump_target_tids.insert(symbol_tid.clone());
+        }
+
+        jump_target_tids
     }
 
     /// Replace jumps to nonexisting TIDs with jumps to a dummy target
@@ -234,35 +270,21 @@ impl Project {
     #[must_use]
     fn remove_references_to_nonexisting_tids(&mut self) -> Vec<LogMessage> {
         let mut log_messages = Vec::new();
+        let all_jump_targets = self.find_all_jump_targets();
 
-        // Gather all existing jump targets.
-        let mut jump_target_tids = HashSet::new();
-        for sub in self.program.term.subs.values() {
-            jump_target_tids.insert(sub.tid.clone());
-            for block in sub.term.blocks.iter() {
-                jump_target_tids.insert(block.tid.clone());
-            }
-        }
-        for symbol_tid in self.program.term.extern_symbols.keys() {
-            jump_target_tids.insert(symbol_tid.clone());
-        }
-
-        // Replace all jumps to non-existing jump targets with jumps to dummy targets
-        let dummy_sub_tid = Tid::new("Artificial Sink Sub");
-        let dummy_blk_tid = Tid::new("Artificial Sink Block");
+        // Replace all jumps to non-existing jump targets with jumps to dummy
+        // targets.
         for sub in self.program.term.subs.values_mut() {
             for block in sub.term.blocks.iter_mut() {
                 if let Err(mut logs) =
-                    block.remove_nonexisting_indirect_jump_targets(&jump_target_tids)
+                    block.remove_nonexisting_indirect_jump_targets(&all_jump_targets)
                 {
                     log_messages.append(&mut logs);
                 }
                 for jmp in block.term.jmps.iter_mut() {
-                    if let Err(log_msg) = jmp.retarget_nonexisting_jump_targets_to_dummy_tid(
-                        &jump_target_tids,
-                        &dummy_sub_tid,
-                        &dummy_blk_tid,
-                    ) {
+                    if let Err(log_msg) =
+                        jmp.retarget_nonexisting_jump_targets_to_artificial_sink(&all_jump_targets)
+                    {
                         log_messages.push(log_msg);
                     }
                 }
@@ -348,14 +370,13 @@ impl Project {
     #[must_use]
     pub fn normalize(&mut self) -> Vec<LogMessage> {
         let mut logs = self.remove_duplicate_tids();
-        self.add_artifical_sinks();
+        self.add_artifical_sink();
         logs.append(self.remove_references_to_nonexisting_tids().as_mut());
         make_block_to_sub_mapping_unique(self);
         logs.append(
             self.retarget_non_returning_calls_to_artificial_sink()
                 .as_mut(),
         );
-
         crate::analysis::expression_propagation::propagate_input_expression(self);
         self.substitute_trivial_expressions();
         crate::analysis::dead_variable_elimination::remove_dead_var_assignments(self);
@@ -370,29 +391,32 @@ impl Project {
 }
 
 impl Term<Jmp> {
-    /// If the TID of a jump target or return target is not contained in `known_tids`
-    /// replace it with a dummy TID and return an error message.
-    fn retarget_nonexisting_jump_targets_to_dummy_tid(
+    /// If the TID of a jump target, call target, or return target is not
+    /// contained in in the known jump targets, replace it with a dummy TID and
+    /// return an error message.
+    fn retarget_nonexisting_jump_targets_to_artificial_sink(
         &mut self,
-        known_tids: &HashSet<Tid>,
-        dummy_sub_tid: &Tid,
-        dummy_blk_tid: &Tid,
+        all_jump_targets: &HashSet<Tid>,
     ) -> Result<(), LogMessage> {
         use Jmp::*;
         match &mut self.term {
-            BranchInd(_) => (),
-            Branch(tid) | CBranch { target: tid, .. } if known_tids.get(tid).is_none() => {
+            BranchInd(_) => Ok(()),
+            Branch(tid) | CBranch { target: tid, .. } if !all_jump_targets.contains(tid) => {
                 let error_msg = format!("Jump target at {} does not exist", tid.address);
                 let error_log = LogMessage::new_error(error_msg).location(self.tid.clone());
-                *tid = dummy_blk_tid.clone();
-                return Err(error_log);
+
+                *tid = Tid::artificial_sink_block("");
+
+                Err(error_log)
             }
-            Call { target, return_ } if known_tids.get(target).is_none() => {
+            Call { target, return_ } if !all_jump_targets.contains(target) => {
                 let error_msg = format!("Call target at {} does not exist", target.address);
                 let error_log = LogMessage::new_error(error_msg).location(self.tid.clone());
-                *target = dummy_sub_tid.clone();
+
+                *target = Tid::artificial_sink_sub();
                 *return_ = None;
-                return Err(error_log);
+
+                Err(error_log)
             }
             Call {
                 return_: Some(return_tid),
@@ -405,15 +429,16 @@ impl Term<Jmp> {
             | CallOther {
                 return_: Some(return_tid),
                 ..
-            } if known_tids.get(return_tid).is_none() => {
+            } if !all_jump_targets.contains(return_tid) => {
                 let error_msg = format!("Return target at {} does not exist", return_tid.address);
                 let error_log = LogMessage::new_error(error_msg).location(self.tid.clone());
-                *return_tid = dummy_blk_tid.clone();
-                return Err(error_log);
+
+                *return_tid = Tid::artificial_sink_block("");
+
+                Err(error_log)
             }
-            _ => (),
+            _ => Ok(()),
         }
-        Ok(())
     }
 }
 
@@ -429,12 +454,8 @@ mod tests {
         };
         assert_eq!(jmp_term.term, Jmp::Branch(Tid::new("nonexisting_target")));
         assert!(jmp_term
-            .retarget_nonexisting_jump_targets_to_dummy_tid(
-                &HashSet::new(),
-                &Tid::new("dummy_sub"),
-                &Tid::new("dummy_blk")
-            )
+            .retarget_nonexisting_jump_targets_to_artificial_sink(&HashSet::new(),)
             .is_err());
-        assert_eq!(jmp_term.term, Jmp::Branch(Tid::new("dummy_blk")));
+        assert_eq!(jmp_term.term, Jmp::Branch(Tid::artificial_sink_block("")));
     }
 }

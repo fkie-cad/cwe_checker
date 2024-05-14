@@ -41,7 +41,7 @@ pub fn propagate_control_flow(project: &mut Project) {
         };
         // Conditions that we know to be true "on" a particular outgoing
         // edge.
-        let mut true_conditions = Vec::new();
+        let mut true_conditions = Vec::with_capacity(2);
         // Check if some condition must be true at the beginning of the block,
         // and still holds after all DEFs are executed.
         if let Some(block_precondition) =
@@ -80,7 +80,7 @@ pub fn propagate_control_flow(project: &mut Project) {
                     // Call may have side-effects that invalidate our
                     // knowledge about any condition we know to be true
                     // after execution of all DEFs in a block.
-                    &Vec::new(),
+                    &Vec::with_capacity(0),
                 ) {
                     jmps_to_retarget.insert(call_tid.clone(), new_target);
                 }
@@ -652,7 +652,6 @@ pub mod tests {
         project.program.term.subs =
             BTreeMap::from([(Tid::new("sub_1"), sub_1), (Tid::new("sub_2"), sub_2)]);
 
-        project.add_artifical_sinks();
         let mut log_msg_non_returning = project.retarget_non_returning_calls_to_artificial_sink();
         assert_eq!(
             log_msg_non_returning.pop().unwrap().text,
@@ -675,11 +674,14 @@ pub mod tests {
         let expected_blocks = vec![
             // `cond_blk_1` can be retarget.
             mock_condition_block("cond_blk_1", "end_blk_2", "end_blk_1"),
-            // `call_blk` was re-targeted to artificial sink.
-            mock_block_with_defs_and_call("call_blk", "sub_2", "Artificial Sink Block"),
+            // `call_blk` was re-targeted to artificial sink as it was deemed
+            // non-returning.
+            mock_block_with_defs_and_call("call_blk", "sub_2", "Artificial Sink Block_sub_1"),
             // `cond_blk_2` was removed since cond_blk_1 was re-targeted.
             mock_block_with_defs("end_blk_1", "end_blk_1"),
             mock_block_with_defs("end_blk_2", "end_blk_2"),
+            // Artificial sink block was added to sub_1 since it did not exist.
+            Term::<Blk>::artificial_sink("_sub_1"),
         ];
 
         assert_eq!(

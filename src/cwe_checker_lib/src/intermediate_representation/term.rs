@@ -14,12 +14,25 @@ pub struct Tid {
 }
 
 impl Tid {
+    /// Prefix for IDs of artificial sinks in the control flow graph.
+    ///
+    /// Dummy blocks with such TIDs are added for different purposes, e.g., as
+    /// targets for jumps to non-existing targets or return targets for calls to
+    /// non-returning functions.
+    const ARTIFICIAL_SINK_BLOCK_ID_PREFIX: &'static str = "Artificial Sink Block";
+    /// The ID of the artificial sink sub.
+    ///
+    /// This is used as the target for calls to non-existing functions.
+    const ARTIFICIAL_SINK_SUB_ID: &'static str = "Artificial Sink Sub";
+    /// Address for use in IDs of terms that do not have an address.
+    const UNKNOWN_ADDRESS: &'static str = "UNKNOWN";
+
     /// Generate a new term identifier with the given ID string
     /// and with unknown address.
     pub fn new<T: ToString>(val: T) -> Tid {
         Tid {
             id: val.to_string(),
-            address: "UNKNOWN".to_string(),
+            address: Self::UNKNOWN_ADDRESS.to_string(),
         }
     }
 
@@ -46,6 +59,35 @@ impl Tid {
             id: format!("blk_{address}"),
             address: address.to_string(),
         }
+    }
+
+    /// Returns a new ID for an artificial sink block with the given suffix.
+    pub fn artificial_sink_block(suffix: &str) -> Self {
+        Self {
+            id: format!("{}{}", Self::ARTIFICIAL_SINK_BLOCK_ID_PREFIX, suffix),
+            address: Self::UNKNOWN_ADDRESS.to_string(),
+        }
+    }
+
+    /// Returns a new ID for the artificial sink sub.
+    pub fn artificial_sink_sub() -> Self {
+        Self {
+            id: Self::ARTIFICIAL_SINK_SUB_ID.to_string(),
+            address: Self::UNKNOWN_ADDRESS.to_string(),
+        }
+    }
+
+    /// Returns true iff the ID is for the artificial sink block with the given
+    /// suffix.
+    pub fn is_artificial_sink_block(&self, suffix: &str) -> bool {
+        self.id.starts_with(Self::ARTIFICIAL_SINK_BLOCK_ID_PREFIX)
+            && self.has_id_suffix(suffix)
+            && self.address == Self::UNKNOWN_ADDRESS
+    }
+
+    /// Returns true iff the ID is for the artificial sink sub.
+    pub fn is_artificial_sink_sub(&self) -> bool {
+        self.id == Self::ARTIFICIAL_SINK_SUB_ID && self.address == Self::UNKNOWN_ADDRESS
     }
 }
 

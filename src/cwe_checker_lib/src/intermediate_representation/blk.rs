@@ -39,19 +39,22 @@ pub struct Blk {
 }
 
 impl Term<Blk> {
-    /// Remove indirect jump target addresses for which no corresponding target block exists.
-    /// Return an error message for each removed address.
+    /// Remove indirect jump target addresses for which no corresponding target
+    /// block exists.
+    ///
+    /// Returns an error message for each removed address.
     pub fn remove_nonexisting_indirect_jump_targets(
         &mut self,
-        known_block_tids: &HashSet<Tid>,
+        all_jump_targets: &HashSet<Tid>,
     ) -> Result<(), Vec<LogMessage>> {
         let mut logs = Vec::new();
+
         self.term.indirect_jmp_targets = self
             .term
             .indirect_jmp_targets
             .iter()
             .filter_map(|target| {
-                if known_block_tids.get(target).is_some() {
+                if all_jump_targets.contains(target) {
                     Some(target.clone())
                 } else {
                     let error_msg =
@@ -61,10 +64,24 @@ impl Term<Blk> {
                 }
             })
             .collect();
+
         if logs.is_empty() {
             Ok(())
         } else {
             Err(logs)
+        }
+    }
+
+    /// Returns a new artificial sink block with the given suffix attached to
+    /// its ID.
+    pub fn artificial_sink(id_suffix: &str) -> Self {
+        Self {
+            tid: Tid::artificial_sink_block(id_suffix),
+            term: Blk {
+                defs: Vec::with_capacity(0),
+                jmps: Vec::with_capacity(0),
+                indirect_jmp_targets: Vec::with_capacity(0),
+            },
         }
     }
 }
