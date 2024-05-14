@@ -235,7 +235,7 @@ mod checkers {
                         &analysis_results,
                         |b, analysis_results| {
                             b.iter_with_large_drop(|| {
-                                (checker.run)(&analysis_results, &config[&checker.name])
+                                (checker.run)(analysis_results, &config[&checker.name])
                             })
                         },
                     );
@@ -630,14 +630,14 @@ mod cfg {
                         BenchmarkId::new("unoptimized", pcode_project_json),
                         &program_unoptimized,
                         |b, program_unoptimized| {
-                            b.iter_with_large_drop(|| graph::get_program_cfg(&program_unoptimized));
+                            b.iter_with_large_drop(|| graph::get_program_cfg(program_unoptimized));
                         },
                     );
                     group.bench_with_input(
                         BenchmarkId::new("optimized", pcode_project_json),
                         &program_optimized,
                         |b, program_optimized| {
-                            b.iter_with_large_drop(|| graph::get_program_cfg(&program_optimized));
+                            b.iter_with_large_drop(|| graph::get_program_cfg(program_optimized));
                         },
                     );
                 }

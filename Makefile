@@ -28,6 +28,7 @@ compile_test_files:
 codestyle-check:
 	cargo fmt -- --check
 	cargo clippy -- -D clippy::all -D missing_docs
+	cargo clippy -p cwe_checker_lib --bench "benchmarks" -- -D clippy::all
 	RUSTDOCFLAGS="-Dwarnings" cargo doc --no-deps --document-private-items
 
 clean:
