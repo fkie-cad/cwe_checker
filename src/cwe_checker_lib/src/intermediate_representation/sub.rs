@@ -18,6 +18,52 @@ pub struct Sub {
     pub calling_convention: Option<String>,
 }
 
+impl Term<Sub> {
+    /// Returns the ID suffix for this function.
+    pub fn id_suffix(&self) -> String {
+        format!("_{}", self.tid)
+    }
+
+    /// Returns true iff the function has an artificial sink block.
+    pub fn has_artifical_sink(&self) -> bool {
+        let id_suffix = self.id_suffix();
+
+        self.term
+            .blocks
+            .iter()
+            .any(|blk| blk.tid.is_artificial_sink_block(&id_suffix))
+    }
+
+    /// Returns a new artificial sink sub.
+    pub fn artificial_sink() -> Self {
+        Self {
+            tid: Tid::artificial_sink_sub(),
+            term: Sub {
+                name: "Artificial Sink Sub".to_string(),
+                blocks: vec![Term::<Blk>::artificial_sink("")],
+                calling_convention: None,
+            },
+        }
+    }
+
+    /// Adds an artificial sink block if there is none.
+    ///
+    /// Returns true iff the artificial sink block was added.
+    pub fn add_artifical_sink(&mut self) -> bool {
+        if self.has_artifical_sink() {
+            false
+        } else {
+            let id_suffix = self.id_suffix();
+
+            self.term
+                .blocks
+                .push(Term::<Blk>::artificial_sink(&id_suffix));
+
+            true
+        }
+    }
+}
+
 /// A parameter or return argument of a function.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub enum Arg {

@@ -1,6 +1,7 @@
 0.9-dev
 ===
 
+-   Improve Control Flow Propagation normalization pass (PR #462)
 -   Improve taint analysis abstraction to simplify interprocedural bottom-up
     analysis of memory taint (PR #451)
 -   Added check for CWE-252: Unchecked Return Value (PR #451)
