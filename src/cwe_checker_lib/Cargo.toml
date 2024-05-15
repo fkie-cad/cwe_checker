@@ -22,5 +22,13 @@ itertools = "0.10.3"
 gcd = "2.1.0"
 nix = "0.26.1"
 
+[dev-dependencies]
+criterion = { version = "0.5.1", features = ["html_reports"] }
+paste = "1.0.14"
+
+[[bench]]
+name = "benchmarks"
+harness = false
+
 [lib]
 name = "cwe_checker_lib"

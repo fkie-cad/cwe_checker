@@ -1,6 +1,7 @@
 0.9-dev
 ===
 
+-   Added initial benchmarking infrastructure (PR #464)
 -   Improve Control Flow Propagation normalization pass (PR #462)
 -   Improve taint analysis abstraction to simplify interprocedural bottom-up
     analysis of memory taint (PR #451)
