@@ -39,7 +39,7 @@
 
 use crate::analysis::forward_interprocedural_fixpoint::create_computation;
 use crate::analysis::forward_interprocedural_fixpoint::Context as _;
-use crate::analysis::graph::{Edge, Node};
+use crate::analysis::graph::Edge;
 use crate::analysis::interprocedural_fixpoint_generic::NodeValue;
 use crate::analysis::taint::state::State as TaState;
 use crate::intermediate_representation::*;
@@ -64,12 +64,20 @@ pub static CWE_MODULE: CweModule = CweModule {
 };
 
 /// The configuration struct.
+///
+/// These values are configurable via the `config.json` and `lkm_config.json`
+/// files.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Config {
+    /// If `true`, passing a tainted value, or a pointer to an object that
+    /// contains taint, as an argument to a function call is more likely to
+    /// cause a warning.
+    strict_call_policy: bool,
+    /// Threshold for the fixpoint computation.
+    max_steps: u64,
     /// The names of symbols for which the analysis should check whether the
     /// return values are checked for being a NULL pointer by the analysed
-    /// binary. This list is configurable via the `config.json` configuration
-    /// file.
+    /// binary.
     symbols: Vec<String>,
 }
 
@@ -89,7 +97,13 @@ pub fn check_cwe(
 
     let config: Config = serde_json::from_value(cwe_params.clone()).unwrap();
     let symbol_map = symbol_utils::get_symbol_map(project, &config.symbols[..]);
-    let general_context = Context::new(project, pi_result, cwe_sender);
+    let general_context = Context::new(
+        &config,
+        project,
+        pi_result,
+        analysis_results.function_signatures.unwrap(),
+        cwe_sender,
+    );
 
     for edge in general_context.get_graph().edge_references() {
         let Edge::ExternCallStub(jmp) = edge.weight() else {
@@ -102,19 +116,16 @@ pub fn check_cwe(
             continue;
         };
         let return_node = edge.target();
-        let Node::BlkStart(.., current_sub) = general_context.get_graph()[return_node] else {
-            panic!("Malformed control flow graph.");
-        };
 
         let mut context = general_context.clone();
-        context.set_taint_source(jmp, current_sub);
+        context.set_taint_source(jmp);
 
         let mut computation = create_computation(context, None);
         computation.set_node_value(
             return_node,
             NodeValue::Value(TaState::new_return(symbol, pi_result, return_node)),
         );
-        computation.compute_with_max_steps(100);
+        computation.compute_with_max_steps(config.max_steps);
     }
 
     let mut cwe_warnings = BTreeMap::new();

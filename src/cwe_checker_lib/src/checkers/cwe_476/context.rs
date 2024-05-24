@@ -8,6 +8,7 @@
 //! [taint analysis module]: crate::analysis::taint
 
 use super::CWE_MODULE;
+use crate::analysis::function_signature::FunctionSignature;
 use crate::analysis::graph::{Graph as Cfg, HasCfg, Node as CfgNode};
 use crate::analysis::pointer_inference::{
     Data as PiData, PointerInference as PointerInferenceComputation,
@@ -17,9 +18,10 @@ use crate::analysis::vsa_results::{HasVsaResult, VsaResult};
 use crate::intermediate_representation::*;
 use crate::utils::log::CweWarning;
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::convert::AsRef;
-use std::sync::Arc;
+
+use super::Config;
 
 /// The context object for the NULL-Pointer-Dereference check.
 ///
@@ -37,19 +39,17 @@ pub struct Context<'a> {
     /// They are used to determine the targets of pointers to memory, which in
     /// turn is used to keep track of taint on the stack or on the heap.
     pi_result: &'a PointerInferenceComputation<'a>,
-    /// Maps the TID of an extern symbol to the extern symbol struct.
-    extern_symbol_map: Arc<HashMap<Tid, &'a ExternSymbol>>,
+    /// A pointer to the computed function signatures for all internal
+    /// functions.
+    function_signatures: &'a BTreeMap<Tid, FunctionSignature>,
     /// The call whose return values are the sources for taint for the analysis.
     taint_source: Option<&'a Term<Jmp>>,
     /// The name of the function, whose return values are the taint sources.
     taint_source_name: Option<String>,
-    /// The current subfunction.
-    ///
-    /// Since the analysis is intraprocedural, all nodes with state during the
-    /// fixpoint algorithm should belong to this function.
-    current_sub: Option<&'a Term<Sub>>,
     /// A channel where found CWE hits can be sent to.
     cwe_collector: crossbeam_channel::Sender<CweWarning>,
+    /// See the corresponding field of [`Config`].
+    strict_call_policy: bool,
 }
 
 impl<'a> HasCfg<'a> for Context<'a> {
@@ -71,29 +71,36 @@ impl<'a> AsRef<Project> for Context<'a> {
 }
 
 impl<'a> TaintAnalysis<'a> for Context<'a> {
-    /// Generate a CWE warning if taint may be contained in the function parameters.
+    /// Generate a CWE warning if taint may be contained in the function
+    /// parameters.
     ///
-    /// If a possible parameter register of the call contains taint,
-    /// generate a CWE warning and return `None` to suppress the generation of
-    /// further warnings. Else just remove all taint contained in
+    /// If `strict_call_policy` is set and a possible argument of the call
+    /// contains taint, generate a CWE warning and return `None` to suppress the
+    /// generation of further warnings. Else just remove all taint contained in
     /// non-callee-saved registers.
+    ///
+    /// If `strict_call_policy` is not set, this mirrors the default
+    /// implementation.
     fn update_call_generic(
         &self,
         state: &TaState,
         call_tid: &Tid,
         calling_convention_hint: &Option<String>,
     ) -> Option<TaState> {
-        if state.check_generic_function_params_for_taint::<true>(
-            self.vsa_result(),
-            call_tid,
-            self.project,
-            calling_convention_hint,
-        ) {
-            self.generate_cwe_warning(call_tid);
+        if self.strict_call_policy
+            && state.check_generic_function_params_for_taint::<true>(
+                self.vsa_result(),
+                call_tid,
+                self.project,
+                calling_convention_hint,
+            )
+        {
+            self.generate_cwe_warning(call_tid, "call_generic_arg_taint");
 
             // Stop taint propagation to suppress futher warnings.
             None
         } else {
+            // This should always mirror the default implementation.
             let mut new_state = state.clone();
 
             if let Some(calling_conv) = self
@@ -103,68 +110,91 @@ impl<'a> TaintAnalysis<'a> for Context<'a> {
                 new_state.remove_non_callee_saved_taint(calling_conv);
             }
 
-            Some(new_state)
+            if new_state.is_empty() {
+                self.handle_empty_state_out(call_tid)
+            } else {
+                Some(new_state)
+            }
         }
     }
-    /// Generate a CWE warning if taint may be contained in the function parameters.
+
+    /// Generate a CWE warning if taint may be contained in the function
+    /// parameters.
+    ///
+    /// If `strict_call_policy` is set and a possible parameter of the call
+    /// contains taint, generate a CWE warning and return `None` to suppress the
+    /// generation of further warnings.
     ///
     /// Always returns `None` so that the analysis stays intraprocedural.
     fn update_call(
         &self,
         state: &TaState,
         call: &Term<Jmp>,
-        _target: &CfgNode,
+        target: &CfgNode,
         calling_convention: &Option<String>,
     ) -> Option<TaState> {
-        if state.check_generic_function_params_for_taint::<true>(
-            self.vsa_result(),
-            &call.tid,
-            self.project,
-            calling_convention,
-        ) {
-            self.generate_cwe_warning(&call.tid);
+        if self.strict_call_policy {
+            if state.check_generic_function_params_for_taint::<true>(
+                self.vsa_result(),
+                &call.tid,
+                self.project,
+                calling_convention,
+            ) {
+                self.generate_cwe_warning(&call.tid, "call_arg_taint");
+            }
+        } else {
+            let CfgNode::BlkStart(_, sub) = *target else {
+                return None;
+            };
+            let function_signature = self.function_signatures.get(&sub.tid)?;
+
+            for (arg, access_pattern) in &function_signature.parameters {
+                if !access_pattern.is_dereferenced() {
+                    continue;
+                }
+                if state.check_abstract_location_for_taint(self.vsa_result(), &call.tid, arg) {
+                    self.generate_cwe_warning(&call.tid, "call_arg_taint_fn_sig");
+                }
+            }
         }
 
         None
     }
 
-    /// Generate a CWE warning if taint may be contained in the function parameters.
+    /// Generate a CWE warning if taint may be contained in the function
+    /// parameters.
     ///
-    /// If taint may be contained in the function parameters, generate a CWE
-    /// warning and return `None` to the suppress the generation of
-    /// further warnings. Else remove taint from non-callee-saved registers.
-    fn update_call_stub(&self, state: &TaState, call: &Term<Jmp>) -> Option<TaState> {
-        if state.is_empty() {
-            return None;
-        }
+    /// If `strict_call_policy` is set and a possible argument of the call
+    /// contains taint, generate a CWE warning and return `None` to suppress the
+    /// generation of further warnings. Else just remove all taint contained in
+    /// non-callee-saved registers.
+    ///
+    /// If `strict_call_policy` is not set, this mirrors the default
+    /// implementation.
+    fn update_extern_call(
+        &self,
+        state: &TaState,
+        call: &Term<Jmp>,
+        project: &Project,
+        extern_symbol: &ExternSymbol,
+    ) -> Option<TaState> {
+        if self.strict_call_policy
+            && state.check_extern_parameters_for_taint::<true>(
+                self.vsa_result(),
+                extern_symbol,
+                &call.tid,
+            )
+        {
+            self.generate_cwe_warning(&call.tid, "extern_call_arg_taint");
 
-        match &call.term {
-            Jmp::Call { target, .. } => {
-                let extern_symbol = self
-                    .extern_symbol_map
-                    .get(target)
-                    .expect("Extern symbol not found.");
+            None
+        } else {
+            // This should always mirror the default implementation.
+            let mut new_state = state.clone();
 
-                if state.check_extern_parameters_for_taint::<true>(
-                    self.vsa_result(),
-                    extern_symbol,
-                    &call.tid,
-                ) {
-                    self.generate_cwe_warning(&call.tid);
+            new_state.remove_non_callee_saved_taint(project.get_calling_convention(extern_symbol));
 
-                    None
-                } else {
-                    let mut new_state = state.clone();
-
-                    new_state.remove_non_callee_saved_taint(
-                        self.project.get_calling_convention(extern_symbol),
-                    );
-
-                    Some(new_state)
-                }
-            }
-            Jmp::CallInd { .. } => self.update_call_generic(state, &call.tid, &None),
-            _ => panic!("Malformed control flow graph encountered."),
+            Some(new_state)
         }
     }
 
@@ -184,11 +214,6 @@ impl<'a> TaintAnalysis<'a> for Context<'a> {
         untaken_conditional: Option<&Term<Jmp>>,
         _target: &Term<Blk>,
     ) -> Option<TaState> {
-        if state.is_empty() {
-            // Without taint there is nothing to propagate.
-            return None;
-        }
-
         // If this control flow transfer depends on a condition involving
         // a tainted value then we do not propagate any taint information to
         // the destination.
@@ -205,37 +230,18 @@ impl<'a> TaintAnalysis<'a> for Context<'a> {
                 }),
             ) if state.eval(condition).is_tainted() => None,
             // Does not depend on tainted values.
-            _ => Some(state.clone()),
+            _ => {
+                if state.is_empty() {
+                    self.handle_empty_state_out(&jump.tid)
+                } else {
+                    Some(state.clone())
+                }
+            }
         }
     }
 
-    /// Generate a CWE warning if the subroutine may return taint.
-    ///
-    /// We assume that returning a tainted value means that the function may
-    /// return a NULL pointer. This always generates a warning, even if this may
-    /// be expected by the caller.
-    fn update_return_callee(
-        &self,
-        state: &TaState,
-        _call_term: &Term<Jmp>,
-        return_term: &Term<Jmp>,
-        calling_convention: &Option<String>,
-    ) -> Option<TaState> {
-        if state.check_return_values_for_taint::<true>(
-            self.vsa_result(),
-            &return_term.tid,
-            self.project,
-            calling_convention,
-        ) {
-            self.generate_cwe_warning(&return_term.tid);
-        }
-
-        // Keep analysis intraprocedural but do not force propagation to be
-        // stopped in the caller.
-        Some(TaState::new_empty())
-    }
-
-    /// Generate a CWE warning if the Def was a load/store through a tainted pointer.
+    /// Generate a CWE warning if the Def was a load/store through a tainted
+    /// pointer.
     ///
     /// If a warning is generated, return `None` to suppress the generation of
     /// further warnings. Else return the new state unchanged.
@@ -245,21 +251,22 @@ impl<'a> TaintAnalysis<'a> for Context<'a> {
         new_state: TaState,
         def: &Term<Def>,
     ) -> Option<TaState> {
-        if old_state.is_empty() {
-            // Without taint there is nothing to propagate.
-            return None;
-        }
-
         match &def.term {
             Def::Load { var: _, address } if old_state.eval(address).is_tainted() => {
-                self.generate_cwe_warning(&def.tid);
+                self.generate_cwe_warning(&def.tid, "load_addr_taint");
                 None
             }
             Def::Store { address, .. } if old_state.eval(address).is_tainted() => {
-                self.generate_cwe_warning(&def.tid);
+                self.generate_cwe_warning(&def.tid, "store_addr_taint");
                 None
             }
-            _ => Some(new_state),
+            _ => {
+                if new_state.is_empty() {
+                    self.handle_empty_state_out(&def.tid)
+                } else {
+                    Some(new_state)
+                }
+            }
         }
     }
 }
@@ -273,8 +280,10 @@ impl<'a> Context<'a> {
     /// one should clone or reuse an existing `Context` object instead of generating new ones,
     /// since this function can be expensive!
     pub fn new(
+        config: &Config,
         project: &'a Project,
         pi_result: &'a PointerInferenceComputation<'a>,
+        function_signatures: &'a BTreeMap<Tid, FunctionSignature>,
         cwe_collector: crossbeam_channel::Sender<CweWarning>,
     ) -> Self {
         let mut extern_symbol_map = HashMap::new();
@@ -284,16 +293,16 @@ impl<'a> Context<'a> {
         Context {
             project,
             pi_result,
-            extern_symbol_map: Arc::new(extern_symbol_map),
+            function_signatures,
             taint_source: None,
             taint_source_name: None,
-            current_sub: None,
             cwe_collector,
+            strict_call_policy: config.strict_call_policy,
         }
     }
 
-    /// Set the taint source and the current function for the analysis.
-    pub fn set_taint_source(&mut self, taint_source: &'a Term<Jmp>, current_sub: &'a Term<Sub>) {
+    /// Set the taint source for the analysis.
+    pub fn set_taint_source(&mut self, taint_source: &'a Term<Jmp>) {
         let taint_source_name = match &taint_source.term {
             Jmp::Call { target, .. } => self
                 .project
@@ -307,11 +316,10 @@ impl<'a> Context<'a> {
         };
         self.taint_source = Some(taint_source);
         self.taint_source_name = Some(taint_source_name);
-        self.current_sub = Some(current_sub);
     }
 
     /// Generate a CWE warning for the taint source of the context object.
-    fn generate_cwe_warning(&self, taint_access_location: &Tid) {
+    fn generate_cwe_warning(&self, taint_access_location: &Tid, reason: &str) {
         let taint_source = self.taint_source.unwrap();
         let taint_source_name = self.taint_source_name.clone().unwrap();
         let cwe_warning = CweWarning::new(CWE_MODULE.name, CWE_MODULE.version,
@@ -319,7 +327,8 @@ impl<'a> Context<'a> {
             taint_source.tid.address, taint_source_name))
             .addresses(vec![taint_source.tid.address.clone(), taint_access_location.address.clone()])
             .tids(vec![format!("{}", taint_source.tid), format!("{taint_access_location}")])
-            .symbols(vec![taint_source_name]);
+            .symbols(vec![taint_source_name])
+            .other(vec![vec![format!("reason={}", reason)]]);
         let _ = self.cwe_collector.send(cwe_warning);
     }
 }
@@ -330,13 +339,31 @@ mod tests {
     use crate::analysis::taint::Taint as TaTaint;
     use crate::{expr, variable};
 
+    impl Config {
+        fn mock(strict_call_policy: bool) -> Self {
+            Self {
+                strict_call_policy,
+                max_steps: 100,
+                symbols: Vec::new(),
+            }
+        }
+    }
+
     impl<'a> Context<'a> {
         pub fn mock(
+            config: &Config,
             project: &'a Project,
             pi_results: &'a PointerInferenceComputation<'a>,
+            function_signatures: &'a BTreeMap<Tid, FunctionSignature>,
         ) -> Context<'a> {
             let (cwe_sender, _) = crossbeam_channel::unbounded();
-            let mut context = Context::new(project, pi_results, cwe_sender);
+            let mut context = Context::new(
+                &config,
+                project,
+                pi_results,
+                function_signatures,
+                cwe_sender,
+            );
             let taint_source = Box::new(Term {
                 tid: Tid::new("taint_source"),
                 term: Jmp::Call {
@@ -345,10 +372,8 @@ mod tests {
                 },
             });
             let taint_source = Box::leak(taint_source);
-            let current_sub = Box::new(Sub::mock("current_sub"));
-            let current_sub = Box::leak(current_sub);
 
-            context.set_taint_source(taint_source, current_sub);
+            context.set_taint_source(taint_source);
 
             context
         }
@@ -358,11 +383,14 @@ mod tests {
     fn update_call_generic() {
         let project = Project::mock_x64();
         let pi_results = PointerInferenceComputation::mock(&project);
-        let context = Context::mock(&project, &pi_results);
+        let function_signatures = BTreeMap::new();
+        let config = Config::mock(true);
+        let context = Context::mock(&config, &project, &pi_results, &function_signatures);
         let mut state = TaState::mock();
 
         // Test that taint is propagated through calls that do not receive
         // tainted arguments.
+        state.set_register_taint(&variable!("RBX:8"), TaTaint::Tainted(ByteSize::new(8)));
         assert!(context
             .update_call_generic(&state, &Tid::new("call_tid"), &None)
             .is_some());
@@ -379,7 +407,9 @@ mod tests {
     fn update_jump() {
         let project = Project::mock_x64();
         let pi_results = PointerInferenceComputation::mock(&project);
-        let context = Context::mock(&project, &pi_results);
+        let function_signatures = BTreeMap::new();
+        let config = Config::mock(true);
+        let context = Context::mock(&config, &project, &pi_results, &function_signatures);
         let (state, _pi_state) = TaState::mock_with_pi_state();
 
         // Test that no taint is propagated through conditions that depend on a
