@@ -292,7 +292,10 @@ impl IntervalDomain {
             interval,
             widening_lower_bound: lower_bound,
             widening_upper_bound: upper_bound,
-            widening_delay: self.widening_delay >> low_byte.as_bit_length(),
+            widening_delay: self
+                .widening_delay
+                .overflowing_shr(low_byte.as_bit_length() as u32)
+                .0,
         }
     }
 

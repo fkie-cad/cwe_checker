@@ -151,7 +151,7 @@ impl State {
                     self.store_value(
                         &Data::from_target(
                             parent_id,
-                            Bitvector::from_u64(address + offset as u64)
+                            Bitvector::from_u64(address.wrapping_add(offset as u64))
                                 .into_resize_signed(self.stack_id.bytesize())
                                 .into(),
                         ),
