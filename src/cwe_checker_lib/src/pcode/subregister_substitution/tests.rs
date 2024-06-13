@@ -257,7 +257,7 @@ fn piecing_or_zero_extending() {
         tid: Tid::new("zext_ah_to_eax"),
         term: Def::Assign {
             var: variable!("EAX:4"),
-            value: Expression::cast(expr!("AH:1"), CastOpType::IntZExt),
+            value: Expression::cast_to_size(expr!("AH:1"), CastOpType::IntZExt, ByteSize::new(4)),
         },
     };
     let zext_ah_to_rax = Term {
