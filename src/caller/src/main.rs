@@ -100,6 +100,11 @@ struct CmdlineArgs {
     /// The current behavior of this flag is unstable and subject to change.
     #[arg(long, hide(true))]
     debug: Option<CliDebugMode>,
+
+    /// Read the saved output of the Pcode Extractor plugin from a file instead
+    /// of invoking Ghidra.
+    #[arg(long, hide(true))]
+    pcode_raw: Option<String>,
 }
 
 impl From<&CmdlineArgs> for debug::Settings {
@@ -108,7 +113,7 @@ impl From<&CmdlineArgs> for debug::Settings {
             None => debug::Stage::default(),
             Some(mode) => mode.into(),
         };
-        let verbose = if args.verbose {
+        let verbosity = if args.verbose {
             debug::Verbosity::Verbose
         } else if args.quiet {
             debug::Verbosity::Quiet
@@ -116,7 +121,16 @@ impl From<&CmdlineArgs> for debug::Settings {
             debug::Verbosity::default()
         };
 
-        debug::Settings::new(stage, verbose)
+        let mut builder = debug::SettingsBuilder::default()
+            .set_stage(stage)
+            .set_verbosity(verbosity)
+            .set_termination_policy(debug::TerminationPolicy::EarlyExit);
+
+        if let Some(pcode_raw) = &args.pcode_raw {
+            builder = builder.set_saved_pcode_raw(PathBuf::from(pcode_raw.clone()));
+        }
+
+        builder.build()
     }
 }
 

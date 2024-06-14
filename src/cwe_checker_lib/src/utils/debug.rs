@@ -4,6 +4,8 @@
 #![allow(dead_code)]
 #![allow(missing_docs)]
 
+use std::path::PathBuf;
+
 #[derive(PartialEq, Eq, Copy, Clone, Debug, Default)]
 /// Stages of the analysis that can be debugged separately.
 #[non_exhaustive]
@@ -48,29 +50,60 @@ pub enum Verbosity {
 /// Selects whether the analysis is aborted after reaching the point of
 /// interest.
 #[non_exhaustive]
-enum TerminationPolicy {
+pub enum TerminationPolicy {
     KeepRunning,
     #[default]
     EarlyExit,
     Panic,
 }
 
-#[derive(PartialEq, Eq, Copy, Clone, Default, Debug)]
+#[derive(PartialEq, Eq, Clone, Default, Debug)]
 /// Configuration of the debugging behavior.
 pub struct Settings {
     stage: Stage,
     verbose: Verbosity,
     terminate: TerminationPolicy,
+    saved_pcode_raw: Option<PathBuf>,
+}
+
+#[derive(PartialEq, Eq, Clone, Default, Debug)]
+pub struct SettingsBuilder {
+    inner: Settings,
+}
+
+impl SettingsBuilder {
+    pub fn build(self) -> Settings {
+        self.inner
+    }
+
+    pub fn set_stage(mut self, stage: Stage) -> Self {
+        self.inner.stage = stage;
+
+        self
+    }
+
+    pub fn set_verbosity(mut self, verbosity: Verbosity) -> Self {
+        self.inner.verbose = verbosity;
+
+        self
+    }
+
+    pub fn set_termination_policy(mut self, policy: TerminationPolicy) -> Self {
+        self.inner.terminate = policy;
+
+        self
+    }
+
+    pub fn set_saved_pcode_raw(mut self, saved_pcode_raw: PathBuf) -> Self {
+        self.inner.saved_pcode_raw = Some(saved_pcode_raw);
+
+        self
+    }
 }
 
 impl Settings {
-    /// Returns a new settings object.
-    pub fn new(stage: Stage, verbose: Verbosity) -> Self {
-        Self {
-            stage,
-            verbose,
-            terminate: TerminationPolicy::default(),
-        }
+    pub fn get_saved_pcode_raw(&self) -> Option<PathBuf> {
+        self.saved_pcode_raw.clone()
     }
 
     /// Returns true iff the `stage` is being debugged.

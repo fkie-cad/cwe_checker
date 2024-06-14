@@ -26,26 +26,32 @@ pub fn get_project_from_ghidra(
     bare_metal_config_opt: Option<BareMetalConfig>,
     debug_settings: &debug::Settings,
 ) -> Result<(Project, Vec<LogMessage>), Error> {
-    let tmp_folder = get_tmp_folder()?;
-    // We add a timestamp suffix to file names
-    // so that if two instances of the cwe_checker are running in parallel on the same file
-    // they do not interfere with each other.
-    let timestamp_suffix = format!(
-        "{:?}",
-        std::time::SystemTime::now()
-            .duration_since(std::time::SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_millis()
-    );
-    // Create a unique name for the pipe
-    let fifo_path = tmp_folder.join(format!("pcode_{timestamp_suffix}.pipe"));
-    let ghidra_command = generate_ghidra_call_command(
-        file_path,
-        &fifo_path,
-        &timestamp_suffix,
-        &bare_metal_config_opt,
-    )?;
-    let pcode_project = execute_ghidra(ghidra_command, &fifo_path, debug_settings)?;
+    let pcode_project = if let Some(saved_pcode_raw) = debug_settings.get_saved_pcode_raw() {
+        let file = std::fs::File::open(saved_pcode_raw)
+            .expect("Failed to open saved output of Pcode Extractor plugin.");
+        serde_json::from_reader(std::io::BufReader::new(file))?
+    } else {
+        let tmp_folder = get_tmp_folder()?;
+        // We add a timestamp suffix to file names
+        // so that if two instances of the cwe_checker are running in parallel on the same file
+        // they do not interfere with each other.
+        let timestamp_suffix = format!(
+            "{:?}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_millis()
+        );
+        // Create a unique name for the pipe
+        let fifo_path = tmp_folder.join(format!("pcode_{timestamp_suffix}.pipe"));
+        let ghidra_command = generate_ghidra_call_command(
+            file_path,
+            &fifo_path,
+            &timestamp_suffix,
+            &bare_metal_config_opt,
+        )?;
+        execute_ghidra(ghidra_command, &fifo_path, debug_settings)?
+    };
 
     parse_pcode_project_to_ir_project(pcode_project, binary, &bare_metal_config_opt)
 }
