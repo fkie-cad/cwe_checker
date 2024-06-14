@@ -6,6 +6,7 @@ pub use results::AnalysisResults;
 
 use crate::intermediate_representation::{Project, RuntimeMemoryImage};
 use crate::prelude::*;
+use crate::utils::debug;
 use crate::utils::log::LogMessage;
 use crate::utils::{binary::BareMetalConfig, ghidra::get_project_from_ghidra};
 use std::path::Path;
@@ -17,7 +18,7 @@ use std::path::Path;
 pub fn disassemble_binary(
     binary_file_path: &Path,
     bare_metal_config_opt: Option<BareMetalConfig>,
-    verbose_flag: bool,
+    debug_settings: &debug::Settings,
 ) -> Result<(Vec<u8>, Project, Vec<LogMessage>), Error> {
     let binary: Vec<u8> =
         std::fs::read(binary_file_path).context("Could not read from binary file path {}")?;
@@ -25,10 +26,21 @@ pub fn disassemble_binary(
         binary_file_path,
         &binary[..],
         bare_metal_config_opt.clone(),
-        verbose_flag,
+        debug_settings,
     )?;
+
     // Normalize the project and gather log messages generated from it.
-    all_logs.append(&mut project.normalize());
+    debug_settings.print(&project.program.term, debug::Stage::Ir(debug::IrForm::Raw));
+    all_logs.append(&mut project.normalize_basic());
+    debug_settings.print(
+        &project.program.term,
+        debug::Stage::Ir(debug::IrForm::Normalized),
+    );
+    all_logs.append(&mut project.normalize_optimize());
+    debug_settings.print(
+        &project.program.term,
+        debug::Stage::Ir(debug::IrForm::Optimized),
+    );
 
     // Generate the representation of the runtime memory image of the binary
     let mut runtime_memory_image = if let Some(bare_metal_config) = bare_metal_config_opt.as_ref() {
