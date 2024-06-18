@@ -5,14 +5,46 @@ extern crate cwe_checker_lib; // Needed for the docstring-link to work
 
 use anyhow::Context;
 use anyhow::Error;
-use clap::Parser;
+use clap::{Parser, ValueEnum};
+
 use cwe_checker_lib::analysis::graph;
 use cwe_checker_lib::pipeline::{disassemble_binary, AnalysisResults};
 use cwe_checker_lib::utils::binary::BareMetalConfig;
+use cwe_checker_lib::utils::debug;
 use cwe_checker_lib::utils::log::{print_all_messages, LogLevel};
 use cwe_checker_lib::utils::read_config_file;
+
 use std::collections::{BTreeSet, HashSet};
+use std::convert::From;
 use std::path::PathBuf;
+
+#[derive(ValueEnum, Clone, Debug, Copy)]
+/// Selects which kind of debug output is displayed.
+pub enum CliDebugMode {
+    /// Result of the Pointer Inference computation.
+    Pi,
+    /// Unnormalized IR form of the program.
+    IrRaw,
+    /// Normalized IR form of the program.
+    IrNorm,
+    /// Optimized IR form of the program.
+    IrOpt,
+    /// Output of the Ghidra plugin.
+    PcodeRaw,
+}
+
+impl From<&CliDebugMode> for debug::Stage {
+    fn from(mode: &CliDebugMode) -> Self {
+        use CliDebugMode::*;
+        match mode {
+            Pi => debug::Stage::Pi,
+            IrRaw => debug::Stage::Ir(debug::IrForm::Raw),
+            IrNorm => debug::Stage::Ir(debug::IrForm::Normalized),
+            IrOpt => debug::Stage::Ir(debug::IrForm::Optimized),
+            PcodeRaw => debug::Stage::Pcode(debug::PcodeForm::Raw),
+        }
+    }
+}
 
 #[derive(Debug, Parser)]
 #[command(version, about)]
@@ -67,7 +99,39 @@ struct CmdlineArgs {
     /// Output for debugging purposes.
     /// The current behavior of this flag is unstable and subject to change.
     #[arg(long, hide(true))]
-    debug: bool,
+    debug: Option<CliDebugMode>,
+
+    /// Read the saved output of the Pcode Extractor plugin from a file instead
+    /// of invoking Ghidra.
+    #[arg(long, hide(true))]
+    pcode_raw: Option<String>,
+}
+
+impl From<&CmdlineArgs> for debug::Settings {
+    fn from(args: &CmdlineArgs) -> Self {
+        let stage = match &args.debug {
+            None => debug::Stage::default(),
+            Some(mode) => mode.into(),
+        };
+        let verbosity = if args.verbose {
+            debug::Verbosity::Verbose
+        } else if args.quiet {
+            debug::Verbosity::Quiet
+        } else {
+            debug::Verbosity::default()
+        };
+
+        let mut builder = debug::SettingsBuilder::default()
+            .set_stage(stage)
+            .set_verbosity(verbosity)
+            .set_termination_policy(debug::TerminationPolicy::EarlyExit);
+
+        if let Some(pcode_raw) = &args.pcode_raw {
+            builder = builder.set_saved_pcode_raw(PathBuf::from(pcode_raw.clone()));
+        }
+
+        builder.build()
+    }
 }
 
 fn main() -> Result<(), Error> {
@@ -90,6 +154,7 @@ fn check_file_existence(file_path: &str) -> Result<String, String> {
 
 /// Run the cwe_checker with Ghidra as its backend.
 fn run_with_ghidra(args: &CmdlineArgs) -> Result<(), Error> {
+    let debug_settings = args.into();
     let mut modules = cwe_checker_lib::get_modules();
     if args.module_versions {
         // Only print the module versions and then quit.
@@ -111,7 +176,7 @@ fn run_with_ghidra(args: &CmdlineArgs) -> Result<(), Error> {
     let binary_file_path = PathBuf::from(args.binary.clone().unwrap());
 
     let (binary, project, mut all_logs) =
-        disassemble_binary(&binary_file_path, bare_metal_config_opt, args.verbose)?;
+        disassemble_binary(&binary_file_path, bare_metal_config_opt, &debug_settings)?;
 
     // Filter the modules to be executed.
     if let Some(ref partial_module_list) = args.partial {
@@ -186,7 +251,7 @@ fn run_with_ghidra(args: &CmdlineArgs) -> Result<(), Error> {
     // Print debug and then return.
     // Right now there is only one debug printing function.
     // When more debug printing modes exist, this behaviour will change!
-    if args.debug {
+    if debug_settings.should_debug(debug::Stage::Pi) {
         cwe_checker_lib::analysis::pointer_inference::run(
             &analysis_results,
             serde_json::from_value(config["Memory"].clone()).unwrap(),

@@ -435,7 +435,7 @@ fn mark_values_in_caller_global_mem_as_potentially_overwritten(
             } else {
                 caller_global_mem_region.mark_interval_values_as_top(
                     *index as i64,
-                    std::i64::MAX - 1,
+                    i64::MAX - 1,
                     ByteSize::new(1),
                 );
             }

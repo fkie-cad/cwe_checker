@@ -13,14 +13,20 @@ use crate::{expr, intermediate_representation::*, variable};
 
 #[cfg(test)]
 impl Expression {
-    /// Shortcut for creating a cast expression
+    /// Shortcut for creating a cast expression.
     #[cfg(test)]
-    pub fn cast(self, op: CastOpType) -> Expression {
+    pub fn cast_to_size(self, op: CastOpType, result_size: ByteSize) -> Expression {
         Expression::Cast {
             op,
-            size: ByteSize::new(8),
+            size: result_size,
             arg: Box::new(self),
         }
+    }
+
+    /// Shortcut for creating a cast expression with target size 8.
+    #[cfg(test)]
+    pub fn cast(self, op: CastOpType) -> Expression {
+        self.cast_to_size(op, ByteSize::new(8))
     }
 
     /// Shortcut for creating a subpiece expression

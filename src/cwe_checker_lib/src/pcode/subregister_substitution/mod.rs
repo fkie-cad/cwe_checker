@@ -111,8 +111,23 @@ impl<'a> SubregisterSubstitutionBuilder<'a> {
     fn replace_output_subregister(&mut self, def: Term<Def>) {
         match &def.term {
             Def::Assign { var, value } => {
+                // At this point, the code should be in a form where variables
+                // being assigned and values that are assigned are of the same
+                // size.
+                debug_assert_eq!(
+                    var.size,
+                    value.bytesize(),
+                    "Encountered invalid assignment: variable {} has size {} vs. value {} has size {}.",
+                    var,
+                    var.size,
+                    value,
+                    value.bytesize()
+                );
                 if let Some(register) = self.register_map.get(&var.name) {
-                    if var.name != register.base_register || var.size < register.size {
+                    let base_register: &RegisterProperties =
+                        self.register_map.get(&register.base_register).unwrap();
+                    // Check if the variable being assigned is a subregister.
+                    if is_subregister_assignment(var, base_register) {
                         // The register is not a base register and should be replaced.
                         if self.is_next_def_cast_to_base_register(var) {
                             let mut output = self.input_iter.next().unwrap().clone();
@@ -128,14 +143,13 @@ impl<'a> SubregisterSubstitutionBuilder<'a> {
                             self.output_defs.push(output);
                             return;
                         } else {
-                            let base_register: &RegisterProperties =
-                                self.register_map.get(&register.base_register).unwrap();
                             let output_var: Variable = base_register.into();
+                            let register = into_subregister(register, var);
                             let output_expression =
                                 piece_base_register_assignment_expression_together(
                                     value,
                                     base_register,
-                                    register,
+                                    &register,
                                 );
                             self.output_defs.push(Term {
                                 tid: def.tid.clone(),
@@ -151,7 +165,9 @@ impl<'a> SubregisterSubstitutionBuilder<'a> {
             }
             Def::Load { var, address } => {
                 if let Some(register) = self.register_map.get(&var.name) {
-                    if var.name != register.base_register || var.size < register.size {
+                    let base_register: &RegisterProperties =
+                        self.register_map.get(&register.base_register).unwrap();
+                    if is_subregister_assignment(var, base_register) {
                         // The register is not a base register and should be replaced.
                         // We need two replacement defs: One is a load into a temporary register
                         // and the second is a cast to the base register.
@@ -176,8 +192,7 @@ impl<'a> SubregisterSubstitutionBuilder<'a> {
                             }
                             self.output_defs.push(cast_to_base_def);
                         } else {
-                            let base_register: &RegisterProperties =
-                                self.register_map.get(&register.base_register).unwrap();
+                            let register = into_subregister(register, var);
                             self.output_defs.push(Term {
                                 tid: def.tid.clone().with_id_suffix("_cast_to_base"),
                                 term: Def::Assign {
@@ -185,7 +200,7 @@ impl<'a> SubregisterSubstitutionBuilder<'a> {
                                     value: piece_base_register_assignment_expression_together(
                                         &Expression::Var(temp_reg),
                                         base_register,
-                                        register,
+                                        &register,
                                     ),
                                 },
                             });
@@ -357,6 +372,34 @@ fn piece_base_register_assignment_expression_together(
             rhs: Box::new(input_expression.clone()),
         }
     }
+}
+
+/// Helper to check wheter an assignment to `var` is a subregister assignment.
+///
+/// Assumes that `var` is held in a register and that `base_register` is the
+/// corresponding full-size register.
+fn is_subregister_assignment(var: &Variable, base_register: &RegisterProperties) -> bool {
+    var.name != base_register.register || var.size < base_register.size
+}
+
+/// Helper to create a subregister based on a variable.
+///
+/// Assumes that `var` is held in a register whose full-size version is equal
+/// to, or a superregister of, `register`.
+fn into_subregister(register: &RegisterProperties, var: &Variable) -> RegisterProperties {
+    // Background: If a subregister being assigned has the same
+    //   name as the full-size register (but a different size), `register`
+    //   will be the full register at this point. Thus, we correct the
+    //   size manually and create a register with the full-size name but a
+    //   smaller size. This should be a no-op if `register` is already the
+    //   correct subregister.
+    // FIXME: This is incomplete if the LSB of the subregister and the full
+    // register are different. Until now this has not been observed as in those
+    // cases the register names are different.
+    let mut register = register.clone();
+    register.size = var.size;
+
+    register
 }
 
 #[cfg(test)]

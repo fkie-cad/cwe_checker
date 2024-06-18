@@ -1,6 +1,7 @@
 0.9-dev
 ===
 
+-   Fixed an issue in the pcode to IR translation (PR #470)
 -   Added initial benchmarking infrastructure (PR #464)
 -   Improve Control Flow Propagation normalization pass (PR #462)
 -   Improve taint analysis abstraction to simplify interprocedural bottom-up

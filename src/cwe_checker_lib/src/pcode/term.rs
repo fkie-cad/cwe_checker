@@ -1,5 +1,4 @@
 use std::collections::{BTreeSet, HashMap};
-use std::usize;
 
 use super::subregister_substitution::replace_input_subregister;
 use super::{Expression, ExpressionType, RegisterProperties, Variable};

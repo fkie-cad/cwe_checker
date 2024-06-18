@@ -5,10 +5,14 @@ use crate::utils::binary::BareMetalConfig;
 use crate::utils::{get_ghidra_plugin_path, read_config_file};
 use crate::{
     intermediate_representation::{Project, RuntimeMemoryImage},
+    utils::debug,
     utils::log::LogMessage,
 };
+
 use directories::ProjectDirs;
 use nix::{sys::stat, unistd};
+
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::thread;
@@ -20,28 +24,34 @@ pub fn get_project_from_ghidra(
     file_path: &Path,
     binary: &[u8],
     bare_metal_config_opt: Option<BareMetalConfig>,
-    verbose_flag: bool,
+    debug_settings: &debug::Settings,
 ) -> Result<(Project, Vec<LogMessage>), Error> {
-    let tmp_folder = get_tmp_folder()?;
-    // We add a timestamp suffix to file names
-    // so that if two instances of the cwe_checker are running in parallel on the same file
-    // they do not interfere with each other.
-    let timestamp_suffix = format!(
-        "{:?}",
-        std::time::SystemTime::now()
-            .duration_since(std::time::SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_millis()
-    );
-    // Create a unique name for the pipe
-    let fifo_path = tmp_folder.join(format!("pcode_{timestamp_suffix}.pipe"));
-    let ghidra_command = generate_ghidra_call_command(
-        file_path,
-        &fifo_path,
-        &timestamp_suffix,
-        &bare_metal_config_opt,
-    )?;
-    let pcode_project = execute_ghidra(ghidra_command, &fifo_path, verbose_flag)?;
+    let pcode_project = if let Some(saved_pcode_raw) = debug_settings.get_saved_pcode_raw() {
+        let file = std::fs::File::open(saved_pcode_raw)
+            .expect("Failed to open saved output of Pcode Extractor plugin.");
+        serde_json::from_reader(std::io::BufReader::new(file))?
+    } else {
+        let tmp_folder = get_tmp_folder()?;
+        // We add a timestamp suffix to file names
+        // so that if two instances of the cwe_checker are running in parallel on the same file
+        // they do not interfere with each other.
+        let timestamp_suffix = format!(
+            "{:?}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_millis()
+        );
+        // Create a unique name for the pipe
+        let fifo_path = tmp_folder.join(format!("pcode_{timestamp_suffix}.pipe"));
+        let ghidra_command = generate_ghidra_call_command(
+            file_path,
+            &fifo_path,
+            &timestamp_suffix,
+            &bare_metal_config_opt,
+        )?;
+        execute_ghidra(ghidra_command, &fifo_path, debug_settings)?
+    };
 
     parse_pcode_project_to_ir_project(pcode_project, binary, &bare_metal_config_opt)
 }
@@ -84,8 +94,9 @@ pub fn parse_pcode_project_to_ir_project(
 fn execute_ghidra(
     mut ghidra_command: Command,
     fifo_path: &PathBuf,
-    verbose_flag: bool,
+    debug_settings: &debug::Settings,
 ) -> Result<crate::pcode::Project, Error> {
+    let should_print_ghidra_error = debug_settings.verbose();
     // Create a new fifo and give read and write rights to the owner
     unistd::mkfifo(fifo_path, stat::Mode::from_bits(0o600).unwrap())
         .context("Error creating FIFO pipe")?;
@@ -106,7 +117,7 @@ fn execute_ghidra(
                 return;
             }
         }
-        if verbose_flag {
+        if should_print_ghidra_error {
             eprintln!("{}", String::from_utf8(output.stdout).unwrap());
             eprintln!("{}", String::from_utf8(output.stderr).unwrap());
             if let Some(code) = output.status.code() {
@@ -120,9 +131,13 @@ fn execute_ghidra(
     });
 
     // Open the FIFO
-    let file = std::fs::File::open(fifo_path.clone()).expect("Could not open FIFO.");
+    let mut file = std::fs::File::open(fifo_path.clone()).expect("Could not open FIFO.");
+    let mut buf = String::new();
+    file.read_to_string(&mut buf)
+        .expect("Error while reading from FIFO.");
+    debug_settings.print(&buf, debug::Stage::Pcode(debug::PcodeForm::Raw));
+    let pcode_parsing_result = serde_json::from_str(&buf);
 
-    let pcode_parsing_result = serde_json::from_reader(std::io::BufReader::new(file));
     ghidra_subprocess
         .join()
         .expect("The Ghidra thread to be joined has panicked!");

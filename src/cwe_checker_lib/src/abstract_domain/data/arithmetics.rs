@@ -194,6 +194,12 @@ impl<T: RegisterDomain> RegisterDomain for DataDomain<T> {
 
     /// extract a sub-bitvector
     fn subpiece(&self, low_byte: ByteSize, size: ByteSize) -> Self {
+        // Extracting zero-sized subpieces is an semantically invalid operation.
+        debug_assert_ne!(
+            size,
+            ByteSize::new(0),
+            "Attempt to extract zero-sized subpiece."
+        );
         if low_byte == ByteSize::new(0) && size == self.bytesize() {
             // The operation is a no-op
             self.clone()
