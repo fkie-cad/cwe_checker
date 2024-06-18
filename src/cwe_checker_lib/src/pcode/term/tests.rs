@@ -805,7 +805,7 @@ fn from_project_to_ir_project() {
     );
     assert_eq!(
         format!("{}", ir_block.defs[3].term),
-        "RAX:8 = IntZExt((RDI:8)[0-3])".to_string()
+        "RAX:8 = IntZExt((RDI:8)[0-3]):8".to_string()
     );
     assert_eq!(
         format!("{}", ir_block.defs[4].term),

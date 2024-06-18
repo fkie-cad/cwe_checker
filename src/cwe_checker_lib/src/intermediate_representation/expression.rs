@@ -243,7 +243,7 @@ impl fmt::Display for Expression {
                 _ => write!(f, "({lhs} {op} {rhs})"),
             },
             Expression::UnOp { op, arg } => write!(f, "{op}({arg})"),
-            Expression::Cast { op, size: _, arg } => write!(f, "{op}({arg})"),
+            Expression::Cast { op, size, arg } => write!(f, "{op}({arg}):{size}"),
             Expression::Unknown {
                 description,
                 size: _,

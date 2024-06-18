@@ -287,7 +287,7 @@ fn piecing_or_zero_extending() {
     replace_subregister_in_block(&mut block, &register_map);
     assert!(check_defs_of_block(
         &block,
-        vec!["zext_eax_to_rax: RAX:8 = IntZExt(0x0:4)"]
+        vec!["zext_eax_to_rax: RAX:8 = IntZExt(0x0:4):8"]
     ));
 
     // Test whether zero extension to base register is still recognized
@@ -303,7 +303,7 @@ fn piecing_or_zero_extending() {
     replace_subregister_in_block(&mut block, &register_map);
     assert!(check_defs_of_block(
         &block,
-        vec!["zext_ah_to_rax: RAX:8 = IntZExt(0x0:1)"]
+        vec!["zext_ah_to_rax: RAX:8 = IntZExt(0x0:1):8"]
     ));
 
     // Test when the next register is a zero extension to a different register.
@@ -320,7 +320,7 @@ fn piecing_or_zero_extending() {
         &block,
         vec![
             "eax_assign: RAX:8 = ((RAX:8)[4-7] Piece 0x0:4)",
-            "zext_eax_to_rcx: RCX:8 = IntZExt((RAX:8)[0-3])"
+            "zext_eax_to_rcx: RCX:8 = IntZExt((RAX:8)[0-3]):8"
         ]
     ));
 
@@ -338,7 +338,7 @@ fn piecing_or_zero_extending() {
         &block,
         vec![
             "ah_assign: RAX:8 = (((RAX:8)[2-7] Piece 0x0:1) Piece (RAX:8)[0-0])",
-            "zext_ah_to_eax: RAX:8 = ((RAX:8)[4-7] Piece IntZExt((RAX:8)[1-1]))",
+            "zext_ah_to_eax: RAX:8 = ((RAX:8)[4-7] Piece IntZExt((RAX:8)[1-1]):4)",
         ]
     ));
 
@@ -356,7 +356,7 @@ fn piecing_or_zero_extending() {
         &block,
         vec![
             "load_to_eax: loaded_value:4(temp) := Load from 0x0:8",
-            "zext_eax_to_rax: RAX:8 = IntZExt(loaded_value:4(temp))",
+            "zext_eax_to_rax: RAX:8 = IntZExt(loaded_value:4(temp)):8",
         ]
     ));
 
@@ -375,7 +375,7 @@ fn piecing_or_zero_extending() {
         vec![
             "load_to_eax: loaded_value:4(temp) := Load from 0x0:8",
             "load_to_eax_cast_to_base: RAX:8 = ((RAX:8)[4-7] Piece loaded_value:4(temp))",
-            "zext_eax_to_rcx: RCX:8 = IntZExt((RAX:8)[0-3])"
+            "zext_eax_to_rcx: RCX:8 = IntZExt((RAX:8)[0-3]):8"
         ]
     ));
 }
