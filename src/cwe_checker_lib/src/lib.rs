@@ -68,6 +68,7 @@ by reading the check-specific module documentation in the [`checkers`] module.
 pub mod abstract_domain;
 pub mod analysis;
 pub mod checkers;
+pub mod ghidra_pcode;
 pub mod intermediate_representation;
 pub mod pcode;
 pub mod pipeline;
