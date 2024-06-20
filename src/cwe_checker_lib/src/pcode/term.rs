@@ -19,6 +19,8 @@ use crate::intermediate_representation::Variable as IrVariable;
 use crate::prelude::*;
 use crate::utils::log::LogMessage;
 
+use std::fmt::{self, Display};
+
 // TODO: Handle the case where an indirect tail call is represented by CALLIND plus RETURN
 
 // TODO: Since we do not support BAP anymore, this module should be refactored
@@ -64,6 +66,21 @@ pub enum JmpType {
     CALLIND,
     CALLOTHER,
     RETURN,
+}
+
+impl Display for JmpType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use JmpType::*;
+        match self {
+            BRANCH => write!(f, "BRANCH"),
+            CBRANCH => write!(f, "CBRANCH"),
+            BRANCHIND => write!(f, "BRANCHIND"),
+            CALL => write!(f, "CALL"),
+            CALLIND => write!(f, "CALLIND"),
+            CALLOTHER => write!(f, "CALLOTHER"),
+            RETURN => write!(f, "RETURN"),
+        }
+    }
 }
 
 impl From<Jmp> for IrJmp {
