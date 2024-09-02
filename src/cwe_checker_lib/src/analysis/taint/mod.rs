@@ -201,21 +201,55 @@ pub trait TaintAnalysis<'a>: HasCfg<'a> + HasVsaResult<PiData> + AsRef<Project> 
     ///   site!); thus, return the empty state if you want to keep the analysis
     ///   in the caller going.
     ///
-    /// [`update_return`]: TaintAnalysis::update_return
-    /// [`merged`]: State::merge
-    ///
     /// # Default
     ///
-    /// Returns an empty state, i.e., information is propagated through the call
-    /// but the analysis stays intraprocedural.
+    /// Reduces register taint to include only the return registers of the
+    /// used calling convention that are tainted.
+    ///
+    /// Memory taint is returned as-is since [`update_return`] will make sure that
+    /// objects that can not be reached from the caller context are removed.
+    ///
+    /// [`merged`]: State::merge
+    /// [`update_return`]: TaintAnalysis::update_return
     fn update_return_callee(
         &self,
-        _state: &State,
+        state: &State,
         _call_term: &Term<Jmp>,
         _return_term: &Term<Jmp>,
-        _calling_convention: &Option<String>,
+        calling_convention: &Option<String>,
     ) -> Option<State> {
-        Some(State::new_empty())
+        let (mut propagated_register_taint, memory_taint) = state.clone().into_mem_reg_taint();
+
+        if let Some(calling_convention) = <Self as AsRef<Project>>::as_ref(self)
+            .get_specific_calling_convention(calling_convention)
+        {
+            let return_registers = calling_convention.get_all_return_register();
+
+            // If there are tainted return registers we propagate the taint to
+            // the caller, which makes them responsible for handling it.
+            propagated_register_taint
+                .retain(|reg, taint| return_registers.contains(&reg) && taint.is_tainted());
+        } else {
+            // We might have tainted registers but we do not know the calling
+            // convention. Here we simply return the complete register taint
+            // of the callee to the caller. This heuristic should in practice
+            // hopefully be a good approximation to the real calling convention:
+            //
+            // - It is an over approximation so return registers will be
+            //   propagated correctly.
+            // - There is a chance that callee-saved registers have been
+            //   overwritten with their saved values by the function epilog and
+            //   are thus not tainted.
+            // - There is a chance that caller saved registers will be restored
+            //   by the caller such that the taint is immediatly eliminated and
+            //   we catch cases where the called function has ignored tainted
+            //   values.
+        };
+
+        Some(State::from_mem_reg_taint(
+            propagated_register_taint,
+            memory_taint,
+        ))
     }
 
     /// Corresponds to returns from calls to other functions within the program.

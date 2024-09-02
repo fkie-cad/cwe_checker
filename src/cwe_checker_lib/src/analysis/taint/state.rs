@@ -256,7 +256,7 @@ impl State {
     ///
     /// Returns true iff the value at any of the exact memory locations that the
     /// pointer may point to is tainted.
-    pub fn check_if_address_points_to_taint(&self, address: PiData) -> bool {
+    pub fn check_if_address_points_to_taint(&self, address: &PiData) -> bool {
         address
             .get_relative_values()
             .iter()
@@ -294,7 +294,7 @@ impl State {
                 POINTER_TAINT
                 && vsa_result
                 .eval_parameter_location_at_call(jmp_tid, &AbstractLocation::Register(register.clone()))
-                .is_some_and(|register_value| self.check_if_address_points_to_taint(register_value))
+                .is_some_and(|register_value| self.check_if_address_points_to_taint(&register_value))
             )
         })
     }
@@ -367,6 +367,36 @@ impl State {
         }
     }
 
+    /// Check if the given abstract location may contain a tainted value.
+    pub fn check_abstract_location_for_taint(
+        &self,
+        vsa_result: &impl VsaResult<ValueDomain = PiData>,
+        call_tid: &Tid,
+        abstract_location: &AbstractLocation,
+    ) -> bool {
+        use crate::abstract_domain::AbstractLocation::*;
+        match abstract_location {
+            GlobalAddress { .. } => false,
+            Register(reg) => self.get_register_taint(reg).is_tainted(),
+            _ => {
+                // TODO: Check if it is problematic that we hard code a pointer
+                // size of 8 bytes. Maybe there is a more elegant way.
+                let (parent_location, offset) = abstract_location
+                    .get_parent_location(ByteSize::new(8))
+                    .unwrap();
+
+                let Some(parent_value) =
+                    vsa_result.eval_parameter_location_at_call(call_tid, &parent_location)
+                else {
+                    return false;
+                };
+                let parent_value = parent_value.add_offset(&offset.into());
+
+                self.check_if_address_points_to_taint(&parent_value)
+            }
+        }
+    }
+
     /// Remove the taint from all registers not contained in the callee-saved
     /// register list of the given calling convention.
     pub fn remove_non_callee_saved_taint(&mut self, calling_conv: &CallingConvention) {
@@ -405,7 +435,7 @@ impl State {
                     ||
                     // Check if value in parameter register points to taint.
                     (POINTER_TAINT && vsa_result.eval_at_jmp(call_tid, expr).is_some_and(|register_value| {
-                        self.check_if_address_points_to_taint(register_value)
+                        self.check_if_address_points_to_taint(&register_value)
                     }))
                 }
                 Arg::Stack { address, size, .. } => {
@@ -417,7 +447,7 @@ impl State {
                     ||
                     // Check if stack-based argument points to taint.
                     (POINTER_TAINT && vsa_result.eval_parameter_arg_at_call(call_tid, parameter).is_some_and(|stack_value| {
-                        self.check_if_address_points_to_taint(stack_value)
+                        self.check_if_address_points_to_taint(&stack_value)
                     }))
                 },
             }
