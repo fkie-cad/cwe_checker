@@ -48,7 +48,7 @@ public class PcodeExtractor extends GhidraScript {
 		ghidra.program.model.listing.Program ghidraProgram = currentProgram;
 		FunctionManager funcMan = ghidraProgram.getFunctionManager();
 		VarnodeContext context = new VarnodeContext(ghidraProgram, ghidraProgram.getProgramContext(),
-		    ghidraProgram.getProgramContext());
+		    ghidraProgram.getProgramContext(), false);
 		SimpleBlockModel simpleBM = new SimpleBlockModel(ghidraProgram);
 		Listing listing = ghidraProgram.getListing();
 		Language language = ghidraProgram.getLanguage();
