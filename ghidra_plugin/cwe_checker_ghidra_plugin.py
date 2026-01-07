@@ -6,6 +6,8 @@
 #   "cwe_checker BINARY --json --out output.json"
 # - Open the binary in Ghidra and run this file as a script. Select the generated json file when prompted.
 
+# @runtime Jython
+
 import json
 
 
