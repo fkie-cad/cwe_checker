@@ -98,7 +98,16 @@ For more information take a look at the [online documentation](https://docs.cwe-
 
 ## Documentation and Tests ##
 
-The test binaries for our test suite can be built with `make compile_test_files` (needs Docker to be installed!). The test suite can then be run with `make test`.
+The test samples for our test suite are stored in [git-lfs](https://docs.github.com/en/repositories/working-with-files/managing-large-files/about-git-large-file-storage).
+If you want to run tests, you first need to install git-lfs, install the hooks in the repository and then download the samples:
+
+```sh
+sudo apt install git-lfs
+git lfs install
+git lfs pull
+```
+
+New test binaries can also be built with `make compile_test_files` (needs Docker to be installed!). The test suite can then be run with `make test`.
 
 Source code documentation can be built with `make documentation`. For the stable version, the documentation can be found [here](https://docs.cwe-checker.io/index.html).
 

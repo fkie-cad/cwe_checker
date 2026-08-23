@@ -206,9 +206,15 @@ pip-selfcheck.json
 
 # End of https://www.gitignore.io/api/c,ocaml,python
 
-# dont upload our real life zoo
 test/real_world_samples
 test/run_real_world_samples.sh
+
+# test binaries are stored in git-lfs
+!test/artificial_samples/build/
+!test/artificial_samples/build/*.out
+!test/lkm_samples/build/
+!test/lkm_samples/build/*.ko
+!test/bare_metal_samples/*.bin
 
 .project
 .pydevproject

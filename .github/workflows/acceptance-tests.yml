@@ -18,16 +18,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+        with:
+          lfs: true
       - name: Build the cwe_checker docker image
         run: docker build -t cwe_checker .
-      - name: Build and run docker image for cross compiling
-        run: |
-          pushd test/artificial_samples
-          docker build -t cross_compiling .
-          docker run --rm -v $(pwd)/build:/home/cwe/artificial_samples/build cross_compiling sudo python3 -m SCons
-          popd
-          pushd test/lkm_samples
-          ./build.sh
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -37,17 +31,6 @@ jobs:
         with:
           command: test
           args: --locked --no-fail-fast -p acceptance_tests_ghidra -F docker -- --show-output --ignored
-      - name: Generate zip with test binaries
-        run: |
-          zip artificial_samples.zip test/artificial_samples/build/*.out
-          zip lkm_samples.zip test/lkm_samples/build/*.ko
-      - name: Archive test binaries
-        uses: actions/upload-artifact@v4
-        with:
-          name: acceptance-test-binaries
-          path: |
-            artificial_samples.zip
-            lkm_samples.zip
 
 
   docker-build:
