@@ -45,7 +45,7 @@ pub struct TidAddress(Option<u64>);
 impl Display for TidAddress {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0 {
-            Some(a) => write!(f, "{}", a),
+            Some(a) => write!(f, "{:x}", a),
             None => write!(f, "{}", Tid::UNKNOWN_ADDRESS),
         }
     }
