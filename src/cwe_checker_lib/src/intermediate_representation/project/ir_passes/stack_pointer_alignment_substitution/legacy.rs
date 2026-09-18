@@ -145,11 +145,12 @@ pub fn substitute_and_on_stackpointer(
     cpu_architecture: &str,
 ) -> Vec<LogMessage> {
     // for sanity check
-    let sp_alignment = match cpu_architecture {
-        "x86_32" => 16,
-        "x86_64" => 16,
-        "arm32" => 4,
-        _ => 0,
+    let sp_alignment = if is_x86(cpu_architecture) {
+        16
+    } else if is_arm32(cpu_architecture) {
+        4
+    } else {
+        0
     };
 
     let mut logs: Vec<LogMessage> = vec![];

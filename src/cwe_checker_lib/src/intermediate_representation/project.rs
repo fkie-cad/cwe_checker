@@ -8,6 +8,34 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod ir_passes;
 use ir_passes::*;
 
+/// Returns the processor family named by a cpu architecture string.
+///
+/// The Ghidra p-code extractor writes a LanguageID such as `x86:LE:64:default`
+/// (`PcodeExtractor.java:119` takes `language.getLanguageID().getIdAsString()`)
+/// and it reaches the IR unchanged, while short names like `x86_64` and `arm32`
+/// come from the older frontend. Both put the processor first, so the leading
+/// field identifies the family either way. The MIPS checks elsewhere rely on the
+/// same property with `contains("MIPS")`.
+pub fn cpu_architecture_family(cpu_architecture: &str) -> String {
+    cpu_architecture
+        .split(':')
+        .next()
+        .unwrap_or(cpu_architecture)
+        .to_lowercase()
+}
+
+/// Whether the cpu architecture string denotes an x86 variant, 32 or 64 bit.
+pub fn is_x86(cpu_architecture: &str) -> bool {
+    cpu_architecture_family(cpu_architecture).starts_with("x86")
+}
+
+/// Whether the cpu architecture string denotes 32 bit ARM.
+///
+/// AArch64 reports the family `aarch64`, so it is excluded by construction.
+pub fn is_arm32(cpu_architecture: &str) -> bool {
+    cpu_architecture_family(cpu_architecture).starts_with("arm")
+}
+
 /// The `Project` struct is the main data structure representing a binary.
 ///
 /// It contains information about the disassembled binary
@@ -172,3 +200,35 @@ mod tests {
     }
 }
 */
+
+#[cfg(test)]
+mod arch_tests {
+    use super::*;
+
+    #[test]
+    fn ghidra_language_ids_are_recognised() {
+        // What PcodeExtractor.java actually emits.
+        assert!(is_x86("x86:LE:32:default"));
+        assert!(is_x86("x86:LE:64:default"));
+        assert!(is_arm32("ARM:LE:32:v8"));
+
+        // The short names the older frontend produced.
+        assert!(is_x86("x86"));
+        assert!(is_x86("x86_32"));
+        assert!(is_x86("x86_64"));
+        assert!(is_arm32("arm32"));
+    }
+
+    #[test]
+    fn other_architectures_are_not_claimed() {
+        assert!(!is_x86("MIPS:BE:32:default"));
+        assert!(!is_x86("AARCH64:LE:64:v8A"));
+        assert!(!is_x86("PowerPC:BE:32:default"));
+        assert!(!is_x86(""));
+
+        // AArch64 reports its own family, so the 32 bit ARM alignment does not
+        // apply to it.
+        assert!(!is_arm32("AARCH64:LE:64:v8A"));
+        assert!(!is_arm32("MIPS:BE:32:default"));
+    }
+}

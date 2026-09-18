@@ -114,14 +114,15 @@ impl<'a> Context<'a> {
         &self,
         state_before_return: &State,
     ) -> Result<(), Error> {
-        let expected_stack_pointer_offset = match self.project.cpu_architecture.as_str() {
-            "x86" | "x86_32" | "x86_64" => {
-                Bitvector::from_u64(u64::from(self.project.get_pointer_bytesize()))
-                    .into_truncate(apint::BitWidth::from(self.project.get_pointer_bytesize()))
-                    .unwrap()
-            }
-            _ => Bitvector::zero(apint::BitWidth::from(self.project.get_pointer_bytesize())),
-        };
+        let expected_stack_pointer_offset =
+            match cpu_architecture_family(&self.project.cpu_architecture).as_str() {
+                family if family.starts_with("x86") => {
+                    Bitvector::from_u64(u64::from(self.project.get_pointer_bytesize()))
+                        .into_truncate(apint::BitWidth::from(self.project.get_pointer_bytesize()))
+                        .unwrap()
+                }
+                _ => Bitvector::zero(apint::BitWidth::from(self.project.get_pointer_bytesize())),
+            };
         match state_before_return
             .get_register(&self.project.stack_pointer_register)
             .get_if_unique_target()
@@ -195,8 +196,8 @@ impl<'a> Context<'a> {
     ) {
         let stack_register = &self.project.stack_pointer_register;
         let stack_pointer = state_before_call.get_register(stack_register);
-        match self.project.cpu_architecture.as_str() {
-            "x86" | "x86_32" | "x86_64" => {
+        match cpu_architecture_family(&self.project.cpu_architecture).as_str() {
+            family if family.starts_with("x86") => {
                 let offset = Bitvector::from_u64(stack_register.size.into())
                     .into_truncate(apint::BitWidth::from(stack_register.size))
                     .unwrap();

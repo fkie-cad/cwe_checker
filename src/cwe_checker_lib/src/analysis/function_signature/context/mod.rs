@@ -319,8 +319,8 @@ impl<'a> Context<'a> {
     ) {
         let stack_register = &self.project.stack_pointer_register;
         let stack_pointer = state_before_call.get_register(stack_register);
-        match self.project.cpu_architecture.as_str() {
-            "x86" | "x86_32" | "x86_64" => {
+        match cpu_architecture_family(&self.project.cpu_architecture).as_str() {
+            family if family.starts_with("x86") => {
                 let offset = Bitvector::from_u64(stack_register.size.into())
                     .into_truncate(apint::BitWidth::from(stack_register.size))
                     .unwrap();

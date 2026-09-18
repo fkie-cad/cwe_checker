@@ -283,8 +283,8 @@ impl FunctionSignature {
     ///   as no proper sanitation pass is implemented for such cases yet.
     /// * Merge intersecting stack parameters
     fn sanitize(&mut self, project: &Project) -> Vec<String> {
-        match project.cpu_architecture.as_str() {
-            "x86" | "x86_32" | "x86_64" => {
+        match cpu_architecture_family(&project.cpu_architecture).as_str() {
+            family if family.starts_with("x86") => {
                 let return_addr_location = AbstractLocation::from_stack_position(
                     &project.stack_pointer_register,
                     0,
