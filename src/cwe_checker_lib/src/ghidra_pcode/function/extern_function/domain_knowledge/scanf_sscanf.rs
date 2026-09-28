@@ -1,6 +1,6 @@
 use super::prelude::*;
 
-use crate::intermediate_representation::Arg as IrArg;
+use crate::intermediate_representation::{Arg as IrArg, ByteSize, Expression as IrExpression};
 
 const APPLICABLE_SYMBOLS: [&str; 4] = ["scanf", "sscanf", "__isoc99_scanf", "__isoc99_sscanf"];
 const SSCANF_SYMBOLS: [&str; 2] = ["sscanf", "__isoc99_sscanf"];
@@ -25,26 +25,43 @@ fn apply_domain_knowledge_to(
             .calling_conventions
             .get(ir_extern_symbol.calling_convention.as_ref().unwrap())
             .unwrap();
-        let mut parameters: Vec<IrArg> = Vec::new();
+        let num_params = if SSCANF_SYMBOLS.contains(&ir_extern_symbol.name.as_str()) {
+            2
+        } else {
+            1
+        };
 
-        // TODO: Test that this is indeed on the stack for x86.
         // TODO: Insert domain knowledge about parameter type.
-        let param0 = cconv
-            .get_integer_parameter_register(0)
-            .unwrap()
-            .to_ir_arg(&ir_expr_sp);
-        parameters.push(param0);
-
-        if SSCANF_SYMBOLS.contains(&ir_extern_symbol.name.as_str()) {
-            let param1 = cconv
-                .get_integer_parameter_register(1)
-                .unwrap()
-                .to_ir_arg(&ir_expr_sp);
-            parameters.push(param1);
-        }
-
-        ir_extern_symbol.parameters = parameters;
+        ir_extern_symbol.parameters = (0..num_params)
+            .map(|idx| match cconv.get_integer_parameter_register(idx) {
+                Some(register) => register.to_ir_arg(&ir_expr_sp),
+                // Calling conventions without integer parameter registers,
+                // e.g., x86 cdecl, pass all parameters on the stack.
+                None => get_stack_param(idx, pcode_project, &ir_expr_sp),
+            })
+            .collect();
     }
 
     should_stop
+}
+
+/// Returns the `idx`th pointer-sized parameter passed on the stack.
+///
+/// On x86 the return address is pushed to the stack by the call instruction,
+/// i.e., the parameters start after it.
+fn get_stack_param(idx: usize, pcode_project: &PcodeProject, ir_expr_sp: &IrExpression) -> IrArg {
+    let pointer_size = pcode_project.stack_pointer_register.size();
+    let first_param_offset = if pcode_project.cpu_arch.starts_with("x86") {
+        pointer_size
+    } else {
+        0
+    };
+
+    IrArg::Stack {
+        address: ir_expr_sp
+            .clone()
+            .plus_const((first_param_offset + idx as u64 * pointer_size) as i64),
+        size: ByteSize::new(pointer_size),
+        data_type: None,
+    }
 }
