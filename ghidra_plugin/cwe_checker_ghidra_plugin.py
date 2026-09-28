@@ -56,7 +56,7 @@ def main():
             comment_cwe_pre(ghidra_address, cwe_text)
         else:
             address_string = warning['addresses'][0]
-            ghidra_address = currentProgram.getAddressFactory().getAddress(address_string)
+            ghidra_address = currentProgram.getAddressFactory().getAddress(hex(int(address_string)))
             bookmark_cwe(ghidra_address, warning['description'])
             comment_cwe_eol(ghidra_address, warning['description'])
 
