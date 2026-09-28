@@ -195,22 +195,47 @@ public class PcodeExtractor extends GhidraScript {
 		ArrayList<Varnode> integer_parameter_register = new ArrayList<Varnode>();
 		DatatypeProperties dataTypeProperties = new DatatypeProperties(ghidraProgram);
 
+		for (Register base_register : get_integer_parameter_base_register(prototypeModel, ghidraProgram)) {
+			integer_parameter_register.add(new Varnode(context.getRegisterVarnode(base_register), context, dataTypeProperties));
+		}
+		return integer_parameter_register;
+	}
+
+	/**
+	 * Returns the base registers of the integer parameter registers in order
+	 * defined by the calling convention.
+	 */
+	private ArrayList<Register> get_integer_parameter_base_register(PrototypeModel prototypeModel,
+	        ghidra.program.model.listing.Program ghidraProgram) {
+		ArrayList<Register> integer_parameter_register = new ArrayList<Register>();
+
 		// prepare a parameter list of integers only
 		DataTypeManager dataTypeManager = ghidraProgram.getDataTypeManager();
 		IntegerDataType[] integer_parameter_list = new IntegerDataType[10];
 		for (int i = 0; i < integer_parameter_list.length; i++) {
 			integer_parameter_list[i] = new IntegerDataType(dataTypeManager);
 		}
+		// get all used registers by the prepared integer parameter list
+		// (the first element always describes the return value storage and is skipped)
+		VariableStorage[] storage_locations = prototypeModel.getStorageLocations(ghidraProgram,
+		        integer_parameter_list, false);
+		List<VariableStorage> integer_parameter_storage = Arrays.asList(storage_locations).subList(1,
+		        storage_locations.length);
 		// get all possible parameter passing registers, including floating point
 		// registers
 		for (VariableStorage potential_register : prototypeModel.getPotentialInputRegisterStorage(ghidraProgram)) {
-			// get all used registers by the prepared integer parameter list
-			for (VariableStorage integer_register : prototypeModel.getStorageLocations(ghidraProgram,
-			        integer_parameter_list, false)) {
+			if (!potential_register.isRegisterStorage()) {
+				continue;
+			}
+			Register base_register = potential_register.getRegister().getBaseRegister();
+			for (VariableStorage integer_register : integer_parameter_storage) {
 				// take only registers that are in common
+				// (compare base registers, since e.g. ARM's r0 has no parent register
+				// and PowerPC's 32-bit parameter registers are subregisters of 64-bit registers)
 				if (integer_register.isRegisterStorage()
-				        && integer_register.getRegister().getParentRegister() == potential_register.getRegister()) {
-					integer_parameter_register.add(new Varnode(potential_register.getFirstVarnode(), context, dataTypeProperties));
+				        && integer_register.getRegister().getBaseRegister() == base_register
+				        && !integer_parameter_register.contains(base_register)) {
+					integer_parameter_register.add(base_register);
 				}
 			}
 		}
@@ -239,9 +264,8 @@ public class PcodeExtractor extends GhidraScript {
 		potential_register.removeIf(reg -> reg.getRegister() == null);
 
 		// remove all integer parameter register
-		for (Varnode integer_register : get_integer_parameter_register(prototypeModel, ghidraProgram, context)) {
-			potential_register.removeIf(reg -> reg.getRegister().getName() == integer_register.getRegisterName());
-		}
+		ArrayList<Register> integer_register = get_integer_parameter_base_register(prototypeModel, ghidraProgram);
+		potential_register.removeIf(reg -> integer_register.contains(reg.getRegister().getBaseRegister()));
 
 		for (VariableStorage float_register : potential_register) {
 			float_parameter_register.add(new Varnode(float_register.getFirstVarnode(), context, dataTypeProperties));

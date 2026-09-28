@@ -397,6 +397,35 @@ mod tests {
         run_tests!(tests, 1, "[CWE78]");
     }
 
+    /// Regression test: Calls to `scanf` and `sscanf` must not crash the
+    /// pcode-to-IR translation. The input passed through `sscanf` to `system`
+    /// should be detected as CWE-78.
+    #[test]
+    #[ignore]
+    fn scanf_sscanf() {
+        let tests = all_test_cases("scanf_sscanf", "CWE78");
+
+        // CWE-78 is not detected, but the analysis must not crash.
+        run_tests!(
+            tests,
+            1,
+            "[CWE78]",
+            ("mips64", "gcc", 0),
+            ("mips64", "clang", 0),
+            ("mips64el", "gcc", 0),
+            ("mips64el", "clang", 0),
+            ("ppc", "gcc", 0),
+            ("ppc64", "gcc", 0),
+            ("ppc64", "clang", 0),
+            ("ppc64le", "gcc", 0),
+            ("ppc64le", "clang", 0),
+            ("x86", "gcc", 0),
+            ("x86", "clang", 0),
+            ("x64", "mingw32-gcc", 0),
+            ("x86", "mingw32-gcc", 0),
+        );
+    }
+
     #[test]
     #[ignore]
     fn cwe_119() {
