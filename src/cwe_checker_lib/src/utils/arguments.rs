@@ -151,8 +151,10 @@ pub fn calculate_parameter_locations(
     let calling_convention = project.get_calling_convention(extern_symbol);
     let mut var_args: Vec<Arg> = Vec::new();
     let mut float_arg_register_count = calling_convention.float_parameter_register.len();
-    let mut stack_offset: i64 = match project.cpu_architecture.as_str() {
-        "x86" | "x86_32" | "x86_64" => u64::from(project.stack_pointer_register.size) as i64,
+    let mut stack_offset: i64 = match cpu_architecture_family(&project.cpu_architecture).as_str() {
+        family if family.starts_with("x86") => {
+            u64::from(project.stack_pointer_register.size) as i64
+        }
         _ => 0,
     };
     let mut integer_arg_register_count =
