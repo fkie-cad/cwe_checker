@@ -9,12 +9,15 @@ use crate::utils::log::{LogMessage, WithLogs};
 use crate::utils::{get_ghidra_plugin_path, read_config_file};
 
 use directories::ProjectDirs;
-use nix::{sys::stat, unistd};
+use tokio::{
+    io::AsyncReadExt,
+    net::windows::named_pipe::ServerOptions,
+    process::Command,
+};
 
+use std::env;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::thread;
 
 /// Execute the `p_code_extractor` plugin in Ghidra and parse its output into the `Project` data structure.
 ///
@@ -34,7 +37,6 @@ pub fn get_project_from_ghidra(
         debug_settings.print(&saved_pcode_raw, debug::Stage::Pcode(debug::PcodeForm::Raw));
         serde_json::from_str(&saved_pcode_raw)?
     } else {
-        let tmp_folder = get_tmp_folder()?;
         // We add a timestamp suffix to file names
         // so that if two instances of the cwe_checker are running in parallel on the same file
         // they do not interfere with each other.
@@ -46,7 +48,13 @@ pub fn get_project_from_ghidra(
                 .as_millis()
         );
         // Create a unique name for the pipe
-        let fifo_path = tmp_folder.join(format!("pcode_{timestamp_suffix}.pipe"));
+        #[cfg(target_os = "linux")]
+        let fifo_path ={
+            let tmp_folder = get_tmp_folder()?;
+            tmp_folder.join(format!("pcode_{timestamp_suffix}.pipe"))
+        };
+        #[cfg(target_os = "windows")]
+        let fifo_path = PathBuf::from(format!(r"\\.\pipe\pcode_{timestamp_suffix}"));
         let ghidra_command = generate_ghidra_call_command(
             file_path,
             &fifo_path,
@@ -117,53 +125,72 @@ fn execute_ghidra(
     debug_settings: &debug::Settings,
 ) -> Result<PcodeProject, Error> {
     let should_print_ghidra_error = debug_settings.verbose();
-    // Create a new fifo and give read and write rights to the owner
-    unistd::mkfifo(fifo_path, stat::Mode::from_bits(0o600).unwrap())
-        .context("Error creating FIFO pipe")?;
-    // Execute Ghidra in a new thread and return a Join Handle, so that the thread is only joined
-    // after the output has been read into the cwe_checker
-    let ghidra_subprocess = thread::spawn(move || {
-        // Execute the command and catch its output.
-        let output = match ghidra_command.output() {
-            Ok(output) => output,
-            Err(err) => {
-                eprintln!("Ghidra could not be executed: {err}");
-                std::process::exit(101);
-            }
-        };
 
-        if let Ok(stdout) = String::from_utf8(output.stdout.clone()) {
-            if stdout.contains("Pcode was successfully extracted!") && output.status.success() {
-                return;
+    // The function stays sync, so it drives its own runtime.
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .context("Failed to build tokio runtime")?;
+
+    runtime.block_on(async {
+        // Must be created inside the runtime context so the pipe gets registered with the reactor.
+        let mut server = ServerOptions::new()
+            .first_pipe_instance(true)
+            .create(fifo_path)
+            .context("Failed to create named pipe server")?;
+
+        // If we bail out early, don't leave Ghidra running.
+        ghidra_command.kill_on_drop(true);
+
+        // Spawned as a task so it keeps draining stdout/stderr while we read the pipe.
+        let mut ghidra_subprocess = tokio::spawn(async move {
+            let output = ghidra_command
+                .output()
+                .await
+                .context("Ghidra could not be executed")?;
+            let stdout = String::from_utf8_lossy(&output.stdout);
+
+            if output.status.success() && stdout.contains("Pcode was successfully extracted!") {
+                return Ok(());
+            }
+            if should_print_ghidra_error {
+                eprintln!("{stdout}");
+                eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+                if let Some(code) = output.status.code() {
+                    eprintln!("Ghidra plugin failed with exit code {code}");
+                }
+            } else {
+                eprintln!("Execution of Ghidra plugin failed. Use the --verbose flag to print Ghidra output for troubleshooting.");
+            }
+            Err(anyhow!("Execution of Ghidra plugin failed."))
+        });
+
+        // Wait for the plugin to connect, but bail out if Ghidra exits first.
+        tokio::select! {
+            res = server.connect() => {
+                res.context("Failed to accept client connection")?;
+            }
+            res = &mut ghidra_subprocess => {
+                res.context("The Ghidra task panicked")??;
+                return Err(anyhow!("Ghidra exited without connecting to the named pipe"));
             }
         }
-        if should_print_ghidra_error {
-            eprintln!("{}", String::from_utf8(output.stdout).unwrap());
-            eprintln!("{}", String::from_utf8(output.stderr).unwrap());
-            if let Some(code) = output.status.code() {
-                eprintln!("Ghidra plugin failed with exit code {code}");
-            }
-            eprintln!("Execution of Ghidra plugin failed.");
-        } else {
-            eprintln!("Execution of Ghidra plugin failed. Use the --verbose flag to print Ghidra output for troubleshooting.");
-        }
-        std::process::exit(101)
-    });
 
-    // Open the FIFO
-    let mut file = std::fs::File::open(fifo_path.clone()).expect("Could not open FIFO.");
-    let mut buf = String::new();
-    file.read_to_string(&mut buf)
-        .expect("Error while reading from FIFO.");
-    debug_settings.print(&buf, debug::Stage::Pcode(debug::PcodeForm::Raw));
-    let pcode_parsing_result = serde_json::from_str(&buf).expect("Failed to parse plugin output.");
+        let mut buf = String::new();
+        server
+            .read_to_string(&mut buf)
+            .await
+            .context("Error while reading from named pipe")?;
+        drop(server);
 
-    ghidra_subprocess
-        .join()
-        .expect("The Ghidra thread to be joined has panicked!");
-    // Clean up the FIFO pipe and propagate errors from the JSON parsing.
-    std::fs::remove_file(fifo_path).context("Could not clean up FIFO pipe")?;
-    Ok(pcode_parsing_result)
+        debug_settings.print(&buf, debug::Stage::Pcode(debug::PcodeForm::Raw));
+
+        ghidra_subprocess
+            .await
+            .context("The Ghidra task panicked")??;
+
+        serde_json::from_str(&buf).context("Failed to parse plugin output.")
+    })
 }
 
 /// Generate the command that is used to call Ghidra and execute the P-Code-Extractor plugin in it.
@@ -176,7 +203,10 @@ fn generate_ghidra_call_command(
     let ghidra_path: std::path::PathBuf =
         serde_json::from_value(read_config_file("ghidra.json")?["ghidra_path"].clone())
             .context("Path to Ghidra not configured.")?;
+    #[cfg(target_os = "linux")]
     let headless_path = ghidra_path.join("support/analyzeHeadless");
+    #[cfg(target_os = "windows")]
+    let headless_path = ghidra_path.join("support/analyzeHeadless.bat");
     let tmp_folder = get_tmp_folder()?;
     let filename = file_path
         .file_name()
@@ -221,12 +251,12 @@ fn get_tmp_folder() -> Result<PathBuf, Error> {
     let project_dirs = ProjectDirs::from("", "", "cwe_checker")
         .context("Could not determine path for temporary files")?;
     let tmp_folder = if let Some(folder) = project_dirs.runtime_dir() {
-        folder
+        folder.to_path_buf()
     } else {
-        Path::new("/tmp/cwe_checker")
+        env::temp_dir().join("cwe_checker")
     };
     if !tmp_folder.exists() {
-        std::fs::create_dir(tmp_folder).context("Unable to create temporary folder")?;
+        std::fs::create_dir(&tmp_folder).context("Unable to create temporary folder")?;
     }
-    Ok(tmp_folder.to_path_buf())
+    Ok(tmp_folder)
 }
